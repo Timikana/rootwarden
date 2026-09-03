@@ -42,7 +42,66 @@ class TestRegeneratePlatformKey:
         assert resp.status_code == 401
 
     def test_regenerate_success(self, client, superadmin_headers, mock_db):
+        """CE TEST MESURAIT L'ENVIRONNEMENT, PAS LE CODE.
+
+        Il attendait 200 — c'est-a-dire le CONTOURNEMENT du role 3 sur la porte a
+        quatre yeux. E-201 a leve ce contournement pour les deux gestes de
+        flotte, et le test est passe au rouge : il figeait le comportement d'avant
+        une decision.
+
+        Mais il portait un second defaut, plus discret, et c'est lui qui compte :
+        **il ne declarait pas `APPROVAL_ENABLED`**. Or ce drapeau vaut `false`
+        dans `srv-docker.env.example` et dans la CI, et `true` dans le conteneur
+        de ce banc. Le meme commit rendait donc 200 en CI et 202 ici — un test
+        dont le verdict depend d'une variable d'environnement que rien ne nomme.
+
+        Il est desormais explicite, et les DEUX etats sont mesures :
+        `TestApprobationSelonLeDrapeau` ci-dessous. Le detail de la porte
+        elle-meme vit dans `test_approbation_quatre_yeux.py`.
+        """
+        pytest.skip('remplace par TestApprobationSelonLeDrapeau, qui declare le drapeau')
+
+
+class TestApprobationSelonLeDrapeau:
+    """La rotation de la paire de cles selon que l'approbation est active ou non.
+
+    Chaque test POSE le drapeau qu'il mesure et le REND ensuite : sans cela le
+    verdict suit l'environnement, et deux machines rendent deux resultats pour le
+    meme code.
+    """
+
+    @pytest.fixture
+    def drapeau(self):
+        from config import Config
+
+        ancien = Config.APPROVAL_ENABLED
+
+        def pose(valeur):
+            Config.APPROVAL_ENABLED = valeur
+
+        yield pose
+        Config.APPROVAL_ENABLED = ancien
+
+    def test_approbation_ACTIVE_la_rotation_attend_un_second_administrateur(
+            self, client, superadmin_headers, mock_db, drapeau):
+        drapeau(True)
+
         resp = client.post('/regenerate_platform_key', headers=superadmin_headers)
+
+        assert resp.status_code == 202, (
+            'un role 3 ne contourne plus la porte sur un geste de FLOTTE (E-201)')
+        data = resp.get_json()
+        assert data['success'] is False
+        assert data['pending_approval'] is True
+        assert 'public_key' not in data, "rien ne doit avoir ete regenere"
+
+    def test_approbation_INACTIVE_la_rotation_a_lieu(
+            self, client, superadmin_headers, mock_db, drapeau):
+        # L'etat par defaut d'un deploiement neuf, et celui de la CI.
+        drapeau(False)
+
+        resp = client.post('/regenerate_platform_key', headers=superadmin_headers)
+
         assert resp.status_code == 200
         data = resp.get_json()
         assert data['success'] is True

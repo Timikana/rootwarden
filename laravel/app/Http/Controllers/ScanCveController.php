@@ -1,0 +1,290 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Services\ScansCve;
+use Illuminate\Http\Request;
+use Illuminate\View\View;
+
+/**
+ * Module `security/`, sous-lot S3 : la consultation des resultats CVE.
+ *
+ * Portage de la partie LECTURE SEULE de `legacy/security/index.php` (549 lignes)
+ * et de son JS (1026 lignes). Hors perimetre : la planification (S4), le suivi et
+ * le ticketing (S5), EPSS/KEV (S6), et le DECLENCHEMENT du scan (S7 — flux SSH,
+ * destructif, en dernier).
+ *
+ * PAS DE PASSERELLE. Le legacy peint cette page par des appels
+ * `GET /cve_results`, un par machine, a travers `api_proxy.php`. Trois mesures
+ * ont impose un autre chemin :
+ *   - sur les 19 routes CVE du backend, `require_permission` apparait **zero**
+ *     fois, et `can_scan_cve` n'existe dans tout le backend que dans une fixture
+ *     de test : la permission ne garde AUCUNE requete, seulement des pages ;
+ *   - `require_machine_access` resout l'identifiant de machine par le CORPS JSON
+ *     d'abord (`backend/routes/helpers.py:331-332`) alors que les routes GET
+ *     lisent EXCLUSIVEMENT `request.args` — le garde autoriserait une machine et
+ *     la route en servirait une autre. Ferme aujourd'hui par les passerelles, qui
+ *     ne relaient pas le corps d'un GET, mais ferme par accident ;
+ *   - le decorateur ne refuse pas non plus quand aucun identifiant n'est trouve.
+ * Ce controleur lit donc la base directement, comme S1 (`ExportCveController`).
+ * Le backend Python n'est pas touche, et la garde de la route redevient la seule
+ * chose a lire pour savoir qui entre.
+ *
+ * LE CLOISONNEMENT EST FAIT PAR LA REQUETE, pas apres. `machinesVisibles()`
+ * joint `user_machine_access` pour un role 1 : une machine non attribuee n'entre
+ * jamais dans la page, donc aucun rendu ne peut la laisser fuir. Et le resume de
+ * parc est calcule SUR CETTE MEME LISTE — le legacy, lui, agrege toute la base
+ * (E-47).
+ *
+ * LA COMPARAISON EST PARESSEUSE, et c'est deliberé. La calculer pour chaque
+ * machine au chargement relirait DEUX jeux de findings entiers par machine pour
+ * un panneau que personne n'a encore ouvert. Elle vit donc dans
+ * `ComparaisonCveController`, appele au clic, sous la MEME garde.
+ *
+ * TOUT LE RESTE EST RENDU EN UNE REQUETE. Les findings de chaque machine scannee partent
+ * en donnees dans la page ; la pagination, la recherche et le filtre travaillent
+ * dessus sans rien redemander. Cela ferme le defaut d'affichage mesure sur le
+ * legacy — quatre generateurs de lignes dont trois oublient une colonne — parce
+ * qu'il n'y a plus qu'UN generateur, cote navigateur, et qu'il est partage par
+ * tous les gestes. S7 s'y branchera au lieu de le dupliquer.
+ */
+class ScanCveController extends Controller
+{
+    public function __construct(
+        private readonly ScansCve $scans,
+        private readonly \App\Services\PlanificationsCve $planifs,
+        private readonly \App\Services\SuiviCve $suivi,
+        private readonly \App\Services\Droits $droits,
+    ) {
+    }
+
+    public function __invoke(Request $requete): View
+    {
+        $role     = (int) $requete->session()->get('role_id', 0);
+        $idCompte = (int) $requete->session()->get('utilisateur_id', 0);
+
+        $machines = $this->scans->machinesVisibles($idCompte, $role);
+        $ids      = array_map(static fn ($m) => (int) $m->id, $machines);
+
+        $derniers = $this->scans->derniersScansParMachine($ids);
+
+        // Les findings, machine par machine, et SEULEMENT pour celles qui ont un
+        // scan : une machine jamais scannee doit rendre un etat vide explicite,
+        // pas un tableau de zero ligne qui ressemble a un chargement inacheve.
+        $findings = [];
+        foreach ($derniers as $machineId => $scan) {
+            $findings[$machineId] = $this->scans->findingsPourAffichage((int) $scan->id);
+        }
+
+        // LE SUIVI STOCKE, machine par machine — sous-lot S5. Le legacy ne lit
+        // JAMAIS cette table depuis la page : son selecteur montrait un tiret meme
+        // quand une remediation existait, et le choix qu'on venait de faire
+        // disparaissait au rechargement.
+        $suivi = [];
+        foreach (array_keys($derniers) as $machineId) {
+            $suivi[$machineId] = $this->suivi->parMachine((int) $machineId);
+        }
+
+        return view('scan-cve', [
+            // LE BLOC DE PLANIFICATION N'EST PAS RENDU EN DESSOUS DU ROLE 2, et le
+            // script ne s'initialise donc pas : le legacy, lui, branche
+            // `loadSchedules` pour TOUS les roles (`js/main.js:991`) alors que son
+            // bloc est sous `$role >= 2`. Un role 1 y emet un `GET /cve_schedules`
+            // a chaque chargement de page, refuse en 403 et avale en silence.
+            'peutPlanifier' => $role >= 2,
+            'tags'          => $role >= 2 ? $this->planifs->tagsDisponibles() : [],
+            'machines'   => $machines,
+            'derniers'   => $derniers,
+            'findings'   => $findings,
+            'facettes'   => array_map([$this, 'facettes'], $findings),
+            'suivi'       => $suivi,
+            // UNE REGLE APPLIQUEE PAR LE BACKEND SE REND VISIBLE. `POST /tickets`
+            // exige `can_admin_portal` ; sans elle, le bouton est DESACTIVE avec
+            // son explication plutot que cliquable pour rien. La regle n'est pas
+            // deplacee cote navigateur : c'est toujours le backend qui refuse.
+            'peutTicket'  => $role >= 3
+                || ($this->droits->permissions($idCompte)['can_admin_portal'] ?? false),
+            'resume'      => $this->scans->resumeParc($ids),
+            'seuilDefaut' => (int) (getenv('CVE_MIN_CVSS') ?: 0),
+            'libelles'    => $this->libelles(),
+            'libellesPlanif' => $role >= 2 ? $this->libellesPlanif() : [],
+            'libellesSuivi'  => $this->libellesSuivi(),
+        ]);
+    }
+
+    /**
+     * Les libelles consommes par le script, POSES EN DONNEES.
+     *
+     * Une chaine ecrite en dur dans du JS echappe a la parite FR/EN — le script
+     * du legacy en porte plus de trente. Ils sont assembles ICI et non dans le
+     * gabarit parce qu'un `@json` multiligne casse le PHP compile.
+     *
+     * @return array<string,string>
+     */
+    private function libelles(): array
+    {
+        return [
+            'affiche_sur' => __('cve.affiche_sur', ['montre' => '{montre}', 'total' => '{total}']),
+            'aucun_resultat' => __('cve.aucun_resultat'),
+            'erreur_chargement' => __('cve.erreur_chargement'),
+            'erreur_comparaison' => __('cve.erreur_comparaison'),
+            'comparaison_titre' => __('cve.comparaison_titre'),
+            'comparaison_insuffisante' => __('cve.comparaison_insuffisante'),
+            'comparaison_ajoutees' => __('cve.comparaison_ajoutees'),
+            'comparaison_corrigees' => __('cve.comparaison_corrigees'),
+            'comparaison_inchangees' => __('cve.comparaison_inchangees'),
+            // ── Enrichissement EPSS / KEV (sous-lot S6) ──────────────────────
+            'kev_aide' => __('cve.kev_aide'),
+            'kev_depuis' => __('cve.kev_depuis', ['date' => '{date}']),
+            'epss_aide' => __('cve.epss_aide'),
+            'priorite_aide' => __('cve.priorite_aide', ['libelle' => '{libelle}']),
+            'non_enrichi' => __('cve.non_enrichi'),
+            'reprio_encours' => __('cve.reprio_encours'),
+            'reprio_ok' => __('cve.reprio_ok', ['kev' => '{kev}', 'epss' => '{epss}']),
+            'reprio_echec' => __('cve.reprio_echec'),
+            // LA RE-PRIORISATION PASSE PAR LA PASSERELLE, et pour la meme raison
+            // que le ticket de S5 : elle interroge deux services EXTERNES
+            // (FIRST.org pour l'EPSS, le catalogue CISA pour le KEV). La
+            // reimplementer ici dupliquerait cette integration, et le portage n'a
+            // aucune raison de porter un client HTTP vers l'exterieur.
+            'url_reprio' => url('/api/gateway/cve_reprioritize'),
+            // ── Le scan (sous-lot S7a) ───────────────────────────────────────
+            'scan_en_cours' => __('cve.scan_en_cours'),
+            'scan_demarre' => __('cve.scan_demarre'),
+            'scan_paquet' => __('cve.scan_paquet', [
+                'paquet' => '{paquet}', 'courant' => '{courant}', 'total' => '{total}',
+            ]),
+            'scan_termine' => __('cve.scan_termine', ['paquets' => '{paquets}', 'cve' => '{cve}']),
+            'scan_erreur' => __('cve.scan_erreur', ['message' => '{message}']),
+            'scan_refuse' => __('cve.scan_refuse', ['statut' => '{statut}']),
+            'scan_interrompu' => __('cve.scan_interrompu'),
+            // LE SCAN EST UN FLUX SERVI PAR LE BACKEND : il passe par la
+            // passerelle, comme le ticket de S5 et la re-priorisation de S6. Il ne
+            // se reimplemente pas — c'est lui qui ouvre les sessions SSH.
+            'url_scan' => url('/api/gateway/cve_scan'),
+            'comparaison_identique' => __('cve.comparaison_identique'),
+            'fermer' => __('cve.fermer'),
+            'suivi_a_venir' => __('cve.suivi_a_venir'),
+            'voir_details' => __('cve.voir_details'),
+            'replier' => __('cve.replier'),
+            'url_comparaison' => route('scan-cve.comparaison'),
+            // La langue de la SESSION, jamais 'fr-FR' en dur : le legacy fige la
+            // locale de ses dates a trois endroits, donc un utilisateur anglais y
+            // lit des dates francaises.
+            'langue' => app()->getLocale(),
+        ];
+    }
+
+    /**
+     * Les libelles du suivi, POSES EN DONNEES.
+     *
+     * Le legacy en portait DEUX JEUX pour les memes statuts — `Open`/`Accepte`
+     * dans son selecteur, `Ouverte`/`Acceptee` dans son message de confirmation,
+     * dont un en anglais. Ici il n'y en a qu'un.
+     *
+     * @return array<string,mixed>
+     */
+    private function libellesSuivi(): array
+    {
+        $statuts = [];
+        foreach (\App\Services\SuiviCve::STATUTS as $st) {
+            $statuts[$st] = __('suivi.' . $st);
+        }
+
+        return [
+            'statuts' => $statuts,
+            'choisissables' => \App\Services\SuiviCve::STATUTS_CHOISISSABLES,
+            'aucun' => __('suivi.aucun'),
+            'resolved_aide' => __('suivi.resolved_aide'),
+            'ticket' => __('suivi.ticket'),
+            'ticket_court' => __('suivi.ticket_court'),
+            'ticket_aide' => __('suivi.ticket_aide'),
+            'ticket_refuse' => __('suivi.ticket_refuse'),
+            'ticket_cree' => __('suivi.ticket_cree'),
+            'ticket_existant' => __('suivi.ticket_existant'),
+            'ticket_echec' => __('suivi.ticket_echec'),
+            'enregistre' => __('suivi.enregistre'),
+            'err_reseau' => __('suivi.err_reseau'),
+            'url_suivi' => route('scan-cve.suivi'),
+            // LE TICKET PASSE PAR LA PASSERELLE, contrairement au reste du module :
+            // `POST /tickets` appelle un fournisseur ITSM externe quand il est
+            // configure, et le reimplementer dupliquerait une integration.
+            'url_ticket' => url('/api/gateway/tickets'),
+        ];
+    }
+
+    /**
+     * Les libelles du bloc de planification, POSES EN DONNEES.
+     *
+     * Le script du legacy en porte VINGT-SIX en dur, donc hors de toute parite
+     * FR/EN — dont ses deux pluriels fabriques par concatenation.
+     *
+     * @return array<string,string>
+     */
+    private function libellesPlanif(): array
+    {
+        $cles = ['aucune', 'actives', 'selection', 'apercu_titre', 'apercu_invalide',
+                 'apercu_trop_frequent', 'col_nom', 'col_recurrence', 'col_cible',
+                 'col_prochaine', 'col_derniere', 'col_auteur', 'col_etat', 'etat_active',
+                 'etat_suspendue', 'activer', 'suspendre', 'supprimer', 'confirmer_suppression',
+                 'confirmer_oui', 'confirmer_non', 'jamais', 'auteur_inconnu', 'creee',
+                 'supprimee', 'modifiee', 'err_reseau', 'cible_all', 'cible_tag',
+                 'cible_machines'];
+        $libelles = [];
+        foreach ($cles as $c) {
+            // Les compteurs gardent leur marqueur : le script le remplace, il ne
+            // fabrique pas de pluriel par concatenation.
+            $libelles[$c] = __('planif.' . $c, ['nombre' => '{nombre}']);
+        }
+        $libelles['url_planifs'] = route('scan-cve.planifs');
+        $libelles['url_apercu'] = route('scan-cve.apercu-cron');
+        $libelles['langue'] = app()->getLocale();
+
+        return $libelles;
+    }
+
+    /**
+     * Les severites et les annees REELLEMENT presentes dans un jeu de findings,
+     * avec leur compte.
+     *
+     * Calcule ici et rendu par le gabarit : les boutons de filtre sont alors du
+     * HTML traduit, et non des chaines fabriquees par du JS — cote legacy, le
+     * libelle « Tout (n) » et les noms de severite sont ecrits en dur dans le
+     * script, donc hors de toute parite FR/EN.
+     *
+     * @param  list<array<string,mixed>>  $findings
+     * @return array{severites:array<string,int>,annees:array<string,int>,total:int,kev:int}
+     */
+    private function facettes(array $findings): array
+    {
+        $ordre = ['CRITICAL' => 0, 'HIGH' => 1, 'MEDIUM' => 2, 'LOW' => 3, 'NONE' => 4];
+        $severites = [];
+        $annees = [];
+        $kev = 0;
+
+        foreach ($findings as $f) {
+            if (! empty($f['k'])) {
+                $kev++;
+            }
+            $sev = (string) ($f['s'] ?: 'NONE');
+            $severites[$sev] = ($severites[$sev] ?? 0) + 1;
+            // L'annee vient de l'identifiant CVE, jamais d'une date de scan :
+            // « CVE-2019-... » reste de 2019 quel que soit le jour du scan.
+            $an = preg_match('/^CVE-(\d{4})-/', (string) $f['c'], $m) ? $m[1] : '?';
+            $annees[$an] = ($annees[$an] ?? 0) + 1;
+        }
+
+        uksort($severites, fn ($a, $b) => ($ordre[$a] ?? 9) <=> ($ordre[$b] ?? 9));
+        krsort($annees);
+
+        return [
+            'severites' => $severites,
+            'annees' => $annees,
+            'total' => count($findings),
+            // Le compte des vulnerabilites REELLEMENT exploitees. Comme sur le
+            // legacy, le bouton de filtre n'existe que s'il y en a : un filtre
+            // « KEV (0) » invite a un clic qui ne peut rien montrer.
+            'kev' => $kev,
+        ];
+    }
+}

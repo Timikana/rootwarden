@@ -1,0 +1,45 @@
+--- a/backend/scheduler.py
++++ b/backend/scheduler.py
+@@ -206,9 +206,40 @@
+                     f"SELECT {base_cols} FROM machines WHERE id IN ({fmt})", ids
+                 )
+             else:
+-                cur.execute(f"SELECT {base_cols} FROM machines")
+-        else:
++                # ══ E-281 : ECHOUER FERME, COMME LA TACHE SOEUR ═════════════
++                #
++                # Cette branche faisait `SELECT … FROM machines` — TOUT LE PARC —
++                # quand la liste d'identifiants etait vide ou illisible. Sa
++                # jumelle `_run_scheduled_ssh_audit`, dans ce meme fichier, fait
++                # `WHERE 1=0` au meme endroit.
++                #
++                # **La bonne forme etait donc connue de l'auteur.** Une regle
++                # appliquee d'un cote et pas de l'autre est une DIVERGENCE a
++                # remonter, pas un oubli de conception — et c'est la tache qui
++                # echoue OUVERT qui aboutit a l'envoi d'un courriel reel.
++                cur.execute(f"SELECT {base_cols} FROM machines WHERE 1=0")
++        elif schedule['target_type'] == 'all':
++            # « tout le parc » est un CHOIX. Il etait dans le meme `else` que
++            # « je ne t'ai pas compris » : rien, ni a l'execution ni apres coup,
++            # ne disait laquelle des deux intentions avait produit le scan.
+             cur.execute(f"SELECT {base_cols} FROM machines")
++        else:
++            # ══ ECHEC FERME — ET IL COUVRE UN CAS QUE L'ENUM N'ARRETE PAS ═══
++            #
++            # `cve_scan_schedules.target_type` est un `enum('all','tag',
++            # 'machines')` mais il est NULLABLE, contrairement a celui de
++            # `ssh_audit_schedules`. Or `cve.py` fait
++            # `data.get('target_type', 'all')` : sur un `null` JSON EXPLICITE,
++            # `.get` rend `None` — le defaut ne joue pas, la cle existe — et
++            # `NULL` s'insere sans erreur. Eprouve en transaction annulee.
++            #
++            # Ce `None` retombait ici, donc sur tout le parc. Il y retombe
++            # toujours, mais sans machine.
++            logger.error(
++                "Planification CVE %s ignoree : portee illisible "
++                "(target_type=%r) — AUCUNE machine scannee",
++                schedule.get('id'), schedule.get('target_type'))
++            cur.execute(f"SELECT {base_cols} FROM machines WHERE 1=0")
+ 
+         machines = cur.fetchall()
+     finally:

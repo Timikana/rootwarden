@@ -666,6 +666,16 @@ def _scheduler_loop_with_purge():
             # Watchdog zombies : independant de LOG_RETENTION_DAYS (les taches
             # 'running' orphelines doivent expirer meme sans retention active).
             _expire_stale_tasks()
+            # Purge des cles plateforme ARCHIVEES : hors de la porte
+            # `LOG_RETENTION_DAYS`, comme le watchdog ci-dessus. Un secret
+            # archive doit avoir une date de destruction qui ne depende pas
+            # d'une variable de retention de JOURNAUX — celle-ci vaut 0 par
+            # defaut et eteindrait la purge en silence.
+            try:
+                from ssh_key_manager import purge_platform_key_archives
+                purge_platform_key_archives()
+            except Exception as e:
+                _log.error("Purge des archives de cle plateforme echouee : %s", e)
             _purge_old_logs()
             # Purge des taches terminees anciennes (meme retention que les logs)
             try:

@@ -3,7 +3,7 @@ routes/chatops.py - ChatOps bidirectionnel : endpoint entrant + mapping users.
 
 - POST /chatops/command : reçoit une commande depuis le chat (Slack slash command
   ou webhook Teams/generique). Auth par signature Slack OU jeton partage (pas de
-  session). Atteignable via le passthrough public www/chatops/webhook.php.
+  session). Atteignable via le passthrough public legacy/chatops/webhook.php.
 - /chatops/users (GET/POST/DELETE) : gestion du mapping chat<->RootWarden,
   reserve admin, via le proxy authentifie classique.
 

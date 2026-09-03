@@ -1,0 +1,69 @@
+<?php
+
+/*
+ * Module `ssh/` — "SSH keys". Sub-batch K1: the bare page.
+ *
+ * `serveurs_disponibles` carries a `:nombre` token that is ACTUALLY substituted.
+ * The legacy writes `count($machines)` then `t('ssh.servers_available')`, whose
+ * value is ":count serveur(s) disponible(s)" — the token stays on screen.
+ */
+
+return [
+    'titre' => 'SSH key deployment',
+    'description' => 'Select the servers to deploy the public keys of entitled accounts to. The deployment itself is still on the legacy portal.',
+    'serveurs_disponibles' => ':nombre server(s) available',
+
+    'aucun_serveur' => 'No reachable server',
+    'aucun_serveur_aide' => 'No machine is assigned to you, or every machine in the fleet is archived.',
+
+    'filtre_tag' => 'Tag',
+    'filtre_env' => 'Environment',
+    'tous_tags' => 'All tags',
+    'tous_envs' => 'All environments',
+    'cocher_filtre' => 'Select filtered',
+    'cocher_tout' => 'Select all',
+    'decocher_tout' => 'Clear selection',
+
+    'aucune_selection' => 'No server selected',
+    'selection' => ':nombre server(s) selected',
+
+    'deployer' => 'Deploy the keys',
+    'annuler' => 'Cancel',
+    'confirmer_titre' => 'Deploy SSH keys to these servers?',
+    'confirmer_avertissement' => 'On every checked server, as root: the sudo package is installed if missing, entitled accounts are created, their authorized_keys file is REWRITTEN, and a sudoers policy is installed. Keys belonging to any account that lost its entitlement are REVOKED. None of this can be undone from this page.',
+    // A conjunction whose second member became false — see the note in
+    // `lang/fr/ssh.php`. `/deploy` is not called (true), but `/logs` IS:
+    // `ClesSshController.php:93` then a `fetch` at `cles-ssh.js:390`. A
+    // sentence saying "A and B are not ported" reads as entirely true when
+    // only A still is. `description`, which asserts only ONE thing, held.
+    'non_porte' => 'Starting the deployment is not ported yet: it stays on the legacy portal.',
+    'non_porte_lien' => 'Run them from the legacy portal',
+    // ── The pre-deployment check (sub-batch K2) ─────────────────────────────
+    'verifier' => 'Check prerequisites',
+    'verifier_aide' => 'Queries the checked servers READ-ONLY and reports back. Deploys nothing.',
+    'verif_en_cours' => 'Checking...',
+    'verif_echec' => 'The check failed (code :statut)',
+    'verif_non_concluante' => "The check is not conclusive: the server returned no verdict. Nothing is shown below, because a partial result would read as a successful check.",
+    'verif_pret' => 'No missing prerequisite',
+    'verif_bloque' => ':nombre server(s) blocked: fix below or uncheck them',
+    'cles_aucune' => "WARNING: no active account carries an SSH key. A deployment would INSTALL no key — but it would still REVOKE the accesses listed below: revocation does not depend on any key.",
+    'cles_nombre' => ':nombre active account(s) with an SSH key',
+    'inventaire' => ':nombre account(s) inventoried on this server',
+    'revoques_synthese' => "Accesses that WILL BE REVOKED across the selected fleet — :nombre in total: :noms",
+    'inventaire_non_lu' => "The account inventory could not be read on this machine: we do not know which accesses would be revoked. The absence of a list below therefore does NOT mean there is none.",
+    'machines_sans_resultat' => "Selected machines with no result: :nombre. They are counted neither blocking nor ready.",
+    'badge_ok' => "OK",
+    'badge_echec' => "FAIL",
+    'badge_partiel' => "PARTIAL",
+    'a_creer' => 'Accounts that will be created:',
+    'a_revoquer' => 'Access that will be REVOKED (key removed, account kept):',
+    'lien_comptes_distants' => 'Open Remote users',
+    // ── The deployment log (sub-batch K3) ───────────────────────────────────
+    'journal' => 'View the last deployment log',
+    'journal_aide' => 'Reads the log already written. Contacts no server and triggers nothing.',
+    'journal_ouverture' => 'Reading the log...',
+    'journal_vide' => 'The log is empty: no deployment has been started yet.',
+    'journal_fin' => '— end of log —',
+    'journal_refus' => 'The log was refused by the server (code :statut)',
+    'journal_interrompu' => 'The stream ended before the log did: what precedes is incomplete',
+];

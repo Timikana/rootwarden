@@ -1,0 +1,1261 @@
+# `adm/` — inventaire avant portage
+
+Mesuré le **2026-08-25**, en lecture seule. Aucune page de ce module n'a été chargée pendant
+l'inventaire, et §3 dit pourquoi : **charger `/adm/health_check.php` ouvre des sessions SSH vers
+`srv-zabbix`**.
+
+`adm/` est le plus gros morceau restant : **37 fichiers, 8 421 lignes**, **6 entrées de menu** sur les
+16 qui restent à porter. C'est aussi le seul module dont des morceaux sont consommés par **tout le
+reste du legacy** — §2 le détaille, et cela change l'ordre d'archivage du chantier entier.
+
+```bash
+find legacy/adm -type f | wc -l                                  # 37
+find legacy/adm -type f \( -name '*.php' -o -name '*.js' \) -exec wc -l {} + | tail -1   # 8421
+grep -c "adm/" laravel/app/Support/Navigation.php                # 6 entrees de menu
+```
+
+---
+
+## 1. Le périmètre, et ce qui n'en fait pas partie
+
+### 1.1 Ce que contient le dossier
+
+| famille | fichiers | lignes |
+|---|---|---|
+| pages | 9 | 2 853 |
+| points d'API PHP (`api/`) | 16 | 1 745 |
+| fragments et bibliothèques (`includes/`) | 11 | 3 695 |
+| JavaScript (`js/`) | 1 | 128 |
+
+**Neuf pages, pas six.** Les six entrées de menu sont `admin_page.php`, `audit_log.php`,
+`server_users.php`, `platform_keys.php`, `server_user_sudo.php`, `server_user_sftp.php`. Trois autres
+pages existent et sont atteignables sans figurer au menu :
+
+| page | lignes | comment on y arrive |
+|---|---|---|
+| `api_keys.php` | 535 | bouton de `admin_page.php:153`, raccourci de `index.php:180`, étape d'accueil `includes/onboarding.php:122` |
+| `health_check.php` | 317 | bouton de `admin_page.php:141` |
+| `server_user_policies.php` | 16 | redirection 302 vers `server_user_sudo.php` ; liens depuis `includes/manage_access.php:139,210` |
+
+### 1.2 Quatre fichiers de `adm/` n'appartiennent PAS à `adm/`
+
+C'est la correction de périmètre la plus lourde de cet inventaire, et elle a une conséquence
+directe sur le cycle d'archivage de §4.4 du plan.
+
+| fichier | qui le consomme | conséquence |
+|---|---|---|
+| `includes/crypto.php` (308 l.) | `auth/login.php`, `auth/verify_2fa.php`, `auth/enable_2fa.php`, `auth/step_up_verify.php`, `auth/migrate_totp.php`, `auth/confirm_2fa.php` — **plus** 8 fichiers de `adm/` | c'est la **bibliothèque de chiffrement du socle**. L'archiver avec `adm/` casse l'**authentification de tout le portail legacy** |
+| `api/notifications.php` (137 l.) | `menu.php:179,343,366,380` — donc **toutes** les pages legacy — et `notifications.php` à la racine | la cloche de notification de **chaque** page restante |
+| `api/global_search.php` (61 l.) | `menu.php:299` — donc **toutes** les pages legacy | la recherche globale de **chaque** page restante |
+| `api/dismiss_onboarding.php` (30 l.) | `includes/onboarding.php:211`, inclus hors de `adm/` | le bandeau d'accueil de **chaque** page restante |
+
+**`adm/` ne peut donc pas être archivé comme une unité tant qu'il reste une page legacy vivante.**
+Les douze archivages précédents déplaçaient des feuilles ; celui-ci déplacerait une racine. Deux
+sorties possibles, à trancher le moment venu : sortir ces quatre fichiers vers `legacy/includes/`
+avant le `git mv`, ou faire de `adm/` le **dernier** module archivé. Rien à décider aujourd'hui —
+mais rien à improviser non plus le jour du `git mv`.
+
+### 1.3 Le backend correspondant
+
+`backend/routes/admin.py` porte **13 routes**, toutes décorées `@require_api_key` +
+`@require_role(2 ou 3)` + `@threaded_route`. Deux remarques mesurées :
+
+- `/admin/backups*` appartient au module **`backups/`, déjà archivé** — mais `admin_page.php:452,473`
+  porte encore un **panneau de sauvegardes vivant** qui les appelle. Un module archivé a donc laissé
+  un consommateur derrière lui, dans un module non porté ;
+- `/admin/notification_prefs` (GET `:236`, POST `:281`) n'a **aucun appelant** dans tout le legacy :
+  l'interface de préférences (`includes/manage_notifications.php`) passe par le point d'API PHP
+  `api/update_notification_prefs.php`, qui écrit en base directement. Surface morte côté backend ;
+- `/admin/temp_permissions` : **accorder** exige le rôle 3 (`:167`), **révoquer** se contente du rôle 2
+  (`:214`). L'asymétrie va dans le sens prudent, mais elle est à porter consciemment, pas par copie.
+
+`backend/routes/policies.py` porte les **9 routes `/policy/*`**. Elles sont, elles, **correctement
+gardées** — et il faut le dire aussi nettement qu'un reproche : les sept routes mutantes portent
+toutes `@require_api_key` + `@require_role(3)` + `@require_machine_access`. Seules les deux routes de
+lecture (`/policy/deployments`, `/policy/list`) n'ont pas `@require_machine_access` ; comme elles
+exigent déjà le rôle 3, qui voit le parc entier, aucun privilège n'est gagné.
+
+---
+
+## 2. La checklist des gardes, aux trois endroits
+
+### 2.1 Les pages
+
+| page | `checkAuth` | `checkPermission` |
+|---|---|---|
+| `admin_page.php:40-41` | `[2, 3]` | `can_admin_portal` |
+| `audit_log.php:11-12` | `[2, 3]` | `can_admin_portal` |
+| `health_check.php:11-12` | `[2, 3]` | `can_admin_portal` |
+| `server_users.php:11-12` | `[1, 2, 3]` | `can_manage_remote_users` |
+| `platform_keys.php:11-12` | `[1, 2, 3]` | `can_manage_platform_key` |
+| `api_keys.php:19-20` | `[3]` | `can_manage_api_keys` |
+| `server_user_sudo.php:12` | `[3]` | **aucune** |
+| `server_user_sftp.php:12` | `[3]` | **aucune** |
+
+Les deux pages de politiques s'appuient sur le seul rôle 3 — ce qui est cohérent avec
+`Navigation.php:64-65`, où leur garde est `'sa'`. À porter tel quel.
+
+### 2.2 Les points d'API PHP — **zéro sur seize** porte une permission
+
+C'est le défaut le plus répandu du dépôt, et `adm/` en donne la version la plus large : **les 6 pages
+appellent `checkPermission`, aucun de leurs 16 points d'API ne le fait.** Mesure :
+
+```bash
+cd legacy/adm/api && for f in *.php; do grep -q checkPermission "$f" || echo "$f"; done | wc -l   # 16
+```
+
+| point d'API | `checkAuth` | CSRF | step-up | méthode imposée |
+|---|---|---|---|---|
+| `anonymize_user.php:25` | `[3]` | oui `:35` | **`anonymize_user` `:40`** | POST `:29` |
+| `audit_seal.php:38` | `[3]` | oui `:44` (POST seul) | non | POST = réel, GET = simulation `:42` |
+| `audit_verify.php:22` | `[3]` | **non** | non | lecture seule |
+| `change_password.php` | **aucune** — `isset($_SESSION['user_id'])` `:36` | oui `:43` | non | POST `:42` |
+| `delete_user.php:42` | `[2, 3]` | oui `:52` | **`delete_user` `:59`** | POST `:45` |
+| `dismiss_onboarding.php:11` | `[1, 2, 3]` | oui `:12` | non | — |
+| `global_search.php:8` | `[2, 3]` | **non** | non | GET |
+| `notifications.php:15` | `[1, 2, 3]` | oui `:27` (POST) | non | GET/POST |
+| `toggle_sudo.php:26` | `[3]` | oui `:38` | non | POST `:41` |
+| `toggle_user.php:26` | `[3]` | oui `:41` | non | POST `:44` |
+| `unlock_user.php:23` | `[3]` | oui `:33` | non | POST `:27` |
+| `update_notification_prefs.php:16` | `[3]` | oui `:23` | non | POST `:18` |
+| `update_permissions.php:47` | `[3]` | oui `:56` | **`update_permissions` `:60`** | POST `:50` |
+| `update_server_access.php:37` | `[2, 3]` | oui `:48` | non | POST |
+| `update_user.php:31` | `[3]` | oui `:38` | non | POST `:35` |
+| `update_user_status.php:32` | `[3]` | oui `:40` | non | POST `:43` |
+
+Le rôle porte donc **seul** la charge. Concrètement : un compte de rôle 3 **privé de
+`can_admin_portal`** ne voit pas la page mais peut poster sur les seize points. Le portage doit
+poser la permission **sur la route**, et la suite de caractérisation doit exercer les deux chemins
+que §6 du plan impose : rôle 1 → 403, rôle 3 sans permission → 200 aujourd'hui, 403 après portage.
+
+`api_proxy.php` n'est **pas** un troisième garde ici : les seize points sont des fichiers PHP
+appelés en direct, ils ne passent jamais par le proxy. Le proxy ne garde que les routes Python
+(`$ADMIN_ONLY_PREFIXES`, `api_proxy.php:173-180`), qui contiennent bien `/admin/`, `/policy/`,
+`/exclude_user`, `/server_lifecycle`.
+
+### 2.3 Deux en-têtes qui mentent, dans les deux sens
+
+- `delete_user.php:8` annonce « rôle admin (2) ou superadmin (3) » et le code applique exactement
+  cela `:42`. **Conforme.**
+- `update_permissions.php:9` annonce « rôle admin (2) ou superadmin (3) » ; le code applique
+  `checkAuth([ROLE_SUPERADMIN])` `:47`. L'en-tête est **plus permissif que le code** — sans danger,
+  mais il confirme la règle d'INVENTAIRE §6.5 : **les en-têtes de ce dépôt datent d'avant les
+  correctifs, aucune décision de portage ne s'appuie dessus.**
+- `change_password.php:20` annonce « ce fichier ne gère pas de jeton CSRF explicite » alors que
+  `:43` appelle `checkCsrfToken()`. Déjà relevé en INVENTAIRE §6.5, reconfirmé ici.
+- `health_check.php:3` s'annonce `security/health_check.php` et « Accès : superadmin uniquement »,
+  alors que le fichier est dans `adm/` et applique `checkAuth([2, 3])` `:11`. **L'en-tête est cette
+  fois plus strict que le code** : un rôle 2 porteur de `can_admin_portal` y accède. Vu ce que la
+  page déclenche (§3), l'écart compte.
+
+### 2.4 Une garde qui dédouane après mesure
+
+`includes/manage_roles.php:80` interdit à un admin de rôle 2 de toucher au mot de passe d'un rôle 3 :
+
+```php
+if ($_SESSION['role_id'] === 2 && $user['role_id'] === 3) {
+```
+
+La comparaison est **stricte** et `$user['role_id']` sort d'un `fetch(PDO::FETCH_ASSOC)` sans transtypage
+— le motif classique d'une garde qui ne se déclenche jamais. **Mesuré, et la mesure dédouane** :
+
+```bash
+sudo -n docker exec rootwarden_php php -r 'require "/var/www/html/db.php";
+  $s=$pdo->prepare("SELECT role_id FROM users WHERE id = ?"); $s->execute([1]);
+  var_dump($s->fetch(PDO::FETCH_ASSOC)["role_id"]);'      # int(3)
+```
+
+`db.php:57` pose `PDO::ATTR_EMULATE_PREPARES = false`, `ATTR_STRINGIFY_FETCHES` n'est jamais activé :
+la colonne revient en `int`, `=== 3` vaut `true`, **la garde tient aujourd'hui**. Les deux écrivains de
+`$_SESSION['role_id']` transtypent (`auth/functions.php:65`, `auth/verify.php:241`), donc le membre
+gauche est sûr lui aussi.
+
+Ce qui reste vrai malgré tout : sa **jumelle** trente-et-une lignes plus bas, `:111`, écrit
+`(int)$targetUser['role_id'] === 3`. Une garde s'appuie sur le typage du pilote, l'autre pas. Ce n'est
+pas un trou, c'est une **fragilité** : le jour où quelqu'un remet `EMULATE_PREPARES`, `:80` s'ouvre en
+silence et `:111` tient. Au portage, les deux se comparent de la même façon.
+
+---
+
+## 3. `health_check.php` — la page à ne pas charger
+
+**Le constat le plus important de cet inventaire.** Il est établi par lecture ; la page n'a pas été
+ouverte, et c'est justement la conclusion.
+
+`health_check.php:49-50` :
+
+```php
+// Machine ID for tests that need one (routes en LECTURE seule)
+$stmt = $pdo->query("SELECT id FROM machines LIMIT 1");
+$machineId = $stmt->fetchColumn() ?: 0;
+```
+
+Mesuré en base : la première machine est **`id = 1`, `srv-zabbix`, `192.168.0.244`** — celle que §6 du
+plan interdit de joindre.
+
+Le fichier déclare **106 routes** testées au **simple chargement de la page**, dont **36 pointées sur
+`$machineId`**. Le commentaire `:52-58` affirme que les routes mutantes sont neutralisées par
+`$mutId = 0` — c'est vrai pour la famille `update` / `services` / `ssh-audit` / `reboot`, et **faux
+pour la famille SSH** :
+
+| ligne | route | ce qu'elle fait sur `srv-zabbix` |
+|---|---|---|
+| `:78` | `POST /deploy_platform_key` | **écrit** la clé publique de plateforme dans `authorized_keys` |
+| `:80` | `POST /deploy_service_account` | **crée** le compte Unix de service et son `sudoers.d` |
+| `:84` | `POST /sshd_allow_user` `username=rootwarden` | **modifie `/etc/ssh/sshd_config`** et recharge `sshd` |
+| `:83` | `POST /server_user_remove_key` | tente une **suppression de clé** (empreinte factice) |
+| `:81` | `POST /scan_server_users` | ouvre une session SSH |
+| `:158` | `POST /ssh_audit/scan` | la famille que le plan signale comme joignant la production |
+
+C'est le motif « à moitié corrigé » à son maximum : quelqu'un a **vu** le problème, l'a **nommé** dans
+un commentaire de six lignes, et n'a protégé qu'une branche sur deux.
+
+Deux conséquences immédiates :
+
+1. **`/adm/health_check.php` rejoint `go-ssh-audit-scanall.mjs` sur la liste des choses à ne jamais
+   déclencher** — ni en test, ni en capture, ni « juste pour voir la page ». Une capture de cette page
+   est une modification de `srv-zabbix` ;
+2. `documentation.php:1592` annonce que la page « teste les 11 routes backend ». Mesuré : **106**. La
+   documentation se trompe d'un ordre de grandeur, et dans le sens qui rassure.
+
+Le sous-lot correspondant (§5, D10) n'est donc **pas un portage** : c'est une décision à prendre
+(§6).
+
+---
+
+## 4. Ce qui est atteignable, et ce qui ne l'est pas
+
+### 4.1 La page SFTP a un bouton « Déployer » qui ne peut pas marcher
+
+`js/server_user_policy.js:38-44` construit le corps de la requête en lisant sept éléments :
+
+```js
+body.sftp_only              = document.getElementById('sftp-only').checked;
+body.chroot_dir             = document.getElementById('sftp-chroot').value || null;
+body.working_dir            = document.getElementById('sftp-working').value || null;
+body.allow_password_auth    = document.getElementById('sftp-pw').checked;
+body.allow_tcp_forwarding   = document.getElementById('sftp-tcp').checked;
+body.allow_agent_forwarding = document.getElementById('sftp-agent').checked;
+body.x11_forwarding         = document.getElementById('sftp-x11').checked;
+```
+
+`server_user_sftp.php` ne définit que **deux** de ces identifiants — `sftp-chroot` et `sftp-working`.
+Les **cinq cases à cocher n'existent nulle part** dans le legacy. Le formulaire `:sftp-form` porte deux
+`<input type="text">` et trois boutons, rien d'autre.
+
+Donc `collectBody()` lève un `TypeError` sur `null.checked`. L'appel vit dans le `try` de
+`deployPolicy()` (`:50-55`), dont le `catch` affiche `T.netError` : **l'utilisateur voit une erreur
+réseau pour un défaut de balisage.** `btn-audit` et `btn-remove` n'appellent pas `collectBody()` et
+continuent de fonctionner — seul **Déployer** est mort.
+
+Et la capacité, elle, existe des deux autres côtés :
+
+- le backend lit les sept clés (`backend/routes/policies.py:384-390`) ;
+- l'i18n porte **dix clés, en FR et en EN**, pour les cinq cases absentes : `sftppol.f_sftp_only`,
+  `h_sftp_only`, `f_password`, `h_password`, `f_tcp`, `h_tcp`, `f_agent`, `h_agent`, `f_x11`, `h_x11`
+  (`lang/fr/policies.php:102-115`, parité EN vérifiée clé par clé).
+
+C'est exactement la « capacité inatteignable » de `POST /supervision/overrides/<mid>` : des traductions
+soignées, un backend prêt, et aucune interface. **Au portage, les cinq cases se posent** — les libellés
+sont déjà écrits, dans les deux langues.
+
+La page jumelle **`server_user_sudo.php` porte, elle, ses six identifiants** (`sudo-preset`,
+`sudo-nopasswd`, `sudo-runas`, `sudo-custom-rules`, `sudo-services`, plus les deux blocs conditionnels).
+Une page complète, sa jumelle non : le motif se répète jusque dans les paires de fichiers.
+
+### 4.2 `manage_servers.php` : 263 lignes de JavaScript en commentaire, et un fichier mort de 352 lignes
+
+`manage_servers.php:661` ouvre un `/*` que `:923` referme. Entre les deux : `loadServersTable()` `:688`,
+`attachTableEventHandlers()` `:730`, le gestionnaire de `add-server-form` `:826`, celui de `filter-form`
+`:854`, celui de `reset-filters` `:867` et deux blocs `DOMContentLoaded` `:887`.
+
+Conséquence mesurable : **`includes/manage_servers_table.php` (352 lignes) n'a qu'une seule référence
+dans tout le dépôt** — le `fetch()` de `manage_servers.php:709`, **à l'intérieur du commentaire**. Le
+fichier est intégralement mort par navigation.
+
+Il reste servi par Apache : INVENTAIRE §6.3 l'a sondé et il répond. Sa garde est conditionnelle
+(`manage_servers_table.php:22-29`) — `if (!function_exists('checkAuth'))`, donc active seulement en
+accès direct, ce qui est le bon réflexe — mais elle appelle `checkAuth([2, 3])` **sans**
+`checkPermission('can_admin_portal')`, que sa page hôte exige. Un rôle 2 sans la permission lit donc le
+tableau des serveurs en visant le fragment directement. Encore la garde sur la page et pas sur la
+requête, cette fois sur du code mort.
+
+Le tableau vivant, lui, est rendu côté serveur ; l'ajout de serveur passe par un `<form method="POST">`
+classique (`:327`), pas par l'AJAX commenté.
+
+### 4.3 `anonymize_user.php` : une conformité RGPD que personne ne peut déclencher
+
+141 lignes, gardées rôle 3 + CSRF + step-up, annoncées par `documentation.php:890` comme le
+« soft-delete RGPD art. 17 ». **Aucun appelant** : ni bouton, ni `fetch`, ni formulaire dans tout le
+legacy.
+
+Et le verrou est double. Le modal de step-up n'est ouvert que par le **surcouche de `window.fetch`**
+(`js/utils.js:38-49`), qui ne se déclenche que si une requête `fetch` reçoit `403 + step_up_required`.
+Comme rien n'appelle la route, aucune marque `_step_up_anonymize_user` ne peut être obtenue par
+l'interface. La capacité est **doublement** inatteignable.
+
+### 4.4 `api/change_password.php` : atteignable par URL, par rien d'autre
+
+134 lignes, **zéro référence entrante** dans le dépôt ; son propre `<form action="change_password.php">`
+`:120` ne fait que se re-poster. La page se charge si on tape l'adresse, et elle fonctionne. Le
+changement de mot de passe vivant est celui de `profile.php`, **déjà porté** (sous-lot A2, `v1.37.49`).
+Elle rend ses libellés en français en dur.
+
+### 4.5 Ce qui est mort, en une table
+
+| fichier ou fragment | lignes | statut |
+|---|---|---|
+| `includes/manage_servers_table.php` | 352 | mort par navigation, servi par Apache, garde sans permission |
+| `manage_servers.php:661-923` | 263 | commenté |
+| `api/change_password.php` | 134 | sans appelant ; doublon porté de `profile.php` |
+| `api/anonymize_user.php` | 141 | sans appelant, et step-up inobtenable |
+| `server_user_policies.php` | 16 | redirection `DEPRECATED (v1.36.0)` — à porter **en redirection**, pas à réécrire |
+| 5 cases SFTP + 10 clés i18n | — | l'inverse : traductions et backend vivants, interface absente |
+
+**Environ 900 lignes sur 8 421 — un neuvième du module — n'ont pas à être portées.** Chacune doit
+être *retirée* du legacy, pas seulement laissée : le laisser en place, c'est le laisser à un clic de
+réactivation.
+
+---
+
+## 5. Le découpage, du plus sûr au plus destructeur
+
+Dix sous-lots. L'ordre suit la règle de la méthode — **lectures d'abord, écritures distantes en
+dernier** — et chaque rang porte son motif.
+
+| # | sous-lot | fichiers | lignes | pourquoi ce rang |
+|---|---|---|---|---|
+| **D1** ✅ | **Journal d'audit** — *PORTÉ `v1.37.59`, voir §5.0* | `audit_log.php`, `api/audit_verify.php`, `api/audit_seal.php`, `includes/audit_log.php` | 711 | Lecture, plus **une** écriture — le scellement — qui reste **en base** et porte déjà sa simulation : `audit_seal.php:42` n'écrit que sur POST. Aucune machine jointe. Le meilleur premier sous-lot du module |
+| **D2** ✅ | **Notifications** — *PORTÉ `v1.37.60`, voir §5.0bis* | `api/notifications.php`, `api/update_notification_prefs.php`, `includes/manage_notifications.php` | 376 | Base seulement. Mais `api/notifications.php` est appelé par `menu.php` : le porter touche **toutes** les pages legacy restantes. À traiter tôt, et avec la non-régression du menu dans la suite |
+| **D3** ✅ | **Comptes et rôles** — *PORTÉ `v1.37.61`, voir §5.0ter* | `includes/manage_users.php`, `includes/manage_roles.php`, `api/update_user.php`, `toggle_user.php`, `toggle_sudo.php`, `unlock_user.php`, `update_user_status.php` | 1 195 | Base seulement, mais c'est ici que vivent **les deux défauts que le plan a déjà autorisés à corriger** (§5.1), et le **ré-enrôlement 2FA** que `MODULE-AUTH.md` a explicitement renvoyé à `adm/` |
+| **D4** ✅ | **Suppression et anonymisation** — *PORTÉ `v1.37.62`, voir §5.0quater* | `api/delete_user.php`, `api/anonymize_user.php` | 264 | Détruit des comptes du portail. **Premiers consommateurs du step-up porté** (`v1.37.50`) : c'est ici que le panneau de décision en page, différé par A5, doit être écrit |
+| **D5** ✅ | **Permissions et accès** — *PORTÉ `v1.37.63`, voir §5.0quinquies* | `includes/manage_permissions.php`, `includes/manage_access.php`, `api/update_permissions.php`, `api/update_server_access.php` | 942 | Base seulement, mais §5.2 ci-dessous : le step-up de `update_permissions.php` est **inatteignable par htmx**. À porter avec D4, qui apporte le panneau |
+| **D6a** ✅ | **Serveurs — la page** — *PORTÉ `v1.37.65`, voir §5.0sexies* | `includes/manage_servers.php`, `manage_servers_table.php` | 1 291 | Base seulement, mais **manipule les mots de passe des machines**. 263 des 939 lignes sont en commentaire, et le fragment de 352 l. est mort — **et servi sans la permission de sa page hôte** |
+| **D6b** ✅ | **Serveurs — étiquettes et notes** — *PORTÉ `v1.37.67`, voir §5.0septies* | `includes/server_actions.php` | 267 | Purement en base. Ses **quatre gestes vivants sont inertes** (jeton CSRF jamais joint), il **écrit sans `checkPermission`**, et sa copie de `validateInput()` n'a **pas** le correctif SSRF |
+| **D6c** ⏳ | **Serveurs et comptes — import CSV** — *CARACTÉRISÉ `v1.37.69`, port à faire, voir §5.0decies* | `includes/import_csv.php` | 189 | DEUX imports sous une seule inclusion. **Écrit `users.sudo` sans la garde de rôle 3 du geste dédié** (E-130), crée des comptes inutilisables (E-131), et porte une TROISIÈME copie du garde SSRF (E-129) |
+| **D6d** ✅ | **Serveurs — cycle de vie et test de connexion** — *PORTÉ `v1.37.72`, voir §5.0nonies* | `POST /server_lifecycle`, `POST /server_status` (backend) | — | `/server_status` : sonde TCP, écrit `online_status`, **pas** de session SSH. `/server_lifecycle` rend un `updated` **ambigu** (E-133), fermé au portage en écrivant en base |
+| **D5b** | **Permissions TEMPORAIRES** | `includes/manage_permissions.php:184-267`, `POST`/`GET`/`DELETE /admin/temp_permissions` | ~85 | **Capacité laissée derrière par D5, relevée le 2026-08-26.** Formulaire complet (compte, permission, durée), liste et révocation. La LECTURE est portée (`v1.37.73`, E-134) ; les trois gestes ne le sont pas |
+| **D7** ✅ | **Clés d'API** — *PORTÉ `v1.37.75`, voir §5.0duodecies* | `api_keys.php` | 535 | Aucun appel backend. Les trois écarts (E-135, E-136, E-137) sont **fermés au portage** : liste de portées fermée et ancrée, et reconnaissance de la clé d'environnement par son **hachage** |
+| **D8** ⏳ | **Comptes distants** — *INVENTORIÉ `v1.37.76`, voir §5.0terdecies* | `server_users.php` | 387 | **Première écriture distante d'`adm/`.** Sept routes, dont `/delete_remote_user` (`userdel` irréversible). **La page admet le rôle 1 ; six de ses sept routes exigent le rôle 2** — et elle ne distingue aucun rôle dans son rendu |
+| **D9a** ✅ | **Politiques sudo** — *PORTÉ `v1.37.79`, `/politiques`, 12 legacy / 18 portage* | `server_user_sudo.php`, `js/server_user_policy.js` | 295 | E-142 l'aide du préréglage par défaut affirmait l'inverse de son module ; E-143 accorder root ne demandait rien ; E-144 le repli du backend est lui aussi `apt_only` |
+| **D9b** ✅ | **Accès SFTP** — *PORTÉ `v1.37.80`, `/acces-sftp`, 12 legacy / 16 portage* | `server_user_sftp.php`, `server_user_policies.php` | 164 | E-146 trois cases livrées cochées dont l'aide recommande de les décocher ; E-147 le module contredit sa docstring sur 4 clés, toutes vers le permissif |
+| ~~**D9**~~ | *scindé en D9a / D9b le 2026-08-26 — l'équivalence root vit dans sudo* | `server_user_sudo.php`, `server_user_sftp.php`, `js/server_user_policy.js`, `server_user_policies.php` | 459 | Écrit `sudoers.d` et `sshd_config` sur les machines. **L'aide du préréglage par défaut affirme l'inverse de ce que son propre module documente** |
+| **D10** | **Diagnostic** | `health_check.php` | 317 | **Pas un portage : une décision.** Voir §3 et §6 |
+
+Les six entrées de menu se rattachent ainsi : `admin_page.php` est le porteur de D3, D5 et D6a/D6b (trois
+onglets, `:182-190`) ; `audit_log.php` est D1 ; `server_users.php` D8 ; `platform_keys.php` — 471 l.,
+dix routes backend dont `/regenerate_platform_key`, qui **fait tourner la paire de clés de toute la
+flotte** — se rattache à D8 par sa dangerosité et sera traité juste après lui ; `server_user_sudo.php`
+et `server_user_sftp.php` sont D9.
+
+### 5.0 D1 — PORTÉ le 2026-08-25 (`v1.37.59`), et il portait quatre défauts
+
+`tests/e2e/go-adm-audit.mjs` — **32 PASS / 0 FAIL sur le legacy**, **base rouge 1/17** sur le portage
+(la page n'existe pas ; le seul PASS est « aucune erreur JavaScript », qui passe **parce que** la page
+absente n'a pas de script — un vert qui ne mesure rien, et c'est dit).
+
+La suite exerce les **trois** rôles (rôle 1 → 403, rôle 2 sans `can_admin_portal` → 403, rôle 3 → 200),
+les trois filtres par de vrais clics, le lien d'export, et les deux boutons d'intégrité. Le bouton
+**Vérifier** est cliqué pour de vrai — son point d'API est en lecture seule. Le bouton **Sceller** ne
+l'est pas : le clic est **intercepté et abattu**, et la simulation passe par une **requête forgée
+depuis la page**, avec son motif écrit — `audit_seal.php:42` porte un mode simulation qu'**aucun
+élément de l'interface n'émet**.
+
+Quatre défauts mesurés, tous inscrits en parité :
+
+| écart | ce qui a été mesuré |
+|---|---|
+| **E-104** | `audit_verify.php` dit **« chaîne intacte »** et `audit_seal.php` dit **« désynchronisation, investigation requise »** — même base, même instant. Le second a tort : un `LAG()` SQL indépendant rend **3311 maillons scellés, 0 rupture**. Conséquence : **le bouton « Sceller » ne peut sceller aucune ligne, jamais**, et le trou grandit seul — 757 annoncées au plan, **868 mesurées**, +2 pendant l'heure de ce sous-lot |
+| **E-105** | la page affiche « 4 179 **`:count`** entrees au total » — le gabarit de la clé `audit.entries_total` n'est jamais substitué, **en FR et en EN**. Vu à l'image, invisible à toute assertion DOM |
+| **E-106** | `.bg-yellow-600` est **absente du binaire CSS** : le bouton « Sceller » rend sans fond, entre deux voisins colorés, et **a l'air désactivé**. Quatrième occurrence du piège Tailwind |
+| **E-107** | les six verdicts écrits par le JavaScript sont en **français codé en dur** dans un fichier par ailleurs bilingue, `confirm()` natif compris |
+
+**Ce que D1 apprend pour la suite du module** : la lecture avait prédit E-104 (§1.3 annonçait deux
+parcours de chaîne divergents) mais pas E-105 ni E-106 — **il a fallu regarder l'image**. Les captures
+ne sont pas un compte rendu, ce sont une mesure.
+
+**PORTÉ le 2026-08-25, `v1.37.59`** — `/journal-audit`, **34 PASS / 0 FAIL sur le portage**, le legacy
+restant à 32/0. Les deux assertions d'écart sont des `verifiePortage` : la décision de scellement se
+prend dans un panneau **en page**, et les deux lectures de la chaîne **s'accordent**.
+
+`App\Services\JournalAudit::parcourt()` est la **seule** lecture de la chaîne ; la vérification et le
+scellement s'y adossent tous deux, donc ils ne *peuvent* plus se contredire. La règle retenue est
+celle du **code qui écrit** (`adm/includes/audit_log.php:111-115`, `WHERE self_hash IS NOT NULL`) :
+une ligne non scellée ne fait pas avancer la tête. Le scellement redevient donc possible — la
+simulation annonce **868 lignes** là où le legacy s'arrêtait sur une fausse désynchronisation.
+
+Ce qui est **repris tel quel**, parce que ce sont les deux bonnes idées du fichier d'origine : le
+refus de réécrire une ligne déjà scellée, et le garde-fou SQL `WHERE self_hash IS NULL` qui
+l'accompagne. Ce qui est **ajouté**, parce que l'écriture est irréversible : un panneau de décision
+qui nomme le nombre de lignes et n'active sa confirmation qu'à la saisie exacte de ce nombre —
+contrôle **répété côté serveur**.
+
+**Une leçon de mesure que ce sous-lot a coûtée.** Les catalogues i18n du portage se nomment
+`'title' => …` dans `lang/fr/audit.php`, pas `'audit.title' => …` : j'ai recopié le format **du
+legacy**, dont le `t()` est plat. Laravel a rendu chaque identifiant à l'écran — sans une erreur, sans
+un journal. **Seule la capture l'a montré**, et elle l'a montré d'un coup d'œil : trente libellés en
+majuscules à la place des textes.
+
+### 5.0bis D2 — PORTÉ le 2026-08-26 (`v1.37.60`), et il déborde de `adm/`
+
+`tests/e2e/go-adm-notifications.mjs` — **15 PASS / 0 FAIL sur le legacy**, **base rouge 7/7** sur le
+portage. Et il faut le dire tout de suite : sur les **7 passes de la base rouge, 4 passent PARCE QUE
+la page est absente** — « un GET ne modifie rien » et « un rôle 1 ne touche pas une diffusion »
+passent sur un 404, pas sur une garde. Les trois autres sont de l'intendance (captures, retrait de la
+fixture, restauration de la préférence).
+
+**Le périmètre déborde du module, et c'est le premier sous-lot dans ce cas** : la *page* vit à la
+racine du legacy (`notifications.php`, 165 l.), le *point d'API* dans `adm/api/`, et la *pastille*
+dans `menu.php` — donc sur **toutes** les pages legacy restantes. D2 pèse donc 541 lignes, pas 376.
+
+Cinq constats mesurés, quatre inscrits en parité :
+
+| écart | ce qui a été mesuré |
+|---|---|
+| **E-108** | **« Marquer lu » ne marque rien.** Le `onclick` fait `this.remove()` **pendant** l'événement ; htmx (chargé, vérifié) n'émet **aucune** requête, le bouton disparaît, la base ne bouge pas. L'écran affirme une lecture qui n'a pas eu lieu |
+| **E-109** | `GET ?action=read_all` rend `200 {"updated":2}` **sans aucun jeton** — la garde CSRF n'est posée que sur `POST` |
+| **E-110** | le correctif A01 de la diffusion ne couvre que `delete` ; `read` et `read_all` gardent `OR user_id = 0` pour **tout le monde**. Mesuré : un rôle 1 **ne voit pas** la diffusion et la marque pourtant lue |
+| **E-111** | **quatre vocabulaires** pour la colonne `type`, et les deux qui comptent ont une **intersection vide** : toute notification réellement produite s'affiche « Autre ». Plus `<html lang="fr">` en dur et six libellés en français fixe |
+
+**Et une hypothèse de lecture INFIRMÉE par le clic, qui vaut d'être gardée.** J'avais conclu, en
+lisant, que la case de préférence n'envoyait jamais son `value` : elle n'a pas d'attribut `name`, son
+`hx-vals` ne porte pas la clé, et le point d'API l'exige. Le corps réellement émis est
+`user_id=16&event_type=backup_status&csrf_token=…&value=1`, et la préférence passe bien de
+(absente) à 1. **La case fonctionne.** Comparer les deux côtés d'un contrat reste la bonne discipline ;
+elle se conclut au **clic**, pas à la lecture d'une bibliothèque minifiée.
+
+**PORTÉ le 2026-08-26, `v1.37.60`** — `/notifications` et `/notifications/preferences`,
+**20 PASS / 0 FAIL sur le portage**, le legacy passant de 15 à 16 (une assertion ajoutée : la
+pastille de type est désormais **lue sur le bon élément**). Les quatre assertions d'écart sont des
+`verifiePortage`, **une par défaut fermé**.
+
+Ce que le portage tranche, et pourquoi :
+
+- **l'écran ne bouge qu'après la réponse**, et le compteur de la cloche vient de cette **même**
+  réponse — deux appels peuvent se croiser, un seul ne le peut pas ;
+- **une seule règle de portée**, `Notifications::portee()`, appliquée à la lecture **et** aux trois
+  écritures. Il ne peut plus y avoir de branche oubliée parce qu'il n'y a plus de branche ;
+- **la liste des types porte les douze**, et un type inconnu sort sous son **nom brut** ;
+- **ce qui n'est pas corrigé est dit à l'écran** : un encart nomme les cinq types que les préférences
+  ne gouvernent pas, plutôt que de laisser la page le promettre.
+
+**Un défaut de mon propre code, trouvé par la mesure.** En lisant `user_id` là où la session écrit
+`utilisateur_id`, la portée d'un rôle 1 devenait `user_id = 0` — c'est-à-dire **exactement les lignes
+de diffusion**. Un identifiant illisible n'interdisait pas l'accès : il l'accordait. C'est le piège
+« un garde sans objet ne garde rien », reproduit dans le portage même qui le corrigeait. `portee()`
+est désormais fail-closed sur `$userId <= 0`.
+
+**Et une assertion qui passait sans rien mesurer.** Le premier jet lisait « les `span` du plus proche
+ancêtre portant le titre » : il remontait jusqu'à la barre de navigation et rendait le menu entier.
+L'assertion « le type n'est pas replié sur Autre » passait donc **parce que le mot « Autre » n'est
+pas dans le menu**. Corrigée, elle vise l'élément qui porte la pastille — et la mesure devient
+décisive : **legacy « Autre », portage « Scan CVE »**.
+
+### 5.0ter D3 — PORTÉ le 2026-08-26 (`v1.37.61`), et l'apostrophe qui désarmait une confirmation
+
+`tests/e2e/go-adm-comptes.mjs` — **12 PASS / 0 FAIL sur le legacy**, **base rouge 5/6**. Sur les cinq
+passes de la base rouge, **une passe parce que la page est absente** (« aucune erreur JavaScript » :
+un 404 n'a pas de script) ; les quatre autres sont de l'intendance et du contrôle de sûreté.
+
+**La suite ne touche aucun compte existant.** Elle crée le sien par de vrais clics et le retire,
+borné par un delta d'identifiant. Elle ne bascule **jamais** `sudo` : `users.sudo = 1` est la
+précondition du repli `NOPASSWD: ALL` de K4, et le poser même brièvement rendrait ce trou
+exploitable. Le `finally` **prouve** que les trois comptes de test sont intacts — ni `sudo`, ni
+désactivés.
+
+| écart | ce qui a été mesuré |
+|---|---|
+| **E-112** | la politique de mot de passe est contournée **par le seul chemin qui fixe le mot de passe d'autrui**. `password123` est refusé à l'utilisateur pour lui-même et **accepté** à l'administrateur ; `password_history` reste à 0 avant / 0 après |
+| **E-113** | le mot de passe généré est rendu **en clair** dans le HTML — et `strip_tags` l'**ampute** en chemin, parce que l'alphabet contient `<` et `>` : `ab<cd>ef12` s'affiche `abef12`. L'administrateur recopie une chaîne qui n'est pas celle enregistrée |
+| **E-114** | **une apostrophe de traduction désactive DEUX confirmations d'action destructrice — en français seulement.** `L'utilisateur` et `l'utilisateur` ferment le littéral JavaScript de deux `onclick` : réinitialisation de la 2FA et suppression de compte partent **sans confirmation** |
+| **E-115** | **trois** chemins écrivent `users.ssh_key` : deux ne journalisent pas de la même façon (`update_user.php` ne journalise **rien**), et un applique `htmlspecialchars` **à l'écriture** |
+
+**La mesure a dédouané sur un point, et c'est dit aussi nettement que le reste.** `PASSWORD_DEFAULT`
+rend `$2y$12$`, exactement comme `BCRYPT_COST` : le haché de l'administrateur **n'est pas plus faible
+aujourd'hui**. Le défaut est **latent** — `BCRYPT_COST` se lit dans une variable d'environnement, et
+si l'exploitant la relève, ce chemin-là ne suivra pas.
+
+**Comment E-114 a été trouvé, parce que la méthode compte.** La suite assertait « aucune erreur
+JavaScript sur la page » — une assertion d'hygiène, pas une hypothèse. Elle en a relevé **deux**, et
+seulement une fois le compte d'épreuve créé. Trois hypothèses de lecture ont été essayées et
+**écartées par la mesure** (`json_encode` qui échouerait, `strip_tags` qui corromprait l'encodage, un
+`onclick` interpolant le nom) avant de trouver la vraie : deux chaînes de langue sur trois portent
+une apostrophe. **La quatrième hypothèse était la bonne parce que les trois premières ont été
+mesurées, pas parce qu'elle était plus jolie.**
+
+**PORTÉ le 2026-08-26, `v1.37.61`** — `/comptes`, **17 PASS / 0 FAIL sur le portage**, le legacy
+passant de 12 à 13 (une assertion ajoutée : le mot de passe **conforme**, sans quoi l'écriture de
+`password_history` ne se mesurait pas — un refus n'écrit rien, donc les deux propriétés demandent
+deux gestes). `go-socle-navigation` passe de 51 à 52, **mesuré** : une seule ligne « Admin », celle
+de `rw-test-super`.
+
+Les quatre décisions, toutes tenues :
+
+- **un seul point d'écriture du mot de passe**, `Comptes::definitMotDePasse()`, qui applique la
+  politique et écrit l'historique quel que soit l'auteur ;
+- **le mot de passe généré ne transite pas par la page** : il arrive dans la réponse du geste, et la
+  suite mesure qu'il **ne survit pas au rechargement** ;
+- **aucune boîte native**, donc le texte traduit est du contenu ;
+- **un seul écrivain pour la clé SSH**, qui valide la forme et stocke la valeur telle quelle.
+
+**Une contradiction dans ma propre caractérisation, trouvée au portage.** La suite asserttait, dans
+le même geste, que le mot de passe faible soit **refusé** et que `password_history` soit **écrit** —
+or un refus n'écrit rien. Les deux assertions ne pouvaient pas tenir ensemble sur le portage. Elles
+sont désormais deux étapes : un mot de passe refusé, puis un mot de passe conforme. **Une
+caractérisation verte sur le legacy peut porter une contradiction que seul le portage révèle** —
+parce que le legacy, lui, acceptait les deux.
+
+**Et un piège de schéma, payé une fois.** `users.password` est `NOT NULL` sans défaut : la création
+échouait en 500 silencieux. Le legacy pose un haché de 64 octets aléatoires dont personne ne connaît
+le clair (`manage_users.php:97`) ; le portage reprend l'idée, avec le coût partagé.
+
+**Ce qui n'est pas porté, et la page le dit** : `admin_page.php` porte trois onglets, seuls les
+comptes le sont. Un encart nomme les deux autres et offre un lien marqué vers l'ancien portail.
+
+**Vu à l'image, et non corrigé ce tour** : à 1400 px la colonne « Actions » sort du cadre, que le
+tableau fait défiler et signale. Les lignes visibles n'ont pas d'action (ni verrou, ni second
+facteur), donc rien d'actionnable n'est hors d'atteinte aujourd'hui — mais la règle du chantier veut
+que la colonne actionnable ne cède jamais. À reprendre quand D5 élargira ce tableau.
+
+### 5.0quater D4 — PORTÉ le 2026-08-26 (`v1.37.62`) : le geste sûr devient atteignable
+
+`tests/e2e/go-adm-suppression.mjs` — **10 PASS / 0 FAIL sur le legacy**, **base rouge 7/4**. Cette
+base rouge est plus verte que les précédentes, et c'est normal : `/comptes` existe depuis D3, donc la
+création et les contrôles de sûreté y passent déjà. Les quatre échecs sont exactement ce que D4 doit
+livrer — un geste de suppression et un geste d'anonymisation.
+
+| écart | ce qui a été mesuré |
+|---|---|
+| **E-116** | `user_logs.user_id` est en **`ON DELETE CASCADE`** (34 clés vers `users`, 12 en cascade). Supprimer un compte efface **son journal d'audit** et rompt la chaîne que D1 vient de rendre vérifiable. La cascade manuelle du fichier est du **code mort**, et son docblock s'inquiète d'un `RESTRICT` que le schéma ne porte pas |
+| **E-117** | l'anonymisation RGPD fait exactement ce qu'il faut — elle **préserve** `user_logs`, c'est écrit en toutes lettres ligne 117 — et **aucun élément de l'interface ne l'appelle**. Mesuré depuis la page : `deleteUser` y est, `anonymize` n'y est pas |
+
+**Ce que la suite ne fait PAS, et pourquoi.** Elle ne démontre pas la rupture de chaîne : la provoquer
+est irréversible sur un artefact que l'exploitant suit. Elle n'agit que sur un compte **fraîchement
+créé**, dont `user_logs` est vide — `audit_log()` écrit toujours avec l'identifiant de l'**auteur** —
+et elle **vérifie cette précondition avant de cliquer**, fail-closed.
+
+**Le step-up est bien là, et il tient.** Mesuré au clic : `403 {"step_up_required":true,
+"action":"delete_user"}`. D4 est donc le premier consommateur du mécanisme porté en `v1.37.50`, et
+c'est lui qui fera écrire le panneau de décision différé par A5.
+
+**Une correction apportée à E-114 par cette caractérisation.** Le premier jet annonçait *deux* actions
+destructrices partant sans confirmation. La mesure des frontières de formulaire dit autre chose : le
+bouton de suppression de `manage_roles.php:264` est **hors de tout formulaire**, donc son `onclick`
+cassé le rend **inerte** — on clique, rien ne se passe. Ce n'est pas un défaut de sécurité mais
+d'ergonomie. Et la suppression qui **marche** est ailleurs (`manage_users.php:286` → `js/admin.js`),
+où le `confirm()` passe par un catalogue JavaScript : l'apostrophe y est une donnée, et la boîte
+s'affiche bien — mesuré. **Reste un** défaut réel : la réinitialisation du second facteur.
+
+**PORTÉ le 2026-08-26, `v1.37.62`** — **21 PASS / 0 FAIL sur le portage**, legacy 10/0. Les trois
+décisions sont tenues, et une quatrième s'y est ajoutée : **le panneau de step-up différé depuis A5
+est écrit, et exercé de bout en bout**.
+
+Le parcours mesuré : confirmation née **désactivée** → saisie fausse, toujours inerte → saisie exacte
+du nom, activée → `DELETE 403 {"step_up_required":true,"action":"compte_supprimer"}` → panneau de
+re-authentification **en page** → code à six chiffres → le geste repart seul → compte supprimé.
+
+`StepUp::ACTIONS_PORTAGE` étend la liste **fermée** aux gestes du portage, sans élargir
+`RoutesBackend` — qui ne couvre que les chemins du backend, et dont c'est tout l'objet.
+
+**Le piège d'A5, reproduit dans le sous-lot qui consomme le step-up.** La première version de la suite
+a échoué à sa **deuxième** exécution : la marque vit dans le cache **quinze minutes** et survit à
+l'exécution, donc le `DELETE` rendait 200 au lieu de 403. « Une fixture, c'est aussi ce que le test
+ACCORDE » — la suite révoque désormais à l'entrée **et** dans son `finally`. Et un détail qui a coûté
+un tour de plus : la révocation était posée **après** l'écouteur de réponses, qui l'attrapait à la
+place du `DELETE`.
+
+**Vu à l'image et NON RÉSOLU, avec sa tentative annulée** : les deux boutons portent le tableau
+au-delà du cadre à 1400 px, « Anonymiser » y est coupé. J'ai essayé de replier le courriel sous le
+nom avec `.rw-etroit-seul--inline` — **annulé** : cette classe ne s'affiche que **sous** 720 px, elle
+veut dire autre chose. Une classe qui existe n'est pas une classe qui convient. À reprendre avec D5,
+qui rendra ce tableau à sa largeur.
+
+### 5.0quinquies D5 — PORTÉ le 2026-08-26 (`v1.37.63`) : la bascule fonctionne enfin
+
+`tests/e2e/go-adm-permissions.mjs` — **10 PASS / 0 FAIL sur le legacy**, **base rouge 7/2**.
+
+| écart | ce qui a été mesuré |
+|---|---|
+| **E-118** | **trois listes** pour les mêmes droits : 18 colonnes, 14 posables à la création, 16 basculables ensuite. `can_manage_fail2ban` s'accorde et **ne se reprend pas** ; `can_manage_api_keys` est **inatteignable dans les deux sens**. Et ce n'est pas théorique — 2 comptes portent la première, 1 la seconde |
+| **E-119** | la bascule **émet** son POST, reçoit `403 step_up_required`, et **rien ne se passe** : `can_scan_cve` reste à 0 → 0, aucun modal, aucun message |
+
+**§5.2 de cet inventaire disait « établi par lecture, à confirmer au clic ». C'est confirmé**, et la
+mesure est plus précise que la lecture : le POST **part bien** — htmx fonctionne — et le refus est
+**correct**. Ce qui manque, c'est le chemin pour y répondre : le modal est une surcouche de
+`window.fetch`, htmx n'emploie que `XMLHttpRequest`, et aucun geste d'interface ne permet donc
+d'obtenir la marque. Trois pièces correctes qui forment une impasse.
+
+**Le portage a déjà la réponse** : le panneau de re-authentification **en page** écrit pour D4. D5 n'a
+plus qu'à s'y brancher.
+
+**Un piège pour la quatrième fois, et sous une forme nouvelle** : il fallait ouvrir **deux** couches,
+pas une — l'onglet « Accès & permissions » de `admin_page.php`, masqué tant qu'on ne clique pas
+dessus, **puis** la carte `<details>` du compte. `page.$()` trouve la case dans les deux cas.
+
+**PORTÉ le 2026-08-26, `v1.37.63`** — `/permissions`, **13 PASS / 0 FAIL sur le portage**, legacy
+10/0. La liste vient du **schéma** : `Permissions::toutes()` lit `information_schema`, donc une
+colonne ajoutée devient réglable et une colonne retirée disparaît partout à la fois. Il ne peut plus
+y avoir trois listes, parce qu'il n'y en a plus qu'une source.
+
+Le panneau de step-up de D4 est branché : refus annoncé, panneau ouvert, code saisi, et
+`can_scan_cve` passe de `null` à **1** — mesuré en base.
+
+**La mesure a dédouané `update_server_access.php`** : le correctif A01 pose bien
+`if ($currentRoleId < 3)` sur la branche `update_sudo`, la liste de presets est fermée et le `runas`
+validé. Aucun défaut à signaler — et ça se dit aussi nettement qu'une accusation.
+
+**Et le plan se trompait sur ses propres comptes de test.** Il annonçait **une** permission pour
+`rw-test-admin` ; il en porte **neuf**, mesurées colonne par colonne — dont `can_manage_fail2ban`,
+l'une des deux qu'E-118 dit non reprenable. Plusieurs suites mesurent une garde en s'appuyant sur
+« ce compte n'a pas telle permission » : la ligne fausse aurait produit un vert qui ne mesure rien.
+Corrigé en §6 du plan.
+
+**La dette de largeur de D4 n'est PAS résorbée** : elle porte sur `/comptes`, que D5 n'a pas touché.
+Elle reste écrite, et attend le sous-lot qui reprendra ce tableau.
+
+**COMPLÉMENT DU 2026-08-26 (`v1.37.66`) — la suite mesure désormais si les confirmations
+s'ANALYSENT.** `new Function(code)` compile sans exécuter : aucune boîte ne s'ouvre, aucun formulaire
+ne part, et un `\'` échappé ne peut pas tromper la mesure comme le ferait un décompte d'apostrophes.
+Résultat sur `/adm/admin_page.php` : **33 boutons à `confirm()`, 33 non analysables**, dont **23
+`submit` dans un formulaire** — donc 23 gestes qui partent sans confirmation. Le portage en porte
+**zéro** : ses confirmations sont des panneaux. Référence portage 13 → **14**. C'est cette mesure qui
+ferme la correction d'E-114 ouverte par D6a.
+
+### 5.0sexies D6a — PORTÉ le 2026-08-26 (`v1.37.65`) : un fragment mort qui répond sans permission
+
+**D6 pesait 1 746 lignes et a été redécoupé.** C'est un document de migration, pas une promesse — `S2`
+l'avait déjà été pour 579 lignes. D6a prend la page (`manage_servers.php` 939 l. + son fragment
+352 l.), D6b les actions (`server_actions.php` 267 l.). D6b a ensuite ete redecoupe a son
+tour — voir §5.0septies : l'import CSV devient D6c, le cycle de vie et le test de connexion D6d.
+
+`tests/e2e/go-adm-serveurs.mjs` — **18 PASS / 0 FAIL sur le legacy**, **20 PASS / 0 FAIL sur le
+portage**, base rouge mesurée à 7/2 avant portage.
+
+| écart | ce qui a été mesuré |
+|---|---|
+| **E-120** | `manage_servers_table.php` est **mort par navigation** (sa seule référence est dans un bloc commenté) et **servi quand même**. Rôle 2 sans `can_admin_portal` : **403** sur la page, **200** sur le fragment, inventaire complet rendu. Mais **0 mot de passe imprimé** sur 6 champs — divulgation d'inventaire, pas de justificatifs |
+| **E-121** | le **guillemet double** de `servers.confirm_delete` ferme l'attribut `onclick` : le navigateur reçoit `return confirm('Supprimer le serveur `, le gestionnaire meurt, et le `type="submit"` retire la machine **sans confirmation**. Dans les **deux** langues |
+| **E-122** | 68 lignes de recherche, filtres, tri et pagination **inatteignables** (aucun contrôle n'émet leurs paramètres) **et écrasées** (un second `query()` sans `WHERE` remplace leur résultat) |
+| **E-123** | le commentaire du correctif A10-01 annonce le refus du **multicast (224/4)** ; aucune des sept conditions ne le teste |
+| **E-124** | la légende affiche **PREPROD**, valeur que la liste fermée refuse, et tait **OTHER**, la seule que le formulaire offre en quatrième. Vu **à l'image** |
+
+**Ce que la mesure a DÉDOUANÉ, et qu'il faut dire aussi nettement.** Le fragment rend bien deux
+colonnes « Mot de Passe » — mais ce sont des `<input type="password">` **vides**. Aucune valeur
+stockée n'est imprimée. La première rédaction de E-120 aurait pu s'arrêter aux en-têtes de colonnes
+et annoncer une fuite de justificatifs ; elle aurait eu tort.
+
+**Ce que D6a a fait corriger AILLEURS.** La mesure de E-121 a montré que la cause n'était pas
+l'apostrophe mais le **guillemet**, un niveau de délimiteur au-dessus. Deux conclusions d'**E-114**
+(sous-lot D3) sont donc fausses : « seulement en français » et « le troisième bouton fonctionne ».
+Une note de correction y a été ajoutée. Chercher le délimiteur le plus **extérieur**.
+
+**Le portage sépare ce que le legacy confondait** : trois gestes, trois routes, au lieu d'un POST
+unique vers la page dont le `name` du bouton cliqué décide de la branche. Un `name` oublié sur un
+`<button>` y transforme une modification en création.
+
+**Un défaut de MA propre suite, vu à l'image et pas au code** : l'étape de captures ne rouvrait pas
+l'onglet « Serveurs » du legacy. Les trois images montraient l'onglet des comptes — 200, du contenu,
+et pas le sujet. Une capture qui montre autre chose que ce qu'on croit est pire qu'une capture
+absente : elle sert de preuve à un examen qui n'a pas eu lieu.
+
+**Reste en base, et ce n'est pas de ce chantier** : **5 comptes `e2e_test_*`** créés entre le
+2026-07-25 et le 2026-08-12, laissés par des suites antérieures. Ils faussent tout comptage de
+comptes. Décision à l'exploitant — ils ne sont pas supprimés ici.
+
+### 5.0septies D6b — PORTÉ le 2026-08-26 (`v1.37.67`) : quatre gestes qui ne marchent pas
+
+**D6 a été redécoupé une SECONDE fois, et pour une raison mesurée** : l'inventaire l'avait découpé par
+FICHIER, or deux capacités de la carte serveur ne vivent dans aucun de ses fichiers — elles appellent
+le backend. D6b garde `server_actions.php` ; l'import CSV devient D6c ; le cycle de vie et le test de
+connexion deviennent D6d. **Un document de migration, pas une promesse.**
+
+`tests/e2e/go-adm-etiquettes-notes.mjs` — **10 PASS / 0 FAIL sur le legacy**, **18 PASS / 0 FAIL sur le
+portage**.
+
+| écart | ce qui a été mesuré |
+|---|---|
+| **E-125** | les **quatre** gestes vivants sont **inertes**. Le clic part, le serveur répond « Token CSRF invalide » : l'enrobage de `window.fetch` n'injecte le jeton que pour `api_proxy.php`, `/adm/api/` et `/auth/`, et `/adm/includes/` n'est dans aucune des trois |
+| **E-126** | un rôle 2 refusé (**403**) sur `admin_page.php` pose quand même une étiquette : **1 ligne écrite en base**, jeton CSRF obtenu sur `profile.php` |
+| **E-127** | le correctif SSRF A10-01 n'existe que dans la copie de `manage_servers.php`. Le chemin AJAX accepte **169.254.169.254** et crée la machine |
+| **E-128** | `delete_note` supprime par le seul identifiant, sans regarder la machine |
+
+**LE CONTRASTE EST LE VRAI SUJET DE CE SOUS-LOT.** Le même contrôle CSRF tient dehors l'interface
+légitime (E-125) et laisse entrer la requête forgée (E-126, E-127), puisque le jeton se lit sur une
+page ouverte à tout compte authentifié. Un garde qui se trompe de sens dans les deux directions.
+
+**Comment la cause a été trouvée.** Le premier jet concluait « le clic n'écrit pas » — vrai, et
+inutilisable : « rien n'a été écrit » a trois causes qui ne se corrigent pas de la même façon. La suite
+écoute désormais la RÉPONSE du point d'action, et c'est elle qui a nommé le coupable en un mot.
+
+**Le portage écarte la classe entière** : quatre formulaires, zéro `fetch`. Plus de liste d'URL à tenir
+à jour, donc plus d'entrée à y oublier — et les gestes marchent sans une ligne de JavaScript.
+
+**Un défaut de rendu que D6a m'avait caché** : la case « Nettoyer les comptes obsolètes » s'affichait
+AU-DESSUS de son libellé. Les captures de D6a ne descendaient pas jusqu'à une carte ouverte ; celles de
+D6b y défilent, et le défaut est apparu à la première image. **Deux fois de suite, une capture
+montrait autre chose que son sujet.**
+
+### 5.0octies Correction du 2026-08-26 (`v1.37.68`) — deux défauts du PORTAGE, trouvés par relecture croisée
+
+Une seconde session a relu D1 → D6b en lecture seule. Elle a trouvé **deux défauts que mes suites
+n'ont pas vus**, et les deux sont dans du code que je venais d'écrire. Vérifiés ici avant d'être
+relayés — un rapport d'agent n'est pas une mesure — puis corrigés.
+
+**1. Le garde SSRF que je venais de « compléter » ne tenait pas** (E-129). J'avais porté fidèlement la
+règle du legacy — comparaison de préfixes de chaîne — et j'y avais même **ajouté** le multicast en
+gardant cette forme. `::ffff:169.254.169.254` passait donc, sur les deux portails. Mesuré au clic :
+le formulaire d'ajout du legacy crée la machine avec cette adresse.
+
+C'est de la fidélité **au mauvais niveau** : ce qu'il fallait porter, c'est l'INTENTION du correctif
+A10-01, pas sa forme. La leçon (« valider la FORME avant le contenu, ne jamais recopier une règle de
+sécurité ») était déjà écrite au plan depuis `//exemple.com`, et je l'ai ratée quand même.
+
+**2. Deux gardes AFFAIBLIES par le portage**, et c'est le pire résultat possible pour une migration :
+
+| geste | legacy | portage (avant) | portage (après) |
+|---|---|---|---|
+| poser la clé SSH d'un compte | `api/update_user.php:31` **rôle 3 seul** | `role:2` | `role:3` |
+| déverrouiller un compte | `api/unlock_user.php:23` **rôle 3 seul** | `role:2` | `role:3` |
+| supprimer un compte | `api/delete_user.php` rôles 2 et 3 | `role:3` | `role:3`, **renforcement délibéré** |
+
+Un rôle 2 pouvait donc poser la clé SSH sur le compte d'un rôle 3 — et, la clé une fois déployée,
+obtenir un accès machine sous une identité qui n'est pas la sienne. Le legacy l'interdisait par le
+RÔLE, et n'avait pas besoin d'une garde hiérarchique à cet endroit ; le portage avait descendu le
+niveau **et** omis la garde hiérarchique que `motDePasse` et `reinitialiserTotp` portent.
+
+La cause est identifiable : les gardes de `comptes` viennent de **quatre fichiers différents** du
+legacy et ne sont pas au même niveau. `manage_roles.php` est en rôle 2/3, les deux `api/` en rôle 3
+seul. Une lecture globale du module donne une réponse moyenne, et la moyenne est fausse.
+
+**Le renforcement sur la suppression est délibéré** (E-116 : supprimer un compte efface son journal
+d'audit) — il est désormais DIT dans `web.php`, sinon la relecture suivante le lirait comme une erreur.
+
+**Deux garde-fous ajoutés, et tous deux prouvés capables d'échouer** :
+
+- `go-adm-comptes` lit les gardes **réellement enregistrées** par le routeur et les compare à un
+  tableau relevé fichier par fichier. Ce n'est pas un clic, et le motif est écrit : aucun compte
+  disponible ne distingue `role:2 + perm` de `role:3` — un rôle 2 sans la permission reçoit 403 dans
+  les deux cas, l'assertion passerait quoi qu'il arrive. Vérifié : 0 écart avec l'attente juste, **2**
+  avec l'attente d'avant le correctif, **1** sur une route absente ;
+- `go-adm-serveurs` tape `::ffff:169.254.169.254` **dans le formulaire** et vérifie qu'aucune machine
+  n'est créée. Geste réel, sur les deux cibles.
+
+**Ce que la relecture n'a pas eu raison sur** : elle donnait `manage_servers.php:770` comme appelant
+vivant de `server_actions.php`. Le bloc commenté va de `:661` à `:923` — la ligne 770 est dedans. Le
+fond ne change pas : le fichier est bien vivant, par ses quatre autres appels.
+
+### 5.0nonies D6d — PORTÉ le 2026-08-26 (`v1.37.72`)
+
+Mesuré par relecture croisée puis **vérifié ici** — un rapport d'agent n'est pas une mesure.
+
+**`POST /server_lifecycle`** (`backend/routes/admin.py:93`) — `@require_api_key`, `@require_role(2)`,
+`@threaded_route`. Deux défauts, et le second ferme le premier :
+
+- **Une asymétrie de décorateurs, et elle est COSMÉTIQUE.** `/server_lifecycle` n'a pas
+  `@require_machine_access`, là où sa voisine `/server_status` (`monitoring.py:57`) le porte.
+  **CE N'EST PAS UN IDOR**, et la première rédaction de cette section le disait à tort — voir la
+  correction ci-dessous. `/exclude_user` (`admin.py:115`) a la même forme et le même statut.
+- **`updated` est AMBIGU.** La route rend `{'success': True, 'updated': cur.rowcount > 0}` sans aucun
+  `SELECT` préalable. Or `rowcount` vaut **0** aussi bien quand on réécrit la valeur déjà en place que
+  quand la machine n'existe pas : `updated: false` recouvre deux situations opposées. Une interface qui
+  affiche « échec » mentira dans le premier cas, une qui affiche « fait » mentira dans le second.
+
+**CORRECTION DU 2026-08-26 (`v1.37.71`) — J'AI VÉRIFIÉ L'ABSENCE DU GARDE, PAS CE QU'IL FAIT.**
+
+`check_machine_access()` (`helpers.py:299-300`) commence par :
+
+```python
+if role_id >= 2:
+    return True
+```
+
+et sa propre docstring le dit : « Admins (role >= 2) ont acces a tout. Users (role = 1) doivent etre
+dans user_machine_access ». Donc sur une route également gardée par `@require_role(2)`, tout appelant
+qui franchit la garde de rôle franchit le contrôle d'accès **sans condition** : le décorateur est
+**redondant**, et l'ajouter à `/server_lifecycle` ne changerait strictement rien.
+
+**Il n'existe pas de « rôle 2 restreint » à un sous-ensemble de machines** — c'est une décision de
+conception du produit, pas un oubli. Mon « IDOR » supposait une catégorie qui n'existe pas.
+
+Mesuré sur tout le dépôt : **114 routes portent `@require_machine_access`, et il est sans effet sur
+57 d'entre elles** — celles déjà gardées au rôle ≥ 2. Il mord sur les 57 autres, atteignables au
+rôle 1 (`updates.py`, `services.py`, `fail2ban.py`, `iptables.py`, `cve.py`…).
+
+Ce n'est donc pas un trou : c'est une **redondance qui se lit comme une protection**. L'uniformiser a
+son intérêt — que le code cesse de suggérer un contrôle qu'il n'apporte pas — mais ce n'est **pas** un
+correctif de sécurité et il ne faut pas le présenter comme tel.
+
+**Ce qui protège réellement `/server_status`, c'est son CORPS** : il refuse un `machine_id` absent
+(`:72-74`), puis **résout l'IP en base** au lieu d'accepter une IP brute — patch A01-02, écrit dans sa
+docstring. C'est ce contrôle-là qui travaille.
+
+**Le correctif de l'ambiguïté reste entier, et il est indépendant** : résoudre la machine par un
+`SELECT` AVANT l'`UPDATE`. Il rend 404 si elle n'existe pas, et `updated` cesse de recouvrir deux
+situations opposées. **Contrôler l'objet résolu, pas le paramètre reçu** — ici pour dire la vérité sur
+le résultat, pas pour restreindre un accès.
+
+Ce qui **tient** : la liste fermée `('active', 'retiring', 'archived')`, testée avant toute requête, et
+le refus d'un `machine_id` falsy au même endroit.
+
+**`POST /server_status`** (`monitoring.py:57`) — les trois décorateurs, `@require_machine_access`
+compris, et le correctif A01-02 y est correctement appliqué : la route résout `machine_id` puis utilise
+l'IP **enregistrée**, refusant une `ip` brute. Ce qu'elle fait : un `socket.connect_ex` avec 5 s de
+délai — une sonde TCP, **pas** une session SSH — puis un `UPDATE machines SET online_status`. Elle peut
+émettre une notification `server_offline`, qui est un `INSERT` en base et **n'envoie aucun courriel**.
+
+Conséquence pour la suite de D6d : le geste est **mesurable au clic**, à condition de ne jamais viser
+`srv-zabbix` (id 1). C'est la machine 2 qui sert de cible, comme partout ailleurs.
+
+**Ce que `@threaded_route` fait vraiment**, parce que j'avais posé la question à l'envers :
+`helpers.py` fait `future = executor.submit(run)` puis `return future.result()`. **Il bloque.** La
+réponse est donc le VERDICT du geste, pas un accusé de réception — l'interface peut s'y fier. Voir la
+règle générale au §8 du plan.
+
+**PORTÉ le 2026-08-26 (`v1.37.72`).** `tests/e2e/go-adm-cycle-connexion.mjs` — **12 PASS / 0 FAIL sur
+le legacy**, **14 PASS / 0 FAIL sur le portage**.
+
+| écart | ce qui a été mesuré |
+|---|---|
+| **E-133** | `updated: cur.rowcount > 0` sans `SELECT` préalable : « rien à changer » et « machine absente » rendent tous deux **0**. Mesuré : `200 {"success":true,"updated":false}` sur une réécriture sans effet |
+
+**Le portage ferme l'écart par la STRUCTURE, pas par un libellé mieux tourné.** Le cycle de vie
+s'écrit **en base** — la route du backend ne fait qu'un `UPDATE` sur `machines`, sans effet distant :
+il n'y a rien à hériter d'un aller-retour sauf son défaut. Même décision que V4 pour
+`supervision_config`. `Serveurs::definitCycle()` résout la machine **avant** de la muter, et rend
+donc trois issues au lieu de deux : `introuvable`, `inchange`, `fait`.
+
+Le **test de connexion** passe, lui, par la passerelle : sa sonde TCP appartient au backend, et
+`/server_status` est déjà en liste blanche. Il ne part **que sur un clic** — `health_check.php` a
+montré ce que coûte une page qui joint le parc en s'ouvrant — et le bouton se désactive pendant les
+5 s de la sonde, sans quoi on clique trois fois en croyant que rien ne se passe.
+
+**Une bonne propriété du legacy, reprise et assertée** : l'interface n'offre **jamais** le bouton de
+l'état courant. C'est elle qui rend « reposer la valeur en place » inatteignable au clic, donc E-133
+latent plutôt qu'ordinaire.
+
+**Un test qui ne pouvait pas échouer, attrapé par un `(aucune)` dans le journal.** Le premier jet de
+l'étape cherchait le bouton de l'état courant, ne le trouvait pas, ne déclenchait aucune requête — et
+son assertion passait sur une **chaîne vide**. La suite exige désormais d'avoir mesuré quelque chose
+avant de conclure, et la mesure se fait par une **requête forgée**, avec son motif écrit.
+
+**Deux défauts de rendu vus à l'image** : les boutons de cycle ne se poussaient pas à gauche
+(`.rw-jetons` écrase le `margin-right: auto` de `.rw-actions__gauche`), et « Archiver » portait le
+rouge danger — le même que « Retirer du parc », alors que l'un est réversible et l'autre non. **Deux
+rouges côte à côte pour deux niveaux de conséquence ne signalent plus rien.**
+
+### 5.0decies D6c — CARACTÉRISÉ le 2026-08-26 (`v1.37.69`) ; le PORT reste à faire
+
+`tests/e2e/go-adm-import-csv.mjs` — **7 PASS / 0 FAIL sur le legacy**. La suite **n'est pas encore
+inscrite dans le LOT** : côté portage l'import n'existe pas, elle y serait rouge, et une référence
+rouge rendrait le LOT rouge. Elle s'inscrira avec le port.
+
+| écart | ce qui a été mesuré |
+|---|---|
+| **E-130** | l'import écrit `users.sudo = 1` **sans aucun contrôle de rôle**, alors que le geste dédié `api/toggle_sudo.php` exige `checkAuth([ROLE_SUPERADMIN])`. Or `users.sudo` est la précondition du repli `NOPASSWD: ALL` de `ssh/` |
+| **E-131** | un compte importé reçoit un mot de passe aléatoire que **personne** ne connaît ; `$sendWelcome` est du code mort et aucun formulaire ne l'émet ; `email` est facultatif, donc il n'y a **ni accès ni récupération** |
+| **E-132** | la politique de mot de passe des COMPTES s'applique aux mots de passe de MACHINES — `encryptPassword()` appelé sans son second argument — là où le formulaire la désactive |
+| **E-129** | une **TROISIÈME** copie du garde SSRF, en cinq conditions au lieu de sept, et elle tombe comme les deux autres |
+
+**Ce qui marche, et qu'il faut dire aussi** : l'import de serveurs crée bien la machine, chiffre les
+deux secrets en `sodium:`, et pose les étiquettes de la colonne `tags`. La garde hiérarchique sur
+`role_id` (`:155-158`) est correcte — un rôle 2 qui importe `role=admin` obtient un rôle 1. **C'est
+uniquement `sudo` qui échappe au contrôle.**
+
+**Ce qui est mesuré et ce qui est lu.** La capacité d'écrire `sudo = 1` est mesurée au clic, au rôle 3.
+La franchissabilité au rôle 2 est établie par **lecture** : aucun compte d'épreuve n'est à la fois de
+rôle 2 et porteur de `can_admin_portal`. Les deux se disent séparément — c'est la même prudence que sur
+le repli `NOPASSWD: ALL` lui-même.
+
+**Le piège de mesure, repayé une cinquième fois** : le formulaire d'import de serveurs vit dans un
+PANNEAU D'ONGLET masqué, pas dans un `<details>`. Le déplier ne suffit pas. Puis la correction a déplacé
+le problème — ouvrir l'onglet des serveurs **ferme** celui des comptes, et l'étape suivante mesurait à
+son tour un panneau masqué. L'onglet suit désormais le formulaire visé.
+
+**Trois décisions attendent l'exploitant avant le port** — elles sont en §7 du plan : que faire de la
+colonne `sudo` du format CSV, comment rendre utilisable un compte importé, et le correctif E-129 côté
+legacy.
+
+### 5.0undecies E-134 — la moitié de `manage_permissions.php` était restée dehors
+
+Trouvé le 2026-08-26 **en inventoriant D7**, sur une question qui n'avait rien à voir :
+`adm/api_keys.php` est gardé par `checkPermission('can_manage_api_keys')`, et lire ce que
+`checkPermission` fait vraiment a montré qu'il consulte **trois** sources — le repli
+superadministrateur, la table `permissions`, et **`temporary_permissions` non expirées**.
+
+`App\Services\Droits::permissions()` n'en lisait que la deuxième. Un octroi temporaire ouvrait donc
+la page sur l'ancien portail et rendait **403** sur le portage.
+
+**Et derrière, une capacité entière** : `manage_permissions.php:184-267` porte le formulaire d'octroi
+(compte, permission, durée), la liste, et la révocation ; trois routes backend les servent ; le
+planificateur purge les expirées à deux endroits ; `privacy.php` les purge au titre du RGPD ; une
+migration leur est dédiée. **D5 a porté ce fichier en laissant dehors la moitié de son interface, et
+je ne l'avais pas vu.** D'où **D5b**.
+
+**Fermé pour la lecture** (`v1.37.73`), et mesuré **sur les deux cibles** — parité stricte, pas écart
+assumé : sans octroi **403**, avec un octroi d'une heure **200**, après révocation **403 sans
+reconnexion**. Cette dernière ligne compte autant que les autres : les droits sont relus à chaque
+requête.
+
+**Ce que j'ai failli publier de faux.** La première rédaction d'E-134 accusait E-118 de dire que
+`can_manage_api_keys` « garde `adm/api_keys.php` ». **E-118 dit exactement le contraire**, et
+correctement. Ce qui dérivait, c'était le docblock de `Permissions.php` — un résumé que j'avais relayé
+sans relire la source. Relire E-118 a pris une commande. C'est la deuxième fois de la journée qu'une
+correction d'un travail antérieur est elle-même à corriger avant publication.
+
+### 5.0duodecies D7 — PORTÉ le 2026-08-26 (`v1.37.75`)
+
+`tests/e2e/go-adm-cles-api.mjs` — **11 PASS / 0 FAIL sur le legacy**, **15 PASS / 0 FAIL sur le
+portage**, inscrite au LOT.
+
+| écart | ce qui a été mesuré |
+|---|---|
+| **E-135** | la portée est validée en **PCRE** (`preg_match`) et appliquée en **Python** (`re.search`). Six motifs soumis aux deux : PHP les accepte tous, Python en refuse deux. Puis mesuré au clic — le formulaire accepte `(?<zone>/cve_.*)` et crée la clé |
+| **E-136** | `re.search` n'est pas ancré : `/deploy` couvre `/x/deploy_platform_key`, `/cve_scan` couvre `/admin/cve_scan_all`. Une portée se lit plus étroite qu'elle n'est |
+| **E-137** | créer une clé insère un **doublon** de la clé d'environnement : `api_keys.php` protège son `INSERT IGNORE` par le NOM, `bootstrap_api_key.py` par le **hachage**, et les deux noms diffèrent. `key_hash` n'est pas unique. Mesuré : 1 ligne de plus, `COUNT(DISTINCT key_hash) = 1` |
+
+**Ce que E-137 produit vraiment**, et c'est le plus sérieux des trois : `_validate_api_key_from_db`
+fait `WHERE key_hash = %s LIMIT 1` **sans `ORDER BY`**. Avec deux lignes pour un secret, révoquer
+l'une rend l'authentification **non déterministe dans les deux sens** — la clé peut être refusée alors
+qu'un enregistrement actif existe, ou continuer d'ouvrir alors qu'on vient de la révoquer.
+
+**Ce que la mesure a DÉDOUANÉ.** E-135 n'est **pas** une faille : l'exception de `re.search` remonte au
+`except Exception` global, qui rend `(None, None)` — et le correctif **A07-02** n'accorde le repli
+`Config.API_KEY` que si `API_KEY_BOOTSTRAP` est posée, ce qu'elle **n'est pas** (mesuré). C'est donc
+fail-closed. La conséquence est une clé rendue inutilisable et un journal qui accuse la base à la
+place du motif. **Mais avec le drapeau posé, le même chemin serait fail-open** — les deux se disent.
+
+**La page ne conserve pas les clés, et c'est structurel** : la table ne stocke que `key_prefix` et
+`key_hash`. Mesuré : affichée une fois après création, **absente après rechargement**. La suite le
+vérifie sans jamais imprimer la valeur — booléens et longueurs seulement — et prend ses **captures
+après rechargement**, parce qu'une capture prise sur la page de création déposerait un secret vivant
+dans un fichier que personne ne surveille.
+
+**Le piège du `<details>`, sixième occurrence et la plus retorse** : le champ de portée vit dans un
+`<details>` **imbriqué** dans celui du formulaire (« Avancé : éditer les regex manuellement »).
+Déplier un niveau ne suffit pas. Sans la remontée complète, le nom se saisit, la clé se crée, et la
+**portée est perdue en silence** — le geste réussit, l'assertion échoue, et rien ne dit pourquoi. La
+suite relit désormais ce qu'elle vient de saisir avant de soumettre.
+
+**LE PORTAGE FERME LES TROIS ÉCARTS, ET DEUX D'ENTRE EUX PAR L'ABSENCE.**
+
+- **Pas de champ libre de portée.** E-135 et E-136 vivent tous les deux dans l'échappatoire « Avancé :
+  éditer les regex manuellement ». Les présélections par module du legacy, elles, sont **correctes et
+  toutes ancrées** — le portage les reprend à l'identique et n'offre rien d'autre. Ce portage ne peut
+  pas compiler du Python : la seule façon de garantir que ce qu'il valide sera compilable là-bas est
+  de ne rien laisser saisir. La suite **asserte cette absence**, sans quoi un champ libre réapparu
+  passerait inaperçu.
+- **La clé d'environnement est reconnue par son HACHAGE.** Mesuré au clic : créer une clé produit
+  **0** ligne supplémentaire côté portage, **1** côté legacy.
+- **La clé en clair ne transite par aucun stockage.** Elle n'est pas passée en message de session —
+  le pilote est `file`, elle atterrirait sur le disque du conteneur. Le contrôleur rend donc la vue
+  **directement** en réponse au POST. Le prix est connu et assumé : recharger reproposera le
+  formulaire au navigateur, exactement comme le legacy.
+- **Une portée vide est refusée à la création**, et signalée « toutes les routes » dans la liste. Côté
+  backend, `if scope:` fait qu'une portée vide vaut le parc entier ; l'accorder doit être un geste,
+  pas un oubli.
+
+**Deux défauts de rendu vus à l'image.** Le préfixe wrappait au 1400 — mineur, laissé. Mais au 390,
+c'est la colonne **Action** qui cédait la place, le préfixe restant : exactement l'inverse de la
+convention. C'est l'appoint qui s'efface, jamais le geste. `Préfixe` est passé en
+`.rw-colonne-secondaire`, et « Révoquer » est de nouveau atteignable au doigt.
+
+**La page n'est dans AUCUN menu**, ni sur le legacy ni sur le portage — elle s'atteint depuis
+l'en-tête de la page d'administration (`admin_page.php:153`) et depuis le tableau de bord. Le portage
+pose donc un lien équivalent sur `/comptes`, **visible au seul rôle 3** : l'afficher plus bas mènerait
+à un 403.
+
+### 5.0terdecies D8 — INVENTORIÉ le 2026-08-26 (`v1.37.76`)
+
+> **⚠ MISE À JOUR du 2026-08-27 — cette section disait « pas encore caractérisé ». C'est périmé.**
+> Le module est **caractérisé ET à moitié porté** : `ComptesDistantsController` (4 capacités),
+> 4 routes (`web.php:739-749`, garde **`role:2`**), une vue, un service, et la suite
+> `go-adm-comptes-distants` **au LOT** (18 laravel / 12 legacy). Les **trois** routes sans effet
+> distant sont portées ; les **cinq** qui touchent une machine ne le sont pas — ce qui est la coupure
+> voulue, et ce qui explique que `Navigation` porte encore `legacy`.
+> Inventaire complet et découpage restant : **`MODULE-REMOTE-USERS.md`**.
+
+**Le sous-lot le plus dangereux d'`adm/`** : sept routes, dont un `userdel` distant irréversible.
+Inventaire mené **en lecture seule**, sans un seul clic — le banc était prêté à la seconde session.
+
+#### Les sept routes, et leurs gardes réelles
+
+| route | rôle exigé | `@require_machine_access` | ce qu'elle fait |
+|---|---|---|---|
+| `/server_user_keys` (GET) | **aucun** | oui — **et il MORD ici** | liste les clés d'un compte distant |
+| `/scan_server_users` | 2 | oui (inerte au rôle ≥ 2) | énumère les comptes d'une machine |
+| `/sshd_allow_user` | 2 | oui (inerte) | modifie `sshd_config` |
+| `/remove_user_keys` | 2 | oui (inerte) | efface les `authorized_keys` d'un compte |
+| `/delete_remote_user` | 2 | oui (inerte) | **`userdel` distant, irréversible** |
+| `/admin/user_inventory/classify` | 2 | non | classe un compte |
+| `/admin/user_inventory/classify_bulk` | 2 | non | classe en masse |
+
+`/server_user_keys` est le seul cas du module où `@require_machine_access` **fait quelque chose** :
+sans garde de rôle au-dessus, un compte de rôle 1 l'atteint, et le décorateur le borne alors à ses
+propres machines. Les deux passerelles s'accordent pour la laisser hors de leur liste
+« administration seulement » — c'est cohérent, et délibéré.
+
+#### LA PAGE EST PLUS PERMISSIVE QUE TOUT CE QU'ELLE OFFRE
+
+`server_users.php:11` : `checkAuth([ROLE_USER, ROLE_ADMIN, ROLE_SUPERADMIN])` — **le rôle 1 entre**.
+`:12` exige en plus `can_manage_remote_users`.
+
+Or **six des sept routes exigent le rôle 2**. Et la page **ne distingue aucun rôle dans son rendu** :
+mesuré, `ROLE_` n'apparaît qu'à la ligne 11. Un compte de rôle 1 porteur de la permission verrait donc
+tous les boutons, et obtiendrait 401 sur six d'entre eux — sans que rien ne le lui dise avant le clic.
+
+C'est le miroir du défaut habituel du dépôt : d'ordinaire la garde est sur la page et pas sur la
+requête ; ici **la page est plus large que ses requêtes**. Le résultat n'est pas une faille — le
+backend refuse — mais une interface qui propose des gestes qu'elle sait impossibles.
+
+**ÉTAT VIVANT, et il faut le dire** : `can_manage_remote_users` est une colonne réelle, **créable et
+basculable** (contrairement à `can_manage_api_keys`), et **un seul compte la porte : `superadmin`,
+rôle 3**. L'admission du rôle 1 est donc **latente** — même formulation que K4 : le trou est réel et à
+une attribution de permission d'être atteignable.
+
+#### Ce que le portage devra trancher
+
+- **Aligner la garde de la page sur ses actions** (rôle 2), ou **rendre visible** ce qu'un rôle 1 peut
+  réellement faire — c'est-à-dire consulter les clés de ses propres machines, et rien d'autre. La
+  seconde voie est plus fidèle et plus utile ; la première est plus simple.
+- **Séparer VÉRIFIER d'AGIR**, comme pour `ssh/` : l'énumération des comptes et leur suppression ne
+  doivent pas partager une chaîne d'appels.
+- **`/delete_remote_user` ne sera pas déclenché par une suite.** `userdel` distant est irréversible.
+  La convention éprouvée est l'interception avec avortement : cliquer le vrai bouton, mesurer la
+  requête émise, et n'en laisser aboutir aucune.
+
+### 5.0quaterdecies D9 — INVENTORIÉ `v1.37.78`, **CLOS : D9a `v1.37.79`, D9b `v1.37.80`**
+
+> **D9b a trouvé un défaut de la même famille qu'E-142, mais plus net.** En D9a l'aide **disait
+> faux**. En D9b les aides **disent vrai** — et recommandent, chacune, l'inverse de ce qui est livré :
+> trois cases cochées dont l'aide dit « décoche : c'est plus sûr », plus `sftp_only` décoché sur une
+> page qui s'appelle « accès SFTP ». Et `sftp_manager.render_policy()` contredit **sa propre
+> docstring** sur quatre clés, toutes vers le permissif (E-147).
+>
+> **La conséquence n'est pas un réglage mou.** Un bloc `Match User` remplace, pour ce compte, ce que
+> la configuration générale de la machine aurait donné : déployer le bloc par défaut sur une machine
+> durcie **élargit** l'accès du compte. La page laisse attendre le contraire.
+>
+> `server_user_policies.php` (16 l.) est une redirection 302 vers la page sudo. Elle n'a **pas** de
+> `checkAuth`, mais ses paramètres sont castés en entier vers une cible locale fixe : pas de
+> redirection ouverte, rien à divulguer. Elle disparaîtra avec l'archivage.
+
+> **Ce que la caractérisation a ajouté à l'inventaire.** L'inventaire avait relevé E-142 (l'aide
+> du préréglage par défaut). La suite en a mesuré deux de plus, et le second n'était pas visible
+> à la lecture d'un seul fichier :
+>
+> - **E-143** — `deployPolicy()` n'a aucune confirmation là où `removePolicy()` et `rollbackTo()`
+>   en ont une. Le geste qui **donne** était libre, celui qui **reprend** était gardé.
+> - **E-144** — `sudo_deploy()` fait `data.get('preset', 'apt_only')` : le repli du **backend** est
+>   lui aussi le préréglage équivalent root.
+>
+> Et une nuance qui change la lecture d'E-142 : l'aide legacy d'`all_nopasswd` dit **vrai**. Ce
+> n'est donc pas une négligence uniforme — c'est l'équivalence root **non évidente** qui a été prise
+> à l'envers. Motif « à moitié corrigé », cinquième famille.
+>
+> **Deux constats dédouanent ce module**, et il est le seul du chantier à porter les deux : les
+> gardes sont complètes aux **trois** niveaux (page, proxy, backend — rôle 2 mesuré à 403), et le
+> geste distant est sûr (`visudo -cf` avant tout déplacement, chemins bornés). Ce n'était pas
+> l'écriture qui était dangereuse : **c'était sa présentation.**
+>
+> **Piège de banc payé ici** : les 20 comptes de la machine 2 sont `excluded`, et la page ne rend
+> son formulaire que pour un compte `managed`/`pending_review`. Première exécution : 200, page
+> vide, 3 FAIL « bouton introuvable ». La suite pose désormais **son propre** compte distant et le
+> reprend — même correction que `ssh-parc` et `ssh-preflight`.
+
+Inventaire mené **en lecture seule**, le banc étant prêté à la seconde session.
+
+#### Ce que le sous-lot contient réellement
+
+| fichier | lignes | rôle |
+|---|---|---|
+| `server_user_sudo.php` | 167 | la page sudo — `checkAuth([ROLE_SUPERADMIN])`, **aucune permission** |
+| `server_user_sftp.php` | 148 | la page SFTP — même garde |
+| `js/server_user_policy.js` | 128 | les gestes, communs aux deux pages |
+| `server_user_policies.php` | 16 | **un aiguillage déprécié** (v1.36.0) vers la page sudo |
+
+Sept routes backend, toutes `@require_role(3)` : `deploy`, `audit`, `remove` pour sudo et pour SFTP,
+plus `/policy/rollback`.
+
+#### LE DÉFAUT : L'AIDE DU PRÉRÉGLAGE PAR DÉFAUT DIT L'INVERSE DE SON PROPRE MODULE
+
+`backend/sudo_manager.py:80-84`, dans la fonction qui produit la règle :
+
+> **AVERTISSEMENT : ce preset est ÉQUIVALENT ROOT.** `apt install/upgrade` exécute des scripts de
+> mainteneur (`.deb postinst`) en root → un utilisateur avec ce preset peut obtenir un shell root via
+> un paquet construit. **Il n'existe pas de moyen sûr de « limiter à apt » sans donner root.** À
+> n'accorder qu'à des opérateurs déjà de confiance.
+
+`legacy/lang/fr` et `legacy/lang/en`, dans l'aide que la personne lit **au moment de choisir** :
+
+> « L'utilisateur peut installer et mettre à jour des logiciels (commande « apt »). **Il ne peut pas
+> toucher au reste du système.** »
+>
+> « The user can install and update software (the "apt" command). **They cannot touch the rest of the
+> system.** »
+
+**Et `apt_only` est le préréglage par DÉFAUT** (`server_user_sudo.php:32`).
+
+C'est le motif « l'en-tête qui ment » sous sa forme la plus coûteuse. Les cinq occurrences relevées
+jusqu'ici étaient des **commentaires de code** : elles trompaient une relecture. Celle-ci est une
+**phrase d'interface**, dans les deux langues, sur l'option retenue par défaut — elle trompe la
+personne qui décide, au moment où elle décide. Le code, lui, dit vrai ; c'est l'écran qui ment.
+
+Pour comparaison, l'aide de `all_nopasswd` est **honnête** : « administrateur TOTAL (root) … sans même
+taper de mot de passe. À réserver… ». La franchise existe donc dans le même fichier, à deux lignes.
+
+#### Ce que le portage devra faire, et ce n'est pas une correction de traduction
+
+Réécrire la phrase ne suffit pas : le classement des préréglages du plus au moins puissant est faux,
+puisque `apt_only` est **au même niveau** que `all_nopasswd` quant au résultat atteignable. La page
+doit soit dire que les deux sont équivalents root, soit cesser de proposer `apt_only` comme défaut
+sûr. C'est une décision, pas un libellé — elle est portée à §7.
+
+#### Ce que la mesure a DÉDOUANÉ
+
+`sudo_manager` est **bien construit** par ailleurs, et il faut le dire : `visudo -cf` valide le fichier
+temporaire **avant** tout déplacement, les chemins sont bornés à `/etc/sudoers.d/rootwarden-*`, et un
+échec de validation lève plutôt que d'écrire. Le geste distant est sûr ; c'est sa présentation qui ne
+l'est pas.
+
+`server_user_policies.php` n'a **aucune garde** — et c'est correct : seize lignes qui redirigent, avec
+un `(int)` sur les deux paramètres, exactement comme la page cible les lit. Rien à corriger.
+
+#### Un lien contextuel perdu par le portage de D5
+
+`manage_access.php:139,210` pointe vers ces pages **avec `?server=X&user=Y`**. `/permissions`, qui
+porte ce fichier depuis D5, ne porte aucun de ces liens — mesuré, **0**. Les pages restent
+atteignables par leurs deux entrées de menu, mais sans leur contexte : il faut re-choisir la machine
+et le compte. À reprendre au portage de D9.
+
+### 5.1 Les deux défauts déjà autorisés, avec leurs lignes
+
+Le plan les porte en §7 sous « autorisés, donc à faire ». Vérifiés :
+
+- **`includes/manage_roles.php:85`** — `password_hash($new_password, PASSWORD_DEFAULT)` : ni
+  `BCRYPT_COST`, ni `passwordPolicyValidateAll()`, ni écriture dans `password_history`. Le chemin
+  administrateur **contourne entièrement** la politique de mot de passe que `auth/` applique ;
+- **`includes/manage_roles.php:93`** — le mot de passe généré est renvoyé **en clair dans le HTML** :
+  `t('roles.generated_password') . " : <strong>$new_password</strong>"`. Il finit dans l'historique du
+  navigateur et dans tout cache intermédiaire.
+
+Le second rejoint la règle du plan : **ne jamais renvoyer un mot de passe dans la réponse**.
+
+### 5.2 Le step-up : `adm/` en est le premier consommateur, et un des trois chemins est cassé
+
+Trois points d'API portent `stepUpRequire` (`auth/step_up.php:53`) : `delete_user.php:59`,
+`anonymize_user.php:40`, `update_permissions.php:60`. Le quatrième appelant du mécanisme est
+`api_proxy.php:63`, qui couvre les routes `/policy/*` de D9. **Le module ne peut donc pas être porté
+sans le panneau de step-up en page que le sous-lot A5 avait explicitement différé « à son premier
+consommateur ».** Le voici.
+
+Et le legacy n'a qu'un seul chemin d'ouverture du modal : la surcouche de `window.fetch`
+(`js/utils.js:38-49`). Or les trois points sont invoqués de trois manières différentes :
+
+| point d'API | comment il est appelé | le modal s'ouvre-t-il ? |
+|---|---|---|
+| `delete_user.php` | `fetch` — `includes/manage_users.php:402`, `js/admin.js:31` | **oui** |
+| `update_permissions.php` | **htmx** `hx-post` — `includes/manage_permissions.php:116` | **non** |
+| `anonymize_user.php` | rien ne l'appelle (§4.3) | sans objet |
+
+htmx 2.0.4 est embarqué (`js/htmx.min.js`) et n'utilise **que** `XMLHttpRequest` — zéro occurrence de
+`fetch` dans le fichier. La surcouche ne le voit donc jamais. Et sa configuration par défaut traite
+`[45]..` en `swap:false, error:true` ; aucun écouteur `htmx:responseError` n'existe dans le legacy.
+
+**Conclusion, établie par lecture et à confirmer au clic** : pour un rôle 3 qui n'a pas fait de step-up
+dans les quinze dernières minutes, basculer une permission dans l'onglet « Accès & Permissions » ne
+produit **rien du tout** — pas de bascule, pas de message, pas de modal. Et il n'existe aucun geste
+d'interface qui permette d'obtenir la marque `_step_up_update_permissions`. C'est la première mesure à
+prendre en caractérisant D5, et elle décide si le portage doit **reproduire** ce comportement ou le
+corriger. Il devra le corriger : le portage refuse déjà proprement (403 + `step_up_required`), il lui
+manque seulement le panneau.
+
+### 5.3 Ce que le portage gagne sans effort
+
+- **Le tiroir mobile du legacy ne porte que 3 des 6 entrées `adm/`** (`menu.php:247-249` : `admin_page`,
+  `server_users`, `platform_keys` ; absents : `audit_log`, `server_user_sudo`, `server_user_sftp`). La
+  navigation à source unique du portage en affichera **six**. C'est une amélioration, pas une
+  régression — **à déclarer dans `PARITE.md`** pour qu'elle ne soit pas lue comme un écart ;
+- **`adm/` ne porte aucun `.htaccess`** (vérifié : `find legacy/adm -name .htaccess` ne rend rien),
+  ce qui est le sujet d'INVENTAIRE §6.3. Laravel ne sert que `public/` : le problème disparaît.
+
+### 5.4 Ce que le portage devra construire, et qui n'existe pas encore
+
+- **33 `confirm()` / `prompt()` natifs** dans le module (plus 2 `hx-confirm`), là où la convention
+  impose un panneau de décision. C'est le plus gros gisement de dialogues natifs restant ;
+- `platform_keys.php:243` — `appendLog()` fait `content.innerHTML += ...` avec un message venu du
+  **backend** (`res.message`, `${res.name}: ${res.message}`). C'est la forme exacte du défaut relevé
+  sur `ssh/js/main.js`. La voie par le **nom de machine** est fermée : `validateServerName`
+  (`server_actions.php:46`) n'accepte pas `<`. La voie par le **message du backend** n'est ni prouvée
+  ni écartée — à trancher en portant D8, en échappant de toute façon ;
+- `includes/server_actions.php:113-148` — les actions `add_tag`, `remove_tag`, `add_note`, `delete_note`
+  acceptent un `machine_id` (et `delete_note` un `note_id`) **sans aucun filtre `user_machine_access`**.
+  Le rôle 2 suffit. `adm/includes/server_actions.php` figure déjà dans l'annexe A d'`INVENTAIRE.md` ;
+- le préfixe i18n **`audit.` est éclaté sur quatre catalogues** (`search.php`, `admin.php`, `tips.php`,
+  `terms.php`). Le piège « une traduction peut exister et être inaccessible » s'applique : mesurer dans
+  **quel fichier** vit chaque clé avant de la déplacer.
+
+### 5.5 Le volume i18n
+
+**543 clés, en FR et en EN**, sur cinq catalogues :
+
+| catalogue | clés utilisées par `adm/` |
+|---|---|
+| `admin.php` | 273 (`servers.` 72, `users.` 57, `roles.` 36, `admin.` 38, `perms.` 31, `access.` 19, `server_users.` 20) |
+| `policies.php` | 92 (`policies.` 70, `sftppol.` 18, `sudopol.` 4) |
+| `health.php` | 76 |
+| `platform.php` | 50 |
+| `notif_pref.php` | 21 |
+| `audit.` — **éclaté sur 4 fichiers** (`search`, `admin`, `tips`, `terms`) | 29 |
+| `nav.php` (fils d'Ariane) | 2 |
+
+C'est le plus gros transfert i18n du chantier : la parité FR/EN se vérifie **catalogue par catalogue,
+dans le même commit**. La ligne `audit.` est celle qui piège : la clé existe, mais pas forcément dans
+le fichier où on la cherche.
+
+---
+
+## 6. Décisions à porter à l'exploitant
+
+Séparées des constats, comme le veut la méthode.
+
+1. **`health_check.php` — que devient la page ?** Elle est aujourd'hui la seule vue d'ensemble de la
+   santé des 106 routes, et elle est **dangereuse par construction** (§3). Trois issues :
+   pointer **toutes** les routes sur `machine_id = 0` et ne plus tester que le contrat HTTP ; ne
+   déclencher les tests que sur un **clic explicite**, route par route, avec la machine **choisie** ;
+   ou ne pas la porter. Aucune n'est un portage fidèle, et la fidélité serait ici un défaut. **Rien ne
+   sera fait sur cette page sans arbitrage** ;
+2. **`/regenerate_platform_key`** (`platform_keys.php`) fait tourner la paire de clés de la flotte
+   entière : caractériser ce bouton demande la même autorisation que K4. À isoler dans son propre
+   geste, jamais dans une suite qui tourne en lot ;
+3. **`server_users.php` appelle `/delete_remote_user`** : supprimer un compte Unix sur une machine
+   réelle. Même régime que ci-dessus ;
+4. **Les quatre fichiers partagés de §1.2** : les sortir de `adm/` avant l'archivage, ou faire de
+   `adm/` le dernier module archivé ? La question ne bloque aucun sous-lot, mais elle doit être
+   tranchée **avant** le premier `git mv` ;
+5. **Le panneau de sauvegardes de `admin_page.php:425-473`** appelle `/admin/backups`, dont le module
+   `backups/` est archivé depuis longtemps. Le porter, ou le retirer avec l'archive à laquelle il
+   appartient ?
+6. **Les ~900 lignes de code mort de §4.5** : les retirer du legacy dans le même commit que le
+   portage du sous-lot correspondant, ou les archiver à part ?
+
+---
+
+## 7. Ce dont je ne suis pas sûr
+
+La section la plus utile, et elle est courte parce que le reste a été mesuré.
+
+- **Le silence de la bascule de permission (§5.2) est établi par lecture, pas par clic.** J'ai mesuré
+  que htmx 2.0.4 n'emploie que `XMLHttpRequest`, que la surcouche ne couvre que `fetch`, et qu'aucun
+  écouteur `htmx:responseError` n'existe. Je n'ai pas cliqué la case. C'est la **première** mesure de
+  la caractérisation de D5, et elle doit se faire au clic, sur le legacy, avant tout portage ;
+- **Le `TypeError` de la page SFTP (§4.1) est établi par lecture.** Les identifiants absents sont un
+  fait vérifiable au `grep` ; que le `catch` affiche bien `T.netError` reste à voir à l'écran ;
+- **La voie XSS de `appendLog` (§5.4)** n'est ni prouvée ni écartée : je n'ai pas cherché quel message
+  du backend pourrait contenir du balisage. Je n'ai pas non plus déclenché de déploiement pour le
+  savoir, et je ne le ferai pas sans autorisation ;
+- **`/exclude_user`** est déclaré dans `$ADMIN_ONLY_PREFIXES` et appelé par `platform_keys.php`, mais je
+  n'ai pas lu ce que la route fait côté backend ;
+- **Je n'ai pas lu `api_keys.php` en entier** (535 l.) : j'ai mesuré qu'il n'appelle aucune route
+  backend et connais ses gardes. Le détail de son CRUD reste à inventorier au moment de D7 ;
+- **Aucune capture n'accompagne cet inventaire** : il ne produit aucune interface. Les trois largeurs
+  se prennent au premier sous-lot qui rend une page — D1.

@@ -17,8 +17,10 @@ import datetime
 import threading
 from flask import Blueprint, jsonify, request
 
+from routes.helpers import resolve_ssh_creds as _resolve_ssh_creds
 from routes.helpers import (
-    require_api_key, require_role, require_machine_access, threaded_route, get_db_connection,
+    require_api_key, require_role, require_permission, require_machine_access,
+    threaded_route, get_db_connection,
     server_decrypt_password, get_current_user, logger,
 )
 from ssh_utils import ssh_session
@@ -34,43 +36,6 @@ bp = Blueprint('ssh_audit', __name__)
 
 # ── Helper : resolution credentials SSH ────────────────────────────────────
 
-def _resolve_ssh_creds(data):
-    """
-    Lookup credentials SSH en BDD via machine_id (securise - pas de credentials dans le HTML).
-    Retourne (ip, port, user, ssh_pass, root_pass, svc_account, machine_id, error).
-    """
-    machine_id = data.get('machine_id')
-    if not machine_id:
-        return None, None, None, None, None, False, None, "machine_id requis."
-
-    # Patch (bug/A09) : with-context + message generique (detail en log).
-    try:
-        with get_db_connection() as conn:
-            cur = conn.cursor(dictionary=True)
-            cur.execute(
-                "SELECT id, ip, port, user, password, root_password, "
-                "service_account_deployed, platform_key_deployed FROM machines WHERE id = %s",
-                (int(machine_id),))
-            row = cur.fetchone()
-    except Exception as e:
-        logger.error("Erreur BDD _resolve_ssh_creds (ssh_audit): %s", e)
-        return None, None, None, None, None, False, None, "Erreur BDD"
-
-    if not row:
-        return None, None, None, None, None, False, None, "Machine introuvable."
-
-    server_ip = row['ip']
-    server_port = row.get('port', 22)
-    ssh_user = row['user']
-    ssh_password = server_decrypt_password(row.get('password') or '', logger=logger) or ''
-    root_password = server_decrypt_password(row.get('root_password') or '', logger=logger) or ''
-    svc_account = row.get('service_account_deployed', False)
-    has_keypair = svc_account or row.get('platform_key_deployed', False)
-
-    if not ssh_password and not has_keypair:
-        return None, None, None, None, None, False, None, "Ni mot de passe ni keypair disponible."
-
-    return server_ip, server_port, ssh_user, ssh_password, root_password, svc_account, machine_id, None
 
 
 def _log_audit_action(machine_id, action, details, user_id='0'):
@@ -477,10 +442,52 @@ def ssh_audit_fix():
 
 @bp.route('/ssh-audit/policies', methods=['GET'])
 @require_api_key
+@require_permission('can_audit_ssh')
 @require_machine_access
 @threaded_route
 def ssh_audit_policies_get():
-    """Liste les policies d'audit pour une machine (ou globales)."""
+    """Liste les policies d'audit pour une machine (ou globales).
+
+    ══ E-211 : POURQUOI UNE PERMISSION, ET PAS UN PARAMETRE OBLIGATOIRE ═════
+
+    `@require_machine_access` ne garde RIEN ici, mais PAS pour la raison qu'on
+    croit — et cette precision compte, parce que la premiere redaction se
+    trompait de mecanisme.
+
+    Le decorateur LIT BIEN les parametres d'URL :
+
+        single = (data.get('machine_id') or request.args.get('machine_id')
+                  or data.get('server_id') or request.args.get('server_id'))
+
+    Avec `?machine_id=5`, il trouve l'identifiant et il verifie l'acces. Ce qui
+    le neutralise ici n'est pas la PROVENANCE du parametre, c'est son caractere
+    FACULTATIF : quand il est absent, la liste `ids` reste vide, `denied` reste
+    vide, et rien n'est refuse.
+
+    La distinction n'est pas academique. « Le decorateur ne lit pas la
+    query-string » aurait envoye corriger le decorateur — qui n'a rien a
+    corriger — au lieu de la route.
+    Quatrieme occurrence de « un garde sans objet ne garde rien » — et la pire
+    de la famille, parce que le repli rend un jeu de donnees PARFAITEMENT
+    COHERENT au lieu d'une erreur. Un repli permissif ressemble a de la
+    robustesse : le chemin non garde est celui qui a l'air de bien se comporter.
+
+    LA PORTEE EST ETROITE, ET IL FAUT LE DIRE. Sans `machine_id`, la requete ne
+    rend QUE les politiques globales (`WHERE machine_id IS NULL`) : il n'y a
+    AUCUNE lecture transverse du parc. La premiere redaction du releve des
+    gardes affirmait le contraire — elle a ete corrigee.
+
+    RENDRE `machine_id` OBLIGATOIRE aurait ete le reflexe, et il aurait ete
+    FAUX : la page legacy garde par la PERMISSION (`ssh-audit/index.php:13`),
+    pas par le parametre, et les politiques globales sont justement celles
+    qu'on consulte sans machine. Exiger le parametre aurait supprime un usage
+    legitime tout en laissant l'autorisation non verifiee.
+
+    On reprend donc la garde de la page qu'on porte, plutot que d'en inventer
+    une : c'est la meme lecon que les quatre implementations de
+    `_validate_username` (E-204) — une regle de securite se DERIVE de sa
+    source, elle ne se recopie pas.
+    """
     machine_id = request.args.get('machine_id')
 
     try:
@@ -757,8 +764,43 @@ def create_ssh_schedule():
         return jsonify({'success': False, 'message': 'Expression cron invalide'}), 400
 
     user_id, _ = get_current_user()
-    target_type = data.get('target_type', 'all')
-    target_value = data.get('target_value') or None
+    # ══ E-280 : UNE PORTEE RESTREINTE SANS SA VALEUR N'EST PAS « TOUT » ═════
+    #
+    # `target_type` est deja un ENUM en base — `enum('all','tag','environment',
+    # 'machines')`, et le mode SQL est STRICT sur InnoDB : une valeur inventee
+    # est REFUSEE (`ERROR 1265`, eprouve). La liste fermee existe donc, et le
+    # trou n'est pas la.
+    #
+    # Il est dans `target_value`, qui est `TEXT NULL` sans contrainte. Le
+    # planificateur exige `and schedule.get('target_value')` sur ses trois
+    # branches restreintes : une portee `tag` dont le champ est reste VIDE
+    # retombait donc dans le `else`, c'est-a-dire SUR TOUT LE PARC. Par une case
+    # laissee blanche, et sur une CRON — sessions SSH reelles, repetees, sans
+    # personne devant l'ecran, `srv-zabbix` compris.
+    #
+    # On refuse ici plutot que de corriger en silence : une planification dont
+    # la portee est vide n'a pas de sens, et la remplacer par « tout » serait
+    # exactement le repli qu'on ferme.
+    #
+    # Le controle du type est REDONDANT avec l'ENUM, et il est garde quand meme :
+    # sans lui la base leve et l'appelant recoit un 500 opaque, la ou un 400
+    # nomme ce qui ne va pas. *Une garde redondante qui ameliore le message n'est
+    # pas une garde inutile.*
+    PORTEES = ('all', 'tag', 'environment', 'machines')
+    target_type = (data.get('target_type') or 'all').strip()
+    target_value = (data.get('target_value') or '').strip() or None
+
+    if target_type not in PORTEES:
+        return jsonify({
+            'success': False,
+            'message': f"target_type doit valoir l'un de : {', '.join(PORTEES)}"
+        }), 400
+    if target_type != 'all' and not target_value:
+        return jsonify({
+            'success': False,
+            'message': (f"Une portee '{target_type}' exige target_value. "
+                        "Sans valeur, la planification viserait tout le parc.")
+        }), 400
 
     try:
         conn = get_db_connection()

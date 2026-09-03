@@ -31,7 +31,22 @@ from ssh_utils import execute_as_root
 
 _log = logging.getLogger(__name__)
 
-_USERNAME_RE = re.compile(r'^[a-z_][a-z0-9_-]{0,31}$')
+# E-198 : la CASSE seulement. Ce validateur recevait des noms DECOUVERTS —
+# `policies.py` les resout dans `server_user_inventory` — et refusait les
+# majuscules, donc `Timikana`, `Debian-exim` et `Debian-snmp`, trois comptes
+# reels du parc. Un compte reel ne pouvait pas recevoir de politique a cause
+# d'une majuscule.
+#
+# CE QUI N'EST PAS ELARGI, ET POURQUOI : le POINT. Le validateur des noms
+# decouverts (`configure_servers._valid_username`) l'accepte, mais `sudo`
+# ignore les fichiers de `/etc/sudoers.d` dont le nom en contient un — une
+# politique deployee pour `a.b` serait ecrite et JAMAIS APPLIQUEE. Je n'ai pas
+# pu le MESURER (`visudo -cf` valide le contenu, pas l'inclusion), donc le
+# point reste refuse : c'est la direction sure, et la question est remontee.
+#
+# Les deux domaines ne different donc pas d'UNE chose mais de DEUX, et une
+# seule est un defaut. « Avant d'unifier, nommer le domaine de chacune. »
+_USERNAME_RE = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_-]{0,31}$')
 _PATH_RE = re.compile(r'^/[A-Za-z0-9._/-]{1,510}$')
 
 SSHD_CONFIG_D_DIR = '/etc/ssh/sshd_config.d'
@@ -81,9 +96,38 @@ def render_policy(policy: dict) -> str:
     Retourne le contenu complet du fichier sshd_config.d/.
     """
     username = _validate_username(policy['username'])
+    # ══ E-147 : QUATRE REPLIS CONTREDISAIENT LA DOCSTRING DU MEME BLOC ═══
+    #
+    # La docstring ci-dessus documente la forme attendue : `sftp_only: True`,
+    # `allow_password_auth: False`, `allow_tcp_forwarding: False`,
+    # `allow_agent_forwarding: False`. Les valeurs par defaut du code etaient
+    # l'INVERSE des quatre, toutes vers le permissif.
+    #
+    # `sftp_only` est la plus grave : a `False`, le bloc ne pose ni
+    # `ForceCommand internal-sftp`, ni `PermitTunnel no`, ni `PermitTTY no` —
+    # **une cle omise transforme un compte SFTP restreint en compte SHELL**.
+    #
+    # Les quatre sont donc EXIGEES. `x11_forwarding` garde son repli a `False` :
+    # il est deja restrictif et conforme a ce que la docstring annonce.
+    #
+    # Reserve levee avant d'ecrire : `render_policy` n'a qu'UN appelant
+    # (`deploy_policy`), qui n'en a lui-meme qu'UN (`routes/policies.py:411`),
+    # et cette route compose ses sept cles a chaque appel. Aucun chemin vivant
+    # ne passe de dict partiel.
+    _obligatoires = ('sftp_only', 'allow_password_auth',
+                     'allow_tcp_forwarding', 'allow_agent_forwarding')
+    _absentes = [k for k in _obligatoires if k not in policy]
+    if _absentes:
+        raise ValueError(
+            "cles requises absentes de la politique SFTP : " + ', '.join(_absentes)
+            + " — aucune valeur permissive n'est supposee")
+
     sftp_only = bool(policy.get('sftp_only', False))
     chroot_dir = policy.get('chroot_dir')
     working_dir = policy.get('working_dir')
+    # Les `.get(..., True)` qui suivent sont desormais INATTEIGNABLES : la
+    # garde ci-dessus exige les quatre cles. Ils restent pour que la ligne
+    # se lise seule, mais ils ne decident plus de rien.
     allow_pw = bool(policy.get('allow_password_auth', True))
     allow_tcp = bool(policy.get('allow_tcp_forwarding', True))
     allow_agent = bool(policy.get('allow_agent_forwarding', True))

@@ -27,6 +27,7 @@ import logging
 
 from flask import Blueprint, jsonify, request
 
+from routes.helpers import resolve_ssh_creds as _resolve_ssh_creds
 from routes.helpers import (
     require_api_key, require_role, require_machine_access, threaded_route,
     get_db_connection, server_decrypt_password, logger,
@@ -40,42 +41,6 @@ bp = Blueprint('policies', __name__)
 
 # ── Helpers ─────────────────────────────────────────────────────────────────
 
-def _resolve_ssh_creds(data):
-    """Lookup credentials SSH en BDD via machine_id. Identique aux autres routes."""
-    machine_id = data.get('machine_id')
-    if not machine_id:
-        return None, None, None, None, None, False, None, "machine_id requis."
-
-    # Patch (bug) : with-context -> la connexion est fermee meme si execute leve
-    # (avant, conn.close() dans le try fuyait la connexion sur erreur).
-    # Patch A09 : message generique au client, detail en log (pas de f"...{e}").
-    try:
-        with get_db_connection() as conn:
-            cur = conn.cursor(dictionary=True)
-            cur.execute(
-                "SELECT id, ip, port, user, password, root_password, "
-                "service_account_deployed, platform_key_deployed FROM machines WHERE id = %s",
-                (int(machine_id),))
-            row = cur.fetchone()
-    except Exception as e:
-        logger.error("Erreur BDD _resolve_ssh_creds: %s", e)
-        return None, None, None, None, None, False, None, "Erreur BDD"
-
-    if not row:
-        return None, None, None, None, None, False, None, "Machine introuvable."
-
-    ip = row['ip']
-    port = row.get('port', 22)
-    ssh_user = row['user']
-    ssh_password = server_decrypt_password(row.get('password') or '', logger=logger) or ''
-    root_password = server_decrypt_password(row.get('root_password') or '', logger=logger) or ''
-    svc = row.get('service_account_deployed', False)
-    has_keypair = svc or row.get('platform_key_deployed', False)
-
-    if not ssh_password and not has_keypair:
-        return None, None, None, None, None, False, None, "Ni mot de passe ni keypair disponible."
-
-    return ip, port, ssh_user, ssh_password, root_password, svc, machine_id, None
 
 
 def _get_username_from_server_user_id(server_user_id: int, machine_id=None) -> str:
@@ -231,9 +196,25 @@ def sudo_deploy():
     if not username:
         return jsonify({'success': False, 'message': 'server_user introuvable'}), 404
 
+    # ══ E-144 : LE REPLI RETOMBAIT DU COTE PERMISSIF ═════════════════════
+    #
+    # C'etait `data.get('preset', 'apt_only')`. Une requete qui OMET `preset`
+    # obtenait donc `apt_only` — le prereglage dont la docstring de son propre
+    # module dit : « AVERTISSEMENT : ce preset est EQUIVALENT ROOT »
+    # (`sudo_manager.py:80`).
+    #
+    # Deviner un prereglage de privileges est une decision, et une decision ne
+    # se prend pas par defaut. Fail-closed : la cle est EXIGEE.
+    #
+    # Le portage envoie toujours `preset`, donc il ne rencontrait pas ce repli —
+    # c'est pour ca qu'il a survecu. Il restait ouvert pour tout autre appelant.
+    if not data.get('preset'):
+        return jsonify({'success': False,
+                        'message': 'preset requis'}), 400
+
     policy = {
         'username': username,
-        'preset': data.get('preset', 'apt_only'),
+        'preset': data.get('preset'),
         'nopasswd': bool(data.get('nopasswd', False)),
         'runas': data.get('runas', 'root'),
         'custom_rules': data.get('custom_rules', ''),

@@ -349,9 +349,28 @@ def deploy():
                 "systemctl restart rsyslog", root_pwd, logger=logger, timeout=30)
             restart_ok = (rst_code == 0)
 
-        _upsert_state(row['id'], rsyslog_version=version,
-                      forward_deployed=True,
-                      last_deploy_at=datetime.datetime.now())
+        # ══ L'ETAT PERSISTE SUIT LE VERDICT, IL NE LE PRECEDE PAS ═══════════
+        #
+        # Ce bloc ecrivait `forward_deployed=True` SANS regarder `syntax_ok` ni
+        # `restart_ok`, alors que la reponse rendait `success: false`. Un
+        # deploiement dont rsyslog refusait la configuration ou ne redemarrait
+        # pas laissait donc en base une machine marquee « transfert actif », et
+        # l'interface affichait cette pastille APRES avoir montre l'echec : le
+        # message disparait au rechargement, la pastille reste.
+        #
+        # `forward_deployed` signifie « la configuration RootWarden est ACTIVE
+        # sur cette machine ». Elle ne l'est que si la syntaxe a ete acceptee ET
+        # si le service a redemarre : les fichiers sont ecrits avant ces deux
+        # controles, donc leur presence sur le disque ne prouve rien.
+        #
+        # `last_deploy_at` n'est pose qu'en cas de succes : une tentative ratee
+        # n'est pas un deploiement, et l'afficher comme tel ferait croire que la
+        # machine a ete servie a cette date.
+        actif = bool(syntax_ok and restart_ok)
+        etat = {'rsyslog_version': version, 'forward_deployed': actif}
+        if actif:
+            etat['last_deploy_at'] = datetime.datetime.now()
+        _upsert_state(row['id'], **etat)
         _audit(user_id, 'deploy',
                f"machine_id={row['id']} version={version} templates={len(pushed)} "
                f"syntax={syntax_ok} restart={restart_ok}")
@@ -416,10 +435,32 @@ def uninstall():
     user_id, _ = get_current_user()
     ip, port, ssh_user, pwd, root_pwd, svc = _get_ssh_creds(row)
     try:
+        # ══ LE CODE DE RETOUR EST CAPTURE, ET IL DECIDE ════════════════════
+        #
+        # Cette route jetait entierement le resultat de sa commande, ecrivait
+        # `forward_deployed=False` sans condition, et rendait `success: True`
+        # quoi qu'il arrive. Un `rm` ou un `systemctl restart` en echec laissait
+        # donc l'ecran affirmer que le transfert etait retire alors qu'il
+        # CONTINUAIT.
+        #
+        # C'est le sens le plus grave des deux : quelqu'un qui retire le
+        # transfert pour une raison de conformite recevait une confirmation
+        # franche d'un geste qui pouvait n'avoir rien fait. Un deploiement rate
+        # fait perdre des journaux ; un retrait rate fait croire qu'on a cesse
+        # d'en envoyer.
         with ssh_session(ip, port, ssh_user, pwd, logger, service_account=svc) as client:
-            execute_as_root(client,
+            _, err_out, code = execute_as_root(client,
                 f"rm -f {_RW_FORWARD_CONF} {_RW_CONF_PREFIX}*.conf && systemctl restart rsyslog",
                 root_pwd, logger=logger, timeout=30)
+
+        if code != 0:
+            # L'etat n'est PAS touche : on ne sait pas ce qui reste en place, et
+            # ecrire `False` affirmerait un retrait qui n'a pas eu lieu.
+            _audit(user_id, 'uninstall_fail', f"machine_id={row['id']} code={code}")
+            return jsonify({'success': False,
+                            'message': 'Retrait echoue : le transfert peut etre encore actif',
+                            'stderr': (err_out or '')[-1500:]}), 500
+
         _upsert_state(row['id'], forward_deployed=False)
         _audit(user_id, 'uninstall', f"machine_id={row['id']}")
         return jsonify({'success': True})

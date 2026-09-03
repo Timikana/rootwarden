@@ -1,0 +1,34 @@
+-- ============================================================
+-- Migration 063 - Contrainte d unicite sur iptables_rules
+-- Version : 1.38.69
+-- ============================================================
+-- E-222. La copie en base des regles de pare-feu se fait par un DELETE suivi
+-- d un INSERT. Si le DELETE reussit et que l INSERT echoue, la copie est
+-- PERDUE sans que rien ne le dise. Le remede est un UPSERT
+-- INSERT ... ON DUPLICATE KEY UPDATE, qui exige une cle unique sur server_id
+--
+-- ETAT MESURE LE 2026-08-28, base du banc
+--   iptables_rules porte 0 ligne
+--   index PRIMARY sur id, et un index NON UNIQUE server_id celui de la cle
+--   etrangere
+--
+-- CE QUE CETTE MIGRATION NE FAIT PAS, ET POURQUOI
+--   Elle ne supprime PAS l index non unique existant. La cle etrangere a
+--   besoin d un index, la table est vide donc le gain d espace est nul, et le
+--   risque de retirer l index d une contrainte ne l est pas
+--
+-- CE QU ELLE NE REFERME PAS TOUTE SEULE
+--   La contrainte rend l UPSERT POSSIBLE, elle ne le pose pas. Tant que le
+--   code fait DELETE puis INSERT, le cas probable reste ouvert. Les deux vont
+--   ensemble, et la contrainte vient en premier parce qu elle ne casse rien
+--
+-- IDEMPOTENCE
+--   Le runner tolere errno 1061 cle en double. Rejouer cette migration sur une
+--   base qui porte deja la contrainte est donc sans effet
+--
+-- FENETRE
+--   Sans danger tant que la table est vide. Elle se ferme a la premiere copie
+--   enregistree si deux lignes partagent un server_id, l ALTER echouera
+-- ============================================================
+
+ALTER TABLE iptables_rules ADD UNIQUE KEY uq_iptables_rules_server (server_id)

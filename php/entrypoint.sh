@@ -38,7 +38,7 @@ echo "[RootWarden] Démarrage - SSL_MODE=${SSL_MODE}, SERVER_NAME=${SERVER_NAME}
 
 # ── Bootstrap des dépendances PHP (Composer) ─────────────────────────────────
 # Le README annonce qu'un simple "docker compose up -d" suffit.
-# Or le bind mount ./www -> /var/www/html peut exposer un dossier sans vendor/
+# Or le bind mount ./legacy -> /var/www/html peut exposer un dossier sans vendor/
 # ou avec un vendor/ partiel. On bootstrap donc automatiquement les dépendances
 # au premier démarrage si vendor/autoload.php est absent.
 if [ -f "${APP_DIR}/composer.json" ] && [ ! -f "${APP_DIR}/vendor/autoload.php" ]; then

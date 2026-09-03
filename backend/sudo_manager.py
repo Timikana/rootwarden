@@ -29,7 +29,22 @@ from ssh_utils import execute_as_root
 _log = logging.getLogger(__name__)
 
 # Username Linux : conforme a `useradd` standard - cf. NAME_REGEX de adduser(8)
-_USERNAME_RE = re.compile(r'^[a-z_][a-z0-9_-]{0,31}$')
+# E-198 : la CASSE seulement. Ce validateur recevait des noms DECOUVERTS —
+# `policies.py` les resout dans `server_user_inventory` — et refusait les
+# majuscules, donc `Timikana`, `Debian-exim` et `Debian-snmp`, trois comptes
+# reels du parc. Un compte reel ne pouvait pas recevoir de politique a cause
+# d'une majuscule.
+#
+# CE QUI N'EST PAS ELARGI, ET POURQUOI : le POINT. Le validateur des noms
+# decouverts (`configure_servers._valid_username`) l'accepte, mais `sudo`
+# ignore les fichiers de `/etc/sudoers.d` dont le nom en contient un — une
+# politique deployee pour `a.b` serait ecrite et JAMAIS APPLIQUEE. Je n'ai pas
+# pu le MESURER (`visudo -cf` valide le contenu, pas l'inclusion), donc le
+# point reste refuse : c'est la direction sure, et la question est remontee.
+#
+# Les deux domaines ne different donc pas d'UNE chose mais de DEUX, et une
+# seule est un defaut. « Avant d'unifier, nommer le domaine de chacune. »
+_USERNAME_RE = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_-]{0,31}$')
 
 # Chemin cible figé pour eviter path traversal via username
 SUDOERS_D_DIR = '/etc/sudoers.d'
@@ -166,7 +181,16 @@ def render_policy(policy: dict) -> str:
     Retourne le contenu complet du fichier sudoers.d, header + 1 ligne(s).
     """
     username = _validate_username(policy['username'])
-    preset = policy.get('preset', 'apt_only')
+    # ══ E-144, SECONDE OCCURRENCE — celle que le plan ne nommait pas ══════
+    #
+    # Corriger la seule route aurait laisse ce repli ARME pour tout autre
+    # appelant de `render_policy`. Ici comme la-bas : `apt_only` porte
+    # « AVERTISSEMENT : ce preset est EQUIVALENT ROOT » dans sa propre
+    # docstring (`:80`), et un prereglage de privileges ne se devine pas.
+    preset = policy.get('preset')
+    if not preset:
+        raise ValueError(
+            "preset requis : aucun prereglage sudo n'est applique par defaut")
     nopasswd = bool(policy.get('nopasswd', False))
     runas = policy.get('runas', 'root')
 

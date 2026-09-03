@@ -1,0 +1,61 @@
+--- a/backend/routes/supervision.py
++++ b/backend/routes/supervision.py
+@@ -492,7 +492,24 @@
+     elif platform == 'telegraf':
+         interval = overrides.get('interval') or '10s'
+         output_url = overrides.get('output_url') or global_cfg.get('telegraf_output_url') or ''
+-        output_token = global_cfg.get('telegraf_output_token') or ''
++        # ══ DECHIFFREMENT — SANS LUI, LE CORRECTIF D'ECRITURE CASSE TOUT ═══
++        #
++        # Ce contenu part dans la configuration de l'agent, sur la machine. Tant
++        # que la colonne etait en clair, la lire brute marchait. Des qu'elle est
++        # chiffree, la lire brute deploierait `sodium:…` COMME JETON — et
++        # l'agent echouerait a s'authentifier, SILENCIEUSEMENT, puisque rien ne
++        # verifie ce jeton apres coup.
++        #
++        # C'est pourquoi les deux moities sont dans le meme commit : le
++        # chiffrement seul ne laisse pas un defaut, il en CREE un pire —
++        # aujourd'hui le jeton est en clair et il FONCTIONNE ; apres, il serait
++        # chiffre et CASSE.
++        #
++        # `server_decrypt_password` rend '' sur une entree vide comme sur un
++        # echec (fail-closed) : un jeton illisible produit une configuration
++        # sans jeton, jamais une configuration avec du charabia.
++        output_token = server_decrypt_password(
++            global_cfg.get('telegraf_output_token') or '', logger=logger)
+         output_org = global_cfg.get('telegraf_output_org') or ''
+         output_bucket = global_cfg.get('telegraf_output_bucket') or ''
+         inputs = global_cfg.get('telegraf_inputs') or 'cpu,mem,disk,diskio,net,system'
+@@ -2337,10 +2354,29 @@
+             cur.execute("SELECT id FROM supervision_config WHERE platform = %s LIMIT 1", (platform,))
+             existing = cur.fetchone()
+ 
+-            # Chiffrer le token Telegraf si fourni
++            # ══ LE JETON TELEGRAF ETAIT STOCKE EN CLAIR ════════════════════
++            #
++            # Ce commentaire annoncait « Chiffrer le token Telegraf si fourni »
++            # et la fonction ne contenait AUCUN appel de chiffrement. Septieme
++            # occurrence de l'en-tete qui ment, et la premiere sur un secret.
++            #
++            # LE GARDE EST REPRIS DU PSK, LIGNE 671, ET IL FAIT DEUX CHOSES.
++            # Sans lui, une chaine VIDE serait chiffree en `sodium:…` — donc non
++            # vide — et le badge du portage, qui teste
++            # `telegraf_output_token <> ''`, annoncerait « jeton pose » pour un
++            # jeton absent. Le badge est juste AUJOURD'HUI parce que `''` reste
++            # `''` ; il le reste DEMAIN parce que `''` devient `None`.
++            #
++            # *Un garde en amont vaut mieux qu'un predicat corrige en aval* : il
++            # garde l'invariant « la colonne est vide, ou un secret chiffre
++            # reel », et aucun lecteur n'a a le savoir.
++            from encryption import Encryption
++            enc_jeton = Encryption()
+             telegraf_token = data.get('telegraf_output_token', '')
+-            if telegraf_token == '********':
+-                telegraf_token = None  # garder l'existant
++            if telegraf_token and telegraf_token != '********':
++                telegraf_token = enc_jeton.encrypt_password(telegraf_token)
++            else:
++                telegraf_token = None  # masque ou vide : garder l'existant
+ 
+             if existing:
+                 cur.execute("""

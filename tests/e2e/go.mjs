@@ -200,7 +200,7 @@ await testPage(page,5,'Dashboard','/index.php',['dashboard','serveur','server'])
 // =====================================================================
 const modules=[
   {p:'/ssh/',n:'SSH Keys',e:['SSH']},
-  {p:'/update/',n:'Updates',e:['jour','update']},
+  // `update/` porte sur Laravel (/mises-a-jour) et archive le 2026-08-20.
   {p:'/iptables/',n:'Iptables',e:['iptables']},
   {p:'/fail2ban/',n:'Fail2ban',e:['Fail2ban']},
   {p:'/services/',n:'Services',e:['service']},

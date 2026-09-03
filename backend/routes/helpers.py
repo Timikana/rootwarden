@@ -199,6 +199,7 @@ def get_current_user():
     if user_id <= 0:
         g._rw_user_cache = (0, 0)
         g._rw_user_perms = {}
+        g._rw_user_perms_temp = set()
         return g._rw_user_cache
 
     try:
@@ -217,6 +218,7 @@ def get_current_user():
                 )
                 g._rw_user_cache = (0, 0)
                 g._rw_user_perms = {}
+                g._rw_user_perms_temp = set()
                 return g._rw_user_cache
             role_id = int(row.get('role_id') or 0)
 
@@ -226,8 +228,54 @@ def get_current_user():
             prow = cur.fetchone() or {}
             perms = {k: bool(v) for k, v in prow.items() if k != 'user_id'}
 
+            # ══ LES PERMISSIONS TEMPORAIRES, QUE LES DEUX PORTAILS ACCEPTENT ═
+            #
+            # `legacy/auth/functions.php:296` et `laravel/.../Droits.php:64`
+            # accordent l'acces si la permission PERMANENTE est absente mais
+            # qu'un octroi TEMPORAIRE non expire existe. Le backend ne lisait
+            # que la premiere table : une page s'ouvrait et chacun de ses
+            # boutons prenait 403, sans que rien a l'ecran ne l'explique.
+            #
+            # Cet ecart etait deja NOMME dans `routes/ssh.py` le 2026-08-27, sur
+            # le choix de garder `role(2)` plutot qu'une permission sur
+            # `/deploy` : « un compte dont la permission est temporaire
+            # passerait la page et serait refuse ici ». Les 33 routes d'E-149 et
+            # E-152 ont reproduit exactement ce que ce commentaire refusait.
+            #
+            # LA REGLE EST DERIVEE DU LEGACY, PAS REINVENTEE : un octroi
+            # temporaire AJOUTE un droit, il n'en retire jamais, et le filtre
+            # est `expires_at > NOW()` — la meme borne, evaluee par la meme base.
+            # `machine_id` de cette table est volontairement IGNORE ici, parce
+            # que les portails l'ignorent : le backend ne doit pas etre plus
+            # strict que la page qu'il sert, c'est tout l'objet du correctif.
+            #
+            # ══ ET SON MODE D'ECHEC EST DELIBERE ════════════════════════════
+            #
+            # Cette requete a son PROPRE `try`. Sans lui, une table absente ou
+            # une erreur SQL remonterait au `except` englobant, qui rend
+            # `(0, 0)` — c'est-a-dire qu'un incident sur les permissions
+            # TEMPORAIRES refuserait TOUTE authentification, y compris
+            # permanente. Le repli retenu est l'ancien comportement : les
+            # temporaires ne comptent pas. Degrader vers ce qu'on faisait hier
+            # vaut mieux que fermer la porte a tout le monde.
+            temporaires = set()
+            try:
+                cur.execute(
+                    "SELECT permission FROM temporary_permissions "
+                    "WHERE user_id = %s AND expires_at > NOW()", (user_id,))
+                for trow in cur.fetchall() or []:
+                    nom = trow.get('permission')
+                    if nom:
+                        perms[nom] = True      # ajoute seulement, ne retire jamais
+                        temporaires.add(nom)
+            except Exception as e:
+                logger.warning("get_current_user: permissions temporaires illisibles "
+                               "pour user_id=%d (%s) - seules les permanentes comptent",
+                               user_id, e)
+
             g._rw_user_cache = (user_id, role_id)
             g._rw_user_perms = perms
+            g._rw_user_perms_temp = temporaires
             return g._rw_user_cache
         finally:
             conn.close()
@@ -235,6 +283,7 @@ def get_current_user():
         logger.error("get_current_user: erreur DB pour user_id=%d : %s", user_id, e)
         g._rw_user_cache = (0, 0)
         g._rw_user_perms = {}
+        g._rw_user_perms_temp = set()
         return g._rw_user_cache
 
 
@@ -270,8 +319,17 @@ def get_user_permissions():
 
 def require_permission(permission):
     """Decorateur : verifie que l'utilisateur possede la permission specifique.
-    Les permissions sont transmises par le proxy PHP via X-User-Permissions (JSON).
-    Superadmin (role_id >= 3) bypass la verification."""
+
+    Superadmin (role_id >= 3) court-circuite la verification.
+
+    ⚠ La phrase precedente disait « les permissions sont transmises par le proxy
+    PHP via X-User-Permissions (JSON) ». C'ETAIT PERIME, et cette docstring
+    contredisait celle de `get_user_permissions`, six lignes plus haut, qui dit
+    juste : les en-tetes ont ete abandonnes au durcissement A01-01 parce qu'ils
+    permettaient de FORGER n'importe quel droit. La source est la base.
+
+    La verification couvre les permissions PERMANENTES et les TEMPORAIRES non
+    expirees, comme les deux portails (`get_current_user`)."""
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -286,6 +344,13 @@ def require_permission(permission):
                     permission, user_id, role_id, request.path, request.remote_addr
                 )
                 return jsonify({'success': False, 'message': 'Permission insuffisante'}), 403
+            # Un droit accorde par un octroi TEMPORAIRE se trace : c'est une
+            # elevation bornee dans le temps, et la seule facon de savoir apres
+            # coup qu'un geste l'a employee est de le dire au moment ou il passe.
+            from flask import g as _g
+            if permission in (getattr(_g, '_rw_user_perms_temp', None) or set()):
+                logger.info("Permission TEMPORAIRE employee (%s) par user_id=%d "
+                            "role=%d sur %s", permission, user_id, role_id, request.path)
             return func(*args, **kwargs)
         return wrapper
     return decorator
@@ -346,6 +411,83 @@ def require_machine_access(func):
             return jsonify({'success': False, 'message': 'Acces refuse a cette machine'}), 403
         return func(*args, **kwargs)
     return wrapper
+
+
+def resolve_ssh_creds(data):
+    """Resout les identifiants SSH d'une machine a partir de son `machine_id`.
+
+    Rend un 8-uplet :
+        (ip, port, user, ssh_password, root_password, service_account, machine_id, erreur)
+    `erreur` vaut None en cas de succes ; sinon tous les autres champs valent
+    None/False et `erreur` porte le message a rendre au client.
+
+    ══ POURQUOI CETTE FONCTION VIT ICI, ET PAS DANS CINQ MODULES ════════════
+
+    Elle etait recopiee dans `iptables`, `ssh_audit`, `services`, `fail2ban` et
+    `policies`. Les cinq copies avaient CINQ empreintes distinctes, pour UNE
+    seule divergence de fond : `iptables` rendait un 7-uplet, sans `machine_id`.
+    Les quatre autres ecarts etaient un nom de variable locale et trois chaines
+    de journal.
+
+    C'est exactement le motif d'E-204 — quatre `_validate_username` dont une
+    avait pris du retard, et le retard a laisse passer un `..` jusqu'a une
+    session SSH — mais pris AVANT qu'il ne coute quelque chose. Elles etaient
+    d'accord aussi, jusqu'a ce qu'une bouge.
+
+    ══ CE QU'ELLE N'EST PAS : UNE GARDE ═════════════════════════════════════
+
+    Elle ne verifie AUCUN droit. Pas de `check_machine_access`, pas de bornage
+    au compte appelant : elle fait `SELECT … WHERE id = %s` et rend des
+    identifiants de connexion. L'autorisation est faite par
+    `@require_machine_access`, et par lui seul.
+
+    Ce qu'elle apporte est une PRECONDITION, pas une garde : en refusant de
+    travailler sans `machine_id`, elle rend VRAIE la premisse du decorateur.
+    Nommer une precondition « garde » est l'erreur de categorie qui produit les
+    commentaires qui affirment une protection que le code n'exerce pas — ce
+    depot en compte trois.
+
+    ══ DEUX CHOSES CHANGENT PAR RAPPORT AUX CINQ COPIES, ET C'EST TOUT ══════
+
+    1. `machine_id` rendu est `row['id']` — l'entier de la base — et non plus la
+       valeur BRUTE du client, qui pouvait etre la chaine `'5'`. Meme valeur,
+       type sur. Les copies rendaient ce qu'elles avaient recu.
+    2. Le journal nomme `request.path` au lieu du module. Les cinq copies
+       ecrivaient leur propre nom en dur ; la route est plus precise et ne peut
+       pas se desynchroniser d'un deplacement de fichier.
+
+    Le reste est IDENTIQUE, deliberement. En particulier `int(machine_id)` sur
+    une valeur non numerique leve, est rattrape par le `except` et rend
+    « Erreur BDD » — un message qui decrit mal la cause. `validate_machine_id`
+    dirait mieux, mais changerait le message rendu au client sur les 41 sites
+    d'appel : c'est une correction a part, pas un effet de bord d'unification.
+    """
+    machine_id = data.get('machine_id')
+    if not machine_id:
+        return None, None, None, None, None, False, None, 'machine_id requis.'
+    try:
+        with get_db_connection() as conn:
+            cur = conn.cursor(dictionary=True)
+            cur.execute(
+                "SELECT id, ip, port, user, password, root_password, "
+                "service_account_deployed, platform_key_deployed "
+                "FROM machines WHERE id = %s",
+                (int(machine_id),))
+            row = cur.fetchone()
+    except Exception as e:
+        logger.error("Erreur BDD resolve_ssh_creds (%s): %s", request.path, e)
+        return None, None, None, None, None, False, None, 'Erreur BDD'
+    if not row:
+        return None, None, None, None, None, False, None, 'Machine introuvable.'
+
+    ssh_password = server_decrypt_password(row.get('password') or '', logger=logger) or ''
+    root_password = server_decrypt_password(row.get('root_password') or '', logger=logger) or ''
+    svc_account = row.get('service_account_deployed', False)
+    has_keypair = svc_account or row.get('platform_key_deployed', False)
+    if not ssh_password and not has_keypair:
+        return None, None, None, None, None, False, None, 'Ni mot de passe ni keypair disponible.'
+    return (row['ip'], row.get('port', 22), row['user'], ssh_password,
+            root_password, svc_account, row['id'], None)
 
 
 def server_decrypt_password(encrypted_password, logger=None):

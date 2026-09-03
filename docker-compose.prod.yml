@@ -4,7 +4,7 @@
 # Apporte le hardening recommande par les audits securite :
 #
 # Audit v1.17.0 - FIND-3 :
-#   - retire les bind-mounts ./backend:/app et ./www:/var/www/html
+#   - retire les bind-mounts ./backend:/app et ./legacy:/var/www/html
 #     qui defaisaient le hardening de l'image baked
 #   - le code applicatif reste celui baked dans l'image construite
 #     en CI ; les volumes nommes/persistants pour data/logs/keys sont
@@ -54,11 +54,11 @@ services:
 
   php:
     volumes:
-      # Retire ./www:/var/www/html (utilise l'image baked).
+      # Retire ./legacy:/var/www/html (utilise l'image baked).
       # Conserve uniquement les volumes runtime/upload :
       - php_sessions:/var/www/sessions
-      - ./www/logs:/var/www/html/logs
-      # Patch : mount ./www/_ul retire (artefact : snapshot statique de la page
+      - ./legacy/logs:/var/www/html/logs
+      # Patch : mount ./legacy/_ul retire (artefact : snapshot statique de la page
       # login avec token CSRF en dur, non reference par le code).
       - ./php/php.ini:/usr/local/etc/php/php.ini:ro
       - ./certs:/var/www/certs:ro

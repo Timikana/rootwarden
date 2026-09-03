@@ -4,6 +4,40 @@ Tout ce qu'il faut savoir pour déployer, mettre à jour et opérer RootWarden e
 
 ---
 
+## 0. Deux frontends à exploiter, pas un
+
+Pendant la migration vers Laravel, **deux conteneurs servent une interface** contre la même
+base et le même backend :
+
+| conteneur | port | rôle |
+|---|---|---|
+| `rootwarden_laravel` | **8444** | le portage, la cible |
+| `rootwarden_php` | **8443** | l'ancien portail, déprécié partie par partie |
+
+**Conséquences pour l'exploitation :**
+
+- **une mise à jour rebâtit les deux.** Ne pas conclure qu'un portail va bien parce que
+  l'autre répond ;
+- **aucune migration de schéma côté Laravel.** La base appartient au backend Python et
+  évolue par `mysql/migrations/*.sql`, appliquées par `db_migrate.py`. Ne jamais lancer
+  `php artisan migrate` ;
+- **après un déploiement du portage** : `php artisan view:clear && php artisan view:cache`
+  dans `rootwarden_laravel`. Sans le cache de vues, Blade recompile à chaque requête (2 à
+  4,6 s contre 0,21 s) ;
+- **ne pas ajouter `config:cache` ni `route:cache`** pendant la migration : ils figeraient
+  des valeurs encore en mouvement ;
+- `laravel/.env` est généré au premier démarrage (`APP_KEY`) et **n'est pas versionné**. Toute
+  variable nouvelle passe par `srv-docker.env.example`, que `./maj.sh` fusionne ;
+- **une partie archivée rend 404**, et c'est voulu : c'est la preuve que plus rien ne la sert.
+  Les parties archivées vivent sous `legacy/_deprecated/`.
+
+**État et suite des opérations : [ROADMAP.md](ROADMAP.md).** Il porte aussi les décisions en
+attente, dont **le rétroportage vers `main` de `v1.37.16` et `v1.37.17`, deux correctifs de
+sécurité qui n'existent que sur la branche de migration**, et une **vulnérabilité présente en
+production** sur le chemin d'enrôlement 2FA.
+
+---
+
 ## 1. Déploiement initial
 
 ```bash
@@ -185,7 +219,7 @@ Les actions sensibles exigent une re-vérification TOTP fraîche (15 min) :
 - `delete_user`
 - `update_permissions`
 
-**Côté UI** : automatique. Un modal demande le code 2FA quand l'utilisateur clique sur l'action. Voir [www/js/utils.js](www/js/utils.js) (`window.rwOpenStepUpModal`).
+**Côté UI** : automatique. Un modal demande le code 2FA quand l'utilisateur clique sur l'action. Voir [legacy/js/utils.js](legacy/js/utils.js) (`window.rwOpenStepUpModal`).
 
 **Côté API** : si tu appelles `/adm/api/delete_user.php` sans step-up, tu reçois :
 ```json
@@ -204,7 +238,7 @@ Tu dois alors POST `/auth/step_up_verify.php` avec le code TOTP puis retry.
 | Déploiements SSH | `backend/logs/deployment.log` | ✅ (via configure_servers.py) |
 | Iptables | `backend/logs/iptables.log` | ✅ |
 | APT updates | `backend/logs/update_servers.log` | ✅ |
-| PHP | `www/logs/*.log` | (Apache standard) |
+| PHP | `legacy/logs/*.log` | (Apache standard) |
 | Audit (DB) | table `user_logs` | HMAC-SHA256 chained |
 
 ### Forwarding GELF (optionnel)

@@ -16,8 +16,9 @@ import re
 import logging
 from flask import Blueprint, jsonify, request
 
+from routes.helpers import resolve_ssh_creds as _resolve_ssh_creds
 from routes.helpers import (
-    require_api_key, require_role, require_machine_access, threaded_route, get_db_connection,
+    require_api_key, require_role, require_permission, require_machine_access, threaded_route, get_db_connection,
     server_decrypt_password, logger,
 )
 from ssh_utils import ssh_session
@@ -45,43 +46,6 @@ def _validate_service_name(name):
 
 # ── Helper : resolution credentials SSH ────────────────────────────────────
 
-def _resolve_ssh_creds(data):
-    """
-    Lookup credentials SSH en BDD via machine_id (securise - pas de credentials dans le HTML).
-    Retourne (ip, port, user, ssh_pass, root_pass, svc_account, machine_id, error).
-    """
-    machine_id = data.get('machine_id')
-    if not machine_id:
-        return None, None, None, None, None, False, None, "machine_id requis."
-
-    # Patch (bug/A09) : with-context + message generique (detail en log).
-    try:
-        with get_db_connection() as conn:
-            cur = conn.cursor(dictionary=True)
-            cur.execute(
-                "SELECT id, ip, port, user, password, root_password, "
-                "service_account_deployed, platform_key_deployed FROM machines WHERE id = %s",
-                (int(machine_id),))
-            row = cur.fetchone()
-    except Exception as e:
-        logger.error("Erreur BDD _resolve_ssh_creds (services): %s", e)
-        return None, None, None, None, None, False, None, "Erreur BDD"
-
-    if not row:
-        return None, None, None, None, None, False, None, "Machine introuvable."
-
-    server_ip = row['ip']
-    server_port = row.get('port', 22)
-    ssh_user = row['user']
-    ssh_password = server_decrypt_password(row.get('password') or '', logger=logger) or ''
-    root_password = server_decrypt_password(row.get('root_password') or '', logger=logger) or ''
-    svc_account = row.get('service_account_deployed', False)
-    has_keypair = svc_account or row.get('platform_key_deployed', False)
-
-    if not ssh_password and not has_keypair:
-        return None, None, None, None, None, False, None, "Ni mot de passe ni keypair disponible."
-
-    return server_ip, server_port, ssh_user, ssh_password, root_password, svc_account, machine_id, None
 
 
 def _log_service_action(machine_id, service: str, action: str, user_id: str = '0'):
@@ -104,8 +68,37 @@ def _log_service_action(machine_id, service: str, action: str, user_id: str = '0
 
 # ── Routes ──────────────────────────────────────────────────────────────────
 
+# ══ E-149 : LES HUIT ROUTES N'AVAIENT NI ROLE NI PERMISSION ═══════════════
+#
+# `can_manage_services` ne protegeait que l'ECRAN. Les huit routes ci-dessous —
+# dont `stop`, `disable` et `restart` — ne portaient que `@require_api_key` et
+# `@require_machine_access`, ce dernier etant inerte des le role 2.
+#
+# Reel dans le code, non exploitable par aucun compte du parc au moment de la
+# mesure — le seul role 2 detient la permission — mais trois gestes
+# d'administration ordinaires le rendaient vivant.
+#
+# DEUX CHOIX QUI NE SONT PAS DES OUBLIS :
+#
+# 1. PAS de `@require_role`. Les deux pages admettent le ROLE 1 porteur de la
+#    permission (`legacy/services/index.php:11-12`, et la route du portage).
+#    En ajouter un serait un durcissement que personne n'a demande, et il
+#    retirerait l'acces a des comptes qui l'ont legitimement.
+#    `require_permission` porte deja `if role_id >= 3` : le decorateur EST
+#    « cette permission OU role >= 3 ».
+#
+# 2. `/services/` n'est PAS ajoute a `ADMIN_SEULEMENT` cote passerelle. Cette
+#    liste exige le role >= 2, or la page admet le role 1 : l'y mettre
+#    CASSERAIT un chemin legitime. La passerelle n'a aucun mecanisme
+#    « permission » — le seul bon endroit est ici, sur le decorateur.
+#    Le mimetisme avec `/supervision/` serait une faute.
+#
+# L'ordre `permission` AVANT `machine_access` suit la convention du depot :
+# 34 routes portent les deux, 34 dans cet ordre, zero dans l'autre.
+
 @bp.route('/services/list', methods=['POST'])
 @require_api_key
+@require_permission('can_manage_services')  # E-149
 @require_machine_access
 @threaded_route
 def services_list():
@@ -126,6 +119,7 @@ def services_list():
 
 @bp.route('/services/status', methods=['POST'])
 @require_api_key
+@require_permission('can_manage_services')  # E-149
 @require_machine_access
 @threaded_route
 def services_status():
@@ -152,6 +146,7 @@ def services_status():
 
 @bp.route('/services/start', methods=['POST'])
 @require_api_key
+@require_permission('can_manage_services')  # E-149
 @require_machine_access
 @threaded_route
 def services_start():
@@ -188,6 +183,7 @@ def services_start():
 
 @bp.route('/services/stop', methods=['POST'])
 @require_api_key
+@require_permission('can_manage_services')  # E-149
 @require_machine_access
 @threaded_route
 def services_stop():
@@ -224,6 +220,7 @@ def services_stop():
 
 @bp.route('/services/restart', methods=['POST'])
 @require_api_key
+@require_permission('can_manage_services')  # E-149
 @require_machine_access
 @threaded_route
 def services_restart():
@@ -260,6 +257,7 @@ def services_restart():
 
 @bp.route('/services/enable', methods=['POST'])
 @require_api_key
+@require_permission('can_manage_services')  # E-149
 @require_machine_access
 @threaded_route
 def services_enable():
@@ -296,6 +294,7 @@ def services_enable():
 
 @bp.route('/services/disable', methods=['POST'])
 @require_api_key
+@require_permission('can_manage_services')  # E-149
 @require_machine_access
 @threaded_route
 def services_disable():
@@ -332,6 +331,7 @@ def services_disable():
 
 @bp.route('/services/logs', methods=['POST'])
 @require_api_key
+@require_permission('can_manage_services')  # E-149
 @require_machine_access
 @threaded_route
 def services_logs():

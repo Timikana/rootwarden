@@ -29,7 +29,7 @@ paths = [
     '''backend/bandit\.yml''',        # config scanner, contient des justifications prose
     '''tests/e2e/helpers\.mjs''',     # contient un TOTP_SECRET de test documente
     '''mysql/init\.sql''',
-    '''www/vendor/''',
+    '''legacy/vendor/''',
     '''backend/tests/''',
     '''obsidian-rootwarden/''',       # vault documentation : placeholders pedagogiques (openssl rand, etc.)
     '''docs/''',                       # documentation technique avec exemples de commandes
