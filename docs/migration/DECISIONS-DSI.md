@@ -5843,3 +5843,56 @@ message ; ne pas les transmettre coûte une mesure fausse par session.**
 
 **Le point 3 est celui que j'aurais manqué** : *une liste fermée dont une valeur signifie « champ libre »
 n'est pas une liste fermée.*
+
+---
+
+## Tour de 11:35 — le LOT est COMPLET, et « 172 » était périmé
+
+**Le LOT a fini. Le Lead rejoue les sept suites de supervision au repos** (`go-page-supervision-profils-crud`,
+pid 1510173). **Le banc n'est donc pas libre.**
+
+### ✅ La base est complète — et deux chiffres qui circulaient étaient faux
+
+    journaux   85 laravel + 82 legacy + 1 repertoire `bin`   = 168 entrees
+    declare    SUITES_LARAVEL 85 · SUITES_LEGACY 82          = 167 executions
+    -> 167 journaux pour 167 executions : RIEN N'A MANQUE
+
+    « 172 executions »   annonce par la session 4    PERIME
+    « 164 executions »   dans MA memoire (83+81)     PERIME — corrige a 167
+    FAIL cumules         54, exactement les sept suites de la fenetre de 500
+
+> **J'ai failli laisser publier « 168 sur 172 », qui se lit comme un LOT incomplet.** *Il est complet. Le
+> chiffre attendu avait grandi de 164 à 167 sans que personne ne remesure — et deux versions périmées
+> circulaient en même temps, l'une chez moi.*
+
+**C'est exactement la règle du plan** : *chaque chiffre porte sa commande de remesure, et une mesure sans
+horodatage est fausse dès qu'elle est relayée.* **Le mien datait du 2 septembre.**
+
+### ⚠ L'indicateur doc/code : cinquième franchissement, cinquième cause
+
+    0 code / 20 doc
+
+    tour 07:35   il compte le DSI, dont le perimetre est `docs/` seul
+    tour 08:35   sa definition exclut le harnais de test
+    tour 09:35   le banc occupe -> ecrire du code est INTERDIT
+    tour 10:35   idem, + l'heure est allee a l'audit demande par l'exploitant
+    tour 11:35   idem, + les vingt documents sont TROIS DOSSIERS DE DEFAUTS
+                 DE PRODUCTION que personne n'avait
+
+**Les vingt commits de documentation de cette heure comprennent `DOSSIER-19`, `DOSSIER-20` et
+`DOSSIER-21`** — *le fail-open sudo, la chaîne d'audit qui ne discrimine plus, et la liste blanche
+orpheline.* **Trois expositions de production, aucune trouvée par du portage.**
+
+### Ce que la délégation a produit, mesuré
+
+    c1   le FAIL-OPEN sudo (DOSSIER-19)          <- en cherchant a porter l'octroi
+    94   la chaine d'audit (DOSSIER-20)          <- angle 6 du pentest
+    94   la liste blanche orpheline (DOSSIER-21) <- angle 1 du pentest
+    0b   la REINITIALISATION DE MOT DE PASSE non portee  <- bloquant hors de toute liste
+    4f   trois correctifs relus, 6 attaques refutees, 3 reserves
+    c6   deux correctifs relus, un arbitrage inexistant demasque
+    5f   la spec de qualification de l'export RGPD
+
+**Et deux sessions ont corrigé la même erreur de ma part** — *« la branche n'a jamais été relue » était
+faux : elle l'a été deux fois, le 27/08 et le 02/09.* **J'ai envoyé trois sessions refaire un travail
+existant, en ignorant le document qui déplore ce coût exact à sa ligne 9.**
