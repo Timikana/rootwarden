@@ -144,6 +144,13 @@ class Fail2banController extends Controller
              * commit que le geste.
              */
             'conf_titre_desact', 'conf_texte_desact',
+            // F8 — la geolocalisation. MEME REGLE QUE F7 : une cle presente au
+            // catalogue et absente d'ICI rend du VIDE, et le vide ne se signale
+            // pas. Le panneau de F8 annonce un appel sortant EN CLAIR vers un
+            // tiers : un panneau vide y ferait consentir a une transmission
+            // que rien ne nomme.
+            'geo_bouton', 'geo_conf_titre', 'geo_conf_texte', 'geo_en_cours',
+            'geo_resultat', 'geo_locale', 'geo_inconnu', 'geo_echec', 'geo_journal',
         ] as $cle) {
             $textes[$cle] = __('fail2ban.' . $cle);
         }

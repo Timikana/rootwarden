@@ -64,7 +64,63 @@ return [
      * par aucun script du portage.
      */
     'non_porte_titre' => "Ce que cet onglet ne fait pas encore",
-    'non_porte_texte' => "Installer Fail2ban sur UNE machine, redémarrer le service et interroger la géolocalisation d'une adresse se font encore depuis l'ancien portail. Tout le reste est ici : l'état, les jails et leur désactivation, l'historique, la configuration, les journaux, les bans, la liste blanche et les deux gestes de parc.",
+    /*
+     * ⚠ L'ENUMERATION PERD UN ELEMENT, ET C'EST TOUT CE QU'ELLE PERD.
+     *
+     * Elle citait trois gestes : installer sur UNE machine, redemarrer le
+     * service, interroger la geolocalisation. Le troisieme est porte par F8 ;
+     * les deux autres restent. Le compte avait deja ete RETIRE en F7 — « quatre
+     * gestes » ne se corrige pas en « trois », il se remplace par
+     * l'enumeration, qui est la seule source.
+     */
+    'non_porte_texte' => "Installer Fail2ban sur UNE machine et redémarrer le service se font encore depuis l'ancien portail. Tout le reste est ici.",
+
+    // ══ F8 — LA GEOLOCALISATION D'UNE ADRESSE BANNIE ══════════════════════
+    //
+    // ⚠ CE GESTE EST UN APPEL SORTANT VERS UN TIERS, EN CLAIR.
+    //
+    // Le panneau NOMME le tiers et l'absence de chiffrement. « Un service
+    // tiers » laisse croire a une relation contractuelle ; « ip-api.com, en
+    // clair » dit ce qui se passe. Un panneau de decision qui reste vague ne
+    // decide rien.
+    //
+    // Il porte AUSSI le fait rassurant, mesure : les adresses privees, de
+    // bouclage et reservees ne partent pas — `fail2ban_manager.py` les rend
+    // « Local » sans aucun appel. Une personne qui decide doit savoir ce qui
+    // part ET ce qui ne part pas.
+    //
+    // ⛔ ET LA RESERVE DU BACKEND N'EST PAS RECOPIEE. Elle dit « l'IP est deja
+    // publique, donc fuite negligeable ». C'est faux : ce qui n'est pas
+    // public, c'est LE FAIT QUE NOTRE INFRASTRUCTURE L'A BANNIE. Un
+    // observateur du trafic sortant ne lit pas une adresse, il lit la carte de
+    // ce que nous bloquons. Une reserve fausse recopiee devient une
+    // justification.
+    'geo_bouton'     => 'Géolocaliser',
+    'geo_conf_titre' => 'Interroger un service tiers sur :ip ?',
+    'geo_conf_texte' => "L'adresse :ip sera transmise à ip-api.com, un service tiers, EN CLAIR — la requête part en HTTP, sans chiffrement. Les adresses privées, de bouclage et réservées ne sont jamais transmises : elles sont résolues localement.",
+    'geo_en_cours'   => 'Interrogation en cours…',
+    /*
+     * ⚠ LE RESULTAT RENDU DANS LA LIGNE NE REPETE PAS L'ADRESSE.
+     *
+     * `go-fail2ban-f4.mjs:566` mesure qu'une adresse bannie APPARAIT dans la
+     * liste, par `includes()` sur son `innerText`. Ma premiere redaction
+     * rendait « :ip — France (FR) » DANS la ligne : l'assertion serait devenue
+     * satisfiable par mon rendu et non par le ban.
+     *
+     * Elle n'aurait pas rougi — elle serait devenue vraie pour une autre
+     * raison. **Un faux vert sur une assertion de surete ne se signale
+     * jamais**, la ou un faux rouge se voit tout de suite.
+     *
+     * La cellule d'adresse porte deja l'IP ; la repeter n'ajoutait rien qu'un
+     * couplage. Le JOURNAL, lui, la porte — c'est un autre element, et une
+     * trace qui ne nomme pas son objet ne sert a rien.
+     */
+    'geo_resultat'   => ':pays (:code)',
+    'geo_locale'     => 'adresse locale, aucune requête n\'est partie.',
+    'geo_inconnu'    => 'le service n\'a pas su répondre.',
+    'geo_journal'    => ':ip — :detail',
+    'geo_echec'      => "La géolocalisation a échoué. :message",
+
     'non_porte_lien' => 'Ouvrir Fail2ban dans l\'ancien portail',
 
     // ── Sous-lot F2 : historique et frise ────────────────────────────────

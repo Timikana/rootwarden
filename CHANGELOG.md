@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.189** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.190** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,127 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.190 — E-360 : `fail2ban` F8, geolocaliser une adresse — un appel SORTANT, en clair, jamais exerce
+
+**Premiere capacite du chantier dont le non-exercice ne tient pas a un risque machine.** *Un geste
+destructeur sur une machine se repare ; un fait publie ne se depublie pas.*
+
+    fail2ban_manager.py:397   http://ip-api.com/json/<ip>      HTTP, PAS HTTPS
+    requetes vers /fail2ban/geoip pendant la mesure : []
+
+La sonde **compte et AVORTE**. Une requete sortante vers un tiers se journalise chez lui, se correle,
+et ne se retire pas.
+
+#### Le panneau NOMME le tiers, l'absence de chiffrement, ET ce qui ne part pas
+
+    « L'adresse 203.0.113.42 sera transmise a ip-api.com, un service tiers, EN CLAIR
+      — la requete part en HTTP, sans chiffrement. Les adresses privees, de bouclage
+      et reservees ne sont jamais transmises : elles sont resolues localement. »
+
+*« Un service tiers » laisse croire a une relation contractuelle ; « ip-api.com, en clair » dit ce
+qui se passe.* Et le fait rassurant est **mesure**, pas suppose : `is_private / is_loopback /
+is_reserved` rendent « Local » sans aucun appel.
+
+> **Un panneau qui n'annonce que le risque fait renoncer a un geste sur ; un panneau qui n'annonce
+> que la garantie fait consentir a un geste qui ne l'est pas.**
+
+#### ⛔ LA RESERVE DU BACKEND N'EST PAS RECOPIEE
+
+Elle dit *« l'IP est deja publique, donc fuite negligeable »*. **C'est faux.** L'adresse est publique ;
+ce qui ne l'est pas, c'est **LE FAIT QUE NOTRE INFRASTRUCTURE L'A BANNIE**. Un observateur du trafic
+sortant ne lit pas une adresse — il lit, requete par requete, **la carte de ce que nous bloquons**.
+
+*La reserve mesure la sensibilite de la DONNEE et pas celle de la RELATION.* **Une reserve fausse
+recopiee devient une justification.**
+
+#### ⚠ UN FAUX VERT EVITE SUR UNE ASSERTION DE SURETE
+
+Une session tierce m'a signale ceci avant que j'ecrive :
+
+    go-fail2ban-f4.mjs:566   presente: (liste.innerText || '').includes(adr)
+
+Elle mesure qu'une adresse bannie **apparait** dans la liste. Mon premier jet rendait
+`« :ip — France (FR) »` **dans la ligne**, et le bouton aurait pu s'appeler « Geolocaliser <ip> » :
+l'assertion serait devenue satisfiable **par mon rendu** et non par le ban.
+
+**Elle n'aurait pas rougi — elle serait devenue vraie pour une autre raison.** *Un faux vert sur une
+assertion de surete ne se signale jamais, la ou un faux rouge se voit tout de suite.*
+
+Le libelle est « Geolocaliser » seul, le resultat rendu est `:pays (:code)` sans l'adresse, et le
+JOURNAL — un autre element — la porte. **Et la propriete est MESUREE** : on retire la cellule
+d'adresse du clone et on regarde s'il en reste une trace.
+
+    l'adresse subsiste-t-elle SANS sa cellule ?   false
+
+#### Les quatre issues ne se confondent pas
+
+    pas de reponse       -> le geste a echoue
+    countryCode « LO »   -> RIEN N'EST PARTI, l'adresse est locale
+    countryCode « ?? »   -> le tiers n'a pas su repondre
+    sinon                -> un pays
+
+*Confondre les deux du milieu ferait croire a une transmission qui n'a pas eu lieu, ou a un silence
+qui n'en est pas un.*
+
+#### L'enumeration perd UN element, et c'est tout ce qu'elle perd
+
+    avant  « Installer sur UNE machine, redemarrer le service ET interroger la
+             geolocalisation se font encore depuis l'ancien portail »
+    apres  « Installer sur UNE machine et redemarrer le service … »
+
+Le COMPTE avait deja ete retire en F7 : *« quatre gestes » ne se corrige pas en « trois », il se
+remplace par l'enumeration, qui est la seule source.* Elle vient d'en perdre un, et elle reste juste.
+
+#### Les neuf cles sont TRANSMISES
+
+`Fail2banController` porte une liste EXPLICITE — l'exposition d'E-353, payee sur F7 il y a six
+heures. *Un panneau vide y ferait consentir a une transmission que rien ne nomme.*
+
+#### ⚠⚠ MA PREMIERE MESURE ETAIT VIDE, ET DEUX DE SES VERTS L'ETAIENT AUSSI
+
+    jail ouverte : false · ligne rendue : false
+    « libelle sans l adresse : true »              <- VRAI SUR RIEN
+    « l adresse subsiste sans sa cellule : false » <- VRAI SUR RIEN
+
+**Un zero sur un objet absent n'est pas une mesure**, et les deux allaient dans le sens qui rassure.
+Un garde a ete pose : *si la fixture n'a pas pris, la sonde S'ARRETE au lieu de rendre des verts.*
+
+Trois causes, toutes trouvees en MESURANT plutot qu'en ajustant :
+
+1. la forme de `/fail2ban/status` etait **supposee** — `jails: [{name, currently_banned}]`, pas un
+   tableau de serveurs ;
+2. `/fail2ban/services` ouvre `ssh_session` cote backend : non fournie, la page joignait la machine
+   pour de vrai ;
+3. **la page n'appelle JAMAIS `/fail2ban/status` au chargement** — le statut vient du CACHE en base,
+   et le rafraichir demande un geste explicite. Ma fixture n'avait rien a intercepter. Le journal des
+   URL reellement demandees l'a montre en une passe.
+
+#### Mesures
+
+    GET /fail2ban                       200
+    machine choisie                     Test-Server-Debian — relue AVANT de choisir,
+                                        et ce n'est pas `srv-zabbix`
+    ligne, bouton                       rendus · libelle « Geolocaliser », sans adresse
+    badge pays                          masque avant tout geste
+    panneau : ip-api.com                nomme
+              absence de chiffrement    nommee
+              fait rassurant            porte
+              reserve fausse            ABSENTE
+    requetes vers /fail2ban/geoip       []
+    erreurs JavaScript                  []
+    identifiants a l'ecran              []
+    parite i18n                         FR=197 EN=197, JEUX DE CLES compares
+
+#### ⛔ CE QUI N'A PAS ETE MESURE
+
+**L'appel lui-meme, et il ne le sera pas ici.** Le rendu du pays, les quatre issues et le cas de
+l'adresse locale sont **ecrits et non eprouves**.
+
+**Et la jail est FOURNIE** : `fail2ban` n'est pas installe sur ce banc (`fail2ban_status` : 1 ligne,
+`installed=0`), donc aucune adresse bannie ne se rend depuis de vraies donnees. *Ce qui est mesure
+est le RENDU sur une donnee fournie ; ce qui ne l'est pas, c'est qu'une machine reelle en produise
+une.*
 
 ### v1.38.189 — E-359 : `ssh_audit` A3, lire `sshd_config` — et la CONJONCTION scindee
 
