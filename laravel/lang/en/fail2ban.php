@@ -55,7 +55,32 @@ return [
     // The count is REMOVED, not reduced — see fr. The three remaining are
     // appaired one by one against the backend's 19 routes.
     'non_porte_titre' => "What this tab cannot do yet",
-    'non_porte_texte' => "Installing Fail2ban on ONE machine, restarting the service and looking up an address's geolocation are still done from the legacy portal. Everything else is here: state, jails and disabling them, history, configuration, logs, bans, the allowlist and the two fleet actions.",
+    // F8 removes ONE item from the enumeration and only that one — see the
+    // note in `lang/fr/fail2ban.php`.
+    'non_porte_texte' => 'Installing Fail2ban on ONE machine and restarting the service still go through the legacy portal. Everything else is here.',
+
+    // F8 — geolocating a banned address. THIS IS AN OUTGOING CALL TO A THIRD
+    // PARTY, IN CLEAR. The panel names the third party AND the absence of
+    // encryption; it also carries the reassuring fact that private, loopback
+    // and reserved addresses never leave. The backend's own reserve is NOT
+    // copied: "the IP is already public" measures the sensitivity of the DATA,
+    // not that of the RELATION — what is not public is that our infrastructure
+    // banned it.
+    'geo_bouton'     => 'Geolocate',
+    'geo_conf_titre' => 'Query a third party about :ip?',
+    'geo_conf_texte' => 'Address :ip will be sent to ip-api.com, a third-party service, IN CLEAR — the request goes over HTTP, without encryption. Private, loopback and reserved addresses are never sent: they are resolved locally.',
+    'geo_en_cours'   => 'Querying…',
+    // The in-row result does NOT repeat the address: `go-fail2ban-f4.mjs:566`
+    // asserts that a banned address APPEARS in the list, via `includes()` on
+    // its innerText. Repeating it here would make that assertion satisfiable
+    // by my rendering instead of by the ban — a false green, which never
+    // signals itself. The journal carries the address; the row already does.
+    'geo_resultat'   => ':pays (:code)',
+    'geo_locale'     => 'local address, no request was sent.',
+    'geo_inconnu'    => 'the service could not answer.',
+    'geo_journal'    => ':ip — :detail',
+    'geo_echec'      => 'Geolocation failed. :message',
+
     'non_porte_lien' => 'Open Fail2ban in the legacy portal',
 
     // ── Sub-lot F2: history and timeline ─────────────────────────────────

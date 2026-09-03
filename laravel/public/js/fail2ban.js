@@ -866,6 +866,41 @@ window.RW_FAIL2BAN = true;
             b.textContent = textes.debannir || '';
             b.addEventListener('click', function () { demandeDebannir(adresse); });
             tdAction.appendChild(b);
+
+            /*
+             * ══ F8 — LA GEOLOCALISATION ══════════════════════════════════
+             *
+             * ⚠ LE LIBELLE NE PORTE PAS L'ADRESSE, ET LE RESULTAT NON PLUS.
+             *
+             * `go-fail2ban-f4.mjs:566` mesure qu'une adresse bannie APPARAIT
+             * dans cette liste, par `includes()` sur son `innerText`. Un
+             * bouton « Geolocaliser <ip> » rendrait cette assertion
+             * satisfiable par le BOUTON et non par le BAN : elle ne rougirait
+             * pas, elle deviendrait vraie pour une autre raison. **Un faux
+             * vert sur une assertion de surete ne se signale jamais.**
+             *
+             * L'adresse vit dans la cellule voisine et dans le JOURNAL. Elle
+             * n'a pas besoin d'etre ici.
+             *
+             * Le span est declare AVANT le bouton : la fermeture capturerait
+             * la variable et non sa valeur, donc l'ordre inverse marcherait —
+             * mais il se relit comme un bug, et un lecteur ne devrait pas
+             * avoir a raisonner sur le hissage pour valider une ligne.
+             */
+            var pays = document.createElement('span');
+            pays.className = 'rw-badge';
+            pays.setAttribute('data-rw', 'f2b-geoip-pays-' + adresse);
+            pays.hidden = true;
+
+            var g = document.createElement('button');
+            g.type = 'button';
+            g.className = 'rw-bouton rw-bouton--discret rw-bouton--minuscule';
+            g.setAttribute('data-rw', 'f2b-geoip-' + adresse);
+            g.textContent = textes.geo_bouton || '';
+            g.addEventListener('click', function () { demandeGeo(adresse, pays); });
+            tdAction.appendChild(g);
+            tdAction.appendChild(pays);
+
             tr.appendChild(tdAction);
             corpsBannies.appendChild(tr);
         });
@@ -1018,6 +1053,65 @@ window.RW_FAIL2BAN = true;
                 agit('/fail2ban/ban',
                     { machine_id: parseInt(o.value, 10), jail: jailCourante, ip: adresse });
             });
+    }
+
+    /*
+     * ══ F8 — INTERROGER UN TIERS SUR UNE ADRESSE ════════════════════════
+     *
+     * ⚠ C'EST UN APPEL SORTANT, EN CLAIR, VERS UN SERVICE TIERS.
+     *
+     *     fail2ban_manager.py:397   http://ip-api.com/json/<ip>   HTTP, pas HTTPS
+     *
+     * Le panneau NOMME le tiers et l'absence de chiffrement : « un service
+     * tiers » laisse croire a une relation contractuelle, « ip-api.com, en
+     * clair » dit ce qui se passe. Il porte AUSSI le fait rassurant — les
+     * adresses privees, de bouclage et reservees ne partent pas, elles sont
+     * resolues localement.
+     *
+     * *Un panneau qui n'annonce que le risque fait renoncer a un geste sur ;
+     * un panneau qui n'annonce que la garantie fait consentir a un geste qui
+     * ne l'est pas.*
+     *
+     * ⛔ LA RESERVE DU BACKEND N'EST PAS RECOPIEE. Elle dit « l'IP est deja
+     * publique, donc fuite negligeable ». C'est faux : ce qui n'est pas
+     * public, c'est LE FAIT QUE NOTRE INFRASTRUCTURE L'A BANNIE — un
+     * observateur du trafic sortant ne lit pas une adresse, il lit la carte de
+     * ce que nous bloquons. Une reserve fausse recopiee devient une
+     * justification.
+     */
+    function demandeGeo(adresse, hotePays) {
+        demande('geo_conf_titre', 'geo_conf_texte', { ip: adresse }, function () {
+            ferme();
+            if (hotePays) {
+                hotePays.hidden = false;
+                hotePays.textContent = textes.geo_en_cours || '';
+            }
+            litDistant('/fail2ban/geoip', { ip: adresse }).then(function (d) {
+                /*
+                 * QUATRE ISSUES, ET ELLES NE SE CONFONDENT PAS :
+                 *   pas de reponse      -> le geste a echoue
+                 *   countryCode « LO »  -> RIEN N'EST PARTI, l'adresse est locale
+                 *   countryCode « ?? »  -> le tiers n'a pas su repondre
+                 *   sinon               -> un pays
+                 *
+                 * Confondre les deux du milieu ferait croire a une
+                 * transmission qui n'a pas eu lieu, ou a un silence qui n'en
+                 * est pas un.
+                 */
+                if (! d) {
+                    if (hotePays) { hotePays.textContent = ''; hotePays.hidden = true; }
+                    journalise(remplit('geo_echec', { message: '' }), true);
+
+                    return;
+                }
+                var code = String(d.countryCode || '??');
+                var detail = code === 'LO' ? (textes.geo_locale || '')
+                    : code === '??' ? (textes.geo_inconnu || '')
+                    : remplit('geo_resultat', { pays: String(d.country || ''), code: code });
+                if (hotePays) { hotePays.textContent = detail; hotePays.hidden = false; }
+                journalise(remplit('geo_journal', { ip: adresse, detail: detail }), false);
+            });
+        });
     }
 
     function demandeDebannir(adresse) {
