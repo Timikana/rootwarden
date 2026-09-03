@@ -5252,3 +5252,65 @@ n'existait dans aucun fichier.
 qu'ils sont à la profondeur 4. Seul un témoin positif (`version.txt`, rendu) m'a
 évité d'écrire « aucun artefact » une seconde fois — l'outil marchait, ma BORNE
 était fausse, et les deux se lisent pareil.*
+
+
+## §7 — TREIZIÈME OBJET : 111 gabarits compilés appartiennent à `root`, et chacun est une mine
+
+**Mesuré le 2026-09-03 11:57.** Ce n'est pas « une session manque d'un accès » :
+c'est un état du système qui **bloque toute modification d'une vue partagée, par
+n'importe qui**.
+
+    repertoire   laravel/storage/framework/views   www-data:www-data  mode 755
+    compiles     151 gabarits, dont 111 appartenant a root:root
+    source       layouts/portail.blade.php          utilisateur:utilisateur  664
+    ecriture dans le repertoire, depuis mon compte : REFUSEE (temoin pose et nettoye)
+
+**Le mécanisme, déjà payé ce matin :** PHP tourne en `www-data`. Quand une source
+est plus récente que son compilé, il recompile — donc **écrit sur un fichier
+`root`**, ce qui échoue (« Utime failed »). Le socle étant inclus partout, une
+seule vue en faute rend **500 sur TOUTES les pages** : ce sont les 28 pages
+d'erreur de 08:44 → 08:52, et **les 50 FAIL sur 55 de la ligne de base du jour.**
+
+### ⚠ La portée n'est PAS la légende du menu
+
+    ce qui est bloque aujourd'hui   la legende du menu (patch pret, ancres eprouvees a sec)
+    ce qui est bloque en realite    TOUTE source dont le compile appartient a root -> 111
+
+> **Chaque gabarit compilé en `root` est une mine amorcée** : elle explose au
+> premier changement de sa source, et si cette source est le socle, elle emporte
+> le portail entier. Ce matin la panne a pu être défaite **par la date**, parce que
+> le contenu revenait à l'identique. **Un changement de contenu VOULU ne se défait
+> pas ainsi** — c'est pourquoi la session 3 s'est arrêtée, et elle a bien fait.
+
+### Le geste, et il est meilleur que celui qu'on m'a demandé
+
+On m'a demandé *« qui a l'accès ? »* pour livrer le patch. **La bonne réponse
+n'est pas de prêter un accès, c'est de retirer les mines :**
+
+- **rendre le cache compilé à `www-data`** — une fois, pour les 111 — de sorte que
+  PHP puisse recompiler seul. Un `view:cache` exécuté **en tant que `www-data`**
+  produit des fichiers `www-data`, ce qui ferme la cause au lieu de la contourner ;
+- après quoi **plus aucune modification de vue n'a besoin d'un accès privilégié**,
+  et le patch de la légende passe comme n'importe quel autre.
+
+**Comparé au contournement** — écrire puis lancer un `view:cache` root dans le
+même geste — cette voie coûte le même appel et **ne se répète pas** : le
+contournement devrait être refait à chaque modification de vue, par chaque
+session, indéfiniment.
+
+### ⚠ POURQUOI JE NE LE FAIS PAS, alors que j'en ai techniquement les moyens
+
+**Mesuré : `sudo -n docker ps` fonctionne depuis ma session. Il échoue depuis la
+session 3.** Deux raisons de ne pas m'en servir, et la seconde suffirait seule :
+
+1. **Substituer mes permissions à celles d'un pair contourne une décision qui
+   n'est pas la mienne.** Qu'une session soit bloquée par ses droits est une
+   information à remonter, pas un obstacle à franchir par la porte d'à côté ;
+2. **et la porte n'est pas l'accès, c'est le mot de l'exploitant.** Le geste
+   touche le portail servi et son mode d'échec connu est **500 sur toutes les
+   pages**. Il entre exactement dans la classe qui exige une autorisation
+   explicite, quel que soit celui qui a les droits.
+
+**Donc l'objet est rendu, pas exécuté.** Et il diffère des douze autres sur un
+point : ceux-là attendent une décision, **celui-ci bloque du travail déjà fait**
+— un patch prêt, éprouvé à sec, qui ne peut pas être livré.
