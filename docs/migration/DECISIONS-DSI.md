@@ -4704,3 +4704,64 @@ l'exploitant : le parc entier, l'écriture dans `sshd_config`, le scan CVE de ma
 > `documentation.php` et sa console d'API, joignable tant qu'elle est servie —, **treize dossiers non
 > signés** et **trois migrations non appliquées**. *La fin du portage des gestes n'est pas la mort du
 > legacy, et confondre les deux serait la dernière erreur de compte de ce chantier.*
+
+---
+
+## Tour de 04:35 — F8 livrée, une seule capacité reste, et l'indicateur doc/code m'accuse à tort
+
+**Banc libre, arbre propre. `69072c0` à 03:50 : F8, la géolocalisation, livrée par la session 3.**
+
+### Vérifiée, pas crue
+
+    laravel/lang/fr/fail2ban.php:100  nomme `ip-api.com`, dit EN CLAIR, dit HTTP,
+                                      et porte le fait rassurant (privees non transmises)
+    laravel/lang/en/fail2ban.php:71   parite tenue, MEME commit
+    aucune cle `np_geo*`              l'absence est RETIREE, pas doublee
+    grep socle_avertissement laravel/ tests/   ->  ABSENT, declaration TENUE
+
+**Les trois choses faciles à rater ont été faites** : *nommer le tiers plutôt que « un service tiers »,
+dire HTTP, et porter ce qui NE part pas.* **Et le geste n'a pas été exercé.**
+
+### ⚠ L'indicateur doc/code a franchi son seuil, et l'attaquer aurait été une erreur
+
+    17 doc / 7 code  =  2,43 pour 1     -> seuil franchi
+
+    dont a moi :  dsi 8 · dossier-00 1 · dossier-13 1   = 10
+    a l'equipe :  lead 2 · superv 1 · changelog 1 · capacites 1 · dossier-13 2  = 7
+
+**Sans moi : 7 doc / 7 code — exactement un pour un.**
+
+> **L'indicateur compte le DSI dans le numérateur, alors que mon périmètre d'écriture est `docs/`
+> uniquement.** *Il est donc structurellement condamné à franchir son seuil dès que je travaille — et le
+> franchissement ne mesure alors pas l'équipe, il mesure ma présence.*
+
+**J'étais mandatée pour dire « l'équipe écrit sur ses propres mesures au lieu de porter » et pour
+l'attaquer. La mesure dit que l'équipe porte à parité, et que l'écriture est la mienne.** *Un indicateur
+qu'on applique sans regarder qui il compte accuse celui qui n'a rien à se reprocher — et dédouane
+personne, ce qui est le pire des deux sens.*
+
+**Ce n'est pas un plaidoyer** : mes dix commits de cette nuit sont des arbitrages, un index et une
+correction de dossier. **Ils sont ma production, pas mon bavardage.** *Mais si le rapport doit servir à
+décider, il doit se calculer sur les sessions dont le périmètre inclut du code.*
+
+### Ce qui reste, et le compte a bougé de deux
+
+    np_relever   relever UN serveur   ENCORE ABSENT (:116, mesure 04:35)  -> session 3
+    ⛔ exploitant : relever tout le parc · MODIFIER sshd_config · scan CVE de masse
+
+**Une capacité. Puis les onze sont closes.**
+
+### Un piège que je n'ai PAS mesuré, et je le dis plutôt que de le taire
+
+**`fail2ban.js` a gagné 94 lignes ; je n'ai pas contrôlé que leurs classes CSS existent dans `rw.css`.**
+*PurgeCSS ne garde que le vu, ce dépôt l'a payé quatre fois, et aucune assertion DOM ne le voit.* **Je
+l'ai renvoyé à la session 3 au lieu de le porter au crédit de la livraison.**
+
+### État des effets sortants
+
+    origin/Migration-Laravel ... HEAD   ->  retard 0 · avance 26
+    git push  ->  REFUSE par le garde d'auto-mode de ma session
+
+**Le Lead a refusé de la lancer depuis la sienne, et il a eu raison** : *un garde de session refuse un
+geste ; le faire exécuter par une autre session ne le satisfait pas, il l'enjambe.* **L'exploitant est
+prévenu ; les 26 commits n'existent que sur ce disque.**
