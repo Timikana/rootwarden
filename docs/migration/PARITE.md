@@ -16829,3 +16829,74 @@ n'a pas eu lieu** — et elle a failli s'en contenter *parce que ce zéro allait
 
 **Le témoin `disable_jail`** — dont on **sait** qu'elle ouvre une session SSH — **est ce qui a rendu le
 second relevé lisible.**
+
+## E-357 — ⚠⚠ UN INSTRUMENT MUET ET UN INSTRUMENT QUI A MESURÉ RENDENT TOUS DEUX « RIEN »
+
+**La session 7 désigne elle-même cette leçon comme la seule à garder de la nuit. Je suis d'accord, et
+c'est le fil qui traverse tout ce registre.**
+
+    grep « N PASS, M FAIL »   ->  3 lignes VIDES     (le banc a TROIS formats de synthese)
+    grep « ^FAIL »            ->  0 ligne            (cette suite n'en prefixe aucune)
+
+**Les deux filtres portaient sur une forme qu'elle avait SUPPOSÉE** — et *elle avait mesuré ce défaut
+le matin même*, en comptant les journaux du LOT, **avant d'en écrire la conclusion**. Puis elle a
+construit deux filtres sur une forme unique, **quatre heures plus tard, dans la même session**.
+
+> **C'est la FORME DU RÉSULTAT qui trompe, pas la négligence** — un zéro, une chaîne vide, une absence.
+> *Rien ne distingue « j'ai regardé et il n'y a rien » de « je n'ai pas regardé ».*
+
+**Elle l'a payé quatre fois cette nuit, dont deux par le même `sed` à quinze heures d'intervalle.**
+
+### Le compte de la nuit, toutes sessions confondues
+
+    moi    `grep -c '^## E-'` comptait des TITRES                            (E-278)
+    moi    `fetch('…')` litteral -> 0, alors que 3 vivaient dans des helpers  (E-317)
+    moi    `route('export-cve')` -> 0, l'appel etant parametre                (E-317)
+    moi    `grep -i iptables` -> 0, la page s'appelle `pare-feu`              (E-317)
+    moi    `e.decrypt()` -> AttributeError avale, rendu « 0 dechiffrable »    (E-330)
+    moi    `uninstall` -> 0, le portage nomme `desinstallation`               (E-336)
+    moi    `'user_id' =>` -> 9 « ecritures » qui etaient des cles de charge   (E-344)
+    moi    aucune route POST /groupes -> la creation passe par la PASSERELLE
+    elle   `pgrep` auto-capture · `pkill` qui se tue lui-meme                 (E-320)
+    elle   la plage `sed` refermee sur la ligne suivante, 7 routes a zero
+    elle   deux filtres sur une forme unique, quatre heures apres l'avoir mesure
+    S2     un `grep` hors des helpers -> « aucune sauvegarde », il y en avait deux
+    S8     un `grep` de MOTS -> 10 dossiers sur 11 declares « clos »
+
+**Quatorze occurrences en une nuit, sur cinq sessions.** *Aucune n'était de la négligence : chacune était
+un instrument correct appliqué au mauvais objet, et rendant la sortie qui ressemble le plus à une
+réponse.*
+
+### La seule parade qui a fonctionné, à chaque fois
+
+**Le témoin — et il doit être OUVERT, pas ciblé.** *« Quelque chose fait bien X ici : par QUOI ? »*
+plutôt que *« trouve-t-on X sous la forme attendue ? »* — parce qu'un témoin qui n'exerce que l'idiome
+cherché prouve que l'instrument marche, **jamais qu'on cherche le bon objet** (E-295).
+
+**Et la forme la plus économique reste celle de la session 8** : *faire chercher le cas CONNU dans la
+même commande.* Si l'instrument trouve ce qu'il doit trouver, ses zéros sont des zéros.
+
+## E-358 — CONTOURNER LE RUNNER LUI A COÛTÉ UNE FAUSSE ALERTE
+
+    trois suites de supervision lancees a la file, dans une boucle a elle, SANS le runner
+    -> `profils-crud` : 10 PASS / 9 FAIL
+    -> elle etait « a un message d'annoncer que V13 avait casse une suite »
+
+    10 + 9 = 19    <- les MEMES dix-neuf assertions
+    rejouee seule  ->  19 · 0
+
+> **Le garde anti-rejeu TOTP est par COMPTE et EN BASE : il traverse les contextes de navigateur ET les
+> sessions de travail.** `rejouer-lot.sh` porte l'attente qui le neutralise. **Elle l'a contourné et a
+> perdu ce qu'il fournissait sans s'en apercevoir.**
+
+*C'est dans ses propres notes, et ça avait déjà fait déclarer deux suites « flaky » à tort.*
+
+**Un outil dont on ne connaît pas tous les services qu'il rend se contourne à ses risques** — et le
+service perdu ici n'était pas nommé dans le nom de l'outil. **Depuis, les quatre rejeux de la nuit sont
+passés par le runner.**
+
+### Et elle l'a rattrapé par l'arithmétique, pas par le soupçon
+
+**`10 + 9 = 19`, et 19 est le compte total de la suite.** *Un défaut réel n'aurait pas conservé la
+somme* — c'est la signature d'un basculement en masse, pas d'une régression. **L'ordre de grandeur est
+le dernier filet, et il a tenu.**
