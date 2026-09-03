@@ -69,6 +69,36 @@ peut faire tomber le portage sans le savoir.
   Formes qui voient un repertoire ignore : `--no-ignore`, ou une boucle shell
   sans `-r`.
 
+## ⚠ DEUX CLASSES D'INSTRUMENT FAUX, ET LA SECONDE NE SE TRAHIT PAS
+
+Relevés le 2026-09-03, à une heure d'intervalle, par deux sessions.
+
+    grep -rl 'rw-' <cache>        ->   0 fichier    la verite etait 48
+    grep -l 'sudo_preset'         ->  11 fichiers   la verite etait  1 ECRIVAIN
+
+**Le premier est un instrument AVEUGLE** : ripgpep respecte `.gitignore` (ci-dessus).
+**Le second est un instrument qui MESURE AUTRE CHOSE QUE SA QUESTION** : il compte des
+*mentions* là où la question portait sur des *écrivains*. Filtré sur `UPDATE|INSERT`, il rend 1.
+
+> **Le second est le plus dangereux : il rend un nombre plausible, et il allait servir à
+> contredire un pair.** *Le premier s'est trahi par un témoin à zéro ; le second n'aurait
+> rien trahi.*
+
+**How to apply :**
+
+- un compte de `grep` porte le nom de la **chose**, pas le **geste**. Pour compter des
+  écrivains, filtrer sur le verbe (`UPDATE`, `INSERT`, `DELETE`, `->execute`) ;
+- même piège sur l'atteignabilité : *citer* une route n'est pas y *mener*. Un compte de
+  mentions inclut les **auto-références** — `serveurs` en avait une centaine, presque
+  toutes dans son propre gabarit. Ancrer sur `href=`/`action=` et **exclure le fichier de
+  la page elle-même** ;
+- **et énumérer par ROUTE, jamais par MODULE.** Un module peut être atteignable pendant
+  qu'une de ses pages ne l'est pas : `notifications` est liée depuis le socle,
+  `notifications.reglages` ne l'est de nulle part — le préfixe partagé rend la confusion
+  invisible ;
+- ⚠ **une sonde fondée sur `glob` + lecture n'a pas la cécité de `grep`.** Contre-épreuve :
+  elle voit les 151 fichiers de `laravel/storage/framework/views`, que `grep -r` rend à 0.
+
 ## Ce que `banc-libre.sh` n'a pas vu
 
 Il a rendu **« RIEN VU »** du debut a la fin, pendant que les 28 exceptions
