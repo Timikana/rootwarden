@@ -5947,3 +5947,68 @@ qui l'a arrêté.**
 
 **Sa raison technique est bonne aussi** : *son rejeu tourne sur ce banc ; vider le cache de vues pendant
 qu'il tourne rejouerait l'incident de 08:44 — à l'échelle de 50 vues, comme je l'écrivais moi-même.*
+
+---
+
+## ✅ LIGNE DE BASE DU 2026-09-03 11:45 — et son attribution vaut plus que son total
+
+**Rendue par la session 4, recomptée par ses propres moyens. Les deux affirmations qui portent la
+conclusion, vérifiées par moi.**
+
+    167 executions (85 laravel + 82 legacy)  ·  2613 PASS  ·  55 FAIL
+
+    50 FAIL   incident du CACHE DE VUES, CLOS depuis 08:52
+     4 FAIL   defaut de SUITE (E-374) — pas du portage
+     1 FAIL   defaut REEL du LEGACY (go-bashrc-b4)
+    -------
+     0 FAIL   imputable au PORTAGE
+
+**Précédentes** : *164 · 2550 · 1 (02/09)* et *158 · 2439 · 0 (01/09)*. **⚠ L'attendu avait grandi de 164 à
+167 sans que personne ne remesure — deux versions périmées circulaient, dont la mienne.**
+
+### ✅ Ce que j'ai vérifié, et le témoin qualifie l'instrument
+
+    chemins d'ECRITURE bashrc dans laravel/  ->  0   (/bashrc/deploy, /bashrc/restore)
+    TEMOIN — fichiers mentionnant bashrc     ->  28
+    -> l'instrument voit le module ; l'absence d'ecriture est un FAIT
+
+**B4 n'est pas porté. Donc le seul défaut réel du lot vit dans un module qui meurt.**
+
+### Et la distinction que la session 4 pose est celle qui compte pour l'exploitant
+
+> **« *Réel* ne veut pas dire *à corriger*, et le compter avec les autres surestimerait le travail
+> restant. »**
+
+*Le legacy émet une requête pour deux machines cochées. C'est un vrai défaut, et le legacy meurt.* **Le
+portage fait structurellement l'inverse** : *il n'agit que si exactement une machine est cochée, et refuse
+sinon avec un message distinct.*
+
+### ⛔ Le treizième objet en attente, et il diffère des douze autres
+
+**Les 111 gabarits compilés appartenant à `root` ne bloquent pas une décision : ils bloquent du travail
+déjà fait.**
+
+    ils sont la cause de 50 des 55 FAIL de cette ligne de base
+    ils sont la cause des 28 pages d'erreur de 08:44 -> 08:52
+    et la portee n'est PAS la legende du menu : c'est TOUTE source dont
+      le compile appartient a root, soit 111
+
+> **Ce matin la panne s'est défaite PAR LA DATE, le contenu revenant à l'identique. Un changement de
+> contenu VOULU ne se défait pas ainsi.** *C'est pourquoi la session 3 s'est arrêtée avec un patch prêt et
+> éprouvé à sec, et elle a bien fait.*
+
+**Le bon geste est de FERMER LA CAUSE, pas de contourner** : *un `view:cache` exécuté **en tant que
+`www-data`** produit des fichiers `www-data`, donc PHP recompile seul.* **Le contournement — écrire puis
+`view:cache` root dans le même geste — coûte le même appel et devrait être refait à chaque modification de
+vue, par chaque session, indéfiniment.**
+
+### ⚠ Et la session 4 a DÉCLINÉ de le faire alors qu'elle en a les moyens
+
+    `sudo -n docker ps`   fonctionne depuis sa session, ECHOUE depuis la session 3
+
+**Deux raisons, et la seconde est la bonne** : *substituer ses permissions à celles d'un pair contourne une
+décision qui n'est pas la sienne* — **et la porte n'est pas l'ACCÈS, c'est le mot de l'exploitant.** *Le
+geste touche le portail servi et son mode d'échec connu est 500 partout.*
+
+**C'est le même refus que celui que le Lead m'a opposé vingt minutes plus tôt, formulé par une troisième
+session qui n'était pas dans l'échange.** *Trois sessions, trois refus convergents, aucune coordination.*
