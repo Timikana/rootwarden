@@ -5407,3 +5407,81 @@ porte. Elle les a rouvertes :**
 > **Sans le dernier, « non appelée » aurait été vrai et CREUX — et il aurait rempli une case du tableau
 > exactement comme un vrai résultat.** *C'est la meilleure application de « une universelle négative est
 > vraie à vide » que ce chantier ait produite, et elle porte sur son propre travail.*
+
+---
+
+## ⛔ RECTIFICATION 10:45 — `:3896` est CASSÉ, sur mon propre critère laissé inappliqué
+
+**Cassé par la session 3, à qui j'avais demandé d'essayer. Chaîne revérifiée par moi, site par site.**
+
+### Mon critère était juste, et je ne l'ai pas appliqué au geste
+
+> **Ce que j'avais écrit** : *« Exclure les archivées est juste pour un GESTE, faux pour une SÉLECTION. »*
+> *« Où l'exclusion existe légitimement : `scheduler.py`, `ssh_audit` — tous des chemins qui AGISSENT sur
+> le parc. »*
+
+**Le module `groups` offre un GESTE, et je ne l'ai pas examiné.**
+
+    groupes.js:521   ecris('/groups/' + id + '/run', { action: 'drift_scan' })
+    groups.py:286    @bp.route('/groups/<int:group_id>/run', POST) @threaded_route
+             :38     _BULK_ACTIONS = {'drift_scan', 'cve_scan'}
+
+    _member_ids:85   "SELECT machine_id FROM machine_group_members WHERE group_id = %s"
+                     <- SELECT NU, aucun filtre de cycle de vie
+    _run_bulk        drift_scan -> scan_machine(mid)
+                     cve_scan   -> « Reutilise tout le pipeline CVE
+                                     (SSH + enrichissement + persistance) »
+
+**Énumération, pas motif** : `lifecycle_status` apparaît **exactement deux fois** dans `groups.py` —
+`:36` comme **valeur de filtre autorisée** (donc `archived` est un filtre LÉGAL), `:247` dans un `SELECT`
+qui **rend** la colonne. **Aucune clause d'exclusion.**
+
+**Et la convention est établie SEPT fois ailleurs, pas quatre comme je l'avais citée :**
+
+    scheduler.py   274 · 279 · 292 · 299 · 457-458
+    ssh_audit.py   254 · 301
+
+### ⚠ Le défaut s'ARME PAR LE TEMPS, et c'est ce qui le rend invisible
+
+**`machine_group_members` est une table d'appartenance STATIQUE.** *Une machine ajoutée à un groupe
+aujourd'hui y reste quand elle passe `archived` le mois prochain.*
+
+> **Construire le groupe pendant que tout est actif, archiver une machine ensuite, lancer le groupe — et
+> une session SSH s'ouvre sur une machine décommissionnée.** *Personne n'a rien fait de mal, et rien dans
+> la chaîne ne le remarque.*
+
+### ⚠⚠ ET MA MESURE A ÉTÉ PRISE À VIDE — je l'ai citée comme élément RASSURANT
+
+    ce que j'avais releve : « machines archivees en base -> 0 (les trois sont `active`) »
+
+> **Avec zéro machine archivée, aucune observation ne distingue « correctement traité » de « pas traité du
+> tout ».** *La mesure ne rendait pas la propriété vraie : elle la rendait INOBSERVABLE — et elle figurait
+> au dossier du bon côté.*
+
+**C'est la forme que la session 3 venait d'éprouver sur ses trois « non appelées », dans l'autre sens** :
+*elle a pu montrer que les trois routes EXISTAIENT côté backend, donc que son négatif mesurait quelque
+chose.* **Mon zéro n'avait pas ce témoin, et je ne l'ai pas cherché.**
+
+### La portée réécrite
+
+> **La SÉLECTION n'est pas un défaut et ne se corrige pas.** *Le GESTE `/groups/<id>/run` en est un : il
+> agit sur le parc sans exclure les archivées, contrairement aux SEPT autres chemins agissants du dépôt.*
+
+**La session 6 avait tort sur la prémisse et raison de trouver quelque chose.** *J'ai fermé la question au
+lieu de déplacer sa portée.*
+
+> **« Ce n'est pas un défaut, et ça ne se corrige pas » est la phrase qui a dispensé tout le monde de
+> regarder le geste.** *C'est ma forme la plus coûteuse : pas une erreur de mesure, une FERMETURE DE
+> QUESTION.*
+
+### Ce qui n'est PAS établi, et la session 3 le dit plutôt que de l'arrondir
+
+    ETABLI par enumeration   la chaine /run ne porte aucun filtre de cycle de vie
+    ETABLI par enumeration   sept autres chemins agissants excluent, eux
+    NON ETABLI               s'il existe une machine archivee AUJOURD'HUI
+                             -> `docker` refuse l'acces, la base n'est pas relevee
+    NON ETABLI               qu'une session SSH s'ouvre reellement
+                             -> il faudrait LANCER le geste, et le scan CVE de masse
+                                est reserve a l'exploitant
+
+**Le défaut de CODE est établi ; son caractère ACTIF aujourd'hui ne l'est pas.**

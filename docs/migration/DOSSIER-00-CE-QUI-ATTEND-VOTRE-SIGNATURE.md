@@ -337,3 +337,32 @@ produit le premier rapport rassurant et faux.*
 - **si l'incident du 2026-09-01 a été vu par un utilisateur** — 29 secondes, aucun journal consulté ;
 - **combien de suites du LOT en cours ont traversé la fenêtre de sept minutes.** *La ligne de base rendue
   vers 11:15 peut porter des échecs qui n'appartiennent pas au code mesuré.*
+
+---
+
+## ⚠ AJOUT 10:45 — un correctif à faire AVANT d'autoriser un geste de masse par groupe
+
+**`POST /groups/<id>/run` — les actions `drift_scan` et `cve_scan` — n'exclut PAS les machines
+archivées**, alors que **sept autres chemins agissants du dépôt le font** (`scheduler.py` 274·279·292·299·457-458,
+`ssh_audit.py` 254·301).
+
+    _member_ids:85   "SELECT machine_id FROM machine_group_members WHERE group_id = %s"
+                     <- SELECT NU
+    _run_bulk        cve_scan -> « tout le pipeline CVE (SSH + enrichissement + persistance) »
+    lifecycle_status dans groups.py : 2 occurrences, aucune n'exclut
+
+**Le défaut s'arme par le TEMPS** : *l'appartenance à un groupe est STATIQUE. Une machine ajoutée
+aujourd'hui y reste quand elle passe `archived` le mois prochain.* **Construire le groupe, archiver
+ensuite, lancer le groupe — et une session SSH s'ouvre sur une machine décommissionnée, sans que personne
+ait mal agi.**
+
+**Ce qui est demandé** : *le scan CVE de masse par groupe est déjà réservé à votre mot.* **Ce dossier
+demande seulement que le correctif d'exclusion soit fait AVANT que ce mot soit donné**, et non après.
+
+**⚠ Et il est INERTE jusqu'au redémarrage** (`DOSSIER-01`) : *c'est du code `backend/`, lu au démarrage du
+processus.*
+
+**Ce qui n'est pas mesuré** : *s'il existe une machine archivée aujourd'hui — `docker` est refusé depuis
+les sessions, la base n'a pas été relevée* · *qu'une session SSH s'ouvre réellement : le démontrer
+demanderait de lancer le geste réservé.* **Le défaut de code est établi ; son caractère actif ne l'est
+pas.**
