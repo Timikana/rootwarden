@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.192** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.193** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,97 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.193 — E-363 : `groups` R4, supprimer un groupe — PROUVE, et le piege `deleted` eprouve
+
+**Geste DESTRUCTEUR et IRREVERSIBLE, et il est PROUVE** — pas seulement cable. *Un geste destructeur
+livre sans preuve est exactement celui qu'on ne rejoue jamais.*
+
+#### Il ne touche AUCUNE machine, et c'est verifie au SCHEMA
+
+    055_machine_groups.sql:30-31   ON DELETE CASCADE sur group_id ET machine_id
+    DELETE /groups/<id>            require_api_key + require_role(2)
+                                   + require_permission('can_admin_portal')
+    group_id hors groups.py        0 fichier   (TEMOIN : 18 occurrences dedans)
+    scheduler.py target_type 'group'   0 — aucune reference pendante apres coup
+
+Les APPARTENANCES partent avec le groupe ; le parc reste intact. *Mesure du schema, pas deduction de
+la docstring — et un soupcon qu'on ne clot pas se propage : le commentaire du backend dit vrai.*
+
+#### ⚠ LE PANNEAU RASSURE AUTANT QU'IL AVERTIT, ET C'EST LE POINT
+
+> **La peur qu'aura la personne devant l'ecran est « est-ce que je detruis mes machines ». La reponse
+> est NON, et le panneau doit la donner — sinon il fait hesiter sur le mauvais objet.**
+
+`np_supprimer_detail` est GARDEE pour cela : *« La suppression ne touche que le groupe : les serveurs
+qu'il rassemble ne sont pas modifies. »* **C'est la meme lecon que F8** — y taire que les adresses
+privees ne partent pas aurait fait renoncer a un geste sur.
+
+    nomme le GROUPE                  « Groupe vise : R4-SUPPRESSION-TEMOIN »
+    nomme le NOMBRE de membres       « Ce groupe rassemble 2 serveur(s) aujourd'hui. »
+    dit que les machines RESTENT     oui
+    dit que ca NE SE DEFAIT PAS      oui
+    TON du bouton                    `rw-bouton--danger`, et non le vert de
+                                     l'enregistrement — un ton qui survit a son
+                                     panneau est un mensonge de style
+    lien vers l'ancien portail       masque
+
+**Une portee ILLISIBLE ne bloque pas ce geste**, et c'est la difference avec le scan de derive : là
+où l'un AGIT sur N machines et exige donc de savoir combien, celui-ci n'en touche aucune. *Le nombre
+informe, il ne conditionne pas.*
+
+#### ⚠⚠ LE VERDICT N'EST PAS `success`, ET LE PIEGE EST EPROUVE
+
+    groups.py:225   return jsonify({'success': True, 'deleted': cur.rowcount > 0})
+
+**La route repond « success » meme quand elle n'a RIEN supprime.** Lire `success` annoncerait une
+suppression sur un groupe deja disparu — *le marqueur n'est pas le verdict*, meme famille qu'un flux
+qui finit par `code 127` puis annonce `SUCCESS`.
+
+**Provoque fidelement** : un groupe cree, AFFICHE, puis supprime EN COULISSE — la carte reste a
+l'ecran, et le clic tombe sur un groupe qui n'existe plus. *C'est la situation reelle de deux
+personnes qui suppriment le meme groupe.*
+
+    supprime en coulisse   {"deleted": true,  "success": true}
+    puis le clic de la page -> {"deleted": false, "success": true}
+
+    annonce   « Aucun groupe n'a ete supprime : « R4-DEJA-DISPARU » n'existait plus.
+                La liste est rechargee. »
+    classe    rw-annonce--attention   (et NON --ok)
+    la page dit-elle « est supprime » ?   false
+    dit-elle qu'AUCUN ne l'a ete ?        true
+
+> **Une suppression qui ne supprime rien doit le DIRE.** *Si la page affichait « groupe supprime » sur
+> `deleted: false`, elle mentirait sur un geste irreversible — et c'est pire que de ne rien afficher.*
+
+#### Un helper qui ne sait faire QU'UN `DELETE`
+
+`supprime(chemin)` ne prend pas de methode en parametre. Un `envoie(methode, chemin)` generique
+ouvrirait `PUT` et `PATCH` sans qu'aucun code les demande — *meme raison qu'en A2 pour `ecris()`.*
+
+#### Mesures, et l'etat rendu
+
+    panneau : les QUATRE proprietes ci-dessus, mesurees
+    suppression      DELETE /api/gateway/groups/13, une seule requete
+                     « Le groupe « … » est supprime. Les serveurs qu'il
+                       rassemblait n'ont pas ete modifies. »   rw-annonce--ok
+    piege            eprouve, la page ne mente pas
+    erreurs JavaScript   []
+    parite i18n      FR=72 EN=72, JEUX DE CLES compares
+
+    machine_groups         0 -> 2 temoins -> 0
+    machine_group_members  0 -> 0
+    machines               3 -> 3   LE PARC N'A PAS BOUGE
+
+**Les deux groupes supprimes sont les MIENS**, crees pour la preuve par le chemin porte (R2). *Aucun
+groupe fait par quelqu'un n'a ete touche — un geste qui ne se defait pas ne s'eprouve pas sur le
+travail d'autrui.*
+
+#### Ce qu'aucune suite ne couvrait, et qui est signale
+
+Le bouton de suppression existe sur chaque carte depuis R2, et **`go-page-groupes.mjs` n'en contient
+aucune occurrence** — le seul geste irreversible de la page n'avait aucune assertion. C'est signale a
+la session qui tient cette suite, avec le patron a reprendre.
 
 ### v1.38.192 — E-362 : `profil` disait d'aller ailleurs 48 lignes AU-DESSUS du formulaire — et la page se CONTREDISAIT
 

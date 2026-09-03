@@ -50,7 +50,43 @@ return [
     'np_ouvrir'     => "Ouvrir dans l'ancien portail",
     'np_fermer'     => 'Fermer',
 
-    'np_supprimer'  => 'La suppression de groupe n’est pas encore portée sur cette interface.',
+    /*
+     * ══ R4 — LA SUPPRESSION D'UN GROUPE EST PORTEE ════════════════════════
+     *
+     * `np_supprimer` est RETIREE. `np_supprimer_detail` NE BOUGE PAS — et
+     * c'est celle qui compte le plus : elle porte le FAIT RASSURANT.
+     *
+     * > La peur qu'aura la personne devant l'ecran est « est-ce que je detruis
+     * > mes machines ». La reponse est NON, et le panneau doit la donner —
+     * > sinon il fait hesiter sur le mauvais objet.
+     *
+     * Meme principe que F8 : porter le fait rassurant autant que le fait
+     * alarmant. Un panneau qui n'annonce que le risque fait renoncer a un
+     * geste sur.
+     *
+     * MESURES REFAITES plutot que relayees :
+     *   DELETE /groups/<id>   require_api_key + require_role(2)
+     *                         + require_permission('can_admin_portal')
+     *   055_machine_groups.sql:30-31   ON DELETE CASCADE sur group_id ET
+     *                                  machine_id — le commentaire du backend
+     *                                  dit vrai
+     *   group_id hors groups.py : 0 fichier   (temoin : 18 dedans)
+     *   scheduler.py, target_type 'group' : 0 — aucune planification ne
+     *                                  viserait un groupe, donc aucune
+     *                                  reference pendante apres coup
+     *
+     * ⚠ ET LE VERDICT N'EST PAS `success`. La route rend
+     * `{'success': True, 'deleted': rowcount > 0}` : elle repond « success »
+     * meme quand elle n'a rien supprime. `supprimer_introuvable` existe pour
+     * ce cas — le marqueur n'est pas le verdict.
+     */
+    'supprimer_titre'      => 'Supprimer ce groupe ?',
+    'supprimer_membres'    => 'Ce groupe rassemble :n serveur(s) aujourd\'hui.',
+    'supprimer_definitif'  => 'Cette suppression ne se défait pas : le groupe et ses appartenances disparaissent, et il faudra le recréer.',
+    'supprimer_valider'    => 'Supprimer le groupe',
+    'supprimer_fait'       => 'Le groupe « :nom » est supprimé. Les serveurs qu\'il rassemblait n\'ont pas été modifiés.',
+    'supprimer_introuvable' => 'Aucun groupe n\'a été supprimé : « :nom » n\'existait plus. La liste est rechargée.',
+    'supprimer_echec'      => 'Le groupe n\'a pas pu être supprimé. :message',
     'np_supprimer_detail' => "La suppression ne touche que le groupe : les serveurs qu'il rassemble ne sont pas modifiés.",
 
     // ══ R3 — LE SCAN DE DERIVE DE MASSE, PORTE ══════════════════════════
