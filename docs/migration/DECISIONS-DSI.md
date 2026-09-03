@@ -6190,3 +6190,78 @@ bloquée sur exactement ça depuis 08:44, et j'avais mis son blocage sur le comp
 
 **Ce qui n'est assigné à personne, et c'est volontaire** : *le durcissement de `laravel` dans `prod.yml`
 attend le mot de l'exploitant, et la légende du menu attend son `docker compose up -d`.*
+
+---
+
+## 13:25 — HIBP : un dédouanement VÉRIFIÉ, et une distinction qui vaut d'être gardée
+
+**La session 5 a pris la question ouverte que j'avais notée, l'a répondue, et a CORRIGÉ SA PROPRE
+QUESTION dans le sens qui l'affaiblit.** *Elle me l'a signalé en nommant le fait : « je te le signale dans
+le sens qui DÉDOUANE — celui où personne ne vient corriger une exagération ».*
+
+**Revérifié par moi, comme ma propre règle l'exige** (*un résultat qui arrange doit être remesuré PAR
+RÈGLE, puisqu'il ne le sera pas par réflexe*) :
+
+    legacy/auth/password_policy.php     (et NON legacy/includes/ — mon chemin etait faux)
+      :81  « Opt-in via env HIBP_ENABLED=true »
+      :82  « Si HIBP injoignable (reseau, timeout), on fail-open »   <- DECLARE au docstring
+      :35  passwordPolicyCheckComplexity   LOCAL
+      :50  passwordPolicyCheckHistory      LOCAL
+      :89  passwordPolicyCheckHIBP         RESEAU
+
+**Sa question disait : « la politique de complexité tombe pendant une panne réseau ». C'est faux, et elle
+le retire.** *Une coupure fait tomber **un contrôle sur trois** — celui du corpus de fuites. Longueur,
+classes et non-réutilisation sont locaux.*
+
+### La distinction qu'elle pose, et je la garde
+
+> **« Un fail-open DÉCLARÉ et un fail-open HÉRITÉ ne se traitent pas pareil. »**
+
+    HIBP   repli DECLARE au docstring · JOURNALISE a l'execution · BORNE a 3 s
+           + `HIBP_ENABLED=false` a l'exemple, « opt-in » a l'ARCHITECTURE,
+             « off par defaut » au CHANGELOG
+           -> la plateforme ne revendique PAS une protection qu'elle n'exerce pas
+
+    la limite de debit (a)   repli justifie par une raison QUI N'A PLUS D'OBJET
+                             (la table existe), et non presente comme un arbitrage
+
+**C'est le contraire du motif qu'on traque, et ça vaut d'être dit aussi.**
+
+### ⚠ Et une divergence d'OBJET entre nos deux mesures, pas de fait
+
+    elle (conteneur EN SERVICE)   HIBP_ENABLED=[]      temoin MAIL_ENABLED=[true]
+    moi (fichier d'EXEMPLE)       HIBP_ENABLED=false   MAIL_ENABLED=false
+
+**Les deux disent « pas `true` », donc la conclusion tient — par deux objets distincts.** *C'est « arbre ou
+service » pour la sixième fois de la semaine, et cette fois nous étions d'accord sans mesurer la même
+chose.*
+
+### ✅ Elle a aussi corrigé son §3.1 dans le sens qui AGGRAVE
+
+**Elle avait écrit** : *« la limite échoue ouverte sur erreur de base »*. **Vrai et insuffisant.**
+
+> **Même avec une base parfaitement saine, elle ne borne pas l'attaque qu'elle existe pour borner** — *le
+> compteur compte des JETONS ÉMIS, pas des DEMANDES REÇUES.* **« J'avais mesuré son mode de PANNE sans
+> mesurer son mode NOMINAL. »**
+
+### ✅ Et elle améliore ma propre exigence sur l'assertion d'inatteignabilité
+
+**J'avais exigé** : *une assertion « aucune vue ne lie cette route », verte maintenant, rouge dès que le
+lien sera posé.*
+
+> **Son ajout** : *« je regarderai aussi que l'assertion échoue pour la BONNE raison — une assertion
+> "aucune vue ne lie cette route" peut virer au vert parce que le balayage ne regarde plus au bon
+> endroit. **Un test d'inatteignabilité doit porter son propre témoin**, sinon il vieillit en silence. »*
+
+**C'est meilleur que mon exigence, et c'est la règle du témoin appliquée à un test au lieu d'une mesure.**
+*Une assertion négative sans témoin est une universelle négative vraie à vide — et je l'avais prescrite
+sans témoin, le jour où j'ai passé la matinée à l'exiger des autres.*
+
+### Et elle endosse le `Mail::queue`, qui était à elle
+
+> *« Une prescription n'est pas moins une affirmation qu'un constat — elle mérite la même mesure, et je ne
+> l'avais pas mesurée. »*
+
+**Je l'avais relayée sans la mesurer non plus.** *Nous l'avons donc commise à deux : elle en prescrivant,
+moi en transmettant.* **Et c'est la session 3, celle qui devait l'écrire, qui l'a arrêtée — le pair qui va
+AGIR dessus, pour la troisième fois aujourd'hui.**
