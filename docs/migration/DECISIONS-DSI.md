@@ -4585,3 +4585,63 @@ lui-même : il faut prouver que l'instrument a bien mordu avant de lire ce qu'il
 **Et sa frontière est écrite EN TÊTE du fichier, pas en note** : *les points « liste fermée offerte à
 l'écran » et « refus visible » vivent au banc — une suite hermétique n'a pas de navigateur.* **Le vert ne
 peut donc pas être lu comme une couverture du formulaire.**
+
+---
+
+## ✅ Le compte des déclarations MONTE quand le produit devient plus honnête — l'indicateur est mort
+
+**Mesuré le 2026-09-03 à 02:40.** *En une heure, trois capacités ont été portées et le compte est passé de
+30 à 32. J'ai cherché la régression ; il n'y en a pas.*
+
+    ssh_audit  7 -> 8      superv  3 -> 4
+
+### Ce que la hausse contient
+
+**Une déclaration NEUVE et légitime, née du portage lui-même :**
+
+    'cfg_lecture_seule' => « Ce contenu est affiche en lecture seule :
+                             la modification de `sshd_config` n'est pas portee ici. »
+
+> **Porter `sshd_config` en LECTURE a créé un écran qui doit dire qu'il n'écrit pas.** *La déclaration
+> n'existait pas avant parce que l'écran n'existait pas.*
+
+**Et un artefact de mon instrument** — *une ligne de COMMENTAIRE documentant une correction :*
+
+    « Elle disait "elle reste sur l'ancien portail". Mesure du 2026-09-03, … »
+
+**Mon motif compte le commentaire qui explique qu'une déclaration a été corrigée.** *Quatrième artefact de
+comptage sur le même objet en une nuit, et la même famille que `div` et `span` : le motif attrape la prose
+qui parle de l'objet au lieu de l'objet.*
+
+### ⚠ La conclusion, et elle est définitive
+
+> **Le compte des déclarations d'absence MONTE quand le produit devient plus honnête.** *Chaque écran
+> nouvellement porté qui reconnaît ce qu'il ne fait pas ajoute une ligne — et c'est exactement ce qu'on
+> lui demande.*
+
+**J'ai rapporté ce chiffre à l'exploitant pendant des heures comme un reste à porter.** *Il l'a été trois
+fois démenti : il sous-estime le périmètre (une clé peut porter neuf gestes), il surestime ce que le
+produit affirme (une clé peut n'atteindre aucun écran), et maintenant il monte quand on porte.*
+
+**Je cesse de le rapporter comme un reste.** *Ce qui reste à porter se lit dans
+`MODULE-CAPACITES-RESTANTES.md`, capacité par capacité, avec son objet — pas dans un `grep`.*
+
+---
+
+## État du tour — production saine, et deux sessions correctement inactives
+
+    code+test = 5   ·   doc = 3        (22h:0 · 23h:2 · 00h:6 · 01h:2 · 02h:3)
+
+    03afb0b  V13 — rattacher un serveur a un profil        <- mon arbitrage B, execute
+    bcc5d13  A3  — lire sshd_config, la CONJONCTION scindee <- la scission exigee, faite
+    35a3a5e  A3  — la branche fail-closed que rien ne mesurait
+    263f33f  audit-ssh 18 -> 25, « la moitie NON EPROUVEE dite dans la reference »
+    a84f3b8  planification ssh_audit — E-280 verrouille
+
+**Trois sessions produisent. Les sessions 2 et 4 n'ont rien livré depuis deux tours, et c'est correct :**
+
+    session 4   son patch Telegraf est PRET et attend le mot de l'exploitant
+    session 2   son audit des sept pages est CLOS
+
+> **Je ne leur invente pas de tâche.** *Une relance qui fabrique du travail pour remplir un tour est
+> exactement ce que la règle « 2 pour 1 » cherche à empêcher, dans l'autre sens.*
