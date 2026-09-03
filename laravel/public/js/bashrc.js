@@ -219,7 +219,28 @@
                 .map(function (b) { return b.value; });
 
             panneauApercu.hidden = false;
-            if (mid === null || comptes.length === 0) {
+
+            // E-376 : TROIS etats, un seul message. `chargeComptes` les separe
+            // deja vingt lignes plus haut — on lui applique sa propre
+            // convention plutot que d'en inventer une, et AUCUNE cle nouvelle
+            // n'est necessaire.
+            //
+            // Le defaut n'etait pas seulement d'etre peu discriminant :
+            // `apercu_vide` ne parle que des COMPTES (« Cochez au moins un
+            // compte »). L'afficher quand la MACHINE est en cause prescrivait
+            // le mauvais remede, a quelqu'un qui avait peut-etre deja coche
+            // ses comptes.
+            if (cases.filter(function (c) { return c.checked; }).length === 0) {
+                contenuApercu.textContent = textes.choisir || '';
+
+                return;
+            }
+            if (mid === null) {
+                contenuApercu.textContent = textes.plusieurs_cochees || '';
+
+                return;
+            }
+            if (comptes.length === 0) {
                 contenuApercu.textContent = textes.apercu_vide || '';
 
                 return;

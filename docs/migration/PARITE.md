@@ -114,6 +114,56 @@ authentifie.*
 
 ---
 
+## E-376 — un message qui prescrit le MAUVAIS remede
+
+**Corrige le 2026-09-03 (`v1.38.198`), module `bashrc/`, portage.**
+
+```
+avant   bashrc.js:222
+        if (mid === null || comptes.length === 0) {
+            contenuApercu.textContent = textes.apercu_vide; return;
+        }
+```
+
+**Deux causes, un seul message — et vingt lignes plus haut le meme fichier les
+separe deja** (`chargeComptes:183-187` rend `choisir` pour « rien coche » et
+`plusieurs_cochees` pour « plusieurs cochees »). *Le correctif consiste donc a
+appliquer au fichier sa propre convention, pas a en inventer une.*
+
+**Mais le defaut est plus fort que « peu discriminant » :**
+
+    apercu_vide  FR  « Cochez au moins un compte pour voir ce qui changerait. »
+                 EN  « Tick at least one account to see what would change. »
+
+**Ce libelle ne parle que des COMPTES. L'afficher quand la MACHINE est en cause
+prescrivait le mauvais remede** — a quelqu'un qui avait peut-etre deja coche ses
+comptes, et qui allait donc chercher au mauvais endroit. *Huitieme occurrence de
+la famille « detail du mauvais cote de sa condition », premiere en version douce :
+le message n'est pas faux, il est adresse au mauvais etat.*
+
+**TROIS etats, ZERO cle nouvelle.** Les trois libelles existaient et etaient
+exacts ; mesurer avant d'ajouter a evite deux cles et a garde **un seul
+vocabulaire pour un seul etat**.
+
+    0 machine cochee        -> textes.choisir            (bashrc.comptes_choisir)
+    plusieurs cochees       -> textes.plusieurs_cochees  (bashrc.comptes_plusieurs)
+    1 machine, 0 compte     -> textes.apercu_vide        (bashrc.apercu_vide)
+
+**Verifications.** `node --check` vert, avec temoin (un fichier volontairement
+casse est bien refuse). Croisement des **trois** ensembles — cle JS, cle du
+TABLEAU, cle de TRADUCTION : 27 cles, chaine intacte, temoin sur une cle inventee
+qui rend `None`. *La distinction cle-du-tableau / cle-de-traduction est celle qui
+m'avait fait publier un faux positif une heure plus tot : `'choisir' =>
+__('bashrc.comptes_choisir')`.* Parite des jeux de cles FR/EN : 70 = 70, inchangee
+puisque aucune cle n'est ajoutee.
+
+**⚠ Reserve.** Le controle reseau ne couvre pas ce fichier : `/bashrc` exige une
+session, et l'ecran de connexion ne charge pas `bashrc.js`. *La portee lexicale de
+`cases` est etablie par lecture — declaree a `:43`, employee a `:73` et `:204`, a
+la meme indentation que le bloc corrige.*
+
+---
+
 ## E-02 — Le filtrage des routes backend compare des SEGMENTS, pas des prefixes
 
 **Cible legacy : compare par debut de chaine. Cible Laravel : compare par segment.**

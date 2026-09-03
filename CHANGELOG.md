@@ -5,6 +5,26 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.38.198] - 2026-09-03
+
+### Corrige
+- **`bashrc/` — un message d'aperçu qui prescrivait le mauvais remède (E-376).**
+  `bashrc.js:222` fusionnait deux causes distinctes — aucune machine unique, aucun
+  compte coché — sous le seul libellé `apercu_vide`, qui ne parle que des COMPTES.
+  Quand la machine était en cause, l'opérateur lisait « cochez au moins un compte »
+  alors qu'il en avait peut-être déjà coché : le message ne se contentait pas d'être
+  peu discriminant, il envoyait chercher au mauvais endroit. Le même fichier séparait
+  déjà ces deux cas vingt lignes plus haut (`chargeComptes:183-187`) — le correctif
+  lui applique sa propre convention. **Trois états, zéro clé nouvelle** : les trois
+  libellés existaient et étaient exacts, donc un seul vocabulaire par état.
+
+### Tests
+- `node --check` vert avec témoin ; croisement des trois ensembles clé JS → clé du
+  tableau → clé de traduction (27 clés, chaîne intacte, témoin sur clé inventée) ;
+  parité FR/EN 70 = 70, inchangée.
+- **Réserve** : le contrôle réseau ne couvre pas ce fichier (`/bashrc` exige une
+  session, l'écran de connexion ne charge pas `bashrc.js`).
+
 ## [1.38.197] - 2026-09-03
 
 ### Corrige
