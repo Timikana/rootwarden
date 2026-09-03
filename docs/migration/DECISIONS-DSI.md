@@ -5798,3 +5798,48 @@ rend couvrante.**
 - **la méfiance envers un chiffre qui tombe trop bien** : *le Lead a trouvé ses deux motifs faux à
   résultat juste parce qu'un `0` était **trop net** et une divergence fichier/rapporté **trop propre**.*
   **« Ce n'est pas de la rigueur, c'est de la méfiance envers un chiffre qui tombe trop bien. »**
+
+---
+
+## Distribution du 2026-09-03 10:50 — sept sessions, sept chantiers
+
+**Reproche de l'exploitant, juste : « bah délègue, que quelqu'un bosse sur ça ! »** *Quatre sessions
+étaient inactives pendant que je faisais l'audit moi-même.*
+
+    c1  gestion-ssh-key-c1   L'OCTROI DES POLITIQUES SUDO
+                             `sudo_preset` : 0 occurrence sur 447 fichiers laravel/
+                             -> priorite 1 du « full Laravel », rien ne le remplace
+    5f  gestion-ssh-key-5f   L'EXPORT RGPD art. 20
+                             obligation legale, et l'archivage la supprime en silence
+    94  gestion-ssh-key-94   LE PENTEST du portage — six angles mesures
+    0b  gestion-ssh-key-0b   L'INVENTAIRE D'ARCHIVAGE des 159 .php, par blocs
+    4f  gestion-ssh-key-4f   security/backend-cve : 9ac8456 · 427306c · a345e65
+    c6  gestion-ssh-key-c6   security/backend-cve : 8043303 · 399931a
+    ec  gestion-ssh-key-ec   le LOT (122/172) puis le rejeu des 7 suites
+
+**Et moi : `3e65ad3`, fini — la seule trouvaille de relecture à ce stade.**
+
+### Ce que la distribution corrige de ma conduite
+
+> **Je gardais deux correctifs sécurité « pour moi » alors que je ne les aurais pas faits.** *Les
+> déléguer n'est pas une décharge : c'est reconnaître qu'un travail retenu par le coordinateur est un
+> travail arrêté.*
+
+**Et j'ai donné à chaque session les deux pièges d'instrument mesurés ce matin** — *`grep` aveugle sur les
+chemins ignorés, et un compte qui porte le nom au lieu du geste.* **Les transmettre coûte trois lignes par
+message ; ne pas les transmettre coûte une mesure fausse par session.**
+
+### Le seul arbitrage rendu dans cette distribution
+
+**L'octroi des politiques sudo n'est PAS un écran de plus : c'est un geste d'attribution de privilège.**
+*Quatre contraintes, dont trois sont des reprises :*
+
+    1. les prereglages sont l'ENUM de 051:7 — la liste fermee EXISTE deja en base
+    2. la clause anti-escalade se REPREND (`add_user`, `import_csv.php:156`)
+    3. ⚠ `custom` est la seule valeur de l'enum qui rouvre une ENTREE LIBRE
+       -> la traiter comme telle, ou ne pas la porter au premier tour et le DIRE
+    4. le panneau nomme l'utilisateur, la MACHINE, le prereglage, et dit que
+       l'application aura lieu au PROCHAIN DEPLOIEMENT
+
+**Le point 3 est celui que j'aurais manqué** : *une liste fermée dont une valeur signifie « champ libre »
+n'est pas une liste fermée.*
