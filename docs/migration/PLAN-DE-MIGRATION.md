@@ -219,7 +219,7 @@ n'a jamais été fait.*
 | modules entièrement dépréciés | **2** — `update/`, `supervision/` |
 | LOT de tests E2E | ✅ **NOUVELLE LIGNE DE BASE — 2026-09-01 : 158 exécutions · 2439 PASS · ZÉRO FAIL · 2 h 50** (journaux `/tmp/rw-lot-j8Li6h`, départ 15:37:23, dernier journal 18:27:32). Répartition : **80 laravel / 1574 PASS** et **78 legacy / 865 PASS**. **+141 PASS et 2 FAIL de moins que la ligne de base du 2026-08-28** (153 · 2298 · 2), après **67 commits dont 3 fichiers globaux**. **Les trois références neuves sont confirmées à l'unité par le LOT complet** : `go-page-pare-feu` 23/17, `go-page-accueil` 41/16, `go-page-mot-de-passe` 16 (laravel seul, elle n'a pas de cible legacy). ⚠ **Ce LOT est le premier à contenir une suite qui ÉCRIT en base** (`go-page-mot-de-passe`) : la restauration a tenu, l'abattage n'a pas eu à se déclencher. ⚠ **Et le Lead n'a inscrit ce verdict que cinq heures après la fin** — un LOT vert que personne ne relève ne sert à rien, et c'est la même famille qu'une conclusion écrite qu'on ne remesure pas. Remesure : `./scripts/rejouer-lot.sh`, attendre un **PID enregistré**, **conclure sur le JOURNAL**.
 | tests backend | **REMESURE le 2026-09-01 a 14:16 CEST — `609 passed · 1 skipped · 1 xfailed`** (pytest, `rootwarden_python`) et **`279 passed · 895 assertions`** (`php artisan test`, `rootwarden_laravel`, 14:18). Commits `319c0ba` et `a5d8f36`. ⚠ *Le couple precedent — `566` / `277`, du 2026-08-28 16:28 — etait juste a son heure et perime a la reprise : **quatre jours d'arret, et les deux releves geles ont rougi SEULS**, chacun sur sa cause (une route neuve `POST /pare-feu/historique`, un `pare-feu.js` modifie sans changement de verdict).* **C'est leur seule raison d'exister : un releve qui ne rougit jamais ne prouve pas que rien n'a bouge, il prouve qu'il ne regarde plus.** Il n'y a jamais eu de contradiction entre `509` et `549` non plus : tous deux justes, a onze heures d'ecart — le seul chiffre faux etait `462`, qui comptait des `def test_`, donc des FONCTIONS et non des cas. **Un compte reste vrai le temps que personne n'ecrit** : celui-ci cessera de l'etre a la prochaine ecriture backend. `sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"` — **et jamais pendant qu'une autre session tient le banc.** |
-| écarts de parité documentés | **351** — identifiants dédupliqués, numérotés jusqu'à **E-371** (361 titres : 10 corrections inscrites À CÔTÉ, jamais substituées). Remesuré 2026-09-03 10:45 par `grep -ohE '^## (E-[0-9]+)' docs/migration/PARITE.md | awk '{print $2}' | sort -u | wc -l` — ⚠ **E-278 : ne JAMAIS compter `grep -c '^## E-'`**, qui compte des TITRES et dérive à chaque écart proprement amendé. ⚠ **E-280 est à sa CINQUIÈME passe** : mes quatre premières se sont trompées, les deux dernières **dans le sens qui rassure** — la propriété n'est pas « la requête porte un filtre archivées » mais « le périmètre est borné », et un champ de cible BLANC vise **tout le parc vivant** sur **4 branches sur 5**. La lecture d'autorité est `DOSSIER-08-PUSH-ET-MERGE.md` §4, pas mes relevés. |
+| écarts de parité documentés | **351** — identifiants dédupliqués, numérotés jusqu'à **E-371** (361 titres : 10 corrections inscrites À CÔTÉ, jamais substituées). Remesuré 2026-09-03 10:45 par `grep -ohE '^## (E-[0-9]+)' docs/migration/PARITE.md | awk '{print $2}' | sort -u | wc -l` — ⚠ **E-278 : ne JAMAIS compter `grep -c '^## E-'`**, qui compte des TITRES et dérive à chaque écart proprement amendé. ⚠ **E-280 est à sa CINQUIÈME passe** : mes quatre premières se sont trompées, les deux dernières **dans le sens qui rassure** — la propriété n'est pas « la requête porte un filtre archivées » mais « le périmètre est borné », et un champ de cible BLANC vise **tout le parc vivant** — ⚠ **sur 5 branches sur 5 dans HEAD et dans le service, sur 4 sur 5 après la fusion** (`a345e65` ne ferme que `_run_scheduled_scan · machines`). *Mon « 4 sur 5 » ne nommait pas son régime, dans le fichier dont c'est précisément le piège — corrigé sur mesure de la session 4.* La lecture d'autorité est `DOSSIER-08-PUSH-ET-MERGE.md` §4, pas mes relevés. |
 | `main` en production | **v1.37.15** — il lui manque **v1.37.16**, **v1.37.17** et **v1.37.48** |
 
 Le **socle** est complet : authentification avec second facteur obligatoire, navigation à source unique,
@@ -5137,3 +5137,55 @@ pas `pytest` : le LOT tourne**, et *une charge concurrente a fait passer `go-fai
 une page saine.* Un repère non probant est inscrit à la place — **462 fonctions `def test_`** — avec sa
 limite : *un compte de fonctions n'est pas un compte de cas ; le paramétrage en produit plusieurs par
 fonction.* **Écrire un repère en disant qu'il n'est pas la mesure vaut mieux que laisser un chiffre faux.**
+
+
+## §7 — DOUZIÈME OBJET : le geste qui ferme E-280 existe, et il n'était nulle part
+
+**Relevé le 2026-09-03 10:50. Les onze décisions étaient onze parce que ce
+douzième objet n'était inscrit dans aucun document.**
+
+La session 4 a écrit **deux patchs** le 2026-09-02, vérifiés par
+`git apply --check`, qui ferment E-280 par un **repli inversé** : une branche
+`all` explicite plus un `else` qui REFUSE (`WHERE 1=0` + journal). Le mécanisme
+couvre les **cinq** branches d'un coup — un champ blanc échoue `tag`, échoue
+`environment`, échoue `machines`, échoue `== 'all'`, et tombe dans le refus.
+**Ce n'est pas une énumération de cas à tenir à jour, c'est une inversion du
+repli** — et c'est meilleur que le correctif par conjonctions que j'avais décrit.
+
+Deux pièces, parce que les deux fonctions ne vivent pas dans le même régime de
+fusion : `_run_scheduled_ssh_audit` généré contre **HEAD**,
+`_run_scheduled_scan` généré contre l'**après-fusion** (`a345e65`), et celui-là
+refuse sur HEAD par construction.
+
+### ⚠ Ce qui rendait l'objet invisible
+
+    fichiers .patch / .diff dans l'arbre            aucun
+    git stash list                                   vide
+    DIFFS-PRETS-NON-APPLIQUES.md                     0 mention E-280, 0 E-281
+    DOSSIER-00-CE-QUI-ATTEND-VOTRE-SIGNATURE.md      0 mention E-280, 0 E-281
+
+> **Un patch vérifié qui ne vit que dans un contexte de session n'attend pas une
+> signature : il attend une compaction.** Le journal n'est pas l'autorité,
+> l'artefact l'est.
+
+Et le précédent est dans nos propres documents :
+`RELECTURE-SECURITY-BACKEND-CVE.md:9` signale des sessions ayant re-trouvé,
+re-mesuré et re-rédigé `a345e65`, **écrit douze jours plus tôt**. Sans
+persistance, ces deux patchs seront réécrits une troisième fois. La persistance
+est demandée à la session 4 ; elle ne touche ni `laravel/`, ni `legacy/`, ni
+`backend/`, ni `tests/e2e/`, donc **le gel du banc ne la bloque pas**.
+
+### Ce qui compte pour l'exploitant, et c'est une bonne nouvelle
+
+**Ce douzième objet ne coûte AUCUNE interruption de plus.** Un patch sur
+`scheduler.py` est **inerte jusqu'au redémarrage** (E-238), et le redémarrage de
+`rootwarden_python` est déjà la décision n°1. **Appliquer les deux patchs avant
+ce redémarrage se signe dans le même geste.** Du point de vue de l'exploitant, il
+y a donc toujours **onze interruptions**, dont la première a gagné un contenu.
+
+⚠ **Et la symétrie doit être dite, parce que je me suis déjà trompée dans ce sens
+aujourd'hui** : sans ces patchs, le redémarrage **ne corrige rien** d'E-280 — j'ai
+prétendu le contraire, c'était faux (E-280 deuxième passe, retiré en quatrième).
+Le redémarrage ne devient un remède **que** s'il est précédé de l'application.
+*Le même geste est neutre ou réparateur selon ce qui a été écrit avant lui — et
+c'est exactement pourquoi il ne se présente pas comme un bénéfice acquis.*
