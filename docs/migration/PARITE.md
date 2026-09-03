@@ -17357,3 +17357,59 @@ elle n'est pas suffisante, et elle ne l'est pas non plus pour le seul `scan`.
 > instrument RESSEMBLE à de la rigueur. *Un chiffre daté et sourcé se lit, il ne
 > se refait pas* — la règle était écrite, elle est à moi, et elle vise le cas où
 > refaire est **plus coûteux que faux**. Ici c'était les deux.
+
+
+## E-372 — un garde de fenêtre qui MORD À VIDE, et c'est celui qui protège les lignes de base
+
+**Mesuré le 2026-09-03 11:20 sur LOT3.** Le verdict `FENETRE SALE` de
+`go-page-ssh-flux` nomme trois fichiers *« écrits pendant la fenêtre »* :
+`laravel/app/Support/Navigation.php`, `laravel/resources/views/layouts/portail.blade.php`,
+`laravel/app/Http/Controllers/ClesSshController.php`.
+
+**Aucun des trois n'a été écrit pendant le LOT.** Départ établi par deux sources
+concordantes — naissance du journal et `ps -o lstart -p 1296673` — à **08:16:26** :
+
+    laravel/   0 fichier depuis 08:16:26   (forme ABSOLUE, stderr non silencé)
+    legacy/    0 fichier
+    backend/   1 -> backend/logs/deployment.log, 0 octet, .gitignore, état d'exécution
+    TÉMOIN     laravel/app depuis le 01/09 -> 20 fichiers  <- l'instrument rend le positif
+
+Les `mtime` des trois nommés : **2026-09-02 15:30**, **2026-09-01 14:58**,
+**2026-08-27 12:56**. Aucun n'est même parmi les plus neufs de `laravel/` — six
+fichiers de ce matin (07:41:38 → 07:57:21, donc **avant** le départ) sont plus
+récents qu'eux.
+
+### Pourquoi ça compte plus qu'un faux positif ordinaire
+
+> **Le coût est asymétrique : un garde qui crie à vide se fait ignorer, et
+> celui-ci est le seul instrument qui voit une écriture pendant une mesure.**
+
+C'est la parade construite après l'incident du 2026-09-01 — trois mesures faites
+« seules au repos » pendant lesquelles l'arbre avait bougé, sans que rien
+n'apparaisse dans `ps`, ni dans une durée, ni dans un `StartedAt`. Si ce verdict
+devient du bruit, cette classe d'incident redevient invisible.
+
+### ⚠ ET CE FAUX POSITIF DÉPLACE UN AUTRE DIAGNOSTIC
+
+Sept suites `supervision` sont en ECHEC dans LOT3, **contiguës**, juste après la
+fenêtre dite sale (7·9, 11·7, 8·9, 11·5, 9·10, 7·7, 9·7). Le discriminant d'un
+bloc contigu est **l'horloge**, pas le module — et la fois précédente (les 54
+FAIL) l'arbre était bien le coupable. **Cette fois la mesure l'élimine.** Il
+reste donc :
+- **un état partagé EN BASE**, qui ne laisse aucune trace dans un `mtime` ni dans
+  `git status` — anti-rejeu TOTP par compte, ou `force_password_change` posé par
+  une autre suite sur un compte partagé, dont l'effet est une **redirection**
+  indiscernable d'une vue cassée ;
+- **une régression réelle** du module.
+
+Les deux se séparent par l'**URL finale servie** sur un de ces échecs, mesure qui
+appartient à la session qui tient le banc.
+
+*Trois notes d'instrument du même tour, toutes du même genre — un outil juste,
+mal borné, qui rend la réponse rassurante :* `find -maxdepth 3` a rendu **zéro**
+patch alors qu'ils sont à la profondeur 4 ; un motif d'inscription en ligne
+entière a rendu **zéro** sonde ET **zéro** témoin sur une liste qui est un
+tableau bash à plusieurs noms par ligne ; et un `awk` sur `backend/logs/` a rendu
+**« 0 ligne »** là où la lecture était **refusée** — seul un `tail` qui échoue
+bruyamment l'a révélé. **Un instrument qui ne peut pas lire rend exactement la
+même sortie qu'un objet absent.**
