@@ -27,12 +27,16 @@ SPEC ATTENDUE, ET ELLE A DEUX MOITIES QU'IL FAUT MESURER SEPAREMENT :
   - l'EFFET — l'ecriture d'inventaire — ne joue que si ce verdict est bon, et son
     propre echec ne peut pas se faire passer pour une reussite.
 
-┌─ CE QUE CE FICHIER NE DIT PAS, ET C'EST L'AVERTISSEMENT D'E-238 ────────────┐
-│ Ces tests s'executent contre l'ARBRE. Le process backend en service date du  │
-│ 2026-08-27 14:28 : il ne porte pas ce code. **Un verrou pose sur du code non  │
-│ charge verrouille l'intention, pas le comportement** — un vert ici ne dit     │
-│ rien de ce que la production fait aujourd'hui, et seul un redemarrage du      │
-│ conteneur rend les deux comparables.                                         │
+┌─ E-238 : L'ECART ARBRE / SERVICE EST REFERME ───────────────────────────────┐
+│ Ce tampon disait que le process en service datait du 2026-08-27 14:28 et ne  │
+│ portait pas ce code — donc qu'un vert ici verrouillait l'INTENTION et pas le │
+│ COMPORTEMENT. **Le backend a redemarre le 2026-09-03 a 18:48** : arbre et    │
+│ service concordent, et la reserve n'a plus d'objet.                          │
+│                                                                              │
+│ Elle est retiree plutot que laissee : *une reserve perimee devient une fausse │
+│ alarme, et une fausse alarme use le credit du fichier qui la porte.* Elle     │
+│ redeviendra vraie au prochain ecart — et c'est alors la DATE du process qui   │
+│ le dira, pas ce texte.                                                       │
 └─────────────────────────────────────────────────────────────────────────────┘
 
 LA MESURE DE L'ABSENCE. `_upsert_agent` est INTERCEPTEE et enregistre ses appels :

@@ -11,7 +11,10 @@ affirmations qui portent la conclusion revérifiées par moi à 15:10 CEST.*
 
 ## 1. Ce qu'un rôle 3 SANS ligne de permissions atteint, chiffré
 
-    sur 230 routes :
+    sur 230 routes du BACKEND PYTHON (les decorateurs de `backend/routes/*.py`)
+    ⚠ NE PAS additionner ni comparer avec les 91 routes AUTHENTIFIEES du PORTAGE :
+       deux objets distincts, releves par deux sessions
+
 
      14   exigent `require_role(3)` SANS permission
           -> DECIDEES par le role. Poser `role_id = 3` est une decision, et elle est inscrite.
@@ -130,3 +133,30 @@ qu'il faut.**
   `approvals.py`, et son autrice le déclare :* **`/update_security_exec` a déjà montré qu'une route peut
   s'authentifier dans son corps.** *Un contrôle hors décorateur bornant un rôle 3 échapperait à ce
   relevé.*
+
+
+---
+
+## ⚠ PRÉCISION 22:50 — ce chiffre porte sur le BACKEND, pas sur le portage
+
+**Relevé par la session 5, et c'est la faute que je corrige chez les autres depuis ce matin.**
+
+    mes 124   routes du BACKEND PYTHON dont une PERMISSION est le seul discriminant
+    ses 15    routes du PORTAGE LARAVEL dans le meme cas
+
+**Deux objets distincts, relevés par deux sessions.** *Ne pas les additionner, ne pas les comparer.*
+
+> **C'est le cinquième faux désaccord de la semaine, et toujours la même cause : l'objet non nommé.**
+> *J'avais écrit « sur 230 routes » sans dire lesquelles — et le mot « backend » figurait ailleurs dans
+> le fichier, jamais à côté du chiffre.*
+
+### Et son relevé du portage, pour mémoire — 91 routes authentifiées
+
+    41  permission + role:2        17  permission + role:3
+    15  permission SEULE           <- le meme motif que mes 124, cote portage
+     8  aucune garde au-dela de l'authentification
+     5  role:1 seul   ·   3  role:3 seul   ·   2  role:2 seul
+
+**Les 8 « sans garde » ont été regardées une à une et sont légitimes** : *`accueil`, `cgu` (GET+POST),
+`profil`, le mot de passe, les deux `step-up`, et le relais de passerelle.* **Aucune n'a d'objet à
+protéger au-delà de l'authentification.**
