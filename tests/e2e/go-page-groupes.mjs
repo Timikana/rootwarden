@@ -222,13 +222,17 @@ const C = CIBLE === 'laravel'
         panneauEffets: '[data-rw="groupes-panneau-effets"]',
         panneauFermer: '[data-rw="groupes-panneau-fermer"]',
         panneauConfirmer: '[data-rw="groupes-panneau-confirmer"]',
+        panneauLegacy: '[data-rw="groupes-panneau-legacy"]',
+        panneauTitre: '[data-rw="groupes-panneau-titre"]',
+        panneauTexte: '[data-rw="groupes-panneau-texte"]',
         portee: '[data-rw="groupes-portee"]',
         cgu: /\/cgu/, accepte: '[data-rw="cgu-accepter"]' }
     : { connexion: '/auth/login.php?lang=fr', page: '/groups/',
         liste: null, chargement: null, nouveau: null, formulaire: null,
         champNom: null, enregistrer: null, annuler: null, formMessage: null,
         panneau: null, panneauEffets: null, panneauFermer: null,
-        panneauConfirmer: null, portee: null,
+        panneauConfirmer: null, panneauLegacy: null, panneauTitre: null,
+        panneauTexte: null, portee: null,
         cgu: /terms\.php/, accepte: 'button[name="accept_terms"]' };
 
 let echecs = 0;
@@ -837,6 +841,154 @@ try {
         verifie('AUCUN scan de masse n\'a ete lance', lancements.length === 0,
             lancements.map((p) => `${p.methode} ${p.route} ${p.corps || ''}`).join(' | '),
             'aucun lancement');
+    });
+
+    await etape('R4 : le panneau de SUPPRESSION, et cette suite ne confirme jamais', async () => {
+        if (CIBLE !== 'laravel') {
+            constate('suppression de groupe', 'SANS OBJET — R4 n\'existe que sur le portage');
+
+            return;
+        }
+        /*
+         * ══ R4 — LE SEUL GESTE IRREVERSIBLE DE CETTE PAGE ════════════════
+         *
+         * `DELETE /groups/<id>` ne se defait pas, et la table porte
+         * `ON DELETE CASCADE` sur `group_id` ET `machine_id`
+         * (`055_machine_groups.sql:30-31`).
+         *
+         * ⚠ CE PANNEAU N'ETAIT COUVERT PAR RIEN. Le bouton existe sur chaque
+         *   carte depuis R2 ; cette suite couvrait le formulaire, l'annonce de
+         *   portee et le scan de masse, et laissait sans une assertion **le
+         *   seul geste de la page qui ne se repare pas**.
+         *
+         * ⚠ ET ON N'ATTEND PAS DE FAIL-CLOSED ICI, contrairement au scan de
+         *   derive. Une portee ILLISIBLE ne bloque PAS la suppression, et c'est
+         *   un CHOIX de son auteur, pas un defaut : la ou le scan AGIT sur N
+         *   machines et exige de savoir combien, celui-ci n'en touche aucune.
+         *   **Le nombre informe, il ne conditionne pas.** Une assertion qui
+         *   exigerait le blocage rougirait sur un arbitrage.
+         *
+         * ⛔ La confirmation n'est JAMAIS prise. Les deux cartes visees sont
+         *    les fixtures de cette suite, jamais un groupe fait par quelqu'un.
+         */
+        const titre = libelle('supprimer_titre');
+        const definitif = libelle('supprimer_definitif');
+        const membresFmt = libelle('supprimer_membres');
+        if (titre === null || definitif === null || membresFmt === null) {
+            constate('suppression de groupe',
+                'SANS OBJET — un libelle du catalogue est illisible ; comparer a une chaine'
+                + ' recopiee ici mesurerait ma prose et non l\'ecran');
+
+            return;
+        }
+        const motifMembres = new RegExp(membresFmt
+            .replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(':n', '(\\d+)'));
+
+        const avantR4 = passees.length;
+        for (const cas of [
+            { nom: FIXTURE_UN, attendu: 1 },
+            { nom: FIXTURE_VIDE, attendu: 0 },
+        ]) {
+            let bouton = null;
+            try {
+                bouton = await page.evaluateHandle((nom) => {
+                    const carte = [...document.querySelectorAll('[data-rw="groupes-carte"]')]
+                        .find((c) => { const t = c.querySelector('h2'); return t && t.innerText.trim() === nom; });
+                    if (! carte) return null;
+
+                    return [...carte.querySelectorAll('button')]
+                        .find((b) => /supprim/i.test(b.innerText || '')) || null;
+                }, cas.nom);
+                if (bouton && ! (await bouton.evaluate((n) => n !== null).catch(() => false))) bouton = null;
+            } catch { bouton = null; }
+            if (! bouton || ! bouton.asElement()) {
+                verifie(`« ${cas.nom} » : le geste de suppression est OFFERT`, false,
+                    'aucun bouton dont le texte contient « supprim » sur cette carte');
+                continue;
+            }
+            await bouton.asElement().evaluate((n) => n.scrollIntoView({ block: 'center' }));
+            await dors(200);
+            await bouton.asElement().click();
+            await dors(1200);
+
+            const vu = await page.evaluate((sel) => {
+                const p = document.querySelector(sel.panneau);
+                const t = document.querySelector(sel.panneauTitre);
+                const x = document.querySelector(sel.panneauTexte);
+                const e = document.querySelector(sel.panneauEffets);
+                const c = document.querySelector(sel.panneauConfirmer);
+                const l = document.querySelector(sel.panneauLegacy);
+
+                return {
+                    ouvert: p !== null && p.offsetParent !== null,
+                    titre: t ? (t.innerText || '').replace(/\s+/g, ' ').trim() : '',
+                    texte: x ? (x.innerText || '').replace(/\s+/g, ' ').trim() : '',
+                    effets: e ? [...e.querySelectorAll('li, p')].map((n) => (n.innerText || '').trim())
+                        .filter(Boolean) : [],
+                    confirme: c !== null && c.offsetParent !== null,
+                    classe: c ? (c.className || '') : '',
+                    legacyVisible: l !== null && l.offsetParent !== null,
+                };
+            }, C);
+            const tousEffets = vu.effets.join(' | ');
+            constate(`« ${cas.nom} »`, vu.ouvert
+                ? `« ${vu.titre} » · ${vu.effets.length} effet(s) · confirmation `
+                  + `${vu.confirme ? 'offerte' : 'ABSENTE'} · classe « ${vu.classe} »`
+                : 'panneau NON ouvert');
+
+            verifiePortage(`« ${cas.nom} » : le clic ouvre un panneau`,
+                vu.ouvert, 'aucun panneau : un geste irreversible partirait sans reprise de main');
+            if (! vu.ouvert) continue;
+
+            verifiePortage(`« ${cas.nom} » : le panneau porte le titre du catalogue`,
+                vu.titre === titre.replace(/\s+/g, ' ').trim(),
+                `l'ecran dit « ${vu.titre} » et le catalogue « ${titre} »`);
+            verifiePortage(`« ${cas.nom} » : le panneau NOMME le groupe`,
+                tousEffets.includes(cas.nom) || vu.texte.includes(cas.nom),
+                `« ${cas.nom} » n'apparait pas : le panneau ne dit pas CE QU'il supprime`);
+            /*
+             * LE COMPTE RESOLU, ET LE CAS ZERO EST CELUI QUI VAUT : un panneau
+             * qui annonce « 0 serveur » doit QUAND MEME offrir la confirmation,
+             * parce que le groupe existe — il est juste vide.
+             */
+            const m = tousEffets.match(motifMembres);
+            verifiePortage(`« ${cas.nom} » : le compte de membres annonce vaut ${cas.attendu}`,
+                m !== null && Number(m[1]) === cas.attendu,
+                m === null ? `aucun compte annonce dans « ${tousEffets.slice(0, 90)} »`
+                    : `annonce ${m[1]}, la base en resout ${cas.attendu}`,
+                m ? `${m[1]} serveur(s)` : '');
+            verifiePortage(`« ${cas.nom} » : le panneau dit que c'est DEFINITIF`,
+                tousEffets.includes(definitif.replace(/\s+/g, ' ').trim()),
+                `la mention definitive du catalogue est absente de « ${tousEffets.slice(0, 90)} »`);
+            /*
+             * LE TON SUIT LE GESTE. Le vert de l'enregistrement sur une
+             * suppression irreversible serait un mensonge de style — et c'est
+             * une propriete qu'aucune assertion de texte ne voit.
+             */
+            verifiePortage(`« ${cas.nom} » : le bouton de confirmation porte le ton DANGER`,
+                vu.confirme && /--danger/.test(vu.classe) && ! /--ok\b/.test(vu.classe),
+                ! vu.confirme ? 'aucun bouton de confirmation'
+                    : `classe « ${vu.classe} » : le ton ne suit pas le geste`);
+            verifiePortage(`« ${cas.nom} » : aucun renvoi vers l'ancien portail`,
+                ! vu.legacyVisible,
+                'le lien legacy est offert a cote d\'un geste PORTE : il entretient ce qu\'on eteint');
+
+            const fermer = await page.$(C.panneauFermer);
+            if (fermer) { await fermer.click(); await dors(400); }
+        }
+
+        /*
+         * AU RESEAU : ouvrir DEUX panneaux de suppression n'a supprime personne.
+         * On distingue la LECTURE de portee — legitime, c'est elle qui alimente
+         * l'annonce — du DELETE, qui ne doit jamais partir.
+         */
+        const parties = passees.slice(avantR4);
+        constate('requetes des deux panneaux', parties.length
+            ? parties.map((p) => `${p.methode} ${p.route}`).join(' | ') : '(aucune)');
+        const suppressions = parties.filter((p) => p.methode === 'DELETE' && /\/groups\//.test(p.route));
+        verifie('AUCUNE suppression n\'est partie', suppressions.length === 0,
+            suppressions.map((p) => `${p.methode} ${p.route}`).join(' | '),
+            suppressions.length === 0 ? 'aucun DELETE' : '');
     });
 
     await etape('le collecteur voit un POST (temoin)', async () => {
