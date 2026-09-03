@@ -4645,3 +4645,62 @@ produit affirme (une clé peut n'atteindre aucun écran), et maintenant il monte
 
 > **Je ne leur invente pas de tâche.** *Une relance qui fabrique du travail pour remplir un tour est
 > exactement ce que la règle « 2 pour 1 » cherche à empêcher, dans l'autre sens.*
+
+---
+
+## Tour de 03:39 — il ne reste que DEUX capacités portables sur les onze
+
+**Mesuré, pas reconduit.** Banc libre, arbre propre, **24 commits non poussés**, dernier commit `35f15e1`
+à **02:37 — le mien**. *Une heure de silence complet de la flotte.*
+
+### Le relevé des onze, par ce que le catalogue DÉCLARE encore
+
+    np_planif_creer   creer un releve planifie   PORTE          (A2)
+    np_derive         scan de derive de masse    PORTE          (R3)
+    np_config         MODIFIER sshd_config       absent, et JUSTE — A3 a scinde la
+                                                 conjonction et garde la reserve d'ECRITURE
+    np_relever        relever UN serveur         ABSENT, PORTABLE   <- envoye au Lead
+    fail2ban geoloc   geolocaliser une adresse   0 appel JS         <- envoye a la session 3
+    np_parc           relever TOUT LE PARC       ⛔ EXPLOITANT
+    np_cve            scan CVE de masse          ⛔ EXPLOITANT
+
+### Ce que la mesure a corrigé de ma propre liste
+
+**J'ai failli compter `np_config` comme restant à porter.** *Elle est déclarée absente, et cette
+déclaration est désormais **exacte** : A3 a scindé la conjonction qui mélangeait lecture et écriture,
+porté la lecture, et laissé l'écriture déclarée absente avec sa réserve intacte.*
+
+> **Une déclaration d'absence qui subsiste n'est pas toujours du travail restant : elle peut être le
+> RÉSULTAT du travail.** *C'est exactement le motif que j'ai écrit il y a une heure — le compte des
+> déclarations monte quand le produit devient plus honnête — et j'ai manqué de m'y prendre moi-même.*
+
+### Les deux envois, et pourquoi ils sont séparés
+
+| capacité | à qui | ce qui la borne |
+|---|---|---|
+| **géolocaliser une adresse** | session 3 | *appel sortant vers `ip-api.com`, en **HTTP clair***. Le panneau doit **nommer le tiers et l'absence de chiffrement** — « un service tiers » laisse croire à une relation contractuelle |
+| **relever un serveur** | Lead, à router vers la session d'A3 | *session SSH **réelle***. Même patron qu'A3 : `np_relever` se retire, **`np_relever_detail` NE BOUGE PAS** |
+
+**Aucune des deux ne s'exerce.** *Une requête sortante vers un tiers publie quelque chose ; une session
+SSH ouvre une connexion. Le portage rend le geste disponible — il ne le commet pas.*
+
+**Et j'ai refusé de recopier la Note A10 du backend** dans le brief : sa réserve — *« l'IP est déjà
+publique, donc la fuite est négligeable »* — est fausse. **Ce qui n'est pas public, c'est le fait que
+notre infrastructure l'a bannie.** *Une réserve fausse recopiée devient une justification.*
+
+### Ce que je n'ai PAS fait, et c'est délibéré
+
+**Je n'ai relancé ni la session 2 ni la session 4.** *L'audit de la 2 est clos ; le correctif de la 4
+attend l'exploitant, pas moi.* **Leur inactivité est correcte, et inventer une tâche pour remplir un tour
+est précisément ce que la règle « deux pour un » cherche à empêcher — dans l'autre sens.**
+
+### Ce que ces deux livraisons FERMENT, et ce qu'elles ne ferment pas
+
+**Elles closent la liste des onze.** *Tout ce qui restera sur les gestes appartiendra alors à
+l'exploitant : le parc entier, l'écriture dans `sshd_config`, le scan CVE de masse, les six gestes
+`wazuh`, K4.*
+
+> **Ce n'est pas la fin du chantier.** Il restera **159 `.php` métier encore servis** — dont
+> `documentation.php` et sa console d'API, joignable tant qu'elle est servie —, **treize dossiers non
+> signés** et **trois migrations non appliquées**. *La fin du portage des gestes n'est pas la mort du
+> legacy, et confondre les deux serait la dernière erreur de compte de ce chantier.*
