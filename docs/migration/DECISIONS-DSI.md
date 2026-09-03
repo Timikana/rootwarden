@@ -6068,3 +6068,67 @@ fraîcheur**.*
     les points 1 et 3 commites par la session 3   -> je fusionne (846 commits, a sec PROPRE)
     le point 2                                     -> attend le mot de l'exploitant
     063/064/065 · `docker compose up -d` · `git push`  -> a l'exploitant, et a lui seul
+
+---
+
+## ✅ LA FUSION EST FAITE — 2026-09-03 12:40, `4742438`
+
+**Autorisée par l'exploitant (« go ! on merge faut tout faire »), exécutée après vérification à sec.**
+
+    main   0 / 892 commits par rapport a origin/main
+    conflits : 0
+    www/ ABSENT · legacy/ PRESENT · laravel/ PRESENT
+    docker-compose.yml:21   - ./legacy:/var/www/html
+    laravel/docker-entrypoint.sh:59   chown -R www-data:www-data storage/framework/views
+    version : 1.38.199
+
+### ⚠ ET J'AI FAILLI CASSER LES DEUX PORTAILS — la mesure que je n'avais pas faite
+
+    il n'existait AUCUNE branche `main` locale
+    `git checkout main` aurait fait : 558 fichiers, 140 insertions, 69 211 SUPPRESSIONS
+      -> `laravel/` disparait, `legacy/` redevient `www/`
+
+**Or `docker-compose.yml` monte `./legacy` ET `./laravel`.** *Entre le `checkout` et le `merge`, les deux
+portails auraient servi un montage VIDE — et sept sessions auraient vu un arbre saccagé.*
+
+> **Un geste dont l'état FINAL est correct peut avoir un état TRANSITOIRE destructeur.** *J'avais vérifié
+> que la fusion était propre ; je n'avais pas vérifié le chemin pour y arriver.* **C'est la classe de la
+> journée, appliquée au geste le plus important : la propriété du résultat attribuée au parcours.**
+
+**Parade employée** : `git worktree add -b main <chemin séparé> origin/main`, fusion dans cet arbre.
+*L'arbre partagé n'a pas bougé — même `HEAD` (`3055dec`), zéro fichier modifié, avant comme après. Les
+conteneurs montent le chemin partagé, donc ils n'ont rien vu.*
+
+### Ce que la session 3 a corrigé de mon ordre, et elle avait raison
+
+**J'avais écrit « le banc est libre, prends tes deux patchs d'abord ». Faux pour l'un des deux.**
+
+    proprietaires des compiles a cet instant : {'root': 111, 'www-data': 40}
+    le portage REPOND : /connexion -> HTTP 200
+
+> **Le blocage de la légende du menu n'a jamais été le banc : c'est la propriété du cache.**
+> *`portail.blade.php` a son compilé `root`, le portage sert des requêtes, et la ligne d'entrypoint ne
+> prend effet qu'au REDÉMARRAGE.* **Committer la légende maintenant rendrait 500 à la première requête —
+> et cette fois sans pouvoir défaire par la date, le changement de contenu étant voulu.**
+
+**L'ordre contraint, qui est le sien :**
+
+    1. la ligne d'entrypoint       FAIT (3055dec)
+    2. la fusion                   FAIT (4742438)
+    3. `docker compose up -d`      A L'EXPLOITANT -> le cache renait `www-data`
+    4. ALORS la legende            session 3, sans privilege, un commit d'une ligne
+
+**Et sa preuve sur `view:cache` en `www-data` est élégante** : *les 28 échecs de 08:44 n'ont RIEN écrit —
+le compilé du socle est resté `root:root` daté de 07:48:46 pendant toute la fenêtre.* **Un geste qui
+échoue 28 fois de suite ne progresse pas.**
+
+### ⛔ CE QUI RESTE, ET QUI N'EST À PERSONNE D'AUTRE QU'À L'EXPLOITANT
+
+    les migrations 063 · 064 · 065        dont 065 = la garde en base d'E-280
+    `docker compose up -d`                OBLIGATOIRE : ./www n'existe plus
+    declarer `laravel` dans prod.yml      cap_drop · read_only + tmpfs · user
+                                          -> AUJOURD'HUI le SEUL service de prod non durci
+    `git push`                            refuse par le garde de ma session
+
+**La fusion vit dans un arbre de travail séparé et sur la branche locale `main`. Elle n'est pas publiée.**
+*Rien n'a été déployé, aucun conteneur redémarré, aucune migration appliquée.*
