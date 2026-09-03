@@ -273,3 +273,67 @@ pas confirmer CES trois-là », parce que les confirmer, c'est exercer le geste 
 **Pourquoi ça mérite d'être écrit ici** : *un grand nombre vert se lit comme une couverture.* **« 2650
 PASS » et « on ne sait pas ce qui se passe après un aboutissement » sont tous les deux vrais en même
 temps, et le premier fera oublier le second.**
+
+---
+
+## ⚠ SECOND RISQUE DE BASCULE — éditer une vue peut faire tomber TOUT le portail, sans instrument
+
+**Découvert le 2026-09-03 par un incident de la session 3, mesuré par moi à 08:56 CEST.** *Ce n'est pas
+une réserve de portage : c'est un piège de l'installation, et il vise précisément le geste que la bascule
+accomplit.*
+
+### Le mécanisme, mesuré
+
+    sources des vues     utilisateur:utilisateur  664
+    fichiers compiles    root:root                755   <- ecrits par `view:cache` lance en ROOT
+    151 compiles, dont 111 appartenant a ROOT
+
+**Une source plus récente que son compilé → PHP (`www-data`) tente de recompiler → `touch()` sur un
+fichier root → `Utime failed: Operation not permitted` → 500.**
+
+> **Le gabarit de socle est inclus dans toutes les pages. Une seule vue désynchronisée fait donc tomber
+> le portail entier**, et le message d'erreur ne parle ni de droits ni de propriétaire : il parle d'un
+> horodatage.
+
+**Constaté deux fois, à deux jours d'écart, par deux sessions différentes :**
+
+    2026-09-03  08:44:38 -> 08:51:43 CEST   ~7 minutes de 500 sur tout le portage
+    2026-09-01  15:30:25 -> 15:30:54 CEST   2 exceptions, 31 min apres `9422ab5`
+
+**Après correction : 0 exception depuis 06:52 UTC** (vérifié par moi ; le compte exact d'exceptions de la
+première fenêtre est celui de la session 3, je n'ai vérifié que la fenêtre non vide et le retour à zéro).
+
+### ⚠ Pourquoi ça vise la bascule en particulier
+
+**La fusion change 831 fichiers, dont des vues Blade.** *Si le cache compilé de production appartient à
+`root` comme ici — 111 fichiers sur 151 —, la mise en production rend chaque vue touchée plus récente que
+son compilé, et le portail répond 500 jusqu'à ce que quelqu'un s'en aperçoive.*
+
+**Et `git checkout` n'est pas un défaire neutre** : *il restitue le CONTENU et arme la panne par la DATE.*
+
+### Le geste exact, avant la bascule
+
+```
+1. RELEVER   les proprietaires du cache compile en PRODUCTION
+                stat -c '%U:%G' <cache>/framework/views/*.php | sort | uniq -c
+             -> si `root` y figure, le piege est arme
+
+2. NORMALISER  soit vider et reconstruire le cache SOUS L'UTILISATEUR
+               dont PHP prend l'identite, soit aligner la propriete.
+               Pas apres la bascule : AVANT, ou dans le meme geste.
+
+3. CONTROLE   apres la bascule, une requete sur une page quelconque
+              -> 200, pas 500.  Et lire le journal : `Utime failed` = le piege a mordu.
+```
+
+**⚠ Le journal Laravel est en UTC, l'hôte en CEST.** *Une lecture du journal sans conversion fait passer
+un incident d'il y a neuf secondes pour un incident de deux heures plus tôt — c'est précisément ce qui a
+produit le premier rapport rassurant et faux.*
+
+### Ce qui n'est pas mesuré
+
+- **la propriété du cache compilé en PRODUCTION.** *Je mesure l'hôte de développement ; je n'interroge
+  pas la prod, et c'est la seule mesure qui décide si le piège y est armé* ;
+- **si l'incident du 2026-09-01 a été vu par un utilisateur** — 29 secondes, aucun journal consulté ;
+- **combien de suites du LOT en cours ont traversé la fenêtre de sept minutes.** *La ligne de base rendue
+  vers 11:15 peut porter des échecs qui n'appartiennent pas au code mesuré.*
