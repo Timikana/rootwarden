@@ -113,57 +113,6 @@ l'ecran de connexion n'emploie aucune cle `ssh.*`. *A confirmer par un rendu
 authentifie.*
 
 ---
-
-## E-376 — un message qui prescrit le MAUVAIS remede
-
-**Corrige le 2026-09-03 (`v1.38.198`), module `bashrc/`, portage.**
-
-```
-avant   bashrc.js:222
-        if (mid === null || comptes.length === 0) {
-            contenuApercu.textContent = textes.apercu_vide; return;
-        }
-```
-
-**Deux causes, un seul message — et vingt lignes plus haut le meme fichier les
-separe deja** (`chargeComptes:183-187` rend `choisir` pour « rien coche » et
-`plusieurs_cochees` pour « plusieurs cochees »). *Le correctif consiste donc a
-appliquer au fichier sa propre convention, pas a en inventer une.*
-
-**Mais le defaut est plus fort que « peu discriminant » :**
-
-    apercu_vide  FR  « Cochez au moins un compte pour voir ce qui changerait. »
-                 EN  « Tick at least one account to see what would change. »
-
-**Ce libelle ne parle que des COMPTES. L'afficher quand la MACHINE est en cause
-prescrivait le mauvais remede** — a quelqu'un qui avait peut-etre deja coche ses
-comptes, et qui allait donc chercher au mauvais endroit. *Huitieme occurrence de
-la famille « detail du mauvais cote de sa condition », premiere en version douce :
-le message n'est pas faux, il est adresse au mauvais etat.*
-
-**TROIS etats, ZERO cle nouvelle.** Les trois libelles existaient et etaient
-exacts ; mesurer avant d'ajouter a evite deux cles et a garde **un seul
-vocabulaire pour un seul etat**.
-
-    0 machine cochee        -> textes.choisir            (bashrc.comptes_choisir)
-    plusieurs cochees       -> textes.plusieurs_cochees  (bashrc.comptes_plusieurs)
-    1 machine, 0 compte     -> textes.apercu_vide        (bashrc.apercu_vide)
-
-**Verifications.** `node --check` vert, avec temoin (un fichier volontairement
-casse est bien refuse). Croisement des **trois** ensembles — cle JS, cle du
-TABLEAU, cle de TRADUCTION : 27 cles, chaine intacte, temoin sur une cle inventee
-qui rend `None`. *La distinction cle-du-tableau / cle-de-traduction est celle qui
-m'avait fait publier un faux positif une heure plus tot : `'choisir' =>
-__('bashrc.comptes_choisir')`.* Parite des jeux de cles FR/EN : 70 = 70, inchangee
-puisque aucune cle n'est ajoutee.
-
-**⚠ Reserve.** Le controle reseau ne couvre pas ce fichier : `/bashrc` exige une
-session, et l'ecran de connexion ne charge pas `bashrc.js`. *La portee lexicale de
-`cases` est etablie par lecture — declaree a `:43`, employee a `:73` et `:204`, a
-la meme indentation que le bloc corrige.*
-
----
-
 ## E-02 — Le filtrage des routes backend compare des SEGMENTS, pas des prefixes
 
 **Cible legacy : compare par debut de chaine. Cible Laravel : compare par segment.**
@@ -17925,6 +17874,54 @@ traduction → présente dans les deux catalogues. **Ce faux positif était cré
 parce qu'il collait trop bien au défaut cherché** : *un résultat qui confirme
 l'hypothèse qu'on porte mérite une seconde mesure, pas une inscription.*
 
+
+
+### CORRIGE le 2026-09-03 (`v1.38.198`) — et deux points de cette fiche etaient a reviser
+
+**1. « Deux cles i18n a creer » etait une PREDICTION, et elle etait FAUSSE : il en fallait
+ZERO.** Les trois libelles existaient deja et etaient exacts. *Mesurer avant d'ajouter a evite
+deux cles et garde **un seul vocabulaire pour un seul etat**.*
+
+**2. Il n'y a pas deux etats mais TROIS**, parce que `mid === null` en reunit lui-meme deux :
+
+    0 machine cochee       -> textes.choisir            (bashrc.comptes_choisir)
+    plusieurs cochees      -> textes.plusieurs_cochees  (bashrc.comptes_plusieurs)
+    1 machine, 0 compte    -> textes.apercu_vide        (bashrc.apercu_vide)
+
+**3. Et le defaut etait plus fort que « insuffisamment discriminant » : il prescrivait le
+MAUVAIS REMEDE.**
+
+    apercu_vide  FR  « Cochez au moins un compte pour voir ce qui changerait. »
+
+*Ce libelle ne parle que des COMPTES.* **L'afficher quand la MACHINE etait en cause disait
+« cochez un compte » a quelqu'un qui en avait peut-etre deja coche** — il n'envoyait pas
+seulement chercher ailleurs, il designait un endroit precis et FAUX. Le correctif applique au
+fichier sa propre convention plutot que d'en inventer une.
+
+**Verifications.** `node --check` vert avec temoin (un fichier volontairement casse est bien
+refuse). Croisement des **trois** ensembles — cle JS, cle du TABLEAU, cle de TRADUCTION :
+27 cles, chaine intacte, temoin sur une cle inventee qui rend `None`. Parite FR/EN **70 = 70**,
+inchangee puisque aucune cle n'est ajoutee. Assertions du correctif executees sur le resultat
+**en memoire avant toute ecriture**.
+
+**Reserve.** Le controle reseau ne couvre pas ce fichier : `/bashrc` exige une session et
+l'ecran de connexion ne charge pas `bashrc.js`. *La portee lexicale de `cases` est etablie par
+lecture — declaree a `:43`, employee a `:73` et `:204`, a la meme indentation que le bloc
+corrige.*
+
+**Et DEUX fautes de procedure, inscrites parce qu'elles sont instructives.**
+
+**(a) J'ai cree un DOUBLON de cette fiche.** J'avais lance le controle de presence **et**
+l'ecriture dans la meme invocation : le resultat s'est affiche sans **conditionner** le geste.
+*Un controle dont le resultat ne commande pas l'action n'est pas un controle, c'est un
+commentaire.*
+
+**(b) Puis mon assertion de nettoyage a compte le titre DANS MA PROPRE PROSE** — mon paragraphe
+citait la commande de controle, donc le motif s'y trouvait. **Cinquieme occurrence de
+« l'assertion mord sur mon texte et non sur la structure ».** *Elle a tenu quand meme, parce
+qu'elle etait posee AVANT l'ecriture : elle a refuse deux fois et n'a rien casse.* La parade
+est double — asserter sur des lignes de TITRE (`startswith`) et non sur une sous-chaine, et
+faire porter l'assertion sur le resultat en memoire pour qu'un desaccord EMPECHE l'ecriture.
 
 ## E-377 — le geste que `DOSSIER-00` prescrit rendrait « pas de piège » là où la réponse est « pas encore »
 
