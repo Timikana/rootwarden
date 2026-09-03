@@ -5257,7 +5257,9 @@ peut pas créer un rôle supérieur ou égal au sien.*
 > cascade sur `np_supprimer` et le mécanisme de conflit inventé pour sauver un axe retiré. *Les trois
 > visaient un défaut réel du dépôt, appliqué au mauvais objet.*
 
-### ✅ ARBITRAGE : l'import CSV se porte, et deux choses ne se réécrivent pas
+### ⛔ ARBITRAGE RETIRÉ — il tranchait `sudo` par omission (voir la rétractation en fin de section)
+
+**Ce qui suit est conservé pour ce qui reste juste ; la conclusion « se porte » est FAUSSE.**
 
 1. **`roleMap` reste une LISTE FERMÉE avec défaut au rôle 1.** *Un nom de rôle inconnu ne crée pas un
    compte privilégié — il crée le plus faible* ;
@@ -5269,3 +5271,70 @@ que les permissions sont créées à zéro, et que l'audit reçoit une entrée p
 
 **⛔ Ne pas l'exercer sur un fichier réel** : *l'import crée des comptes, et un compte créé ne se retire
 pas par un `DELETE` — `DOSSIER-12` porte déjà deux comptes que personne n'a décidés.*
+
+### ⛔ RÉTRACTATION 09:50 — mon arbitrage tranchait `sudo` par omission, et mon « alarme infondée » était un DÉDOUANEMENT
+
+**Refusé par la session 3, qui a vérifié à la source au lieu de me relayer. Revérifié par moi.**
+
+#### Le défaut vit UNE LIGNE sous ma dernière citation
+
+    :150-:156  roleMap ferme, defaut role 1, anti-escalade   <- ce que j'ai cite : JUSTE
+    :162       $sudo = (int)($data['sudo'] ?? 0);            <- AUCUNE garde
+    :166       ->execute([… $roleId, $active, $sudo]);       <- ecrit tel quel
+
+    toggle_sudo.php:26   checkAuth([ROLE_SUPERADMIN])
+                  :47    refuse meme de modifier SON PROPRE sudo
+
+**`users.sudo` est la précondition du repli `NOPASSWD: ALL` de `ssh/`.** *Un rôle 2 porteur de
+`can_admin_portal` crée donc par fichier ce que le geste dédié réserve au rôle 3.* **C'est E-130, mesuré
+ici le 2026-08-26.**
+
+> **J'ai cherché l'escalade sur `role_id`, je l'ai trouvée bien gardée, et j'ai conclu sur l'objet
+> ENTIER.** *C'est la classe que je démonte depuis ce matin — un énoncé vrai d'un membre appliqué à
+> l'ensemble — et cette fois elle DÉDOUANE, donc rien ne l'aurait signalée.*
+
+#### Et mes « quatre effets » étaient trois et demi, plus un cinquième que personne n'avait nommé
+
+    j'ai ecrit   « une entree d'audit part par LIGNE »
+    mesure       :120 et :181 — UNE par IMPORT, portant un COMPTE
+
+    et le CINQUIEME :  INSERT INTO user_logs (user_id, action)
+                       ni prev_hash ni self_hash  ->  les inserts sont NUS
+    les chaineurs : audit_log.php · audit_seal.php · audit_verify.php
+
+**`user_logs` porte une chaîne de hachage depuis la migration `036`.** *Chaque import ajoute donc un
+orphelin à la chaîne d'audit — la classe des 1385 orphelins déjà relevés.* **Un panneau qui promettrait
+une trace d'audit promettrait une trace non chaînable.**
+
+#### Ce qui rend ma faute plus lourde que la mesure : le travail était DÉJÀ FAIT
+
+    MODULE-ADM.md §5.0decies   D6c CARACTERISE le 2026-08-26 (v1.37.69)
+                               E-129 · E-130 · E-131 · E-132 nommes
+    tests/e2e/go-adm-import-csv.mjs   7 PASS / 0 FAIL sur le legacy, hors LOT
+    PLAN-DE-MIGRATION.md:1648  LES TROIS DECISIONS, avec leurs issues redigees
+
+**Et le plan écrit, sur `sudo`** : *« Retirer une colonne d'un format de fichier documenté change un
+contrat : ce n'est pas à moi. »* **Une session précédente avait déjà refusé de trancher, correctement.**
+
+> **Concevoir un panneau maintenant aurait tranché `sudo` par OMISSION** — précisément ce que le plan
+> refuse de faire à la place de l'exploitant. *Et ma propre mémoire porte « lire les docs du chantier
+> AVANT de replanifier », écrite après exactement cette faute.*
+
+#### ⚠ Et une règle de mon registre vient d'être RÉFUTÉE, ce qui est la meilleure nouvelle
+
+**J'y ai écrit** : *« la relecture par un pair attrape les fausses alarmes, JAMAIS les dédouanements — les
+trois miens ont été trouvés par moi seule, en relisant du déjà-publié. »*
+
+**Celui-ci a été trouvé par un pair, en une heure, sur du frais.** *Ce qui a changé : la session 3 a
+vérifié à la source une affirmation qui l'ARRANGEAIT — je venais de lui dire que la voie était libre.*
+**Un pair qui remesure ce qui le dispense de travail est le seul instrument qui attrape un
+dédouanement.**
+
+#### Ce qui SURVIT de mon arbitrage, et la session 3 le préserve
+
+    roleMap        LISTE FERMEE, defaut role 1 — l'absence d'entree libre EST la garde
+    anti-escalade  REPRISE de `add_user`, jamais reinventee
+    permissions    les 15 a ZERO explicitement
+
+**Et l'interdit d'exercice tient, renforcé** : *inutile de risquer un compte — la suite existe et passe à
+7/0 sur le legacy.*
