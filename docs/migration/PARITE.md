@@ -17924,3 +17924,98 @@ manquante), et la chaîne complète tient — clé JS → clé du tableau → cl
 traduction → présente dans les deux catalogues. **Ce faux positif était crédible
 parce qu'il collait trop bien au défaut cherché** : *un résultat qui confirme
 l'hypothèse qu'on porte mérite une seconde mesure, pas une inscription.*
+
+
+## E-377 — le geste que `DOSSIER-00` prescrit rendrait « pas de piège » là où la réponse est « pas encore »
+
+**Trouvé par la session 3, vérifié par moi le 2026-09-03 12:10.**
+`DOSSIER-00:333` nomme comme *« la seule mesure qui décide si le piège y est
+armé »* : **relever la propriété du cache compilé en PRODUCTION**, et son geste
+étape 1 le prescrit. **Cette mesure est décidable sans toucher la production — et
+son résultat rend le geste trompeur.**
+
+    origin/main    docker-compose.yml   240 lignes   service `^  laravel:` = 0
+    HEAD           docker-compose.yml   306 lignes   service `^  laravel:` = 1
+    TEMOIN         `^  python:`         = 1 dans les DEUX refs
+
+> **`origin/main` ne déclare pas le service `laravel`. Le conteneur du portage ne
+> tourne donc PAS en production aujourd'hui** — il n'y a aucun cache compilé à
+> posséder.
+
+**Donc le piège n'est pas armé maintenant, et il sera armé PAR LA BASCULE
+ELLE-MÊME** : au premier `up -d` après la fusion, le conteneur est construit
+depuis `laravel/Dockerfile` et son entrypoint lance `view:cache` **en root**.
+
+⚠ **Et c'est pourquoi le geste prescrit est trompeur** : son étape 1 interrogerait
+un répertoire **inexistant**, ce qui se lit comme *« pas de piège »* alors que la
+réponse est *« pas encore »*.
+
+> **Une universelle négative est vraie à vide** — ici sur la mesure même qui doit
+> décider d'une signature. *Le geste n'est pas faux, il est **insensible** : il
+> rend le même résultat quand le piège est absent et quand il est simplement
+> à venir.*
+
+**Conséquence pour la ligne d'entrypoint** (`chown -R www-data:www-data
+storage/framework/views` après `docker-entrypoint.sh:44`) : appliquée **avant** la
+fusion, le premier démarrage en production produit un cache `www-data`, et **il
+n'y a jamais rien à normaliser après coup.** Elle passe de rattrapage à
+**correctif de la bascule**.
+
+## E-378 — le fichier qui existe pour durcir la production ne couvre pas le conteneur qui VA DEVENIR la production
+
+**Mesuré le 2026-09-03 12:10.** `docker-compose.prod.yml` est une **superposition**
+(`docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d`).
+
+    services qu'il declare :   python · php · db
+    `^  laravel:` dans prod.yml :   0        TEMOIN `^  php:` = 1
+    directives de durcissement :   cap_drop 4 · read_only 4 · tmpfs 3 · user 2 · security_opt 4
+                                   -> toutes pour les TROIS autres
+
+> **Après la bascule, le conteneur Laravel devient LE portail — et c'est le seul
+> service de production sans `cap_drop`, sans `read_only`, sans `tmpfs`, sans
+> `user` non-root.** Les services qu'on retire ou qu'on garde en arrière-plan sont
+> durcis ; **celui qui prend la façade ne l'est pas.**
+
+Formulé du côté qui compte pour une signature : **le `php` legacy est durci
+aujourd'hui, et le conteneur qui le remplace ne l'est pas.** *La bascule serait
+donc, sur ce point précis, une **régression de durcissement de la porte
+d'entrée** — pas un statu quo.*
+
+Ce n'est pas un oubli de rédaction : `prod.yml` a été écrit quand `laravel`
+n'existait pas, et personne ne l'a rouvert depuis. **Aucun document du chantier ne
+mentionne `cap_drop`** (mesuré : 0 occurrence dans `docs/migration/`), donc le
+sujet n'était couvert nulle part.
+
+### ⚠ Et ça ne se recopie PAS — les deux sujets s'enclenchent
+
+`read_only: true` sur ce conteneur **empêcherait l'écriture dans
+`storage/framework/views`**, donc casserait la compilation Blade. Il faut un
+`tmpfs` sur ce répertoire — **et alors le cache est reconstruit à chaque
+démarrage, par l'entrypoint, en root.**
+
+> **Avec `tmpfs`, la ligne de `chown` n'est plus une commodité : elle devient
+> indispensable.** Sans elle, chaque démarrage en production repose un cache
+> `root` sur un système de fichiers neuf. *Deux sujets écrits séparément se
+> révèlent être un seul geste.*
+
+**Ni l'un ni l'autre n'est écrit** : l'entrypoint ne prend effet qu'au
+redémarrage (`D-07`), et `prod.yml` touche `cap_drop`/`read_only`/`user`, ce qui
+demande le mot de l'exploitant. **`D-07` porte donc maintenant TROIS choses** — la
+ligne d'entrypoint, la légende du menu, et la question ouverte du durcissement de
+`laravel`.
+
+### Note d'instrument, et elle est d'une classe nouvelle
+
+J'ai d'abord conclu que `cap_drop` figurait dans `INVENTAIRE.md`, puis — le
+constatant absent — **j'ai accusé `grep -r` de signifier `--replace` sous
+ripgrep.** Les deux étaient faux. La vérité :
+
+    j'avais imprime DEUX commandes a la suite, sans etiquette
+    les DEUX lignes rendues venaient de la PREMIERE
+    -> j'ai attribue la seconde ligne a la seconde commande
+
+> **Une erreur d'attribution de sortie produit une explication plausible au
+> niveau de l'OUTIL, et inventer ce mécanisme ressemble à de la rigueur.** *J'ai
+> failli inscrire en mémoire un fait d'environnement faux, qui se serait propagé
+> à toutes mes sondes.* **Une commande par bloc étiqueté** — le coût est une ligne
+> de `printf`.
