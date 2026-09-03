@@ -199,3 +199,110 @@ l'auditeur du chemin de récupération de compte.
 **Cette spécification est prête** : session 3 porte, je relis après. Et si
 l'exploitant décide que je porte, je le fais — mais alors la relecture doit aller
 à quelqu'un d'autre.
+
+---
+
+## 7. Mesures du 2026-09-03 (suite) — dont une correction de ma propre question
+
+### 7.1 ⚠ Le troisième défaut : la limite de débit ne borne PAS ce qu'elle existe pour borner
+
+Relevé par le DSI, **vérifié ligne à ligne** — et il est plus grave que mon §3.1.
+
+```php
+if ($user) {
+    …
+    INSERT INTO password_reset_tokens (user_id, token_hash, expires_at, ip_address)  // ligne 92
+    …
+} else {
+    password_hash(bin2hex(random_bytes(32)), PASSWORD_DEFAULT);   // ligne 115 — RIEN n'est insere
+}
+```
+
+Et le compteur :
+
+```sql
+SELECT COUNT(*) FROM password_reset_tokens WHERE ip_address = ? AND created_at >= …
+```
+
+> **Sonder une adresse INCONNUE n'insère aucune ligne, donc n'est jamais comptée.**
+> La limite de 3/IP/heure ne borne que les demandes portant sur des adresses qui
+> **existent** : elle freine l'utilisateur légitime et **laisse l'énumération
+> libre**.
+
+**Mon §3.1 disait « elle échoue ouverte sur erreur de base ». C'est vrai et
+insuffisant : même avec une base saine, elle ne borne pas l'attaque.** Le
+compteur est au mauvais endroit — il compte des **jetons émis**, pas des
+**demandes reçues**.
+
+**C'est le seul des trois défauts qui rendrait §3.2 coûteux à exploiter.** Sans
+lui, l'oracle de temps est sondable sans limite.
+
+### 7.2 `backend/migrations/` est un répertoire VIDE — formulation corrigée
+
+J'avais écrit *« le dépôt a deux répertoires de migrations »*. **Mesuré : `backend/migrations/`
+contient 0 fichier ; `mysql/migrations/` en contient 65.** Ce n'est pas deux jeux
+qui divergent — c'est **un répertoire réel et un leurre vide**. La formulation du
+DSI est meilleure et je l'adopte : *un balayage du premier rend zéro et ressemble
+à une absence.*
+
+### 7.3 La question HIBP — répondue, ET ma question était mal posée
+
+J'avais laissé ouvert : *« l'appel HIBP échoue-t-il OUVERT ? Si oui, la politique
+de complexité tombe pendant une panne réseau. »*
+
+**a) Oui, il échoue ouvert — déclaré, journalisé, borné.**
+
+```php
+// ligne 82 du docstring : « Si HIBP injoignable (reseau, timeout), on fail-open »
+'timeout' => 3,
+$body = @file_get_contents($url, false, $ctx);
+if ($body === false) {
+    error_log('HIBP check: API unreachable, fail-open');
+    return null;                       // <- aucune erreur : le mot de passe passe
+}
+```
+
+**Ce n'est pas la même situation que §3.1** : ici le repli est une **décision
+écrite** dans le docstring, journalisée à l'exécution, et bornée à 3 secondes.
+En §3.1 le repli est justifié par une raison qui n'a plus d'objet et n'est pas
+présentée comme un arbitrage.
+
+**b) ⚠ Mais ma question surestimait la portée, et je la corrige.**
+
+```php
+function passwordPolicyValidateAll(PDO $pdo, int $userId, string $newPassword): ?string {
+    … passwordPolicyCheckComplexity …     // LOCAL
+    … passwordPolicyCheckHistory   …     // LOCAL (base)
+    $e = passwordPolicyCheckHIBP($newPassword); if ($e) return $e;   // RESEAU
+}
+```
+
+**La politique de complexité ne tombe pas.** 15 caractères, 4 classes et
+l'historique sont **locaux** et insensibles à une panne réseau. Une coupure fait
+tomber **un contrôle sur trois** — celui du corpus de fuites. *Ma formulation
+disait « la politique de complexité tombe », ce qui est faux.*
+
+**c) Et le contrôle est ÉTEINT aujourd'hui.**
+
+```
+HIBP_ENABLED=[]        HIBP_THRESHOLD=[]        TEMOIN MAIL_ENABLED=[true]
+```
+
+Le témoin rend une valeur **par la même commande, dans le même conteneur** : donc
+l'instrument a regardé, et le vide des deux premières est un fait, pas un
+silence. `password_policy.php:90` sort immédiatement quand `HIBP_ENABLED !== 'true'` :
+**le contrôle ne s'exécute jamais.**
+
+**d) Et rien ne l'annonce faussement.** Vérifié : `srv-docker.env.example:529`
+pose `HIBP_ENABLED=false` explicitement, `ARCHITECTURE.md:139` dit « opt-in »,
+le CHANGELOG dit « off par défaut ». **La plateforme ne revendique pas une
+protection qu'elle n'exerce pas.**
+
+> **Conclusion : négatif vérifié, et ma question était trop large.** Le repli est
+> réel, déclaré, borné, sans objet aujourd'hui, et honnêtement documenté. **Je le
+> signale dans ce sens — celui où personne ne vient corriger une exagération.**
+
+**Reste une question, plus petite** : le portage porte `mdp_erreur_fuite` en FR et
+EN (`laravel/lang/*/profil.php`). Une clé pour un contrôle éteint est correcte
+**si** le contrôle est porté ; **non vérifié** — c'est à la relecture du portage
+de la politique, pas ici.
