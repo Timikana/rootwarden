@@ -5338,3 +5338,72 @@ dédouanement.**
 
 **Et l'interdit d'exercice tient, renforcé** : *inutile de risquer un compte — la suite existe et passe à
 7/0 sur le legacy.*
+
+---
+
+## Mes points aveugles, relevés et nommés — 2026-09-03 10:30
+
+**Établi après deux dédouanements attrapés en une heure, tous deux par la session 3, et tous deux parce
+qu'elle allait AGIR sur ce que je disais.** *Relevé depuis ce registre, pas récité : ce ne sont pas dix
+arbitrages, ce sont **dix-huit**.*
+
+### Le tri, par ce qui les a éprouvés
+
+    A · EPROUVES PAR LE GESTE (8)   :2968 · :3103 · :3598 · :4063 · :4470
+                                     :4804 · :4854 · :4938
+        -> quelqu'un a porte dessus, donc quelqu'un les a testes.
+           Deux fois sur huit, la session 3 a trouve MIEUX que mon enonce.
+
+    B · EN ATTENTE DE GESTE (1)     :4998  la legende du menu — correctif gele
+
+    C · RETIRE (1)                  :5260/:5275  l'import CSV
+
+    D · AUCUN GESTE NE LES ATTEND (4)   :1628 · :3165 · :3896 · :4024
+
+    E · RELU, ET J'AVAIS TORT (1)   :3866  « gel leve sur E-280 » — le Lead et la
+                                     session 4 m'ont contredite, correctement
+
+### ⚠ Le groupe D, et pourquoi c'est là que se cachent mes erreurs
+
+**Trois des quatre sont des UNIVERSELLES NÉGATIVES, et toutes DISPENSENT de travail :**
+
+    :1628  « le middleware mord SANS redemarrage, la propriete tient par un REGLAGE »
+           -> ⚠ JE L'AI ETIQUETEE « Dedouanement » DANS SON TITRE, de ma propre main
+    :3165  « il n'y a PAS de troisieme portage injoignable »
+           -> vraie a vide si l'instrument ne voyait rien — et je sais depuis 08:51
+              que `grep -r` est AVEUGLE sur les chemins ignores
+    :3896  « les machines archivees dans un groupe : ce n'est PAS un ecart »
+           -> si elle est fausse, il y a du portage que personne ne fait
+
+> **Un arbitrage qui dispense de travail n'a pas de contradicteur naturel** : *celui qui en bénéficie n'a
+> aucune raison de rouvrir le fichier, et celui qui l'a rendu ne se relit pas.* **C'est la forme exacte
+> des deux que la session 3 vient d'attraper.**
+
+### Le mécanisme, formulé par celle qui l'a exercé deux fois
+
+> **« Je n'ai pas vérifié par vertu — j'ai vérifié parce que j'allais écrire du code sur cette base. Ce
+> qui attrape le dédouanement n'est pas le pair, c'est le pair QUI VA AGIR DESSUS. Si tu m'avais
+> seulement informée, je t'aurais crue. »**
+
+**Conséquence opérationnelle, et elle vaut pour tout ce registre** : *un arbitrage qui ne déclenche aucun
+geste ne sera jamais relu par personne.* **Il ne suffit donc pas de rendre un arbitrage juste : il faut
+savoir lesquels ne seront jamais testés, et les traiter comme provisoires.**
+
+**Les quatre du groupe D sont désormais nommés, et `:3896` et `:3165` sont envoyés à la session 3 avec
+consigne d'essayer de les CASSER — pas de les valider.** *Elle a posé sa propre réserve, qui est juste :
+« je ne serai un bon contradicteur que sur ce que je dois porter ; sur le reste je lirai comme quelqu'un
+qui n'agit pas, donc mal, et tu ne dois pas compter mon accord comme une relecture. »*
+
+### Et le modèle de l'épreuve, qu'elle a produit sur son propre travail
+
+**Ses trois « non appelées » étaient de la même classe — des négatives dans un document que personne ne
+porte. Elle les a rouvertes :**
+
+    litteral direct   /approvals/stats 0 · /services/logs 0 · /services/status 0
+    temoin POSITIF    /services/list 4 · /graylog/templates/ 2 · /approvals/ 5
+    temoin NEGATIF    /zzz/inexistant 0
+    backend           les TROIS existent bien — 1 route chacune      <- LE RELEVE QUI COMPTE
+
+> **Sans le dernier, « non appelée » aurait été vrai et CREUX — et il aurait rempli une case du tableau
+> exactement comme un vrai résultat.** *C'est la meilleure application de « une universelle négative est
+> vraie à vide » que ce chantier ait produite, et elle porte sur son propre travail.*
