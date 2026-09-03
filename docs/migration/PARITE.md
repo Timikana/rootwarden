@@ -17618,3 +17618,70 @@ ci-dessus.
 FAIL conforme** sur la cible `legacy` — ce qui *n'est pas* un dédouanement du
 legacy mais la marque que les deux cibles n'exercent pas la même chose : c'est le
 portage qui porte le formulaire par plateforme.
+
+
+## E-374 — MA PISTE EST MORTE, DEUX FOIS, ET LA SECONDE ÉTAIT DANS CE FICHIER
+
+**L'écart reste OUVERT avec « cause première non établie ».** Ce qui tombe est ma
+piste, pas la mesure.
+
+### Réfutation 1 — par la mesure (session 7, 11:52)
+
+    supervision_config   ZÉRO ligne, aucune plateforme
+
+L'état correspond bien à ce que mon mécanisme prédisait — **et ça ne suffit pas** :
+
+    vue/suite :154  DELETE FROM supervision_config WHERE <sa marque>
+              :182  INSERT INTO supervision_config ...
+              :188  INSERT INTO supervision_config ...
+
+**La suite POSE ses deux lignes par `INSERT`.** Elle ne dépend donc d'aucune ligne
+préexistante, et son journal le confirme — *« après enregistrement — ligne zabbix :
+zabbix_server=rw-e2e-v4-zbx-avant.example »* : **la ligne EXISTAIT pendant la
+course.** Ma « mesure décisive » — *la plateforme a-t-elle une ligne AVANT le
+départ ?* — rend `non` pour toutes, **et la suite s'en passe**. Donc « la table est
+vide maintenant » décrit **la sortie propre de la suite, pas son entrée**.
+
+### ⚠ Réfutation 2 — par CE FICHIER, et elle est plus large
+
+**E-75, `:2458`, mesuré et écrit avant moi :**
+
+> *« **Le portage écrit avec `WHERE platform = ?`** et n'hérite donc pas du
+> défaut. »*
+
+et `:2517` :
+
+> *« Non corrigé — c'est du backend : le `WHERE platform` manquant de `:508` reste
+> en place pour tout appelant du legacy. **Le portage ne passe simplement plus par
+> là.** »*
+
+**Toute la famille « une plateforme perd sa ligne » est donc hors sujet pour le
+portage**, pas seulement l'instance que la session 7 a réfutée. J'ai construit un
+mécanisme depuis `MODULE-SUPERVISION.md:45-50`, je l'ai cru **confirmé** en
+mesurant `save_config` dans le backend — `ORDER BY id DESC LIMIT 1`, sans filtre,
+charge utile nommée Zabbix, identique en arbre et en service — et **rien de tout
+cela ne concerne la page mesurée.**
+
+> **Une mesure juste sur le mauvais objet ressemble exactement à une
+> confirmation.** Elle en a la forme : une commande, un artefact, une ligne de
+> code citée. Ce qui manquait n'était pas de la rigueur, c'était **de savoir de
+> quel appelant on parle** — et E-75 le disait en une phrase.
+
+⚠ **SIXIÈME FOIS DU JOUR, ET LA PLUS INSTRUCTIVE PARCE QUE LA VICTIME EST MON
+PROPRE FICHIER.** Les trois premières se réfutaient dans `docs/migration/`, la
+quatrième dans ma mémoire de travail, la cinquième dans le journal d'un pair,
+celle-ci **dans le registre dont la tenue est mon seul mandat**. *Un registre
+qu'on n'interroge pas n'est pas une trace : c'est un dépôt.*
+
+### Ce qui reste, et qui n'est PAS de moi
+
+Piste de la session 7, **non mesurée et donnée comme telle** : la vue rend
+`aria-selected` sur `$loop->first` (`:34`), et le formulaire est
+`superv-config-form-{{ $plateforme }}`. *Si la suite pose sa ligne sur une
+plateforme qui n'est pas la première du tableau, le bloc visible n'est pas le
+sien, et le point d'entrée qu'elle cherche est dans un bloc masqué.*
+
+**C'est la bonne famille avec le bon mécanisme** — le mien avait la famille
+(l'état de la base) et un mécanisme faux (la destruction de lignes) ; celui-ci
+tient à l'**ordre d'itération de la vue**, ce qui n'exige aucune ligne détruite.
+**Il demande de faire tourner. Ne pas refermer E-374 dessus non plus.**
