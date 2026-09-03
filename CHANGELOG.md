@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.194** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.195** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,79 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.195 — E-365 : le panneau de defi s'ouvrait SOUS LE PLI — et les 75 px coupes portaient la saisie
+
+**Omission de MON sous-lot E-364, que j'avais declaree sans la mesurer.** *Une autre session l'a
+mesuree, et ce qu'elle a trouve est plus precis que mon inquietude.*
+
+    /politiques  @1920   champ y=1008   dans la vue
+    /politiques  @1400   champ y=905    SOUS LE PLI
+    /acces-sftp  @1920   champ y=1085   SOUS LE PLI
+    /acces-sftp  @1400   champ y=905    SOUS LE PLI
+
+    en-tete collant : bas=65 partout — le panneau n'est JAMAIS recouvert
+    panneau : 177 px de haut, dont 102 visibles dans TROIS cas sur QUATRE
+
+#### Ce n'est PAS le defaut de F6, c'est l'autre consequence du meme manque
+
+F6 avait paye un panneau **recouvert par l'en-tete collant**. Ici l'en-tete s'arrete a 65 px et ne le
+recouvre jamais : le panneau **tombe sous le pli**. *Le meme `scrollIntoView` manquant produit les
+deux, selon que le geste part du haut ou du bas de la page.*
+
+#### ⚠ ET LE POURCENTAGE N'EST PAS LA TROUVAILLE : C'EST CE QUI EST COUPE
+
+**Les 75 px manquants portaient LE CHAMP DE SAISIE ET LE BOUTON DE VALIDATION.**
+
+> *L'utilisateur voit le titre, lit qu'on lui demande un code a six chiffres, et ne voit pas ou le
+> taper.*
+
+**C'est le cas ou l'on croit qu'il ne s'est rien passe.** Il peut defiler — *c'est une friction, pas
+un blocage* — mais un panneau de defi qui s'ouvre sans montrer sa saisie est l'ecran qu'on abandonne.
+*Et « 102 px sur 177 sont visibles » aurait pu passer pour acceptable : c'est en nommant CE QUI est
+dans les 75 autres que la mesure devient un verdict.*
+
+#### Le remede existait dans ce depot, et il etait de ma main
+
+    fail2ban.js:1012   confirmation.scrollIntoView({ block: 'center' });
+
+Avec son commentaire, qui dit pourquoi `nearest` ne suffit pas : *il fait le defilement MINIMUM, donc
+il aligne en haut — exactement la ou l'en-tete collant recouvre.* **`step-up.js` ne l'appelait nulle
+part.** Repris, non reecrit.
+
+#### Mesure APRES correction — sur LA CHOSE, pas sur la presence
+
+    page          taille       panneau      champ        valider     champ  bouton
+    politiques    1920x1080    800..977     907..947     918..963    OUI    OUI
+    politiques    1400x900     620..797     727..767     738..783    OUI    OUI
+    acces-sftp    1920x1080    800..977     907..947     918..963    OUI    OUI
+    acces-sftp    1400x900     620..797     727..767     738..783    OUI    OUI
+
+    critere : `haut >= 65` (sous l'en-tete) ET `bas <= hauteur de la vue`
+    requetes /policy/ SORTIES : 0 — la sonde repond a leur place
+
+**La propriete mesuree est que le champ ET le bouton soient lisibles**, pas que le panneau soit
+« present » ou « ouvert ». *La premiere mesure d'une autre session regardait le bord HAUT du panneau
+et rendait « visible » sur trois cas illisibles — mesurer la PRESENCE au lieu de la CHOSE.*
+
+#### ⚠ ET MA SONDE A ATTRAPE DEUX BOUTONS POUR UN
+
+Mon premier jet cliquait `[...button].find(/confirmer/i)`. **Le panneau de defi porte lui aussi
+« Confirmer »** (`step_up.panneau_valider`) : le selecteur par texte visait donc parfois le mauvais.
+Le panneau ne s'ouvrait pas.
+
+*Le garde de fixture a arrete la sonde au lieu de rendre des mesures vides* — « panneau NON ouvert,
+mesure vide, on s'arrete ». **Sans lui j'aurais eu quatre lignes de geometrie sur un panneau ferme,
+et elles auraient toutes dit `false` : un defaut la ou il n'y en avait plus.**
+
+Ancre exacte desormais (`politique-confirmer`, `sftp-confirmer`). *Deux boutons, un seul mot — c'est
+la meme famille que le prefixe `superv-profil-` qui attrapait sept ancres.*
+
+#### ⛔ Ce qui n'a pas ete exerce
+
+**Aucun `deploy` ni `remove` n'est parti** — la sonde repond a leur place par le `403` qui ouvre le
+defi. *La POSITION du panneau ne depend pas de la facon dont il s'ouvre : elle depend du defilement
+au moment ou il s'affiche.* On ne clique pas un geste destructeur pour mesurer une geometrie.
 
 ### v1.38.194 — E-364 : le DEFI de re-authentification, porte sur `politiques` et `acces-sftp`
 
