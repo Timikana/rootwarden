@@ -6827,3 +6827,44 @@ pas.* **Le couple garde, et il se répartit le travail : l'épingle localise, la
     backend                redemarre, sain — les 20 modules inertes EN SERVICE
     cache de vues          0 compile a root (etait 111)
     migrations             base a 65 (etaient 62)
+
+---
+
+## Tour de 23:35 — la CI tient, et ce qui reste tient en trois lignes
+
+    la CI de main    20:43Z  SUCCESS   -> elle tient
+    production       1 ingenierie / 7 doc
+
+**Neuvième franchissement du seuil, neuvième cause dans sa définition** : *l'heure a fait passer la CI au
+vert et refermer `E-374`. C'est de la vérification, et l'indicateur ne compte que du portage.*
+
+### Ce qui reste OUVERT, mesuré
+
+    le flux de reinitialisation   PAS atterri
+                                  0 fichier du portage cite `forgot_password`
+                                  -> session 3, spec ecrite par la session 5, en vol
+
+    `prod.yml`                    `laravel` toujours non durci
+                                  -> le SEUL service de production sans cap_drop,
+                                     read_only ni user non-root
+                                  -> attend le mot de l'exploitant
+
+    `security/backend-cve`        6 correctifs, relus DEUX fois, jamais fusionnes
+                                  -> attend son mot verbal explicite
+
+    l'archivage                   le prompt est ecrit, le chantier non lance
+                                  -> et il ne depend d'aucun geste de l'exploitant
+
+### ✅ Et une correction de la ligne de base, par une autre session
+
+**`490f331` : la ligne de base ne porte plus 5 défauts réels mais UN, et zéro du portage.**
+
+*C'est la troisième fois aujourd'hui que ce chiffre est recompté, et il descend à chaque fois — parce que
+chaque recompte attribue une cause au lieu de compter un total.* **`E-374` refermé « faute de protocole de
+mesure » : le défaut était dans la façon de mesurer, pas dans le code.**
+
+### Ce que je ne fais pas ce tour-ci
+
+**Je ne relance personne.** *La session 3 porte, la session 5 a rendu son rejeu et attend pour relire, les
+autres ont rendu leur assignation.* **Et je n'invente pas de tâche pour remplir un tour — c'est ce que
+j'ai refusé toute la journée.**
