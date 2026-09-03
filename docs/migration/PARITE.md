@@ -17091,3 +17091,122 @@ t'avais faite hier, rendue en outil »*.
 *Le qualificateur de cache a rendu `0` sur la fenêtre du LOT au même moment* : aucune reconstruction
 depuis le départ, donc **aucun FAIL de délai ne pourra lui être attribué pour l'instant** — ce qui est
 précisément le service qu'on attend de lui.
+
+## E-365 — ⚠⚠ `git checkout` SUR UN GABARIT BLADE ARME UNE PANNE : sept minutes de 500 en plein LOT
+
+**L'incident le plus instructif des deux jours, et son défaire est la cause.**
+
+### Le mécanisme, mesuré
+
+    sources des vues     uid de l'HOTE, non mappe dans le conteneur   664
+    fichiers compiles    root:root                                    755
+    repertoire du cache  www-data:www-data                            755
+
+Une source devenue **plus récente** que son compilé fait recompiler PHP (`www-data`), qui appelle
+ensuite `touch()` sur un fichier **appartenant à root** :
+
+    touch(): Utime failed: Operation not permitted   ->   500
+
+**Le socle étant inclus par toutes les pages, tout le portage tombe.**
+
+> **`git checkout -- <vue>` n'est PAS un défaire neutre sur un gabarit Blade.** *Il restitue le contenu
+> et **arme une panne différente par la date**.* **L'écriture accidentelle n'avait rien cassé ; c'est sa
+> réparation qui a fait tomber le portage.**
+
+**Parade** : `git checkout -- <vue>` **puis** `touch -d '<date d'origine>' <vue>`. *Et la date d'origine
+doit avoir été relevée AVANT — sans ce relevé, il n'y a rien à restituer.*
+
+### Ce que le LOT a mangé, et le bracketing des deux côtés
+
+    laravel-go-page-ssh-flux            FAIL=0   08:44:10   <- JUSTE AVANT, propre
+    supervision-onglets                 FAIL=9   08:45:56
+    supervision-profils                 FAIL=7   08:46:47
+    supervision-config                  FAIL=9   08:47:46
+    supervision-config-ecriture         FAIL=5   08:49:17
+    supervision-profils-crud            FAIL=10  08:50:51
+    supervision-version                 FAIL=7   08:51:29
+    supervision-editeur                 FAIL=7   08:51:59
+    laravel-go-page-supervision-releve  FAIL=0   08:53:11   <- APRES reparation, propre
+
+    FAIL total du LOT : 54    FAIL dans la fenetre : 54
+
+**Aucune régression : l'incident les explique tous.** Et les deux suites qui l'encadrent rendent **0** —
+*l'incident est borné des deux côtés, pas seulement daté.*
+
+### ⚠ MON RAPPORT POINTAIT LE MODULE ; LE DISCRIMINANT EST L'HORLOGE
+
+**J'ai écrit « sept suites, toutes `supervision` ».** *C'est vrai et ça désigne le mauvais objet.*
+
+> **Le runner est séquentiel, et `supervision` est un bloc contigu de sa liste.** Les sept sont
+> simplement celles qui passaient pendant ces sept minutes. **N'importe quel autre bloc de sept aurait
+> rendu le même tableau.**
+>
+> *Un relevé qui nomme sept fois « supervision » invite à chercher dans `supervision` — et c'est le
+> premier endroit où l'on ne trouvera rien.*
+
+**La corrélation est parfaite et le module est innocent.** *C'est la forme la plus trompeuse d'une
+corrélation : parfaite, reproductible, et sur une variable qui n'est pas la cause.*
+
+### ⚠ ET MON « RECOUPEMENT EXACT, PAS APPROCHANT » ÉTAIT DE TROP
+
+`supervision-editeur` finit à **08:51:59**, après la fin de la fenêtre que j'avais bornée sur les
+horodatages d'exception.
+
+> **Ma fenêtre est bornée sur les exceptions ; son relevé sur les `mtime` de journaux. Deux objets, qui
+> ne coïncident pas au bord.** *La conclusion tient — le journal porte un 500 — mais « exact, pas
+> approchant » n'est vrai qu'avec le prédicat écrit à côté.*
+
+**Et en vérifiant SA correction, mon propre motif a fauté à la même borne** : mon filtre `08:4[4-9]:*` a
+signalé `ssh-flux` (08:44:10) comme « pendant la panne », alors qu'il la **précède de 28 secondes**.
+*J'ai construit une sonde pour éprouver une correction de borne, et ma sonde avait une erreur de borne.*
+
+## E-366 — UNE QUATRIÈME COUCHE PARTAGÉE : l'ÉTAT SERVI
+
+    arbre        `lib-arbre.mjs`, mtime           INSTRUMENTE
+    base         TOTP, drapeaux, fixtures          aucun instrument
+    cache        l'amas des mtime                  INSTRUMENTE depuis ce matin
+    ETAT SERVI   le portail rend-il 200 ou 500 ?   AUCUN INSTRUMENT       <- neuf
+
+**`banc-libre.sh` a dit « RIEN VU » pendant que les exceptions partaient.** *Il mesure les processus de
+suite ; l'état servi ne lui est pas visible.*
+
+> **Son avertissement — « ce n'est pas *le banc est libre* » — était juste pour une raison de plus que
+> celle que j'avais écrite.** J'y avais mis « un rejeu peut démarrer dans la seconde ». *Il fallait aussi
+> : « et le portail peut être en panne sans qu'aucun processus ne le dise ».*
+
+**Un garde de banc complet demanderait une requête vers le portail**, pas seulement un `ps`. *Non écrit,
+et déclaré comme manque.*
+
+## E-367 — J'AI LU LA CROISSANCE DU CACHE COMME UNE PREUVE DE SANTÉ
+
+**Ma faute d'interprétation, et c'est la troisième en deux jours dans le sens rassurant.**
+
+J'avais relevé, en validant mon propre instrument :
+
+> *« Le cache est passé de 112 à 151 gabarits, et mon détecteur signale toujours l'amas sans confondre
+> les 39 ajouts. La discrimination négative marche maintenant sur des données réelles. »*
+
+**Les 39 nouveaux sont les gabarits du moteur de rendu d'exception de Laravel.**
+
+> **C'était la page d'erreur qui se compilait — et je l'ai citée comme un signe de bon fonctionnement,
+> dans le message même où je validais l'outil.**
+
+**Mon qualificateur n'a rien à se reprocher** : il détecte les reconstructions, pas les pannes de
+permission, et il a fait exactement ce qu'il annonce. ***C'est l'interprétation qui a penché***, et elle
+a penché du côté qui valide ce que je venais d'écrire.
+
+*Un dédouanement n'est jamais trouvé par la relecture d'un pair* — celui-ci a été trouvé parce que
+l'autrice de l'incident a rectifié son propre rapport, et que sa rectification a rendu mes 39 gabarits
+lisibles.
+
+## E-368 — LES DEUX EXCEPTIONS DU 2026-09-01 : ce n'était pas un incident, c'était un piège qui attendait
+
+    2026-09-01 15:30:25 et 15:30:54 CEST   2 exceptions `Utime failed`
+    31 minutes apres un commit du socle
+
+**Même classe, même mécanisme, deux jours plus tôt.** *Quelqu'un a édité le socle, le portage a rendu des
+500 jusqu'à la reconstruction suivante du cache, et personne ne l'a su.*
+
+> **L'incident d'aujourd'hui n'a pas créé le piège : il l'a rendu visible.** *Et il ne l'a rendu visible
+> que parce qu'il est tombé pendant une mesure de 172 exécutions — sans le LOT, les 28 exceptions
+> auraient rejoint les 2 autres dans un journal que personne ne lit.*
