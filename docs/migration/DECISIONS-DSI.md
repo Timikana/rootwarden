@@ -6706,3 +6706,60 @@ OUI.** *Refusée pour trois raisons mesurées :*
 
 **Les trois conditions pour que ce soit oui sont écrites et rendues à l'exploitant.** *L'ordre compte :
 supprimer d'abord obligerait sept sessions à committer sur la branche que la production tire.*
+
+---
+
+## 22:55 — ma question de fond a reçu une meilleure réponse que mon cadrage
+
+**J'avais objecté qu'une empreinte épinglée est un mauvais instrument** : *« elle rougit à chaque
+changement, légitime ou non, donc elle se réaligne par réflexe, et c'est ainsi qu'une garde meurt ».*
+
+**La session 5 a mesuré avant de réaligner, et sa mesure répond :**
+
+    31 -> 35 fichiers JS      60 -> 68 sites d'appel
+    liste a examiner : 4 -> 4       LES MEMES QUATRE
+    -> huit sites neufs, aucun n'entre dans la liste
+
+    l'EPINGLE      a rougi 4 fois, pour des changements LEGITIMES
+    la PROPRIETE   (comptes de verdicts, liste a examiner) n'a PAS bouge
+                   -> et c'etait le fait a etablir
+
+> **Une épingle ne dit pas « il y a un défaut ». Elle dit « ce fichier n'a pas été relu depuis qu'il a
+> changé ».** *C'est déjà ce qu'écrit son message d'échec, et c'est un office différent du mien.*
+
+### La règle, et elle vaut pour tout relevé gelé
+
+> **Une épingle seule meurt par réflexe ; une propriété seule est aveugle aux changements qui ne la
+> touchent pas. C'est le COUPLE qui garde.**
+
+*Un site d'appel qui change de cible en gardant son verdict passerait sous une propriété seule.*
+**L'épingle est le seul mécanisme qui FORCE la lecture.** *Inscrit en mémoire.*
+
+### ✅ Et elle a mesuré une lacune de son propre analyseur avant qu'on la lui trouve
+
+**F8 ajoute un appel sortant en clair vers `ip-api.com`.** *Si ce `fetch` avait été dans le JS, son
+analyseur l'aurait classé « chemin du PORTAGE » — parce que sa dérivation ne connaît que « passerelle » et
+« pas passerelle ».* **Un appel à un tiers rangé du côté rassurant.**
+
+**Mesuré : l'appel est dans `fail2ban_manager.py:397`, côté backend. Rien à corriger.** *Mais la lacune
+est réelle et elle l'inscrit :* **une taxonomie sans catégorie pour le cas grave range le cas grave dans
+la catégorie bénigne.**
+
+### ⚠ Et elle me corrige sur un chiffre — la faute que je corrige chez les autres
+
+    mes 124   routes du BACKEND PYTHON a permission seule
+    ses 15    routes du PORTAGE LARAVEL dans le meme cas
+
+**J'avais écrit « sur 230 routes » sans dire lesquelles.** *Le mot « backend » figurait ailleurs dans le
+fichier, jamais à côté du chiffre.* **Cinquième faux désaccord de la semaine, toujours la même cause :
+l'objet non nommé. `DOSSIER-22` corrigé.**
+
+### Ce que le redémarrage a refermé chez elle
+
+**Le tampon E-238 de `test_supervision_deploiement.py` et `test_wazuh_verdicts.py`** — *« un verrou posé
+sur du code non chargé verrouille l'intention, pas le comportement »* — **n'a plus d'objet.** *Elle le
+retire en le datant.*
+
+> **« Une réserve périmée devient une fausse alarme, et une fausse alarme use le crédit du fichier qui la
+> porte. »** *C'est le meilleur argument que j'aie lu pour daterretirer une réserve plutôt que de la
+> laisser dormir.*
