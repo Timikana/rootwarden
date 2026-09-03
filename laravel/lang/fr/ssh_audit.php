@@ -120,7 +120,38 @@ return [
     // ⚠ LE PANNEAU LE PLUS IMPORTANT DE LA PAGE.
     'np_parc_detail' => "Ce geste ouvre une session SSH sur CHAQUE machine non archivée du parc, production comprise. Il ne prend aucun paramètre : il n'y a rien à restreindre, et aucune façon de le viser ailleurs.",
 
-    'np_config' => "L'affichage et la modification de `sshd_config` ne sont pas encore portés sur cette interface.",
+    /*
+     * ══ A3 — LA CONJONCTION EST SCINDEE, PAS RETIREE ══════════════════════
+     *
+     * Elle disait « l'affichage ET la modification ». A3 porte l'affichage :
+     * la phrase devient donc a MOITIE fausse, et une moitie fausse se lit
+     * comme entierement vraie. C'est la septieme forme du motif de la semaine
+     * — apres `serveurs` (trois capacites, une portee) et `bashrc` (deux
+     * portees declarees absentes), la conjonction est la plus discrete.
+     *
+     * `np_config_detail` NE BOUGE PAS : sa reserve porte sur l'ECRITURE, qui
+     * reste absente, et elle reste vraie mot pour mot.
+     */
+    'np_config' => "La modification de `sshd_config` n'est pas encore portée sur cette interface.",
+
+    // ══ A3 — L'AFFICHAGE, PORTE ═══════════════════════════════════════════
+    //
+    // ⚠ CE GESTE JOINT LA MACHINE. `POST /ssh-audit/config` ouvre une vraie
+    // session SSH (`ssh_audit.py:372`) pour lire le fichier. C'est une
+    // LECTURE — rien n'est ecrit, ni sur la machine ni en base — mais ce
+    // n'est pas une lecture locale, et le panneau doit le dire AVANT le clic.
+    'cfg_titre'    => 'Lire `sshd_config` sur ce serveur ?',
+    'cfg_texte'    => "Cette lecture ouvre une session SSH réelle sur le serveur choisi. Elle n'écrit rien, ni sur la machine ni en base, et le fichier s'affiche ici en lecture seule.",
+    'cfg_lire'     => 'Lire le fichier',
+    'cfg_en_cours' => 'Lecture en cours…',
+    'cfg_titre_resultat' => '`sshd_config` de :nom',
+    'cfg_vide'     => 'Le serveur a répondu, mais le fichier est vide.',
+    'cfg_echec'    => "Le fichier n'a pas pu être lu. :message",
+    'cfg_refus'    => "La lecture a été refusée. :message",
+    'cfg_sans_serveur' => 'Choisissez un serveur avant de lire sa configuration.',
+    // La lecture seule se DIT, elle ne se devine pas d'une absence de bouton.
+    'cfg_lecture_seule' => "Ce contenu est affiché en lecture seule : la modification de `sshd_config` n'est pas portée ici.",
+
     'np_config_detail' => "Écrire dans `sshd_config` et recharger le service peut couper l'accès SSH au serveur — et SSH est le seul canal dont RootWarden dispose pour y revenir. Une sauvegarde existe et la restauration est possible.",
 
     // ══ A2 — LA CREATION D'UN RELEVE PLANIFIE EST PORTEE ═══════════════════
