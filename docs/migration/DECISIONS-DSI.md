@@ -6648,3 +6648,61 @@ posé.*
 **Quinze erreurs de mesure sur la journée, et les quatre dernières en une heure d'action.** *Aucune n'a
 produit de mauvais geste — toutes ont été rattrapées par un témoin ou par une relecture. **C'est le seul
 mécanisme qui a fonctionné, et il a fonctionné quinze fois sur quinze.***
+
+---
+
+## ✅ 22:40 — le correctif CI a marché, et il a révélé que 285 tests tournaient dans le vide
+
+**`main` poussé (`7a575af`), CI rejouée (`33797467515`). Elle est ROUGE — et c'est le bon résultat.**
+
+    AVANT   `php artisan test` mourait sur « Test directory tests/Unit not found »
+            -> AUCUN test execute, jamais
+    APRES   Tests: 4 failed, 285 passed (923 assertions)   Duration: 7.29s
+
+> **285 tests et 923 assertions n'avaient JAMAIS tourné en CI.** *Le job ne rapportait pas un test en
+> échec : il rapportait un répertoire que git ne portait pas.*
+
+### Les quatre échecs sont des gardes qui font leur office
+
+    AppelantsDuBackendTest > chaque fichier javascript…
+    AppelantsDuBackendTest > aucun fichier n a change d…
+      « fail2ban.js : attendu ae10645cca4d5129, trouve 7b61… »
+    InventaireDesGardesTest > aucune route n echappe au…
+    InventaireDesGardesTest > le compte des deux listes…
+
+**`fail2ban.js` a été modifié à 03:50 (`69072c0`, F8, la géolocalisation) et son empreinte n'a pas
+suivi.** *Ces tests rougissent depuis 03:50, et personne n'a pu l'apprendre.*
+
+**Routé à la session 5 (`laravel/tests/` est son périmètre), avec deux consignes :**
+
+    1. distinguer « une epingle a realigner » de « un vrai defaut »
+       ⚠ ne PAS realigner sans lire la diff : une epingle realignee par reflexe
+         transforme une garde en formalite, et c'est ainsi qu'une garde meurt
+    2. `aucune route n'echappe au…` peut recouper le pentest du jour
+       -> 124 routes ont une permission pour seul discriminant, et
+          `/ssh-audit/scan-all` a une page plus stricte que sa route
+
+### Ce que ça dit du reste
+
+**Le second rouge — `sast-semgrep-custom` — est `continue-on-error`, donc il ne bloque pas.** *Mais le
+`DOSSIER-23` établit que sept de ses dix règles sont inertes : trois mortes, quatre filtrées par
+`--severity=ERROR`.*
+
+> **Deux jobs rouges, deux causes qui n'avaient rien à voir, et aucune des deux n'était ce que le rouge
+> semblait dire.** *Le premier disait « un test échoue » et disait « aucun test ne tourne ». Le second dit
+> « une analyse échoue » et dit « sept règles sur dix n'analysent rien ».*
+
+### ⚠ Et sur la suppression de `Migration-Laravel`, demandée par l'exploitant
+
+**Techniquement possible — `git merge-base --is-ancestor origin/Migration-Laravel origin/main` rend
+OUI.** *Refusée pour trois raisons mesurées :*
+
+    1. l'arbre PARTAGE par les sept sessions est checkout dessus,
+       et il portait 1 fichier non commite au moment de la question
+    2. c'est la seule couche entre le travail et la production :
+       `maj.sh` fait `git pull origin main`
+    3. la CI ne se declenche QUE sur `main` — donc supprimer la branche
+       revient a pousser du code NON ANALYSE droit sur ce que la prod tire
+
+**Les trois conditions pour que ce soit oui sont écrites et rendues à l'exploitant.** *L'ordre compte :
+supprimer d'abord obligerait sept sessions à committer sur la branche que la production tire.*
