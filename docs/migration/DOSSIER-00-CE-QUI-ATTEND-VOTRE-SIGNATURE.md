@@ -108,3 +108,43 @@ vous-même. *Rien d'incohérent ne partirait — le Lead confirme que rien de lu
   trois entrées en trois jours.* **Un index de ce qui reste est exactement le genre d'artefact qui
   devient faux sans que personne ne le touche** — c'est le défaut que ce chantier a payé cinq fois, et
   celui-ci ne s'en exempte pas.
+
+---
+
+## ⚠ AJOUT DU 2026-09-03, 08:45 — un axe qui manquait : ce qui EMPIRE avec la bascule
+
+**Relevé par le Lead, et il renverse l'ordre que ce document proposait.**
+
+**L'exploitant a autorisé la fusion sur `main` à 08:29.** *Cette fusion est la bascule v2.0 : 820
+commits, 831 fichiers, `www/` renommé en `legacy/`.* **Les entrées ci-dessus se classaient par ce
+qu'elles DEMANDENT. Il en manquait une : ce qu'elles deviennent si la bascule a lieu sans elles.**
+
+    migrations 063 · 064 · 065 non appliquees
+      -> le code suppose une contrainte qui n'existe pas
+      -> ça CASSE, donc ça se VOIT, donc ça se repare
+
+    `security/backend-cve`, 6 correctifs jamais fusionnes
+      -> 4 des 6 mordent AUJOURD'HUI sur un portail servi (DOSSIER-15)
+      -> ça ne casse RIEN, donc personne ne l'apprend
+
+> **« Les migrations non appliquées bloquent ; les correctifs non fusionnés, eux, ne bloquent rien — ils
+> se contentent de manquer. »**
+
+**Je plaçais les migrations en premier PARCE QU'ELLES BLOQUENT. C'est exactement ce qui les rend les
+moins dangereuses des deux.** *Un blocage se signale de lui-même ; une garde absente attend.*
+
+### Ce que ça change dans l'ordre
+
+**`security/backend-cve` doit être traitée AVANT ou AVEC la bascule, pas après.** *Sinon la mise en
+production livre un portail neuf dont quatre routes CVE gardent des défauts que six correctifs écrits le
+21 août corrigent — et rien, dans le portail neuf, ne le dira.*
+
+**Elle exige une validation verbale explicite** (règle du dépôt pour tout patch de sécurité), **et
+l'exploitant ne l'a pas mentionnée en autorisant la fusion.** *Elle ne part donc pas avec le reste, et
+c'est le seul point de cette liste dont l'attente coûte plus après la bascule qu'avant.*
+
+### Et une question de portée qui reste ouverte
+
+**« Pour info » n'est pas la formule d'un déclenchement de bascule.** *J'ai demandé confirmation que la
+mise en production du portail Laravel est bien l'intention ; la réponse n'est pas venue.* **227 fichiers
+supprimés d'un portail servi ne se déduisent pas d'un « quand tu veux ».**

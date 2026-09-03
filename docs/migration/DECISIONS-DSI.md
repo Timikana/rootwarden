@@ -5039,3 +5039,44 @@ demandait.** *Aucun des deux écrans ne pouvait la voir depuis sa propre page.*
 **E-365** : *le panneau s'ouvrait sous le pli, les 75 px coupés portaient la saisie.* **Un défi de second
 facteur dont le champ est hors écran est un refus déguisé en panne** — la garde tenait, et personne
 n'aurait pu la satisfaire. *Visible à l'image seulement.*
+
+---
+
+## Complément du tour de 08:35 — une attribution fausse, et l'axe qui manquait
+
+### ⚠ J'ai attribué au Lead deux trouvailles qui ne sont pas de lui
+
+    git log --since='07:35'
+      a771189 08:26 docs(croisement): deux declarations contredites par la matrice
+      4393a87 08:23 docs(lead):       le classement des six par portee
+
+**J'ai lu deux lignes adjacentes du journal comme un seul fil.** *`4393a87` porte l'étiquette du Lead,
+`a771189` la suit d'une ligne — et j'ai attribué le contenu du second à l'auteur du premier.*
+
+> **Deuxième fois cette nuit qu'une adjacence me trompe** — la première était de lire la continuité du
+> CONTEXTE comme une continuité du TEMPS. **La proximité dans un journal n'est ni une identité ni une
+> date.**
+
+**Et je ne peux pas rectifier l'attribution** : *`a771189` porte le préfixe `docs(croisement)`, sans
+étiquette de session, et le document ne nomme aucun auteur.* **Je consigne donc le constat sans nom.**
+
+**Pourquoi ce défaut est pire qu'une erreur de chiffre** : *une mesure se refait, une attribution non* —
+et j'ai proposé un correctif à quelqu'un pour un travail qu'il n'avait pas fait, **ce qui aurait fait
+porter la suite par la mauvaise personne.**
+
+### ✅ L'AXE QUI MANQUAIT AU `DOSSIER-00` — et il renverse mon ordre
+
+**Le Lead a nommé une asymétrie que je n'avais pas vue :**
+
+    migrations non appliquees  ->  ça CASSE, donc ça se VOIT
+    correctifs non fusionnes   ->  ça ne casse RIEN, donc personne ne l'apprend
+
+**Je plaçais les migrations en premier PARCE QU'ELLES BLOQUENT. C'est exactement ce qui les rend les
+moins dangereuses des deux.**
+
+> **Un blocage se signale de lui-même ; une garde absente attend.** *Toute ma hiérarchie de la nuit —
+> « le prérequis le plus bas passe devant » — mesurait la facilité d'atteinte. Elle ne mesurait pas la
+> VISIBILITÉ de l'attente, et c'est un second axe, pas un raffinement du premier.*
+
+**Porté au `DOSSIER-00` : `security/backend-cve` doit être traitée AVANT ou AVEC la bascule.** *C'est le
+seul point de la liste dont l'attente coûte plus après qu'avant.*
