@@ -5199,3 +5199,73 @@ l'hôte.* **Les trois ont produit une valeur plausible, et aucune ne s'est signa
 **Ce qui tient de son premier rapport** : *`porteDuLegacy` absent des 151 compilés — aucune requête n'a
 rendu sa version* · *contenu des 5 cibles identique à `HEAD`* · *le refus de `view:clear`, qui
 **s'améliore** : une reconstruction par root aurait réparé aussi, en polluant tout le LOT restant.*
+
+---
+
+## Tour de 09:35 — l'import CSV est UNE capacité, décrite deux fois à moitié
+
+**Banc OCCUPÉ (`go-page-wazuh.mjs`), 61 journaux sur 172. Zéro commit de code cette heure, et c'est ma
+propre règle qui l'interdit.**
+
+### ⚠ L'indicateur doc/code, troisième tour, troisième raison — je le déclare inutilisable en l'état
+
+    tour de 07:35   il compte le DSI, dont le perimetre d'ecriture est `docs/` SEUL
+    tour de 08:35   sa definition exclut TOUT le harnais de test
+    tour de 09:35   le banc est occupe : ecrire dans laravel/ est INTERDIT
+
+**Trois franchissements, trois causes distinctes, toutes dans sa définition.** *Je ne l'attaque pas une
+troisième fois : un seuil qui se franchit pour une raison différente à chaque tour ne mesure pas
+l'objet qu'il nomme.*
+
+### ✅ LA DERNIÈRE DÉCLARATION NON MESURÉE EST CLOSE — et elle en cachait une seule
+
+    comptes.php:20   « L'import de comptes par fichier CSV vit toujours sur l'ancien portail »
+    la mission       « import par fichier CSV (serveurs) »
+
+**Les deux désignent le MÊME fichier** — `legacy/adm/includes/import_csv.php` — **et chacune n'en nomme
+que la moitié :**
+
+    INSERT INTO machines      <- ce que la mission annonce
+    INSERT INTO users         <- ce que `comptes.php` annonce
+    INSERT INTO permissions   <- ce qu'AUCUNE des deux n'annonce
+    INSERT INTO user_logs     <- ni celle-la
+
+> **Ce n'est pas deux capacités : c'est une, qui fait quatre choses, et dont les deux descriptions
+> existantes en couvrent une chacune.** *C'est la conjonction à l'envers — au lieu d'un ET dont un membre
+> devient faux, deux énoncés vrais et partiels sur un objet plus large que chacun.*
+
+**Conséquence pour le portage** : *qui porterait « l'import CSV des serveurs » porterait un geste qui
+crée aussi des COMPTES, leurs lignes de permissions et des entrées d'audit.* **Le libellé sous lequel on
+prend une tâche décide de ce qu'on croit porter.**
+
+### Une alarme que j'ai formée et qui est tombée à la mesure — la troisième ce matin
+
+**J'ai vu `role_id` fourni par le CSV et j'ai pensé à `DOSSIER-12`** — *le compte de rôle 3 sans ligne de
+permissions, et le court-circuit de `require_permission` par le rôle 3.* **Un mécanisme qui produit cet
+état depuis un fichier aurait été grave.**
+
+    :150  $roleMap = ['user'=>1, 'admin'=>2, 'superadmin'=>3];
+    :151  $roleId  = $roleMap[strtolower($data['role'] ?? 'user')] ?? 1;   <- LISTE FERMEE
+    :156  if ($myRole < 3 && $roleId >= $myRole) { $roleId = 1; }          <- ANTI-ESCALADE
+    :168  les 15 permissions a ZERO explicitement
+          « Patch A01/A07 : meme regle hierarchique que add_user »
+
+**L'import legacy est bien bâti.** *Liste fermée, défaut au rôle le plus faible, et un non-superadmin ne
+peut pas créer un rôle supérieur ou égal au sien.*
+
+> **Troisième hypothèse de la matinée formée par MOTIF et tombée à la MESURE** — après le soupçon de
+> cascade sur `np_supprimer` et le mécanisme de conflit inventé pour sauver un axe retiré. *Les trois
+> visaient un défaut réel du dépôt, appliqué au mauvais objet.*
+
+### ✅ ARBITRAGE : l'import CSV se porte, et deux choses ne se réécrivent pas
+
+1. **`roleMap` reste une LISTE FERMÉE avec défaut au rôle 1.** *Un nom de rôle inconnu ne crée pas un
+   compte privilégié — il crée le plus faible* ;
+2. **la clause anti-escalade se REPREND, elle ne se réinvente pas.** *Elle existe dans `add_user` ; trois
+   implémentations d'une même règle divergent, et celle-ci décide de qui peut créer un superadmin.*
+
+**Et le panneau doit nommer les QUATRE effets**, pas deux : *combien de serveurs, combien de comptes,
+que les permissions sont créées à zéro, et que l'audit reçoit une entrée par ligne.*
+
+**⛔ Ne pas l'exercer sur un fichier réel** : *l'import crée des comptes, et un compte créé ne se retire
+pas par un `DELETE` — `DOSSIER-12` porte déjà deux comptes que personne n'a décidés.*
