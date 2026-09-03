@@ -157,6 +157,70 @@ class MotDePasse
         if (! password_verify($actuel, (string) $compte->password)) {
             return 'profil.mdp_erreur_actuel';
         }
+
+        return $this->applique(
+            $idCompte,
+            (string) $compte->password,
+            $nouveau,
+            $confirmation,
+            $sessionCourante,
+            'Mise a jour du mot de passe',
+        );
+    }
+
+    /**
+     * Reinitialise le mot de passe SANS l'ancien — apres validation d'un jeton
+     * de courriel. Rend une CLE i18n : `self::OK` ou la cle du refus.
+     *
+     * POURQUOI CETTE METHODE EXISTE, ET POURQUOI ELLE NE COPIE RIEN. Le flux de
+     * reinitialisation ne connait pas le mot de passe actuel — c'est sa raison
+     * d'etre. Recopier ici la chaine de controles de `change()` donnerait DEUX
+     * implementations d'une meme regle de securite, qui divergeraient : c'est le
+     * defaut que ce depot a paye trois fois (trois copies du garde SSRF, trois
+     * compteurs 2FA, deux fichiers `sudoers.d` en conflit). Les deux entrees
+     * partagent donc `applique()`, et ne different QUE par la verification de
+     * l'ancien mot de passe.
+     *
+     * ⚠ AUCUNE session n'est preservee : la personne n'est pas connectee, il n'y
+     * a pas de session courante a epargner. C'est aussi le choix du legacy
+     * (`reset_password.php:153` : `DELETE FROM active_sessions WHERE user_id = ?`
+     * sans exception) — et il est le bon : une reinitialisation par courriel doit
+     * chasser un intrus qui detiendrait une session.
+     */
+    public function reinitialise(
+        int $idCompte,
+        string $nouveau,
+        string $confirmation,
+    ): string {
+        $compte = DB::table('users')->where('id', $idCompte)
+            ->select('id', 'password')->first();
+        if ($compte === null) { return 'profil.mdp_erreur_compte'; }
+
+        return $this->applique(
+            $idCompte,
+            (string) $compte->password,
+            $nouveau,
+            $confirmation,
+            null,
+            'Reinitialisation du mot de passe par jeton',
+        );
+    }
+
+    /**
+     * La chaine de controles et l'ecriture, communes aux deux entrees.
+     *
+     * L'ORDRE EST CELUI DU LEGACY : correspondance, complexite, historique,
+     * fuite. La verification de l'ancien mot de passe reste chez l'appelant,
+     * parce qu'elle est justement ce qui les distingue.
+     */
+    private function applique(
+        int $idCompte,
+        string $ancien,
+        string $nouveau,
+        string $confirmation,
+        ?string $sessionCourante,
+        string $actionJournal,
+    ): string {
         if ($nouveau !== $confirmation) {
             return 'profil.mdp_erreur_correspondance';
         }
@@ -169,8 +233,6 @@ class MotDePasse
         if ($this->compromis($nouveau)) {
             return 'profil.mdp_erreur_fuite';
         }
-
-        $ancien = (string) $compte->password;
 
         DB::transaction(function () use ($idCompte, $ancien, $nouveau) {
             // L'ANCIEN HACHE D'ABORD : c'est lui qui rend le refus de reutilisation
@@ -245,7 +307,7 @@ class MotDePasse
         try {
             DB::table('user_logs')->insert([
                 'user_id' => $idCompte,
-                'action' => 'Mise a jour du mot de passe',
+                'action' => $actionJournal,
                 'created_at' => now(),
             ]);
         } catch (\Throwable $e) {
