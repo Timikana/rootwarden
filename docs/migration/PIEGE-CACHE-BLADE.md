@@ -69,6 +69,42 @@ peut faire tomber le portage sans le savoir.
   Formes qui voient un repertoire ignore : `--no-ignore`, ou une boucle shell
   sans `-r`.
 
+## ⚠ UN TROISIEME CACHE : OPCACHE, ET IL N'A PAS LE MEME REGLAGE DANS LES DEUX CONTENEURS
+
+Mesure du 2026-09-03, en lisant la configuration que le DEPOT compile dans chaque conteneur.
+
+    directive                     portage (laravel/Dockerfile)   legacy (php/Dockerfile)
+    php.ini                       AUCUN copie -> les DEFAUTS     COPY php/php.ini  (:100)
+    opcache.enable                1 (defaut)                     1        (php.ini:246)
+    opcache.validate_timestamps   1 (defaut)                     On       (php.ini:269)
+    opcache.revalidate_freq       2 s (defaut)                   60 s     (php.ini:259)   <-- ⚠
+    opcache.enable_cli            0 (defaut)                     1        (php.ini:265)
+
+`laravel/Dockerfile:22` fait bien `docker-php-ext-install … opcache` : **le portage a OPcache
+activé**, mais aucun `php.ini`, donc il tourne sur les défauts. `docker-compose.yml:11` associe
+`php/Dockerfile` à `container_name: rootwarden_php` — **c'est le legacy qui porte le 60 s.**
+
+> **« `laravel/**` et `legacy/**` sont relus a CHAQUE REQUETE » est vrai de la SOURCE et faux du
+> BYTECODE cote legacy : un fichier PHP y reste non relu pendant jusqu'a 60 secondes.**
+
+**Et rien ne purge le bytecode** : `opcache_reset` / `opcache_invalidate` → **0 fichier sur 3169
+scannés** *(témoin positif : « opcache » dans 5 fichiers, dont `php/php.ini` et
+`laravel/Dockerfile` ; témoin négatif : 0)*. Seuls le temps ou un redémarrage du conteneur
+l'effacent.
+
+**Pourquoi ça trompe** : un correctif appliqué au legacy et vérifié tout de suite peut paraître
+**inerte pendant une minute** — et le legacy est la cible de RÉFÉRENCE des mesures de parité.
+*Le délai est assez long pour tromper, assez court pour disparaître avant qu'on cherche.*
+
+**⚠ Ceci est un cache DISTINCT de celui des gabarits Blade** décrit ci-dessus. Les 28 pages
+d'erreur du 2026-09-03 venaient du `touch()` sur un compilé appartenant à root, **pas** d'OPcache.
+Les confondre ferait chercher au mauvais endroit.
+
+**Borne de cette mesure** : elle lit la configuration que le dépôt **compile**, pas celle des
+conteneurs **en service** (`docker` refuse l'accès depuis l'hôte de cette session). Pour trancher
+sur le serveur, il faut lire `opcache.revalidate_freq` **par une requête HTTP** dans
+`rootwarden_php`, jamais par `docker exec` — la SAPI de service est la seule qui compte.
+
 ## ⚠ DEUX CLASSES D'INSTRUMENT FAUX, ET LA SECONDE NE SE TRAHIT PAS
 
 Relevés le 2026-09-03, à une heure d'intervalle, par deux sessions.
