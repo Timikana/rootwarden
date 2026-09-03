@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.195** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.196** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,101 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.196 — LOT3 : 55 FAIL bruts, **5 reels**, et six erreurs de mesure toutes du meme cote
+
+**LIGNE DE BASE, 2026-09-03 11:45** — journaux `/tmp/rw-lot-fpELZT`, depart
+**08:16:26**, fin **11:23** :
+
+    167 executions   (85 laravel + 82 legacy, toutes ont tourne)
+    2613 PASS
+    55 FAIL
+    verdicts : 157 conformes + 1 ECART + 8 ECHEC + 1 FENETRE SALE = 167
+
+Recomptee **independamment** sur les lignes de verdict, meme valeur. Precedentes :
+164 · 2550 · 1 (2026-09-02) et 158 · 2439 · 0 (2026-09-01). ⚠ **Le compte attendu
+avait grandi de 164 a 167 sans que personne ne remesure**, et le « 172 » annonce
+au lancement venait d'une extraction de jetons qui sur-comptait (89+83).
+
+**ATTRIBUTION, parce que « 55 FAIL » est trompeur :**
+
+    50 FAIL  imputables a l'incident du cache de vues Blade (08:44 -> 08:52)
+     4 FAIL  REELS — go-page-supervision-config-ecriture, persistants AU REPOS
+     1 FAIL  REEL — go-bashrc-b4 legacy
+    equivalent hors incident : 167 · ~2663 · 5
+
+L'incident a coute **50 PASS en plus des 50 FAIL** (les sept suites rendent 112
+PASS au repos contre 62 sous LOT). Le plan portait encore la base du 2026-09-01 :
+**remplacee**.
+
+#### Reference reposee
+
+`go-socle-navigation` **74 -> 75**. La reference avait un tour de retard, pas la
+suite : 74 pose le 2026-09-02 a 07:58, et l'entree `wazuh` ajoutee a
+`Navigation.php` a **15:38 le meme jour**. ⚠ **Zero FAIL et le compte qui bouge est
+le cas invariant-vs-compte**, jamais une regression — reserve ecrite dans le
+fichier, a cote des commentaires de cette suite.
+
+#### Trois ecarts
+
+- **E-372** — le garde de fenetre **mord a vide** : la `FENETRE SALE` nomme trois
+  fichiers dont les `mtime` sont vieux de plusieurs jours, et la mesure rend
+  **0 fichier source ecrit depuis 08:16:26** (temoin positif : 20 sur fenetre
+  large). Confirme par son proprietaire, corrige apres le LOT. **Le cout est
+  asymetrique : un garde qui crie a vide se fait ignorer, et c'est le seul
+  instrument qui voit une ecriture pendant une mesure.**
+- **E-373** — une action de masse emet **UNE requete pour DEUX machines cochees**
+  (`go-bashrc-b4`, cible legacy). Consequent parce que la machine de
+  **production** porte une case identique aux autres : un ecran qui n'agit pas sur
+  tout ce qu'il montre coche rend l'operateur **incapable de savoir sur quoi il a
+  agi**. La propriete a etablir n'est pas « le nombre vise est petit » mais **« le
+  nombre vise est CELUI qui est coche »** — l'erreur symetrique serait pire.
+- **E-374** — 4 FAIL qui **survivent au repos**, un seul defaut a quatre
+  symptomes (rien n'est soumis, donc rien ne change, donc la valeur « avant »
+  subsiste et aucun refus n'est emis). **Cause premiere NON etablie**, deux pistes
+  mortes, une vivante et non mesuree.
+
+#### Ce qui merite d'etre garde : six erreurs de mesure, toutes du meme cote
+
+Aucune n'a produit de mauvais code — toutes ont produit du **temps perdu**, dont
+celui d'autres sessions. La cause commune n'est pas la precipitation :
+
+> **Un desaccord se cherche ; un accord se croit.** Les six allaient vers ce qui
+> rassure ou vers ma propre hypothese. Je n'ai jamais cherche a me contredire,
+> seulement a me verifier.
+
+Les mecanismes, tous reutilisables :
+
+1. **Compter la PRESENCE d'un garde-fou n'est pas mesurer la PROPRIETE qu'il
+   produit** — « la requete porte un filtre » n'est pas « le perimetre est
+   borne » ; et **un fail-closed cite sans son EMPLACEMENT dedouane la mauvaise
+   branche**.
+2. **Un outil juste mais MAL BORNE rend la reponse rassurante** : `-maxdepth 3`
+   sur des fichiers a la profondeur 4 ; un motif en ligne entiere sur un tableau
+   bash multi-noms ; un `awk` rendant « 0 ligne » la ou la lecture etait
+   **REFUSEE**. **Un instrument qui ne peut pas lire rend exactement la meme
+   sortie qu'un objet absent** — d'ou temoin positif ET negatif avant tout constat.
+3. **Un journal est CUMULATIF : la date d'une LECTURE n'est pas celle de
+   l'evenement.** Un bloc contigu lu pour la premiere fois etait clos depuis deux
+   heures et demie.
+4. **Le diagnostic differentiel se lit dans le VERDICT** : `302` = redirection,
+   `200` + assertions fausses = regression, **`500` = ni l'une ni l'autre**.
+5. **La CIBLE est un discriminant gratuit** : les sept suites echouaient sur
+   `laravel` et etaient **conformes sur `legacy` dans la meme fenetre**, ce qui
+   refutait seul l'hypothese d'un etat partage en base — une ligne plus bas dans
+   le journal.
+6. **Une mesure juste sur le mauvais OBJET a exactement la FORME d'une
+   confirmation** — une commande, un artefact, une ligne de code citee. Ce qui
+   manque n'est pas de la rigueur mais **de savoir de quel APPELANT on parle** : un
+   defaut de backend n'atteint pas une page qui ne l'appelle pas.
+
+Et le corollaire le plus retors, mesure : **deux routes independantes peuvent
+s'accorder sur un nombre en designant deux objets.** Un `54` somme a la main est
+tombe sur un `54` produit par un motif aveugle a 62 journaux sur 167 — l'accord
+etait *reel*, et il a **ferme la question** alors que le cout de l'incident etait
+**50**.
+
+**Aucune fusion, aucun push, aucun patch applique.**
 
 ### v1.38.195 — E-365 : le panneau de defi s'ouvrait SOUS LE PLI — et les 75 px coupes portaient la saisie
 
