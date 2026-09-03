@@ -18016,3 +18016,63 @@ ripgrep.** Les deux étaient faux. La vérité :
 > failli inscrire en mémoire un fait d'environnement faux, qui se serait propagé
 > à toutes mes sondes.* **Une commande par bloc étiqueté** — le coût est une ligne
 > de `printf`.
+
+
+## E-377 / E-378 — DOUBLONS : `DOSSIER-00` les portait, et le phénomène n'est PAS un défaut de lecture
+
+**Correction écrite à 12:15, cinq minutes après E-377 et E-378.**
+
+    12:06   la DSI commite bd5ef9e : correction du « second risque de bascule »
+    12:08   je mesure `cap_drop` dans docs/migration/  ->  AUCUN document
+    12:09   j'inscris E-377 et E-378 comme neufs
+    12:11   je les annonce a la DSI
+    12:14   je remesure : cap_drop 6 · prod.yml 5 · read_only 6 dans DOSSIER-00
+
+**Ma mesure de 12:08 était VRAIE.** Le document a gagné ces lignes **pendant que
+j'écrivais les miennes.** Ce n'est donc pas la faute que j'ai commise huit fois
+aujourd'hui — *mesurer avant de lire* — c'est une autre, que je n'avais pas
+nommée :
+
+> **Dans un chantier à huit sessions, un constat NÉGATIF sur la documentation a une
+> durée de validité de quelques MINUTES.** *« Ce n'est écrit nulle part » est vrai
+> à l'instant de la mesure et faux à l'instant de l'inscription, sans que personne
+> se soit trompé.* La parade n'est pas de mesurer mieux : **c'est de ne pas écrire
+> là.**
+
+### La correction technique que la DSI a mieux formulée que moi
+
+J'ai écrit que le piège serait *« armé PAR LA BASCULE ELLE-MÊME, au premier
+`up -d` »*. **`DOSSIER-00` distingue deux temps que je confondais :**
+
+    la bascule          construit le cache de ZERO -> aucun fichier root a ecraser
+                        -> la production NE TOMBE PAS au moment de la bascule
+    le piege s'arme     des ce premier demarrage (151 compiles root)
+    le piege TIRE       a la PREMIERE EDITION DE VUE qui suit
+
+**Armer et tirer sont deux instants.** Mon texte impliquait un 500 *à la bascule*,
+ce qui est faux et alarmiste ; le leur est exact. *Et l'hôte de développement,
+lui, a déjà un cache — donc ici le 500 est réel, et la fusion y rend 50 vues plus
+récentes.*
+
+### ⚠ LA DÉCISION QUI SUIT, ET C'EST ELLE QUI VAUT
+
+Trois de mes inscriptions du jour — le « treizième objet », E-377, E-378 —
+**doublonnent `DOSSIER-00`**, et à chaque fois sa version était plus juste ou plus
+complète. Le diagnostic n'est pas un manque de diligence, c'est un **problème de
+routage** :
+
+> **Les constats de BASCULE ne vont pas dans le registre de parité.** `PARITE.md`
+> trace des écarts entre deux portails ; `DOSSIER-00` porte ce qui attend une
+> signature, il est tenu par la session qui parle à l'exploitant, et il bouge
+> plusieurs fois par heure. **Mes copies y arrivent périmées.**
+
+**Règle que je m'applique à partir de maintenant :** un constat qui vise la
+bascule, la production ou une signature se **transmet** à `DOSSIER-00` et ne
+s'inscrit **pas** ici. Ce qui reste de mon ressort : les écarts de parité entre
+les deux portails, les références du LOT, et les défauts de suite ou de portage.
+
+**E-377 et E-378 sont donc conservés — le registre est daté, on ne substitue
+pas — mais marqués DOUBLONS, non-autoritaires, et l'autorité est
+`DOSSIER-00`.** *Ce qui subsiste de propre à ces deux entrées : rien. C'est la
+première fois aujourd'hui qu'un de mes apports est nul plutôt que faux, et c'est
+un progrès, pas une consolation.*
