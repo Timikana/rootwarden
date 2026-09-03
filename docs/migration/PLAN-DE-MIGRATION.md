@@ -5375,3 +5375,80 @@ deux comptes, `16` import CSV (trois décisions), `18` full Laravel et pentest,
 > rôle est d'y renvoyer, pas de tenir une liste parallèle** : une seconde liste
 > ne se synchronise jamais, elle divergence en silence, et c'est exactement ce
 > qu'elle vient de faire.
+
+
+## §7 — MON CORRECTIF DU CACHE ÉTAIT FAUX. Le bon tient en une ligne, et il se signe DANS une décision déjà en attente
+
+**Réfuté par la session 3, vérifié par moi le 2026-09-03 12:05.** J'avais écrit
+qu'un `view:cache` lancé **en `www-data`** fermerait la cause. **Il échouerait.**
+
+### Ce qui réfute, et ce sont des mesures, pas des théories
+
+    les 28 echecs de ce matin n'ont RIEN ecrit : le compile du socle est
+    TOUJOURS root:root et TOUJOURS date de 07:48:46
+      -> la recompilation ne rate pas seulement le `touch()` :
+         elle ne peut pas ABOUTIR sur un compile appartenant a root
+
+    ventilation proprietaire/heure, verifiee independamment :
+        root      07:48:46   111 fichiers   <- le view:cache de l'entrypoint
+        www-data  07:4x        1 fichier
+        www-data  08:4x       39 fichiers   <- le rendu d'exception de l'incident
+
+> **`www-data` peut CRÉER dans ce répertoire, mais pas ÉCRASER un fichier `root`
+> existant.** Un `view:cache` en `www-data` appellerait `put()` sur 111 fichiers
+> déjà là et appartenant à `root` : il échouerait **exactement comme une requête
+> web**. *Mon correctif reproduisait la panne qu'il prétendait guérir.*
+
+Il faut donc **`view:clear` d'abord**, et il fonctionne : le répertoire est
+`www-data:www-data` **755 sans bit collant** — vérifié, `drwxr-xr-x` contre
+`drwxrwxrwt` pour `/tmp`. **Sans bit collant, le propriétaire du répertoire
+supprime n'importe quel fichier dedans**, quel qu'en soit le propriétaire.
+
+### ⛔ Et la cause est RECRÉÉE À CHAQUE DÉMARRAGE — c'est le fait décisif
+
+    laravel/docker-entrypoint.sh:25   chown -R www-data:www-data storage bootstrap/cache
+                                :44   php artisan view:cache            <- EXECUTE EN ROOT
+                                :47   exec "$@"                          -> apache2, travailleurs www-data
+
+**La ligne 44 défait l'intention de la ligne 25 pour les fichiers qu'elle crée.**
+Donc **tout correctif manuel serait annulé au prochain démarrage** — et ça
+explique la ventilation exactement : les 111 `root` datent d'un démarrage de
+conteneur, les 40 `www-data` de requêtes ultérieures.
+
+### ✅ Le correctif de la session 3, et il change la nature de la demande
+
+    laravel/docker-entrypoint.sh, apres la ligne 44 :
+    + chown -R www-data:www-data storage/framework/views 2>/dev/null || true
+
+Une ligne, **idempotente**, qui ne change pas qui exécute `artisan` — donc aucun
+risque sur l'environnement de cette commande — et qui applique **après la
+création** la règle que la ligne 25 applique avant. *Le dépôt fournit déjà
+exactement ce motif.*
+
+> **La mienne fermait la cause UNE FOIS ; celle-là la ferme à CHAQUE DÉMARRAGE.**
+> Et elle transforme la demande à l'exploitant : au lieu de *« lance cette
+> commande privilégiée »*, c'est *« accepte une ligne dans l'entrypoint, puis un
+> redémarrage »* — **un changement de code ordinaire, relu comme les autres.**
+
+### Ce que j'ajoute, et c'est de l'économie de §7 et non de la technique
+
+Le correctif ne prend effet **qu'au redémarrage du conteneur**. Or **recréer
+`rootwarden_laravel` est déjà la décision `D-07`**, en attente. Donc :
+
+> **Cette ligne ne coûte AUCUNE interruption de plus.** Elle se signe **dans**
+> `D-07`, comme les quatre patchs du planificateur se signent dans `D-01`.
+> **Séparer les deux créerait une interruption ; les grouper n'en crée aucune.**
+
+Et la symétrie doit être dite, comme pour `D-01` : **sans cette ligne, recréer le
+conteneur RÉARME le piège** — 151 compilés à nouveau `root` — au lieu de le
+désarmer. *`D-07` sans le correctif n'est pas neutre, il reconstitue la cause.*
+
+### ⚠ Deux bornes, dont une qui déclasse l'urgence
+
+- **zéro mine ACTIVE** : les 151 compilés sont à jour, **0 source plus récente que
+  son compilé** (témoin inverse rendu). Les 111 sont latents. **Ce n'est donc pas
+  une urgence, c'est un prérequis** à tout travail sur les vues — et à la bascule,
+  qui touche 831 fichiers dont des vues ;
+- **la propriété du cache en PRODUCTION n'est pas mesurée** (`DOSSIER-00:333`), et
+  c'est la seule mesure qui décide si le piège y est armé. Ni la session 3 ni moi
+  n'interrogeons la production.
