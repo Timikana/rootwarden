@@ -1,0 +1,47 @@
+--- a/backend/routes/supervision.py
++++ b/backend/routes/supervision.py
+@@ -842,6 +842,7 @@
+ 
+                 # PSK : ecriture securisee via base64
+                 psk_value = None
++                psk_illisible = False
+                 if global_cfg.get('tls_psk_value'):
+                     from encryption import Encryption
+                     enc = Encryption()
+@@ -849,11 +850,36 @@
+                         psk_value = enc.decrypt_password(global_cfg['tls_psk_value'])
+                     except Exception as e:
+                         logger.warning("Dechiffrement PSK supervision echoue : %s", e)
++                        psk_illisible = True
++                    # Une PSK qui DECHIFFRE EN VIDE est illisible elle aussi :
++                    # `decrypt_password` rend '' sur une entree vide, et la
++                    # colonne peut porter le chiffre PHP de la chaine vide. Le
++                    # test `if psk_value:` ne distinguait pas les deux (E-217).
++                    if not psk_illisible and not psk_value:
++                        logger.warning("PSK supervision configuree mais vide apres "
++                                       "dechiffrement (machine_id=%s)", machine_id)
++                        psk_illisible = True
+ 
+                 # Les etapes DECISIVES sont collectees ici : le verdict se
+                 # compose, il ne se lit pas sur le dernier marqueur.
+                 echecs = []
+ 
++                # ══ E-231 : UNE PSK CONFIGUREE ET ILLISIBLE EST UN ECHEC ═════
++                #
++                # Le commentaire de l'ecriture, plus bas, le dit lui-meme :
++                # « DECISIVE quand une PSK est configuree : sans elle l'agent ne
++                # peut pas parler au serveur ». Or la garde etait `if psk_value:`
++                # — un echec de dechiffrement SAUTAIT donc tout le bloc sans rien
++                # inscrire dans `echecs`, et `_conclut_geste` emettait
++                # `SUCCESS_MACHINE::`. L'agent partait sans sa cle, et le portail
++                # annoncait la reussite.
++                #
++                # `None` voulait dire DEUX choses : « aucune PSK configuree » et
++                # « PSK configuree, illisible ». Un etat que seule une phrase
++                # distingue n'est pas un etat.
++                if psk_illisible:
++                    echecs += _echec("dechiffrement de la cle PSK", 1)
++
+                 with ssh_session(ip, port, ssh_user, ssh_pass,
+                                  logger=logger, service_account=svc_account) as client:
+                     # Installation repo. NON decisive a elle seule, et c'est

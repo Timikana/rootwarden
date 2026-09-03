@@ -1,0 +1,48 @@
+--- a/backend/scheduler.py
++++ b/backend/scheduler.py
+@@ -293,10 +293,44 @@
+                     ids)
+             else:
+                 cur.execute("SELECT id, name, ip, port, user, password, root_password, service_account_deployed FROM machines WHERE 1=0")
+-        else:
++        elif schedule['target_type'] == 'all':
++            # ══ E-280 : « TOUT LE PARC » EST UN CHOIX, PLUS UN REPLI ═════════
++            #
++            # Cette branche etait le `else`. Elle recevait donc DEUX intentions
++            # que rien ne distinguait ensuite :
++            #   - « j'ai choisi tout le parc »        (target_type = 'all')
++            #   - « ta portee restreinte n'a pas de valeur, je prends tout »
++            #
++            # Le second cas est atteignable par le chemin NORMAL de l'interface :
++            # `ssh_audit.py` accepte `target_value` vide, et les trois branches
++            # ci-dessus exigent toutes `and schedule.get('target_value')`. Une
++            # planification « scanner les machines du tag X » dont le champ tag
++            # est reste vide devenait donc un scan RECURRENT DE TOUT LE PARC —
++            # `srv-zabbix` compris — par une case laissee blanche.
++            #
++            # Rendre `all` explicite ne ferme rien a soi seul : ce qui ferme,
++            # c'est que le `else` ci-dessous REFUSE au lieu de tout prendre.
+             cur.execute(
+                 "SELECT id, name, ip, port, user, password, root_password, service_account_deployed "
+                 "FROM machines WHERE lifecycle_status IS NULL OR lifecycle_status != 'archived'")
++        else:
++            # ══ ECHEC FERME, ET IL COUVRE LES QUATRE CAS ════════════════════
++            #
++            # On arrive ici quand une portee RESTREINTE n'a pas sa valeur, ou
++            # quand le type est inconnu. Dans les deux cas on ne sait pas quoi
++            # scanner — et « je ne sais pas quoi scanner » ne doit jamais
++            # vouloir dire « scanne tout ».
++            #
++            # `WHERE 1=0` plutot qu'un `return` : la branche `machines` employait
++            # deja cette forme, et la remonter garde une seule facon d'echouer
++            # dans cette fonction. Une regle appliquee ailleurs se remonte de la.
++            logger.error(
++                "Planification %s ignoree : portee illisible (target_type=%r, "
++                "target_value %s) — AUCUNE machine scannee",
++                schedule.get('id'), schedule.get('target_type'),
++                'vide' if not schedule.get('target_value') else 'presente')
++            cur.execute("SELECT id, name, ip, port, user, password, root_password, "
++                        "service_account_deployed FROM machines WHERE 1=0")
+ 
+         machines = cur.fetchall()
+         scanned = 0
