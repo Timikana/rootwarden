@@ -74,9 +74,69 @@ importeur qui croit avoir accordé sudo et ne l'a pas accordé prendra la décis
 sur une croyance fausse. *Le même angle mort vaut pour la coercition de `role_id` — correcte
 et muette : second arbitrage, plus petit, à ne pas perdre.*
 
+## ⚠ PLUS FORT QUE « INERTE » : LE DÉPLOIEMENT *RETIRE* LE SUDO
+
+Relevé par la session DSI en revérifiant la chaîne, et confirmé ici. Avec `preset = 'none'`, ce
+n'est pas la troisième branche qui est sautée : **c'est la deuxième qui tire.**
+
+    elif policy_for_machine and policy_for_machine.get('preset') == 'none':
+        remove_from_sudoers(channel, username, …)
+
+**La base dit « accordé », la page l'affiche accordé, et le déploiement le RETIRE.** Un privilège
+accordé et *contredit*, pas seulement inerte.
+
+## ET LE REPLI EST MORT PAR LE SCHÉMA, PAS PAR UN DÉFAUT DU COLLECTEUR
+
+    051:7   sudo_preset ENUM('none','all_nopasswd',…) NOT NULL DEFAULT 'none'
+
+**`NOT NULL`** : la colonne n'est jamais nulle, donc `policy_for_machine` est toujours un dict
+plein. Le `record.get('sudo_preset') or 'none'` de `ssh_utils:959` n'est donc même pas la cause.
+*L'intention écrite juste au-dessus de la branche — « policy=None -> fallback bool users.sudo » —
+décrit un cas que le schéma rend impossible. **Un commentaire qui affirme plus que le code.***
+
+Et `051:37-38` fait un rattrapage **à un coup** :
+
+    SET uma.sudo_preset = 'all_nopasswd', uma.sudo_nopasswd = TRUE
+    WHERE u.sudo = 1 AND uma.sudo_preset = 'none';
+
+Les comptes antérieurs à 051 ont donc été convertis. **Rien ne rattrape ceux d'après.**
+
+## ⚠ CE QUI RENVERSE E-130 : LE GESTE DE RÔLE 3 EST LUI AUSSI SANS EFFET
+
+    toggle_sudo.php:61    UPDATE users SET sudo = ? WHERE id = ?      <- users.sudo SEUL
+    le seul ecrivain de sudo_preset :
+    update_server_access.php:123   UPDATE user_machine_access SET sudo_preset = ?, …
+    declencheur SQL qui rattraperait : AUCUN (0 CREATE TRIGGER dans les migrations)
+
+> **`users.sudo` ne confère plus rien sur aucune machine — ni par l'import, ni par le geste de
+> rôle 3 que le dossier cite comme la référence bien gardée.** Le seul chemin d'octroi vivant est
+> la liste déroulante de préréglage de `manage_access.php`.
+
+E-130 n'est donc pas « une escalade par fichier ». C'est **une interface de privilège qui ment
+dans les deux sens** : elle montre accordé ce qui ne l'est pas, et le déploiement défait
+silencieusement ce qu'elle affiche — y compris pour un rôle 3 faisant le geste légitime.
+
+## ⚠ LA SÉVÉRITÉ N'EST PAS NULLE : ELLE EST DIFFÉRÉE
+
+**Le jour où quelqu'un répare `toggle_sudo.php` en écrivant aussi `sudo_preset`, tout compte
+portant `users.sudo = 1` obtiendrait `NOPASSWD: ALL` sur chaque machine qu'il atteint** — les
+comptes importés sans garde inclus.
+
+**C'est l'argument le plus fort pour l'issue (a), et il impose un ORDRE :**
+
+    1. garder la colonne `sudo` a l'import  (role 3, coercition + compte-rendu par ligne)
+    2. SEULEMENT ENSUITE reparer le chemin d'octroi
+
+*Réparer (2) avant (1) armerait par un correctif ce que le correctif venait empêcher.*
+
 ## ⚠ Réserve de cette mesure
 
 Établie **par lecture**, sans clic. Le seul point de faux serait un désaccord de type entre
 `self.machine['id']` et la clé `mid` de `sudo_policies` : les deux viennent du même
 `cursor(dictionary=True)` sur des colonnes INT, donc ils s'accordent — mais c'est une
 lecture, pas une exécution.
+
+**Deuxième réserve** : `mid` (clé de `sudo_policies`, issue de `record.get('machine_id')` dans la
+requête de `ssh_utils`) et `self.machine['id']` viennent de **deux requêtes distinctes**, non du
+même `cursor` comme je l'avais d'abord écrit. Ils s'accordent parce que les colonnes sont INT.
+*Correction apportée par la session DSI.*

@@ -1647,9 +1647,19 @@ précisément ce qui rend les six inatteignables.
 
 **Trois décisions avant de porter D6c (import CSV)** — caractérisé le 2026-08-26, non porté
 - **La colonne `sudo` du format CSV** (E-130). L'import l'écrit sans contrôle de rôle, alors que
-  `api/toggle_sudo.php` exige le rôle 3, et `users.sudo` est la précondition du repli `NOPASSWD: ALL`.
+  `api/toggle_sudo.php` exige le rôle 3.
   Trois issues : exiger le rôle 3 pour cette colonne, la refuser à l'import, ou la garder en l'état.
   **Retirer une colonne d'un format de fichier documenté change un contrat** : ce n'est pas à moi.
+  > ⚠ **La suite de cette phrase était périmée et elle est retirée** — elle disait *« et `users.sudo`
+  > est la précondition du repli `NOPASSWD: ALL` »*. Mesuré le 2026-09-03 : **`users.sudo` ne confère
+  > plus rien sur aucune machine**, pas même par le geste de rôle 3. Le repli est mort par le SCHÉMA
+  > (`sudo_preset` est `NOT NULL DEFAULT 'none'`, donc `policy_for_machine` est toujours vrai et la
+  > branche `elif sudo:` est inatteignable), et la branche qui tire à sa place **RETIRE** le sudo.
+  > **La sévérité n'est pas nulle : elle est DIFFÉRÉE.** `toggle_sudo.php:61` n'écrit que `users.sudo` ;
+  > le jour où quelqu'un le répare en écrivant aussi `sudo_preset`, tout compte portant `users.sudo = 1`
+  > — importés sans garde inclus — obtiendrait `NOPASSWD: ALL` sur chaque machine qu'il atteint.
+  > **C'est l'argument le plus fort pour l'issue (a), et il impose un ORDRE : garder l'import AVANT de
+  > réparer le chemin d'octroi.** Détail, énumération et réserves : `E-130-PORTEE-REELLE.md`.
 - **Un compte importé est inutilisable** (E-131) : mot de passe aléatoire que personne ne connaît,
   `$sendWelcome` mort, `email` facultatif donc pas de récupération. Trois issues : rendre `email`
   obligatoire, afficher le mot de passe généré **une fois** comme le fait déjà D3, ou forcer
