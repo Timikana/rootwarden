@@ -797,7 +797,24 @@ declare -A REF_LARAVEL=(
   # 24 -> 35 le 2026-09-03 00:28 (`a2081ab`), arbre releve PROPRE aux deux bouts de la
   # mesure — meme etat au depart (HEAD a49b885) et a la fin, donc la fenetre n'a pas ete
   # traversee. legacy INCHANGEE a 15.
-  [go-page-groupes]=35
+    # 35 -> 50 le 2026-09-03, apres R4 (`39781cd`). legacy INCHANGEE a 15.
+  # ⚠ MESUREE DEUX FOIS : fenetre SALE 07:40-07:42 (50 · 0) puis fenetre PROPRE
+  # 07:44-07:47 (50 · 0). *Le premier chiffre etait IDENTIQUE et n'a pas ete pose* —
+  # un verdict credible n'est pas un verdict mesure, et on ne peut pas savoir avant de
+  # refaire qu'il l'etait.
+  # R4 comble un trou que rien ne mesurait : le bouton de SUPPRESSION existe sur chaque
+  # carte depuis R2, et `grep supprimer` rendait 0 dans la suite — le formulaire, la
+  # portee et le scan de masse etaient couverts, et *le seul geste de cette page qui ne
+  # se repare pas* n'avait aucune assertion.
+  #     le titre est celui du CATALOGUE, mot pour mot
+  #     le panneau NOMME le groupe et son compte de membres RESOLU (1 et 0)
+  #     il dit que c'est DEFINITIF · le bouton porte --danger et PAS --ok
+  #     aucun renvoi vers l'ancien portail · et AUCUN DELETE n'est parti
+  # ⚠ LE CAS ZERO est celui qui vaut : un panneau qui annonce « 0 serveur » doit QUAND
+  # MEME offrir la confirmation, parce que le groupe existe — il est juste vide.
+  # Et le TON est une propriete qu'aucune assertion de texte ne voit : *le vert de
+  # l'enregistrement sur une suppression irreversible serait un mensonge de style.*
+  [go-page-groupes]=50
 )
 declare -A REF_LEGACY=(
   # Les trois pages portees dans la nuit du 2026-09-02, posees a 03:52.
