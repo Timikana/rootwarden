@@ -17724,3 +17724,72 @@ sien, et le point d'entrée qu'elle cherche est dans un bloc masqué.*
 (l'état de la base) et un mécanisme faux (la destruction de lignes) ; celui-ci
 tient à l'**ordre d'itération de la vue**, ce qui n'exige aucune ligne détruite.
 **Il demande de faire tourner. Ne pas refermer E-374 dessus non plus.**
+
+
+## E-374 — LA CAUSE EST ÉTABLIE, ET ELLE EST DANS LA SUITE. Mais la contradiction se déplace, elle ne disparaît pas
+
+**Mesuré le 2026-09-03 12:00.** La session 7 a établi que sa suite cherche des
+identifiants qui n'existent pas. **Je le confirme par une route différente, et
+sa propre sonde ne l'établissait pas** — elle mesurait le mauvais objet.
+
+### Les identifiants réellement RENDUS, dérivés de leur source
+
+    la suite cherche          la page rend                    source
+    cfg-zabbix-server         cfg-zabbix-zabbix_server        CHAMPS_PAR_PLATEFORME
+    cfg-listen-port           cfg-zabbix-listen_port          CHAMPS_PAR_PLATEFORME
+    cfg-hostname-pattern      cfg-zabbix-hostname_pattern     CHAMPS_PAR_PLATEFORME
+    cfg-psk-value             cfg-zabbix-psk                  EN DUR, vue :148
+
+Le gabarit est `id="cfg-{{ $plateforme }}-{{ $colonne }}"` (vue `:112`), et
+`$colonne` vient de `$champs[$plateforme]` = `self::CHAMPS_PAR_PLATEFORME`
+(contrôleur `:181`) — donc **l'identifiant rendu est décidé par le CONTRÔLEUR**,
+pas par la vue. Et le champ PSK est rendu **hors de la boucle**, en dur, avec
+`id="cfg-zabbix-psk"` et `name="tls_psk_value"`.
+
+**`tls_psk_value` n'est PAS une clé de la carte** (0 occurrence, témoin
+`tls_psk_identity` = 1). Donc `cfg-psk-value` **ne peut pas exister par
+construction**, et les quatre identifiants cherchés sont dans une convention
+*avec tirets* que la page n'a jamais employée.
+
+### ⚠ Et la sonde de la session 7 ne pouvait pas établir sa propre conclusion
+
+    grep / git log -S 'cfg-zabbix-server'  dans le Blade   ->  0, TOUJOURS
+
+> **La suite cherche un identifiant RENDU ; la vue contient un GABARIT.** Un
+> `grep` du littéral dans le gabarit rend zéro quelle que soit la vérité, parce
+> que l'identifiant est produit par interpolation. **Zéro y est structurel, pas
+> informatif.**
+
+C'est **exactement** l'erreur que je viens de payer six fois : *une mesure sur le
+mauvais objet*. Ici elle a rendu la bonne conclusion — ce qui est la variante la
+plus difficile à repérer, puisque rien ne signale l'écart. **La route correcte est
+de dériver l'identifiant depuis sa source** (la carte du contrôleur + le littéral
+en dur), pas de chercher son littéral dans le gabarit.
+
+### ⚠ CE QUI RESTE OUVERT : aucun changement de code n'explique un basculement
+
+La session 7 refuse de refermer, parce qu'elle a observé cette suite rendre
+**16 PASS / 0 FAIL conforme** avant son travail de la nuit. **Elle a raison de ne
+pas refermer, et voici ce que j'ai mesuré :**
+
+    la SUITE depuis le LOT du 02/09 07:54                    0 commit
+    le gabarit d'id de la VUE dans eb54230 et 03afb0b        0 changement
+    CHAMPS_PAR_PLATEFORME dans 03afb0b                       0 changement
+
+> **Suite immobile, gabarit immobile, carte immobile : il n'y a rien qui puisse
+> avoir fait basculer cette suite du vert au rouge.** Donc *il n'y a pas eu de
+> basculement* — et l'élément faible n'est pas le code, c'est **l'observation du
+> vert**.
+
+**Candidat, non établi et à ne pas inscrire comme cause** : le rejeu au repos rend
+`supervision-onglets` à **16 · 0** — exactement la valeur observée. Trois noms
+voisins cohabitent dans ce module (`supervision-config`,
+`supervision-config-ecriture`, `supervision-onglets`), et *le vocabulaire piège
+plus que la structure.*
+
+**La mesure qui tranche est celle que la session 7 a elle-même nommée** : le
+verdict de cette suite dans le LOT du 2026-09-02, lu **dans ses journaux et par
+son nom exact** — pas dans un souvenir de sortie. **Deuxième borne, dérivée de la
+ligne de base** : le LOT du 02/09 rendait **1 seul FAIL**, attribué à
+`update-u2` ; si `config-ecriture` y avait rendu 4 FAIL, cette ligne de base
+serait fausse. *Les deux ne peuvent pas être vrais ensemble.*
