@@ -1,6 +1,6 @@
 # DOSSIER 15 — Dans quel ordre lire les six correctifs de `security/backend-cve`
 
-**Session 8 (DSI délégué), le 2026-09-03 à 10:20 CEST.** *Demandé par la session 4, qui a relevé que
+**Session 8 (DSI délégué), le 2026-09-03 à 08:21 CEST.** *Demandé par la session 4, qui a relevé que
 j'avais classé UN correctif et laissé les cinq autres sans le même examen.*
 
 > **La branche attend une relecture depuis le 21 août.** *Ce dossier ne la fait pas : il dit dans quel
@@ -86,3 +86,21 @@ défaut**, puisqu'il touche précisément les profils de machines.
 - **il ne recommande pas la fusion.** *La règle du dépôt est qu'un patch de sécurité ne se fusionne que
   sur validation verbale explicite, et rien dans ce dossier ne la remplace* ;
 - **il ne mesure pas si l'un des six a déjà été exploité.** *Cela demanderait les journaux de production.*
+
+---
+
+## ⚠ Correction de ce document, dix minutes après son écriture
+
+**Il portait « 10:20 CEST ». Il était 08:21.** *J'avais lu la durée écoulée d'un processus — `etime`,
+format `MM:SS` sous l'heure — comme des heures et des minutes : `04:49` lu « 4 h 49 » alors que c'était
+4 minutes 49.* **La même erreur deux fois dans le même relevé.**
+
+    ps -p 1296673 -o lstart=   ->  jeu. sept. 3 08:16:26 2026
+
+> **Une valeur plausible et fausse ne se signale pas d'elle-même.** *« 1 h 56 écoulées » sur un LOT de
+> trois heures est parfaitement crédible — c'est précisément pourquoi rien ne l'arrête.* **Et une mesure
+> mal datée devient fausse dès qu'elle est relayée**, ce qui est le seul défaut de ce dossier qui aurait
+> survécu à sa lecture.
+
+**Le classement lui-même ne dépend d'aucune horloge** : il est établi par les appelants et les
+décorateurs, qui ne bougent pas avec l'heure. *La correction porte sur l'en-tête, pas sur le fond.*
