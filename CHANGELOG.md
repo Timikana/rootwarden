@@ -2238,6 +2238,42 @@ et elles auraient toutes dit `false` : un defaut la ou il n'y en avait plus.**
 Ancre exacte desormais (`politique-confirmer`, `sftp-confirmer`). *Deux boutons, un seul mot — c'est
 la meme famille que le prefixe `superv-profil-` qui attrapait sept ancres.*
 
+#### ⚠ UN TEMOIN DE CHEMIN, parce qu'une sonde peut contourner le correctif qu'elle mesure
+
+Une autre session a remesure APRES ce correctif et a rendu **les memes chiffres qu'avant**. Cause :
+sa sonde ouvre le panneau par `panneau.hidden = false` — elle **contourne `ouvre()`**, donc le
+`scrollIntoView` qu'il s'agit de mesurer.
+
+> **Sa sonde n'etait juste que tant que le defaut existait.** *Le correctif l'a perimee, et elle
+> continue de rendre un chiffre — un instrument qui ne dit pas qu'il ne mesure plus.*
+
+C'est le MIROIR de ma propre faute de la meme heure : la mienne attrapait deux boutons pour un et
+n'ouvrait jamais le panneau ; la sienne l'ouvre par un chemin qui n'est pas celui de l'application.
+**Deux instruments, deux faux negatifs, sur le meme correctif.** *Le mien a ete arrete par un garde de
+fixture ; le sien n'en avait pas.*
+
+**Ce qui manquait est un temoin de CHEMIN, pas de resultat.** Ajoute a ma sonde, et il ne s'obtient
+pas en demasquant un element :
+
+    politiques  @1920   scrollY 0   -> 101    a defile
+    politiques  @1400   scrollY 106 -> 281    a defile
+    acces-sftp  @1920   scrollY 388 -> 563    a defile
+    acces-sftp  @1400   scrollY 647 -> 799    a defile
+
+La mesure passe donc d'ACCEPTEE a ATTESTEE.
+
+#### ⚠ ET MON SECOND TEMOIN N'ETAIT PAS VALIDE — j'ai failli rapporter un defaut
+
+J'avais ajoute la **signature de `block: 'center'`** : le centre du panneau proche du centre de la
+vue. Elle rend **316 px d'ecart** — donc « pas centre ».
+
+    course maximale de defilement   101 · 281 · 563 · 799
+    scrollY final                   101 · 281 · 563 · 799   ->  AU BOUT dans les 4 cas
+
+**Le panneau est en bas de page : le defilement est epuise, et `center` a fait tout ce qu'il pouvait
+faire.** *« Pas centre » n'est un defaut que si le defilement POUVAIT aller plus loin* — et je l'ai
+verifie au lieu de le supposer, apres avoir failli l'ecrire comme une trouvaille.
+
 #### ⛔ Ce qui n'a pas ete exerce
 
 **Aucun `deploy` ni `remove` n'est parti** — la sonde repond a leur place par le `403` qui ouvre le
