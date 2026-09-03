@@ -573,3 +573,101 @@ CONTROLE :  une requete -> 200 ;  et `Utime failed` au journal = le piege a mord
 **Les points 1 et 2 sont des écritures hors de mon périmètre** (`laravel/docker-entrypoint.sh`,
 `docker-compose.prod.yml`) — *ils appartiennent à une session de portage, et le point 2 touche
 `cap_drop`/`read_only`/`user`, donc il exige votre mot.*
+
+---
+
+## ⚠ AJOUT 15:00 — deux gestes à demander, dont un d'UNE commande
+
+### 1. `php -l` sur un fichier partagé — une commande, et personne ici ne peut la lancer
+
+    php · php8 · php8.4 · php-cli · php8.4-cli   INTROUVABLES sur l'hote
+    docker                                        permission denied (toutes les sessions)
+
+**`laravel/app/Services/MotDePasse.php` a été modifié à 12:56 (`a7b0885`) et n'a pas pu être analysé.**
+*Ce fichier sert aussi le changement de mot de passe du PROFIL — une page en service.* **Une erreur de
+syntaxe y casserait plus que le flux neuf qui l'a fait modifier.**
+
+    docker compose exec rootwarden_laravel php -l /var/www/html/app/Services/MotDePasse.php
+
+**Le contrôle structurel de son autrice est passé** — *accolades 35/35, crochets 8/8, indentation
+cohérente, et l'écart de parenthèses de son dépouillement IDENTIQUE avant et après, donc préexistant.*
+**Mais ce n'est pas une analyse syntaxique, et elle l'a déclaré au commit plutôt que de le laisser
+supposer.**
+
+### 2. `/ssh-audit/scan-all` — la PAGE exige plus que la ROUTE
+
+**Relevé par la session 4 (pentest, angle 3), vérifié par moi :**
+
+    la PAGE   legacy/ssh-audit/index.php:12-13
+              checkAuth([ROLE_USER, …]) + checkPermission('can_audit_ssh')
+    la ROUTE  backend/routes/ssh_audit.py:237-241
+              @require_api_key + @require_role(2) + @threaded_route
+              -> AUCUN @require_permission
+
+> **Un rôle 2 sans `can_audit_ssh` ne peut pas ouvrir la page, et peut appeler la route.** *Et c'est la
+> route dont la consigne permanente du chantier dit « ne jamais la lancer » : elle ouvre une session SSH
+> par machine du parc, production comprise.*
+
+**C'est E-236 appliqué à `scan-all` — même population, même correctif : la permission au backend.** *Il
+entre dans le lot déjà constitué, il n'en ouvre pas un nouveau.*
+
+**⚠ Et il est INERTE jusqu'au redémarrage** (`DOSSIER-01`) : *c'est du `backend/`.*
+
+### ✅ Ce que le même relevé a FERMÉ, et le négatif vaut d'être su
+
+    /docker/scan_all       exclut les archivees · page et route COHERENTES   -> rien a faire
+    /supervision/scan-all  la mieux gardee des quatre                        -> rien a faire
+    /groups/<id>/run       AUCUNE exclusion   <- deja au dossier, confirme par
+                                                 DEUX instruments distincts
+
+**Et une piste que j'avais donnée comme la plus prometteuse ne donne rien** : *le motif de la « liste
+blanche orpheline » (`DOSSIER-21`) est SPÉCIFIQUE aux modules dont la page a été portée **et retirée**.*
+**Les quatre routes de masse ont des appelants vivants. Ma généralisation était la faute, pas la mesure.**
+
+---
+
+## ⚠ AJOUT 21:00 — la CI ne se déclenche QUE sur `main` : la bascule n'a jamais été analysée
+
+**Confié à la session 4 sur demande de l'exploitant, après mesure.**
+
+    .github/workflows/ci.yml   un seul workflow, 14 jobs
+    declencheurs :  push: branches: [main]  ·  pull_request: branches: [main]
+                    -> RIEN D'AUTRE
+
+> **Les 133 commits poussés ce soir sur `Migration-Laravel` n'ont déclenché AUCUN job.** *Et les 892
+> commits de la bascule n'ont jamais passé `lint`, `test`, `sast`, ni `gitleaks`.*
+
+**C'est la confirmation d'un constat de ce matin** — *« gitleaks présenté comme un contrôle pré-poussée
+n'avait rien inspecté »* — **et il vaut pour les quatorze jobs, pas seulement pour celui-là.**
+
+### ⚠ La conséquence qui vous concerne directement
+
+**Le jour où `git push origin main` aura lieu, les quatorze jobs partiront d'un coup sur 892 commits de
+code jamais analysé.** *Ce n'est pas un risque de production — c'est un risque de RÉSULTAT : un premier
+passage sur autant de code neuf produira probablement des rouges, et il faudra les trier.*
+
+**Mieux vaut le savoir avant que pendant.**
+
+### Trois autres faits mesurés
+
+    sast-semgrep-custom   `continue-on-error: true`, libelle « advisory »
+                          -> un job advisory qui echoue en permanence est un job
+                             ETEINT qui a l'air ALLUME. Etat actuel NON mesure.
+
+    jobs de DEPLOIEMENT   0
+                          grep deploy|ssh-action|rsync|scp|kubectl|helm -> 0
+                          -> il n'y a PAS de CD. Le deploiement est `maj.sh`, a la main.
+
+    auto-tag              needs: 8 jobs · if: ref == main && event == push
+                          permissions: contents: write
+
+### La question qui vous revient, et que je ne tranche pas
+
+**Faut-il une CD, ou `maj.sh` suffit-il ?** *`maj.sh` fait `git pull` + `env-merge` + `build` +
+`db_migrate.py` + `up -d`, et il touche la production.* **Une CD ferait la même chose sans main humaine —
+ce qui est un gain de régularité et une perte de porte de décision.** *La session 4 vous apportera ce que
+l'un fait que l'autre ne fait pas ; le choix est le vôtre.*
+
+**⛔ Et une borne que j'ai posée** : *ne rien écrire dans `ci.yml` sans votre mot.* **Un workflow est un
+effet sortant : il tourne sur l'infrastructure de GitHub avec un `GITHUB_TOKEN`, et `auto-tag` porte
+`contents: write`.**

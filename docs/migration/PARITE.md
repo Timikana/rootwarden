@@ -18119,3 +18119,87 @@ déjà vingt lignes plus haut — et ne touche aucun catalogue. Parité 70 = 70,
 *Ma consigne « mesure avant d'ajouter » a donc évité les deux clés que j'annonçais
 comme nécessaires : je m'étais trompée sur le coût dans le sens qui gonfle le
 travail.*
+
+
+## E-379 — le job « Tests PHPUnit » échoue sur un répertoire VIDE, donc les six tests du portage n'ont jamais tourné
+
+**Mesuré le 2026-09-03 20:55, sur le premier passage de CI de la bascule** (run
+`33792110538`, `push` sur `main`, **conclusion FAILURE**).
+
+    journal CI :  Test directory ".../laravel/tests/Unit" not found
+
+    laravel/phpunit.xml:8-10   <testsuite name="Unit"><directory>tests/Unit</directory>
+    laravel/tests/Unit/        existe localement, VIDE (cree le 27 aout, jamais rempli)
+    git ls-files tests/Unit    0 fichier       TEMOIN tests/Feature : 6 fichiers
+
+**Git ne suit pas les répertoires vides**, donc le dépôt n'a pas `tests/Unit`,
+donc PHPUnit refuse une suite dont le répertoire manque, donc **`php artisan test`
+meurt avant d'exécuter les six tests `Feature` qui existent.**
+
+> **Le job ne rapporte pas un test qui échoue : il rapporte un répertoire vide.**
+> *Et son échec est BLOQUANT — c'est lui qui met `main` au rouge après la fusion.*
+
+**Correctif : un `.gitkeep` dans `laravel/tests/Unit/`, ou retirer la suite `Unit`
+de `phpunit.xml`.** Le `.gitkeep` est préférable : *retirer la suite masquerait
+qu'il n'existe aucun test unitaire.*
+
+⚠ **Et c'est la démonstration du trou de déclencheurs** : la CI ne se déclenche que
+sur `main` (`push`/`pull_request: branches: [main]`), donc ce défaut a survécu à
+**891 commits** de branche et n'est apparu qu'à la fusion — *une fois la bascule
+faite.*
+
+## E-380 — trois règles de sécurité custom ne PARSENT pas, et le job advisory a caché pourquoi
+
+**Même passage de CI.** Le job `sast-semgrep-custom` est rouge, et son journal
+donne la raison :
+
+    semgrep-core rule validation failed (PatternParseError)
+    [ERROR] rw-shell-fstring-execute-as-root  — Invalid pattern for Python
+    [ERROR] rw-php-echo-unescaped-var         — Invalid pattern for PHP
+    [ERROR] rw-flask-route-without-api-key    — Invalid pattern for Python
+
+**Trois règles sur dix ne se compilent pas** (les trois `id:` sont bien présents
+dans `.semgrep/rules-rootwarden.yml`, donc elles sont *déclarées* et *inertes*).
+Ce qu'elles étaient censées chercher : **un f-string shell exécuté en root**, **un
+`echo` PHP non échappé**, **une route Flask sans clé d'API** — trois motifs de
+notre propre convention OWASP.
+
+> **Un garde qui ne compile pas ne garde rien, et il ne le dit qu'à celui qui lit
+> le journal.** Le job porte `continue-on-error: true` et le libellé
+> « advisory » : il est donc **rouge en permanence, non bloquant, et son rougeur
+> est prise pour son état normal.**
+
+⚠ **Et ma propre mémoire de travail portait *« job semgrep custom rouge mais
+continue-on-error »* comme un état ACCEPTÉ.** *Personne — moi incluse — n'avait
+ouvert le journal pour savoir pourquoi.* **Un défaut consigné comme connu cesse
+d'être examiné : c'est la forme la plus durable de l'angle mort**, et elle est pire
+qu'un défaut inconnu, parce qu'elle a l'air d'une décision.
+
+`DOSSIER-00:653` inventorie bien le `continue-on-error` — **il ne dit pas que les
+règles sont mortes.** *Inventorier une configuration n'est pas mesurer son effet.*
+
+## E-381 — le job qui pose un tag de version ne dépend pas des tests, et il a taggé un build ROUGE
+
+**Même passage de CI**, et c'est le défaut le plus structurel des trois :
+
+    auto-tag   permissions: contents: write
+               needs: [build-docker, security-scan, secrets-scan, sast-python,
+                       sast-semgrep, sca-python, sca-php, trivy-fs]
+               conclusion : SUCCESS   <- alors que « Tests PHPUnit » etait ROUGE
+
+**`test-php`, `test-python`, `lint-python` et `lint-php` ne figurent PAS dans ses
+`needs`.** Le job qui écrit un tag de version — avec `contents: write` — a donc
+**réussi sur un build dont la suite de tests avait échoué.**
+
+> **Une garde qui ne dépend pas des tests n'est pas une garde de qualité, c'est un
+> horodateur.** *Le filet et le verdict doivent partager le même prédicat* — dixième
+> occurrence de cette famille dans ce chantier, et la première où le prédicat
+> manquant est une **liste de dépendances** plutôt qu'une condition.
+
+**Correctif proposé, et il ne coûte aucune minute de runner** : ajouter `test-php`
+et `test-python` aux `needs` d'`auto-tag`. *C'est la moitié du bénéfice d'élargir
+les déclencheurs, obtenue gratuitement.*
+
+⚠ **Non écrit** : `.github/workflows/ci.yml` est un effet sortant — il tourne sur
+l'infrastructure de GitHub avec un `GITHUB_TOKEN`, et `auto-tag` porte
+`contents: write`. **Mesuré et proposé ; pas modifié.**
