@@ -306,3 +306,60 @@ chronométrer des requêtes avec envoi réel, ce qui est un interdit du chantier
 
 **⚠ Et un corollaire à connaître** : *un compte ayant perdu son mot de passe ET son second facteur n'a
 aucun chemin, ni avant ni après le portage.*
+
+---
+
+## ⚠ AJOUT 13:05 — un TROISIÈME défaut : la limite de débit ne borne QUE les adresses qui existent
+
+**Trouvé en cherchant à savoir si fermer (a) bornait (b). Ça ne le bornait pas, et voici pourquoi.**
+
+    :80   if ($user) {                              <- adresse CONNUE
+    :92       INSERT INTO password_reset_tokens (…, ip_address)
+    :110      sendPasswordResetEmail(...)
+    :111  } else {                                  <- adresse INCONNUE
+    :115      password_hash(...)          <- RIEN n'est insere
+    :116  }
+
+    et la limite compte :
+      SELECT COUNT(*) FROM password_reset_tokens WHERE ip_address = ? AND created_at >= …
+      $maxRequests = 3 · $windowSeconds = 3600
+
+> **Sonder une adresse INCONNUE n'insère aucune ligne, donc ne compte JAMAIS dans les 3 demandes par IP et
+> par heure.** *La limite ne borne que les demandes pour des adresses qui **existent**.*
+
+**Elle est exactement à l'envers de son objet : elle freine l'utilisateur légitime et laisse
+l'énumération libre.**
+
+### Ce que ça a détruit de mon propre raisonnement
+
+**J'allais rendre l'arbitrage « ferme (a), ça borne (b), donc porte ».** *C'était faux : (a) fermé ne
+borne rien, puisque les sondes d'énumération ne créent pas de lignes.* **Le compteur est au mauvais
+endroit, et c'est le seul des trois défauts qui rende (b) coûteux à exploiter.**
+
+### ✅ ARBITRAGE RENDU — trois gestes, et le troisième est le seul qui compte
+
+    (a)  la limite echoue FERME sur PDOException          perimetre de la session 3  -> FERMER
+    (c)  le COMPTEUR compte les TENTATIVES, pas les
+         jetons emis — quel que soit le resultat           perimetre de la session 3  -> FERMER
+    (b)  l'oracle de TEMPS (SMTP synchrone, 15 s)          HORS perimetre             -> DECLARER
+
+**Avec (c), l'énumération passe d'illimitée à 3 sondes par IP et par heure.** *L'oracle subsiste et devient
+coûteux au lieu d'être trivial.* **Résidu honnête à écrire au commit : une limite par IP ne borne pas un
+attaquant distribué. (c) RENCHÉRIT (b), il ne le ferme pas.**
+
+### ⛔ Et le correctif que j'avais prescrit pour (b) est INOPÉRANT — retiré
+
+    laravel/.env.example:57      QUEUE_CONNECTION=sync
+    laravel/config/queue.php:16  defaut 'database' si la variable manque
+    table `jobs` dans mysql/migrations/ : AUCUNE
+      TEMOIN : le meme motif trouve `password_reset_tokens` -> 1 fichier
+
+**Avec `sync`, `Mail::queue()` exécute le travail EN LIGNE : le temps ne bouge pas d'un millième.**
+
+> **C'est un correctif qui se LIT comme fait et ne fait RIEN** — la classe exacte que ce chantier démonte
+> depuis ce matin, et je l'ai prescrite. *La session 3 a refusé de l'écrire, et elle a énuméré les quatre
+> issues alternatives avant de conclure qu'aucune n'était dans son périmètre.*
+
+**Et sa mesure rend (b) plus grave que ma formulation** : *`mail_helper.php` pose `$mail->Timeout = 15`.*
+**La branche « l'adresse existe » est bornée par quinze secondes — observable en UNE requête, à l'œil. Et
+le maximum est atteint quand le SMTP est en panne : une panne de courriel rend l'énumération triviale.**
