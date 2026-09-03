@@ -4893,3 +4893,70 @@ là — et c'est le bon dénouement d'une sonde écrite pour accuser.*
 
 **Le second est du portage. Le premier ne l'est peut-être pas** — *un mécanisme d'authentification qui
 manque n'est pas une capacité qu'on porte à la demande d'un tour de boucle.*
+
+---
+
+## Tour de 07:35 — E-363 dépasse le brief, et ma « sixième occurrence » n'existait pas
+
+**`78b2358` à 06:42 : R4, supprimer un groupe.** *Banc libre. `go-page-groupes.mjs` en cours d'écriture.*
+
+### E-363 : trois choses que je n'avais pas demandées, et qui sont justes
+
+    membres_err            si le nombre de membres est ILLISIBLE, il le DIT
+    rw-bouton--danger      le ton suit le geste
+    « Le nombre informe, il ne conditionne pas »
+
+**Le troisième est le meilleur.** *La suppression n'est pas bloquée sur le compte de membres — une garde
+adossée à une lecture qui peut échouer transforme une panne de lecture en refus de geste.* **Je ne
+l'avais pas vu ; je l'aurais probablement demandé à l'envers.**
+
+**Et le piège du verdict est traité** : `r.corps.deleted === true`, pas `success` — *la route répond
+« success » même quand elle n'a rien supprimé.* **`supprimer_introuvable` porte le cas distinct.**
+
+### ⚠ CE QUE J'AI CRU TROUVER, ET QUI N'ÉTAIT PAS LÀ
+
+**J'ai cru tenir une SIXIÈME déclaration fausse** — `passerelle.step_up_requis`, *« une
+re-authentification qui n'est pas encore disponible sur cette interface »*.
+
+**Ce qui rendait la thèse crédible :** `StepUp::valide` existe, `POST /profil/step-up` existe, le
+catalogue `step_up.php` existe, **et `comptes.js:172` + `permissions.js:73` appellent le défi.** *Les
+trois actions du portage — `compte_supprimer`, `compte_anonymiser`, `permission_definir` — sont portées,
+anonymisation RGPD art. 17 comprise.*
+
+**Puis j'ai borné avant de publier :**
+
+    RoutesBackend::MOTIFS_STEP_UP  =  5 chemins, TOUS politiques/sftp
+    politiques.js · acces-sftp.js  ->  aucun appel a /profil/step-up
+
+**La clé dit VRAI pour ces cinq chemins. La sixième occurrence n'existait pas.**
+
+> **J'ai trouvé la classe par sa forme, et la forme était juste dans deux modules sur trois.** *Un motif
+> qui se vérifie cinq fois devient une attente, et une attente trouve ce qu'elle cherche.* **Le seul
+> filet a été de mesurer la PORTÉE avant d'écrire le verdict — et il a tenu de justesse, parce que
+> j'avais déjà rédigé l'accusation.**
+
+### ✅ ARBITRAGE : porter le DÉFI dans `politiques` et `acces-sftp`
+
+**Le vrai défaut est plus net que celui que je cherchais.**
+
+    politiques.js:188  appelle /policy/sudo/{deploy,remove}
+    acces-sftp.js:167  appelle /policy/sftp/{deploy,remove}
+    ... et AUCUN des deux n'offre le moyen de lever le refus
+
+> **Deux écrans du portage appellent un geste que la garde refusera, et renvoient vers un portail qui
+> n'existera plus.** *C'est l'arête d'archivage du `DOSSIER-11`, transposée sur un geste
+> d'infrastructure.*
+
+**Le patron existe déjà** (`comptes.js`, `permissions.js`) : *à réutiliser, pas à réécrire — trois
+implémentations d'une même règle divergent, et celle-ci garde des déploiements sudo.*
+
+**⛔ La borne est absolue : le DÉFI se porte, le DÉPLOIEMENT ne s'exerce pas.** *Le défi est une invite à
+second facteur ; le porter ne déclenche rien.* **Et le raffinement d'A5 ne se recolle pas** — *le legacy
+fusionne les trois routes root sous `policy_action`, si bien qu'un step-up consenti pour ANNULER une
+politique autorise un DÉPLOIEMENT SUDO pendant quinze minutes.*
+
+### L'arête d'archivage, à porter au `DOSSIER-00`
+
+**Tant que le défi n'est pas porté dans ces deux modules, `legacy/auth/step_up.php` ne peut pas être
+archivé** — *sinon le déploiement et le retrait des politiques `sudo` et `sftp`, et leur rollback,
+deviennent inatteignables : la garde refuse, et il n'y a plus de repli.*
