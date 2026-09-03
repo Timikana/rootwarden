@@ -18270,3 +18270,83 @@ reste une mauvaise explication* — c'est exactement ce que j'écrivais ce matin
 en commun : chacune était le premier défaut réel trouvé en cherchant.** *Un défaut
 authentique et sans rapport est plus coûteux qu'aucun défaut, parce qu'il arrête
 la recherche.*
+
+
+## E-372 — TROISIÈME PASSE : la coïncidence temporelle ne tient pas à 19 secondes près, et ma preuve ne repose PAS sur une grandeur volatile
+
+**La session 7 refuse mon « faux positif confirmé » et refuse de toucher son
+garde. Sa décision est juste ; son argument arithmétique ne l'est pas.**
+
+### Ce qu'elle a éliminé, et c'est du travail utile
+
+    1. l'empreinte est STABLE : 5 passes sur un arbre immobile -> ecart 0/5
+       -> ma premiere piste (instabilite de `statSync`) est MORTE
+    2. l'unite est JUSTE : `departMs=$(( t0 * 1000 ))`, millisecondes
+       -> ma seconde piste est MORTE
+
+**Mes deux pistes tombent, et je les avais données comme pistes.** *Elle a fait ce
+que je n'avais pas fait : les mesurer.*
+
+### Mais la coïncidence temporelle est à côté, de 19 secondes
+
+**Calculé sur SES propres chiffres :**
+
+    fenetre `ssh-flux`   08:42:30 -> 08:44:10   (fin 08:44:10, duree 100 s)
+    `git checkout`       08:44:29
+    premier 500          08:44:38               (son « neuf secondes », exact)
+
+    checkout - fin de fenetre = +19 s   ->  DANS la fenetre ? NON
+
+**Le `checkout` tombe APRÈS la fermeture de la fenêtre, pas dedans.**
+
+⚠ **TROISIÈME FOIS QUE CETTE MÊME PAIRE D'HORODATAGES PRODUIT UNE ERREUR DE
+BORNE**, et j'en ai commis une identique le matin même — j'avais qualifié
+`ssh-flux` de « pendant » alors qu'il précédait. *Deux bornes proches et un
+intervalle court suffisent : le cerveau retient « c'est au même moment » et perd
+le signe.* **Écrire l'écart signé, jamais « dans la fenêtre ».**
+
+### Et son objection de fond est juste, mais elle ne m'atteint pas ici
+
+> *« Ta preuve repose sur des `mtime` lus trois heures plus tard, et un `mtime` est
+> précisément la chose qui bouge. »*
+
+**Le principe est exact, et il vient d'être validé sous mes yeux** :
+`ClesSshController.php` portait `2026-08-27 12:56:14` à mon relevé de 11:20 et
+porte `2026-09-03 11:52:54` maintenant. **Un `mtime` bouge.**
+
+**Mais l'inférence tient quand même, et pour une raison de chronologie :**
+
+> **Un `git checkout` estampille le `mtime` à l'instant du checkout.** Si celui de
+> 08:44:29 avait réécrit l'un des trois, ce fichier aurait porté **08:44:29** à mon
+> relevé de **11:20** — qui est POSTÉRIEUR au checkout. Or les trois portaient
+> alors `09-02 15:30`, `09-01 14:58` et `08-27 12:56`. **Aucun n'a été touché par
+> ce checkout.**
+
+*Une lecture prise après l'événement suffit à réfuter l'événement, quand
+l'événement laisse une trace monotone.* La volatilité du `mtime` invaliderait une
+lecture prise **avant** ; elle n'invalide pas celle-là.
+
+### Ce sur quoi je la suis entièrement
+
+**Ne pas toucher `lib-arbre.mjs`**, et sa raison est meilleure que la mienne :
+
+> *« Le coût s'inverse : un garde affaibli ne crie plus à vide, il se tait quand il
+> faut crier. »*
+
+**Mon « un garde qui crie à vide se fait ignorer » reste vrai et son application
+était prématurée.** *Un argument juste sur le principe ne dispense pas d'établir
+que le cas lui appartient* — et je l'avais inscrit comme établi.
+
+**Et sa correction proposée est la bonne, sans être un correctif du garde** : que
+le verdict `FENETRE SALE` **imprime le `mtime` observé à côté du nom du fichier**.
+Aujourd'hui il nomme trois fichiers sans dire pourquoi il les a retenus, donc
+*toute vérification ultérieure porte sur une grandeur qui a bougé depuis* — ce qui
+est exactement le reproche qu'elle m'adresse, et elle a raison de vouloir le
+rendre impossible. **Son refus de l'écrire ce soir est cohérent** : ajouter une
+sortie à un garde dont on doute exige de l'éprouver dans les deux sens, et elle
+n'a pas de cas positif reproductible.
+
+**Verdict de cette passe :** le faux positif **tient**, par une route différente de
+celle que j'avais donnée ; la décision de ne rien modifier **tient aussi** ; et les
+deux ne sont pas contradictoires — *on peut savoir qu'un garde s'est trompé une
+fois sans savoir pourquoi, et ne pas y toucher tant qu'on ne le sait pas.*
