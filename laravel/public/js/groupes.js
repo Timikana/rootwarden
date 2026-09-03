@@ -89,6 +89,10 @@
         if (c) {
             c.disabled = false;
             c.textContent = t('btn_enregistrer');
+            // ...ET SON TON. R4 le passe en `--danger` ; le laisser rouge sur
+            // le panneau d'enregistrement suivant ferait craindre un geste
+            // destructeur la ou il n'y en a pas.
+            c.className = 'rw-bouton rw-bouton--succes';
         }
     }
 
@@ -152,6 +156,27 @@
             credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
             body: JSON.stringify(corps),
+        }).then(function (r) {
+            return r.json().then(
+                function (j) { return { ok: r.ok, corps: j }; },
+                function () { return { ok: false, corps: null }; }
+            );
+        }).catch(function () { return { ok: false, corps: null }; });
+    }
+
+    /*
+     * ══ R4 — LE HELPER DE SUPPRESSION ════════════════════════════════════
+     *
+     * Il ne prend PAS de methode en parametre : il ne sait faire qu'un
+     * `DELETE`, sur le chemin qu'on lui donne. Un `envoie(methode, chemin)`
+     * generique ouvrirait `PUT` et `PATCH` sans qu'aucun code les demande —
+     * meme raison qu'en A2 pour `ecris()`.
+     */
+    function supprime(chemin) {
+        return fetch(PASSERELLE + chemin, {
+            method: 'DELETE',
+            credentials: 'same-origin',
+            headers: { 'Accept': 'application/json' },
         }).then(function (r) {
             return r.json().then(
                 function (j) { return { ok: r.ok, corps: j }; },
@@ -339,11 +364,85 @@
         return t('np_sur_groupe', { nom: groupe.name == null ? '' : String(groupe.name) });
     }
 
+    /*
+     * ══ R4 — SUPPRIMER UN GROUPE ═════════════════════════════════════════
+     *
+     * GESTE DESTRUCTEUR ET IRREVERSIBLE. Il ne touche AUCUNE machine : les
+     * deux cles etrangeres de `055_machine_groups.sql:30-31` portent
+     * `ON DELETE CASCADE`, donc les APPARTENANCES partent avec le groupe et le
+     * parc reste intact. Verifie au schema, pas deduit de la docstring.
+     *
+     * ⚠ LE PANNEAU DOIT RASSURER AUTANT QU'AVERTIR.
+     *
+     * La peur qu'aura la personne devant l'ecran est « est-ce que je detruis
+     * mes machines ». La reponse est NON, et `np_supprimer_detail` la donne.
+     * Un panneau qui n'annonce que le risque fait hesiter sur le mauvais
+     * objet — meme lecon que F8, ou taire que les adresses privees ne partent
+     * pas aurait fait renoncer a un geste sur.
+     *
+     * On RESOUT le nombre de membres avant d'afficher, comme pour le scan de
+     * derive : « ce groupe rassemble 3 serveurs » et « ce groupe rassemble
+     * tout le parc » ne se decident pas de la meme facon.
+     */
     function panneauSupprimer(groupe) {
-        ouvrePanneau(t('np_titre'), t('np_supprimer'), [
-            surGroupe(groupe),
-            t('np_supprimer_detail'),
-        ]);
+        ouvrePanneau(t('supprimer_titre'), t('np_supprimer_detail'), [surGroupe(groupe)]);
+        if (panneauLegacy) { panneauLegacy.hidden = true; }
+
+        lis('/groups/' + encodeURIComponent(groupe.id) + '/members').then(function (r) {
+            var membres = (r.ok && r.corps && r.corps.success === true && Array.isArray(r.corps.members))
+                ? r.corps.members
+                : null;
+
+            var effets = [surGroupe(groupe)];
+            // UNE PORTEE ILLISIBLE NE BLOQUE PAS CE GESTE, et c'est la
+            // difference avec le scan de derive : la ou l'un AGIT sur N
+            // machines et exige donc de savoir combien, celui-ci n'en touche
+            // aucune. Le nombre informe, il ne conditionne pas.
+            if (membres !== null) { effets.push(t('supprimer_membres', { n: membres.length })); }
+            else { effets.push(t('membres_err')); }
+            effets.push(t('supprimer_definitif'));
+
+            ouvrePanneau(t('supprimer_titre'), t('np_supprimer_detail'), effets);
+            gesteConfirme = function () { lanceSuppression(groupe); };
+            if (panneauLegacy) { panneauLegacy.hidden = true; }
+            if (panneauConfirmer) {
+                panneauConfirmer.hidden = false;
+                panneauConfirmer.disabled = false;
+                panneauConfirmer.textContent = t('supprimer_valider');
+                // LE TON SUIT LE GESTE. Le vert de l'enregistrement sur une
+                // suppression irreversible serait un mensonge de style.
+                panneauConfirmer.className = 'rw-bouton rw-bouton--danger';
+            }
+        });
+    }
+
+    /*
+     * ⚠ LE VERDICT EST `deleted`, PAS `success`.
+     *
+     * `groups.py:225` rend `{'success': True, 'deleted': rowcount > 0}` : la
+     * route repond « success » meme quand elle n'a rien supprime. Lire
+     * `success` annoncerait une suppression sur un groupe deja disparu.
+     * *Le marqueur n'est pas le verdict.*
+     */
+    function lanceSuppression(groupe) {
+        if (panneauConfirmer) { panneauConfirmer.disabled = true; }
+        var nom = groupe.name == null ? '' : String(groupe.name);
+
+        supprime('/groups/' + encodeURIComponent(groupe.id)).then(function (r) {
+            fermePanneau();
+            if (! r.ok || ! r.corps || r.corps.success !== true) {
+                annonceGeste(t('supprimer_echec', {
+                    message: (r.corps && r.corps.message) || '',
+                }), 'echec');
+
+                return;
+            }
+            annonceGeste(r.corps.deleted === true
+                ? t('supprimer_fait', { nom: nom })
+                : t('supprimer_introuvable', { nom: nom }),
+                r.corps.deleted === true ? 'ok' : 'attention');
+            charge();
+        });
     }
 
     /*

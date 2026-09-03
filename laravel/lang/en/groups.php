@@ -39,8 +39,21 @@ return [
     'np_titre'      => 'Not ported yet',
     'np_ouvrir'     => 'Open in the old portal',
     'np_fermer'     => 'Close',
-
-    'np_supprimer'  => 'Deleting a group is not ported to this interface yet.',
+    // R4: deleting a group IS ported. `np_supprimer_detail` does NOT move — it
+    // carries the REASSURING fact, and that is the one that matters most: the
+    // fear is "am I destroying my machines", the answer is no, and the panel
+    // must give it. Same principle as F8.
+    //
+    // And the verdict is NOT `success`: the route answers
+    // {'success': True, 'deleted': rowcount > 0} even when nothing was
+    // deleted. `supprimer_introuvable` exists for that case.
+    'supprimer_titre'      => 'Delete this group?',
+    'supprimer_membres'    => 'This group gathers :n server(s) today.',
+    'supprimer_definitif'  => 'This deletion cannot be undone: the group and its memberships disappear, and it will have to be recreated.',
+    'supprimer_valider'    => 'Delete the group',
+    'supprimer_fait'       => 'Group ":nom" is deleted. The servers it gathered were not modified.',
+    'supprimer_introuvable' => 'No group was deleted: ":nom" no longer existed. The list is reloaded.',
+    'supprimer_echec'      => 'The group could not be deleted. :message',
     'np_supprimer_detail' => 'Deletion only affects the group: the servers it gathers are not modified.',
 
     // R3: the bulk drift scan is PORTED — see the note in `lang/fr/groups.php`.
