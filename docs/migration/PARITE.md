@@ -18203,3 +18203,70 @@ les déclencheurs, obtenue gratuitement.*
 ⚠ **Non écrit** : `.github/workflows/ci.yml` est un effet sortant — il tourne sur
 l'infrastructure de GitHub avec un `GITHUB_TOKEN`, et `auto-tag` porte
 `contents: write`. **Mesuré et proposé ; pas modifié.**
+
+
+## E-374 — REFERMÉ : ce n'était pas un défaut du produit, mais une faute de PROTOCOLE DE MESURE
+
+**Rejeu de la session 7, suite SEULE, 2026-09-03 22:47 :**
+
+    go-page-supervision-config-ecriture   laravel   16 PASS / 0 FAIL   conforme
+
+**Vérifié par moi avant d'accepter, parce que cette conclusion m'arrange :**
+
+    la suite `go-page-supervision-config-ecriture.mjs`  0 commit depuis le LOT
+                                                        (dernier : 868e8bd, 02/09 00:10)
+    4 commits sur `laravel/` depuis le LOT, dont 3 touchant ZERO fichier supervision
+    le 4e (7ce22a5, 22:42) touche `backend/tests/test_supervision_deploiement.py`
+                                                        -> un fichier PYTEST, pas la suite
+    controle interne : 12+4 = 16  et  16+0 = 16   -> MEME total d'assertions
+
+**Ni la suite ni le code de supervision n'ont changé entre l'échec et le succès.**
+*Le même total d'assertions des deux côtés est le contrôle qui exclut un
+changement de code : un correctif aurait déplacé le compte, pas seulement le
+verdict.*
+
+### La cause réelle, et c'est ma propre hypothèse du matin
+
+> **Un état partagé EN BASE : le garde anti-rejeu TOTP, par COMPTE.** Les quatre
+> suites `onglets · profils · config · config-ecriture` s'authentifient toutes en
+> `rw-test-admin`, et le « rejeu au repos » était **trois invocations du runner
+> dos à dos**.
+
+⚠ **ET LE FAIT NOUVEAU EST SUR MON OUTIL** : `scripts/rejouer-lot.sh` **encapsule
+l'attente TOTP DANS une invocation, pas ENTRE deux.** Trois appels successifs sur
+le même compte franchissent donc le garde qu'il est censé porter.
+
+> **Utiliser l'outil ne suffit pas s'il est appelé d'une manière dont il ne peut
+> rien savoir.** *Le 2026-09-03 au matin, une session avait CONTOURNÉ le runner et
+> perdu l'attente ; ce soir elle l'a UTILISÉ, trois fois de suite, et l'a perdue
+> aussi.* **Un outil qui protège en silence protège aussi en silence contre le
+> mauvais usage — donc il ne le signale pas.** Réserve écrite dans le runner.
+
+### Ce que ça fait à la ligne de base, et c'est une baisse
+
+    167 · 2613 · 55        le chiffre du LOT, INCHANGE
+      50 FAIL  incident du cache de vues (clos 08:52)
+       4 FAIL  config-ecriture — NON reproductibles seule : garde anti-rejeu
+       1 FAIL  go-bashrc-b4 legacy — LE SEUL defaut reel, et il ne doit PAS etre corrige
+    ------
+       0 defaut du portage a corriger
+
+**Il reste UN défaut réel, pas cinq** — et c'est un défaut du legacy, qui mourra
+avec lui. *Deuxième fois de la journée qu'un chiffre baisse pour une bonne raison
+plutôt que par correction d'erreur.*
+
+### Et sur l'attribution du mérite, que je ne prends pas plus qu'elle ne vaut
+
+La session 7 écrit que mon hypothèse était juste « sur le mécanisme ET sur
+l'objet », et refuse de me servir la politesse du « à moitié raison » que j'avais
+moi-même refusée ce matin. **Je l'accepte dans ces termes, avec une réserve qui
+m'appartient :** *j'avais offert ce mécanisme pour les SEPT suites, et il n'en
+expliquait qu'une. Une hypothèse juste sur un objet et fausse sur son étendue
+reste une mauvaise explication* — c'est exactement ce que j'écrivais ce matin, et
+ça ne change pas parce que le verdict m'est devenu favorable.
+
+**Les deux causes fausses successives** — la mienne (destruction de lignes par un
+`UPDATE` sans `WHERE platform`) et la sienne (des identifiants morts) — **ont ceci
+en commun : chacune était le premier défaut réel trouvé en cherchant.** *Un défaut
+authentique et sans rapport est plus coûteux qu'aucun défaut, parce qu'il arrête
+la recherche.*
