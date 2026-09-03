@@ -82,8 +82,21 @@ return [
     'np_ouvrir' => 'Open in the old portal',
     'np_fermer' => 'Close',
     'np_sur_serveur' => 'Target server: :nom',
-
-    'np_relever' => 'Reading a single server is not ported to this interface yet.',
+    // A4: the reading of a server IS ported. `np_relever_detail` does NOT move
+    // — its reserve is about the CONNECTION and stays true. But it is
+    // INCOMPLETE: the action also persists a record, writes to the audit log
+    // and raises notifications. Measured: those notifications are IN-APP only
+    // (`notify.py:122` filters `channel IN ('inapp','both')`, and the file has
+    // no smtp/webhook/telegram/slack at all). Nothing goes outward — saying
+    // otherwise would make people refuse a safe action.
+    'relever_ecrit' => 'The reading is saved: it appears under "Previous readings", it is written to the audit log, and it raises in-portal notifications. Nothing is sent outside.',
+    'relever_titre' => 'Read this server?',
+    'relever_lancer' => 'Read now',
+    'relever_en_cours' => 'Reading…',
+    'relever_sans_serveur' => 'Choose a server before reading it.',
+    'relever_fait' => 'Reading finished: grade :grade, score :score/100.',
+    'relever_echec' => 'The reading did not complete. :message',
+    'relever_refus' => 'The reading was refused. :message',
     'np_relever_detail' => 'Reading a server opens a real SSH session on it and reads its configuration. It is a read, but it is a connection.',
 
     'np_parc' => 'Reading the whole fleet is not ported to this interface yet.',

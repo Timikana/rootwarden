@@ -180,7 +180,6 @@
         });
     }
 
-    brancher('audit-ssh-relever', t('np_relever'), t('np_relever_detail'), true);
     // Celui-la ne nomme AUCUNE cible, et c'est le fait a dire : la route ne
     // prend aucun parametre. Il n'y a rien a viser, donc rien a restreindre.
     brancher('audit-ssh-parc', t('np_parc'), t('np_parc_detail'), false);
@@ -208,6 +207,98 @@
      * Ce n'est pas au correctif backend de le dire : un refus qui n'a pas
      * d'ecran se lit comme une panne.
      */
+    /*
+     * ══ A4 — RELEVER UN SERVEUR ══════════════════════════════════════════
+     *
+     * ⚠ CE GESTE JOINT LA MACHINE **ET ECRIT EN BASE**.
+     *
+     * `np_relever_detail` dit « c'est une lecture, mais c'est une connexion » —
+     * vrai, et INCOMPLET. Mesure de `ssh_audit.py:143-165` : le geste persiste
+     * un releve (`_save_audit_result`), l'inscrit au journal d'audit
+     * (`_log_audit_action`) et leve des notifications (`notify_subscribed`).
+     *
+     * ⚠ ET J'AI FAILLI ECRIRE QU'IL ENVOYAIT DES COURRIELS. Le mot
+     * « notification » m'a fait supposer un canal sortant. `notify.py:122`
+     * filtre `np.channel IN ('inapp', 'both')`, et `notify.py` ne contient
+     * AUCUNE occurrence de smtp, webhook, telegram ni slack : **rien ne sort.**
+     * Le dire faux aurait fait renoncer a un geste sur, l'inverse exact du
+     * defaut qu'on corrige d'habitude.
+     *
+     * `relever_ecrit` complete la reserve SANS la modifier : ce qui est garde
+     * doit rester tel quel pour rester comparable d'un sous-lot a l'autre.
+     *
+     * ⛔ CE GESTE N'EST PAS EXERCE ICI, et jamais vers `srv-zabbix`.
+     */
+    var relMessage = document.querySelector('[data-rw="audit-ssh-relever-message"]');
+
+    function annonceReleve(texte, echec) {
+        if (! relMessage) { return; }
+        relMessage.className = 'rw-annonce' + (echec ? ' rw-annonce--echec' : ' rw-annonce--ok');
+        relMessage.textContent = texte;
+    }
+
+    function lanceReleve() {
+        if (! selecteur || ! selecteur.value) { return; }
+        var mid = selecteur.value;
+        if (pConfirmer) { pConfirmer.disabled = true; }
+        annonceReleve(t('relever_en_cours'), false);
+
+        ecris('/ssh-audit/scan', { machine_id: Number(mid) }).then(function (r) {
+            fermePanneau();
+            /*
+             * TROIS ISSUES SEPAREES, comme pour A3 : un refus n'est pas un
+             * echec de releve, et aucun des deux n'est une reussite muette.
+             */
+            if (! r.ok) {
+                annonceReleve(t('relever_refus', {
+                    message: (r.corps && r.corps.message) || '',
+                }), true);
+
+                return;
+            }
+            if (! r.corps || r.corps.success !== true) {
+                annonceReleve(t('relever_echec', {
+                    message: (r.corps && r.corps.message) || '',
+                }), true);
+
+                return;
+            }
+            annonceReleve(t('relever_fait', {
+                grade: String(r.corps.grade || (r.corps.result && r.corps.result.grade) || '?'),
+                score: String(r.corps.score || (r.corps.result && r.corps.result.score) || 0),
+            }), false);
+            // LE RELEVE EST RELU, pas ajoute a la main : le backend a calcule
+            // la note et l'a persistee, et une ligne fabriquee ici porterait
+            // la valeur qu'on croit plutot que celle qu'il a inscrite.
+            chargeHistorique(mid);
+        });
+    }
+
+    var bRelever = document.querySelector('[data-rw="audit-ssh-relever"]');
+    if (bRelever) {
+        bRelever.addEventListener('click', function () {
+            if (! selecteur || ! selecteur.value) {
+                ouvrePanneau(t('relever_sans_serveur'), [], t('relever_titre'));
+                if (pLegacy) { pLegacy.hidden = true; }
+                if (pConfirmer) { pConfirmer.hidden = true; }
+                gesteConfirme = null;
+
+                return;
+            }
+            ouvrePanneau(t('np_relever_detail'), [
+                surServeur(),
+                t('relever_ecrit'),
+            ], t('relever_titre'));
+            if (pLegacy) { pLegacy.hidden = true; }
+            if (pConfirmer) {
+                pConfirmer.hidden = false;
+                pConfirmer.disabled = false;
+                pConfirmer.textContent = t('relever_lancer');
+            }
+            gesteConfirme = lanceReleve;
+        });
+    }
+
     /*
      * ══ A3 — LIRE `sshd_config` SUR UN SERVEUR ═══════════════════════════
      *

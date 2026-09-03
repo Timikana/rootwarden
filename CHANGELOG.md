@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.190** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.191** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,101 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.191 — E-361 : `ssh_audit` A4, relever un serveur — LA ONZIEME ET DERNIERE
+
+**Le geste est porte et cable. Il n'est pas exerce.** Avec lui, **la liste des onze capacites est
+CLOSE** : tout ce qui reste sur les gestes appartient a l'exploitant.
+
+    requetes vers /ssh-audit/scan       []
+    requetes vers la PRODUCTION         []      (avortees par construction)
+
+#### La reserve est GARDEE, et COMPLETEE sans etre modifiee
+
+`np_relever` est retiree ; `np_relever_detail` ne bouge pas — *« Relever un serveur ouvre une session
+SSH reelle sur lui et lit sa configuration. C'est une lecture, mais c'est une connexion. »* Sa reserve
+porte sur la CONNEXION, et elle reste vraie une fois l'ecran porte. Meme raison que
+`np_config_detail`, gardee en A3 parce qu'elle portait sur l'ecriture.
+
+**Mais elle est INCOMPLETE, et la mesure l'a montre.** `ssh_audit.py:143-165` : le geste persiste un
+releve (`_save_audit_result`), l'inscrit au journal d'audit (`_log_audit_action`) et leve des
+notifications (`notify_subscribed`). « C'est une lecture » decrit ce qu'il fait A LA MACHINE, pas ce
+qu'il fait EN BASE.
+
+`relever_ecrit` complete la phrase **a cote** d'elle : *ce qui est garde doit rester tel quel pour
+rester comparable d'un sous-lot a l'autre.*
+
+#### ⚠⚠ ET J'AI FAILLI ECRIRE QUE CE GESTE ENVOYAIT DES COURRIELS
+
+Le mot « notification » m'a fait supposer un canal sortant, et j'ai commence a le traiter comme le
+scan CVE de masse — celui qui envoie un courriel par machine.
+
+    notify.py:122    AND np.channel IN ('inapp', 'both')
+    notify.py        smtp 0 · webhook 0 · telegram 0 · slack 0
+
+**Ce sont des notifications EN BASE. Rien ne sort.**
+
+*Et l'erreur allait dans le sens qui ALARME* — c'est la premiere de la nuit dans ce sens-la. Le dire
+faux aurait fait renoncer a un geste sur, et aurait classe une capacite portable parmi celles
+reservees a l'exploitant. **L'inverse exact du defaut qu'on corrige d'habitude, et tout aussi
+couteux.**
+
+#### Le commentaire de la vue disait « les TROIS gestes ne sont pas portes »
+
+Il est devenu faux en deux temps : A3 a porte l'affichage, A4 le releve. **Il enonce desormais
+l'etat et non un nombre** — *un commentaire qui compte est un compte qui se desynchronise.*
+
+#### ⛔ CE QUI NE SE PORTE PAS, ET QUI GARDE SON MARQUEUR
+
+    audit-ssh-parc     « Relever tout le parc ↗ »   -> GARDE son ↗, mesure
+    np_config          l'ECRITURE dans sshd_config   -> scindee en A3, pas recollee
+
+*La route du parc n'accepte AUCUN `machine_id` : sa portee EST le parc, production comprise.* Elle
+reste a l'exploitant. **Et le marqueur `↗` disparait avec sa raison d'etre, pas avant** : `relever`
+et `config` l'ont perdu, `parc` le garde.
+
+#### Mesures
+
+    GET /audit-ssh                  200   (rw-test-super)
+    « Relever ce serveur »          ↗ retire
+    « Relever tout le parc ↗ »      ↗ CONSERVE — non porte
+    « Voir sshd_config »            ↗ retire (A3)
+    region d'annonce                presente des le chargement, et vide
+    A. aucun serveur                le panneau le dit, AUCUNE confirmation
+    B. un serveur choisi            « Serveur vise : OpenCVE-Test-OnPrem — 192.168.0.2 »
+                                    la reserve gardee, MOT POUR MOT
+                                    + « Le releve est enregistre … Rien n'est envoye
+                                       a l'exterieur. »
+                                    confirmation offerte, « Relever maintenant »
+                                    lien vers l'ancien portail MASQUE
+    requetes vers /ssh-audit/scan   []
+    requetes vers la PRODUCTION     []
+    erreurs JavaScript              []
+    identifiants a l'ecran          []
+    parite i18n                     FR=108 EN=108, JEUX DE CLES compares
+
+    et les deux assertions d'une autre session, remesurees APRES :
+      « exactement une issue de perimetre »   -> ["audit-ssh-parc"]
+      « les politiques sont en lecture seule » -> intacte
+
+#### ⛔ CE QUI N'A PAS ETE MESURE
+
+**Le releve lui-meme.** Le bouton est mesure visible, actif et correctement libelle ; il n'a pas ete
+clique. Le rendu de la note, les trois issues et le rechargement de l'historique sont **ecrits et non
+eprouves**.
+
+#### Et une verification de F8, demandee par un pair et faite avant d'ecrire A4
+
+    classes CSS des 94 lignes de F8   rw-badge · rw-bouton · --discret · --minuscule
+                                      les QUATRE existent (temoin : une classe
+                                      inventee est bien detectee absente)
+    style CALCULE du badge            rgb(29,78,216) sur rgb(232,239,255)
+                                      contraste 5,82:1   (AA petit texte : 4,5)
+                                      largeur rendue 85 px   (un badge large de
+                                      zero ne dit rien)
+
+*Ce depot a paye QUATRE fois une classe absente qui ne leve aucune erreur, dont une pastille a 1,06:1
+invisible avec un HTML juste. Aucune assertion DOM ne voit ca — il faut le style calcule.*
 
 ### v1.38.190 — E-360 : `fail2ban` F8, geolocaliser une adresse — un appel SORTANT, en clair, jamais exerce
 

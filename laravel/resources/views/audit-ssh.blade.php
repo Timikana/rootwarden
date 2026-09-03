@@ -41,12 +41,19 @@
             @endif
         </div>
 
-        {{-- Les trois gestes distants du module ne sont pas portes en A1.
-             Aucun bouton inerte : chacun ouvre un panneau qui dit ce qu'il
-             engage. Celui du parc entier est le plus important de la page. --}}
+        {{-- ⚠ CE COMMENTAIRE DISAIT « LES TROIS GESTES NE SONT PAS PORTES »,
+             et il est devenu faux en deux temps : A3 a porte l'affichage de
+             `sshd_config`, A4 le releve d'un serveur. Il n'en reste qu'UN non
+             porte — le releve de TOUT LE PARC — et sa route n'accepte aucun
+             `machine_id` : sa portee EST le parc, production comprise. Elle
+             est reservee a l'exploitant.
+
+             Un commentaire qui compte est un compte qui se desynchronise ;
+             celui-ci enonce desormais l'etat, pas un nombre. --}}
         <div class="rw-actions--groupe">
             <button type="button" class="rw-bouton rw-bouton--discret"
-                    data-rw="audit-ssh-relever">{{ __('ssh_audit.btn_relever') }} ↗</button>
+                    {{-- A4 : marqueur `↗` retire avec sa raison d'etre. --}}
+                    data-rw="audit-ssh-relever">{{ __('ssh_audit.btn_relever') }}</button>
             <button type="button" class="rw-bouton rw-bouton--discret"
                     {{-- A3 : le marqueur `↗` est retire avec la raison de
                          l'afficher. Il annoncait un depart vers l'ancien
@@ -88,6 +95,11 @@
 
          La LECTURE SEULE est DITE : l'absence d'un bouton « enregistrer » ne
          se lit pas comme une interdiction, elle se lit comme un oubli. --}}
+    {{-- A4 : l'annonce du releve. Region live PRESENTE des le chargement et
+         vide — une region `aria-live` ajoutee au moment du message n'est pas
+         annoncee. --}}
+    <p class="rw-annonce" data-rw="audit-ssh-relever-message" role="status" aria-live="polite"></p>
+
     <section class="rw-carte rw-carte--pleine" data-rw="audit-ssh-config-bloc" hidden>
         <h3 class="rw-section__entete" data-rw="audit-ssh-config-titre"></h3>
         <p class="rw-aide rw-prose" data-rw="audit-ssh-config-reserve">{{ __('ssh_audit.cfg_lecture_seule') }}</p>
