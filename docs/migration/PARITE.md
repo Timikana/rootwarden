@@ -17210,3 +17210,150 @@ lisibles.
 > **L'incident d'aujourd'hui n'a pas créé le piège : il l'a rendu visible.** *Et il ne l'a rendu visible
 > que parce qu'il est tombé pendant une mesure de 172 exécutions — sans le LOT, les 28 exceptions
 > auraient rejoint les 2 autres dans un journal que personne ne lit.*
+
+
+## E-280 — QUATRIÈME PASSE : le régime n'était pas le discriminant, la FONCTION l'était
+
+**Mesuré le 2026-09-03 10:37, ancré sur le `def`, par fonction ET par régime.**
+
+    régime                _run_scheduled_scan    _run_scheduled_ssh_audit
+    HEAD (arbre)          2 replis SANS filtre   0
+    service (47e5f11)     2 replis SANS filtre   0
+    branche a345e65       0                      0
+
+**Arbre et service sont IDENTIQUES ici.** Les deux passes précédentes opposaient
+un régime à l'autre — elles opposaient en réalité **deux fonctions jumelles** :
+la ligne dite « arbre » était `_run_scheduled_ssh_audit` (déjà correcte partout,
+repli `WHERE 1=0`), la ligne dite « service » était `_run_scheduled_scan`.
+
+Ce que ça change, et c'est le seul point qui compte pour l'exploitant :
+
+> **Le corollaire inscrit en deuxième passe — « le redémarrage qui lève E-238
+> corrigerait ce défaut-ci au passage » — est FAUX. Un redémarrage ne change
+> rien : seule la fusion de `security/backend-cve` ferme E-280.**
+
+J'avais donc annoncé qu'une décision déjà en attente (D-01, redémarrer
+`rootwarden_python`) réglerait gratuitement un défaut qui lance du SSH sur tout
+le parc, production comprise. Elle ne le règle pas. **Le défaut est ouvert dans
+les deux régimes et il le restera après le redémarrage.**
+
+Trois choses à retenir, et la troisième est la seule neuve :
+- ce fichier de `scheduler.py` a maintenant piégé **quatre** lecteurs prudents sur
+  ses deux jumelles ; l'ancrage sur le `def` est le seul remède, et je l'avais
+  écrit avant de me faire prendre ;
+- **un dédouanement se remesure avec la même exigence qu'une alarme** — celui-là
+  a tenu quatre jours parce qu'il soulageait ;
+- ⚠ **il vivait dans la note dont le titre est le piège exact qui l'a produit.**
+  *Écrire la règle ne protège pas de la classe d'erreur qu'elle décrit.*
+
+## E-369 — la colonne qui signe une acceptation de risque contient tantôt un nom, tantôt un nombre
+
+Relecture adverse de `9ac8456` (branche `security/backend-cve`, non fusionnée).
+**Le correctif tient** : l'auteur d'un blanchiment vient désormais de la session
+et non du client, `@require_role(2)` et le corps lisent la **même** valeur (le
+cache `g._rw_user_cache` est rempli par la garde puis recopié dans le fil par
+`@copy_current_request_context`), et la résolution du nom précède l'`INSERT` —
+donc une base indisponible fait échouer **avant** d'écrire. Deux attaques
+réfutées, une par régime de fil, une par ordonnancement.
+
+**Ce qui reste, et que le correctif ne prétend pas fermer :**
+- `whitelisted_by` reçoit `str(ligne['name'])`, mais le **repli** garde
+  `str(user_id)`. La colonne est donc polymorphe : « superadmin » ou « 7 ». Un
+  lecteur ne peut pas distinguer un identifiant d'un compte nommé `7`. Le repli
+  est atteignable si `users.name` peut valoir `''` (`NOT NULL` ne l'interdit
+  pas) — **non mesuré : ma requête en base n'a rien rendu, ce n'est pas un
+  « aucun nom vide »** ;
+- l'`INSERT` porte `ON DUPLICATE KEY UPDATE … whitelisted_by = VALUES(…)`. Un
+  second blanchiment du même couple (CVE, machine) **écrase la signature du
+  premier**. Ce n'est plus « signer du nom d'autrui », c'est **effacer le nom
+  d'autrui** — la traçabilité de l'acceptation de risque n'a pas d'historique.
+
+Et un fait qui borne l'exposition : **cette colonne n'a qu'UN seul écrivain dans
+tout le dépôt** (`backend/routes/cve.py:825`), aucun côté legacy — mesuré par le
+VERBE (`INSERT|UPDATE|DELETE`), avec témoin positif rendu.
+
+## E-370 — une garde de permission sans garde de rôle : le plancher n'est plus le rôle
+
+Relecture adverse de `427306c`. **Le correctif tient** : `can_scan_cve` existe
+(`mysql/migrations/003`), `require_permission` est **fail-closed** sur une clé
+inconnue (`if not perms.get(permission)` → 403, donc une faute de frappe
+casserait la fonction au lieu de l'ouvrir), et `@require_machine_access` **a un
+objet** ici — la route lit `data.get('machine_id')`, exactement la clé et la
+source que le décorateur contrôle. La garde n'est pas sans objet.
+
+**Ce qui reste :** la pile est `@require_permission('can_scan_cve')` +
+`@require_machine_access` + `@threaded_route`, **sans `@require_role`**. Donc un
+compte de rôle 1 porteur de `can_scan_cve` peut re-prioriser, et un rôle ≥ 3
+passe sans vérification (documenté, voulu). Le plancher de cette écriture est
+désormais une **permission**, pas un rôle — à dire, parce que les autres
+écritures CVE du module posent les deux.
+
+## E-371 — deux jumelles, deux mécanismes de fail-closed, et un test qui n'en couvre qu'un
+
+Relecture adverse de `a345e65`. **Le correctif tient, et c'est le plus
+conséquent des trois** : il ferme le repli qui ÉLARGISSAIT le périmètre. Deux
+attaques réfutées :
+- `vivantes_nues = vivantes.replace('m.', '')` — le motif `m.` n'apparaît que
+  deux fois dans la chaîne, toutes deux l'alias : la dérivation est **correcte**.
+  Fragile (dériver du SQL par remplacement de chaîne), pas fautive ;
+- `elif … == 'machines' and schedule['target_value']:` devient
+  `elif … == 'machines':` — **une conjonction perd un membre, et ici c'est LE
+  correctif** : sans ça, une valeur vide retombait dans le `else` qui scannait
+  tout le parc. *Le motif que je cherchais comme dégât était le remède.*
+
+**Ce qui reste :** les deux jumelles échouent closes par des mécanismes
+**différents** — `_run_scheduled_scan` par `return` (aucune requête émise),
+`_run_scheduled_ssh_audit` par `WHERE 1=0` (une requête émise, zéro ligne). Les
+quatre tests ajoutés asservissent la propriété « il n'y a **AUCUNE** requête sur
+`machines` », qui est vraie de la fonction corrigée et **fausse de sa jumelle**.
+Un test écrit pour l'une ne valide donc pas l'autre, alors que les deux passent
+pour interchangeables — c'est la confusion qui a produit E-280 quatrième passe,
+inscrite cette fois du côté des tests.
+
+
+## E-280 — CINQUIÈME PASSE : ma quatrième passe comptait un FILTRE là où la propriété est un PÉRIMÈTRE
+
+**Écrite vingt minutes après la quatrième, qui était fausse dans le sens qui rassure — la troisième fois du même tour.**
+
+Ma sonde comptait les `SELECT … FROM machines` **sans clause de filtre archivées**.
+Elle a rendu 0 pour `_run_scheduled_ssh_audit` dans les trois régimes, et j'ai
+écrit « déjà correcte partout, repli `WHERE 1=0` ». **La propriété qui compte
+n'est pas « la requête porte un filtre », c'est « le périmètre est borné ».**
+Un champ de cible laissé BLANC rend la conjonction du `elif` fausse et tombe dans
+le `else` final, qui sélectionne **tout le parc vivant** — filtré des archivées,
+et non borné pour autant.
+
+    branche                                  champ blanc ->
+    _run_scheduled_scan · tag                else final    TOUT LE PARC VIVANT
+    _run_scheduled_scan · machines           return        borné  <- ce que a345e65 ferme
+    _run_scheduled_ssh_audit · tag           else final    TOUT LE PARC VIVANT
+    _run_scheduled_ssh_audit · environment   else final    TOUT LE PARC VIVANT
+    _run_scheduled_ssh_audit · machines      else final    TOUT LE PARC VIVANT
+
+Le `WHERE 1=0` que je citais à décharge est dans le `else` INTERNE : il couvre la
+valeur **présente mais illisible**, jamais le champ **blanc**. J'ai donc dédouané,
+avec un instrument, la fonction qui porte **trois** chemins vers tout le parc — et
+`a345e65` n'en ferme **qu'un sur quatre**.
+
+**Ce qui corrige : `DOSSIER-08-PUSH-ET-MERGE.md:235`, écrit AVANT ma sonde**, qui
+énonce exactement le bon discriminant — *« son test de vacuité est resté dans la
+condition du `elif` »* — et conclut : *« la fusion ferme le pire des deux et laisse
+l'autre entier »*. Mon « seule la fusion ferme E-280 » est donc faux deux fois :
+elle n'est pas suffisante, et elle ne l'est pas non plus pour le seul `scan`.
+
+⚠ **TROIS ERREURS DU MÊME SENS DANS UN SEUL TOUR, ET UNE SEULE CAUSE.**
+1. quatrième passe : compter un filtre pour un périmètre ;
+2. avoir annoncé la quatrième passe à deux sessions comme une nouvelle, alors que
+   `DECISIONS-DSI.md:2480` la portait déjà — le DSI avait trouvé mon erreur et
+   vérifié qu'elle n'avait pas contaminé le `DOSSIER-01` ;
+3. avoir relu trois correctifs que `RELECTURE-SECURITY-BACKEND-CVE.md` (2026-09-02
+   02:22) caractérise déjà tous les six — et **ce document même signale des
+   sessions qui avaient re-mesuré `a345e65` écrit douze jours plus tôt.** *J'ai
+   refait le travail refait, dans le document qui le déplore.*
+
+> **La cause commune n'est pas la précipitation : c'est d'avoir mesuré avant de
+> lire.** Chacune des trois se réfutait par un `grep` dans mon propre
+> `docs/migration/`, et j'ai préféré l'instrument au registre parce qu'un
+> instrument RESSEMBLE à de la rigueur. *Un chiffre daté et sourcé se lit, il ne
+> se refait pas* — la règle était écrite, elle est à moi, et elle vise le cas où
+> refaire est **plus coûteux que faux**. Ici c'était les deux.
