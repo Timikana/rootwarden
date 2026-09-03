@@ -19,6 +19,58 @@ root** :
 L'exception remonte : **500 a chaque requete, indefiniment.** Le cache ne se
 repare pas seul — *il echoue a se reparer, en boucle.*
 
+## ✅ LA CAUSE RACINE — l'entrypoint, et une ligne la ferme
+
+    laravel/docker-entrypoint.sh:25   chown -R www-data:www-data storage bootstrap/cache
+                                :44   php artisan view:cache        <- EXECUTE EN ROOT
+
+**La ligne 44 defait l'intention de la ligne 25 pour les fichiers qu'elle cree.**
+L'entrypoint tourne en root, puis `apache2-foreground` fork des travailleurs `www-data`.
+
+> **La cause est donc RECREEE A CHAQUE DEMARRAGE du conteneur.** *Un correctif manuel
+> — `chown` a la main, ou `view:cache` relance — est annule au redemarrage suivant.*
+
+**Ventilation mesuree le 2026-09-03, qui l'etablit :**
+
+    root      07:48   111 fichiers   <- le view:cache de l'entrypoint, en root
+    www-data  07:48     1 fichier
+    www-data  08:44    39 fichiers   <- crees par des REQUETES, apres le demarrage
+
+**Le correctif durable, apres la ligne 44 :**
+
+    + # `view:cache` tourne en root : sans ce chown, les compiles appartiennent a
+    + # root dans un repertoire www-data, et TOUTE modification d'une vue fait
+    + # echouer la recompilation -> 500 sur toutes les pages.
+    + chown -R www-data:www-data storage/framework/views 2>/dev/null || true
+
+*Preferable a `su -c … www-data` : il ne change pas qui execute `artisan`, donc aucun
+risque sur l'environnement de cette commande, et il est idempotent. Le depot fournit
+deja ce motif a la ligne 25 — c'est la meme regle appliquee APRES la creation.*
+
+### ⚠ Deux proprietes du repertoire, mesurees, qui decident du rattrapage
+
+    repertoire  storage/framework/views   www-data:www-data  drwxr-xr-x (755)
+                                          -> AUCUN bit collant
+                                          (temoin : /tmp est drwxrwxrwt 1777)
+
+    1. www-data CREE bien dans ce repertoire      -> les 39 fichiers de 08:44
+    2. www-data n'ECRASE PAS un fichier root      -> les 28 echecs n'ont RIEN ecrit :
+       le compile du socle est reste root:root et 07:48:46 pendant les 7 minutes
+
+**Donc un `view:cache` lance en `www-data` ECHOUERAIT sur les compiles deja presents** —
+il appellerait `put()` sur des fichiers root, exactement comme une requete web.
+**Le rattrapage manuel exige `view:clear` D'ABORD** : sans bit collant, le proprietaire
+du repertoire supprime n'importe quel fichier dedans, quel qu'en soit le proprietaire.
+
+### Etat au 2026-09-03 : latent, pas actif
+
+    compiles au total                      151   (111 root · 40 www-data)
+    source plus recente que son compile      0   <- AUCUNE mine amorcee
+    compiles a jour                        151   <- temoin inverse
+
+Les 151 portent tous un pied de page `/**PATH … ENDPATH**/`, donc le mappage
+source→compile est **complet** — c'est ce qui rend ce compte verifiable.
+
 ## Ce que cela implique pour tout le monde
 
 > **`git checkout -- <vue>` n'est pas un defaire neutre.** Il restitue le
