@@ -17555,3 +17555,66 @@ verdict, est tombé sur la même valeur par une route indépendante — donc l'a
 autrement*). Mais **deux mesures peuvent s'accorder sur un nombre en désignant
 deux objets**, et c'est ce qui s'est passé : 54 = les FAIL des sept sur laravel,
 pas 54 = le coût de l'incident, qui est **50**.
+
+
+## E-374 — `supervision-config-ecriture` : 4 FAIL qui SURVIVENT au repos, et une piste qui a un mécanisme
+
+**Mesuré par la session 7 le 2026-09-03**, rejeu **seule au repos**, donc hors de
+l'incident du cache de vues qui explique les six autres suites :
+
+    go-page-supervision-config-ecriture   laravel   12 PASS · 4 FAIL   ⚠ persistant
+
+    :14  FAIL  l'enregistrement a un point d'entree — aucun
+    :23  INFO  champ PSK renseigne : champ introuvable
+    :17  FAIL  attendu ...-tape.example, trouve ...-avant.example
+    :9   FAIL  un serveur vide est REFUSE — aucun refus lisible
+
+**Les quatre sont cohérents entre eux** : rien n'a été soumis, donc rien n'a
+changé, donc la valeur « avant » subsiste et aucun refus n'est émis. **Un seul
+défaut, quatre symptômes** — et la propriété première est *« la suite n'atteint
+pas le formulaire »*, pas *« l'enregistrement échoue »*.
+
+Ce qui est déjà **écarté** par la session 7 : les trois ancres `superv-config-*`
+**existent dans la vue**, et le bouton est un `type="submit"` dans un `<form>` —
+donc `js=0` est **normal**, pas un défaut.
+
+### ⚠ UNE PISTE, PAS UNE CONCLUSION — mais elle a un mécanisme et une source
+
+`MODULE-SUPERVISION.md:192-194`, **mesuré** : les **quatre** blocs de plateforme
+(`zabbix`, `centreon`, `prometheus`, `telegraf`) sont **présents**, **un seul
+visible** ; et le formulaire est **par plateforme, avec un état vide en regard**.
+
+`MODULE-SUPERVISION.md:45-50`, **mesuré** : l'`UPDATE` de la configuration
+globale se fait **sans `WHERE platform`**. Séquence documentée — enregistrer
+Centreon, revenir sur Zabbix, enregistrer → l'`UPDATE` frappe la ligne de
+Centreon, y écrit les valeurs Zabbix et **laisse `platform='centreon'`** ; ensuite
+`_get_global_config('zabbix')` **ne trouve plus rien**.
+
+> **Donc une plateforme peut se retrouver SANS ligne de configuration à cause
+> d'une écriture faite sur une AUTRE plateforme** — et son bloc rend alors l'état
+> vide, où il n'y a pas de formulaire à atteindre.
+
+**La mesure qui trancherait, et elle est unique** : la plateforme visée par la
+suite a-t-elle une ligne de configuration **avant** que la suite ne démarre ? Si
+non, le défaut n'est pas dans la page mais dans ce que le LOT a laissé en base.
+
+### Ce que je ne m'autorise PAS à en conclure
+
+Cette piste **ressuscite la catégorie** de ma première hypothèse du matin — un
+état partagé en base — et je ne la revendique pas pour autant :
+
+> **Le mécanisme n'est PAS celui que j'avais proposé.** J'avais nommé l'anti-rejeu
+> TOTP et `force_password_change` ; celui-ci est un `UPDATE` sans `WHERE platform`
+> qui **détruit des lignes de configuration**. *Avoir raison sur la catégorie et
+> faux sur le mécanisme, ce n'est pas avoir raison* — c'est exactement le défaut
+> que je m'étais inscrit : **fonder sur le MÉCANISME, pas sur l'énumération.**
+
+Et la borne : **cause première NON établie.** Douze sous-lots ont touché
+`supervision.blade.php` cette nuit, dont V13 — piste supplémentaire, pas
+conclusion. **Ne pas refermer cet écart par une hypothèse**, y compris celle
+ci-dessus.
+
+⚠ **RÉGIME** : mesuré sur la cible **laravel**. La même suite rend **6 PASS · 0
+FAIL conforme** sur la cible `legacy` — ce qui *n'est pas* un dédouanement du
+legacy mais la marque que les deux cibles n'exercent pas la même chose : c'est le
+portage qui porte le formulaire par plateforme.
