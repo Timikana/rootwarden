@@ -113,7 +113,41 @@ return [
     'np_fermer' => 'Fermer',
     'np_sur_serveur' => 'Serveur visé : :nom',
 
-    'np_relever' => "Le relevé d'un serveur n'est pas encore porté sur cette interface.",
+    /*
+     * ══ A4 — LE RELEVE D'UN SERVEUR EST PORTE ═════════════════════════════
+     *
+     * `np_relever` est RETIREE. `np_relever_detail` NE BOUGE PAS : sa reserve
+     * porte sur la CONNEXION, et elle reste vraie une fois l'ecran porte —
+     * meme raison que `np_config_detail`, gardee parce qu'elle portait sur
+     * l'ecriture.
+     *
+     * ⚠ MAIS ELLE EST INCOMPLETE, ET LA MESURE L'A MONTRE.
+     *
+     * « C'est une lecture, mais c'est une connexion » decrit ce que le geste
+     * fait A LA MACHINE. Il fait aussi trois choses EN BASE
+     * (`ssh_audit.py:143-165`) : `_save_audit_result` persiste un releve,
+     * `_log_audit_action` ecrit au journal d'audit, et `notify_subscribed`
+     * leve des notifications.
+     *
+     * ⚠ ET J'AI FAILLI ECRIRE QUE CE GESTE ENVOYAIT DES COURRIELS. Le mot
+     * « notification » m'a fait supposer un canal sortant. Mesure :
+     * `notify.py:122` filtre `np.channel IN ('inapp', 'both')`, et `notify.py`
+     * ne contient AUCUNE occurrence de smtp, webhook, telegram ni slack.
+     * **Ce sont des notifications EN BASE, rien ne sort.** Le dire faux aurait
+     * fait renoncer a un geste sur — l'inverse exact du defaut qu'on corrige
+     * d'habitude.
+     *
+     * `relever_ecrit` complete la reserve SANS la modifier : ce qui est garde
+     * doit rester tel quel pour rester comparable.
+     */
+    'relever_ecrit' => "Le relevé est enregistré : il apparaît dans « Relevés précédents », il est inscrit au journal d'audit, et il lève des notifications dans le portail. Rien n'est envoyé à l'extérieur.",
+    'relever_titre' => 'Relever ce serveur ?',
+    'relever_lancer' => 'Relever maintenant',
+    'relever_en_cours' => 'Relevé en cours…',
+    'relever_sans_serveur' => 'Choisissez un serveur avant de le relever.',
+    'relever_fait' => 'Relevé terminé : note :grade, score :score/100.',
+    'relever_echec' => "Le relevé n'a pas abouti. :message",
+    'relever_refus' => 'Le relevé a été refusé. :message',
     'np_relever_detail' => "Relever un serveur ouvre une session SSH réelle sur lui et lit sa configuration. C'est une lecture, mais c'est une connexion.",
 
     'np_parc' => "Le relevé de tout le parc n'est pas encore porté sur cette interface.",
