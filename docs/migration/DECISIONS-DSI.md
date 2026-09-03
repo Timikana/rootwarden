@@ -4765,3 +4765,72 @@ l'ai renvoyé à la session 3 au lieu de le porter au crédit de la livraison.**
 **Le Lead a refusé de la lancer depuis la sienne, et il a eu raison** : *un garde de session refuse un
 geste ; le faire exécuter par une autre session ne le satisfait pas, il l'enjambe.* **L'exploitant est
 prévenu ; les 26 commits n'existent que sur ce disque.**
+
+---
+
+## Tour de 05:35 — les onze sont closes, et elles n'étaient pas l'ensemble
+
+**`cd57955` à 04:42 : A4, relever un serveur. La dernière des onze.** *Banc libre, arbre propre.*
+
+### Vérifiée, pas crue — et mon premier relevé était faux
+
+    np_relever          RETIREE                    grep -c -> 0
+    np_relever_detail   GARDEE  fr:151 · en:100    la reserve sur la CONNEXION tient
+    np_parc · np_config INTACTES                   la scission d'A3 n'a pas ete recollee
+    cles np_*           fr 10 · en 10, diff vide   parite exacte
+
+**Mon premier compte rendait `15` contre `13`** — *il comptait des lignes de commentaire, pas des clés.*
+**J'ai failli annoncer un écart de parité qui n'existait pas.** *Un compte qui ne porte pas son objet
+dérive ; celui-là a été rattrapé parce que l'écart était invraisemblable, ce qui est le dernier filet et
+non le premier.*
+
+### ⚠ CE QUE LA CLÔTURE A RÉVÉLÉ : la liste des onze était juste et NON EXHAUSTIVE
+
+**En balayant les catalogues pour annoncer que tout était fini, j'ai trouvé quatre déclarations d'absence
+hors inventaire :**
+
+    auth.php:59        changement_requis   <- FAUSSE. Voir ci-dessous.
+    groups.php:53      np_supprimer        supprimer un groupe. Le backend l'a
+                                           (groups.py:218). GESTE DESTRUCTEUR.
+    passerelle.php:16  step_up_requis      la re-authentification n'est portee NULLE PART
+    comptes.php:19     reste_titre         import CSV des COMPTES — distinct de celui
+                                           des SERVEURS que la mission listait
+
+> **J'ai découvert que la liste n'était pas close en cherchant à annoncer qu'elle l'était.** *C'est ce
+> que j'avais écrit deux heures plus tôt dans le `DOSSIER-00` — « un index de ce qui reste est
+> exactement le genre d'artefact qui devient faux sans que personne ne le touche » — et je l'ai vérifié
+> sur mon propre index, dans le sens qui coûte.*
+
+### ✅ ARBITRAGE — `auth.changement_requis` : la CINQUIÈME occurrence du défaut signature
+
+    profil.blade.php:8    « CETTE PAGE N'EST PAS ENCORE PORTEE : effectuez le
+                            changement depuis l'ancien portail. »
+    profil.blade.php:56   <form action="{{ route('profil.mot-de-passe') }}">
+    web.php:111           POST /profil/mot-de-passe -> changerMotDePasse
+    MotDePasse.php:192    'force_password_change' => 0   <- il REMET le drapeau a zero
+
+**Le formulaire est sur la page qui affirme qu'il n'y est pas, quarante-huit lignes plus bas.** *Et le
+commentaire du sous-lot A2, seize lignes sous le bandeau, décrit exactement ce défaut : le formulaire a
+été porté, le bandeau n'a pas été touché.*
+
+**Pourquoi celle-ci coûte plus que les quatre autres** : le commentaire d'A2 porte que **six comptes
+actifs sur dix ont `force_password_change = 1`, dont `superadmin`**. *Chiffre **porté et daté**, PAS
+remesuré — `docker` est refusé depuis cette session.* **S'il tient, c'est 60 % des comptes actifs qui
+lisent, à la connexion, un message rouge les envoyant vers un portail qui n'existera plus à la bascule,
+avec la solution juste en dessous.**
+
+> **Ce n'est pas un libellé périmé, c'est un libellé qui DÉTOURNE.** *Perdre un bouton se voit ; envoyer
+> l'utilisateur ailleurs alors que le bouton est là ne se voit pas.*
+
+**Décision : réécrire la clé, FR et EN, même commit. Elle dit l'exigence, désigne le formulaire de la
+page, et ne nomme plus l'ancien portail. Le bandeau reste CONDITIONNEL** — *une réserve sans objet
+devient un décor qu'on ne lit plus.* **Envoyé à la session 3.**
+
+**Et un contrôle qui compte** : *si une suite assère le texte faux, elle doit devenir ROUGE.* **C'est le
+bon sens du rouge, et c'est le seul cas de la nuit où je le souhaite.**
+
+### Les trois autres restent à moi, et l'une est un arbitrage
+
+**`np_supprimer` est un geste DESTRUCTEUR sur une donnée, pas sur une machine.** *Il n'est nommé dans
+aucun des interdits permanents, ce qui ne le rend pas anodin : il ne se défait pas.* **Instruit au
+prochain tour, pas porté d'ici là.**
