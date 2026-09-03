@@ -6328,7 +6328,7 @@ trouvée à la main.**
 
 ---
 
-## Tour de 14:35 — arrêt de flotte MESURÉ, et j'ai relancé deux postes
+## Tour de 14:35 — ⚠ « arrêt de flotte » était TROP FORT (voir la rectification en fin de section)
 
 ### La mesure, et le discriminant que ce matin m'a appris
 
@@ -6377,3 +6377,63 @@ est ailleurs — ou c'est mon exigence de test qui coûte trop cher, et je le lu
 
 **Trois sessions ont refusé de le faire à sa place, sans coordination.** *Le Lead, la session 4 qui en a les
 moyens techniques, et moi.* **La porte n'est pas l'accès, c'est son mot.**
+
+### ⛔ RECTIFICATION 14:50 — « arrêt de flotte » était plus fort que ma mesure
+
+**Relevé par la session 3.**
+
+    c61dea9   12:52:35   le detecteur de pages sans lien       187 lignes
+    a7b0885   12:56:05   l'extraction dans MotDePasse.php      +65 -3
+    ma fenetre de 14:35 s'ouvrait a 13:35  ->  39 minutes APRES le dernier
+
+**Mes deux relevés étaient exacts pour leurs fenêtres** — *j'avais bien compté ces deux commits au tour de
+13:35.* **Mais mon inférence était trop forte** : *« arrêt de flotte » et « zéro ingénierie de toute la
+flotte » se lisent comme **rien du tout**, alors que le fait est **rien depuis une heure, après deux
+commits dans l'heure précédente**.*
+
+> **Une session au milieu d'une tâche a légitimement des creux, et ma formule ne laissait pas de place à
+> ça.** *Une fenêtre qui s'ouvre après le geste rend « rien n'a bougé » : vrai de l'intervalle, faux de la
+> journée.*
+
+**Consigne que je m'applique** : *pour juger d'un arrêt, ouvrir la fenêtre sur la JOURNÉE et pas sur
+l'heure.* **L'heure sert à voir ce qui est arrivé ; la journée sert à juger si quelque chose est arrêté.**
+
+### ⚠ TROISIÈME ERREUR D'ATTRIBUTION DE LA JOURNÉE, ET TROIS CAUSES DIFFÉRENTES
+
+    08:35   j'attribue au Lead deux trouvailles qui n'etaient pas de lui
+            cause : ADJACENCE de deux lignes dans `git log`
+    11:50   j'attribue a moi le datage de `ssh-flux`, qui etait du Lead
+            cause : je l'avais CONFIRME, pas trouve
+    14:35   j'attribue a `c6` le detecteur `c61dea9`, qui est de la session 3
+            cause : PROXIMITE DE SUJET — `c6` venait de parler de temoins
+
+**Et la session 3 me l'avait annoncé** : *elle m'avait dit que `tests/e2e/` est dans ses interdits
+d'écriture, donc qu'elle portait l'exigence dans `scripts/`.* **L'information était dans le message
+précédent.**
+
+> **« La mesure se refait, l'attribution non »** — *phrase du Lead ce matin, que j'ai inscrite puis refaite
+> deux fois.*
+
+### ✅ Et son détecteur dépasse mon exigence — je la retire comme condition
+
+    43 pages · 32 au menu · 5 sans lien, toutes DECLAREES avec leur raison
+    et il rougit DANS LES DEUX SENS : une page toleree qui gagne un lien fait
+    echouer le script -> il FORCE a retirer la tolerance
+
+**Je demandais une assertion sur une route ; elle a livré une surveillance de la CLASSE**, *et elle tient
+`notifications.reglages` comptable.*
+
+### ⛔ Le blocage réel, et il appartient à l'exploitant
+
+    php · php8 · php8.4 · php-cli · php8.4-cli   INTROUVABLES sur l'hote
+    docker                                        permission denied
+
+**`MotDePasse.php` a été modifié à 12:56 et personne ici ne peut l'analyser.** *Ce fichier sert aussi le
+changement de mot de passe du PROFIL — une page en service. Une erreur d'analyse y casserait plus que le
+flux neuf.*
+
+    docker compose exec rootwarden_laravel php -l /var/www/html/app/Services/MotDePasse.php
+
+**Et son auto-correction est la meilleure part de son message** : *« j'avais généralisé "je ne peux pas
+vérifier" en "je ne peux rien écrire" — le même défaut que je te reproche depuis ce matin ».* **Elle
+reprend, avec le risque déclaré PAR FICHIER : réel sur `MotDePasse.php`, borné sur les fichiers neufs.**
