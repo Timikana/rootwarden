@@ -3,7 +3,7 @@
 **Session 8 (DSI délégué), le 2026-09-03 à 08:21 CEST.** *Demandé par la session 4, qui a relevé que
 j'avais classé UN correctif et laissé les cinq autres sans le même examen.*
 
-> **La branche attend une relecture depuis le 21 août.** *Ce dossier ne la fait pas : il dit dans quel
+> **⚠ « La branche attend une relecture » était FAUX — elle a été relue DEUX fois (27/08 et 02/09). Voir la rectification en fin de document.** *Ce dossier ne la fait pas : il dit dans quel
 > ordre lire, et c'est une question différente de « lequel est le plus grave ».*
 
 ---
@@ -110,7 +110,7 @@ décorateurs, qui ne bougent pas avec l'heure. *La correction porte sur l'en-tê
 # RELECTURE — première partie, 2026-09-03 10:45
 
 **Demandée par l'exploitant : « l'audit de sécurité a été faite ? ».** *Réponse honnête : cette branche
-n'avait JAMAIS été relue depuis le 21 août — treize jours. Le classement ci-dessus portait sur la PORTÉE,
+avait DÉJÀ été relue deux fois — ce que j'ignorais en écrivant ceci, et c'est ma faute (rectification en fin de document). Le classement ci-dessus portait sur la PORTÉE,
 et je l'avais écrit : « je classe la portée, pas la justesse ». Voici la justesse, sur les trois
 correctifs que je me suis attribués.*
 
@@ -187,3 +187,26 @@ l'heure de soumission ».* **Le test actuel ne peut pas l'attraper : il fixe imp
               ⚠ ne PAS s'appuyer sur mon classement du DOSSIER-15 pour celui-la :
                 deux de mes conclusions sur la chaine `users.sudo` ont ete
                 RENVERSEES ce matin, dont une par moi-meme.
+
+
+---
+
+# ⛔ RECTIFICATION 11:35 — la branche AVAIT été relue, deux fois
+
+**Relevé indépendamment par la session 4 et la session 5. Vérifié par moi.**
+
+    AUDIT-BRANCHE-BACKEND-CVE.md      0af58a5, 2026-08-27 19:18, 505 lignes
+                                      les SIX commits, §2.1 a §2.6
+                                      + la divergence de fusion, + les failles du tronc
+    RELECTURE-SECURITY-BACKEND-CVE.md 2f05ff8, 2026-09-02 02:22, les SIX aussi
+
+**Ce qui n'a jamais eu lieu, c'est la FUSION.** *Et c'est délibéré — la règle du dépôt exige l'accord
+verbal explicite de l'exploitant sur toute branche de sécurité.*
+
+**Ce dossier reste utile pour ce qu'il ajoute** — *le classement par CAUSE D'INERTIE, que ni l'un ni
+l'autre document ne portait, et la trouvaille sur `3e65ad3` (le clamp toujours contournable, démontré par
+simulation).* **Mais sa prémisse était fausse, et elle a fait refaire du travail à trois sessions.**
+
+> **`RELECTURE-SECURITY-BACKEND-CVE.md` déplore ce coût exact à sa ligne 9** — *« sept sessions ont
+> re-trouvé, re-mesuré et re-rédigé `a345e65`, écrit douze jours plus tôt »*. **J'en ai causé une
+> huitième.**
