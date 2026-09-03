@@ -17490,3 +17490,68 @@ mention de « machine cochée », et elle concerne K4 (`:16146`). Traitement à 
 annoncé par la session 7. **Régime à nommer avant tout correctif** — la suite a
 mesuré la cible `legacy` ; que le portage Laravel présente ou non le même défaut
 n'est PAS mesuré, et ne doit pas être supposé dans un sens ni dans l'autre.
+
+
+## E-372 — ADDENDUM : le journal portait la réfutation de mon hypothèse, UNE LIGNE PLUS BAS
+
+**Mesuré le 2026-09-03 11:42, sur le même journal que mes deux hypothèses.**
+
+J'avais proposé, pour expliquer les sept `supervision` en ECHEC, soit **un état
+partagé en base**, soit **une régression réelle**. Le journal contenait de quoi
+trancher, et je ne l'avais pas lu : **les sept mêmes noms ont tourné sur les DEUX
+cibles.**
+
+    go-page-supervision-onglets          laravel   7 · 9    ECHEC
+    ...          les sept, cible laravel          62 PASS · 54 FAIL
+    go-page-supervision-onglets          legacy    8 · 0    conforme
+    ...          les sept, cible legacy            44 PASS ·  0 FAIL
+
+> **Un état partagé en base aurait fait tomber les DEUX cibles.** Seule une cause
+> propre à Laravel explique que les mêmes assertions passent en `legacy` dans la
+> même fenêtre — et le cache de vues Blade en est une : `legacy` n'a pas de vues
+> compilées.
+
+**La cible est donc un discriminant, et il était gratuit.** J'ai construit deux
+hypothèses en lisant sept lignes, alors que les sept suivantes les départageaient.
+
+⚠ **Et mon relevé initial disait « 7 suites » là où il y a 14 exécutions** — une
+suite n'est pas une exécution dans ce banc, et *un nombre sans son objet invite au
+faux désaccord*. Le 54 que j'avais sommé était juste **pour son objet** (les FAIL
+des sept sur la cible laravel) ; ce qui était faux, c'est l'usage que j'en ai
+fait.
+
+### Ce que le rejeu au repos a tranché, et que je n'aurais pas dû abandonner
+
+La session 7 a rejoué les sept, seules au repos : **six conformes, une non.**
+
+    supervision-config-ecriture   12 · 4   ⚠ persistant au repos
+    go-page-ssh-flux              10 · 0   -> la FENETRE SALE etait bien un faux positif
+
+> **Six sur sept : l'incident est clos. La septième : il restait quelque chose
+> dessous.** Ma seconde hypothèse — une régression réelle — était donc juste
+> **pour une suite sur sept**, et je l'avais offerte pour les sept.
+
+*C'est la forme la moins confortable d'avoir raison : une hypothèse trop large
+n'est pas « à moitié vraie », elle est fausse comme explication et juste comme
+soupçon.* La leçon n'est pas que j'avais raison, c'est que **la question « et au
+repos ? » était la seule qui valait, et elle ne coûtait qu'un rejeu.**
+
+`config-ecriture` : les trois ancres `superv-config-*` existent dans la vue, le
+bouton est un `type="submit"` dans un `<form>` — donc `js=0` est normal. La cause
+première n'est **PAS établie** ; douze sous-lots ont touché `supervision.blade.php`
+cette nuit, ce qui est une piste et non une conclusion. **À ne pas refermer par
+une hypothèse.**
+
+### ⚠ Trois chiffres périmés circulaient sur ce seul LOT
+
+    « 172 »   annonce au lancement — extraction de jetons sur-comptant (89+83)
+    « 164 »   attendu, herite du 2026-09-02, jamais remesure -> le reel est 167
+    « 54 »    un motif AVEUGLE a 62 des 167 journaux (deux formats de synthese)
+              -> il rendait un nombre PLAUSIBLE, et un nombre plausible ferme la question
+
+**Le troisième est le plus instructif :** mon propre 54, sommé sur les lignes de
+verdict, est tombé sur la même valeur par une route indépendante — donc l'accord
+était réel (E-322 : *un accord ne vaut que si le confirmateur a mesuré
+autrement*). Mais **deux mesures peuvent s'accorder sur un nombre en désignant
+deux objets**, et c'est ce qui s'est passé : 54 = les FAIL des sept sur laravel,
+pas 54 = le coût de l'incident, qui est **50**.
