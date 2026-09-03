@@ -6265,3 +6265,63 @@ sans témoin, le jour où j'ai passé la matinée à l'exiger des autres.*
 **Je l'avais relayée sans la mesurer non plus.** *Nous l'avons donc commise à deux : elle en prescrivant,
 moi en transmettant.* **Et c'est la session 3, celle qui devait l'écrire, qui l'a arrêtée — le pair qui va
 AGIR dessus, pour la troisième fois aujourd'hui.**
+
+---
+
+## Tour de 13:35 — les trois déclarations restantes sont VRAIES, et mon compteur a raté du code
+
+### ⚠ D'abord une erreur à moi : il y avait du code, mon motif ne le voyait pas
+
+    mon compteur : `feat|fix` sur laravel|backend   ->  0
+    la realite   : a7b0885  refactor(mdp)  12:56    <- du CODE
+                   c61dea9  chore(scripts) 12:52    <- un OUTIL
+
+**Le motif exclut `refactor`, `chore` et `test`.** *Huitième compte de la journée qui ne porte pas son
+objet, et c'est encore un des miens.* **Le vrai rapport de l'heure est 2 d'ingénierie contre 6 de
+documentation, dont 4 doc sont des audits demandés par l'exploitant.**
+
+### ✅ VÉRIFICATION D'ÉTAT — les trois déclarations restantes tiennent
+
+**Quatre déclarations de ce chantier se sont révélées fausses. Ces trois-là sont vraies, mesurées avec
+témoins :**
+
+    bashrc:123      « les gestes de deploiement ne sont pas encore portes »
+                    /bashrc/deploy  -> AUCUN APPELANT
+                    /bashrc/restore -> AUCUN APPELANT
+                    TEMOIN /bashrc/ -> 5 fichiers   -> l'instrument VOIT le module
+
+    politiques:114  « l'annulation d'un deploiement n'est pas encore portee »
+    sftp:111        idem
+                    /policy/rollback -> RoutesBackend.php SEUL
+                    TEMOINS /policy/sudo/ -> 6 fichiers · /policy/sftp/ -> 2
+
+### ⚠ Et le piège que ce relevé a évité de justesse
+
+**`/policy/rollback` apparaît dans `RoutesBackend.php`.** *Un compte naïf y aurait lu un APPELANT et
+déclaré le libellé faux — cinquième occurrence apparente du défaut signature.*
+
+> **Or `RoutesBackend.php` est le fichier qui DÉCLARE le chemin dans les motifs step-up.** *Le fichier qui
+> LISTE un chemin n'est pas le fichier qui l'APPELLE.*
+
+**C'est la même classe que les huit autres de la journée** : *une propriété vraie d'un objet — « ce chemin
+est mentionné » — attribuée à un autre — « ce chemin est appelé ».* **Ici elle aurait produit une fausse
+alarme au lieu d'un dédouanement, ce qui est le sens le moins coûteux — mais elle aurait fait retirer
+trois libellés justes.**
+
+### Aucune session n'est à l'arrêt — et je ne leur invente pas de tâche
+
+    c1   porte le flux de reinitialisation (4a)  ·  a livre a7b0885, prerequis du portage
+    c6   a livre la spec + HIBP + un DETECTEUR des pages qu'aucune vue ne lie (c61dea9)
+    94   le pentest, angles 6 et 1 rendus
+    0b   l'inventaire d'archivage, bloc A actionnable
+    4f   parite et references du LOT, routage corrige
+    5f   la spec de qualification RGPD rendue
+    ec   la ligne de base publiee
+
+**Trois sessions sont sur la même capacité — c1 porte, c6 relit, et j'arbitre.** *C'est de la concentration,
+pas de la redondance : le partage auteur/relecteur a été demandé par la relectrice elle-même, pour ne pas
+être auditrice de son propre code sur un flux d'authentification.*
+
+**Et `c61dea9` mérite d'être noté** : *un détecteur des pages du portage qu'aucune vue ne lie.* **C'est
+l'outil qui aurait trouvé `notifications.reglages` sans qu'on la cherche — construit le jour où on l'a
+trouvée à la main.**
