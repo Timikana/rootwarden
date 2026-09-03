@@ -5086,7 +5086,7 @@ seul point de la liste dont l'attente coûte plus après qu'avant.*
 ## Incident du 2026-09-03 08:44 — une écriture dans le socle pendant le LOT, et le piège d'instrument qu'elle a révélé
 
 **Rapporté spontanément par la session 3, dix minutes après que je lui aie écrit « écris à la fin, pas
-avant ».** *Rétabli, rien compilé, aucun effet mesurable sauf une recompilation.* **Ce n'est PAS une
+avant ».** *Rétabli, rien compilé.* **⚠ « AUCUN EFFET MESURABLE » EST FAUX — voir la rectification en fin de section.** **Ce n'est PAS une
 cinquième réserve du `DOSSIER-00` : c'est un incident refermé. Mais il mérite sa ligne.**
 
     5 fichiers ecrits, dont layouts/portail.blade.php — le socle des 172 executions
@@ -5148,3 +5148,54 @@ sa boucle puis relisait le disque pour asserter.* **Une assertion qui échouait 
 
 *C'est le constat que j'ai écrit cette nuit sous une autre forme — la charge se voit dans `ps`,
 l'écriture ne se voit nulle part.* **Ici il est rendu par la personne qui aurait pu se taire.**
+
+### ⚠ RECTIFICATION 08:56 — « sans effet mesurable » était faux : le rétablissement a servi des 500
+
+**Demandée par la session 3, qui a continué à mesurer APRÈS avoir été félicitée pour son rapport.**
+*C'est exactement le moment où on arrête d'habitude.*
+
+**Le fait exact : l'écriture n'a rien cassé. Le RÉTABLISSEMENT a servi des exceptions pendant sept
+minutes, de 08:44:38 à 08:51:43 CEST, en plein LOT.**
+
+    ce que J'AI mesure :
+      0 exception depuis 06:52 UTC   -> repare, confirme
+      la fenetre 06:44-06:52 UTC n'est PAS vide
+      hote 08:56:03 CEST  ·  UTC 06:56:03   (les deux, MEME commande)
+
+**Je ne reprends pas son « 28 exceptions » comme vérifié** : *mon propre relevé rend 84 occurrences
+d'horodatage dans la fenêtre, ce qui compte un autre objet — des lignes, pas des exceptions.* **Son
+chiffre est probablement juste ; le mien ne le confirme pas, et le dire coûte une phrase.**
+
+### Le mécanisme, vérifié sur mon shell — et il vaut pour TOUTE session qui édite une vue
+
+    sources des vues     utilisateur:utilisateur  664
+    fichiers compiles    root:root                755   <- ecrits par `view:cache` (root)
+    151 compiles, dont 111 appartenant a ROOT
+
+**Source plus récente que son compilé → PHP (`www-data`) recompile → `touch()` sur un fichier root →
+`Utime failed: Operation not permitted` → 500.** *Le socle étant inclus partout, c'est tout le portage.*
+
+> **`git checkout` n'est PAS un défaire neutre sur une vue Blade : il restitue le CONTENU et arme une
+> panne par la DATE.** *La parade est `git checkout -- <vue>` **puis** `touch -d '<date d'origine>'` — et
+> sans un relevé des dates fait AVANT d'écrire, il n'y a aucune date à restituer.*
+
+**Et ce n'est pas son incident** : *deux exceptions de la même classe existent le 2026-09-01 à 15:30,
+trente et une minutes après `9422ab5`.* **C'est un piège structurel du dépôt que son incident a rendu
+visible.**
+
+### La seconde classe qu'elle nomme, et elle est pire que la première
+
+**Sa première cause était « un compte d'ancres et un script exécuté portaient le même nom ».** *La
+seconde : le journal Laravel est en **UTC**, l'hôte en **CEST**.* **Elle a lu « 06:44 » comme antérieur à
+son écriture de 08:44, donc comme l'incident de quelqu'un d'autre — et produit un rapport rassurant et
+faux.**
+
+> **`06:44:38 UTC = 08:44:38 CEST` : neuf secondes après son `git checkout`.**
+
+**C'est le troisième piège d'horloge de ce chantier en douze heures** — *le décalage UTC/CEST, le format
+`MM:SS` d'`etime` que j'ai lu comme des heures, et maintenant un journal dont le fuseau diffère de
+l'hôte.* **Les trois ont produit une valeur plausible, et aucune ne s'est signalée d'elle-même.**
+
+**Ce qui tient de son premier rapport** : *`porteDuLegacy` absent des 151 compilés — aucune requête n'a
+rendu sa version* · *contenu des 5 cibles identique à `HEAD`* · *le refus de `view:clear`, qui
+**s'améliore** : une reconstruction par root aurait réparé aussi, en polluant tout le LOT restant.*
