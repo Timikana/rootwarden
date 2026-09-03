@@ -48,7 +48,10 @@
             <button type="button" class="rw-bouton rw-bouton--discret"
                     data-rw="audit-ssh-relever">{{ __('ssh_audit.btn_relever') }} ↗</button>
             <button type="button" class="rw-bouton rw-bouton--discret"
-                    data-rw="audit-ssh-config">{{ __('ssh_audit.btn_config') }} ↗</button>
+                    {{-- A3 : le marqueur `↗` est retire avec la raison de
+                         l'afficher. Il annoncait un depart vers l'ancien
+                         portail ; la lecture est portee. --}}
+                    data-rw="audit-ssh-config">{{ __('ssh_audit.btn_config') }}</button>
             <button type="button" class="rw-bouton rw-bouton--avertissement"
                     data-rw="audit-ssh-parc">{{ __('ssh_audit.btn_parc') }} ↗</button>
         </div>
@@ -76,6 +79,22 @@
                href="{{ $lienLegacy }}" target="_blank" rel="noopener">{{ __('ssh_audit.np_ouvrir') }} ↗</a>
         </div>
     </div>
+
+    {{-- ═══ A3 — LE CONTENU DE `sshd_config`, EN LECTURE SEULE ════════════
+
+         Masque tant qu'aucune lecture n'a abouti. Un cadre vide affiche en
+         permanence se lit comme « le fichier est vide » alors qu'il veut dire
+         « personne n'a encore demande ».
+
+         La LECTURE SEULE est DITE : l'absence d'un bouton « enregistrer » ne
+         se lit pas comme une interdiction, elle se lit comme un oubli. --}}
+    <section class="rw-carte rw-carte--pleine" data-rw="audit-ssh-config-bloc" hidden>
+        <h3 class="rw-section__entete" data-rw="audit-ssh-config-titre"></h3>
+        <p class="rw-aide rw-prose" data-rw="audit-ssh-config-reserve">{{ __('ssh_audit.cfg_lecture_seule') }}</p>
+        <div class="rw-tableau-cadre">
+            <pre class="rw-journal" data-rw="audit-ssh-config-contenu"></pre>
+        </div>
+    </section>
 
     <h2 class="rw-section__entete rw-titre--espace">{{ __('ssh_audit.historique_titre') }}</h2>
     <div data-rw="audit-ssh-historique">

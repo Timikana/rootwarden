@@ -146,7 +146,13 @@
         pEffets.hidden = true;
         pEffets.textContent = '';
         var c = document.querySelector('[data-rw="audit-ssh-panneau-confirmer"]');
-        if (c) { c.hidden = true; c.disabled = false; }
+        if (c) {
+            c.hidden = true;
+            c.disabled = false;
+            // Le libelle revient a celui d'A2 : deux gestes se partagent ce
+            // bouton, et un libelle qui survit a son panneau ment.
+            c.textContent = t('planif_valider');
+        }
         // ...et le lien legacy REVIENT : les quatre gestes non portes en ont
         // besoin, et c'est leur action principale.
         if (pLegacy) { pLegacy.hidden = false; }
@@ -175,7 +181,6 @@
     }
 
     brancher('audit-ssh-relever', t('np_relever'), t('np_relever_detail'), true);
-    brancher('audit-ssh-config', t('np_config'), t('np_config_detail'), true);
     // Celui-la ne nomme AUCUNE cible, et c'est le fait a dire : la route ne
     // prend aucun parametre. Il n'y a rien a viser, donc rien a restreindre.
     brancher('audit-ssh-parc', t('np_parc'), t('np_parc_detail'), false);
@@ -203,6 +208,90 @@
      * Ce n'est pas au correctif backend de le dire : un refus qui n'a pas
      * d'ecran se lit comme une panne.
      */
+    /*
+     * ══ A3 — LIRE `sshd_config` SUR UN SERVEUR ═══════════════════════════
+     *
+     * ⚠ CE GESTE JOINT LA MACHINE. `POST /ssh-audit/config` ouvre une session
+     * SSH REELLE (`ssh_audit.py:372`) pour lire le fichier. C'est une LECTURE
+     * — rien n'est ecrit, ni sur la machine ni en base — mais ce n'est pas une
+     * lecture locale, et le panneau le dit AVANT le clic.
+     *
+     * L'ECRITURE, elle, reste NON PORTEE : `np_config` le declare toujours, et
+     * `np_config_detail` garde sa reserve, qui porte precisement sur elle —
+     * ecrire dans `sshd_config` et recharger le service peut couper le seul
+     * canal dont RootWarden dispose pour y revenir.
+     *
+     * LA LECTURE SEULE EST DITE A L'ECRAN, pas deduite de l'absence d'un
+     * bouton : une absence se lit comme un oubli.
+     */
+    var cfgBloc = document.querySelector('[data-rw="audit-ssh-config-bloc"]');
+    var cfgTitre = document.querySelector('[data-rw="audit-ssh-config-titre"]');
+    var cfgContenu = document.querySelector('[data-rw="audit-ssh-config-contenu"]');
+
+    function litConfig() {
+        if (! selecteur || ! selecteur.value) { return; }
+        var mid = selecteur.value;
+        var opt = selecteur.options[selecteur.selectedIndex];
+        var nom = opt ? opt.textContent : String(mid);
+
+        if (pConfirmer) { pConfirmer.disabled = true; }
+        if (cfgBloc && cfgTitre && cfgContenu) {
+            cfgBloc.hidden = false;
+            cfgTitre.textContent = t('cfg_titre_resultat', { nom: nom });
+            cfgContenu.textContent = t('cfg_en_cours');
+        }
+
+        ecris('/ssh-audit/config', { machine_id: Number(mid) }).then(function (r) {
+            fermePanneau();
+            if (! cfgContenu) { return; }
+            /*
+             * LES TROIS ISSUES SONT SEPAREES. Un refus (« on ne vous a pas
+             * laisse regarder ») n'est pas un echec de lecture (« le fichier
+             * n'a pas pu etre lu »), et aucun des deux n'est un fichier vide.
+             * Les confondre fait chercher au mauvais endroit — la lecon des
+             * trois issues exclusives que cette page applique deja ailleurs.
+             */
+            if (! r.ok) {
+                cfgContenu.textContent = t('cfg_refus', {
+                    message: (r.corps && r.corps.message) || '',
+                });
+                return;
+            }
+            if (! r.corps || r.corps.success !== true) {
+                cfgContenu.textContent = t('cfg_echec', {
+                    message: (r.corps && r.corps.message) || '',
+                });
+                return;
+            }
+            var contenu = String(r.corps.config || '');
+            cfgContenu.textContent = contenu === '' ? t('cfg_vide') : contenu;
+        });
+    }
+
+    var bConfig = document.querySelector('[data-rw="audit-ssh-config"]');
+    if (bConfig) {
+        bConfig.addEventListener('click', function () {
+            if (! selecteur || ! selecteur.value) {
+                // SANS CIBLE, PAS DE PANNEAU. Un panneau qui demande de
+                // confirmer une lecture « sur le serveur choisi » alors
+                // qu'aucun ne l'est ferait consentir a rien de nommable.
+                ouvrePanneau(t('cfg_sans_serveur'), [], t('cfg_titre'));
+                if (pLegacy) { pLegacy.hidden = true; }
+                if (pConfirmer) { pConfirmer.hidden = true; }
+                gesteConfirme = null;
+                return;
+            }
+            ouvrePanneau(t('cfg_texte'), [surServeur()], t('cfg_titre'));
+            if (pLegacy) { pLegacy.hidden = true; }
+            if (pConfirmer) {
+                pConfirmer.hidden = false;
+                pConfirmer.disabled = false;
+                pConfirmer.textContent = t('cfg_lire');
+            }
+            gesteConfirme = litConfig;
+        });
+    }
+
     /*
      * ══ A2 — LA CREATION D'UN RELEVE PLANIFIE ════════════════════════════
      *

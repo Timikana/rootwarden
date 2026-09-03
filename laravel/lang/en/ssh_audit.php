@@ -88,8 +88,24 @@ return [
 
     'np_parc' => 'Reading the whole fleet is not ported to this interface yet.',
     'np_parc_detail' => 'This action opens an SSH session on EVERY non-archived machine in the fleet, production included. It takes no parameter: there is nothing to restrict, and no way to aim it elsewhere.',
+    // A3: the conjunction is SPLIT, not removed — see the note in
+    // `lang/fr/ssh_audit.php`. `np_config_detail` does NOT move: its reserve
+    // is about WRITING, which stays absent.
+    'np_config' => 'Changing `sshd_config` is not ported to this interface yet.',
 
-    'np_config' => 'Viewing and editing `sshd_config` are not ported to this interface yet.',
+    // A3 — reading it IS ported. This action JOINS the machine: the backend
+    // opens a real SSH session to read the file. Nothing is written.
+    'cfg_titre'    => 'Read `sshd_config` on this server?',
+    'cfg_texte'    => 'This read opens a real SSH session on the chosen server. It writes nothing, neither on the machine nor in the database, and the file is shown here read-only.',
+    'cfg_lire'     => 'Read the file',
+    'cfg_en_cours' => 'Reading…',
+    'cfg_titre_resultat' => '`sshd_config` of :nom',
+    'cfg_vide'     => 'The server answered, but the file is empty.',
+    'cfg_echec'    => 'The file could not be read. :message',
+    'cfg_refus'    => 'The read was refused. :message',
+    'cfg_sans_serveur' => 'Choose a server before reading its configuration.',
+    'cfg_lecture_seule' => 'This content is shown read-only: changing `sshd_config` is not ported here.',
+
     'np_config_detail' => 'Writing to `sshd_config` and reloading the service can cut SSH access to the server — and SSH is the only channel RootWarden has to get back in. A backup exists and restoring is possible.',
     // A2: creating a scheduled reading is PORTED — see the note in
     // `lang/fr/ssh_audit.php`. `np_planif_detail` does NOT move: it describes

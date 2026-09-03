@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.188** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.189** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,94 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.189 — E-359 : `ssh_audit` A3, lire `sshd_config` — et la CONJONCTION scindee
+
+**Le geste est PORTE et CABLE. Il n'est pas EXERCE** : `POST /ssh-audit/config` ouvre une session SSH
+**reelle** sur la machine choisie (`ssh_audit.py:372`). C'est une lecture — rien n'est ecrit, ni sur
+la machine ni en base — mais ce n'est pas une lecture locale, et le panneau le dit AVANT le clic.
+
+    requetes vers /ssh-audit/config pendant la mesure : []
+
+La sonde ne se contente pas de compter : elle **avorte** ces requetes. *Un filet, pas un vœu.*
+
+#### LA CONJONCTION EST SCINDEE, PAS RETIREE
+
+    avant  « L'affichage ET la modification de `sshd_config` ne sont pas encore portes »
+    apres  « La modification de `sshd_config` n'est pas encore portee sur cette interface. »
+
+Porter l'affichage rendait cette phrase **a moitie fausse — et une moitie fausse se lit comme
+entierement vraie.** Septieme forme du motif de la semaine, apres `serveurs` (trois capacites, une
+portee) et `bashrc` (deux portees declarees absentes) : la conjonction est la plus discrete des
+trois, parce que rien n'y sonne faux.
+
+**`np_config_detail` NE BOUGE PAS**, et c'est deliberé : sa reserve porte sur l'ECRITURE — *ecrire
+dans `sshd_config` et recharger le service peut couper l'acces SSH, et SSH est le seul canal dont
+RootWarden dispose pour y revenir.* Elle reste vraie mot pour mot.
+
+#### Les trois issues sont SEPAREES
+
+    ! r.ok                      -> « la lecture a ete refusee »       on ne vous a pas laisse regarder
+    success !== true            -> « le fichier n'a pas pu etre lu »  on a regarde, sans resultat
+    config === ''               -> « le serveur a repondu, mais le fichier est vide »
+
+Les confondre fait chercher au mauvais endroit. *C'est la regle des trois issues exclusives que cette
+page applique deja a son perimetre ; elle vaut aussi pour une lecture distante.*
+
+#### SANS CIBLE, PAS DE CONFIRMATION
+
+Un panneau qui demande de confirmer une lecture « sur le serveur choisi » alors qu'aucun ne l'est
+ferait consentir a rien de nommable. Le panneau s'ouvre, dit qu'il faut choisir, et **n'offre aucun
+bouton**.
+
+#### La LECTURE SEULE est DITE, pas deduite
+
+`cfg_lecture_seule` l'annonce dans le bloc de rendu. *L'absence d'un bouton « enregistrer » ne se lit
+pas comme une interdiction : elle se lit comme un oubli.*
+
+#### Deux assertions d'une autre session ont ete MENAGEES, et verifiees
+
+Une session tierce m'a signale trois assertions de `go-page-audit-ssh.mjs` sensibles a ce sous-lot.
+Deux etaient reelles, et elles sont mesurees APRES le changement :
+
+    :348  « exactement UNE issue de perimetre est rendue »   -> ["audit-ssh-parc"], une seule
+    :374  « la page annonce que les politiques sont en
+           lecture seule »                                   -> l'enonce est intact
+
+*Le `:374` demandait une lecture avant d'ecrire, pas seulement apres* : si l'ecran de `sshd_config`
+etait devenu l'exception a cette annonce, elle serait devenue un mensonge partiel — et c'est l'ecran
+qui aurait du le dire, pas la suite qui aurait du s'assouplir. Il est en lecture seule lui aussi,
+donc l'annonce reste vraie.
+
+Les six ancres que cette suite pilote sont verifiees INTACTES, une occurrence chacune.
+
+#### Mesures
+
+    GET /audit-ssh                    200   (rw-test-super)
+    libelle du bouton                 « Voir sshd_config » — marqueur ↗ RETIRE
+    bloc de rendu                     masque tant qu'aucune lecture n'a abouti
+    A. aucun serveur choisi           le panneau le dit, AUCUNE confirmation offerte
+    B. un serveur choisi              « Serveur vise : OpenCVE-Test-OnPrem — 192.168.0.2 »
+                                      « Cette lecture ouvre une session SSH reelle… »
+                                      confirmation offerte, libellee « Lire le fichier »
+                                      lien vers l'ancien portail MASQUE
+    identifiants a l'ecran            []
+    erreurs JavaScript                []
+    parite i18n                       FR=101 EN=101, JEUX DE CLES compares
+
+**`srv-zabbix` n'a pas ete choisie**, meme pour un panneau qui ne part pas : la sonde selectionne le
+premier serveur dont le nom ne contient pas « zabbix ».
+
+#### ⛔ CE QUI N'A PAS ETE MESURE, ET C'EST LA MOITIE DU SOUS-LOT
+
+**La lecture elle-meme.** Le bouton de confirmation est mesure visible, actif et correctement
+libelle ; il n'a pas ete clique. Le rendu du fichier, la separation des trois issues et le cas du
+fichier vide sont donc **ecrits et non eprouves**.
+
+**Et la capture ne montre rien de ce sous-lot** : le panneau est ferme et le bloc masque au moment de
+la prise. *Une capture qui ne montre pas ce qu'elle est censee montrer est pire qu'une absence de
+capture — elle donne la forme d'une verification.* Le panneau a ete mesure champ par champ au DOM,
+ce qui est la vraie preuve ici.
 
 ### v1.38.188 — E-358 : `supervision` V13, rattacher un serveur a un profil — le debouche qui manquait
 
