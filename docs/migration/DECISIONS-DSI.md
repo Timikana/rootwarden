@@ -6132,3 +6132,61 @@ le compilé du socle est resté `root:root` daté de 07:48:46 pendant toute la f
 
 **La fusion vit dans un arbre de travail séparé et sur la branche locale `main`. Elle n'est pas publiée.**
 *Rien n'a été déployé, aucun conteneur redémarré, aucune migration appliquée.*
+
+---
+
+## Tour de 12:35 — la fusion est faite, et le dernier bloquant vient d'être assigné
+
+**Banc libre, arbre propre, `main` local à 892 commits d'avance.**
+
+### Production de l'heure
+
+    3 code / 20 doc      = 6,7 pour 1   -> sixieme franchissement
+
+    3055dec  fix(socle)   le cache Blade naissait root dans un repertoire www-data
+    69f8f58  fix(bashrc)  un message d'apercu qui prescrivait le mauvais remede
+    f759662  fix(ssh)     une conjonction dont un membre etait devenu faux
+
+**Je ne l'attaque pas une sixième fois.** *L'heure a produit la fusion (892 commits), la ligne de base
+(`167 · 2613 PASS · 55 FAIL`, zéro imputable au portage), et le constat de durcissement. **Un seuil
+franchi six fois pour six causes différentes, toutes dans sa définition, mesure sa définition.***
+
+### ✅ ASSIGNÉ — la réinitialisation de mot de passe, à `gestion-ssh-key-c6`
+
+**C'était le seul bloquant du « full Laravel » que personne ne portait.** *Elle avait rendu ses deux
+relectures de sécurité ; elle était la bonne.*
+
+**Quatre contraintes arbitrées, dont une que la plupart des portages ratent :**
+
+    la reponse ne doit PAS reveler si l'adresse existe
+      -> meme message dans les deux cas, sinon le formulaire public devient
+         un ORACLE D'ENUMERATION DE COMPTES
+
+*Plus : lire les deux fichiers legacy en entier avant d'écrire · jeton à durée bornée et usage unique ·
+et **ne pas exercer l'envoi de courriel** — un envoi sortant publie quelque chose.*
+
+### ⚠ Et une contrainte de banc qui n'est PAS le banc
+
+**Je l'ai prévenue de ce que j'avais moi-même mal compris ce matin** :
+
+    111 des 151 compiles appartiennent a `root` dans un repertoire `www-data`
+    -> toucher une vue dont le compile est `root` rend 500 sur toute page qui l'inclut
+    la ligne d'entrypoint qui ferme la cause est COMMITEE (3055dec)
+       mais elle ne prend effet qu'au REDEMARRAGE, qui appartient a l'exploitant
+
+**Consigne** : *créer des vues NEUVES (pas de compilé `root`), ne pas toucher `layouts/portail.blade.php`,
+et me prévenir AVANT d'écrire si le portage exige de modifier une vue existante.* **La session 3 est
+bloquée sur exactement ça depuis 08:44, et j'avais mis son blocage sur le compte du banc.**
+
+### L'état des sept sessions
+
+    c1   l'octroi des politiques sudo (sudo_preset)     en cours
+    c6   la REINITIALISATION DE MOT DE PASSE            assignee a l'instant
+    94   le pentest — angles 6 et 1 rendus              angle suivant a choisir
+    0b   l'inventaire d'archivage — bloc A actionable   16 fichiers non apparies
+    4f   parite, references du LOT, defauts de suite    routage corrige
+    5f   la spec de qualification RGPD                  le PORT reste a faire
+    ec   la ligne de base publiee                       libre
+
+**Ce qui n'est assigné à personne, et c'est volontaire** : *le durcissement de `laravel` dans `prod.yml`
+attend le mot de l'exploitant, et la légende du menu attend son `docker compose up -d`.*
