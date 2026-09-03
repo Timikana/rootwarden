@@ -133,18 +133,39 @@ class InventaireDesGardesTest extends TestCase
     }
 
     #[Test]
-    public function la_passerelle_est_la_seule_route_authentifiee_sans_role(): void
+    public function les_routes_authentifiees_sans_role_sont_CELLES_QUI_SONT_GELEES(): void
     {
         /*
-         * Cette route relaie 200 routes du backend derriere UNE seule
-         * declaration. Elle ne peut donc pas porter de `role:` : ses gardes
-         * vivent DANS le controleur, par liste blanche, reserve
-         * administrateur et re-authentification. C'est une exception, et une
-         * exception qui n'est pas nommee finit par etre imitee.
+         * ── LE NOM DE CE TEST ETAIT FAUX, ET C'EST MOI QUI L'AVAIS ECRIT ────
          *
-         * PasserelleTest mesure ces gardes-la. Ici on mesure seulement que
-         * l'exception reste unique dans sa famille : une AUTRE route de relais
-         * sans role apparaitrait ici.
+         * Il s'appelait « la passerelle est la SEULE route authentifiee sans
+         * role ». L'assertion, elle, gelait DEJA huit noms : le titre promettait
+         * une unicite que le code ne verifiait pas, et il l'a promise jusqu'a ce
+         * qu'une route legitime le contredise. C'est exactement le defaut que ce
+         * chantier poursuit ailleurs — un texte qui affirme plus que son code —
+         * trouve ici dans MON PROPRE test, par un rouge que je ne pouvais pas
+         * voir tant que `php artisan test` mourait avant de lancer.
+         *
+         * Ce que ce test fait reellement : il GELE la famille des routes
+         * ouvertes a tout compte connecte. Chaque entree doit avoir une raison
+         * ecrite, et une entree NEUVE fait rougir — ce qui oblige a la motiver
+         * plutot qu'a la glisser.
+         *
+         * La passerelle reste le cas particulier de la famille : elle relaie 200
+         * routes du backend derriere UNE declaration, donc ses gardes vivent dans
+         * le controleur (liste blanche, reserve administrateur,
+         * re-authentification) et `PasserelleTest` les mesure.
+         *
+         * Les autres n'ont pas d'objet a proteger au-dela de l'authentification :
+         *   accueil, cgu (GET+POST), profil        l'ecran de tout compte
+         *   profil/mot-de-passe, profil/step-up*   ses propres identifiants
+         *   profil/sessions/fermer                 ses propres sessions
+         *   documentation                          FIDELE au legacy, qui pose
+         *       `checkAuth([1,2,3])` sans aucun `checkPermission` : son seul
+         *       cloisonnement est un SEUIL DANS LA PAGE (`role >= 2` sur cinq
+         *       sections). Poser `role:2` sur la route fermerait a un role 1 les
+         *       43 sections que le legacy lui ouvre. La console d'API, elle,
+         *       n'est PAS reprise — decision rendue, verifiee dans la vue.
          */
         $sansRole = [];
 
@@ -160,13 +181,19 @@ class InventaireDesGardesTest extends TestCase
             'GET accueil',
             'GET api/gateway/{chemin?}',
             'GET cgu',
+            'GET documentation',
             'GET profil',
             'POST cgu',
             'POST profil/mot-de-passe',
+            'POST profil/sessions/fermer',
             'POST profil/step-up',
             'POST profil/step-up/revoquer',
-        ], $sansRole, 'Les routes authentifiees sans garde de role doivent rester ces huit — '
-            . 'les sept pages du compte lui-meme, et la passerelle qui garde ailleurs.');
+        ], $sansRole, "Une route est ouverte a TOUT COMPTE CONNECTE sans qu'elle "
+            . "figure dans ce gel, ou l'une a disparu.\n"
+            . "CE ROUGE N'ACCUSE PERSONNE : il demande une RAISON ECRITE. Une "
+            . "route du compte lui-meme (ses identifiants, ses sessions, son "
+            . "ecran) en a une ; une route qui touche le PARC n'en a pas, et "
+            . 'doit porter un `role:`.');
     }
 
     /** @return array<string,list<string>> "METHODE uri" => gardes du portage */
