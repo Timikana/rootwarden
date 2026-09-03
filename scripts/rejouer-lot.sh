@@ -97,6 +97,15 @@ BASE_LARAVEL="${E2E_LARAVEL_BASE:-http://localhost:8444}"
 #
 # Mis a jour a chaque sous-lot qui ajoute ou retire une assertion. Un ecart n'est
 # pas forcement une regression — mais il doit toujours etre EXPLIQUE.
+# ── 75 depuis le 2026-09-03 (etait 74, posee le 2026-09-02 a 07:58 dans 5f8dd17).
+# Le +1 est l'entree `wazuh`, ajoutee a `Navigation.php` par `b6c7280` le
+# 2026-09-02 a 15:38 -- donc SEPT HEURES APRES que j'aie pose 74. Ma reference
+# avait un tour de retard, pas la suite.
+#   LOT3 (depart 08:16:26) : go-socle-navigation laravel  PASS=75  FAIL=0  ECART attendu=74
+# ⚠ ZERO FAIL ET LE COMPTE BOUGE : c'est le cas E-321 / invariant-vs-compte.
+# Les proprietes asserties tiennent toutes ; seul le NOMBRE d'assertions generees
+# a change, parce qu'un compte de plus voit une entree de plus. Ne pas lire un
+# ECART sur cette suite comme une regression avant d'avoir separe les deux.
 # `go-socle-navigation` grandit a CHAQUE entree portee : la suite asserte
 # DYNAMIQUEMENT que chaque entree portee du menu resout, donc basculer une entree
 # de `legacy` a `route` ajoute une assertion PAR ROLE QUI VOIT L'ENTREE.
@@ -310,7 +319,7 @@ declare -A REF_LARAVEL=(
   # entrees ont bascule dans la nuit : groups, ssh_audit, documentation,
   # remote_users, iptables. *Une suite peut etre INDIFFERENTE dans ses assertions
   # et SENSIBLE dans son compte* (E-321).
-  [go-socle-navigation]=74 [go-socle-i18n]=23 [go-socle-passerelle]=10 [go-socle-auth]=14
+  [go-socle-navigation]=75 [go-socle-i18n]=23 [go-socle-passerelle]=10 [go-socle-auth]=14
   [go-page-commandlog]=14 [go-page-approvals]=12 [go-page-drift]=19 [go-page-backups]=16
   # `go-page-search` 12 -> 13 le 2026-08-27 : +1 pour la propriete `LiensLegacy`.
   # Elle DERIVE la liste attendue de `legacy/_deprecated/*` et la compare a la table
