@@ -13,6 +13,9 @@ return [
     'chemin_invalide'         => 'Invalid path.',
     'route_non_autorisee'     => 'Route not allowed.',
     'privileges_insuffisants' => 'Insufficient privileges.',
-    'step_up_requis'          => 'This action requires re-authentication, which is not available on this interface yet. Perform it from the previous portal.',
+    // This sentence pointed at a portal that is going away — see the note in
+    // `lang/fr/passerelle.php`. The challenge is now ported on the two screens
+    // that call these routes.
+    'step_up_requis'          => 'This action requires re-authentication. Confirm it with your second factor.',
     'backend_injoignable'     => 'The service is temporarily unreachable. Try again in a moment.',
 ];

@@ -232,6 +232,41 @@
 </details>
 @endif
 
+
+    {{-- ═══ LE DEFI DE RE-AUTHENTIFICATION — A5, SON DEUXIEME CONSOMMATEUR ══
+
+         Les gestes de cette page (`deploy`, `remove`) figurent dans
+         `RoutesBackend::MOTIFS_STEP_UP` : la passerelle les refuse par un
+         `403` qui porte `step_up_required` ET `action`. Sans ce panneau,
+         l'utilisateur recevait le refus et n'avait AUCUN moyen de le lever —
+         le message lui disait d'aller sur l'ancien portail, qui n'existera
+         plus apres la bascule.
+
+         Le panneau vit EN PAGE et ne recouvre pas ce sur quoi on decide : le
+         legacy pose un modal par une surcouche de `window.fetch`, et on
+         confirme alors sans voir la regle qu'on ecrit. --}}
+    <div class="rw-panneau-decision" data-rw="sftp-panneau-stepup" hidden>
+        <p class="rw-panneau-decision__texte">{{ __('step_up.panneau_titre') }}</p>
+        <p class="rw-aide rw-prose">{{ __('step_up.panneau_aide') }}</p>
+        <label class="rw-champ">
+            <span class="rw-champ__etiquette">{{ __('step_up.panneau_code') }}</span>
+            <input type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code"
+                   class="rw-saisie rw-saisie--code" data-rw="sftp-stepup-code">
+        </label>
+        <div class="rw-panneau-decision__actions">
+            <button type="button" class="rw-bouton rw-bouton--discret"
+                    data-rw="sftp-stepup-annuler">{{ __('step_up.panneau_annuler') }}</button>
+            <button type="button" class="rw-bouton"
+                    data-rw="sftp-stepup-valider">{{ __('step_up.panneau_valider') }}</button>
+        </div>
+    </div>
+
+    {{-- Les libelles du defi, depuis le catalogue PARTAGE : `step-up.js` sert
+         deux pages, et un libelle recopie par page divergerait. --}}
+    <script id="sftp-stepup-libelles" type="application/json">@json(__('step_up'))</script>
     <script id="sftp-libelles" type="application/json">@json($libelles)</script>
+    {{-- LE MODULE PARTAGE D'ABORD : le script de page l'INSTALLE, donc il doit
+         etre defini quand celui-la s'execute. --}}
+    <script src="/js/step-up.js?v={{ @filemtime(public_path('js/step-up.js')) ?: '0' }}"></script>
     <script src="/js/acces-sftp.js?v={{ @filemtime(public_path('js/acces-sftp.js')) ?: '0' }}"></script>
 @endsection

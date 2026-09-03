@@ -13,4 +13,14 @@ return [
     'sans_second_facteur'  => 'No second factor is configured on this account.',
     'revoque'              => 'Privileges released.',
     'session_absente'      => 'Session expired. Please sign in again.',
+
+    // Panel labels live HERE and not in each module: `comptes` and
+    // `permissions` carry their own; the two new consumers read these. Four
+    // copies of one label diverge, and this one describes a guard.
+    'panneau_titre'   => 'Confirm with your second factor',
+    'panneau_aide'    => 'This action writes a rule on a real machine. Enter the six-digit code from your authenticator: the re-authentication lasts fifteen minutes, and for THIS action only.',
+    'panneau_code'    => 'Six-digit code',
+    'panneau_valider' => 'Confirm',
+    'panneau_annuler' => 'Cancel',
+    'panneau_echec'   => 'The re-authentication did not succeed.',
 ];
