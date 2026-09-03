@@ -23,10 +23,16 @@ INTERCEPTEE. La propriete assertee est « la base n'a pas ete ecrite ». Sur ces
 routes elle ne se lit pas sur l'etat final — la detection qui suit corrige la
 ligne et efface le mensonge avant qu'on puisse le mesurer.
 
-┌─ CE QUE CE FICHIER NE DIT PAS — AVERTISSEMENT E-238 ────────────────────────┐
-│ Ces tests s'executent contre l'ARBRE. Le process backend en service date du  │
-│ 2026-08-27 14:28 et ne porte pas ces correctifs. **Un verrou pose sur du     │
-│ code non charge verrouille l'intention, pas le comportement.**               │
+┌─ E-238 : L'ECART ARBRE / SERVICE EST REFERME ───────────────────────────────┐
+│ Ce tampon disait que le process en service datait du 2026-08-27 14:28 et ne  │
+│ portait pas ce code — donc qu'un vert ici verrouillait l'INTENTION et pas le │
+│ COMPORTEMENT. **Le backend a redemarre le 2026-09-03 a 18:48** : arbre et    │
+│ service concordent, et la reserve n'a plus d'objet.                          │
+│                                                                              │
+│ Elle est retiree plutot que laissee : *une reserve perimee devient une fausse │
+│ alarme, et une fausse alarme use le credit du fichier qui la porte.* Elle     │
+│ redeviendra vraie au prochain ecart — et c'est alors la DATE du process qui   │
+│ le dira, pas ce texte.                                                       │
 └─────────────────────────────────────────────────────────────────────────────┘
 """
 import contextlib

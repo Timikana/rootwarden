@@ -84,6 +84,16 @@ class TableDesGardes
             // lecture : l'identifiant voyage dans le CORPS, pas dans l'URL ni dans
             // les journaux d'acces. Le controle porte sur l'objet RESOLU.
             ['POST', 'pare-feu/historique', ['role:1', 'perm:can_manage_iptables']],
+            // Fermer une session ACTIVE : l'objet est une session de l'utilisateur
+            // lui-meme, resolue depuis la sienne. Aucun role ni permission a
+            // exiger — un compte quelconque doit pouvoir fermer les siennes.
+            ['POST', 'profil/sessions/fermer', []],
+            ['GET', 'groupes', ['role:2', 'perm:can_admin_portal']],
+            ['GET', 'audit-ssh', ['role:1', 'perm:can_audit_ssh']],
+            // La documentation ne porte aucun secret : elle decrit le produit.
+            ['GET', 'documentation', []],
+            ['GET', 'wazuh', ['role:2', 'perm:can_manage_wazuh']],
+            ['POST', 'serveurs/importer', ['role:2', 'perm:can_admin_portal']],
             ['GET', 'notifications/preferences', ['role:3', 'perm:can_admin_portal']],
             ['POST', 'notifications/preferences', ['role:3', 'perm:can_admin_portal']],
             ['POST', 'notifications/tout-lire', ['role:1']],
@@ -163,6 +173,9 @@ class TableDesGardes
             'GET auth/verify_2fa.php' => 'redirection depuis le legacy',
             'GET index.php'           => 'redirection depuis le legacy',
             'GET profile.php'         => 'redirection depuis le legacy',
+            'GET groups'              => 'redirection depuis le legacy',
+            'GET ssh-audit'           => 'redirection depuis le legacy',
+            'GET documentation.php'   => 'redirection depuis le legacy',
             'GET terms.php'           => 'redirection depuis le legacy',
             'GET adm/admin_page.php'  => 'redirection depuis le legacy',
             'GET commandlog'          => 'redirection d\'une partie archivee',
