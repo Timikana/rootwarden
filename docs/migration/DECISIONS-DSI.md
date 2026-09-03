@@ -6488,3 +6488,55 @@ et les trois décisions de portage.**
 **Le geste le moins coûteux de la liste est `php -l` sur un fichier.** *Le plus conséquent est
 `docker compose up -d` : il désarme les 111 mines du cache, débloque trois livrables gelés, et met en
 service le seul contrôle qui lie un rôle 3.*
+
+---
+
+## Tour de 17:35 — trois heures de silence, et le document de mission a pourri une seconde fois
+
+    depuis 16:35 : 1 commit, le mien (16:37)
+    non commites : 0
+    -> 2 h 52 sans qu'un fichier bouge, de personne
+
+**J'ai relancé deux fois en deux tours, avec des briefs précis et une question nommée. Rien.** *Je ne
+relance pas une troisième fois : trois relances identiques qui ne produisent rien mesurent la relance, pas
+la flotte.*
+
+### ⚠ Le document que la boucle me cite chaque heure est périmé sur 7 de ses 10 entrées
+
+    docs/migration/PROMPT-FINIR-LES-CAPACITES.md   dernier commit 02/09 19:45
+
+    closes depuis :  creer un releve planifie · creer un groupe · desactiver une jail
+                     geolocaliser · relever un serveur · scan de derive · supprimer un groupe
+    encore ouvertes : import CSV des COMPTES   (bloque sur 3 arbitrages, DOSSIER-16)
+                      modifier `sshd_config`   (reserve a l'exploitant, et JUSTE)
+
+**Le document porte lui-même l'avertissement** : *« CE DOCUMENT A DÉJÀ POURRI UNE FOIS, EN QUATRE
+HEURES. »* **Il a pourri une seconde fois, en un jour — et c'est pourquoi la consigne de relance me fait
+nommer des capacités closes.**
+
+*Il n'est pas dans mon périmètre d'écriture. Je le signale à l'exploitant plutôt que de le corriger.*
+
+### ⚠ Et ma propre sonde a raté en le mesurant — dixième fois du jour
+
+    ma sonde testait si une CLE est PRESENTE
+    -> `test_en_cours` presente = la capacite est PORTEE
+       (ce sont ses quatre cles de RESULTAT, la PREUVE du portage)
+    -> j'aurais rapporte « test de connexion : ouverte » alors qu'elle est portee
+       depuis le 02/09 — et que le document le dit lui-meme, en rature
+
+> **Une clé présente peut signifier « porté » ou « déclaré absent », selon ce que la clé DIT.** *Mon compte
+> mesurait la présence, pas le sens.* **Dixième compte de la journée qui ne porte pas son objet, et le
+> premier qui portait sur mon propre document de mission.**
+
+### Ce qui reste, et rien n'est de mon ressort
+
+    les quatre gestes de l'exploitant   `php -l` · `up -d` · 3 migrations · le durcissement
+    `git push`                          refuse par le garde de ma session — 0 / 892
+    le portage de la reinitialisation   en vol chez `c1`, silencieux depuis 14:50
+
+**Il n'y a aucun arbitrage en attente de moi.** *Les dix rendus aujourd'hui sont tranchés, les deux
+suspendus le sont pour une raison mesurée — E-131 attend le portage de la réinitialisation, et la question
+des cinq comptes sans adresse est une décision sur des comptes réels, donc pas la mienne.*
+
+> **Je n'invente pas de travail pour remplir un tour.** *C'est ce que j'ai refusé aux sept sessions toute
+> la journée ; ça vaut pour moi.*
