@@ -124,11 +124,56 @@
         }).then(function (r) {
             return r.json().catch(function () { return null; });
         }).then(function (d) {
-            return { ok: !!(d && d.success === true), texte: (d && (d.output || d.message || d.error)) || '' };
+            /*
+             * ⚠ LE CORPS REMONTE DESORMAIS, et c'est la piece qui manquait.
+             *
+             * Ce helper ne rendait que `{ok, texte}` : le statut ET
+             * `step_up_required` etaient AVALES. Un `403` exigeant une
+             * re-authentification arrivait donc comme un echec ordinaire, avec
+             * pour seule trace son message — celui qui disait d'aller sur
+             * l'ancien portail. L'ecran ne POUVAIT pas offrir le defi : il ne
+             * savait pas qu'on le lui demandait.
+             *
+             * `corps` est AJOUTE, pas substitue : les appelants existants
+             * lisent `ok` et `texte`, et ne changent pas.
+             */
+            return { corps: d, ok: !!(d && d.success === true), texte: (d && (d.output || d.message || d.error)) || '' };
         }).catch(function () {
             return { ok: false, texte: '' };
         });
     }
+
+    /*
+     * ══ LE DEFI DE RE-AUTHENTIFICATION — A5, ce module en est le consommateur
+     *
+     * `deploy` et `remove` figurent dans `RoutesBackend::MOTIFS_STEP_UP`. La
+     * passerelle les refuse par un `403` qui porte `step_up_required` ET
+     * `action` — l'action etant DERIVEE DU CHEMIN cote serveur.
+     *
+     * ⚠ ON NE COMPOSE PAS CE NOM ICI. Le legacy fusionne les trois routes root
+     * sous `policy_action`, si bien qu'un step-up consenti pour ANNULER une
+     * politique autorise un DEPLOIEMENT SUDO pendant quinze minutes. Le
+     * portage nomme l'action par la route ; un client qui la devinerait
+     * recollerait le defaut.
+     *
+     * Le module est PARTAGE avec l'autre ecran de politiques : trois
+     * implementations d'une meme regle divergent, et celle-ci garde des
+     * ecritures `sudo` et `sftp` sur des machines reelles.
+     */
+    var libellesStepUp = {};
+    try {
+        var blocSU = document.getElementById('politiques-stepup-libelles');
+        if (blocSU) { libellesStepUp = JSON.parse(blocSU.textContent || '{}'); }
+    } catch (e) { libellesStepUp = {}; }
+
+    var stepUp = window.rwStepUp ? window.rwStepUp.installe({
+        panneau: document.querySelector('[data-rw="politiques-panneau-stepup"]'),
+        champ: document.querySelector('[data-rw="politiques-stepup-code"]'),
+        valider: document.querySelector('[data-rw="politiques-stepup-valider"]'),
+        annuler: document.querySelector('[data-rw="politiques-stepup-annuler"]'),
+        textes: libellesStepUp,
+        dis: function (texte) { affiche({ ok: false, texte: texte }); },
+    }) : null;
 
     function affiche(verdict) {
         zoneResultat.hidden = false;
@@ -176,20 +221,40 @@
         .addEventListener('click', function () { ouvre('remove'); });
     boutonAnnuler.addEventListener('click', ferme);
 
+    /*
+     * LE GESTE EST EXTRAIT POUR ETRE REJOUABLE. Apres un second facteur
+     * valide, il repart de lui-meme : sans cela l'operateur devrait
+     * recommencer, et une re-authentification qui ne sert a rien se transforme
+     * en gene qu'on cherche a contourner.
+     *
+     * ⚠ LE CORPS CONSENTI EST CAPTURE, pas relu. Si le formulaire bouge
+     * pendant la saisie du code, le rejeu doit envoyer CE QUI A ETE CONFIRME —
+     * pas ce que la page porte au retour du defi.
+     */
+    function envoieGeste(geste, envoi) {
+        boutonConfirmer.disabled = true;
+
+        return appelle('/policy/sudo/' + geste, envoi).then(function (verdict) {
+            boutonConfirmer.disabled = false;
+            ferme();
+            // Le defi d'abord : s'il prend en charge le refus, on n'affiche
+            // pas un echec par-dessus le panneau qu'il vient d'ouvrir.
+            if (stepUp && stepUp.intercepte(verdict, function () {
+                envoieGeste(geste, envoi);
+            })) { return verdict; }
+            affiche(verdict);
+
+            return verdict;
+        });
+    }
+
     boutonConfirmer.addEventListener('click', function () {
         var geste = enCours;
         if (! geste) { return; }
-        boutonConfirmer.disabled = true;
-        var envoi = (geste === 'remove')
+        envoieGeste(geste, (geste === 'remove')
             ? { machine_id: parseInt(form.dataset.machine, 10),
                 server_user_id: parseInt(form.dataset.compte, 10) }
-            : corps();
-
-        appelle('/policy/sudo/' + geste, envoi).then(function (verdict) {
-            boutonConfirmer.disabled = false;
-            ferme();
-            affiche(verdict);
-        });
+            : corps());
     });
 
     /* ═══ L'AUDIT : UNE LECTURE, DONC AUCUN PANNEAU ═══════════════════════ */

@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.193** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.194** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,135 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.194 — E-364 : le DEFI de re-authentification, porte sur `politiques` et `acces-sftp`
+
+**Deux ecrans du portage lancaient un geste que la garde refuse, et n'offraient AUCUN moyen de lever
+le refus.** *L'utilisateur cliquait, recevait un 403 qui lui disait d'aller sur l'ancien portail — et
+cet ancien portail n'existera plus apres la bascule.* **Ce n'est pas une lacune de portage : c'est une
+impasse fonctionnelle qui se referme le jour de la bascule.**
+
+    MOTIFS_STEP_UP   /policy/(sudo|sftp)/(deploy|remove)  ·  /policy/rollback
+    politiques.js    appelle /policy/sudo/{deploy,remove}   ·  step-up : 0
+    acces-sftp.js    appelle /policy/sftp/{deploy,remove}   ·  step-up : 0
+
+#### ⚠ LA PIECE QUI MANQUAIT N'ETAIT PAS LE PANNEAU, C'ETAIT LE CANAL
+
+    appelle()  ->  { ok: !!(d && d.success === true), texte: … }
+
+**Les deux helpers AVALAIENT le statut et le corps.** Un `403` portant `step_up_required` **et**
+`action` arrivait comme un echec ordinaire, avec pour seule trace son message — celui qui renvoyait
+au legacy. *L'ecran ne POUVAIT pas offrir le defi : il ne savait pas qu'on le lui demandait.*
+
+`corps` est **AJOUTE, pas substitue** : les appelants existants lisent `ok` et `texte` et ne changent
+pas.
+
+#### L'ACTION EST NOMMEE PAR LE SERVEUR, JAMAIS COMPOSEE ICI
+
+Le legacy fusionne les trois routes root sous `policy_action`, si bien qu'**un step-up consenti pour
+ANNULER une politique autorise un DEPLOIEMENT SUDO pendant quinze minutes**. Le portage derive
+l'action du CHEMIN (`/policy/sudo/deploy` -> `policy_sudo_deploy`), et le client **transmet** ce nom.
+*Un client qui le devinerait recollerait le defaut.*
+
+#### Le corps CONSENTI est capture, pas relu
+
+Si le formulaire bouge pendant la saisie du code, le rejeu envoie **ce qui a ete confirme** — pas ce
+que la page porte au retour du defi.
+
+#### TROIS implementations au lieu de QUATRE — et c'est un CHOIX, pas une unification
+
+Le patron etait ecrit deux fois (`comptes.js:158`, `permissions.js`). Deux nouveaux consommateurs
+arrivaient. **Recopier en aurait fait quatre.**
+
+`laravel/public/js/step-up.js` est charge par les deux nouvelles pages. **`comptes` et `permissions`
+gardent la leur** : les unifier toucherait des modules couverts par leurs propres suites, hors
+perimetre de ce sous-lot.
+
+> **Trois au lieu de quatre n'est pas une unification, et l'appeler ainsi couterait plus tard** — le
+> prochain qui lira « reutilise » chercherait un point unique et trouverait les deux autres intactes.
+
+*Il n'y a pas d'etape de construction ici : pas d'`import`, donc un fichier charge par les deux pages
+est ce qui s'approche le plus de « reutiliser ».* Les libelles vivent dans le catalogue **partage**
+`step_up.php`, pas recopies par module.
+
+#### `passerelle.step_up_requis` ne renvoie plus vers un portail qui va disparaitre
+
+    avant  « … qui n'est pas encore disponible sur cette interface. Effectuez-la
+             depuis l'ancien portail. »
+    apres  « Cette action exige une re-authentification. Confirmez-la avec votre
+             second facteur. »
+
+*Elle reste NEUTRE sur le canal : c'est un message d'API, lu par un humain seulement si l'ecran n'a
+pas su ouvrir son panneau.*
+
+#### Mesures — la chaine entiere, sur les DEUX pages
+
+    GET /politiques · /acces-sftp        200
+    panneau present et MASQUE            true / true
+    libelles transmis                    14   (le catalogue step_up entier)
+    module `rwStepUp` charge             true
+    identifiants a l'ecran               []
+
+    apres le 403 step_up_required
+      panneau OUVERT                     true
+      titre                              « Confirmez avec votre second facteur »
+      aide                               dit ce qui est demande ET pourquoi
+      nomme-t-il la GARDE qu'il leve ?   FALSE — un ecran n'annonce pas le
+                                         mecanisme qu'il contourne
+      focus sur le champ                 true
+
+    apres le second facteur
+      appels a /profil/step-up           1
+      panneau ferme                      true
+      LE GESTE A REJOUE                  true — deux appels, le second aboutit
+      sortie affichee                    rendue
+
+    erreurs JavaScript                   []
+    parite i18n                          step_up FR=14 EN=14 · passerelle FR=6 EN=6,
+                                         JEUX DE CLES compares
+
+**Le second appel frappe la BONNE route sur chaque page** — `/policy/sudo/deploy` d'un cote,
+`/policy/sftp/deploy` de l'autre. *Le module est partage ; le cablage, non — et c'est la qu'un
+prefixe d'ancre se trompe.*
+
+#### ⛔ CE QUI N'EST PAS PARTI, ET CE QUI EST STUBE
+
+    appels /policy/* reellement emis     0   — la sonde REPOND a leur place
+    `/profil/step-up`                    STUBE
+
+**Aucun `deploy` ni `remove` n'a quitte le navigateur.** Ils ecrivent des regles `sudo` et `sftp` sur
+des machines reelles et sont dans les interdits permanents.
+
+**Et la VALIDATION du second facteur est stubee** : l'eprouver demanderait un vrai code TOTP consenti
+pour une action de politique. *Ce qui est mesure est le PANNEAU et le REJEU ; ce qui ne l'est pas,
+c'est que `StepUp::valide` accepte ce code-la.* Cette route est portee et couverte par ailleurs.
+
+#### ⚠⚠ ET UNE INTERFERENCE QUE J'AI CREEE, SIGNALEE AVANT D'ETRE CHERCHEE
+
+`artisan view:clear` puis `view:cache`, lances a **07:42:18** pour DEUX vues, ont reconstruit **112
+gabarits** — pendant une course d'une autre session qui allait de 07:40:29 a 07:42:29. **J'ai touche
+ses onze dernieres secondes.**
+
+Elle a remesure : `50 · 0` dans la fenetre sale comme dans la propre. **Rien ne s'est materialise** —
+mais la distinction utile est celle-ci :
+
+> **Un FAIL de DELAI peut venir de la : une requete tombant entre le clear et le cache recompile a la
+> demande, 2 a 4,6 s contre 0,21. Un FAIL de CONTENU ne peut pas.**
+
+*Ces commandes ne sont pas scopees.* Et cela ajoute un **troisieme etat partage** a la liste :
+
+    arbre           instrumente (mtime, garde de fenetre)
+    base            aucun instrument
+    cache de vues   aucun instrument
+
+*« Le garde de fenetre surveille l'arbre, pas la base » — il ne surveille pas non plus le cache.*
+
+#### Un etat intermediaire refuse
+
+A un moment le panneau existait dans le DOM sans etre branche. **Il n'est pas parti dans un commit** :
+*un panneau present et jamais ouvert passe toutes les assertions d'ancre et toutes les parites i18n,
+et ne fait rien.* C'est `conf_titre_desact` vu de l'autre cote — la, les cles existaient sans etre
+transmises ; ici, le panneau existerait sans etre branche. **Tout vert sauf ce qui compte.**
 
 ### v1.38.193 — E-363 : `groups` R4, supprimer un groupe — PROUVE, et le piege `deleted` eprouve
 
