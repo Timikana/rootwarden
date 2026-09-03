@@ -1,10 +1,41 @@
 [🇬🇧 English version](README.en.md)
 
-# 🔐 RootWarden v1.37.7
+# 🔐 RootWarden v1.37.47
 
 > **RootWarden** est une plateforme **DevSecOps** d'administration centralisee de serveurs Linux.
 > Deployez-la sur votre infrastructure pour gerer SSH, mises a jour, firewall, Fail2ban,
 > services systemd, audit sshd_config et vulnerabilites CVE - depuis une interface unique.
+
+## 🚧 Migration en cours vers Laravel — DEUX portails coexistent
+
+RootWarden est en train de changer de frontend. Pendant la migration, **deux interfaces
+tournent en parallèle** sur la même base de données et le même backend Python :
+
+| | port | rôle |
+|---|---|---|
+| **portage Laravel** (`laravel/`) | **8444** | la cible — reçoit les pages une par une |
+| **ancien portail** (`legacy/`) | **8443** | la référence, dépréciée partie par partie |
+
+**État mesuré au 2026-08-23** : **14 entrées de menu portées sur 33**, **9 parties du legacy
+archivées**, deux modules entièrement dépréciés (`update/`, `supervision/`). Le socle est
+complet — authentification avec second facteur obligatoire, navigation, passerelle vers le
+backend, i18n FR/EN. **La migration n'est pas finie**, et la cible est une **bascule directe
+en v2.0**, sans coexistence longue.
+
+Une entrée de menu non encore portée est affichée avec un marqueur et ouvre l'ancien
+portail dans un nouvel onglet : un lien qui change de portail sans le dire trahit
+l'utilisateur.
+
+**Deux capacités bloquent la bascule**, chacune concernant 6 comptes actifs sur 10 :
+l'**enrôlement 2FA** et le **changement de mot de passe requis** n'existent que dans
+l'ancien portail. Détail, chiffres et suite des opérations : **[ROADMAP.md](ROADMAP.md)**.
+
+Le chantier est documenté sous [`docs/migration/`](docs/migration/) —
+[`PARITE.md`](docs/migration/PARITE.md) recense les **93 écarts mesurés** entre les deux
+portails, avec leur preuve, et [`METHODE-SOUS-LOT.md`](docs/migration/METHODE-SOUS-LOT.md)
+décrit les neuf temps d'un sous-lot.
+
+---
 
 ## 🆕 v1.24 → v1.37 — DevSecOps avancé (⚠️ bêta, validé en dev uniquement)
 
@@ -57,7 +88,7 @@ Vague de fonctionnalités post-audit. Chaque feature = slice complet (migration 
 - Liste verticale + colonne **"Dernier deploiement"** color-codee (vert <30j, jaune 30-90j, rouge >90j, italique gris si jamais).
 - Date du dernier deploy extraite de `user_logs` (exclut les dry-run), formatee en fuseau navigateur.
 - Boutons "Deployer multi" / "Dry-run multi" violets, actifs des qu'on coche >1 serveur. Iteration N serveurs, deploiement sur tous les non-system users, resultat aggrege avec details par serveur.
-- Fix collateral CSP : rollback du nonce dans `csp_header_value()` (CSP3 ignorait `unsafe-inline` -> tous les inline scripts du repo etaient casses silencieusement). Doc procedure de re-activation apres migration complete dans `www/includes/csp_nonce.php`.
+- Fix collateral CSP : rollback du nonce dans `csp_header_value()` (CSP3 ignorait `unsafe-inline` -> tous les inline scripts du repo etaient casses silencieusement). Doc procedure de re-activation apres migration complete dans `legacy/includes/csp_nonce.php`.
 
 ## 🛡️ v1.21.0 — Security Hardening OWASP Top 10
 
@@ -211,10 +242,12 @@ Certains modules peuvent etre desactives entierement via `srv-docker.env` sans t
 WAZUH_ENABLED=false
 ```
 
-Quand un flag est sur `false`, le backend n'enregistre pas le blueprint correspondant (404 sur les routes), le frontend cache l'entree de menu et bloque la page concernee. Helper PHP : `feature_enabled('module')`. Voir [feature_flags.php](www/includes/feature_flags.php).
+Quand un flag est sur `false`, le backend n'enregistre pas le blueprint correspondant (404 sur les routes), le frontend cache l'entree de menu et bloque la page concernee. Helper PHP : `feature_enabled('module')`. Voir [feature_flags.php](legacy/includes/feature_flags.php).
 
 ### Accès
-- Interface : **https://localhost:8443**
+- **Portage Laravel (la cible) : http://localhost:8444** — voir la section
+  « Migration en cours » plus haut
+- Ancien portail (la référence, en cours de dépréciation) : **https://localhost:8443**
 - Compte superadmin : mot de passe auto-genere au premier demarrage.
   Consultez : `docker exec <php_container> cat /var/www/html/.first_run_credentials`
   Le changement de mot de passe est obligatoire a la premiere connexion.
@@ -304,10 +337,10 @@ Le sync est hybride : les blocs `<!-- AUTO ... -->` sont regeneres automatiqueme
 
 Un `down -v` supprime les volumes (BDD). Au redemarrage, `init.sql` cree les comptes
 avec des placeholders invalides. `install.sh` doit tourner pour generer les vrais
-mots de passe. Si le flag `www/.installed` existe encore (bind mount), supprimez-le :
+mots de passe. Si le flag `legacy/.installed` existe encore (bind mount), supprimez-le :
 
 ```bash
-rm -f www/.installed
+rm -f legacy/.installed
 ./start.sh -d
 docker exec <php_container> cat /var/www/html/.first_run_credentials
 ```
@@ -354,7 +387,7 @@ Si le fichier n'existe pas, `install.sh` n'a pas tourne (flag `.installed` exist
 ou erreur de connexion BDD). Supprimez le flag et redemarrez :
 
 ```bash
-rm -f www/.installed
+rm -f legacy/.installed
 docker compose restart php
 ```
 

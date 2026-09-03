@@ -94,6 +94,7 @@ from routes.maintenance import bp as maintenance_bp
 from routes.approvals import bp as approvals_bp
 from routes.commandlog import bp as commandlog_bp
 from routes.chatops import bp as chatops_bp
+from routes.settings import bp as settings_bp
 from routes.tickets import bp as tickets_bp
 from routes.search import bp as search_bp
 from routes.docker import bp as docker_bp
@@ -118,6 +119,7 @@ app.register_blueprint(maintenance_bp)
 app.register_blueprint(approvals_bp)
 app.register_blueprint(commandlog_bp)
 app.register_blueprint(chatops_bp)
+app.register_blueprint(settings_bp)
 app.register_blueprint(tickets_bp)
 app.register_blueprint(search_bp)
 app.register_blueprint(docker_bp)

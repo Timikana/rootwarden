@@ -209,7 +209,7 @@ fi
 run ${DC} --env-file "${ENV_FILE}" ${PROFILE_FLAG} up -d
 
 # ── Etape 5b : restart PHP pour vider l'OPcache ─────────────────────────────
-# Le bind-mount ./www:/var/www/html synchronise les fichiers source en temps
+# Le bind-mount ./legacy:/var/www/html synchronise les fichiers source en temps
 # reel mais PHP-FPM/Apache utilisent OPcache qui garde les versions compilees
 # en memoire. `up -d` ne recreate le container PHP que si l'image a change ;
 # une simple modif PHP (ajout bouton, fix UI, etc.) ne declenche pas le

@@ -18,8 +18,8 @@ services:
       - "${HTTPS_PORT:-8443}:443"
     volumes:
       - php_sessions:/var/www/sessions
-      - ./www:/var/www/html
-      - ./www/logs:/var/www/html/logs
+      - ./legacy:/var/www/html
+      - ./legacy/logs:/var/www/html/logs
       - ./php/php.ini:/usr/local/etc/php/php.ini
       - ./certs:/var/www/certs          # Partagé avec l'entrypoint (certs auto ou custom)
       # - /etc/localtime:/etc/localtime:ro   # Linux only - désactivé sur Windows
@@ -37,6 +37,61 @@ services:
       timeout: 5s
       retries: 5
       start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '1.0'
+        reservations:
+          memory: 128M
+    networks:
+      internal:
+      external:
+
+  # ─────────────────────────────────────────────────────────────
+  # Frontend Laravel v2.0 (migration en cours)
+  # Tourne EN PARALLÈLE du frontend legacy (service `php`), sur un port
+  # distinct, pendant toute la durée de la migration. Le legacy reste la
+  # référence tant que la parité d'un module n'est pas prouvée.
+  # Racine documentaire sur public/ (front controller) et non sur la racine.
+  # ─────────────────────────────────────────────────────────────
+  laravel:
+    build:
+      context: .
+      dockerfile: ./laravel/Dockerfile
+    container_name: rootwarden_laravel
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - "${LARAVEL_PORT:-8444}:80"
+    volumes:
+      - ./laravel:/var/www/html
+      # Le numéro de version a UNE seule source : legacy/version.txt, écrit par le
+      # mécanisme de bump. Le portage le LIT, en lecture seule, et n'en tient pas de
+      # copie — une seconde copie dériverait, et ce chiffre a déjà dérivé deux fois
+      # le 2026-08-27 (resté à 1.38.17 pendant deux bumps, puis trois commits sur le
+      # même numéro). Le chemin reste `legacy/` tant que le legacy est servi ; son
+      # emplacement à l'extinction du legacy est une question ouverte (§4.1 ter).
+      - ./legacy/version.txt:/var/www/html/version.txt:ro
+    env_file:
+      - srv-docker.env
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:80/up", "-o", "/dev/null"]
+      interval: 30s
+      # 20 s et non 5 s : sur un hôte Windows, le bind mount est ~258× plus lent
+      # que le système de fichiers du conteneur (mesuré le 2026-08-17 : 9 300 ms
+      # contre 36 ms pour lire 1 500 fichiers PHP). Le legacy charge ~5 fichiers
+      # par page, Laravel plusieurs centaines : une première requête à froid
+      # dépasse 6 s. Avec 5 s, la sonde échouait toujours et le conteneur restait
+      # « unhealthy » en permanence, sans que l'application ait le moindre défaut.
+      # Sur un hôte Linux, ce délai est sans objet.
+      timeout: 20s
+      retries: 5
+      start_period: 60s
     deploy:
       resources:
         limits:
@@ -146,7 +201,7 @@ services:
     container_name: rootwarden_composer
     working_dir: /app
     volumes:
-      - ./www:/app
+      - ./legacy:/app
     command: ["composer", "install", "--no-dev", "--optimize-autoloader"]
     profiles:
       - tools
@@ -158,7 +213,7 @@ services:
     container_name: rootwarden_composer_update
     working_dir: /app
     volumes:
-      - ./www:/app
+      - ./legacy:/app
     command: ["composer", "update", "--no-dev", "--optimize-autoloader"]
     profiles:
       - tools
@@ -199,8 +254,19 @@ services:
     container_name: rootwarden_test_server
     hostname: test-server
     restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
+    # PAS de `no-new-privileges` ici, contrairement aux autres services.
+    #
+    # Ce drapeau interdit toute elevation de privilege : `su` et `sudo` echouent
+    # quel que soit le mot de passe, avec « The "no new privileges" flag is set ».
+    # Or ce conteneur existe precisement pour recevoir des operations
+    # privilegiees — deploiement de cles, mises a jour, iptables, scan CVE. Le
+    # drapeau y annulait sa seule raison d'etre.
+    #
+    # Constate le 2026-08-18 : le mot de passe root stocke pour la machine 2
+    # etait CORRECT (meme empreinte que TEST_SERVER_ROOT_PASSWORD) ; c'est bien
+    # ce drapeau, et lui seul, qui faisait echouer `su`.
+    #
+    # Le durcissement reste en place sur php, laravel, python et db.
     profiles:
       - preprod
     # Passwords obligatoires depuis v1.17.0 - le container refuse de demarrer

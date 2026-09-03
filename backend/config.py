@@ -51,6 +51,25 @@ def _require_env(name: str) -> str:
     return value
 
 class Config:
+    # ══ LE NOM DU COMPTE DE SERVICE, UNE SEULE FOIS ══════════════════════════
+    #
+    # Il vivait en TROIS endroits : `ssh_utils` (le seul qui AUTHENTIFIE
+    # reellement), `configure_servers._RESERVED_SA_USER`, et `routes/ssh.py`.
+    # Trois copies d'une valeur dont depend l'acces a toute machine sans mot de
+    # passe stocke — `srv-zabbix` en est une.
+    #
+    # IL VIT ICI ET PAS DANS `ssh_utils`, ET C'EST UNE MESURE :
+    # `backend/tests/conftest.py:74` remplace `ssh_utils` par un `MagicMock`.
+    # Une constante qui en viendrait deviendrait un Mock sous test, et les deux
+    # gardes qui la comparent — `_purge_legacy_sudoers` et la sonde de
+    # revocation — cesseraient de proteger SANS QUE RIEN NE LE DISE. Mesure du
+    # 2026-08-27 : deux tests rouges avant ce deplacement.
+    #
+    # UNE VALEUR QUI GARDE UN COMPORTEMENT NE DOIT PAS VIVRE DANS UN MODULE
+    # QU'ON REMPLACE POUR TESTER. `config` n'est pas mocke, et ce nom EST de la
+    # configuration.
+    NOM_COMPTE_SERVICE = 'rootwarden'
+
     """
     Classe de configuration globale du backend RootWarden.
 
@@ -161,7 +180,10 @@ class Config:
     # Opt-in (defaut false) : si active, les actions listees exigent l'aval d'un
     # SECOND admin avant execution. Desactive par defaut pour ne pas bloquer les
     # deploiements mono-admin.
-    APPROVAL_ENABLED   = os.getenv('APPROVAL_ENABLED', 'false').lower() == 'true'
+    # ACTIF PAR DEFAUT. Le repli compte autant que le fichier d'exemple : qui ne
+    # copie pas l'exemple obtient CE defaut-la, et la decision ne vaudrait sinon
+    # que pour ceux qui lisent le fichier. Les deux ont ete bascules ensemble.
+    APPROVAL_ENABLED   = os.getenv('APPROVAL_ENABLED', 'true').lower() == 'true'
     APPROVAL_ACTIONS   = {a.strip() for a in os.getenv(
         'APPROVAL_ACTIONS',
         'delete_remote_user,reboot_server,revoke_service_account,regenerate_platform_key'

@@ -1,0 +1,84 @@
+<?php
+
+/**
+ * Functional permissions — `adm/` module, sub-lot D5. English.
+ *
+ * ALL EIGHTEEN permissions are named, including the two the legacy leaves out
+ * of its interface (PARITE E-118).
+ *
+ * Strict parity with lang/fr/perms.php.
+ */
+return [
+
+    'title' => 'Permissions and access',
+    'desc' => 'Grant or revoke a functional right, and access to a machine. Every gesture requires a second-factor confirmation.',
+    'source' => 'The :nombre permissions are read from the database schema: a column added becomes settable, a column removed disappears everywhere at once.',
+    'droits' => 'Functional rights',
+    'acces' => 'Machine access',
+    'compte_resume' => ':droits right(s), :machines machine(s)',
+    'role_1' => 'User',
+    'role_2' => 'Administrator',
+    'role_3' => 'Super administrator',
+    'activee' => 'Permission granted.',
+    'desactivee' => 'Permission revoked.',
+    'acces_accorde' => 'Machine access granted.',
+    'acces_retire' => 'Machine access revoked.',
+    'step_up_titre' => 'Confirm with your second factor',
+    'step_up_aide' => 'Changing a right decides what this account may do on the estate. Type the six-digit code from your authenticator.',
+    'step_up_code' => 'Six-digit code',
+    'step_up_valider' => 'Confirm',
+    'annuler' => 'Cancel',
+    'err_soi_meme' => 'You cannot change your own rights.',
+    'err_rang' => 'You cannot change an account whose role is equal to or above yours.',
+    'err_inconnu' => 'That account does not exist.',
+    'err_permission' => 'That permission does not exist.',
+    'err_valeur' => 'The value is missing.',
+    'err_machine' => 'That machine does not exist.',
+    'err_auto_acces' => 'You cannot grant yourself machine access.',
+    'err_step_up' => 'This gesture requires confirmation with your second factor.',
+    'err_reseau' => 'The portal did not answer (status :statut). Nothing was changed.',
+
+    // The eighteen permissions, named one by one.
+    'p_can_deploy_keys' => 'Deploy SSH keys',
+    'p_can_update_linux' => 'Run Linux updates',
+    'p_can_manage_iptables' => 'Manage iptables rules',
+    'p_can_admin_portal' => 'Administer the portal',
+    'p_can_scan_cve' => 'Run a vulnerability scan',
+    'p_can_manage_remote_users' => 'Manage remote accounts',
+    'p_can_manage_platform_key' => 'Manage the platform key',
+    'p_can_view_compliance' => 'View compliance',
+    'p_can_manage_backups' => 'Manage backups',
+    'p_can_schedule_cve' => 'Schedule CVE scans',
+    'p_can_manage_fail2ban' => 'Manage Fail2ban',
+    'p_can_manage_services' => 'Manage systemd services',
+    'p_can_audit_ssh' => 'Audit the SSH configuration',
+    'p_can_manage_supervision' => 'Manage supervision',
+    'p_can_manage_bashrc' => 'Manage .bashrc files',
+    'p_can_manage_graylog' => 'Manage Graylog',
+    'p_can_manage_wazuh' => 'Manage Wazuh',
+    'p_can_manage_api_keys' => 'Manage API keys',
+
+    // Permissions temporaires — sous-lot D5b
+    'temp_titre' => 'Temporary permissions',
+    'temp_desc' => 'A right granted for a bounded time. It opens pages exactly like a permanent right, and disappears on its own when it expires.',
+    'temp_accorder' => 'Grant a temporary permission',
+    'temp_compte' => 'Account',
+    'temp_permission' => 'Permission',
+    'temp_duree' => 'Duration',
+    'temp_heures' => ':n hour(s)',
+    'temp_raison' => 'Reason',
+    'temp_raison_indice' => 'incident #4312, weekend on-call…',
+    'temp_raison_aide' => 'Optional, but it is what will make the grant understandable in six months.',
+    'temp_avertissement' => 'The grant takes effect immediately and the account is notified.',
+    'temp_btn_accorder' => 'Grant',
+    'temp_btn_revoquer' => 'Revoke',
+    'temp_jusqua' => 'until :date',
+    'temp_par' => 'granted by :qui',
+    'temp_machine_sans_effet' => 'noted for :machine — with no effect: the check does not filter on the machine',
+    'temp_vide' => 'No temporary permission in force.',
+    'temp_en_cours' => 'Granting…',
+    'temp_accorde' => 'The permission has been granted.',
+    'temp_echec' => 'The grant did not go through.',
+    'temp_revoque' => 'Grant :quoi has been revoked.',
+    'temp_err_revocation' => 'That grant does not exist, or it has already expired.',
+];

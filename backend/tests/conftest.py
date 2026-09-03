@@ -135,6 +135,26 @@ class MockCursor:
         self._last_params = params
 
     def fetchone(self):
+        # ══ LE COMPTAGE DES APPROBATEURS PASSE EN PREMIER, ET IL LE FAUT ═════
+        #
+        # E-205 ajoute a `approvals.gate()` un
+        # `SELECT COUNT(*) AS n FROM users u LEFT JOIN permissions p ...`.
+        # Cette requete contient `from users` ET `role_id` : elle tombait donc
+        # dans la branche d'identite juste en dessous, qui rend
+        # `{'id', 'role_id', 'active'}` — et `gate()` y cherchait `['n']`.
+        #
+        # Le mock ne rendait pas « rien » : il rendait UNE AUTRE REPONSE, ce qui
+        # est pire. `gate()` levait un `KeyError` attrape par son propre
+        # `except Exception`, donc journalise en « erreur de base » — un
+        # diagnostic envoye au mauvais endroit, pour un defaut du banc.
+        #
+        # Valeur rendue : UN approbateur eligible, l'etat du banc (deux comptes
+        # de role 3). Un test qui veut mesurer le cas « aucun approbateur » doit
+        # donc poser son propre curseur, et c'est ce que fait
+        # `test_approbation_quatre_yeux.py` — ce mock partage sert le chemin
+        # ORDINAIRE, jamais les cas limites.
+        if 'count(*) as n' in self._last_query:
+            return {'n': 1}
         # Recognize SELECT id, role_id, active FROM users WHERE id = %s
         if 'from users' in self._last_query and 'role_id' in self._last_query:
             uid = (self._last_params[0] if self._last_params else 0)
@@ -247,13 +267,15 @@ def app():
     from routes.docker import bp as docker_bp
     from routes.drift import bp as drift_bp
     from routes.ssh_audit import bp as ssh_audit_bp
+    from routes.graylog import bp as graylog_bp
 
     test_app = Flask(__name__)
     test_app.config['TESTING'] = True
 
     for _bp in (monitoring_bp, admin_bp, ssh_bp, cve_bp, iptables_bp, updates_bp,
                 supervision_bp, tickets_bp, search_bp, approvals_bp, maintenance_bp,
-                groups_bp, tasks_bp, commandlog_bp, docker_bp, drift_bp, ssh_audit_bp):
+                groups_bp, tasks_bp, commandlog_bp, docker_bp, drift_bp, ssh_audit_bp,
+                graylog_bp):
         test_app.register_blueprint(_bp)
 
     return test_app

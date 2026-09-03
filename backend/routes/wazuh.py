@@ -145,6 +145,24 @@ def _upsert_agent(machine_id, **fields):
         conn.commit()
 
 
+# ══ CE QUE L'AMORCAGE LAISSE DERRIERE LUI (E-225) ══════════════════════════
+#
+# L'installation ne pose pas que le paquet : elle etablit une RELATION DE
+# CONFIANCE — une cle de signature et un depot — et la desinstallation ne les
+# retire pas. Ce n'est pas forcement un defaut : un exploitant peut vouloir
+# garder le depot pour reinstaller sans refaire l'amorcage. **Ce qui n'est pas
+# defendable, c'est que le geste ne le DISE pas** : le bouton s'appelle
+# « desinstaller ».
+#
+# Ces valeurs sont la SOURCE UNIQUE de la reponse d'`uninstall`. Elles decrivent
+# ce que le script d'amorcage ecrit, par famille.
+VESTIGES_AMORCAGE = {
+    'debian': ['/usr/share/keyrings/wazuh.gpg', '/etc/apt/sources.list.d/wazuh.list'],
+    'rhel':   ['cle GPG importee dans le trousseau RPM', '/etc/yum.repos.d/wazuh.repo'],
+    'suse':   ['cle GPG importee dans le trousseau RPM', '/etc/zypp/repos.d/wazuh.repo'],
+}
+
+
 def _wazuh_pkg_specs(version: str):
     """Retourne (pkg_deb, pkg_rpm) selon la version Wazuh demandee.
 
@@ -440,35 +458,96 @@ systemctl enable --now wazuh-agent
 @require_permission('can_manage_wazuh')
 @threaded_route
 def install_all():
-    """Installe Wazuh agent sur TOUS les serveurs sans agent.
+    """Installe Wazuh agent sur les serveurs DESIGNES qui n'ont pas d'agent.
 
     Boucle sequentielle (pas en parallele : chaque install fait apt-get update
     et tire des paquets, parallele ferait surcharge reseau + manager Wazuh).
     Renvoie un resume {ok, fail, skipped} avec details par machine.
 
     Body JSON :
-        group (str, optional) : groupe Wazuh applique a tous (sinon default)
+        machine_ids (list[int], OBLIGATOIRE) : les machines a traiter
+        group (str, optional)                : groupe Wazuh applique (sinon default)
+
+    ══ E-224 : DEUX DEFAUTS QUI SE TENAIENT L'UN L'AUTRE ════════════════════
+
+    La requete portait `AND a.id IS NULL` — or `wazuh_agents` n'a **aucune
+    colonne `id`** (`034_wazuh.sql:42` : `machine_id INT NOT NULL PRIMARY KEY`).
+    L'`execute()` n'etant protege par aucun `try`, la route rendait **500**.
+    Elle n'a donc jamais rien installe, et personne ne l'a vu : la table porte
+    zero ligne, le module n'a jamais servi.
+
+    **Corriger ce SQL seul aurait ete plus dangereux que le laisser.** Sans
+    agent en base, la requete corrigee rend TOUT LE PARC, et son
+    `ORDER BY … CASE WHEN criticality = 'CRITIQUE' THEN 0` place la
+    **production en premier**. Et il n'aurait pas fallu cliquer : la page de
+    diagnostic `legacy/adm/health_check.php` POSTait sur cette route avec un
+    **corps vide**, a chaque chargement, sous le commentaire « dry, vide la
+    liste » — un mot qui decrivait un **accident** (la liste etait vide parce
+    que la requete echouait), pas une conception.
+
+    *Un defaut qui protege par accident cesse de proteger au moment exact ou on
+    le corrige.* Les deux correctifs sont donc dans le meme commit.
+
+    ══ LA BORNE : `machine_ids` OBLIGATOIRE ════════════════════════════════
+
+    Absent ou vide -> **400**, aucune machine touchee. Trois raisons :
+
+    1. **un appel a corps vide echoue FERME**, sans qu'il faille se souvenir de
+       modifier quoi que ce soit ailleurs — et la memoire est precisement ce qui
+       a manque ici pendant des mois ;
+    2. **la page a deja la liste** : `wazuh.js` affiche le compte des machines
+       sans agent. Le bouton « Installer sur tous » garde son sens, et ce sens
+       devient EXPLICITE ;
+    3. *ne pas offrir d'entree libre plutot que la valider* — **un perimetre
+       absent n'est pas un perimetre**.
+
+    ══ POURQUOI PAS LE PRECEDENT DE `/supervision/scan-all` ════════════════
+
+    C'est la seule route de parc du produit qui se borne, par `machine_ids` plus
+    `check_machine_access` dans le corps. **Le recopier ici donnerait une borne
+    qui ne borne pas** : `check_machine_access` rend `True` sans condition des
+    le role 2, et cette route porte `@require_role(2)` — le filtre serait inerte
+    pour EXACTEMENT son public. Ce serait la cinquieme occurrence de « un garde
+    sans objet ne garde rien », ecrite en croyant fermer un trou.
+
+    Et **pas de filtre sur `criticality`** non plus : ce serait inventer une
+    politique depuis une etiquette d'inventaire que rien ne garantit a jour.
     """
     data = request.get_json(silent=True) or {}
     requested_group = (data.get('group') or '').strip()
+
+    machine_ids = data.get('machine_ids')
+    if not isinstance(machine_ids, list) or not machine_ids:
+        return jsonify({
+            'success': False,
+            'message': "machine_ids requis : cette route n'a plus de perimetre implicite. "
+                       "Envoie la liste des machines a traiter."
+        }), 400
+    try:
+        machine_ids = [int(x) for x in machine_ids]
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'message': 'machine_ids doit etre une liste d entiers'}), 400
 
     cfg = _get_config()
     if not cfg:
         return jsonify({'success': False, 'message': 'Config Wazuh absente (onglet Configuration)'}), 400
 
-    # Liste des serveurs sans agent (LEFT JOIN wazuh_agents puis filter NULL)
+    # Parmi les machines DESIGNEES, celles qui n'ont pas encore d'agent.
+    # `a.machine_id IS NULL` : c'est la colonne qui existe (cf E-224 ci-dessus).
     with get_db_connection() as conn:
         cur = conn.cursor(dictionary=True)
-        cur.execute("""
+        fmt = ','.join(['%s'] * len(machine_ids))
+        cur.execute(f"""
             SELECT m.id, m.name
             FROM machines m
             LEFT JOIN wazuh_agents a ON a.machine_id = m.id
-            WHERE (m.lifecycle_status IS NULL OR m.lifecycle_status != 'archived')
-              AND a.id IS NULL
+            WHERE m.id IN ({fmt})
+              AND (m.lifecycle_status IS NULL OR m.lifecycle_status != 'archived')
+              AND a.machine_id IS NULL
             ORDER BY
                 CASE WHEN m.criticality = 'CRITIQUE' THEN 0 ELSE 1 END,
                 m.name
-        """)
+        """, machine_ids)
         targets = cur.fetchall()
 
     if not targets:
@@ -688,18 +767,123 @@ def uninstall():
     user_id, _ = get_current_user()
     ip, port, user, pwd, root_pwd, svc = _get_ssh_creds(row)
 
+    # ⚠ CETTE COMMANDE EST `apt`-ONLY, ALORS QUE L'INSTALLATION NE L'EST PLUS.
+    #
+    # Le commentaire de l'installation le dit lui-meme : « avant v1.18.x c'etait
+    # apt-only -> fail silencieux sur RHEL family ». Ce defaut a ete corrige a
+    # l'installation et **jamais reporte ici**. Sur RHEL et SUSE, `apt-get purge`
+    # n'existe pas, le `|| true` avale l'echec, seul `rm -rf /var/ossec` agit —
+    # le paquet reste installe, et `code == 0` fait annoncer une reussite.
+    #
+    # NON CORRIGE ICI : rendre cette commande multi-famille est un CHANGEMENT DE
+    # COMPORTEMENT sur un geste destructeur distant, et E-225 demandait
+    # explicitement de ne pas en faire. Signale, pas repare.
     cmd = (
         "export DEBIAN_FRONTEND=noninteractive && "
         "systemctl stop wazuh-agent 2>/dev/null || true && "
         "apt-get purge -y wazuh-agent 2>/dev/null || true && "
         "rm -rf /var/ossec"
     )
+    # ══ E-225 (moitie deleguee) : CESSER D'ATTESTER ═════════════════════════
+    #
+    # `success` valait `code == 0`. Sur RHEL et SUSE, `apt-get purge` n'existe
+    # pas, le `|| true` avale l'echec, `rm -rf /var/ossec` reussit — et la route
+    # annoncait une REUSSITE sur un paquet reste installe. Fausse attestation de
+    # la famille E-192.
+    #
+    # LA VERIFICATION EST EN LECTURE SEULE, ET C'EST CE QUI LA REND POSSIBLE
+    # ICI. Elle interroge le gestionnaire de paquets present ; elle ne detruit
+    # rien et ne rend le geste effectif nulle part. Le `purge` reste apt-only —
+    # le rendre multi-famille serait un changement de comportement sur un geste
+    # destructeur distant, et il est en arbitrage (DOSSIER-04).
+    #
+    # **Ca ne rencontre donc PAS le piege d'E-215**, ou poser la verification
+    # seule armait le geste : ici il n'y a rien a armer, le geste ne devient pas
+    # plus efficace, il cesse seulement d'etre annonce comme reussi.
+    #
+    # Controle par l'EFFET, pas par le code de sortie — et pas non plus par
+    # l'absence de `/var/ossec`, qui serait trompeuse : `rm -rf` la produit
+    # meme quand le paquet reste installe.
+    verif_cmd = (
+        "if command -v dpkg-query >/dev/null 2>&1 && "
+        "dpkg-query -W -f='${Status}' wazuh-agent 2>/dev/null "
+        "| grep -q 'install ok installed'; then exit 7; fi; "
+        "if command -v rpm >/dev/null 2>&1 && rpm -q wazuh-agent >/dev/null 2>&1; "
+        "then exit 7; fi; "
+        "exit 0"
+    )
     try:
         with ssh_session(ip, port, user, pwd, logger, service_account=svc) as client:
             _, err_out, code = execute_as_root(client, cmd, root_pwd, logger=logger, timeout=180)
-        _upsert_agent(row['id'], status='never_connected', agent_id=None, version=None)
-        _audit(user_id, 'uninstall', f"machine_id={row['id']} code={code}")
-        return jsonify({'success': code == 0})
+            _, _, code_v = execute_as_root(client, verif_cmd, root_pwd, logger=logger, timeout=30)
+        # ══ E-237 : L'INVENTAIRE SUIT LE VERDICT, PLUS L'INTENTION ══════════
+        #
+        # Cette ligne ecrivait `never_connected` INCONDITIONNELLEMENT, treize
+        # lignes avant que `paquet_retire` n'existe. Sur RHEL et SUSE — ou
+        # `apt-get purge` n'existe pas, ou le `|| true` avale l'echec et ou seul
+        # `rm -rf /var/ossec` agit — l'etat reel est : paquet installe,
+        # configuration partie, et un inventaire annoncant qu'il n'y a rien.
+        # **Faux du cote qui MASQUE** : personne ne va chercher un paquet dont
+        # l'inventaire dit qu'il n'existe pas.
+        #
+        # E-225 avait corrige le VERDICT et laisse l'ETAT PERSISTE. Les deux se
+        # contredisaient donc — la reponse disait « echec », l'inventaire disait
+        # « rien ici ». *Un correctif partiel ne laisse pas le systeme a
+        # mi-chemin : il le rend INCOHERENT*, et une incoherence interne coute
+        # plus cher qu'un mensonge unanime, parce qu'elle fait douter de la piece
+        # qui dit vrai.
+        #
+        # ══ POURQUOI `unknown` ET PAS L'UNE DES DEUX AUTRES ════════════════
+        #
+        # Ecrire seulement en cas de reussite laisserait `active`, avec
+        # identifiant et version, sur une machine videe — un agent mort annonce
+        # comme fonctionnel, pire. Les deux options AFFIRMENT quelque chose de
+        # faux : `never_connected` affirme « il n'y a rien », `active` affirme
+        # « ca marche ». **`unknown` n'affirme RIEN**, et c'est la seule des
+        # trois qui ne mente pas quand on ne sait effectivement pas.
+        #
+        # Ce n'est pas une valeur inventee : l'ENUM la porte (034_wazuh.sql:48),
+        # le backend l'ecrit deja quand un statut systemd n'est pas reconnu
+        # (:742), et l'interface la rend en badge gris avec un repli pour tout
+        # statut non mappe (`legacy/wazuh/js/wazuh.js:102` et `:105`).
+        #
+        # ⚠ ELLE EST HONNETE MAIS FAIBLE, et il faut le savoir : elle ne dit pas
+        # QU'UN PAQUET DEMEURE. Aucune autre route ne peut agir dessus, seulement
+        # s'abstenir de conclure — et s'abstenir de conclure vaut mieux que
+        # conclure faux. Le nom complet demande une colonne, et c'est un
+        # arbitrage d'exploitant.
+        _upsert_agent(row['id'],
+                      status='never_connected' if code_v == 0 else 'unknown',
+                      agent_id=None, version=None)
+        _audit(user_id, 'uninstall',
+               f"machine_id={row['id']} code={code} paquet_retire={code_v == 0}")
+        # E-225 : la reponse NOMME ce qui subsiste. Aucun changement de
+        # comportement — on ne retire pas le depot, on cesse de faire croire
+        # qu'il est parti. Un geste reversible qui ne rend pas tout ce qu'il a
+        # pris n'est pas reversible : il est partiel, et le reste est invisible.
+        vestiges = {
+            'retire': ['paquet wazuh-agent', '/var/ossec'],
+            'subsiste': VESTIGES_AMORCAGE,
+            'note': ("Le depot Wazuh et sa cle de signature ne sont PAS retires : "
+                     "la machine continuera de les consulter a chaque mise a jour. "
+                     "Retrait manuel si vous ne comptez pas reinstaller."),
+        }
+        paquet_retire = (code_v == 0)
+        if not paquet_retire:
+            logger.warning("wazuh uninstall : le paquet wazuh-agent est TOUJOURS "
+                           "installe sur machine_id=%s (code_v=%s) — la commande "
+                           "de purge est apt-only", row['id'], code_v)
+        return jsonify({
+            # Le verdict suit l'EFFET mesure, plus le code de sortie d'une
+            # commande dont une moitie ne s'applique pas partout.
+            'success': paquet_retire,
+            'paquet_retire': paquet_retire,
+            'message': None if paquet_retire else (
+                "/var/ossec a ete retire, mais le paquet wazuh-agent est TOUJOURS "
+                "installe : la commande de purge ne couvre que la famille Debian. "
+                "Retrait manuel requis (rpm/zypper)."),
+            'vestiges': vestiges,
+        })
     except Exception as e:
         logger.exception("Erreur uninstall wazuh : %s", e)
         return jsonify({'success': False, 'message': str(e)}), 500
@@ -756,7 +940,31 @@ def set_group():
         with ssh_session(ip, port, user, pwd, logger, service_account=svc) as client:
             # Update /var/ossec/etc/shared/agent.conf ou marquer dans client.keys
             # V1 minimale : on redemarre pour re-inscription
-            execute_as_root(client, "systemctl restart wazuh-agent", root_pwd, logger=logger, timeout=30)
+            _, err_out, code = execute_as_root(
+                client, "systemctl restart wazuh-agent", root_pwd, logger=logger, timeout=30)
+
+        # ══ L'ETAT PERSISTE SUIT LE VERDICT, IL NE LE PRECEDE PAS ═══════════
+        #
+        # Ce bloc jetait le resultat du redemarrage, ecrivait `group_name` en
+        # base et rendait `success: True` quoi qu'il arrive. Or c'est le
+        # redemarrage QUI FAIT le geste : le commentaire ci-dessus le dit —
+        # « on redemarre pour re-inscription ». S'il echoue, l'agent reste dans
+        # son ancien groupe et la base affirme le nouveau. Personne ne peut plus
+        # savoir lequel est vrai, et l'ecran a confirme.
+        #
+        # Meme famille qu'E-90 (supervision) et qu'E-165 (fail2ban), et meme
+        # remede que celui deja pose sur `graylog/deploy` : l'inventaire suit ce
+        # qu'on a pu CONSTATER. Ici le constat est binaire — le service a
+        # redemarre, ou non — donc l'etat ne s'ecrit que dans le premier cas.
+        if code != 0:
+            _audit(user_id, 'set_group_fail',
+                   f"machine_id={row['id']} group={group} code={code}")
+            return jsonify({
+                'success': False,
+                'message': ("Redemarrage de l'agent echoue : le groupe n'a pas ete "
+                            "applique, l'agent reste dans son groupe precedent"),
+                'stderr': (err_out or '')[-1500:],
+            }), 500
 
         _upsert_agent(row['id'], group_name=group)
         _audit(user_id, 'set_group', f"machine_id={row['id']} group={group}")

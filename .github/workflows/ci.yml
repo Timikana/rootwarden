@@ -71,7 +71,7 @@ jobs:
               php -l "$file"
               errors=$((errors + 1))
             fi
-          done < <(find www/ -name "*.php" -type f)
+          done < <(find legacy/ -name "*.php" -type f)
           echo "=== $errors erreur(s) de syntaxe ==="
           [ $errors -eq 0 ] || exit 1
 
@@ -116,6 +116,82 @@ jobs:
         with:
           name: test-results
           path: test-results.xml
+
+  # ─────────────────────────────────────────────────────────────
+  # Job 3 bis : Tests PHPUnit du portage Laravel - BLOQUANT (INF-001)
+  #
+  # Pourquoi il existe. Jusqu'ici la CI portait 13 jobs et UN SEUL executait des
+  # tests : `test-python`. Les 232 tests du portage ne protegeaient donc que la
+  # machine qui les lancait, et les 104 suites E2E restent entierement manuelles.
+  # Ce job ferme la premiere moitie du trou, celle qui ne coute rien.
+  #
+  # Pourquoi il est BLOQUANT. La suite est HERMETIQUE : ni MySQL, ni backend
+  # Python, ni navigateur — `phpunit.xml` pointe la base sur un SQLite en
+  # memoire. Elle n'a donc aucune raison d'etre plus indulgente que les quatre
+  # portes deja bloquantes du depot (bandit, semgrep, pip-audit, gitleaks). Une
+  # porte qui ne bloque pas est un rapport, pas une porte.
+  #
+  # Ce qu'il mesure, et ce qu'il ne mesure pas. Il mesure les GARDES de route —
+  # `role:N`, `perm:xxx`, session authentifiee — sur les 85 routes placees
+  # derriere la session authentifiee, avec les trois roles. Il ne mesure NI qu'une page autorisee rende son
+  # contenu (il faudrait la base du banc et le backend), NI le jeton CSRF : le
+  # cadre EXEMPTE les tests (`PreventRequestForgery::runningUnitTests`), donc une
+  # assertion CSRF ecrite ici passerait sans rien mesurer. C'est
+  # `tests/e2e/go-socle-passerelle.mjs` qui la porte, et elle reste manuelle.
+  #
+  # En prime, et ce n'etait pas cherche : `lint-php` ne verifie la syntaxe que de
+  # `legacy/`. Une erreur de syntaxe dans `laravel/` n'etait vue par aucun job ;
+  # elle fait desormais echouer celui-ci.
+  # ─────────────────────────────────────────────────────────────
+  test-php:
+    name: Tests PHPUnit (portage Laravel)
+    runs-on: ubuntu-latest
+    needs: lint-php
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          # Nommees explicitement plutot que laissees au defaut de l'image :
+          # `pdo_sqlite` est ce sur quoi la suite entiere repose, et une
+          # extension absente se manifesterait par une erreur de connexion
+          # obscure plutot que par un message qui la nomme.
+          extensions: mbstring, dom, xml, ctype, tokenizer, fileinfo, curl, pdo, pdo_sqlite, sqlite3, bcmath
+          tools: composer
+
+      - name: Composer install
+        working-directory: laravel
+        # `--no-scripts` par coherence avec `sca-php` : on n'execute pas les
+        # hooks des paquets. La decouverte de paquets de Laravel n'en souffre
+        # pas — `PackageManifest` reconstruit son manifeste a la volee quand le
+        # fichier de cache est absent.
+        run: composer install --no-scripts --no-interaction --no-progress --prefer-dist
+
+      - name: Preparer l'environnement de test
+        working-directory: laravel
+        # MESURE, PAS PRECAUTION. Sans cle d'application, la suite rend
+        # **226 echecs sur 232** : le groupe `web` chiffre les cookies, donc
+        # toute requete de test echoue, et seuls les six tests qui n'emettent
+        # aucune requete survivent. Mesure le 2026-08-27 en forcant `APP_KEY` a
+        # vide dans le conteneur. La cle est jetable et locale au job : elle ne
+        # dechiffre rien qui existe ailleurs.
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: php artisan test
+        working-directory: laravel
+        run: php artisan test
+
+      - name: Epreuve du deriveur de version (INF-004)
+        # HERMETIQUE : elle fabrique un depot jetable — avec une FUSION, sans
+        # laquelle la propriete d'unicite ne serait pas eprouvee — et n'a donc
+        # besoin ni de l'historique de celui-ci, ni du reseau. Elle est ici
+        # plutot que dans `auto-tag` parce qu'`auto-tag` ne tourne QUE sur les
+        # poussees vers `main` : la regle de version serait alors verifiee apres
+        # avoir servi.
+        run: ./scripts/version.sh --epreuve
 
   # ─────────────────────────────────────────────────────────────
   # Job 4 : Build Docker images (sans push - validation only)
@@ -293,10 +369,10 @@ jobs:
           php-version: "8.4"
           tools: composer
       - name: Composer install (sans scripts pour eviter hooks arbitraires)
-        working-directory: www
+        working-directory: legacy
         run: composer install --no-scripts --no-interaction --no-progress
       - name: Composer audit
-        working-directory: www
+        working-directory: legacy
         # --locked force le scan des versions exactes pinnees dans composer.lock
         # --format=plain pour output GitHub-friendly
         run: |
@@ -394,12 +470,27 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Read version
+      - name: Deriver la version
         id: version
+        # INF-004 : LA VERSION SE DERIVE, ELLE NE SE LIT PLUS.
+        #
+        # Cette etape lisait `legacy/version.txt`, c'est-a-dire un numero POSE A
+        # LA MAIN — et le repli `|| echo "0.0.0"` transformait un fichier absent
+        # en version plausible, donc en tag plausible. Un numero assigne est
+        # valide au moment ou on l'ecrit, pas au moment ou un autre l'emploie :
+        # trois commits de trois sessions ont revendique le meme le 2026-08-27.
+        #
+        # `scripts/version.sh` derive le correctif du depot lui-meme
+        # (`--first-parent` depuis la derniere modification de `VERSION-JALON`),
+        # et il ECHOUE plutot que de deviner. `fetch-depth: 0` ci-dessus est ce
+        # qui le rend possible : sans l'historique complet, le compte serait faux.
+        #
+        # PAS DE CYCLE : la source est le fichier de jalon, jamais les tags — que
+        # ce job produit. Deriver depuis les tags ferait du tag sa propre source.
         run: |
-          VERSION=$(cat www/version.txt 2>/dev/null || echo "0.0.0")
+          VERSION=$(./scripts/version.sh)
           echo "version=v${VERSION}" >> $GITHUB_OUTPUT
-          echo "Version detected: v${VERSION}"
+          echo "Version derivee : v${VERSION}"
 
       - name: Check if tag exists
         id: check

@@ -29,15 +29,19 @@ import time
 import traceback
 import paramiko
 from flask import Blueprint, jsonify, request, Response
-from routes.helpers import require_api_key, require_role, require_machine_access, threaded_route, get_db_connection, server_decrypt_password, logger, encryption, get_current_user
+from routes.helpers import require_api_key, require_role, require_machine_access, check_machine_access, threaded_route, get_db_connection, server_decrypt_password, logger, encryption, get_current_user
+from configure_servers import (
+    _motif_nom_invalide,
+    _valid_username as _valid_username_decouvert,
+)
 from ssh_utils import ssh_session, execute_as_root, ensure_sudo_installed
+from config import Config
 
 bp = Blueprint('ssh', __name__)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Securite : validation des noms d'utilisateur (anti-injection OS command)
 # ─────────────────────────────────────────────────────────────────────────────
-_USERNAME_RE = re.compile(r'^[a-zA-Z0-9._-]{1,32}$')
 
 # ── Helpers SSH keys parsing (v1.18.x) ──────────────────────────────────
 _SSH_KEY_TYPE_RE = re.compile(r'^(ssh-(?:rsa|dss|ed25519)|ecdsa-sha2-[a-z0-9-]+|sk-(?:ssh-ed25519|ecdsa-sha2-nistp256)@openssh\.com)$')
@@ -137,6 +141,42 @@ def _parse_authorized_keys_dump(dump: str):
     return result
 
 
+# Sans `|| true` : ce suffixe forcait le code de sortie a zero et rendait la
+# branche de retour arriere de l'etape 4 litteralement INATTEIGNABLE (E-214).
+_RELOAD_SSHD = "systemctl reload sshd 2>&1 || systemctl reload ssh 2>&1"
+
+
+def _restaure_sshd(client, root_pass, bak_q, fp_q, logger, recharger=False):
+    """Restaure `sshd_config` depuis sa sauvegarde et VERIFIE que la copie a eu lieu.
+
+    ══ E-214 : LE RETOUR ARRIERE MENTAIT DEJA, SUR DEUX CHEMINS VIVANTS ═════
+
+    Les trois branches de rollback faisaient `cp -a` — et parfois un rechargement
+    — en **jetant les deux retours**, puis annoncaient « rollback effectue ». Si
+    la copie echouait, **le fichier restait patche** et l'appelant l'ignorait.
+
+    Les rollbacks des etapes 2 et 3 portent deja ce defaut et sont **vivants** :
+    corriger le `|| true` de l'etape 4 sans corriger ceux-la aurait elargi un
+    defaut existant au lieu de le fermer.
+
+    Rend `(restaure: bool, message: str)`. Quand `restaure` vaut False, le
+    message DIT que le fichier est reste modifie — c'est l'information que
+    l'ancienne version supprimait.
+    """
+    _, err_c, code_c = execute_as_root(client, f"cp -a {bak_q} {fp_q}", root_pass, logger=logger)
+    if code_c != 0:
+        return False, (f"RETOUR ARRIERE ECHOUE ({(err_c or '').strip()[:120]}) - "
+                       f"le fichier sshd_config est RESTE MODIFIE")
+    if not recharger:
+        return True, "retour arriere effectue (fichier restaure)"
+    _, err_r, code_r = execute_as_root(client, _RELOAD_SSHD, root_pass, logger=logger)
+    if code_r != 0:
+        return False, (f"fichier restaure mais RECHARGEMENT ECHOUE "
+                       f"({(err_r or '').strip()[:120]}) - sshd tourne sur l'ancienne "
+                       f"configuration, ce qui est l'etat voulu, mais rien ne l'atteste")
+    return True, "retour arriere effectue et recharge"
+
+
 def _ensure_sshd_allows_user(client, root_pass, sa_name, logger):
     """Patche sshd_config pour ajouter sa_name a AllowUsers si necessaire.
 
@@ -156,19 +196,19 @@ def _ensure_sshd_allows_user(client, root_pass, sa_name, logger):
     )
     out, _, _ = execute_as_root(client, grep_cmd, root_pass, logger=logger)
     if not out or not out.strip():
-        return False, "AllowUsers absent - pas de patch necessaire"
+        return False, True, "AllowUsers absent - pas de patch necessaire"
 
     # Format : /path/to/file:AllowUsers user1 user2 ...
     first_line = out.strip().split('\n')[0]
     if ':' not in first_line:
-        return False, "Parse grep AllowUsers ambigu, skip"
+        return False, True, "Parse grep AllowUsers ambigu, skip"
     file_path, raw = first_line.split(':', 1)
     tokens = raw.strip().split()
     if not tokens or tokens[0].lower() != 'allowusers' or len(tokens) < 2:
-        return False, "Format AllowUsers inattendu, skip"
+        return False, True, "Format AllowUsers inattendu, skip"
     users_listed = tokens[1:]
     if sa_name in users_listed:
-        return False, f"{sa_name} deja dans AllowUsers"
+        return False, True, f"{sa_name} deja dans AllowUsers"
 
     fp_q = shlex.quote(file_path)
     bak_q = shlex.quote(file_path + '.bak.rw')
@@ -177,7 +217,7 @@ def _ensure_sshd_allows_user(client, root_pass, sa_name, logger):
     # 1. Backup
     _, err_b, code_b = execute_as_root(client, f"cp -a {fp_q} {bak_q}", root_pass, logger=logger)
     if code_b != 0:
-        return False, f"Backup echoue : {(err_b or '')[:200]}"
+        return False, False, f"Backup echoue : {(err_b or '')[:200]}"
 
     # 2. Patch via awk : ajoute sa_name a la fin de la 1re ligne AllowUsers
     patch_cmd = (
@@ -188,68 +228,241 @@ def _ensure_sshd_allows_user(client, root_pass, sa_name, logger):
     )
     _, err_p, code_p = execute_as_root(client, patch_cmd, root_pass, logger=logger)
     if code_p != 0:
-        execute_as_root(client, f"cp -a {bak_q} {fp_q}", root_pass, logger=logger)
-        return False, f"Patch awk echoue : {(err_p or '')[:200]}"
+        _, m_r = _restaure_sshd(client, root_pass, bak_q, fp_q, logger)
+        return False, False, f"Patch awk echoue : {(err_p or '')[:200]} - {m_r}"
 
     # 3. Validation sshd -t
     _, err_t, code_t = execute_as_root(client, "sshd -t 2>&1", root_pass, logger=logger)
     if code_t != 0:
-        execute_as_root(client, f"cp -a {bak_q} {fp_q}", root_pass, logger=logger)
-        return False, f"sshd -t a refuse le patch : {(err_t or '')[:200]}"
+        _, m_r = _restaure_sshd(client, root_pass, bak_q, fp_q, logger)
+        return False, False, f"sshd -t a refuse le patch : {(err_t or '')[:200]} - {m_r}"
 
-    # 4. Reload sshd (different selon distrib : sshd vs ssh)
-    reload_cmd = "systemctl reload sshd 2>&1 || systemctl reload ssh 2>&1 || true"
-    _, err_r, code_r = execute_as_root(client, reload_cmd, root_pass, logger=logger)
+    # 4. Rechargement — SANS `|| true`, qui rendait `code_r` toujours nul
+    _, err_r, code_r = execute_as_root(client, _RELOAD_SSHD, root_pass, logger=logger)
     if code_r != 0:
-        execute_as_root(client, f"cp -a {bak_q} {fp_q}", root_pass, logger=logger)
-        execute_as_root(client, reload_cmd, root_pass, logger=logger)
-        return False, f"reload sshd echoue, rollback effectue : {(err_r or '')[:200]}"
+        _, m_r = _restaure_sshd(client, root_pass, bak_q, fp_q, logger, recharger=True)
+        return False, False, f"rechargement sshd echoue : {(err_r or '')[:200]} - {m_r}"
 
-    logger.info("sshd AllowUsers patche : ajoute '%s' dans %s (backup %s.bak.rw)",
-                sa_name, file_path, file_path)
-    return True, f"AllowUsers patche : {sa_name} ajoute dans {file_path}"
+    # 5. ATTESTATION PAR L'EFFET, pas par le code de sortie du rechargement.
+    #
+    # `sshd -T` rend la configuration EFFECTIVE, tous les `Include` resolus, en
+    # LECTURE. C'est le seul controle honnete — et il repond du meme coup a une
+    # borne qui restait ouverte : ce helper ne patche que la PREMIERE ligne
+    # `AllowUsers` trouvee, or sur Debian recente `Include sshd_config.d/*.conf`
+    # est en tete du fichier. Si un `.conf` inclus porte un `AllowUsers`, c'est
+    # LUI qui gagne, et patcher le fichier principal est inerte MEME apres un
+    # rechargement reussi. `sshd -T` le voit ; le code de sortie du rechargement,
+    # non.
+    #
+    # Le verdict est un CODE DE SORTIE et non un texte : rien a parser, donc rien
+    # qu'un echo de terminal puisse falsifier.
+    atteste_cmd = (
+        f"sshd -T 2>/dev/null > /tmp/rw_sshd_t.out || exit 4; "
+        f"if awk 'tolower($1)==\"allowusers\"' /tmp/rw_sshd_t.out "
+        f"| tr ' ' '\\n' | grep -Fxq -- {sa_q}; "
+        f"then rm -f /tmp/rw_sshd_t.out; exit 0; fi; "
+        f"rm -f /tmp/rw_sshd_t.out; exit 5"
+    )
+    _, err_a, code_a = execute_as_root(client, atteste_cmd, root_pass, logger=logger)
+    if code_a == 0:
+        logger.info("sshd AllowUsers patche ET ATTESTE : '%s' figure dans la configuration "
+                    "effective (%s, sauvegarde %s.bak.rw)", sa_name, file_path, file_path)
+        return True, True, f"AllowUsers patche et atteste : {sa_name} est dans la configuration effective"
+
+    if code_a == 5:
+        # Le fichier est patche, sshd a recharge, et le compte n'apparait
+        # TOUJOURS pas : une autre directive prime. Annoncer une reussite ici
+        # serait le defaut meme qu'E-214 corrige.
+        _, m_r = _restaure_sshd(client, root_pass, bak_q, fp_q, logger, recharger=True)
+        return True, False, (f"{sa_name} n'apparait PAS dans `sshd -T` apres rechargement - "
+                             f"une autre directive AllowUsers prime (probablement un "
+                             f"sshd_config.d/*.conf). Le patch de {file_path} est sans effet. "
+                             f"{m_r}")
+
+    # code 4 : `sshd -T` n'a pas pu s'executer. Le patch est ecrit et valide par
+    # `sshd -t`, mais rien ne l'atteste. On ne revient PAS en arriere sur une
+    # modification valide — on refuse simplement de la declarer effective.
+    logger.warning("sshd AllowUsers patche mais NON ATTESTE sur %s : `sshd -T` a echoue (%s)",
+                   file_path, (err_a or '').strip()[:120])
+    return True, False, (f"AllowUsers patche dans {file_path} et valide par `sshd -t`, "
+                         f"mais `sshd -T` n'a pas pu confirmer l'effet - etat NON ATTESTE")
 
 
 def _validate_username(username: str) -> bool:
-    """Valide qu'un nom d'utilisateur ne contient que des caracteres surs."""
-    return bool(_USERNAME_RE.match(username))
+    """Valide qu'un nom d'utilisateur ne contient que des caracteres surs.
+
+    ══ E-204 : C'ETAIT LA QUATRIEME IMPLEMENTATION, ET LA MEME FAUTE ════════
+
+    Ce fichier portait sa PROPRE expression, `^[a-zA-Z0-9._-]{1,32}$` — soit
+    exactement celle de `configure_servers` AVANT E-197. Elle acceptait donc
+    `.` et `..`, qui ne sont pas des noms de compte mais des COMPOSANTS DE
+    CHEMIN, sur quatre routes qui composent des chemins root
+    (`/home/<nom>/.ssh/authorized_keys`) et appellent `userdel`.
+
+    C'est ce trou qui a laisse passer la sonde fautive du 2026-08-27 : le nom
+    `..` qu'elle croyait refuse a traverse tous les gardes et atteint une
+    session SSH. Le defaut etait corrige a un endroit et pas ici.
+
+    ══ ELLE DERIVE, ELLE NE RECOPIE PLUS ═══════════════════════════════════
+
+    Le DOMAINE de ces quatre routes est celui des noms DECOUVERTS — ils
+    viennent de `server_user_inventory`, donc du `/etc/passwd` d'une machine
+    reelle, ou les majuscules existent (`Debian-exim`, `Timikana`). C'est le
+    domaine de `configure_servers._valid_username`, et c'est de la qu'elle
+    vient desormais.
+
+    LA RESERVE D'E-198 NE S'APPLIQUE PAS ICI, et c'est mesure : elle portait sur
+    le POINT, parce que `sudo` ignore les fichiers de `/etc/sudoers.d` dont le
+    nom en contient un. **Aucune de ces quatre routes ne compose de nom de
+    fichier `sudoers.d`** — elles font `userdel` et manipulent
+    `authorized_keys`. Un point au milieu d'un nom (`john.doe`) y est donc
+    legitime, et seuls `.` et `..` doivent tomber. C'est exactement ce que rend
+    la source.
+    """
+    return _valid_username_decouvert(username)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Constantes
 # ─────────────────────────────────────────────────────────────────────────────
 log_dir = os.getenv('LOG_DIR', '/app/logs')
 deployment_log_file = os.path.join(log_dir, "deployment.log")
-MAX_LOG_SIZE = 5 * 1024 * 1024  # 5 Mo
-
-
-def _rotate_log(log_path):
-    """Rotation simple : renomme le fichier s il depasse MAX_LOG_SIZE."""
-    try:
-        if os.path.exists(log_path) and os.path.getsize(log_path) > MAX_LOG_SIZE:
-            rotated = log_path + ".1"
-            if os.path.exists(rotated):
-                os.remove(rotated)
-            os.rename(log_path, rotated)
-    except Exception as e:
-        logging.warning("Rotation log echouee pour %s: %s", log_path, e)
-
-
 def rotate_logs_deployment():
-    """Effectue la rotation du fichier deployment.log si necessaire."""
-    _rotate_log(deployment_log_file)
+    """Archive le journal du deploiement PRECEDENT, puis laisse la place au suivant.
+
+    ══ E-196 : DEUX MECANISMES POUR UNE MEME NOTION, DONT UN INATTEIGNABLE ═══
+
+    Ce fichier etait traite par deux regles qui ne se connaissaient pas :
+
+      - cette rotation, PAR TAILLE — `si > 5 Mo, renommer en .1` ;
+      - `open(deployment_log_file, "w")` dans `/deploy`, qui TRONQUE sans
+        aucune condition, a chaque deploiement.
+
+    La seconde rendait la premiere INATTEIGNABLE. Le fichier ne portant jamais
+    qu'un seul deploiement, il n'atteignait pas 5 Mo, donc la rotation ne
+    pouvait pas se declencher. Mesure du 2026-08-27 dans le conteneur :
+    `deployment.log` = **0 octet**, et **aucun `deployment.log.1` n'a jamais
+    existe**. Le seuil n'etait pas mal choisi : il etait hors d'atteinte.
+
+    Consequence, et c'est ce qui compte : un deploiement qui meurt ne laissait
+    AUCUNE trace apres le suivant — le verdict d'E-193 compris, alors qu'il est
+    ecrit precisement pour dire ce qui a echoue.
+
+    ══ UNE SEULE REGLE, ET ELLE NE DEPEND PLUS D'UNE TAILLE ══════════════════
+
+    Le journal du deploiement precedent devient `.1`, et le suivant repart d'un
+    fichier neuf. Deux generations au plus : l'espace reste borne sans qu'aucun
+    seuil n'ait a etre choisi, et le seuil etait justement la piece qui ne
+    servait a rien.
+
+    Le `"w"` de `/deploy` cesse d'etre une SECONDE troncature : le fichier
+    n'existe plus quand il s'execute, il ne fait plus que le creer.
+
+    Et le flux SSE garde son sens : il envoie « d'abord le contenu existant »,
+    et ce contenu reste celui du deploiement COURANT — pas un historique cumule
+    qu'un exploitant relirait en croyant regarder son deploiement.
+    """
+    try:
+        if os.path.exists(deployment_log_file) and os.path.getsize(deployment_log_file) > 0:
+            precedent = deployment_log_file + ".1"
+            if os.path.exists(precedent):
+                os.remove(precedent)
+            os.rename(deployment_log_file, precedent)
+    except Exception as e:
+        # Un archivage rate ne doit pas empecher le deploiement : au pire le
+        # journal precedent est perdu, ce qui est l'etat d'avant ce correctif.
+        logging.warning("Archivage du journal de deploiement echoue : %s", e)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Deploy + Logs SSE
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _journalise_verdict_deploiement(texte: str) -> None:
+    """Ajoute une ligne de verdict au journal de deploiement, sans le tronquer.
+
+    Ouverture en `a` : le sous-processus vient d'ecrire dans ce fichier ouvert
+    en `w`, et l'ecraser ici effacerait le journal qu'on cherche a conclure.
+    """
+    try:
+        with open(deployment_log_file, "a") as f:
+            f.write(f"\n[RootWarden] {texte}\n")
+    except Exception as e:
+        logging.error("[deploy] verdict non journalise : %s", e)
+
+
 @bp.route('/deploy', methods=['POST'])
 @require_api_key
+@require_role(2)             # E-191
+@require_machine_access      # E-191
 @threaded_route
 def deploy():
-    """
-    Lance le script de deploiement (configure_servers.py) en arriere-plan.
-    La route n'est pas decoree car elle utilise deja un thread dedie pour le deploiement.
+    """Lance le script de deploiement (configure_servers.py) en arriere-plan.
+
+    ══ E-191 : CETTE ROUTE N'AVAIT QUE `@require_api_key` ════════════════════
+
+    Elle ECRIT des cles SSH en root sur toutes les machines transmises, et elle
+    en REVOQUE. Elle etait la moins gardee des trois gestes comparables :
+
+        POST /deploy               flotte transmise, ecrit ET revoque   api_key SEUL
+        POST /deploy_platform_key  UNE machine                          api_key + role(2) + machine_access
+        POST /reboot_server        redemarre                            api_key + role(2) + machine_access
+
+    `deploy_platform_key` est dans CE fichier, 270 lignes plus bas, avec un
+    commentaire de patch explicite. Quelqu'un a durci le deploiement d'une cle
+    sur une machine et laisse ouvert celui du parc entier : « le cas visible
+    traite, le cas subtil pris a l'envers », a son maximum — le geste durci est
+    le MOINS dangereux des deux.
+
+    L'ancien commentaire disait : « La route n'est pas decoree car elle utilise
+    deja un thread dedie pour le deploiement. » Executer dans un thread n'a
+    AUCUN rapport avec l'autorisation. Un commentaire qui justifie une absence
+    par une raison sans rapport est plus couteux qu'un silence : il decourage la
+    question. Il est retire.
+
+    ══ POURQUOI `role(2)` ET PAS `@require_permission('can_deploy_keys')` ═══
+
+    La permission serait le miroir exact de la page. `role(2)` ferme l'ecart
+    mesure, et il le fait sans dependre d'une colonne de permission.
+
+    ⚠ CE PARAGRAPHE PORTAIT UNE OBJECTION QUI N'EST PLUS VRAIE, ET DONT LE
+    MECANISME ETAIT DEJA FAUX QUAND ELLE A ETE ECRITE.
+
+    Il disait : « la page accepte les permissions TEMPORAIRES, tandis que le
+    backend lit `X-User-Permissions` — les PERMANENTES seules. Un compte dont la
+    permission est temporaire passerait la page et serait refuse ici. »
+
+    Deux corrections :
+
+    1. le backend ne lisait DEJA plus les en-tetes au moment ou c'etait ecrit —
+       le durcissement A01-01 les avait abandonnes parce qu'ils permettaient de
+       FORGER un droit. Il lisait la table `permissions`. La conclusion tenait
+       quand meme, par un autre chemin : cette table ne porte que le permanent ;
+    2. l'ecart LUI-MEME est ferme depuis le 2026-08-28 :
+       `helpers.get_current_user` charge desormais les octrois temporaires non
+       expires, comme les deux portails. **L'objection est sans objet.**
+
+    On garde `role(2)` — mais parce que c'est la garde mesuree comme suffisante,
+    plus parce qu'une permission casserait un chemin legitime.
+
+    *Une trouvaille juste peut etre expliquee faux, et l'explication est ce qu'on
+    reutilise* : celle-ci a servi d'argument pendant une journee entiere.
+
+    ══ CE QUE CELA RETIRE : RIEN, ET C'EST MESURE ═══════════════════════════
+
+    Mesure du 2026-08-27 : **aucun compte actif de role 1 ne porte
+    `can_deploy_keys`**, ni en permanent ni en temporaire (0 octroi non expire).
+    `opsuser` — le compte que l'audit nommait comme tombant dans l'ecart — a
+    `can_deploy_keys = 0` : la page le refusait deja, seul le chemin de requete
+    l'acceptait. C'est exactement ce que ce correctif ferme.
+
+    POSER LA GARDE N'EST PAS DECLENCHER LE GESTE. Le deploiement de cles reste
+    interdit par l'exploitant (K4) — et c'est precisement pour cela que poser la
+    garde ne coute rien.
+
+    `@require_machine_access` est inerte au role 2 ; le controle qui travaille
+    reste `check_machine_access(mid)` dans le corps, machine par machine. Il est
+    pose pour aligner cette route sur sa voisine et pour qu'un abaissement futur
+    du role ne soit pas silencieusement une ouverture.
     """
     try:
         data = request.json
@@ -269,6 +482,25 @@ def deploy():
         rotate_logs_deployment()
 
         def run_deployment():
+            # ══ LE CODE DE SORTIE DU SOUS-PROCESSUS EST LU, ET IL EST DIT ════
+            #
+            # E-193. `process.wait()` etait appele et son code JETE. La reponse
+            # HTTP de cette route est un accuse de reception — un
+            # `threading.Thread` dans le corps, pas un `@threaded_route` — donc
+            # elle ne peut pas porter le verdict, et c'est normal. Mais il
+            # n'etait porte NULLE PART : un deploiement qui meurt ne laissait
+            # aucun signal, et le seul endroit ou l'exploitant regarde est le
+            # flux SSE de `/logs`, qui ne lit que ce fichier.
+            #
+            # Le verdict est donc ECRIT DANS LE FLUX, la ou il est regarde.
+            # `stream_logs` suit le fichier pendant 30 s d'inactivite : une
+            # ligne ajoutee juste apres la fin du processus y parvient.
+            #
+            # Le terminateur `[Fin du flux de logs]` n'est PAS emis ici : c'est
+            # un JETON DE PROTOCOLE que le client compare litteralement, et
+            # l'ecrire dans le fichier ferait croire au client que le flux est
+            # fini alors que le serveur continue de le tenir.
+            code = None
             try:
                 with open(deployment_log_file, "w") as log_file:
                     process = subprocess.Popen(
@@ -276,9 +508,21 @@ def deploy():
                         stdout=log_file,
                         stderr=subprocess.STDOUT
                     )
-                    process.wait()
+                    code = process.wait()
             except Exception as e:
                 logging.error(f"Erreur lors de l'execution de configure_servers.py : {e}")
+                _journalise_verdict_deploiement(
+                    f"ECHEC : le deploiement n'a pas pu etre execute ({e}).")
+                return
+
+            if code == 0:
+                logging.info("[deploy] configure_servers.py termine (code 0).")
+                _journalise_verdict_deploiement("Deploiement termine (code 0).")
+            else:
+                logging.error("[deploy] configure_servers.py termine avec le code %s.", code)
+                _journalise_verdict_deploiement(
+                    f"ECHEC : le deploiement s'est termine avec le code {code}. "
+                    f"Les gestes deja emis n'ont PAS ete annules.")
         thread = threading.Thread(target=run_deployment)
         thread.start()
         return jsonify({"success": True, "message": "Deploiement lance avec succes."})
@@ -374,6 +618,19 @@ def preflight_check():
             'ssh_ok': False,
             'os_version': None,
             'disk_free': None,
+            # E-194 : TOUJOURS present, et faux par defaut. L'audit d'impact
+            # ci-dessous vit dans un `try` imbrique : quand il levait, il
+            # journalisait sans rien ajouter a `errors`, et les trois champs
+            # qu'il produit restaient ABSENTS. L'ecran composait alors
+            # « badge OK · aucune erreur · aucun acces a revoquer · aucun
+            # prerequis manquant » — pour une machine dont l'inventaire n'avait
+            # pas pu etre lu. Un champ absent se rend comme une liste vide, et
+            # une liste vide se lit « rien a revoquer ».
+            #
+            # Ce drapeau porte la difference entre « etabli et vide » et
+            # « pas etabli ». Il vaut faux tant que l'audit n'a pas abouti —
+            # y compris quand la connexion SSH echoue avant de l'atteindre.
+            'audit_inventaire': False,
             'errors': [],
         }
 
@@ -483,8 +740,21 @@ def preflight_check():
                     managed_names = {r['username'] for r in inventory if r['status'] == 'managed' and r['managed_by'] == 'rootwarden'}
                     result['users_revoked'] = sorted(managed_names - authorized)
 
+                    # L'audit a ABOUTI : les trois champs ci-dessus sont des
+                    # constats, pas des absences.
+                    result['audit_inventaire'] = True
+
                 except Exception as ex:
                     logger.warning("Preflight inventory audit (%s): %s", m['name'], ex)
+                    # E-194 : DIRE que l'audit a echoue, au lieu de laisser un
+                    # champ absent. Sans cette ligne, la seule trace etait un
+                    # `logger.warning` cote serveur — invisible a l'ecran qui
+                    # prepare le deploiement.
+                    result['errors'].append(
+                        "Audit d'inventaire indisponible : la liste des acces qui "
+                        "seront REVOQUES n'a pas pu etre etablie. Ne pas deployer "
+                        "sans l'avoir relue."
+                    )
 
         except Exception as e:
             result['errors'].append(f"Connexion SSH echouee: {str(e)[:100]}")
@@ -606,7 +876,7 @@ def deploy_platform_key():
                     # Deployer le service account rootwarden dans la foulee
                     sa_ok = False
                     try:
-                        sa_name = 'rootwarden'
+                        sa_name = Config.NOM_COMPTE_SERVICE
                         if not re.match(r'^[a-z][a-z0-9_-]+$', sa_name):
                             raise ValueError(f"Nom de compte invalide: {sa_name}")
                         # Installer sudo si absent (utilise su - avec root_password)
@@ -660,10 +930,13 @@ def deploy_platform_key():
                             except paramiko.AuthenticationException:
                                 # Auto-fix : sshd refuse peut-etre rootwarden via
                                 # AllowUsers. On tente de patcher + retry.
-                                modified, patch_msg = _ensure_sshd_allows_user(
+                                modified, atteste, patch_msg = _ensure_sshd_allows_user(
                                     client, root_pass, sa_name, logger)
                                 logger.info("Service account auth fail, patch sshd : %s", patch_msg)
-                                if modified:
+                                # E-214 : on retente sur l'ATTESTATION, pas sur la
+                                # modification. Un fichier patche dont `sshd -T` ne
+                                # montre pas l'effet ne changera rien a l'essai suivant.
+                                if modified and atteste:
                                     try:
                                         whoami = _try_sa_login()
                                     except paramiko.AuthenticationException:
@@ -717,19 +990,53 @@ def deploy_platform_key():
 @require_role(3)  # superadmin only - kill-switch
 @threaded_route
 def revoke_service_account():
-    """
-    Patch A04-INSEC-N5 (OWASP A04 Insecure Design) - kill-switch.
+    """Retire le compte de service `rootwarden` des machines designees.
 
-    Revoque le compte de service 'rootwarden' sur une ou plusieurs machines :
-    - Supprime l'utilisateur Linux distant (userdel -r -f)
-    - Retire le fichier /etc/sudoers.d/rootwarden
-    - Marque service_account_deployed=0 en BDD
-    - Audit log immutable
+    Body JSON : {machine_ids: [int], reason: str}. Superadmin uniquement.
 
-    Cas d'usage : compromission suspectee de la clé Ed25519 plateforme,
-    rotation forcee, audit sortant. Superadmin only.
+    Ce qu'elle fait, machine par machine :
+    - supprime l'utilisateur Linux distant (`userdel -r -f`)
+    - retire `/etc/sudoers.d/rootwarden`
+    - passe `service_account_deployed` a 0
+    - ecrit une entree d'audit
 
-    Body JSON : {machine_ids: [int], reason: str}
+    ══ E-219 : CE N'EST PAS UN KILL-SWITCH, ET L'ETIQUETTE A ETE RETIREE ════
+
+    Cette docstring portait le mot « kill-switch » et trois cas d'usage :
+    « compromission suspectee de la cle Ed25519 plateforme, rotation forcee,
+    audit sortant ». **Le geste n'en remplit AUCUN**, et le nom faisait croire
+    l'inverse a qui le lisait avant de decider.
+
+    CE QU'IL LAISSE, ET C'EST LA MOITIE QUI MANQUAIT. La cle de plateforme
+    reste deployee sur `root` (`ssh.py` : `>> /root/.ssh/authorized_keys`) ET
+    sur le compte nominal (`>> ~/.ssh/authorized_keys`). Retirer le compte de
+    service ne retire donc **aucune** des deux autres copies : une cle
+    compromise reste acceptee par la machine, par deux chemins.
+
+    ══ LA CHAINE REELLE, POUR UNE CLE COMPROMISE ═══════════════════════════
+
+        1. `regenerate_platform_key`  remplace la cle EMPLOYEE — elle ne retire
+                                      RIEN des machines (E-226)
+        2. `server_user_remove_key`   retire l'ancienne, COMPTE PAR COMPTE et
+                                      MACHINE PAR MACHINE
+
+    **Aucun geste unique n'y repond.** Le dire ici est le seul endroit ou
+    quelqu'un le lira au moment ou il en a besoin.
+
+    ⚠ `server_user_remove_key`, PAS `remove_user_keys` — la confusion a ete
+    faite TROIS fois, y compris dans `PARITE.md`. C'est la route soigneuse :
+    sauvegarde, empreintes recalculees, refus par defaut sur la cle de
+    plateforme, code de retour lu. *Deux fonctions voisines qui font le meme
+    geste sous des noms symetriques sont un piege de lecture avant d'etre un
+    defaut de code.*
+
+    ══ ET LE GESTE NE GRANDIT PAS ══════════════════════════════════════════
+
+    Etendre cette revocation aux trois copies a ete REFUSE : elle rendrait
+    RootWarden injoignable autrement que par mot de passe, c'est-a-dire qu'elle
+    detruirait l'acces au lieu de le restreindre. **Une route qui ne fait qu'une
+    partie du travail et qui le DIT vaut mieux qu'une route qui fait tout et
+    verrouille le parc.**
     """
     data = request.get_json(silent=True) or {}
     machine_ids = data.get('machine_ids', [])
@@ -737,13 +1044,45 @@ def revoke_service_account():
     if not machine_ids:
         return jsonify({'success': False, 'message': 'machine_ids requis'}), 400
 
+    from approvals import gate, AucunApprobateur
+    # ══ E-201 : LA PORTE A QUATRE YEUX EST ENFIN INTERROGEE ═════════════════
+    #
+    # `Config.APPROVAL_ACTIONS` nommait cette action depuis toujours, et
+    # `gate()` n'etait JAMAIS appele : l'approbation existait en configuration
+    # seulement. Une garde declaree et jamais interrogee.
+    #
+    # LE SEUL `except` ATTRAPE LE REFUS MOTIVE, ET IL LE REND. Il n'avale
+    # rien d'autre : sur les deux actions de `ACTIONS_SANS_REPLI`, `gate()`
+    # LEVE aussi quand la base est indisponible, et cette levee-la traverse —
+    # la porte qui echoue REFUSE. Attraper tout et continuer rendrait les deux
+    # levees inutiles ; c'est le defaut des deux appels preexistants, dont le
+    # `logger.debug` n'est meme pas journalise en exploitation.
+    _uid, _role = get_current_user()
+    try:
+        _ap = gate('revoke_service_account', int(machine_ids[0]), 'compte de service',
+                   {'machine_ids': machine_ids, 'reason': reason}, _uid, role=_role)
+    except AucunApprobateur as _e:
+        # Le blocage est LISIBLE : il dit sa cause et la marche a suivre. Une
+        # fonctionnalite briquee en silence est pire qu'une fonctionnalite
+        # bloquee qui s'explique.
+        return jsonify({'success': False, 'approbateur_manquant': True,
+                        'message': str(_e)}), 409
+    if _ap is not None:
+        return jsonify({
+            'success': False, 'pending_approval': True, 'request_id': _ap['id'],
+            'message': ("Demande d'approbation creee : un 2e administrateur doit valider "
+                        "avant execution." if _ap['status'] == 'created'
+                        else "Action deja en attente d'approbation par un 2e administrateur."),
+        }), 202
+
     user_id, _ = get_current_user()
     conn = get_db_connection()
     try:
         cur = conn.cursor(dictionary=True)
         fmt = ','.join(['%s'] * len(machine_ids))
         cur.execute(
-            f"SELECT id, name, ip, port, user, password, root_password "
+            f"SELECT id, name, ip, port, user, password, root_password, "
+            f"service_account_deployed "
             f"FROM machines WHERE id IN ({fmt})", machine_ids
         )
         machines = cur.fetchall()
@@ -753,18 +1092,53 @@ def revoke_service_account():
     import shlex as _shlex
     results = []
     for m in machines:
-        r = {'machine_id': m['id'], 'name': m['name'], 'success': False, 'message': ''}
+        # `sudoers_orphelin` est TOUJOURS present, meme a False : un champ
+        # absent se lit « rien a dire », et ici il y a quelque chose a dire.
+        r = {'machine_id': m['id'], 'name': m['name'], 'success': False,
+             'message': '', 'sudoers_orphelin': False}
         try:
             ssh_pass = server_decrypt_password(m['password'])
             root_pass = server_decrypt_password(m['root_password'])
-            with ssh_session(m['ip'], m['port'], m['user'], ssh_pass, logger=logger) as client:
+            with ssh_session(m['ip'], m['port'], m['user'], ssh_pass, logger=logger,
+                             service_account=m.get('service_account_deployed', False)) as client:
                 # Suppression user + sudoers (idempotent : si deja supprime, OK)
+                # ══ L'ORDRE COMPTE, ET C'EST LE CORRECTIF CI-DESSUS QUI LE REND
+                #    NECESSAIRE (E-218) ═══════════════════════════════════════
+                #
+                # Cette route se connecte desormais PAR le compte de service
+                # quand il est deploye. Or `execute_as_root` en ce mode eleve
+                # via `sudo sh -c`, donc en s'appuyant sur le fichier sudoers
+                # que la premiere commande supprimait.
+                #
+                # L'elevation vaut pour toute l'invocation : la chaine se
+                # terminait malgre tout. Mais un ARRET EN COURS DE ROUTE — le
+                # delai de 30 s expire sur un `userdel -r` d'un gros repertoire,
+                # une coupure reseau — laissait la machine dans un etat dont on
+                # ne pouvait PLUS SORTIR : sudoers supprime, compte encore la,
+                # `service_account_deployed` toujours a 1, et la tentative
+                # suivante se reconnectant par un compte de service qui ne peut
+                # plus eleverer. Sur une machine migree, `root_password` vaut
+                # '' : aucun repli.
+                #
+                # Le retrait du sudoers passe donc EN DERNIER. Un echec partiel
+                # laisse au pire un fichier orphelin — inerte, puisqu'aucun
+                # compte ne porte plus ce nom — et la revocation reste rejouable.
+                #
+                # ══ ET LE VERDICT VERIFIE LES DEUX EFFETS ═══════════════════
+                #
+                # L'ancien ne controlait que l'absence du COMPTE. Il aurait donc
+                # annonce une reussite en laissant le fichier sudoers en place :
+                # un `rootwarden` recree a la main y aurait retrouve un
+                # NOPASSWD: ALL que personne n'a accorde. Les `if` ne declenchent
+                # pas `set -e`, contrairement a un `test … && exit`.
                 cmd = (
                     "set -e; "
-                    "rm -f /etc/sudoers.d/rootwarden; "
                     "userdel -r -f rootwarden 2>/dev/null || true; "
                     "rm -rf /home/rootwarden /var/spool/mail/rootwarden 2>/dev/null || true; "
-                    "id rootwarden 2>/dev/null && exit 1 || exit 0"
+                    "rm -f /etc/sudoers.d/rootwarden; "
+                    "if id rootwarden 2>/dev/null; then exit 1; fi; "
+                    "if [ -e /etc/sudoers.d/rootwarden ]; then exit 2; fi; "
+                    "exit 0"
                 )
                 from ssh_utils import execute_as_root
                 _, err_out, code = execute_as_root(client, cmd, root_pass, logger=logger, timeout=30)
@@ -779,6 +1153,116 @@ def revoke_service_account():
                         conn2.commit()
                     r['success'] = True
                     r['message'] = 'Service account revoque'
+                elif code == 2:
+                    # ══ E-220 : LE DRAPEAU PASSE A 0, ET MA VERSION PRECEDENTE
+                    #    DISAIT L'INVERSE ═════════════════════════════════════
+                    #
+                    # Elle le laissait a 1 « pour qu'un rejeu termine ». C'ETAIT
+                    # FAUX, et le code juste au-dessus le prouve : on n'atteint
+                    # `code == 2` qu'apres avoir passe `if id rootwarden`, donc
+                    # LE COMPTE N'EXISTE PLUS. Avec le drapeau a 1, le rejeu
+                    # ouvrirait sa session EN TANT QUE `rootwarden` — un compte
+                    # supprime. Il ne s'authentifierait meme pas. Le chemin de
+                    # rattrapage que ce commentaire promettait etait ferme.
+                    #
+                    # Et le drapeau a 1 AMPLIFIAIT le defaut ailleurs :
+                    # `remove_ssh_password` (:1275) n'exige que ce drapeau. Elle
+                    # aurait donc ACCEPTE de vider les deux mots de passe d'une
+                    # machine dont le compte de service n'existe plus.
+                    #
+                    # A 0, les lecteurs redeviennent justes :
+                    # `remove_ssh_password` REFUSE, et `has_keypair` cesse de
+                    # compter un compte absent.
+                    #
+                    # ⚠ UNE TROISIEME RAISON FIGURAIT ICI ET ELLE ETAIT FAUSSE.
+                    # Elle disait : « le rejeu passe par le compte NOMINAL, le
+                    # seul qui puisse encore retirer le fichier ». Le rejeu part
+                    # bien du compte nominal — mais il ne peut pas TERMINER.
+                    # Releve par la session 5, verifie ici :
+                    #
+                    #   - meme avec le drapeau a 1, la connexion ABOUTIT :
+                    #     `connect_ssh` attrape `AuthenticationException` sur sa
+                    #     tentative 0 et se replie sur la cle de plateforme du
+                    #     compte nominal (`ssh_utils.py:250`) ;
+                    #   - ce qui echoue n'est donc pas l'authentification mais
+                    #     l'ELEVATION : `_rootwarden_auth_method` vaut alors
+                    #     'keypair', le court-circuit NOPASSWD ne s'applique pas,
+                    #     et `root_password` est envoye — VIDE sur une machine
+                    #     dont la migration est achevee.
+                    #
+                    # Le rejeu est donc ferme a 0 COMME a 1. Le drapeau reste a 0
+                    # pour les deux premieres raisons, qui suffisent.
+                    #
+                    # ══ CE QUI EN DECOULE, ET QUI EST PIRE QUE « INCOMPLET » ══
+                    #
+                    # Sur une machine migree, AUCUN chemin du produit ne retire
+                    # ce fichier. La raison a d'abord ete mal ecrite ici, et la
+                    # vraie est plus simple et plus large :
+                    #
+                    #   AUCUNE routine du produit ne balaie `/etc/sudoers.d/` a
+                    #   la recherche de fichiers sans compte correspondant.
+                    #
+                    # L'explication precedente accusait l'exception
+                    # `if username == _RESERVED_SA_USER` de
+                    # `_purge_legacy_sudoers`. Mesure : cette fonction n'est
+                    # appelee que depuis `add_to_sudoers` et
+                    # `remove_from_sudoers`, TOUJOURS avec le nom d'un
+                    # utilisateur GERE par le portail. Elle ne regarde donc
+                    # jamais `/etc/sudoers.d/rootwarden`, et son exception est un
+                    # garde-fou de COLLISION DE NOMS — le cas ou un utilisateur
+                    # du portail s'appellerait `rootwarden`. Elle ne protege pas
+                    # l'orphelin : elle ne le croise pas.
+                    #
+                    # Le fichier survit parce que PERSONNE NE LE CHERCHE, pas
+                    # parce qu'une regle le protege. Les deux autres maillons
+                    # tiennent : le rejeu ne peut pas elever, et le seul geste
+                    # qui l'ecrase — `deploy_service_account` — le REMPLACE en
+                    # recreant le compte, il ne le retire pas.
+                    # L'etat n'est ni transitoire ni auto-reparant : IL EST
+                    # PERMANENT. Sur une machine NON migree (`root_password`
+                    # present) le rejeu aboutit — le blocage est propre a l'etat
+                    # vers lequel toute la page pousse.
+                    #
+                    # ══ UN CHANGEMENT DE COMPORTEMENT SUR K4, NOMME ══════════
+                    #
+                    # `configure_servers.py:758` : `if not use_sa:
+                    # ensure_sudo_installed(...)`. Le drapeau a 0 fait donc
+                    # EXECUTER cette etape au deploiement suivant. Installer
+                    # `sudo` la ou il est deja present est sans effet, et si
+                    # l'elevation manque l'echec est precoce — mais c'est un
+                    # comportement qui change, et il vaut mieux l'ecrire que le
+                    # decouvrir.
+                    #
+                    # ══ CE QUI RESTE, ET QUI N'A PAS DE PORTEUR EN BASE ══════
+                    #
+                    # Un `/etc/sudoers.d/rootwarden` orphelin : `NOPASSWD: ALL`
+                    # pour un compte qui n'existe plus. Inerte tant que rien ne
+                    # recree ce nom — et le seul purgeur du produit
+                    # (`configure_servers._purge_legacy_sudoers`) l'EXCLUT
+                    # explicitement, exception ecrite pour proteger un compte
+                    # vivant et qui survit a sa disparition parce qu'elle ne la
+                    # teste pas.
+                    #
+                    # Le nommer ici est donc le seul signalement qui existe. Une
+                    # colonne serait le vrai porteur, mais c'est une migration
+                    # sur `machines`, table de PRODUCTION : arbitrage exploitant,
+                    # pas effet de bord d'un correctif.
+                    with get_db_connection() as conn2:
+                        cur2 = conn2.cursor()
+                        cur2.execute(
+                            "UPDATE machines SET service_account_deployed = 0 WHERE id = %s",
+                            (m['id'],)
+                        )
+                        conn2.commit()
+                    r['sudoers_orphelin'] = True
+                    r['message'] = (
+                        "Compte de service supprime, mais /etc/sudoers.d/rootwarden SUBSISTE : "
+                        "NOPASSWD: ALL orphelin. Aucun geste du produit ne le retirera "
+                        "(exception de purge). A retirer a la main sur la machine.")
+                    logger.warning(
+                        "revoke_service_account : sudoers ORPHELIN sur %s (machine_id=%s) — "
+                        "NOPASSWD: ALL sans compte porteur, retrait manuel requis",
+                        m['name'], m['id'])
                 else:
                     r['message'] = (err_out or '')[-300:].strip() or f'exit={code}'
         except Exception as e:
@@ -792,7 +1276,8 @@ def revoke_service_account():
                 cur3.execute(
                     "INSERT INTO user_logs (user_id, action, created_at) VALUES (%s, %s, NOW())",
                     (user_id, f"[panic] revoke_service_account machine={_shlex.quote(m['name'])} "
-                              f"reason={_shlex.quote(reason)} ok={r['success']}")
+                              f"reason={_shlex.quote(reason)} ok={r['success']}"
+                              f"{' SUDOERS_ORPHELIN' if r['sudoers_orphelin'] else ''}")
                 )
                 conn3.commit()
         except Exception:
@@ -833,7 +1318,8 @@ def deploy_service_account():
         cur = conn.cursor(dictionary=True)
         fmt = ','.join(['%s'] * len(machine_ids))
         cur.execute(
-            f"SELECT id, name, ip, port, user, password, root_password "
+            f"SELECT id, name, ip, port, user, password, root_password, "
+            f"service_account_deployed "
             f"FROM machines WHERE id IN ({fmt})", machine_ids
         )
         machines = cur.fetchall()
@@ -848,7 +1334,8 @@ def deploy_service_account():
 
         try:
             # Connexion via keypair ou password existant
-            with ssh_session(m['ip'], m['port'], m['user'], ssh_pass, logger=logger) as client:
+            with ssh_session(m['ip'], m['port'], m['user'], ssh_pass, logger=logger,
+                             service_account=m.get('service_account_deployed', False)) as client:
                 sa_name = 'rootwarden'
 
                 # 0. Installer sudo si absent
@@ -1066,6 +1553,37 @@ def reenter_ssh_password():
 @threaded_route
 def regenerate_platform_key_route():
     """Regenere la keypair plateforme. ATTENTION : necessite re-deploiement."""
+    from approvals import gate, AucunApprobateur
+    # ══ E-201 : LA PORTE A QUATRE YEUX EST ENFIN INTERROGEE ═════════════════
+    #
+    # `Config.APPROVAL_ACTIONS` nommait cette action depuis toujours, et
+    # `gate()` n'etait JAMAIS appele : l'approbation existait en configuration
+    # seulement. Une garde declaree et jamais interrogee.
+    #
+    # LE SEUL `except` ATTRAPE LE REFUS MOTIVE, ET IL LE REND. Il n'avale
+    # rien d'autre : sur les deux actions de `ACTIONS_SANS_REPLI`, `gate()`
+    # LEVE aussi quand la base est indisponible, et cette levee-la traverse —
+    # la porte qui echoue REFUSE. Attraper tout et continuer rendrait les deux
+    # levees inutiles ; c'est le defaut des deux appels preexistants, dont le
+    # `logger.debug` n'est meme pas journalise en exploitation.
+    _uid, _role = get_current_user()
+    try:
+        _ap = gate('regenerate_platform_key', 0, 'flotte',
+                   {'portee': 'flotte entiere'}, _uid, role=_role)
+    except AucunApprobateur as _e:
+        # Le blocage est LISIBLE : il dit sa cause et la marche a suivre. Une
+        # fonctionnalite briquee en silence est pire qu'une fonctionnalite
+        # bloquee qui s'explique.
+        return jsonify({'success': False, 'approbateur_manquant': True,
+                        'message': str(_e)}), 409
+    if _ap is not None:
+        return jsonify({
+            'success': False, 'pending_approval': True, 'request_id': _ap['id'],
+            'message': ("Demande d'approbation creee : un 2e administrateur doit valider "
+                        "avant execution." if _ap['status'] == 'created'
+                        else "Action deja en attente d'approbation par un 2e administrateur."),
+        }), 202
+
     from ssh_key_manager import regenerate_platform_key
     regenerate_platform_key()
     # Marquer tous les serveurs comme non-deployes
@@ -1078,6 +1596,113 @@ def regenerate_platform_key_route():
         conn.close()
     from ssh_key_manager import get_platform_public_key
     return jsonify({'success': True, 'message': 'Keypair regeneree - re-deploiement requis', 'public_key': get_platform_public_key()})
+
+
+@bp.route('/server_users_inventory', methods=['GET'])
+@require_api_key
+@require_role(2)  # aligne sur la page portee, qui exige role:2 (voir ComptesDistantsController)
+@require_machine_access
+@threaded_route
+def server_users_inventory():
+    """Rend l'inventaire des comptes distants d'une machine, AVEC ses drapeaux.
+
+    ══ POURQUOI UNE ROUTE, ET PAS UNE COLONNE ═══════════════════════════════
+
+    E-200. `nom_valide` et `motif_invalide` sont CALCULES (E-199), pas stockes :
+    `server_user_inventory` porte quinze colonnes et aucune ne les nomme. Ils
+    n'existaient donc qu'au RETOUR d'un scan — et la page rend son inventaire
+    depuis la base, au chargement.
+
+    Consequence : un compte nomme `..` restait invisible tant que personne
+    n'avait relance un scan, c'est-a-dire precisement dans l'etat ou l'on en a
+    le plus besoin.
+
+    Persister le verdict aurait demande une migration, et surtout l'aurait rendu
+    PERIMABLE : la colonne aurait garde le verdict du scan qui l'a posee, pendant
+    que la regle, elle, peut changer. C'est la classe qu'E-195, E-196 et E-197
+    ont coutee ce jour — une regle recopiee finit par diverger de celle qui
+    decide. Ici la regle est appliquee A LA LECTURE, donc elle ne peut pas
+    diverger d'elle-meme.
+
+    ══ CETTE ROUTE NE JOINT AUCUNE MACHINE ══════════════════════════════════
+
+    Elle lit la base et applique `_motif_nom_invalide`. Rien d'autre. C'est ce
+    qui la distingue de `/scan_server_users`, qui ouvre une session SSH et reste
+    un GESTE. Une page qui joint le parc en s'ouvrant a deja coute assez cher au
+    chantier (`health_check.php`).
+
+    ══ LE TOTAL VIENT DU SERVEUR, PAS DE LA LONGUEUR DE LA LISTE ════════════
+
+    `total` est un `COUNT(*)`, jamais `len(comptes)`. La regle d'ecran est que
+    le TOTAL gagne quand il contredit la liste : il compte tout, la liste ne
+    porte que ce qui a voyage. Rendre `len()` ferait afficher un nombre PLUS
+    PETIT que la realite le jour ou une borne apparaitrait — la direction
+    dangereuse. Aucune borne n'existe aujourd'hui ; l'invariant tient d'avance.
+
+    ══ `@require_machine_access` EST INERTE ICI, ET C'EST DIT ═══════════════
+
+    `check_machine_access` rend `True` sans condition des le role 2
+    (`helpers.py:299`), donc ce decorateur ne contraint rien sur une route
+    gardee `@require_role(2)`. Il est conserve DELIBEREMENT, et pour une seule
+    raison : le jour ou quelqu'un abaisserait le role pour ouvrir cette lecture
+    plus largement, il deviendrait porteur — et cette route enumere des noms de
+    comptes. Il n'est pas la pour proteger aujourd'hui ; il est la pour que
+    l'abaissement du role ne soit pas silencieusement une divulgation.
+    """
+    machine_id = request.args.get('machine_id')
+    if not machine_id:
+        return jsonify({'success': False, 'message': 'machine_id requis'}), 400
+    # Le cast vit HORS du `try` : une faute de la requete se refuse en 400,
+    # elle ne casse pas en 500 (E-164).
+    try:
+        machine_id = int(machine_id)
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'message': 'machine_id doit etre un nombre'}), 400
+
+    try:
+        with get_db_connection() as conn:
+            cur = conn.cursor(dictionary=True)
+            cur.execute("SELECT COUNT(*) AS n FROM server_user_inventory WHERE machine_id = %s",
+                        (machine_id,))
+            total = int((cur.fetchone() or {}).get('n', 0))
+
+            cur.execute("""
+                SELECT id, username, uid, home_dir, shell, status, managed_by,
+                       keys_count, has_platform_key, first_seen_at, last_seen_at,
+                       reviewed_by, reviewed_at, notes
+                FROM server_user_inventory
+                WHERE machine_id = %s
+                ORDER BY username
+            """, (machine_id,))
+            comptes = cur.fetchall()
+
+        for c in comptes:
+            for k in ('first_seen_at', 'last_seen_at', 'reviewed_at'):
+                if c.get(k) and hasattr(c[k], 'isoformat'):
+                    c[k] = c[k].isoformat()
+            # E-199 : le drapeau est RENSEIGNE, jamais omis — un champ absent se
+            # rend comme une liste vide et ne se distingue pas de « rien a dire ».
+            motif = _motif_nom_invalide(c.get('username'))
+            c['nom_valide'] = motif is None
+            c['motif_invalide'] = motif
+
+        # E-199, condition 3 : `en_attente` appelle un TRAVAIL, donc une ligne
+        # qui ne peut recevoir aucun geste n'y entre pas. `invalides_count` est
+        # rendu a cote plutot que soustrait — les deux nombres ne demandent pas
+        # le meme geste.
+        return jsonify({
+            'success': True,
+            'machine_id': machine_id,
+            'total': total,
+            'comptes': comptes,
+            'en_attente': sum(1 for c in comptes
+                              if c['status'] == 'pending_review' and c['nom_valide']),
+            # Toujours present, meme a zero.
+            'invalides_count': sum(1 for c in comptes if not c['nom_valide']),
+        })
+    except Exception as e:
+        logger.error("server_users_inventory(%s): %s", machine_id, e)
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
 
 
 @bp.route('/scan_server_users', methods=['POST'])
@@ -1114,6 +1739,10 @@ def scan_server_users():
             cmd = "awk -F: '{print $1\":\"$3\":\"$6\":\"$7}' /etc/passwd"
             stdin, stdout, stderr = client.exec_command(cmd, timeout=15)
             passwd_output = stdout.read().decode('utf-8', errors='replace')
+            # E-183. Le code de sortie de CETTE lecture decide de la purge des
+            # « fantomes », plus bas. Il n'etait jamais lu — et `recv_exit_status`
+            # n'apparaissait pas une seule fois dans ce fichier.
+            passwd_rc = stdout.channel.recv_exit_status()
 
             # 2. Dump des authorized_keys.
             # Strategie en 2 etages :
@@ -1141,10 +1770,22 @@ def scan_server_users():
                 "done"
             )
             ak_dump_root = ''
+            # E-187 : UN DRAPEAU PAR LECTURE, PAS UN PAR FONCTION.
+            # `scan_concluant` (E-183) mesure la lecture de `/etc/passwd`. Il ne
+            # dit RIEN de ces deux dumps-ci, qui sont des lectures entierement
+            # differentes — et ce sont elles qui alimentent la purge des cles et
+            # la colonne `keys_count`.
+            dump_root_ok = False
             try:
                 ak_dump_root, _err, _code = execute_as_root(client, dump_script, root_pass,
                                                             logger=logger, timeout=30)
-                if not ak_dump_root.strip():
+                # `_code` etait capture et JAMAIS lu. C'etait la seule occurrence
+                # de ce nom dans la fonction : la valeur qui ferme le trou etait
+                # deja la, a portee d'un `if`.
+                dump_root_ok = (_code == 0)
+                if not dump_root_ok:
+                    logger.warning("scan_server_users(%s): dump root authorized_keys en ECHEC (code=%s) -- fallback simple-user", mid, _code)
+                elif not ak_dump_root.strip():
                     logger.info("scan_server_users(%s): dump root vide (probable absence de fichiers ou silent fail). Fallback simple-user.", mid)
             except Exception as _e:
                 logger.warning("scan_server_users(%s): dump root authorized_keys echoue (%s) -- fallback simple-user", mid, _e)
@@ -1154,6 +1795,7 @@ def scan_server_users():
             # de tous les users car cat /home/X/.ssh/* en simple user echoue
             # pour les autres -> on cible le user de connexion uniquement.
             ak_dump_user = ''
+            dump_user_ok = False
             try:
                 user_script = (
                     "ak=\"$HOME/.ssh/authorized_keys\"; "
@@ -1166,8 +1808,31 @@ def scan_server_users():
                 )
                 _stdin, _stdout, _stderr = client.exec_command(user_script, timeout=10)
                 ak_dump_user = _stdout.read().decode('utf-8', errors='replace')
+                # E-187 : ce code de sortie n'etait meme pas OBTENU.
+                dump_user_ok = (_stdout.channel.recv_exit_status() == 0)
             except Exception as _e:
                 logger.warning("scan_server_users(%s): dump simple-user echoue (%s)", mid, _e)
+
+            # E-187 : AUCUNE des deux lectures de cles n'a abouti ?
+            # Alors on n'a AUCUNE donnee de cles, et tout ce qui en decoule est
+            # une invention : `keys_count = 0` sur chaque compte, et l'ensemble
+            # `seen_keys` vide, dont la difference vaut TOUTES les cles connues.
+            #
+            # Ce drapeau ne porte que sur le cas NON AMBIGU — un code de sortie
+            # non nul, ou une exception. Le cas « code nul mais dump vide » est
+            # DELIBEREMENT laisse de cote : la boucle du script sort en 0 meme
+            # sans rien emettre, donc un dump vide est aussi ce que rend une
+            # machine qui n'a reellement aucune cle. Les distinguer demande une
+            # mesure sur une machine a zero cle (Test-Server-Debian), attribuee
+            # a la session 6. Trancher sans elle reproduirait E-183 dans l'autre
+            # sens : purger a tort une machine qui n'a legitimement rien.
+            cles_lues = dump_root_ok or dump_user_ok
+            if not cles_lues:
+                logger.warning(
+                    "scan_server_users(%s): AUCUNE lecture de cles n'a abouti "
+                    "(root=%s, simple-user=%s) — `keys_count` et la purge des cles "
+                    "sont ABANDONNEES, l'inventaire des cles est conserve tel quel",
+                    mid, dump_root_ok, dump_user_ok)
 
             # Parse les 2 dumps. Root gagne en cas de doublon (dump_root est
             # autoritatif). Le simple-user comble les trous.
@@ -1235,13 +1900,28 @@ def scan_server_users():
                 uname = u['name']
                 if uname in existing:
                     # Mettre a jour les infos (last_seen, keys)
-                    cur.execute("""
-                        UPDATE server_user_inventory
-                        SET uid = %s, home_dir = %s, shell = %s, keys_count = %s,
-                            has_platform_key = %s, last_seen_at = NOW()
-                        WHERE machine_id = %s AND username = %s
-                    """, (u['uid'], u['home'], u['shell'], u['keys_count'],
-                          u['has_platform_key'], mid, uname))
+                    #
+                    # E-187 : les colonnes de CLES ne s'ecrivent que si une des
+                    # deux lectures de cles a abouti. Sinon `keys_count` vaudrait
+                    # 0 sur chaque compte — l'inventaire affirmerait qu'aucun
+                    # compte de la machine ne porte de cle, ce qui est la donnee
+                    # meme sur laquelle K4 raisonne. Les colonnes d'identite
+                    # (uid, home, shell) viennent de `/etc/passwd`, deja garde
+                    # par `scan_concluant` : elles restent ecrites.
+                    if cles_lues:
+                        cur.execute("""
+                            UPDATE server_user_inventory
+                            SET uid = %s, home_dir = %s, shell = %s, keys_count = %s,
+                                has_platform_key = %s, last_seen_at = NOW()
+                            WHERE machine_id = %s AND username = %s
+                        """, (u['uid'], u['home'], u['shell'], u['keys_count'],
+                              u['has_platform_key'], mid, uname))
+                    else:
+                        cur.execute("""
+                            UPDATE server_user_inventory
+                            SET uid = %s, home_dir = %s, shell = %s, last_seen_at = NOW()
+                            WHERE machine_id = %s AND username = %s
+                        """, (u['uid'], u['home'], u['shell'], mid, uname))
                 else:
                     # Nouveau user - classifier automatiquement
                     shell_basename = (u.get('shell') or '').rsplit('/', 1)[-1].lower()
@@ -1276,8 +1956,41 @@ def scan_server_users():
             # autre console, compte systeme supprime, etc.). Sans ca, un
             # compte comme `cleopatre` reste visible a vie dans l'UI.
             # On identifie les fantomes = rows en DB non-touchees par ce scan.
+            #
+            # ══ E-183 : LE SENS DU REPLI CHANGE, ET C'EST DELIBERE ═══════════
+            #
+            # AVANT : « je n'ai rien vu » signifiait « il n'y a plus rien ».
+            # APRES : « je n'ai rien vu » signifie « je ne sais pas ».
+            #
+            # Le code de sortie de la lecture de `/etc/passwd` n'etait jamais
+            # lu. Une lecture qui echoue ou qui rend une sortie vide donnait
+            # donc `scanned_users == []`, donc TOUTES les lignes d'inventaire
+            # de la machine devenaient des « fantomes », donc etaient
+            # SUPPRIMEES — avec `server_user_ssh_keys` dans la foulee. Un
+            # incident SSH passager effacait 72 lignes d'inventaire et 20 cles,
+            # et le journal l'annoncait comme un nettoyage reussi.
+            #
+            # C'est la forme DESTRUCTRICE de la classe « l'etat persiste ne suit
+            # pas le verdict » (E-90, E-165) : pas « ecrire un etat faux » mais
+            # « effacer un etat vrai ».
+            #
+            # L'asymetrie tranche : au pire, ce garde laisse un compte mort
+            # visible a l'ecran — le defaut meme que le commentaire ci-dessus
+            # voulait eviter, et qui se corrige au scan suivant. Sans lui, la
+            # donnee est perdue. Et c'est cet inventaire qui fonde l'arbitrage
+            # de K4 : un deploiement de cles raisonne dessus.
+            #
+            # Le repli est NOMME dans le journal, pas silencieux : remplacer un
+            # faux succes par une absence ne serait qu'un autre mensonge.
             scanned_usernames = {u['name'] for u in scanned_users}
-            ghost_usernames = [u for u in existing.keys() if u not in scanned_usernames]
+            scan_concluant = (passwd_rc == 0 and bool(scanned_users))
+            if not scan_concluant:
+                logger.warning(
+                    "scan_server_users(%s): scan NON CONCLUANT (code=%s, %d compte(s) lu(s)) — "
+                    "purge des fantomes ABANDONNEE, l'inventaire (%d ligne(s)) est conserve tel quel",
+                    mid, passwd_rc, len(scanned_users), len(existing))
+            ghost_usernames = ([u for u in existing.keys() if u not in scanned_usernames]
+                               if scan_concluant else [])
             if ghost_usernames:
                 placeholders = ','.join(['%s'] * len(ghost_usernames))
                 cur.execute(
@@ -1317,7 +2030,14 @@ def scan_server_users():
                     "WHERE machine_id = %s", (mid,))
                 existing_keys = {(r['username'], r['fingerprint_sha256'])
                                  for r in cur.fetchall()}
-                stale = existing_keys - seen_keys
+                # E-183 puis E-187 : `seen_keys` depend de DEUX lectures —
+                # celle de `/etc/passwd` (qui donne les comptes) et celle des
+                # `authorized_keys` (qui donne les cles). Il faut les DEUX, et
+                # c'est le defaut qu'E-183 avait laisse ouvert : `scan_concluant`
+                # seul laissait une purge complete partir quand le dump des cles
+                # avait echoue.
+                stale = ((existing_keys - seen_keys)
+                         if (scan_concluant and cles_lues) else set())
                 if stale:
                     for uname, fp in stale:
                         cur.execute(
@@ -1332,9 +2052,21 @@ def scan_server_users():
                 logger.warning("scan_server_users: maj server_user_ssh_keys echoue (%s)", _e)
                 conn_inv.rollback()
 
-            # Marquer scanne
-            cur.execute("UPDATE machines SET users_scanned_at = NOW() WHERE id = %s", (mid,))
-            conn_inv.commit()
+            # Marquer scanne — SEULEMENT si le scan a abouti.
+            #
+            # E-183, la face qui touche K4. `users_scanned_at` n'est pas un
+            # horodatage d'affichage : c'est la PRECONDITION du preflight de
+            # deploiement (`ssh.py:381`, « Bloquer si le serveur n'a jamais ete
+            # scanne »). L'ecrire apres un scan qui n'a rien lu leve un garde de
+            # surete sur le module le plus dangereux du chantier, en s'appuyant
+            # sur un scan qui n'a pas eu lieu.
+            if scan_concluant:
+                cur.execute("UPDATE machines SET users_scanned_at = NOW() WHERE id = %s", (mid,))
+                conn_inv.commit()
+            else:
+                logger.warning(
+                    "scan_server_users(%s): `users_scanned_at` NON mis a jour — "
+                    "le preflight de deploiement continue d'exiger un scan concluant", mid)
 
             # Recharger l'inventaire complet pour la reponse
             cur.execute("""
@@ -1350,19 +2082,87 @@ def scan_server_users():
                     if row.get(k) and hasattr(row[k], 'isoformat'):
                         row[k] = row[k].isoformat()
 
-            # Compter les pending
-            pending_count = sum(1 for r in inventory if r['status'] == 'pending_review')
+                # ══ E-199 : LA LIGNE EST INSEREE **ET** MARQUEE ══════════════
+                #
+                # Un compte nomme `..` dans un `/etc/passwd` est un INDICE de
+                # manipulation de la machine. Le refuser a l'insertion rendrait
+                # l'inventaire propre pendant que la machine porte l'anomalie —
+                # un ecran propre sur une machine anormale est pire qu'un ecran
+                # qui derange. On insere donc, et on DIT.
+                #
+                # LE DRAPEAU EST TOUJOURS RENSEIGNE, JAMAIS OMIS. C'est la
+                # lecon d'E-183 puis d'E-190 : une information portee par
+                # l'ABSENCE d'un champ ne se distingue pas de « rien a dire »,
+                # et un champ absent se rend comme une liste vide ou un faux.
+                # Meme forme que l'`audit_inventaire` d'E-194.
+                #
+                # Le motif est un CODE, pas une phrase : l'ecran l'affiche et
+                # doit pouvoir SEPARER les causes. « pas de bouton parce que le
+                # nom est invalide » et « pas de bouton parce que je n'ai pas la
+                # permission » sont deux causes pour un meme vide.
+                motif = _motif_nom_invalide(row.get('username'))
+                row['nom_valide'] = motif is None
+                row['motif_invalide'] = motif
+
+            # ══ UNE LIGNE QUI NE PEUT RECEVOIR AUCUN GESTE NE GONFLE PAS ═════
+            #    UN NOMBRE SUR LEQUEL ON DECIDE
+            #
+            # `pending_count` alimente « N comptes a examiner ». Une ligne au
+            # nom invalide ne peut recevoir aucun geste distant — E-192 refuse
+            # la revocation, `configure_user` et `deploy_user_config` refusent
+            # aussi. La compter la ferait promettre un travail impossible.
+            #
+            # Les deux nombres sont rendus SEPAREMENT plutot qu'un seul
+            # corrige : « 3 a examiner » et « 3 a examiner dont 1 illisible »
+            # ne demandent pas le meme geste.
+            pending_count = sum(1 for r in inventory
+                                if r['status'] == 'pending_review' and r['nom_valide'])
+            invalides_count = sum(1 for r in inventory if not r['nom_valide'])
 
         finally:
             conn_inv.close()
 
-        return jsonify({
-            'success': True,
+        # ══ E-187 : LE VERDICT, LA MOITIE QU'E-183 AVAIT LAISSEE ═════════════
+        #
+        # E-183 a corrige l'ETAT PERSISTE — plus rien n'est efface sur une
+        # lecture ratee. Il n'a PAS corrige le verdict : cette route rendait
+        # encore `success: True` inconditionnellement, avec un inventaire ancien
+        # et aucun champ disant que rien n'avait ete lu. L'appelant recevait donc
+        # une liste de comptes correcte, et croyait qu'elle venait de la machine.
+        #
+        # C'est l'INVERSE exact d'E-90, ou le verdict avait ete corrige et pas
+        # l'etat persiste. La classe a deux moities ; les deux comptent.
+        #
+        # `lectures` nomme chaque source separement plutot que de rendre un seul
+        # booleen : « je n'ai pas lu les comptes » et « j'ai lu les comptes mais
+        # pas les cles » ne se corrigent pas de la meme facon, et une interface
+        # qui ne recoit qu'un `false` ne peut pas le dire a l'exploitant.
+        lectures = {
+            'comptes': bool(scan_concluant),
+            'cles_root': bool(dump_root_ok),
+            'cles_utilisateur': bool(dump_user_ok),
+        }
+        concluant = scan_concluant and cles_lues
+        reponse = {
+            'success': bool(concluant),
+            'concluant': bool(concluant),
+            'lectures': lectures,
             'machine_id': m['id'],
             'machine_name': m['name'],
             'users': inventory,
             'pending_count': pending_count,
-        })
+            # Toujours present, meme a zero : un ecran ne peut pas distinguer
+            # « aucune ligne illisible » d'un champ absent.
+            'invalides_count': invalides_count,
+        }
+        if not concluant:
+            manquantes = [nom for nom, ok in lectures.items() if not ok]
+            reponse['message'] = (
+                "Scan non concluant : " + ", ".join(manquantes) +
+                " n'a pas pu etre lu. L'inventaire affiche est celui du dernier "
+                "scan abouti, il n'a pas ete modifie."
+            )
+        return jsonify(reponse)
     except Exception as e:
         logger.error("scan_server_users(%s): %s", machine_id, e)
         return jsonify({'success': False, 'message': 'Erreur interne'}), 500
@@ -1422,7 +2222,7 @@ def sshd_allow_user():
     try:
         with ssh_session(m['ip'], m['port'], m['user'], ssh_pass, logger=logger,
                          service_account=m.get('service_account_deployed', False)) as client:
-            modified, msg = _ensure_sshd_allows_user(client, root_pass, username, logger)
+            modified, atteste, msg = _ensure_sshd_allows_user(client, root_pass, username, logger)
 
         try:
             conn_a = get_db_connection()
@@ -1435,9 +2235,15 @@ def sshd_allow_user():
         except Exception:
             pass
 
+        # E-214 : le verdict suit l'EFFET, pas le geste. L'ancienne version
+        # rendait `success: True` quoi qu'ait dit le helper — y compris apres un
+        # retour arriere. Les deux champs sont TOUJOURS presents : `modified` dit
+        # si le fichier a change, `atteste` si `sshd -T` le confirme, et ils
+        # peuvent diverger.
         return jsonify({
-            'success': True,
+            'success': atteste,
             'modified': modified,
+            'atteste': atteste,
             'message': f"{m['name']}: {msg}",
         })
     except Exception as e:
@@ -1520,6 +2326,103 @@ def server_user_keys():
         conn.close()
 
 
+def _script_retrait_par_empreintes(username, empreintes):
+    """Script root qui retire d'`authorized_keys` les lignes dont l'empreinte figure dans `empreintes`.
+
+    ══ POURQUOI CE HELPER EXISTE (E-215) ════════════════════════════════════
+
+    Ce script etait le corps de `server_user_remove_key`. Sa voisine
+    `remove_user_keys` faisait le MEME geste par `sed -i '/rootwarden/d'` : une
+    selection par SOUS-CHAINE, sur un fichier qui accorde des acces.
+
+    On REMONTE l'implementation prudente au lieu d'en ecrire une seconde. Une
+    regle appliquee ailleurs se remonte de la ; elle ne se recalcule pas.
+
+    ══ CE QU'IL GARANTIT ════════════════════════════════════════════════════
+
+    - la selection se fait sur l'EMPREINTE SHA256 recalculee ligne par ligne
+      (`ssh-keygen -lf`), jamais sur le texte du commentaire ;
+    - une sauvegarde est posee AVANT toute reecriture ;
+    - les commentaires du fichier sont preserves ;
+    - le code de sortie DISTINGUE les etats :
+        0  au moins une cle retiree
+        1  pas de fichier `authorized_keys`
+        2  aucune des empreintes visees n'a ete trouvee (fichier INTACT)
+
+    `empreintes` est une liste : un seul appelant en passe une, l'autre en passe
+    plusieurs. La comparaison reste une EGALITE EXACTE, jamais une inclusion.
+    """
+    user_q = shlex.quote(username)
+    liste = ' '.join(shlex.quote(e) for e in empreintes)
+    return f"""
+set -e
+home=$(getent passwd {user_q} | cut -d: -f6)
+ak="$home/.ssh/authorized_keys"
+if [ ! -f "$ak" ]; then
+    echo "no authorized_keys for" {user_q} >&2
+    exit 1
+fi
+tmp=$(mktemp)
+cp "$ak" "${{tmp}}.bak"
+removed=0
+while IFS= read -r line || [ -n "$line" ]; do
+    [ -z "$line" ] && continue
+    case "$line" in \\#*) echo "$line" >> "$tmp"; continue;; esac
+    fp=$(printf '%s\\n' "$line" | ssh-keygen -lf - 2>/dev/null | awk '{{print $2}}' | sed 's/^SHA256://')
+    cible=0
+    for c in {liste}; do
+        if [ "$fp" = "$c" ]; then cible=1; break; fi
+    done
+    if [ "$cible" = 1 ]; then
+        removed=$((removed + 1))
+    else
+        echo "$line" >> "$tmp"
+    fi
+done < "$ak"
+if [ "$removed" -eq 0 ]; then
+    rm -f "$tmp" "${{tmp}}.bak"
+    echo "fingerprint not found" >&2
+    exit 2
+fi
+mv "$tmp" "$ak"
+chown $(stat -c '%U:%G' "$home") "$ak" 2>/dev/null || true
+chmod 600 "$ak"
+echo "removed=$removed"
+"""
+
+
+def _script_vidage_complet(username):
+    """Script root qui VIDE `authorized_keys`, avec la meme prudence que le retrait cible.
+
+    Meme exigences que `_script_retrait_par_empreintes` : sauvegarde avant, code
+    de sortie qui distingue, et une VERIFICATION que le fichier est bien vide
+    apres coup. `printf '' >` seul ne prouvait rien — son retour n'etait meme pas
+    lu.
+
+        0  fichier vide, verifie
+        1  pas de fichier `authorized_keys`
+        3  le fichier n'est PAS vide apres l'operation
+    """
+    user_q = shlex.quote(username)
+    return f"""
+set -e
+home=$(getent passwd {user_q} | cut -d: -f6)
+ak="$home/.ssh/authorized_keys"
+if [ ! -f "$ak" ]; then
+    echo "no authorized_keys for" {user_q} >&2
+    exit 1
+fi
+avant=$(grep -c . "$ak" 2>/dev/null || echo 0)
+cp -a "$ak" "$ak.bak.rw"
+printf '' > "$ak"
+if [ -s "$ak" ]; then
+    echo "authorized_keys non vide apres vidage" >&2
+    exit 3
+fi
+echo "removed=$avant"
+"""
+
+
 @bp.route('/server_user_remove_key', methods=['POST'])
 @require_api_key
 @require_role(2)
@@ -1592,43 +2495,10 @@ def server_user_remove_key():
 
     ssh_pass = server_decrypt_password(m['password'])
     root_pass = server_decrypt_password(m.get('root_password') or '')
-    fp_q = shlex.quote(fingerprint)
-    user_q = shlex.quote(username)
-
-    # Script bash root-side : pour CHAQUE ligne du authorized_keys, recalculer
-    # le fingerprint via ssh-keygen -lf, comparer, garder la ligne si != cible.
-    # ssh-keygen est universel sur tout systeme avec OpenSSH installe.
-    remove_script = f"""
-set -e
-home=$(getent passwd {user_q} | cut -d: -f6)
-ak="$home/.ssh/authorized_keys"
-if [ ! -f "$ak" ]; then
-    echo "no authorized_keys for {username}" >&2
-    exit 1
-fi
-tmp=$(mktemp)
-cp "$ak" "${{tmp}}.bak"
-removed=0
-while IFS= read -r line || [ -n "$line" ]; do
-    [ -z "$line" ] && continue
-    case "$line" in \\#*) echo "$line" >> "$tmp"; continue;; esac
-    fp=$(printf '%s\\n' "$line" | ssh-keygen -lf - 2>/dev/null | awk '{{print $2}}' | sed 's/^SHA256://')
-    if [ "$fp" = {fp_q} ]; then
-        removed=$((removed + 1))
-    else
-        echo "$line" >> "$tmp"
-    fi
-done < "$ak"
-if [ "$removed" -eq 0 ]; then
-    rm -f "$tmp" "${{tmp}}.bak"
-    echo "fingerprint not found" >&2
-    exit 2
-fi
-mv "$tmp" "$ak"
-chown $(stat -c '%U:%G' "$home") "$ak" 2>/dev/null || true
-chmod 600 "$ak"
-echo "removed=$removed"
-"""
+    # E-215 : le script vit desormais dans `_script_retrait_par_empreintes`,
+    # partage avec `remove_user_keys`. Comportement inchange ici : une seule
+    # empreinte visee, comparaison par egalite exacte, memes codes de sortie.
+    remove_script = _script_retrait_par_empreintes(username, [fingerprint])
 
     user_id, _ = get_current_user()
     try:
@@ -1678,63 +2548,150 @@ echo "removed=$removed"
 @require_machine_access
 @threaded_route
 def remove_user_keys():
-    """
-    Supprime les cles SSH d'un utilisateur sur un serveur distant.
-    Peut supprimer toutes les cles ou seulement les cles RootWarden.
-    Body JSON : {machine_id, username, mode: 'all'|'rootwarden_only'}
+    """Retire les cles SSH d'un utilisateur distant. Corps : {machine_id, username, mode, force}.
+
+    ══ E-215 : CETTE ROUTE FAISAIT SANS GARDE CE QUE SA VOISINE BLOQUE ══════
+
+    `server_user_remove_key`, 150 lignes plus haut, REFUSE de retirer la cle de
+    plateforme sans `force` — son message dit « te locker hors du serveur ».
+    Celle-ci le faisait sans garde, sans confirmation, et **sans lire son code de
+    sortie** : les deux branches jetaient le retour d'`execute_as_root` et
+    rendaient `success: True`. Le `; echo OK` du second mode forcait meme le code
+    a zero, si bien qu'un lecteur futur n'aurait rien pu en tirer.
+
+    C'etait E-192 revenu sur une REVOCATION D'ACCES : une fausse attestation, et
+    personne ne rouvre un dossier de conformite clos.
+
+    ══ TROIS CHANGEMENTS, ET LE PREMIER EST LE PLUS IMPORTANT ══════════════
+
+    1. **la selection se fait par EMPREINTE, plus par sous-chaine.** Le mode
+       cible faisait `sed -i '/rootwarden/d'` — plus large que sa propre
+       docstring, qui annoncait `@rootwarden` ou `rootwarden-platform`. Mesure
+       sur trois cles reelles : le `sed` en retirait DEUX, dont une cle
+       PERSONNELLE commentee `backup-from-rootwarden-host` ; le retrait par
+       empreinte en retire UNE, la bonne ;
+    2. **la cle de plateforme est protegee comme chez la voisine** : refus sans
+       `force`, meme motif et meme formulation. Cela vaut pour les deux modes —
+       le mode cible ne vise QUE cette cle, donc il l'exige toujours ;
+    3. **le code de sortie est lu**, et il distingue : rien a retirer n'est pas
+       une reussite, et un fichier non vide apres vidage non plus.
+
+    ══ LA VERIFICATION SEULE AURAIT ARME LE PIEGE ══════════════════════════
+
+    Aujourd'hui la route peut echouer en silence, et cette non-fiabilite est —
+    par accident — ce qui limite les degats. Lui faire lire son code de retour
+    rend le geste EFFECTIF A CHAQUE FOIS, y compris quand il retire la cle de
+    plateforme. **La garde et la verification sont donc dans le meme commit** :
+    un correctif qui rend un chemin possible doit regarder ce qu'il rend
+    irreversible sur ce meme chemin.
     """
     data = request.get_json(silent=True) or {}
     machine_id = data.get('machine_id')
     username = (data.get('username') or '').strip()
     mode = data.get('mode', 'all')  # 'all' ou 'rootwarden_only'
+    force = bool(data.get('force', False))
 
     if not machine_id or not username:
         return jsonify({'success': False, 'message': 'machine_id et username requis'}), 400
     if not _validate_username(username):
         return jsonify({'success': False, 'message': 'Nom utilisateur invalide (caracteres interdits)'}), 400
+    if mode not in ('all', 'rootwarden_only'):
+        return jsonify({'success': False, 'message': "mode doit valoir 'all' ou 'rootwarden_only'"}), 400
 
     conn = get_db_connection()
     try:
         cur = conn.cursor(dictionary=True)
-        cur.execute("SELECT id, name, ip, port, user, password, root_password, service_account_deployed FROM machines WHERE id = %s", (int(machine_id),))
+        cur.execute("SELECT id, name, ip, port, user, password, root_password, "
+                    "service_account_deployed FROM machines WHERE id = %s", (int(machine_id),))
         m = cur.fetchone()
+        if not m:
+            return jsonify({'success': False, 'message': 'Machine introuvable'}), 404
+
+        # Les empreintes de plateforme connues pour ce couple machine/compte.
+        # Meme source que `server_user_remove_key` : l'inventaire, alimente par
+        # le scan. On ne DEVINE pas une cle de plateforme depuis un commentaire.
+        cur.execute("SELECT fingerprint_sha256 FROM server_user_ssh_keys "
+                    "WHERE machine_id = %s AND username = %s AND is_platform_key = 1",
+                    (int(machine_id), username))
+        empreintes_plateforme = [r['fingerprint_sha256'] for r in cur.fetchall()]
     finally:
         conn.close()
 
-    if not m:
-        return jsonify({'success': False, 'message': 'Machine introuvable'}), 404
+    # ── La garde de la cle de plateforme, reprise TELLE QUELLE de la voisine ──
+    if empreintes_plateforme and not force:
+        return jsonify({
+            'success': False,
+            'platform_key_protegee': True,
+            'message': "Suppression bloquee : la cle plateforme RootWarden est parmi les cles "
+                       "visees. Utilise --force si tu veux vraiment te locker hors du serveur."
+        }), 400
+
+    if mode == 'rootwarden_only' and not empreintes_plateforme:
+        # Ni sous-chaine, ni supposition : sans inventaire on ne sait pas QUOI
+        # retirer, et le dire vaut mieux que balayer au motif.
+        return jsonify({
+            'success': False,
+            'message': "Aucune cle plateforme en inventaire pour ce compte - relance un scan"
+        }), 404
 
     ssh_pass = server_decrypt_password(m['password'])
-    root_pass = server_decrypt_password(m['root_password'])
+    root_pass = server_decrypt_password(m.get('root_password') or '')
+    if mode == 'all':
+        script = _script_vidage_complet(username)
+    else:
+        script = _script_retrait_par_empreintes(username, empreintes_plateforme)
+
+    user_id, _ = get_current_user()
+    try:
+        with ssh_session(m['ip'], m['port'], m['user'], ssh_pass, logger=logger,
+                         service_account=m.get('service_account_deployed', False)) as client:
+            out, err_out, code = execute_as_root(client, script, root_pass,
+                                                 logger=logger, timeout=60)
+    except Exception as e:
+        logger.error("[remove_user_keys] %s : %s", m['name'], e)
+        return jsonify({'success': False, 'message': f'Erreur SSH : {str(e)[:200]}'}), 500
+
+    # ── LE CODE DE SORTIE EST LU, ET IL DISTINGUE ────────────────────────────
+    motifs = {
+        1: "Aucun fichier authorized_keys pour ce compte - rien n'a ete retire",
+        2: "Aucune des cles visees n'a ete trouvee - le fichier est INTACT",
+        3: "Le fichier n'est pas vide apres le vidage - rien ne garantit le retrait",
+    }
+    if code != 0:
+        logger.warning("remove_user_keys(%s,%s) mode=%s : exit=%s err=%s",
+                       machine_id, username, mode, code, (err_out or '')[:200])
+        return jsonify({
+            'success': False,
+            'code': code,
+            'message': motifs.get(code) or (err_out or out or f'exit={code}').strip()[:200],
+        }), 500
+
+    retirees = None
+    for ligne in (out or '').splitlines():
+        if ligne.startswith('removed='):
+            try:
+                retirees = int(ligne.split('=', 1)[1].strip())
+            except ValueError:
+                pass
 
     try:
-        with ssh_session(m['ip'], m['port'], m['user'], ssh_pass, logger=logger, service_account=m.get('service_account_deployed', False)) as client:
-            # Trouver le home de l'utilisateur
-            stdin, stdout, stderr = client.exec_command(f"getent passwd {shlex.quote(username)} | cut -d: -f6", timeout=10)
-            home = stdout.read().decode().strip()
-            if not home:
-                return jsonify({'success': False, 'message': f"Utilisateur '{username}' introuvable sur le serveur"})
+        with get_db_connection() as conn2:
+            cur2 = conn2.cursor()
+            cur2.execute(
+                "INSERT INTO user_logs (user_id, action) VALUES (%s, %s)",
+                (user_id, f"[ssh-keys] remove_user_keys mode={mode} force={force} "
+                          f"sur {username}@{m['name']} : {retirees} cle(s) retiree(s)"))
+            conn2.commit()
+    except Exception:
+        pass
 
-            ak_path = f"{home}/.ssh/authorized_keys"
-
-            # Valider le path (anti-injection)
-            if not re.match(r'^/[a-zA-Z0-9/_.-]+$', ak_path):
-                return jsonify({'success': False, 'message': 'Chemin invalide'}), 400
-
-            if mode == 'all':
-                # Supprimer TOUTES les cles (vider le fichier)
-                cmd = f"printf '' > {ak_path}"
-                execute_as_root(client, cmd, root_pass, logger=logger)
-                return jsonify({'success': True, 'message': f"Toutes les cles de '{username}' supprimees"})
-            else:
-                # Supprimer seulement les cles RootWarden (qui contiennent @rootwarden ou rootwarden-platform)
-                cmd = f"sed -i '/rootwarden/d' {ak_path} 2>/dev/null; echo OK"
-                execute_as_root(client, cmd, root_pass, logger=logger)
-                return jsonify({'success': True, 'message': f"Cles RootWarden de '{username}' supprimees"})
-
-    except Exception as e:
-        logger.error("[remove_user_keys] %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+    return jsonify({
+        'success': True,
+        'mode': mode,
+        # Toujours present : `null` dit « le compte n'a pas ete rendu », pas zero.
+        'cles_retirees': retirees,
+        'message': f"{retirees} cle(s) retiree(s) pour '{username}' sur {m['name']}",
+    })
 
 
 @bp.route('/delete_remote_user', methods=['POST'])
@@ -1778,10 +2735,58 @@ def delete_remote_user():
     if username == m['user']:
         return jsonify({'success': False, 'message': f"'{username}' est l'utilisateur SSH de connexion - suppression interdite"}), 400
 
+    # La garde ci-dessus protege `machines.user`. Elle ne suffit pas : sur une
+    # machine deployee par compte de service, ce n'est PAS ce compte-la qui
+    # ouvre la session.
+    #
+    # Mesure du 2026-08-27 sur le parc : `srv-zabbix` porte
+    # `user = 'user'`, `service_account_deployed = 1`, et AUCUN mot de passe
+    # stocke. Sa seule voie d'acces reelle est donc le compte de service — que
+    # rien n'empechait de supprimer. Un `userdel` dessus verrouille la machine
+    # DEFINITIVEMENT : plus de mot de passe, plus de cle, plus de compte.
+    #
+    # Le refus est POSE AVANT TOUTE SESSION SSH : rien n'est joint, rien n'est
+    # tente. Et il ne depend d'aucune approbation — `gate()` contourne pour
+    # `role >= 3`, donc un frein qui en dependrait serait inerte precisement
+    # pour les comptes qui peuvent appeler cette route.
+    #
+    # Le nom vient de `Config.NOM_COMPTE_SERVICE`, partage avec l'authentification. Le
+    # recopier ici ferait deux valeurs qui divergeraient — c'est le motif qui a
+    # coute E-195, E-196 et E-197 le meme jour.
+    # ══ COMMENT EPROUVER CETTE ROUTE — ET COMMENT JE M'Y SUIS PRIS DE TRAVERS
+    #
+    # Le 2026-08-27, une sonde de verification a appele cette route sur des
+    # chemins qu'elle CROYAIT etre des refus. Son commentaire disait « aucun nom
+    # valide n'a ete essaye ». C'etait une CROYANCE sur le comportement du
+    # garde, pas une mesure. Resultat :
+    #   - `userdel -f rootwarden` execute en root sur Test-Server-Debian
+    #     (le compte n'existait pas : code 6, aucun degat — par chance) ;
+    #   - un `client.connect()` emis vers `srv-zabbix`, LA PRODUCTION, que la
+    #     regle du chantier interdit de joindre. L'authentification n'a pas
+    #     abouti — par chance encore, pas par precaution.
+    #
+    # LA CAUSE : `_validate_username` de CE fichier (`:215`) accepte `..`, donc
+    # le nom que la sonde croyait refuse traversait tous les gardes.
+    #
+    # LE MOTIF SUR EST DE RETIRER LA CIBLE, PAS DE RENFORCER LE GARDE :
+    # eprouver cette route se fait avec un `machine_id` VALIDE MAIS INEXISTANT,
+    # qui ne peut produire qu'un 404 — jamais avec une machine reelle, meme sur
+    # un chemin qu'on croit refuse. Un garde-fou de sonde doit etre une
+    # propriete MESUREE, pas une croyance sur ce qu'on sonde.
+    #
+    # ══ P5 : NE PAS SUPPRIMER LA SEULE VOIE D'ACCES QUI RESTE ════════════════
+    if m.get('service_account_deployed') and username == Config.NOM_COMPTE_SERVICE:
+        return jsonify({
+            'success': False,
+            'message': (f"'{username}' est le compte de service par lequel RootWarden "
+                        f"accede a {m['name']} — le supprimer verrouillerait la machine. "
+                        f"Suppression interdite."),
+        }), 400
+
     # Approbation 4-eyes : suppression d'utilisateur distant = action destructive.
     # Si activee, exige l'aval d'un 2e admin avant execution (store-and-replay).
     try:
-        from approvals import gate
+        from approvals import gate, AucunApprobateur
         _uid, _role = get_current_user()
         _ap = gate('delete_remote_user', int(machine_id), username,
                    {'username': username, 'remove_home': bool(remove_home)}, _uid, role=_role)
@@ -1792,7 +2797,10 @@ def delete_remote_user():
             return jsonify({'success': False, 'pending_approval': True,
                             'request_id': _ap['id'], 'message': msg}), 202
     except Exception as _e:
-        logger.debug("approval gate (delete_remote_user) skipped: %s", _e)
+        # Une porte a quatre yeux qui s'ouvre doit laisser une TRACE : `debug`
+        # n'est pas journalise en exploitation, donc la porte s'ouvrait et
+        # personne ne le savait. Un repli silencieux n'est pas un repli.
+        logger.error("approval gate (delete_remote_user) OUVERTE sur erreur : %s", _e)
 
     ssh_pass = server_decrypt_password(m['password'])
     root_pass = server_decrypt_password(m['root_password'])
@@ -1893,3 +2901,156 @@ def _cleanup_user_inventory(machine_id, username):
     except Exception as e:
         logger.warning("cleanup server_user_inventory (%s/%s) failed: %s",
                        machine_id, username, e)
+
+
+@bp.route('/machines/credential-status', methods=['GET'])
+@require_api_key
+@threaded_route
+def machines_credential_status():
+    """Dit, par machine, si le secret stocke DECHIFFRE EN VIDE — sans jamais le rendre.
+
+    ══ POURQUOI CETTE ROUTE EXISTE ═══════════════════════════════════════════
+
+    `(password <> '')` en SQL est FAUX comme predicat de « cette machine a un mot
+    de passe ». Les deux portails ne chiffrent pas la chaine vide de la meme
+    facon :
+
+        Python  encrypt_password('')          -> ''          (chaine vide)
+        PHP     encryptPassword('', false)    -> 'sodium:…'  (56 octets)
+
+    Le formulaire legacy passe `$validate = false` : un mot de passe REELLEMENT
+    VIDE saisi la-bas est donc stocke comme un cryptogramme NON VIDE, et
+    `(password <> '')` rend VRAI pour une machine qui n'a pas de mot de passe.
+
+    ══ L'ASYMETRIE VAUT POUR LES DEUX COLONNES CHIFFREES ════════════════════
+
+    Elle ne tient a rien de propre a `password` : c'est le chiffrement de la
+    chaine vide qui differe. **`root_password` est donc dans le meme cas**, et
+    cette route rend les memes trois etats pour elle (`root_*`).
+
+    C'est meme la colonne la plus consequente des deux : c'est celle dont depend
+    l'ELEVATION, donc E-218 et E-219, et **c'est la seule que la page de cle de
+    plateforme ne peut pas reecrire**. Un seul calcul les sert toutes les deux
+    (`_trois_etats`) : deux copies divergeraient, et c'est le motif referme le
+    meme jour sur les cinq `_resolve_ssh_creds`.
+
+    Corollaire pour `indetermines` : ses entrees nomment **la colonne** et pas
+    seulement la machine — « je n'ai pas su lire un secret » sans dire lequel
+    n'apprend rien a un ecran qui en affiche deux.
+
+    Le portage a REFUSE de reimplementer le dechiffrement pour trancher — et il
+    a eu raison : *ne jamais recopier une regle de crypto.* Il n'existait
+    qu'une issue honnete : que le backend, seul detenteur de la cle, expose le
+    predicat DEJA CALCULE. Meme precedent qu'E-168 et INF-003.
+
+    ══ CE QU'ELLE NE REND PAS ═══════════════════════════════════════════════
+
+    Ni le secret, ni sa longueur, ni son cryptogramme, ni le nombre de
+    caracteres. Rien qui aide a le deviner : des booleens, et le nom de la
+    machine que l'appelant voit deja.
+
+    ══ TROIS ETATS, PAS DEUX — ET C'EST LE COEUR ════════════════════════════
+
+    `server_decrypt_password` rend `""` dans DEUX cas que rien ne distingue :
+    le clair est vide, ou le dechiffrement a ECHOUE (fail-closed). Rendre un
+    simple booleen « le mot de passe est vide » recopierait cette confusion dans
+    l'interface, et un ecran afficherait « pas de mot de passe » pour une
+    machine dont la cle a change.
+
+        mot_de_passe_vide = true   le clair est vide, mesure
+        mot_de_passe_vide = false  le clair n'est pas vide
+        mot_de_passe_vide = null   INDETERMINE : le dechiffrement a echoue
+
+    C'est la lecon d'E-183 puis d'E-194, deja appliquee a
+    `/settings/announceable` : une interface doit pouvoir distinguer « c'est
+    faux » de « je n'ai pas pu lire ». Les machines indeterminees sont AUSSI
+    listees dans `indetermines`, toujours present meme vide.
+
+    ══ ET LE BACKEND, LUI, CONFOND LES DEUX ═════════════════════════════════
+
+    `joignable_selon_le_backend` reproduit EXACTEMENT ce que
+    `helpers.resolve_ssh_creds` decidera — echec de dechiffrement compris, donc
+    traite comme « pas de mot de passe ». Ce champ n'est pas une redite du
+    precedent : quand il vaut `true` alors que `mot_de_passe_vide` vaut `null`,
+    l'ecran sait que la decision du backend repose sur le keypair et non sur un
+    secret qu'il aurait su lire. **Decrire le comportement, et pas seulement le
+    fait, est ce qui evite de reimplementer le comportement.**
+
+    ══ LA GARDE ════════════════════════════════════════════════════════════
+
+    `@require_api_key` seule au niveau du decorateur, et le bornage est FAIT
+    DANS LE CORPS, machine par machine, par `check_machine_access`. C'est
+    delibere et c'est l'invariant qu'E-211 vient d'etablir : cette route ne
+    prend AUCUN `machine_id`, donc `@require_machine_access` n'aurait rien
+    trouve a refuser — un garde sans objet. Le perimetre du compte est la vraie
+    borne, et elle est ici.
+    """
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor(dictionary=True)
+        cur.execute("SELECT id, name, password, root_password, "
+                    "service_account_deployed, platform_key_deployed "
+                    "FROM machines ORDER BY name")
+        lignes = cur.fetchall()
+        conn.close()
+    except Exception as e:
+        logger.error("machines/credential-status : lecture BDD : %s", e)
+        return jsonify({'success': False, 'message': 'Erreur BDD'}), 500
+
+    machines, indetermines = [], []
+
+    def _trois_etats(secret, machine_id, colonne):
+        """Les trois etats d'UNE colonne chiffree. Rend (vide, dechiffrable).
+
+        Un seul calcul pour `password` et `root_password` : la meme asymetrie
+        Python/PHP vaut pour les deux, et deux copies divergeraient — c'est le
+        motif qu'on vient de refermer sur les cinq `_resolve_ssh_creds`.
+        """
+        if not secret:
+            return True, True
+        try:
+            return (encryption.decrypt_password(secret) == ''), True
+        except Exception:
+            # On ne journalise NI le secret NI l'exception telle quelle : un
+            # message d'erreur de crypto peut porter des octets du cryptogramme.
+            # Seuls l'identifiant de la machine et le nom de colonne sont traces.
+            logger.warning("machines/credential-status : dechiffrement impossible "
+                           "pour machine_id=%s colonne=%s", machine_id, colonne)
+            indetermines.append({'machine_id': machine_id, 'colonne': colonne})
+            return None, False
+
+    for row in lignes:
+        if not check_machine_access(row['id']):
+            continue
+        secret = row.get('password') or ''
+        root_secret = row.get('root_password') or ''
+        vide, dechiffrable = _trois_etats(secret, row['id'], 'password')
+        root_vide, root_dechiffrable = _trois_etats(root_secret, row['id'], 'root_password')
+
+        keypair = bool(row.get('service_account_deployed')
+                       or row.get('platform_key_deployed'))
+        # Reproduit `resolve_ssh_creds` A L'IDENTIQUE : un echec de
+        # dechiffrement y devient une chaine vide, donc « pas de mot de passe ».
+        mdp_effectif = '' if (vide or not dechiffrable) else 'x'
+        machines.append({
+            'machine_id': row['id'],
+            'nom': row['name'],
+            'secret_stocke': bool(secret),
+            'mot_de_passe_vide': vide,
+            'dechiffrable': dechiffrable,
+            # `root_password` : meme prédicat, colonne distincte. C'est celle
+            # dont depend l'ELEVATION, donc E-218 et E-219.
+            'root_secret_stocke': bool(root_secret),
+            'root_password_vide': root_vide,
+            'root_dechiffrable': root_dechiffrable,
+            'keypair_deploye': keypair,
+            'joignable_selon_le_backend': bool(mdp_effectif) or keypair,
+        })
+
+    return jsonify({
+        'success': True,
+        'machines': machines,
+        # Toujours present, meme vide — un champ absent se lit « rien a dire ».
+        'indetermines': indetermines,
+    })
+

@@ -19,6 +19,7 @@ Routes :
 
 import re
 import json
+import threading
 import base64
 import logging
 import datetime
@@ -27,6 +28,7 @@ from flask import Blueprint, jsonify, request, Response
 from routes.helpers import (
     require_api_key, require_role, require_machine_access, require_permission,
     threaded_route, get_db_connection, server_decrypt_password, get_current_user, logger,
+    check_machine_access,
 )
 from ssh_utils import ssh_session, validate_machine_id, execute_as_root, execute_as_root_stream
 
@@ -36,8 +38,87 @@ bp = Blueprint('supervision', __name__)
 _VERSION_RE = re.compile(r'^\d+\.\d+(\.\d+)?$')
 _BACKUP_NAME_RE = re.compile(r'^[\w.-]+\.bak\.\d{8}_\d{6}$')
 _SAFE_PARAM_RE = re.compile(r'^[a-zA-Z0-9_.:-]+$')
+
+# CORRECTIF v1.37.41 - LA VALEUR D'UN OVERRIDE N'ETAIT PAS VALIDEE.
+#
+# `_SAFE_PARAM_RE` ne porte que sur le NOM du parametre. La valeur, elle, partait
+# en `f"{key}={value}\n"` puis en base64, ajoutee au fichier de configuration :
+# une valeur portant un saut de ligne produisait donc UNE DIRECTIVE AUTONOME, que
+# personne n'avait demandee par aucun parametre nomme.
+#
+# Mesure du 2026-08-22 sur Test-Server-Debian, charge deliberement inoffensive.
+# `POST /supervision/overrides/2` avec {"Timeout": "3\nLIGNE_INJECTEE=temoin"} a
+# ete accepte (saut de ligne 0A retenu en base), et la reconfiguration a ecrit :
+#
+#     7  Timeout=3
+#     8  LIGNE_INJECTEE_PAR_LA_MESURE=temoin      <- directive autonome
+#
+# Sur un agent Zabbix reel, cette ligne peut etre un `UserParameter` - donc
+# l'execution d'une commande arbitraire par l'agent, sur la machine supervisee.
+# La route d'ecriture est atteignable par tout role 2 portant
+# `can_manage_supervision`, sans etre administrateur du portail. Voir
+# docs/migration/PARITE.md, E-85.
+#
+# Une valeur de configuration agent tient sur UNE ligne : le motif refuse donc
+# tout caractere de controle, saut de ligne compris. Il est applique DEUX FOIS -
+# a l'ecriture ET a la relecture - parce que la base peut deja contenir des
+# lignes posees avant ce correctif, et qu'une validation qui ne protege que le
+# chemin d'entree laisse le fichier a la merci de l'historique.
+_SAFE_VALUE_RE = re.compile(r'^[^\x00-\x1f\x7f]*$')
 _VALID_PLATFORMS = {'zabbix', 'centreon', 'prometheus', 'telegraf'}
 _SAFE_HOSTNAME_RE = re.compile(r'^[a-zA-Z0-9._-]+$')
+
+# CORRECTIF v1.37.44 - LA DESINSTALLATION NE POUVAIT PAS ECHOUER.
+#
+# Les quatre commandes finissaient CHACUNE par `|| true`, et jetaient leur
+# stderr : la chaine ne pouvait pas sortir autrement qu'en 0. Un verrou apt, un
+# dpkg casse, un depot injoignable etaient avales, puis `SUCCESS_MACHINE::`
+# etait emis inconditionnellement — et `_remove_agent` effacait l'inventaire
+# quoi qu'il arrive. Mesure du 2026-08-23 : « Agent Zabbix desinstalle » sur une
+# machine ou il n'avait JAMAIS ete installe, inventaire passe de 1 a 0 ligne.
+# Voir docs/migration/PARITE.md, E-88.
+#
+# CE QUI RESTE TOLERANT, ET POURQUOI. `systemctl stop` garde son `|| true` : un
+# service deja arrete, ou un systeme sans systemd, n'est PAS un echec de la
+# desinstallation. La purge, elle, EST l'operation : son code de sortie et son
+# stderr remontent desormais intacts.
+#
+# POURQUOI UNE GARDE `dpkg-query` PLUTOT QU'UN SIMPLE RETRAIT DU `|| true`.
+# Mesure : `apt-get purge -y zabbix-agent` rend **100** quand le paquet n'est pas
+# dans l'index du depot — pas seulement quand il n'est pas installe. Retirer le
+# `|| true` sans plus ferait donc echouer la desinstallation sur toute machine ou
+# le depot Zabbix n'est pas configure, ce qui est le cas general. On demande donc
+# d'abord a `dpkg-query` ce qui est REELLEMENT installe, et on ne purge que cela :
+#   - rien d'installe        -> `RIEN_A_PURGER`, code 0 HONNETE (l'agent n'est pas la) ;
+#   - des paquets installes  -> la purge tourne, et son vrai code remonte.
+#
+# `apt-get autoremove -y` A ETE RETIRE DES QUATRE COMMANDES. Il retire tout paquet
+# que le systeme juge devenu inutile — pas seulement les dependances de l'agent —
+# et une desinstallation d'agent n'a pas a decider cela pour l'administrateur.
+# `apt-get purge` suffit a retirer l'agent ET sa configuration.
+def _commande_desinstallation(paquets, services):
+    """Construit la commande de desinstallation d'un agent.
+
+    `paquets` peut contenir des motifs `dpkg-query` (`nom-*`). `services` sont
+    arretes de facon tolerante : leur echec n'est pas celui de la purge.
+    """
+    arrets = ''.join(
+        f"systemctl stop {s} 2>/dev/null || true\n" for s in services)
+    liste = ' '.join(f"'{p}'" for p in paquets)
+
+    return (
+        "export DEBIAN_FRONTEND=noninteractive\n"
+        f"{arrets}"
+        f"P=$(dpkg-query -W -f='${{Package}} ${{Status}}\\n' {liste} 2>/dev/null"
+        " | awk '$NF==\"installed\"{print $1}')\n"
+        "if [ -n \"$P\" ]; then\n"
+        "  echo \"PAQUETS_A_PURGER: $P\"\n"
+        "  apt-get purge -y $P\n"
+        "else\n"
+        "  echo 'RIEN_A_PURGER'\n"
+        "fi\n"
+    )
+
 
 # ── Registre des agents : specs par plateforme ───────────────────────────────
 
@@ -45,24 +126,33 @@ AGENT_REGISTRY = {
     'zabbix': {
         'service': 'zabbix-agent2',
         'config_path': '/etc/zabbix/zabbix_agent2.conf',
-        'version_cmd': "command -v zabbix_agent2 >/dev/null 2>&1 && zabbix_agent2 -V 2>/dev/null | head -1 || command -v zabbix_agentd >/dev/null 2>&1 && zabbix_agentd -V 2>/dev/null | head -1 || echo 'NOT_INSTALLED'",
-        'uninstall_cmd': (
-            "export DEBIAN_FRONTEND=noninteractive && "
-            "systemctl stop zabbix-agent2 2>/dev/null || true && "
-            "systemctl stop zabbix-agent 2>/dev/null || true && "
-            "apt-get purge -y zabbix-agent zabbix-agent2 zabbix-agent2-plugin-* 2>/dev/null || true && "
-            "apt-get autoremove -y 2>/dev/null || true"
+        # E-186. La forme precedente etait une chaine `A && B || C && D || E`
+        # SANS parentheses. `sh` evalue `&&` et `||` a EGALE precedence, de
+        # gauche a droite : la sonde d'agentd partait donc AUSSI quand celle
+        # d'agent2 avait reussi. Mesure du 2026-08-27 avec deux faux binaires —
+        # agent2 seul : 1 ligne · agentd seul : 1 ligne · aucun : 1 ligne ·
+        # LES DEUX INSTALLES : **2 lignes**.
+        #
+        # Un `if/elif/else` plutot que des parentheses : la precedence cesse
+        # d'etre une chose a savoir, et l'intention se lit.
+        'version_cmd': (
+            "if command -v zabbix_agent2 >/dev/null 2>&1; then "
+            "zabbix_agent2 -V 2>/dev/null | head -1; "
+            "elif command -v zabbix_agentd >/dev/null 2>&1; then "
+            "zabbix_agentd -V 2>/dev/null | head -1; "
+            "else echo 'NOT_INSTALLED'; fi"
+        ),
+        'uninstall_cmd': _commande_desinstallation(
+            ['zabbix-agent', 'zabbix-agent2', 'zabbix-agent2-plugin-*'],
+            ['zabbix-agent2', 'zabbix-agent'],
         ),
     },
     'centreon': {
         'service': 'centreon-monitoring-agent',
         'config_path': '/etc/centreon-monitoring-agent/centagent.yaml',
         'version_cmd': "command -v centreon-monitoring-agent >/dev/null 2>&1 && centreon-monitoring-agent --version 2>/dev/null | head -1 || echo 'NOT_INSTALLED'",
-        'uninstall_cmd': (
-            "export DEBIAN_FRONTEND=noninteractive && "
-            "systemctl stop centreon-monitoring-agent 2>/dev/null || true && "
-            "apt-get purge -y centreon-monitoring-agent 2>/dev/null || true && "
-            "apt-get autoremove -y 2>/dev/null || true"
+        'uninstall_cmd': _commande_desinstallation(
+            ['centreon-monitoring-agent'], ['centreon-monitoring-agent'],
         ),
     },
     'prometheus': {
@@ -72,23 +162,15 @@ AGENT_REGISTRY = {
         # vérifie d'abord que le binaire existe, sinon `sh: 1: not found` fuit
         # dans la sortie et est interprete comme version.
         'version_cmd': "command -v node_exporter >/dev/null 2>&1 && node_exporter --version 2>&1 | head -1 || echo 'NOT_INSTALLED'",
-        'uninstall_cmd': (
-            "export DEBIAN_FRONTEND=noninteractive && "
-            "systemctl stop prometheus-node-exporter 2>/dev/null || true && "
-            "apt-get purge -y prometheus-node-exporter 2>/dev/null || true && "
-            "apt-get autoremove -y 2>/dev/null || true"
+        'uninstall_cmd': _commande_desinstallation(
+            ['prometheus-node-exporter'], ['prometheus-node-exporter'],
         ),
     },
     'telegraf': {
         'service': 'telegraf',
         'config_path': '/etc/telegraf/telegraf.conf',
         'version_cmd': "command -v telegraf >/dev/null 2>&1 && telegraf --version 2>/dev/null | head -1 || echo 'NOT_INSTALLED'",
-        'uninstall_cmd': (
-            "export DEBIAN_FRONTEND=noninteractive && "
-            "systemctl stop telegraf 2>/dev/null || true && "
-            "apt-get purge -y telegraf 2>/dev/null || true && "
-            "apt-get autoremove -y 2>/dev/null || true"
-        ),
+        'uninstall_cmd': _commande_desinstallation(['telegraf'], ['telegraf']),
     },
 }
 
@@ -253,29 +335,84 @@ def _build_config_lines(global_cfg, machine_row, overrides=None, profile=None):
             continue
         if not _SAFE_PARAM_RE.match(key):
             continue  # cle invalide (anti-injection)
-        lines[key] = _interpolate(value, machine_row)
+        valeur = _interpolate(value, machine_row)
+        if not isinstance(valeur, str) or not _SAFE_VALUE_RE.match(valeur):
+            # Une valeur multiligne produirait une directive supplementaire : on
+            # la refuse ICI AUSSI, pour les lignes posees avant le correctif.
+            logger.warning(
+                "Override refuse a la relecture (valeur non conforme) : machine=%s cle=%s",
+                machine_row.get('id'), key)
+            continue
+        lines[key] = valeur
 
     return lines
 
 
 def _write_config_stream(client, root_password, file_path, config_lines):
-    """Met a jour un fichier de config Zabbix en streaming (base64 safe)."""
+    """Met a jour un fichier de config Zabbix en streaming (base64 safe).
+
+    RENVOIE le nombre de cles dont l'ecriture a ECHOUE — 0 si tout est passe,
+    et `None` si la fonction s'est interrompue sur une exception. Un appelant
+    qui fait `yield from` sans affectation ne voit aucun changement : l'ajout
+    est ADDITIF, comme celui d'`execute_as_root_stream`.
+
+    Avant, cette fonction jetait les trois valeurs de retour d'`execute_as_root`
+    (`(sortie, erreur, code)`) et annoncait « mis a jour avec succes » quoi qu'il
+    arrive. Un `sed` refuse — fichier absent, disque plein, droits — donnait donc
+    exactement le meme flux qu'une reussite, et les deux routes qui l'appellent
+    concluaient au deploiement. E-90.
+    """
+    echecs = 0
     try:
         for key, value in config_lines.items():
             grep_regex = f"^[#[:space:]]*{re.escape(key)}[[:space:]]*="
             delete_cmd = f"sed -i -E '/{grep_regex}/d' {file_path}"
-            execute_as_root(client, delete_cmd, root_password)
+            _, _, rc_purge = execute_as_root(client, delete_cmd, root_password)
+            if rc_purge != 0:
+                echecs += 1
+                yield f"ERROR: Cle '{key}' : purge refusee (code {rc_purge}).\n"
+                continue
             yield f"INFO: Cle '{key}' purgee.\n"
 
             line = f"{key}={value}\n"
+            # ══ CE `base64` EST UNE PROTECTION, PAS UNE COMMODITE ═════════════
+            #
+            # `line` porte une valeur d'override, donc une valeur venue du
+            # CLIENT. Ce qui est interpole dans la commande n'est jamais cette
+            # valeur : c'est son ENCODAGE, dont l'alphabet est [A-Za-z0-9+/=].
+            # Aucun caractere de la valeur n'atteint donc le shell distant, quel
+            # qu'il soit.
+            #
+            # C'est la MOITIE de ce qui ferme E-85, et c'est la moitie qu'on ne
+            # voit pas. `_SAFE_VALUE_RE` (`:67`) refuse les caracteres de
+            # controle, mais son ancre `$` admet en Python UN saut de ligne en
+            # toute fin de chaine. Ce residu est inoffensif — il produit une
+            # ligne vide, pas une directive — et ce qui le rend inoffensif
+            # jusqu'au bout n'est pas la regex : c'est cet encodage.
+            #
+            # Donc : remplacer ce `printf | base64 -d` par un `printf` direct
+            # « pour la lisibilite » ROUVRIRAIT le trou, et AUCUN test ne
+            # bougerait. Mesure de la session 5, 2026-08-27 : la protection est
+            # double et independante, et cette moitie-ci n'etait ecrite nulle
+            # part.
             encoded = base64.b64encode(line.encode('utf-8')).decode('ascii')
-            execute_as_root(client,
+            _, _, rc_ecrit = execute_as_root(client,
                 f"printf '%s' '{encoded}' | base64 -d >> {file_path}", root_password)
+            if rc_ecrit != 0:
+                echecs += 1
+                yield f"ERROR: Cle '{key}' : ecriture refusee (code {rc_ecrit}).\n"
+                continue
             yield f"INFO: Cle '{key}' definie a '{value}'.\n"
 
-        yield f"INFO: Fichier {file_path} mis a jour avec succes.\n"
+        if echecs:
+            yield (f"ERROR: Fichier {file_path} : {echecs} cle(s) sur "
+                   f"{len(config_lines)} n'ont pas ete ecrites.\n")
+        else:
+            yield f"INFO: Fichier {file_path} mis a jour avec succes.\n"
+        return echecs
     except Exception as e:
         yield f"ERROR: write_config_stream: {e}\n"
+        return None
 
 
 def _config_file_path(agent_type, platform='zabbix'):
@@ -436,17 +573,49 @@ def _get_machine_agents(machine_id=None):
 
 
 def _backup_agent_config(client, root_pass, config_path):
-    """Cree un backup date du fichier de config agent."""
+    """Cree un backup date du fichier de config agent.
+
+    CORRECTIF v1.37.44 - `A && B || C` EFFACAIT LA DIFFERENCE ENTRE « RIEN A
+    SAUVEGARDER » ET « SAUVEGARDE ECHOUEE ».
+
+    La forme precedente etait
+    `test -f X && cp X Y || echo 'NO_FILE'`. En shell, `||` se declenche si A OU
+    B a echoue : un `cp` en echec empruntait donc la branche « pas de fichier ».
+    Mesure du 2026-08-22 sur la machine de test, les trois cas :
+
+        fichier absent              -> [NO_FILE]  rc=0     (voulu)
+        fichier present, cp reussi  -> []         rc=0
+        fichier present, cp ECHOUE  -> [NO_FILE]  rc=0     <- INDISCERNABLE
+
+    La fonction rendait alors `None`, et les appelants qui gardent leur repli par
+    `if backup_path:` **le desarmaient au moment precis ou il servait** : le `>`
+    de l'ecriture tronque le fichier avant d'ecrire, donc un echec a ce stade
+    laissait une configuration tronquee et rien pour la retablir. SIX routes en
+    dependent, dont le deploiement. Voir docs/migration/PARITE.md, E-83.
+
+    LA FORME CORRIGEE separe les deux constats au lieu de les confondre : on
+    teste l'existence d'abord, et le `cp` n'est tente que dans la branche ou le
+    fichier existe. Son echec remonte alors comme un echec.
+    """
     filename = config_path.split('/')[-1]
     timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
     backup_dir = '/'.join(config_path.split('/')[:-1])
     backup_path = f"{backup_dir}/{filename}.bak.{timestamp}"
-    cmd = f"test -f {config_path} && cp {config_path} {backup_path} || echo 'NO_FILE'"
+    cmd = (
+        f"if [ -f {config_path} ]; then\n"
+        f"  cp {config_path} {backup_path}\n"
+        "else\n"
+        "  echo 'NO_FILE'\n"
+        "fi\n"
+    )
     out, stderr, rc = execute_as_root(client, cmd, root_pass, logger=logger)
+    if rc != 0:
+        # Le fichier existait et la copie a echoue : c'est un ECHEC, et il ne
+        # doit plus pouvoir passer pour une absence de fichier.
+        raise RuntimeError(f"Echec backup: {stderr or out}")
     if 'NO_FILE' in out:
         return None
-    if rc != 0:
-        raise RuntimeError(f"Echec backup: {stderr}")
+
     return backup_path
 
 
@@ -681,14 +850,31 @@ def zabbix_deploy():
                     except Exception as e:
                         logger.warning("Dechiffrement PSK supervision echoue : %s", e)
 
+                # Les etapes DECISIVES sont collectees ici : le verdict se
+                # compose, il ne se lit pas sur le dernier marqueur.
+                echecs = []
+
                 with ssh_session(ip, port, ssh_user, ssh_pass,
                                  logger=logger, service_account=svc_account) as client:
-                    # Installation repo
-                    yield from execute_as_root_stream(client, install_repo_cmd, root_pass, logger=logger)
-                    # Installation paquet
-                    yield from execute_as_root_stream(client, install_pkg_cmd, root_pass, logger=logger)
+                    # Installation repo. NON decisive a elle seule, et c'est
+                    # delibere : sur une machine dont le depot Zabbix est deja
+                    # pose autrement, cette commande peut echouer sans que le
+                    # deploiement soit compromis. Ce qui tranche est
+                    # l'installation du paquet, juste apres — si le depot
+                    # manquait vraiment, elle echouera et sera comptee, elle.
+                    rc_repo = yield from execute_as_root_stream(
+                        client, install_repo_cmd, root_pass, logger=logger)
+                    if rc_repo != 0:
+                        yield (f"WARN: Depot Zabbix : code {rc_repo}. L'installation "
+                               f"du paquet dira si cela porte a consequence.\n")
 
-                    # Ecriture PSK
+                    # Installation paquet — DECISIVE.
+                    rc_pkg = yield from execute_as_root_stream(
+                        client, install_pkg_cmd, root_pass, logger=logger)
+                    echecs += _echec("installation du paquet", rc_pkg)
+
+                    # Ecriture PSK — DECISIVE quand une PSK est configuree :
+                    # sans elle l'agent ne peut pas parler au serveur.
                     if psk_value:
                         psk_b64 = base64.b64encode(psk_value.encode('utf-8')).decode('ascii')
                         write_psk_cmd = (
@@ -696,32 +882,39 @@ def zabbix_deploy():
                             f"printf '%s' '{psk_b64}' | base64 -d > /etc/zabbix/zabbix_agent2.d/server.key && "
                             f"chmod 640 /etc/zabbix/zabbix_agent2.d/server.key"
                         )
-                        execute_as_root(client, write_psk_cmd, root_pass, logger=logger)
-                        yield "INFO: Cle PSK deployee.\n"
+                        _, _, rc_psk = execute_as_root(client, write_psk_cmd, root_pass, logger=logger)
+                        echecs += _echec("ecriture de la cle PSK", rc_psk)
+                        if rc_psk == 0:
+                            yield "INFO: Cle PSK deployee.\n"
 
-                    # Configuration
-                    yield from _write_config_stream(client, root_pass, config_path, config_lines)
+                    # Configuration — DECISIVE.
+                    nb_cles_ratees = yield from _write_config_stream(
+                        client, root_pass, config_path, config_lines)
+                    echecs += _echec("ecriture de la configuration", nb_cles_ratees)
 
-                    # Extra config
+                    # Extra config — DECISIVE : l'exploitant l'a saisie, la
+                    # perdre en silence rendrait la machine differente de ce
+                    # que l'ecran annonce.
                     if global_cfg.get('extra_config'):
                         extra_b64 = base64.b64encode(
                             (global_cfg['extra_config'] + '\n').encode('utf-8')).decode('ascii')
-                        execute_as_root(client,
+                        _, _, rc_extra = execute_as_root(client,
                             f"printf '%s' '{extra_b64}' | base64 -d >> {config_path}", root_pass)
-                        yield "INFO: Configuration supplementaire ajoutee.\n"
+                        echecs += _echec("ajout de la configuration supplementaire", rc_extra)
+                        if rc_extra == 0:
+                            yield "INFO: Configuration supplementaire ajoutee.\n"
 
-                    # Restart + enable
+                    # Restart + enable — DECISIVE.
                     service_name = 'zabbix-agent2' if agent_type == 'zabbix-agent2' else 'zabbix-agent'
-                    yield from execute_as_root_stream(client,
+                    rc_svc = yield from execute_as_root_stream(client,
                         f"systemctl restart {service_name} && systemctl enable {service_name}",
                         root_pass, logger=logger)
+                    echecs += _echec("redemarrage du service", rc_svc)
 
-                # Mise a jour BDD
-                try:
-                    _upsert_agent(machine_id, 'zabbix', agent_version, config_deployed=True)
-                    yield f"SUCCESS_MACHINE::{machine_id}::Deploiement reussi pour {machine_name}.\n"
-                except Exception as db_err:
-                    yield f"ERROR_MACHINE::{machine_id}::Echec MAJ BDD: {db_err}\n"
+                yield from _conclut_geste(
+                    machine_id, machine_name, "Deploiement", echecs,
+                    lambda: _upsert_agent(machine_id, 'zabbix', agent_version,
+                                          config_deployed=True))
 
             except Exception as e:
                 yield f"ERROR_MACHINE::{machine_id}::Exception: {e}\n"
@@ -748,12 +941,37 @@ def zabbix_version():
                          logger=logger, service_account=svc_account) as client:
             # Essayer zabbix_agent2 d'abord, fallback zabbix_agentd.
             # command -v evite "sh: not found" qui polluerait la sortie si absent.
+            #
+            # UNE SEULE SOURCE POUR LA COMMANDE — meme correctif que celui deja
+            # applique a `uninstall_cmd`. Cette commande etait ecrite DEUX fois,
+            # ici et dans le registre, et les deux copies sont VIVANTES : la
+            # seconde sert `POST /supervision/scan-all` (`:1572`). E-186 vivait
+            # donc en deux exemplaires, dont un qu'un correctif inattentif
+            # aurait laisse. C'est le motif « a moitie corrige » que ce module a
+            # deja paye cinq fois.
             out, _, rc = execute_as_root(client,
-                "command -v zabbix_agent2 >/dev/null 2>&1 && zabbix_agent2 -V 2>/dev/null | head -1 "
-                "|| command -v zabbix_agentd >/dev/null 2>&1 && zabbix_agentd -V 2>/dev/null | head -1 "
-                "|| echo 'NOT_INSTALLED'",
+                AGENT_REGISTRY['zabbix']['version_cmd'],
                 root_pass, timeout=15)
             out = out.strip()
+
+            # E-184 : sans ce garde, une sonde qui n'a rien pu lire tombait
+            # dans le `else`, ne trouvait pas de version, et faisait
+            # `_remove_agent` — un incident SSH effacait l'agent de
+            # l'inventaire. Voir `_sonde_concluante`.
+            if not _sonde_concluante(rc, out):
+                logger.warning(
+                    "[supervision/zabbix/version] sonde NON CONCLUANTE sur machine_id=%s "
+                    "(code=%s, sortie vide=%s) — l'inventaire n'est PAS modifie",
+                    row['id'], rc, not out)
+                return jsonify({
+                    'success': False,
+                    'concluante': False,
+                    'message': "Sonde non concluante : la version n'a pas pu etre lue. "
+                               "L'inventaire n'a pas ete modifie.",
+                    'version': None,
+                    'agent_type': None,
+                    'machine_id': row['id'],
+                })
 
             if 'NOT_INSTALLED' in out:
                 version_str = None
@@ -772,6 +990,7 @@ def zabbix_version():
 
         return jsonify({
             'success': True,
+            'concluante': True,
             'version': version_str,
             'agent_type': agent_type,
             'machine_id': row['id'],
@@ -780,6 +999,99 @@ def zabbix_version():
         logger.error("[supervision/zabbix/version] %s", e)
         logger.error("[supervision] %s", e)
         return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+
+
+def _sonde_concluante(rc, sortie):
+    """E-184 : une sonde qui echoue n'efface pas ce qu'elle n'a pas pu regarder.
+
+    Les deux routes de version faisaient `_remove_agent` des que la version
+    etait fausse. Or `version_str` est faux dans DEUX situations opposees :
+    l'agent est absent — verdict, et l'effacement est alors VOULU, c'est ainsi
+    qu'une desinstallation se verifie — ou la sonde n'a rien pu lire, ce qui
+    n'est pas un verdict. Le second cas effacait l'inventaire sur un incident.
+
+    La commande porte elle-meme son marqueur d'absence (`|| echo NOT_INSTALLED`)
+    et ce marqueur sort avec un code nul : l'absence RESTE donc concluante, et
+    l'effet voulu est conserve. Ce qui change est la troisieme issue, qui
+    n'existait pas : « je ne sais pas ».
+    """
+    return rc == 0 and bool((sortie or '').strip())
+
+
+def _echec(etape, code):
+    """Rend `[(etape, code)]` si le code n'est pas un succes, `[]` sinon.
+
+    `None` compte comme un ECHEC : c'est ce que rend `execute_as_root_stream`
+    quand elle s'interrompt sur une exception, et « je ne sais pas » ne vaut
+    pas « ca s'est bien passe ». Fail-closed.
+    """
+    return [] if code == 0 else [(etape, code)]
+
+
+def _conclut_geste(machine_id, machine_name, libelle, echecs, effet_si_reussi=None):
+    """Conclut un deploiement ou une reconfiguration SELON CE QUI S'EST PASSE.
+
+    Meme regle que `_conclut_desinstallation` (E-88), etendue aux gestes qui
+    ECRIVENT : l'inventaire suit le VERDICT, jamais l'intention.
+
+    Avant ce correctif, les quatre routes de deploiement et de reconfiguration
+    jetaient tous leurs codes de retour, appelaient `_upsert_agent(...,
+    config_deployed=True)` **inconditionnellement** et emettaient
+    `SUCCESS_MACHINE::` a la suite. Un `apt-get install` en echec inscrivait donc
+    en base un agent qui n'existe pas, et le portail annoncait la reussite. E-90.
+
+    C'est aussi le defaut « le dernier marqueur d'un flux n'est pas son
+    verdict » : `systemctl restart` pouvait rendre 127 deux lignes plus haut,
+    le marqueur concluait quand meme a la reussite.
+
+    :param echecs: liste de `(etape, code)`, construite par `_echec`. Vide =
+        toutes les etapes decisives ont rendu 0.
+    :param effet_si_reussi: callable sans argument, joue UNIQUEMENT si `echecs`
+        est vide — c'est la que vit `_upsert_agent`.
+    """
+    if echecs:
+        detail = ', '.join(f"{etape} (code {code})" for etape, code in echecs)
+        yield (f"ERROR_MACHINE::{machine_id}::{libelle} echouee sur {machine_name} — "
+               f"{detail}. L'inventaire n'a pas ete modifie.\n")
+        return
+
+    if effet_si_reussi is not None:
+        try:
+            effet_si_reussi()
+        except Exception as db_err:
+            yield f"ERROR_MACHINE::{machine_id}::Echec MAJ BDD: {db_err}\n"
+            return
+
+    yield f"SUCCESS_MACHINE::{machine_id}::{libelle} reussie pour {machine_name}.\n"
+
+
+def _conclut_desinstallation(machine_id, platform, machine_name, code):
+    """Conclut une desinstallation SELON CE QUI S'EST PASSE — correctif v1.37.44.
+
+    Avant, les deux routes emettaient `SUCCESS_MACHINE::` et appelaient
+    `_remove_agent` **inconditionnellement**. Combine au `|| true` de la commande
+    (qui rendait le code de sortie toujours nul), le portail ne pouvait ni
+    rapporter un echec ni savoir s'il y avait quelque chose a desinstaller :
+    mesure du 2026-08-23, « Agent Zabbix desinstalle » sur une machine ou il
+    n'avait jamais ete installe, et inventaire vide dans la foulee. E-88.
+
+    LA REGLE : l'inventaire suit CE QU'ON A PU CONSTATER.
+      - code 0  -> soit la purge a reussi, soit il n'y avait rien a purger. Dans
+                   les deux cas il n'y a PLUS d'agent : la ligne d'inventaire est
+                   retiree, et c'est vrai ;
+      - code != 0 ou inconnu -> on ne sait pas ce qui reste sur la machine.
+                   L'inventaire n'est PAS touche, et le marqueur dit l'echec. Un
+                   inventaire qui oublie un agent encore installe est pire qu'un
+                   inventaire qui n'a pas su.
+    """
+    if code == 0:
+        _remove_agent(machine_id, platform)
+        yield f"SUCCESS_MACHINE::{machine_id}::{platform} desinstalle de {machine_name}.\n"
+
+        return
+
+    yield (f"ERROR_MACHINE::{machine_id}::Desinstallation {platform} echouee sur "
+           f"{machine_name} (code {code}). L'inventaire n'a pas ete modifie.\n")
 
 
 @bp.route('/supervision/zabbix/uninstall', methods=['POST'])
@@ -804,17 +1116,14 @@ def zabbix_uninstall():
             yield f"START_MACHINE::{machine_id}::Desinstallation agent Zabbix sur {machine_name}.\n"
             with ssh_session(ip, port, ssh_user, ssh_pass,
                              logger=logger, service_account=svc_account) as client:
-                cmd = (
-                    "export DEBIAN_FRONTEND=noninteractive && "
-                    "systemctl stop zabbix-agent2 2>/dev/null || true && "
-                    "systemctl stop zabbix-agent 2>/dev/null || true && "
-                    "apt-get purge -y zabbix-agent zabbix-agent2 zabbix-agent2-plugin-* 2>/dev/null || true && "
-                    "apt-get autoremove -y 2>/dev/null || true"
-                )
-                yield from execute_as_root_stream(client, cmd, root_pass, logger=logger)
+                # UNE SEULE SOURCE POUR LA COMMANDE. Elle etait dupliquee ici,
+                # a cote de celle du registre : deux exemplaires a corriger, et
+                # le second oublie. Voir `_commande_desinstallation`.
+                code = yield from execute_as_root_stream(
+                    client, AGENT_REGISTRY['zabbix']['uninstall_cmd'],
+                    root_pass, logger=logger)
 
-            _remove_agent(machine_id, 'zabbix')
-            yield f"SUCCESS_MACHINE::{machine_id}::Agent Zabbix desinstalle de {machine_name}.\n"
+            yield from _conclut_desinstallation(machine_id, 'zabbix', machine_name, code)
         except Exception as e:
             yield f"ERROR_MACHINE::{machine_id}::Exception: {e}\n"
 
@@ -872,7 +1181,11 @@ def zabbix_reconfigure():
                     except RuntimeError as be:
                         yield f"WARN: Backup echoue: {be}\n"
 
-                    yield from _write_config_stream(client, root_pass, config_path, config_lines)
+                    echecs = []
+
+                    nb_cles_ratees = yield from _write_config_stream(
+                        client, root_pass, config_path, config_lines)
+                    echecs += _echec("ecriture de la configuration", nb_cles_ratees)
 
                     # PSK
                     psk_value = None
@@ -883,20 +1196,28 @@ def zabbix_reconfigure():
                             psk_value = enc.decrypt_password(global_cfg['tls_psk_value'])
                         except Exception as e:
                             logger.warning("Dechiffrement PSK reconfigure echoue : %s", e)
+                            # Le dechiffrement rate ne se journalisait QUE cote
+                            # serveur : l'ecran annoncait une reconfiguration
+                            # reussie avec l'ancienne PSK toujours en place.
+                            echecs.append(("dechiffrement de la cle PSK", "illisible"))
 
                     if psk_value:
                         psk_b64 = base64.b64encode(psk_value.encode('utf-8')).decode('ascii')
-                        execute_as_root(client,
+                        _, _, rc_psk = execute_as_root(client,
                             f"printf '%s' '{psk_b64}' | base64 -d > /etc/zabbix/zabbix_agent2.d/server.key && "
                             f"chmod 640 /etc/zabbix/zabbix_agent2.d/server.key",
                             root_pass, logger=logger)
-                        yield "INFO: Cle PSK mise a jour.\n"
+                        echecs += _echec("ecriture de la cle PSK", rc_psk)
+                        if rc_psk == 0:
+                            yield "INFO: Cle PSK mise a jour.\n"
 
                     # Restart
-                    yield from execute_as_root_stream(client,
+                    rc_svc = yield from execute_as_root_stream(client,
                         f"systemctl restart {service_name}", root_pass, logger=logger)
+                    echecs += _echec("redemarrage du service", rc_svc)
 
-                yield f"SUCCESS_MACHINE::{machine_id}::Reconfiguration reussie pour {machine_name}.\n"
+                yield from _conclut_geste(machine_id, machine_name,
+                                          "Reconfiguration", echecs)
             except Exception as e:
                 yield f"ERROR_MACHINE::{machine_id}::Exception: {e}\n"
 
@@ -982,13 +1303,13 @@ def zabbix_config_save():
                 f"systemctl restart {service_name}", root_pass, timeout=15)
             if rc_r != 0:
                 return jsonify({
-                    'success': True,
+                    'success': True, 'restarted': False,
                     'message': f'Config sauvegardee mais restart echoue: {stderr_r}',
                     'backup': backup_path,
                 })
 
             return jsonify({
-                'success': True,
+                'success': True, 'restarted': True,
                 'message': 'Configuration sauvegardee et agent redemarre.',
                 'backup': backup_path,
             })
@@ -1088,9 +1409,16 @@ def zabbix_restore_backup():
                 return jsonify({'success': False, 'message': f'Restauration echouee: {stderr}'}), 500
 
             # Restart
-            execute_as_root(client, f"systemctl restart {service_name}", root_pass, timeout=15)
+            _, stderr_r, rc_r = execute_as_root(
+                client, f"systemctl restart {service_name}", root_pass, timeout=15)
+            if rc_r != 0:
+                return jsonify({
+                    'success': True, 'restarted': False,
+                    'message': f'Backup {backup_name} restaure mais restart echoue: {stderr_r}',
+                })
 
-            return jsonify({'success': True, 'message': f'Backup {backup_name} restaure et agent redemarre.'})
+            return jsonify({'success': True, 'restarted': True,
+                            'message': f'Backup {backup_name} restaure et agent redemarre.'})
     except Exception as e:
         logger.error("[supervision] %s", e)
         return jsonify({'success': False, 'message': 'Erreur interne'}), 500
@@ -1122,20 +1450,45 @@ def save_overrides(machine_id):
     data = request.get_json(silent=True) or {}
     overrides = data.get('overrides', {})
 
+    # UN REFUS SILENCIEUX N'EST PAS UN REFUS. Avant ce correctif, un nom de
+    # parametre invalide etait simplement saute : l'appelant recevait
+    # « Overrides sauvegardes » et croyait avoir enregistre ce qu'il venait
+    # d'ecrire. Les entrees refusees sont desormais NOMMEES dans la reponse.
+    refuses = []
+    retenus = {}
+    for param, value in overrides.items():
+        texte = str(value)
+        if not _SAFE_PARAM_RE.match(str(param)):
+            refuses.append({'param': str(param)[:100], 'raison': 'nom invalide'})
+            continue
+        if not _SAFE_VALUE_RE.match(texte):
+            # Le cas mesure : un saut de ligne dans la valeur produisait une
+            # directive autonome dans le fichier de configuration (E-85).
+            refuses.append({'param': str(param)[:100],
+                            'raison': 'valeur multiligne ou avec un caractere de controle'})
+            continue
+        retenus[str(param)] = texte
+
     try:
         with get_db_connection() as conn:
             cur = conn.cursor()
             # Supprimer les anciens
             cur.execute("DELETE FROM supervision_overrides WHERE machine_id = %s", (machine_id,))
             # Inserer les nouveaux
-            for param, value in overrides.items():
-                if not _SAFE_PARAM_RE.match(param):
-                    continue
+            for param, texte in retenus.items():
                 cur.execute(
                     "INSERT INTO supervision_overrides (machine_id, param_name, param_value) "
-                    "VALUES (%s, %s, %s)", (machine_id, param, str(value)))
+                    "VALUES (%s, %s, %s)", (machine_id, param, texte))
             conn.commit()
-        return jsonify({'success': True, 'message': 'Overrides sauvegardes'})
+
+        if refuses:
+            return jsonify({
+                'success': True, 'saved': len(retenus), 'rejected': refuses,
+                'message': f'{len(retenus)} override(s) enregistre(s), {len(refuses)} refuse(s).',
+            })
+
+        return jsonify({'success': True, 'saved': len(retenus), 'rejected': [],
+                        'message': 'Overrides sauvegardes'})
     except Exception as e:
         logger.error("[supervision] %s", e)
         return jsonify({'success': False, 'message': 'Erreur interne'}), 500
@@ -1193,6 +1546,228 @@ def get_machine_agents_route(machine_id):
     except Exception as e:
         logger.error("[supervision] %s", e)
         return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Releve du parc en tache de fond
+#
+# POURQUOI CETTE ROUTE EXISTE. Le releve de parc n'existait que dans le
+# navigateur : `scanAllAgents` (supervision/js/main.js) bouclait sur toutes les
+# machines x 4 plateformes et lancait TOUTES les requetes en parallele, chacune
+# ouvrant sa propre session SSH. Mesure sur le parc courant : 3 machines = 12
+# sessions simultanees, sans etalement ni plafond ni file. Chaque requete etant
+# `@threaded_route`, la rafale se payait sur le pool PARTAGE par toutes les
+# routes — exactement ce que son propre commentaire interdit :
+#
+#     « les operations longues de parc (ex. /ssh-audit/scan-all) doivent elles
+#       passer en tache de fond (centre de taches), jamais monopoliser ce pool »
+#
+# C'est le sinistre du fix v1.37.13 (504 en cascade sur toute l'interface).
+# `ssh-audit` a ete corrige dans cette vague ; `supervision/` avait ete oublie.
+#
+# CE QUE LE PASSAGE EN TACHE DE FOND CHANGE VRAIMENT :
+#   - la reponse HTTP est immediate (`{queued, task_id}`), plus aucune connexion
+#     tenue ouverte pendant le balayage ;
+#   - le balayage est SEQUENTIEL dans un unique thread demon : il ne consomme
+#     AUCUN slot du pool partage, donc le reste du portail ne ralentit pas ;
+#   - **une seule session SSH par machine** sert les quatre releves, au lieu
+#     d'une par plateforme : 3 sessions au lieu de 12 sur le parc courant.
+#
+# Motif aligne sur `/ssh-audit/scan-all` (routes/ssh_audit.py), y compris le
+# helper de creation de thread isole : il reste patchable en test SANS stubber
+# `threading.Thread` globalement, ce qui interbloquerait le ThreadPoolExecutor
+# de `@threaded_route` (il en depend pour creer ses workers).
+#
+# CE QUE CETTE ROUTE N'ENVOIE PAS, DELIBEREMENT. `/ssh-audit/scan-all` appelle
+# `notify_subscribed` pour chaque machine auditee. Un releve de version n'est ni
+# une alerte ni un verdict : aucune notification n'est emise ici. Un effet
+# sortant ne se defait pas, et il n'y a rien a signaler a personne quand on
+# constate qu'un agent est en 7.0.
+# ══════════════════════════════════════════════════════════════════════════════
+
+SCAN_ALL_PLATEFORMES = ('zabbix', 'centreon', 'prometheus', 'telegraf')
+
+
+def _releve_agents_machine(row, platforms):
+    """Releve les versions d'agent d'UNE machine, en UNE session SSH.
+
+    Retourne {plateforme: version_ou_None}. La commande est celle de
+    AGENT_REGISTRY, identique a celle des routes par machine : une lecture pure
+    (`command -v <binaire> && <binaire> -V | head -1 || echo 'NOT_INSTALLED'`).
+    Rien n'installe, rien n'ecrit, rien ne redemarre.
+
+    Note : `execute_as_root` est conserve tel quel. Lire un numero de version
+    n'exige aucun privilege (defaut declare en PARITE.md E-78), mais changer le
+    niveau de privilege d'une commande distante est un changement de droits — il
+    ne se fait pas au detour d'un portage, et une lecture qui echouerait sans
+    root produirait un ecart de comportement avec les routes par machine.
+    """
+    ip, port, ssh_user, ssh_pass, root_pass, svc_account = _get_ssh_creds(row)
+    trouve = {}
+    with ssh_session(ip, port, ssh_user, ssh_pass,
+                     logger=logger, service_account=svc_account) as client:
+        for plateforme in platforms:
+            agent_info = AGENT_REGISTRY.get(plateforme)
+            if not agent_info:
+                continue
+            out, _, _rc = execute_as_root(
+                client, agent_info['version_cmd'], root_pass, timeout=15)
+            out = (out or '').strip()
+            if 'NOT_INSTALLED' in out or not out:
+                trouve[plateforme] = None
+                continue
+            match = re.search(r'(\d+\.\d+[\.\d]*)', out)
+            trouve[plateforme] = match.group(1) if match else out[:30]
+    return trouve
+
+
+def _run_scan_all_background(machines, platforms, task_id):
+    """Releve le parc en ARRIERE-PLAN. Ne touche jamais au contexte de requete.
+
+    SEQUENTIEL par construction : une machine apres l'autre. C'est ce qui
+    remplace la rafale du navigateur — et c'est aussi ce qui rend la
+    progression lisible dans le centre de taches.
+    """
+    from task_tracker import update_task
+    total = max(1, len(machines))
+    ok, absents, erreurs = 0, 0, []
+
+    for idx, row in enumerate(machines, start=1):
+        nom = row.get('name') or row['id']
+        try:
+            trouve = _releve_agents_machine(row, platforms)
+            for plateforme, version in trouve.items():
+                # Meme regle que les routes par machine : un agent qu'on ne
+                # trouve plus DISPARAIT de l'inventaire. L'inventaire suit
+                # l'etat reel des machines, y compris les desinstallations
+                # faites hors du portail.
+                if version:
+                    _upsert_agent(row['id'], plateforme, version)
+                    ok += 1
+                else:
+                    _remove_agent(row['id'], plateforme)
+                    absents += 1
+        except Exception as e:
+            logger.error("[supervision/scan-all] machine #%s: %s", row['id'], e)
+            erreurs.append({'machine_id': row['id'], 'error': str(e)})
+        finally:
+            update_task(task_id, progress=int(idx * 100 / total),
+                        detail=f"{idx}/{len(machines)} - {nom} "
+                               f"({ok} agent(s), {absents} absent(s), "
+                               f"{len(erreurs)} erreur(s))")
+
+    detail = (f"{ok} agent(s) releve(s), {absents} absent(s), "
+              f"{len(erreurs)} erreur(s) sur {len(machines)} machine(s)")
+    update_task(task_id,
+                status='error' if erreurs and not ok else 'success',
+                progress=100, detail=detail, finished=True)
+    logger.info("[supervision/scan-all] termine : %s", detail)
+
+
+def _spawn_scan_all_thread(machines, platforms, task_id):
+    """Cree et demarre le thread demon du releve de parc.
+
+    Isole dans un helper pour rester patchable en test SANS stubber
+    `threading.Thread` globalement : le ThreadPoolExecutor de `@threaded_route`
+    en depend pour creer ses workers, et le stubber globalement interbloque le
+    pool."""
+    t = threading.Thread(target=_run_scan_all_background,
+                         args=(machines, platforms, task_id), daemon=True)
+    t.start()
+    return t
+
+
+@bp.route('/supervision/scan-all', methods=['POST'])
+@require_api_key
+@require_role(2)
+@require_permission('can_manage_supervision')
+@require_machine_access
+@threaded_route
+def supervision_scan_all():
+    """Releve les agents de supervision du parc, en tache de fond.
+
+    Corps (tout est optionnel) :
+      machine_ids : liste explicite de machines. ABSENT = tout le parc non
+                    archive. Une portee explicite est ce qui permet de mesurer
+                    cette route sans balayer le parc entier — et donc sans
+                    joindre une machine de production.
+      platforms   : liste de plateformes. ABSENT = les quatre.
+
+    Reponse IMMEDIATE : {queued, background, task_id}. La progression se lit
+    dans le centre de taches (`/tasks/list`), les resultats dans
+    `GET /supervision/agents`.
+
+    LE GARDE D'ACCES AUX MACHINES A BESOIN D'UN OBJET. `@require_machine_access`
+    lit `machine_id`/`machine_ids` dans le corps et fail-close sur tout id
+    refuse — mais quand le corps n'en porte AUCUN, sa liste est vide, donc rien
+    n'est refuse : sur une route de parc, il aurait l'apparence d'un garde sans
+    en etre un. Le parc implicite est donc filtre ICI, par `check_machine_access`
+    machine par machine. Aujourd'hui ce filtre ne retire rien — la route exige
+    deja le role 2, et `check_machine_access` rend True des le role 2 — et c'est
+    dit plutot que sous-entendu : il est en place pour que le jour ou cette
+    route s'ouvrirait plus bas, le parc implicite soit garde comme la liste
+    explicite.
+    """
+    data = request.get_json(silent=True) or {}
+
+    plateformes_demandees = data.get('platforms')
+    if isinstance(plateformes_demandees, list) and plateformes_demandees:
+        platforms = [p for p in plateformes_demandees if p in SCAN_ALL_PLATEFORMES]
+        if not platforms:
+            return jsonify({'success': False, 'message': 'Aucune plateforme connue'}), 400
+    else:
+        platforms = list(SCAN_ALL_PLATEFORMES)
+
+    portee = data.get('machine_ids')
+    try:
+        with get_db_connection() as conn:
+            cur = conn.cursor(dictionary=True)
+            if isinstance(portee, list) and portee:
+                try:
+                    ids = [validate_machine_id(m) for m in portee]
+                except ValueError as e:
+                    return jsonify({'success': False, 'message': str(e)}), 400
+                trous = ','.join(['%s'] * len(ids))
+                cur.execute(
+                    "SELECT id, name, ip, port, user, password, root_password, "
+                    "service_account_deployed FROM machines "
+                    f"WHERE id IN ({trous}) "
+                    "AND (lifecycle_status IS NULL OR lifecycle_status != 'archived') "
+                    "ORDER BY name", tuple(ids))
+            else:
+                cur.execute(
+                    "SELECT id, name, ip, port, user, password, root_password, "
+                    "service_account_deployed FROM machines "
+                    "WHERE lifecycle_status IS NULL OR lifecycle_status != 'archived' "
+                    "ORDER BY name")
+            machines = cur.fetchall()
+    except Exception as e:
+        logger.error("[supervision/scan-all] BDD: %s", e)
+        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+
+    # Le parc IMPLICITE est filtre ici : voir la docstring.
+    machines = [m for m in machines if check_machine_access(m['id'])]
+
+    if not machines:
+        return jsonify({'success': True, 'queued': 0, 'background': True,
+                        'task_id': None, 'message': 'Aucune machine a relever'})
+
+    from task_tracker import create_task
+    try:
+        cree_par = int(request.headers.get('X-User-ID', 0)) or None
+    except (TypeError, ValueError):
+        cree_par = None
+    task_id = create_task(
+        'supervision_scan',
+        f'Releve des agents de supervision ({len(machines)} machine(s), '
+        f'{len(platforms)} plateforme(s))',
+        created_by=cree_par)
+
+    _spawn_scan_all_thread(machines, platforms, task_id)
+
+    return jsonify({'success': True, 'queued': len(machines),
+                    'platforms': platforms, 'background': True,
+                    'task_id': task_id})
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1254,35 +1829,49 @@ def generic_deploy(platform):
 
                 install_cmds = _get_install_commands(platform, global_cfg, linux_version)
 
+                echecs = []
+
                 with ssh_session(ip, port, ssh_user, ssh_pass,
                                  logger=logger, service_account=svc_account) as client:
-                    for cmd in install_cmds:
-                        yield from execute_as_root_stream(client, cmd, root_pass, logger=logger)
+                    for rang, cmd in enumerate(install_cmds, 1):
+                        rc_inst = yield from execute_as_root_stream(
+                            client, cmd, root_pass, logger=logger)
+                        echecs += _echec(f"installation, commande {rang}", rc_inst)
 
                     if global_cfg:
                         overrides = _get_overrides(machine_id)
                         config_content = _build_agent_config_content(platform, global_cfg, row, overrides)
                         if config_content:
                             config_dir = '/'.join(config_path.split('/')[:-1])
-                            execute_as_root(client, f"mkdir -p {config_dir}", root_pass)
+                            _, _, rc_dir = execute_as_root(client, f"mkdir -p {config_dir}", root_pass)
+                            echecs += _echec("creation du repertoire de configuration", rc_dir)
                             _backup_agent_config(client, root_pass, config_path)
+                            # Le contenu passe par `base64` : c'est ce qui empeche une
+                            # valeur d'override d'atteindre le shell distant. Voir la note
+                            # longue sur `_write_config_stream`. Ne pas remplacer par un
+                            # `printf` direct.
                             b64 = base64.b64encode(config_content.encode('utf-8')).decode('ascii')
-                            execute_as_root(client,
+                            _, _, rc_cfg = execute_as_root(client,
                                 f"printf '%s' '{b64}' | base64 -d > {config_path}", root_pass)
-                            yield f"INFO: Configuration deployee dans {config_path}\n"
+                            echecs += _echec("ecriture de la configuration", rc_cfg)
+                            if rc_cfg == 0:
+                                yield f"INFO: Configuration deployee dans {config_path}\n"
 
                     if global_cfg and global_cfg.get('extra_config') and platform != 'telegraf':
                         extra_b64 = base64.b64encode(
                             (global_cfg['extra_config'] + '\n').encode('utf-8')).decode('ascii')
-                        execute_as_root(client,
+                        _, _, rc_extra = execute_as_root(client,
                             f"printf '%s' '{extra_b64}' | base64 -d >> {config_path}", root_pass)
+                        echecs += _echec("ajout de la configuration supplementaire", rc_extra)
 
-                    yield from execute_as_root_stream(client,
+                    rc_svc = yield from execute_as_root_stream(client,
                         f"systemctl restart {service_name} && systemctl enable {service_name}",
                         root_pass, logger=logger)
+                    echecs += _echec("redemarrage du service", rc_svc)
 
-                _upsert_agent(machine_id, platform, config_deployed=True)
-                yield f"SUCCESS_MACHINE::{machine_id}::Deploiement {platform} reussi pour {machine_name}.\n"
+                yield from _conclut_geste(
+                    machine_id, machine_name, f"Deploiement {platform}", echecs,
+                    lambda: _upsert_agent(machine_id, platform, config_deployed=True))
 
             except Exception as e:
                 yield f"ERROR_MACHINE::{machine_id}::Exception: {e}\n"
@@ -1316,6 +1905,21 @@ def generic_version(platform):
                          logger=logger, service_account=svc_account) as client:
             out, _, rc = execute_as_root(client, agent_info['version_cmd'], root_pass, timeout=15)
             out = out.strip()
+            # E-184, meme garde que `zabbix_version`.
+            if not _sonde_concluante(rc, out):
+                logger.warning(
+                    "[supervision/%s/version] sonde NON CONCLUANTE sur machine_id=%s "
+                    "(code=%s, sortie vide=%s) — l'inventaire n'est PAS modifie",
+                    platform, row['id'], rc, not out)
+                return jsonify({
+                    'success': False,
+                    'concluante': False,
+                    'message': "Sonde non concluante : la version n'a pas pu etre lue. "
+                               "L'inventaire n'a pas ete modifie.",
+                    'version': None,
+                    'platform': platform,
+                    'machine_id': row['id'],
+                })
             if 'NOT_INSTALLED' in out:
                 version_str = None
             else:
@@ -1328,7 +1932,7 @@ def generic_version(platform):
             _remove_agent(row['id'], platform)
 
         return jsonify({
-            'success': True, 'version': version_str,
+            'success': True, 'concluante': True, 'version': version_str,
             'platform': platform, 'machine_id': row['id'],
         })
     except Exception as e:
@@ -1365,9 +1969,9 @@ def generic_uninstall(platform):
             yield f"START_MACHINE::{machine_id}::Desinstallation {platform} sur {machine_name}.\n"
             with ssh_session(ip, port, ssh_user, ssh_pass,
                              logger=logger, service_account=svc_account) as client:
-                yield from execute_as_root_stream(client, agent_info['uninstall_cmd'], root_pass, logger=logger)
-            _remove_agent(machine_id, platform)
-            yield f"SUCCESS_MACHINE::{machine_id}::{platform} desinstalle de {machine_name}.\n"
+                code = yield from execute_as_root_stream(
+                    client, agent_info['uninstall_cmd'], root_pass, logger=logger)
+            yield from _conclut_desinstallation(machine_id, platform, machine_name, code)
         except Exception as e:
             yield f"ERROR_MACHINE::{machine_id}::Exception: {e}\n"
 
@@ -1413,20 +2017,46 @@ def generic_reconfigure(platform):
                 yield f"START_MACHINE::{machine_id}::Reconfiguration {platform} sur {machine_name}.\n"
                 ip, port, ssh_user, ssh_pass, root_pass, svc_account = _get_ssh_creds(row)
 
+                echecs = []
+
                 with ssh_session(ip, port, ssh_user, ssh_pass,
                                  logger=logger, service_account=svc_account) as client:
                     _backup_agent_config(client, root_pass, config_path)
+
+                    # « Reconfigurer » sans configuration a ecrire n'est pas une
+                    # reconfiguration reussie : c'est une reconfiguration qui
+                    # n'a pas eu lieu. Sans configuration globale, ou avec un
+                    # contenu vide, l'ancienne version redemarrait le service et
+                    # annoncait « reussie » sans avoir touche un octet.
+                    config_content = None
                     if global_cfg:
                         overrides = _get_overrides(machine_id)
                         config_content = _build_agent_config_content(platform, global_cfg, row, overrides)
-                        if config_content:
-                            b64 = base64.b64encode(config_content.encode('utf-8')).decode('ascii')
-                            execute_as_root(client,
-                                f"printf '%s' '{b64}' | base64 -d > {config_path}", root_pass)
-                            yield f"INFO: Configuration mise a jour.\n"
-                    yield from execute_as_root_stream(client,
+
+                    if not config_content:
+                        yield (f"ERROR_MACHINE::{machine_id}::Reconfiguration {platform} "
+                               f"impossible sur {machine_name} : aucune configuration a "
+                               f"ecrire (configuration globale absente ou vide). Rien n'a "
+                               f"ete modifie.\n")
+                        continue
+
+                    # Le contenu passe par `base64` : c'est ce qui empeche une
+                    # valeur d'override d'atteindre le shell distant. Voir la note
+                    # longue sur `_write_config_stream`. Ne pas remplacer par un
+                    # `printf` direct.
+                    b64 = base64.b64encode(config_content.encode('utf-8')).decode('ascii')
+                    _, _, rc_cfg = execute_as_root(client,
+                        f"printf '%s' '{b64}' | base64 -d > {config_path}", root_pass)
+                    echecs += _echec("ecriture de la configuration", rc_cfg)
+                    if rc_cfg == 0:
+                        yield f"INFO: Configuration mise a jour.\n"
+
+                    rc_svc = yield from execute_as_root_stream(client,
                         f"systemctl restart {service_name}", root_pass, logger=logger)
-                yield f"SUCCESS_MACHINE::{machine_id}::Reconfiguration {platform} reussie pour {machine_name}.\n"
+                    echecs += _echec("redemarrage du service", rc_svc)
+
+                yield from _conclut_geste(machine_id, machine_name,
+                                          f"Reconfiguration {platform}", echecs)
             except Exception as e:
                 yield f"ERROR_MACHINE::{machine_id}::Exception: {e}\n"
 
@@ -1474,7 +2104,34 @@ def generic_config_read(platform):
 @require_machine_access
 @threaded_route
 def generic_config_save(platform):
-    """Sauvegarde le fichier de config d'un agent distant."""
+    """Sauvegarde le fichier de config d'un agent distant.
+
+    CORRECTIF v1.37.40 — CETTE ROUTE ANNONCAIT UNE REUSSITE QU'ELLE N'AVAIT PAS
+    VERIFIEE. Mesure du 2026-08-22 sur Test-Server-Debian : un POST vers
+    `/etc/telegraf/`, repertoire INEXISTANT, rendait
+    `200 {"success": true, "message": "Config telegraf sauvegardee et agent
+    redemarre."}` — rien n'avait ete ecrit, aucun agent redemarre. Les TROIS
+    codes de retour etaient jetes : celui de la sauvegarde, celui de l'ecriture,
+    celui du redemarrage. Cela valait pour Centreon, Prometheus et Telegraf, soit
+    trois des quatre plateformes de la page ; seule `zabbix_config_save` disait la
+    verite (voir docs/migration/PARITE.md, E-83).
+
+    Alignee desormais sur elle, protection par protection :
+      - l'ecriture qui echoue rend 500 ET restaure la sauvegarde ;
+      - le redemarrage n'est pas meme TENTE si l'ecriture a echoue ;
+      - un redemarrage qui echoue est un TROISIEME cas : la configuration EST
+        ecrite, l'agent ne tourne pas, et la reponse le dit.
+
+    `restarted` est un BOOLEEN, ajoute aux quatre routes de ce chemin : un client
+    n'a pas a deviner l'issue en analysant une phrase francaise. Ajout ADDITIF —
+    aucune valeur existante ne change.
+
+    RESTE DECLARE ET NON CORRIGE : `_backup_agent_config` execute
+    `test -f X && cp X Y || echo NO_FILE`, ou un `cp` en echec est indiscernable
+    d'un fichier absent (meme sortie, meme rc=0). La sauvegarde rend alors `None`
+    et le repli ci-dessus, garde par `if backup_path:`, est desarme. Six routes
+    en dependent, dont le deploiement : la correction n'a pas ete autorisee ici.
+    """
     if platform == 'zabbix':
         return zabbix_config_save()
     err = _validate_platform(platform)
@@ -1498,12 +2155,34 @@ def generic_config_save(platform):
     try:
         with ssh_session(ip, port, ssh_user, ssh_pass,
                          logger=logger, service_account=svc_account) as client:
-            _backup_agent_config(client, root_pass, config_path)
+            backup_path = _backup_agent_config(client, root_pass, config_path)
+
             new_config = new_config.replace('\r\n', '\n').replace('\r', '\n')
             b64 = base64.b64encode(new_config.encode('utf-8')).decode('ascii')
-            execute_as_root(client, f"printf '%s' '{b64}' | base64 -d > {config_path}", root_pass)
-            execute_as_root(client, f"systemctl restart {service_name}", root_pass, timeout=15)
-            return jsonify({'success': True, 'message': f'Config {platform} sauvegardee et agent redemarre.'})
+            _, stderr, rc = execute_as_root(
+                client, f"printf '%s' '{b64}' | base64 -d > {config_path}",
+                root_pass, logger=logger)
+            if rc != 0:
+                # Meme repli que la route Zabbix : on remet la version d'avant.
+                if backup_path:
+                    execute_as_root(client, f"cp {backup_path} {config_path}", root_pass)
+                return jsonify({'success': False, 'restarted': False,
+                                'message': f'Ecriture echouee: {stderr}'}), 500
+
+            _, stderr_r, rc_r = execute_as_root(
+                client, f"systemctl restart {service_name}", root_pass, timeout=15)
+            if rc_r != 0:
+                return jsonify({
+                    'success': True, 'restarted': False,
+                    'message': f'Config {platform} sauvegardee mais restart echoue: {stderr_r}',
+                    'backup': backup_path,
+                })
+
+            return jsonify({
+                'success': True, 'restarted': True,
+                'message': f'Config {platform} sauvegardee et agent redemarre.',
+                'backup': backup_path,
+            })
     except Exception as e:
         logger.error("[supervision] %s", e)
         return jsonify({'success': False, 'message': 'Erreur interne'}), 500
@@ -1591,9 +2270,23 @@ def generic_restore(platform):
             if rc != 0:
                 return jsonify({'success': False, 'message': f'Backup introuvable: {backup_name}'}), 404
             _backup_agent_config(client, root_pass, config_path)
-            execute_as_root(client, f"cp {backup_path} {config_path}", root_pass)
-            execute_as_root(client, f"systemctl restart {service_name}", root_pass, timeout=15)
-            return jsonify({'success': True, 'message': f'Backup restaure et {service_name} redemarre.'})
+
+            _, stderr, rc = execute_as_root(
+                client, f"cp {backup_path} {config_path}", root_pass, logger=logger)
+            if rc != 0:
+                return jsonify({'success': False, 'restarted': False,
+                                'message': f'Restauration echouee: {stderr}'}), 500
+
+            _, stderr_r, rc_r = execute_as_root(
+                client, f"systemctl restart {service_name}", root_pass, timeout=15)
+            if rc_r != 0:
+                return jsonify({
+                    'success': True, 'restarted': False,
+                    'message': f'Backup {backup_name} restaure mais restart echoue: {stderr_r}',
+                })
+
+            return jsonify({'success': True, 'restarted': True,
+                            'message': f'Backup {backup_name} restaure et {service_name} redemarre.'})
     except Exception as e:
         logger.error("[supervision] %s", e)
         return jsonify({'success': False, 'message': 'Erreur interne'}), 500

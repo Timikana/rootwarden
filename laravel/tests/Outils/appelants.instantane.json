@@ -1,0 +1,101 @@
+{
+  "genere_par": "laravel/tests/Outils/analyse-appelants.mjs --instantane",
+  "dossier": "laravel/public/js",
+  "totaux": {
+    "fichiers": 31,
+    "appels": 60,
+    "verifie": 28,
+    "flux": 7,
+    "delegue": 21,
+    "delegue_sans_lecteur": 2,
+    "ignore": 2,
+    "illisible": 0
+  },
+  "empreintes": {
+    "acces-sftp.js": "558a0929f6338813",
+    "approbations.js": "874aa42ba41121f0",
+    "bashrc.js": "b1f82c8e4b9408f5",
+    "chatops.js": "607141666c99b287",
+    "cle-plateforme.js": "847da8fc8e2f3f9c",
+    "cles-ssh.js": "de7d0a5777ba4594",
+    "comptes-distants.js": "9520ed9b433918f4",
+    "comptes.js": "b60f1d1ae2a77e0b",
+    "derive-config.js": "d9d473c325b78901",
+    "docker.js": "9dd84e29d334ce14",
+    "fail2ban.js": "ae10645cca4d5129",
+    "graylog.js": "068cf30f0033ad59",
+    "journal-audit.js": "b6605a328e06b3d8",
+    "journal-commandes.js": "08b632c466f896d2",
+    "journal-execution.js": "2ef18e23c29006cc",
+    "maintenance.js": "99e1cfa88628ba03",
+    "mises-a-jour.js": "e42c7cf10d5af4bf",
+    "notifications-reglages.js": "8c2d9cc6c4a819d0",
+    "notifications.js": "7b87f6a075247b8d",
+    "pare-feu.js": "b02d82e5896ea8cf",
+    "permissions.js": "235d89f13fc92fb3",
+    "planification-cve.js": "c79107cc1487417b",
+    "politiques.js": "8e61ae3bbe5db4c8",
+    "recherche.js": "6daca37c7755f94e",
+    "sauvegardes.js": "3f2a80b29a1d48ea",
+    "scan-cve.js": "4bdbcbe21b0f9515",
+    "serveurs.js": "75ac0ff9843b8717",
+    "services.js": "a8fc3aa9607c974c",
+    "supervision.js": "78a9d78512f387a6",
+    "taches.js": "e2f38dc14fa64973",
+    "tickets.js": "1b9803433b017d1e"
+  },
+  "a_examiner": [
+    {
+      "fichier": "journal-audit.js",
+      "ligne": 73,
+      "fonction": "appelle",
+      "cible": "chemin",
+      "success": false,
+      "ok": true,
+      "verdict": "delegue_sans_lecteur",
+      "chemins_appelants": [
+        "/journal-audit/sceller",
+        "/journal-audit/sceller?simulation=1",
+        "/journal-audit/verifier"
+      ],
+      "origine": null,
+      "fichier_consulte_success": false
+    },
+    {
+      "fichier": "planification-cve.js",
+      "ligne": 78,
+      "fonction": "charge",
+      "cible": "L.url_planifs",
+      "success": false,
+      "ok": true,
+      "verdict": "ignore",
+      "chemins_appelants": [],
+      "origine": null,
+      "fichier_consulte_success": false
+    },
+    {
+      "fichier": "planification-cve.js",
+      "ligne": 180,
+      "fonction": "envoie",
+      "cible": "url",
+      "success": false,
+      "ok": true,
+      "verdict": "delegue_sans_lecteur",
+      "chemins_appelants": [],
+      "origine": null,
+      "fichier_consulte_success": false
+    },
+    {
+      "fichier": "scan-cve.js",
+      "ligne": 713,
+      "fonction": "(anonyme)",
+      "cible": "L.url_comparaison + '?machine_id=' + encodeURIComponent(mid)",
+      "success": false,
+      "ok": true,
+      "verdict": "ignore",
+      "chemins_appelants": [],
+      "origine": null,
+      "fichier_consulte_success": true
+    }
+  ]
+}

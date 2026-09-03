@@ -102,7 +102,7 @@ await visit('graylog', '/graylog/index.php');             // escJsAttr
 await visit('wazuh', '/wazuh/index.php');                 // escJsAttr
 await visit('bashrc', '/bashrc/index.php');               // escJsAttr
 await visit('cve', '/security/index.php');                // cve_compare
-await visit('update', '/update/index.php');
+// `update/` porte sur Laravel et archive le 2026-08-20 : plus rien a visiter ici.
 await visit('documentation', '/documentation.php');       // sous-section v1.23.0+
 
 // 3. Inspection ciblee : API_KEY ne doit PAS etre dans le DOM de policies

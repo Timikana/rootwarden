@@ -93,17 +93,11 @@ async function run() {
     await assertSelector(page, '#profiles-tbody');
     console.log('    OK - catalogue de profils');
 
-    // Retour onglet config et verif page updates
-    console.log('[6] Verification page Updates (pas de Zabbix)...');
-    await page.goto(`${BASE_URL}/update/`, { waitUntil: 'networkidle2' });
-    await sleep(1000);
-    await page.screenshot({ path: `${SCREENSHOTS_DIR}/supervision-05-updates-no-zabbix.png`, fullPage: true });
-    console.log('    Screenshot: supervision-05-updates-no-zabbix.png');
-
-    // Verifier que le bouton Zabbix n'est plus present
-    const zabbixBtn = await page.$('#zabbix-version');
-    if (zabbixBtn) throw new Error('Le champ zabbix-version est encore present dans Updates !');
-    console.log('    OK - plus de Zabbix dans Updates');
+    // [6] RETIRE le 2026-08-20 : la page `update/` a ete portee sur Laravel puis
+    // archivee. L'etape allait sur `/update/` puis verifiait l'ABSENCE du
+    // selecteur `#zabbix-version` — sur une page 404 il est absent lui aussi,
+    // donc l'etape serait passee au vert sans rien mesurer. Un faux vert vaut
+    // moins que pas de test du tout.
 
     // Check menu
     console.log('[7] Verification lien Supervision dans le menu...');

@@ -1,0 +1,745 @@
+# Module `security/` — inventaire et découpage
+
+Deuxième **module** de la migration, après `update/`. Comme lui, il ne se porte pas d'une pièce :
+ce document le mesure, puis le découpe en sous-lots portables un par un.
+
+Établi le 2026-08-20, avant toute modification, selon `METHODE-SOUS-LOT.md` §1.
+
+---
+
+## 1. Ce que pèse le module
+
+| Fichier | Lignes | Rôle |
+|---|---|---|
+| `legacy/security/js/main.js` | 1026 | tout le comportement : scan, rendu, filtres, planification, suivi |
+| `legacy/security/compliance_report.php` | 579 | rapport de conformité du parc — HTML, CSV, PDF |
+| `legacy/security/index.php` | 549 | la page : cartes serveur, panneau de planification, presets cron |
+| `legacy/security/cve_export.php` | 101 | export CSV d'un scan, une machine |
+| **total** | **2255** | |
+
+**Deux des trois pages n'appellent aucune route backend.** `compliance_report.php` et
+`cve_export.php` sont du PDO local de bout en bout. Seule `index.php` parle au backend Python, et
+uniquement via `legacy/api_proxy.php`.
+
+### Deux corrections de périmètre, avant de commencer
+
+- **`backend/routes/policies.py` n'appartient pas à ce module.** Ses 9 routes (`/policy/sudo/*`,
+  `/policy/sftp/*`, `/policy/rollback`, `/policy/deployments`, `/policy/list`) ne sont appelées que
+  par `legacy/adm/server_user_sudo.php` et `legacy/adm/server_user_sftp.php`. Zéro référence dans
+  `legacy/security/`. Elles relèvent de `adm/`, sont toutes `@require_role(3)` et portent un step-up
+  2FA imposé par `api_proxy.php` — donc plus risquées. **À ne pas embarquer ici.**
+- **Le CSRF n'est jamais posé par `main.js`.** Il est ajouté par le *wrapper* `window.fetch` de
+  `legacy/js/utils.js:14-33`. La dépendance est implicite et invisible dans le module : elle doit
+  être reproduite explicitement côté Laravel, sans quoi chaque appel part sans jeton.
+
+---
+
+## 2. La garde, et ce qu'elle ne garde pas
+
+| Page | Rôles admis | Permission | Cloisonnement des données |
+|---|---|---|---|
+| `index.php` | 1, 2, 3 | `can_scan_cve` | rôle ≥ 2 → tout le parc ; rôle 1 → jointure `user_machine_access` |
+| `cve_export.php` | 1, 2, 3 | `can_scan_cve` | contrôle IDOR explicite, réponse **404** et non 403, pour ne pas divulguer l'existence de la machine |
+| `compliance_report.php` | 1, 2, 3 | `can_view_compliance` | **aucun** |
+
+### `compliance_report.php` sert le parc entier à un rôle 1, et son en-tête dit le contraire
+
+L'en-tête du fichier annonce, ligne 13 : « Acces : admin (2) et superadmin (3) ». La garde réelle,
+ligne 19, est `checkAuth([ROLE_USER, ROLE_ADMIN, ROLE_SUPERADMIN])`. **Le commentaire ment**, et
+c'est ce qui rend le défaut durable : une relecture de l'en-tête ne peut pas le voir.
+
+Aucune des collectes ne filtre par utilisateur — `FROM machines m ORDER BY m.name`,
+`FROM users u JOIN roles r`. Ce qu'un rôle 1 porteur de `can_view_compliance` obtient donc, en
+HTML, en CSV (`?format=csv`) et en PDF (`?format=pdf`) :
+
+1. **tout le parc** : nom, IP, **port**, **utilisateur SSH**, version, cycle de vie, criticité,
+   environnement, dates de dernière vérification / redémarrage / mise à jour de sécurité — y
+   compris les machines qui ne lui sont pas attribuées ;
+2. **tous les comptes** : nom, e-mail, actif, sudo, présence de clé SSH, **âge de la clé**,
+   **présence d'un secret 2FA**, date de dernier mot de passe, rôle — soit la carte des comptes les
+   plus faibles du portail ;
+3. **la posture par serveur avec les écarts en clair** : « sshd non audite », « N CVE critique(s) »,
+   « fail2ban absent », « N derive(s) config ». C'est une liste de cibles priorisée ;
+4. l'historique des 10 dernières modifications iptables, **avec leur auteur**.
+
+`checkPermission` accepte en outre une **permission temporaire** non expirée
+(`legacy/auth/verify.php:269-300`) : l'accès peut avoir été accordé pour un temps et rester lisible.
+
+**C'est une décision d'exploitant, pas un choix de portage.** Porter la page telle quelle porte la
+fuite ; la restreindre à `role >= 2` corrige un défaut de sécurité sous couvert de migration. Voir
+§5, décision D-1.
+
+### Le hash « preuve d'intégrité » n'est vérifiable par personne
+
+Lignes 28-30, le code énonce sa propre règle : les mots de passe chiffrés « n'ont rien a faire dans
+un rapport exporte (HTML/CSV/PDF) **ni dans le hash SHA-256 d'integrite** ». La requête suivante,
+ligne 41, sélectionne `u.totp_secret` et `u.ssh_key`. Ligne 141 :
+
+```php
+$reportData = json_encode(compact('servers', 'users', 'remStats', 'date'));
+$reportHash = hash('sha256', $reportData);
+```
+
+Le raisonnement a été tenu pour une table et pas pour la suivante.
+
+**Ce que ce n'est PAS** : une fuite de secret. Vérifié aux trois rendus — CSV ligne 174, PDF ligne
+247, HTML ligne 464 — `totp_secret` et `ssh_key` ne sortent jamais qu'en booléen
+(`!empty($u['totp_secret']) ? 'Oui' : 'Non'`). Le secret ne quitte pas le serveur.
+
+**Ce que c'est** : un antécédent de hash qui contient des champs absents du rapport. Le lecteur du
+rapport ne peut pas recalculer l'empreinte à partir de ce qu'il tient. Une preuve d'intégrité
+invérifiable vaut exactement autant que pas de preuve. Parade au portage : sélectionner
+`u.totp_secret IS NOT NULL AS has_2fa` et `u.ssh_key IS NOT NULL AS has_ssh_key` — le hash redevient
+recalculable *et* la règle de la ligne 28 est enfin tenue partout.
+
+---
+
+## 3. Les commandes exactes du scan, à recopier dans l'en-tête du test
+
+`POST /cve_scan` ouvre une session SSH par machine et n'exécute que des lectures
+(`backend/cve_scanner.py`) :
+
+```
+dpkg-query -W -f='${Package}\t${Version}\n' 2>/dev/null                       # timeout 30
+grep -i '^ID=' /etc/os-release 2>/dev/null | cut -d= -f2 | tr -d '"' | tr '[:upper:]' '[:lower:]'
+uname -r 2>/dev/null
+cat /etc/os-release 2>/dev/null
+ssh -V 2>&1 | head -1
+openssl version 2>/dev/null | head -1
+apache2 -v 2>/dev/null | head -1
+nginx -v 2>&1 | head -1
+systemctl is-active docker 2>/dev/null && docker --version 2>/dev/null | head -1
+```
+
+**Aucun `sudo`, aucune écriture sur la cible.** À dire explicitement dans l'en-tête du test :
+contrairement à `update/`, ce module ne modifie rien sur le serveur distant.
+
+En revanche, un seul clic déclenche côté serveur : un envoi de courriel, deux notifications
+d'abonnés, un webhook, un auto-ticket KEV si `TICKETING_AUTO_KEV`, et — le seul effet destructif du
+module — **l'auto-résolution des remédiations ouvertes non revues**
+(`UPDATE cve_remediation SET status='resolved'`, `cve_scanner.py:1085-1100`), sur des données de
+suivi humain, sans que l'écran l'annonce.
+
+`POST /cve_scan` répond par un **FLUX** : `Response(locked_stream(), mimetype='text/plain')`, en
+JSON-lines. Il ne se porte pas comme un JSON. La passerelle doit relayer sans tampon, comme
+`api_proxy.php` le fait déjà (`X-Accel-Buffering: no`, `flush()` par bloc).
+
+---
+
+## 4. Ce que le croisement JS ↔ backend a donné
+
+**Aucun désaccord de clés.** Les 12 corps envoyés correspondent clé par clé aux clés lues. C'est
+l'inverse de `update/`, où le JS envoyait `{date,time,repeat}` à une route qui lisait
+`interval_minutes` (E-18). Ici ce sont les **réponses d'erreur** qui sont perdues, pas les requêtes.
+
+Défauts relevés, à porter comme corrections ou à consigner dans `PARITE.md` :
+
+| # | Défaut | Effet mesurable |
+|---|---|---|
+| E-23 | `runScan` ne teste jamais `resp.ok` avant `resp.body.getReader()` (`main.js:240-294`) | les deux **429** structurels du backend — throttle 60 s par utilisateur, verrou global de scan — sont avalés en silence : le bouton se réactive, aucun message, rien. Le `catch` ne fait qu'un `console.error` |
+| E-24 | La colonne « Suivi » disparaît dès qu'on filtre, cherche ou pagine | `buildRows` produit 6 `<td>` ; `loadMoreFindings`, `searchFindings` et `filterFindings` en reconstruisent **5**. Après un « Voir plus » ou un filtre, la remédiation et la création de ticket ne sont plus atteignables, et l'en-tête est désaligné. Deux des trois écritures du module ne vivent que sur la première page non filtrée |
+| E-25 | `scanAll()` casse pour un admin sans machine | `#btn-scan-all` est rendu hors du `if (empty($machines))`, mais `#global-progress` ne l'est pas → `TypeError` sur `.classList`, sans garde nulle. Même famille que E-21/E-22 |
+| E-26 | Un rôle 1 déclenche un 403 à chaque chargement | `loadSchedules` est câblée sans condition alors que `#schedules-list` n'est rendu que sous `$role >= 2`. Sans dégât visible, mais un appel refusé par page vue dans les journaux |
+| E-27 | Le rôle exigé par l'UI et par le backend divergent | la page s'ouvre à un rôle 1 et lui affiche le `<select>` de remédiation et le bouton 🎟, alors que `/cve_remediation` est `@require_role(2)` et `/tickets` est `@require_role(2)` + `@require_permission('can_admin_portal')`, doublé d'un refus proxy. Deux contrôles qui échouent toujours |
+| E-28 | Le clamp anti-fréquence du cron n'est pas rejoué en `PUT` | `POST /cve_schedules` impose un intervalle minimum de 600 s ; `PUT /cve_schedules/<id>` ne le contrôle pas. Un admin crée `0 3 * * *` puis le mute en `* * * * *` |
+| E-29 | `status` de `/cve_remediation` sans liste blanche | l'UI n'offre que 4 valeurs, le backend en produit une cinquième, et la route accepte n'importe quelle chaîne |
+| E-30 | Injection de formule CSV | `fputcsv` sans neutralisation de `= + - @` en tête de cellule, sur les noms de machines, de comptes, et les motifs d'écart |
+| E-31 | `dotColor` construit ses classes Tailwind par concaténation | `` `bg-${color}-${…}` `` : `bg-blue-400`, `bg-green-500`, `bg-red-500` ne sont littéraux nulle part et peuvent être purgés au build. Piège connu, voir `rw-pieges` |
+| E-32 | Fuite de synthèse parc au rôle 1 dans `index.php` | l'agrégat `servers_scanned` / `total_cves` / `total_critical` (lignes 197-208) n'est pas filtré par `user_machine_access` et s'affiche dès `count($machines) > 1` : un lecteur avec deux machines lit les compteurs du parc entier |
+
+Points morts à ne pas porter : `#conn-status` (aucun JS ne le touche, le test de connexion a migré
+côté PHP) et `_cveFindings[machineId + '_search']` (écrit, jamais relu).
+
+### i18n
+
+Les 10 clés `js.cve_*` du repli existent en FR **et** en EN, et aucun `t()` de `index.php` ou de
+`compliance_report.php` ne manque. En revanche **~35 littéraux français sont en dur dans
+`main.js`** et devront tous devenir des clés, plus les `title=` et les libellés « Source CVE » /
+« Rapide » / « Hybride » / « Precis » de `index.php`. Un `toLocaleString('fr-FR')` fige la locale
+(`main.js:392`).
+
+Le seul `confirm()` natif du module — « Supprimer cette planification ? », `main.js:865` — **n'a
+aucune clé, ni FR ni EN**. Il est intraduisible en l'état. Au portage il devient un panneau de
+décision en ligne, conformément à `METHODE-SOUS-LOT.md` §7.
+
+---
+
+## 5. Découpage en sous-lots
+
+Du plus simple au plus risqué. Chaque sous-lot est portable et testable seul.
+
+| Lot | Contenu | Routes | SSH | Écrit |
+|---|---|---|---|---|
+| **S1** ✔ | export CSV d'un scan (`cve_export.php`) — **PORTÉ le 2026-08-20** (v1.37.20) | aucune | non | non |
+| **S2a** ✔ | rapport de conformité, page HTML — **PORTÉ le 2026-08-20** (v1.37.21) | aucune | non | non |
+| **S2c** ✔ | export CSV du rapport — **PORTÉ le 2026-08-20** (v1.37.22) | aucune | non | non |
+| **S2b** ✔ | export PDF du rapport — **PORTÉ le 2026-08-20** (v1.37.23) | aucune | non | non |
+| **S3** ✔ | consultation des CVE, lecture seule — **PORTÉ le 2026-08-20** (v1.37.24) | aucune : lecture en base | non | non |
+| **S4** ✔ | planification des scans — **PORTÉ le 2026-08-20** (v1.37.25) | aucune : lecture et ecriture en base | non | oui |
+| **S5** ✔ | suivi et ticketing — **PORTÉ le 2026-08-21** (v1.37.26), whitelist NON portée | passerelle pour le ticket seul |
+| **S6** ✔ | enrichissement EPSS / KEV et priorisation — **PORTÉ le 2026-08-21** (v1.37.27) | passerelle pour la re-priorisation seule |
+| **S7a** ✔ | les refus et la forme du flux — **PORTÉ le 2026-08-21** (v1.37.28) | passerelle |
+| **S7b** | le scan qui aboutit — **EN ATTENTE D'UNE AUTORISATION** : il envoie un courriel réel |
+
+**S1 d'abord** parce que c'est le plus petit périmètre du module et qu'il porte une règle d'accès
+explicite : le contrôle IDOR à reproduire à l'identique, **404 et non 403**.
+
+**Porté le 2026-08-20** (v1.37.20) : `App\Services\ScansCve` + `ExportCveController`, route
+`/export-cve` gardée `role:1` + `perm:can_scan_cve`, catalogue `cve.php` FR+EN.
+`tests/e2e/go-page-cve-export.mjs` — 16 PASS sur le legacy, 20 sur le portage.
+
+Ce que S1 a rapporté, au-delà de lui-même :
+- **E-33** — l'export du legacy n'est pas un CSV en dev/préprod : 1 465 blocs HTML `Deprecated`
+  mêlés au fichier. La parade du portage est structurelle (charge utile assemblée avant envoi) et
+  vaut pour S2, qui hérite du même défaut sur `compliance_report.php`.
+- **E-34** — le contrôle IDOR n'est mesurable par AUCUN compte de test. L'intention de départ
+  (« ce lot valide le harnais de permissions ») ne tient donc pas : il valide les gardes de rôle et
+  de permission, mais pas le cloisonnement par machine. Un quatrième compte de fixture est à
+  arbitrer.
+- **E-35** — la route n'est atteignable qu'en tapant son adresse jusqu'à S3.
+
+**S2 s'est révélé trop gros pour un seul sous-lot, et a été redécoupé** — un document de migration
+n'est pas une promesse. `compliance_report.php` pèse 579 lignes : sept collectes SQL, une notation de
+posture, sept sections HTML **et** un export CSV. Le HTML et le CSV sont désormais **S2a** et **S2c**.
+
+**S2a — porté le 2026-08-20** (v1.37.21) : `App\Services\Conformite` (les sept collectes + la
+posture + l'empreinte), `RapportConformiteController`, `resources/views/rapport-conformite.blade.php`,
+route `/rapport-conformite` gardée `role:2` + `perm:can_view_compliance`, catalogue `conformite.php`
+FR+EN (64 clés), et l'entrée `Navigation` basculée de `legacy` vers `route`.
+`tests/e2e/go-page-conformite.mjs` — 13 PASS sur chaque cible.
+
+Ce que S2a a rapporté :
+- **D-1 appliquée** (E-36) : la garde passe à `role:2`, celle que l'en-tête du fichier annonçait.
+  Mais la divergence **n'est mesurable par aucun compte de test** — même manque de fixture que E-34.
+- **La première mesure du module qui distingue une garde par PERMISSION d'une garde par RÔLE** :
+  `rw-test-admin` entre ici et reste refusé sur `journal-commandes`. Le premier jet de cette
+  assertion visait `/commandlog/`, **archivé donc 404** — elle passait au vert sans rien mesurer.
+- **L'empreinte est identique à l'octet** entre legacy et portage (E-37) : 4 480 octets d'antécédent
+  et le même SHA-256, à date figée. D-2 reste donc ouverte sans risque de régression.
+- **Six libellés d'écarts étaient en dur** dans le PHP du legacy (E-38) : la colonne « Écarts »
+  restait en français quelle que soit la langue.
+- Les exports CSV et PDF restent servis par l'ancien portail, **et la page le dit** (E-39).
+
+**S2c — porté le 2026-08-20** (v1.37.22) : `ExportConformiteController`, route
+`/rapport-conformite/csv` gardée comme la page, et `Conformite::rapport()` **extrait** pour que la
+page et l'export ne puissent pas divergerr. 10 PASS sur le legacy, **17 sur le portage**. E-33 s'y est
+rejoué exactement : 34 blocs d'avertissement, sections gonflées à 13/13/34 contre 3/3/10 — voir
+E-40 à E-42.
+
+~~S2c portera l'export CSV, où **E-33 se rejoue**~~ : `compliance_report.php` écrit lui aussi au fil
+de l'eau dans `php://output`. Sa branche PDF porte déjà un `ob_end_clean()` dont le commentaire
+nomme exactement le défaut — « purger tout output parasite (notices PHP capturées par ob_start en
+mode debug) avant d'émettre le binaire PDF » —, mais la branche CSV, elle, n'a jamais été protégée.
+Quelqu'un avait rencontré le problème et n'en avait corrigé qu'une moitié.
+
+**S2b séparé** de S2 : dépendance Composer distincte, sortie binaire, et la purge `ob_end_clean()`
+sans laquelle le PDF est corrompu — un piège déjà payé une fois, à ne pas re-payer en même temps
+qu'autre chose.
+
+**S2b — porté le 2026-08-20** (v1.37.23) : `ExportConformitePdfController` + la vue dédiée
+`rapport-conformite-pdf.blade.php`, route `/rapport-conformite/pdf` sous la **même** garde que la page
+et le CSV (`role:2` + `perm:can_view_compliance`). `Conformite::rapport()` portait déjà tout : S2b
+n'écrit que le rendu. Le bouton PDF de la page S2a est passé sur la route portée et l'annonce
+`conformite.pdf_a_venir` a disparu. Suite de caractérisation `go-page-conformite-pdf` : **14 PASS**
+côté portage, **13** côté legacy (l'écart est E-45, mesuré et rendu en constat).
+
+La dépendance : `dompdf/dompdf ^3.1` était **absente du portage** et a été ajoutée — **6 paquets, 0
+retiré, 0 modifié**, en v3.1.6, soit exactement la version du legacy. Elle n'exige que `ext-dom` et
+`ext-mbstring`, tous deux présents ; `gd` n'est que *suggéré*, « needed to process images », et le
+rapport n'en porte aucune.
+
+Ce que S2b a rapporté :
+
+- **E-43** — la branche PDF est **la seule des cinq** occurrences du motif « le legacy documente son
+  défaut là où il le commet » où la moitié protégée l'était vraiment. Vérifié des deux côtés. Son
+  `ob_start()` est vestigial ; le portage n'ouvre aucun tampon, donc n'a rien à purger.
+- **E-44** — le PDF du legacy en dit **moins** que sa propre page : six sections contre sept, cinq
+  colonnes de comptes contre six. Le portage l'aligne (pare-feu, âge des clés). Écart voulu.
+- **E-45** — aucun `<thead>` dans les tableaux du PDF du legacy : les 10 lignes de comptes arrivent
+  page 2 **sans en-tête**, resté page 1. Corrigé dans le portage. **Ce défaut ne se voyait pas sur le
+  texte extrait** — il a fallu rendre les pages en images.
+- l'empreinte d'intégrité **n'est pas reproductible** : deux générations du même rapport à cinq
+  minutes d'écart donnent deux empreintes. Ce que E-42 annonçait, désormais mesuré → **D-2**.
+- le mot de passe root de la base **sortait dans les messages d'échec** des suites : corrigé pour les
+  trois suites du module (`tests/e2e/lib-base.mjs`), signalé pour trois suites plus anciennes.
+
+### `compliance_report.php` est intégralement porté, et pourtant pas archivable
+
+Ses points d'entrée ont été énumérés : **`format=csv`, `format=pdf`, et la page**. Rien d'autre. Le
+`$_GET['_pdf_render'] = true;` de la ligne 194 est **écrit et jamais lu** — un second vestige de
+l'approche abandonnée, à côté de l'`ob_start()` vestigial. Les trois branches sont donc portées, par
+S2a, S2c et S2b.
+
+**Il reste néanmoins servi**, parce que `cve_scan.php` (S3 à S7) l'est aussi et que l'archivage se
+fait par module, pas par fichier. Ses quatre portes sont déjà mesurées — les mêmes quatre que
+`update/`, ce qui confirme la règle apprise là-bas :
+
+| Point d'entrée | Fichier |
+|---|---|
+| barre latérale | `legacy/menu.php:155` |
+| tiroir mobile | `legacy/menu.php:250` |
+| tuile « accès rapides » | `legacy/index.php:384` |
+| raccourci clavier `g` puis `r` | `legacy/head.php:210` |
+
+Contrôlé au passage : **aucune des sept pages déjà archivées ne figure encore dans la table des
+raccourcis clavier**, et `update/` y a bien été redirigé vers le portage. Pas de 404 atteignable au
+clavier.
+
+Le menu du portage, lui, pointe déjà sur la route interne (`Navigation.php:66`), et les deux boutons
+d'export de la page portée sont internes depuis S2b : plus aucun aller-retour vers l'ancien portail
+depuis ce rapport.
+
+**Le module `security/` n'est donc PAS archivable** : S3 à S7 vivent encore dans `cve_scan.php`.
+
+### Inventaire de S3 — mesuré le 2026-08-20 (METHODE-SOUS-LOT §1)
+
+Trois inventaires menés en parallèle sur des fichiers **disjoints** : le PHP de la page, son JS, et le
+versant backend + passerelle. **Tout ce qui suit a été re-vérifié à la main** — un rapport d'agent
+n'est pas une mesure. Les rares points non revérifiés sont marqués comme tels.
+
+#### La garde, aux trois endroits — sixième occurrence du défaut
+
+| Endroit | Ce qui est appliqué |
+|---|---|
+| la **page** `legacy/security/index.php:37-38` | `checkAuth([USER,ADMIN,SUPERADMIN])` + `checkPermission('can_scan_cve')` → rôle ≥ 1 **avec** la permission |
+| le **proxy** `legacy/api_proxy.php` | `checkAuth` rôle ≥ 1, `/cve_` en liste blanche (`:119`), **absent de `$ADMIN_ONLY_PREFIXES`**, et `checkPermission` n'y apparaît pas une seule fois |
+| la **passerelle** `laravel/app/Support/RoutesBackend.php:35` | `/cve_` en liste blanche, **absent** de `ADMIN_SEULEMENT` et de `MOTIFS_STEP_UP` — relevé fidèle du legacy, défaut inclus |
+| le **backend** `backend/routes/cve.py` | `cve_results` (`:207-210`) et `cve_compare` (`:311-314`) portent `require_api_key` + `require_machine_access` + `threaded_route`. **Ni rôle, ni permission.** |
+
+**`grep -c require_permission backend/routes/cve.py` rend 0**, et `can_scan_cve` n'existe dans tout le
+backend **que dans une fixture de test** (`backend/tests/conftest.py:152`). La permission ne coupe donc
+**rien** sur le chemin de la requête : elle ne garde que des pages. C'est la sixième fois que ce défaut
+est mesuré dans ce projet.
+
+Conséquence pour le portage : la route de S3 portera `role:1` + `perm:can_scan_cve`, comme celle de S1
+(`laravel/routes/web.php:156`) — **le portage sera donc plus strict que le legacy sur ce chemin**, et
+il faut le déclarer.
+
+#### Le décorateur d'accès et la route ne lisent pas le même paramètre
+
+`require_machine_access` (`backend/routes/helpers.py:331-332`) résout l'identifiant ainsi :
+
+```python
+single = (data.get('machine_id') or request.args.get('machine_id')
+          or data.get('server_id') or request.args.get('server_id'))
+```
+
+**le corps JSON d'abord, la query ensuite.** Or `cve_results` (`cve.py:217`), `cve_compare`
+(`cve.py:322`) et `cve_history` (`cve.py:302`) lisent **exclusivement** `request.args`. Un GET portant
+un corps JSON avec une machine autorisée et une query avec la machine d'autrui ferait donc autoriser
+l'une et servir l'autre.
+
+**Précondition mesurée : aucune des deux passerelles ne relaie le corps d'un GET.** Le portage
+l'exclut explicitement (`AVEC_CORPS = ['POST','PUT','PATCH']`,
+`PasserelleController.php:35`) ; le legacy ne lit `php://input` qu'à `api_proxy.php:260`, hors de sa
+branche GET. Le trou est **réel dans le backend et fermé aujourd'hui par accident** — pas par
+décision. À dire des deux façons : ce n'est pas exploitable, et ce n'est pas protégé.
+
+Et le décorateur **ne refuse pas quand aucun identifiant n'est trouvé** : `ids` reste vide, `denied`
+aussi, la route est appelée. Son propre docstring nomme pourtant ce défaut — « le décorateur était un
+no-op et n'imposait aucun contrôle » — pour la variante au pluriel qu'un correctif antérieur a
+traitée. **La moitié corrigée est celle du nom de clé, pas celle de l'absence.** Le motif « à moitié
+corrigé », cette fois dans le commentaire qui décrit le défaut.
+
+#### Le module CVE ignore entièrement le cycle de vie des machines
+
+`grep -c lifecycle_status` rend **0** sur `backend/routes/cve.py` **et** sur `backend/cve_scanner.py`,
+alors que **dix autres fichiers** du backend l'appliquent. Côté page, même motif à l'intérieur du même
+fichier :
+
+| Requête | Filtre `archived` |
+|---|---|
+| `index.php:42-45`, branche **rôle ≥ 2** | **présent** |
+| `index.php:47-54`, branche **rôle 1** | **ABSENT** |
+| `index.php:292-296` (S4) | présent |
+
+L'oubli tombe sur la branche de l'utilisateur le moins privilégié : un rôle 1 voit et peut scanner une
+machine qu'un admin ne voit plus. Et `cve_scan_all` (`cve.py:42-44`) fait
+`SELECT ... FROM machines` **sans aucune clause `WHERE`** alors que le chemin planifié équivalent
+(`backend/scheduler.py:299`) filtre bien les archivées — le scan-all manuel se connecte donc en SSH à
+des machines retirées du parc. *(le point sur `scheduler.py` vient d'un inventaire d'agent, non
+revérifié ; le `SELECT` sans `WHERE`, lui, est vérifié.)*
+
+#### Le résumé de parc fuit ce que la liste filtre
+
+`index.php:196-207` n'est joint **ni à `machines` ni à `user_machine_access`** : il agrège le dernier
+scan complet de **toutes** les machines de la base, archivées comprises, et s'affiche dès que le compte
+en a deux. Un rôle 1 lit donc les compteurs CVE de la flotte entière ; un admin y voit des machines
+absentes du tableau juste en dessous. **Le portage le bornera aux machines réellement affichées** —
+précédent accepté : `Conformite::serveurs()` en S2a a ajouté le filtre de cycle de vie qui manquait.
+
+#### Le tableau des vulnérabilités se désaligne dès qu'on l'utilise
+
+L'en-tête (`js/main.js:542-547`) a **six** colonnes — CVE, Package, Version, Severite, Resume,
+Suivi — et `buildRows` en produit six. Mais **les trois autres générateurs n'en produisent que cinq**
+(comptage refait à la main) :
+
+| Générateur | `<td>` |
+|---|---|
+| `buildRows` (`:467-498`) | 6 |
+| `loadMoreFindings` (`:589-599`) | **5** |
+| `searchFindings` (`:624-634`) | **5** |
+| `filterFindings` (`:660-671`) | **5** |
+
+Pire : « Voir plus » **ajoute** ses lignes à cinq colonnes derrière les lignes à six — le même tableau
+mélange les deux formes. Et le commentaire de `sevCell` (`:45-48`) revendique précisément d'avoir
+« centralisé pour rester cohérent entre `buildRows` et la pagination » : il a centralisé **une colonne
+sur six**, et la jumelle non protégée est justement celle qui manque.
+
+#### Le reste, mesuré et à traiter dans ce lot
+
+- **`loadLastResults` (`:121-134`), seul chargeur de S3, est muet en panne** : ses trois chemins
+  d'échec n'écrivent que dans la console. Proxy tombé = carte serveur vide, sans un mot.
+- **Le compteur « n / m CVE » ne s'affiche jamais en dessous de 50 CVE** : `#findings-count-{id}` et
+  `#load-more-{id}` ne sont créés que s'il y a une page suivante, alors que la recherche et les
+  filtres s'en servent toujours. Gardés par un `if`, donc silencieux.
+- **Aucune donnée CVE n'est insérée par `textContent`** : tout passe par `innerHTML`. Le portage rendra
+  par `textContent`, comme les sept pages déjà portées.
+- **`esc()` (`:739`) n'échappe pas l'apostrophe** alors que son docblock affirme empêcher l'XSS. Sur 32
+  appels, **deux** sont dans une chaîne JS délimitée par apostrophes à l'intérieur d'un attribut
+  (`:485`, `:492`) et tous deux ne reçoivent que `f.cve_id`. Un identifiant CVE n'en porte pas :
+  **latent, pas armé** — et ces deux sites sont dans la colonne « Suivi », donc **S5**.
+- **`#conn-status` (`index.php:106`) est un bandeau figé au rendu serveur**, jamais touché par le JS
+  (zéro occurrence) : si le backend tombe ou revient, l'écran ne bouge pas avant rechargement.
+  `#servers-container` et `$api_url` sont morts aussi.
+- **24 chaînes d'interface en dur** côté PHP, et beaucoup plus côté JS ; les dates sont figées en
+  `'fr-FR'` (`:392`, `:925-926`) alors que le socle expose la langue. `<html lang="fr">` est codé en
+  dur (`index.php:85`).
+- **Le test de connexion OpenCVE est fait en PHP** par cURL direct sur `https://python:5000`
+  (`index.php:68`), hors proxy, **vérification TLS désactivée** (`:72-73`), `API_KEY` en clair (`:63`).
+  L'en-tête du fichier (`:23-26`) l'annonce pourtant « côté client (JavaScript) » : **cinquième
+  en-tête du projet qui ne dit pas le code**.
+
+#### La contrainte qui commande l'ordre des lots
+
+`renderResults` est appelé depuis **deux** endroits : `loadLastResults` (S3) et `runScan` (S7). S3 ne
+peut donc pas être porté sans **figer dès maintenant un contrat de rendu** que S7 réutilisera — sinon
+le portage de S7 dupliquera le générateur, exactement ce que le legacy a fait quatre fois.
+
+Second point d'architecture : **le portage lira la base directement**, comme S1 l'a fait avec
+`ScansCve`, plutôt que de passer par la passerelle. Cela ferme d'un coup, pour le portage, l'absence de
+permission sur la requête et l'écart corps/query du décorateur — sans toucher au backend Python. En
+contrepartie, la comparaison de deux scans (dont le diff est fait en Python, `cve.py:368-370`) devra
+être réimplémentée dans le service. C'est la ligne déjà suivie par S1.
+
+#### Ce que S3 ne pourra pas prouver
+
+Sans compte de fixture de rôle 1 portant `can_scan_cve` **et** une ligne `user_machine_access`
+(**D-5**), la branche rôle 1 de cette page — donc son filtre `archived` manquant et son résumé de parc
+qui fuit — **n'est pas mesurable par un test**. À dire dans `PARITE.md` plutôt qu'à contourner en
+déplaçant des droits : un test qui déplace les droits ne mesure plus l'application réelle.
+
+**S3 en troisième** : deux routes sans écriture ni SSH, mais c'est là que vit tout le rendu du
+module. Le gros du travail de vues et des ~35 clés i18n se paie ici, une fois ; les lots suivants
+s'y branchent. E-24 et le point mort `#conn-status` se corrigent dans ce lot.
+
+**S3 — porté le 2026-08-20** (v1.37.24) : `ScanCveController` + `ComparaisonCveController`, la vue
+`scan-cve.blade.php`, `public/js/scan-cve.js`, et cinq méthodes ajoutées à `ScansCve`. Routes
+`/scan-cve` et `/scan-cve/comparaison`, toutes deux sous `role:1` + `perm:can_scan_cve` — la garde de
+la page legacy, celle que S1 porte déjà. **L'entrée de menu `cve_scan` est basculée** : 12 entrées
+portées, 21 encore sur l'ancien portail.
+
+Suite de caractérisation `go-page-cve-consultation` : **16 PASS côté portage, 13 côté legacy**. L'écart
+est E-49, mesuré côté legacy et rendu en constat.
+
+**Aucune route backend appelée.** Le portage lit la base, comme S1. Trois mesures l'ont imposé, toutes
+dans E-48 : la permission ne garde aucune requête, le garde d'accès ne lit pas le même paramètre que sa
+route, et il ne refuse pas quand aucun identifiant n'est trouvé. Conséquence : le diff de deux scans,
+fait en Python (`cve.py:368-370`), est réimplémenté dans `ScansCve::comparaison()`.
+
+Ce que S3 a rapporté : **E-46** (filtre `archived` absent de la seule branche du rôle 1), **E-47** (le
+résumé de parc agrège toute la base), **E-48** (la permission ne garde que la page), **E-49** (trois
+générateurs de lignes sur quatre oublient une colonne), **E-50** (rien n'est rendu par `textContent`,
+et `esc()` n'échappe pas l'apostrophe).
+
+**Le contrat de rendu est figé**, et c'était la condition pour porter S3 sans hypothéquer S7 : le
+générateur de lignes est unique et partagé par tous les gestes, l'en-tête vit dans le gabarit, et les
+identifiants DOM sont ceux du legacy — un seul test vise les deux portails.
+
+### Inventaires de S4, S5 et S6 — mesurés le 2026-08-20
+
+Menés par agents en parallèle, sur des périmètres **disjoints**, pendant un rejeu du LOT — le seul
+travail parallélisable ici. **Les constats qui portent une décision ont été re-vérifiés à la main** ;
+les autres sont attribués comme non revérifiés.
+
+#### S4 — le garde anti-fréquence n'est pas rejoué à la modification (**vérifié**)
+
+À la création (`backend/routes/cve.py:500-517`) le code valide l'expression cron, calcule **deux**
+occurrences successives et refuse en dessous de 600 s. Son commentaire nomme le risque :
+
+> `* * * * *` lançait un scan par minute → ban OpenCVE upstream + DoS interne + abus admin malveillant
+
+Au `PUT` (`cve.py:549-566`), `cron_expression` est ajouté à la requête **ligne 556, avant toute
+validation**. Le bloc suivant ne recalcule que `next_run` — ni `is_valid`, ni comparaison de deux
+occurrences — et un `except Exception: pass` avale l'échec : l'`UPDATE` de la ligne 570 écrit
+l'expression quand même. **Un `PUT` avec `* * * * *` est accepté et persisté**, et une expression
+invalide l'est aussi, le scheduler retombant alors sur son repli `+24 h`.
+
+**Neuvième « à moitié corrigé » du projet**, et cette fois le commentaire qui nomme le risque est
+quarante lignes au-dessus de la branche non protégée. Correctif **backend** : décision de l'exploitant.
+
+#### S4 — le reste, mesuré
+
+- les 5 routes de planification portent `require_role(2)` mais **aucun `require_permission`** : un
+  rôle 2 sans `can_scan_cve` peut créer, modifier, supprimer. Le proxy et la passerelle ne gardent rien
+  (`/cve_` absent des deux listes admin) : **le backend est le rempart unique** ;
+- **`created_by` n'est jamais écrit** alors que la colonne existe (`mysql/init.sql:317`, clé étrangère
+  vers `users(id)`) et que la session fournit l'identifiant. Ici l'attribution ne vient pas du client :
+  elle est simplement **absente**. Le portage doit la remplir plutôt que reporter le trou ;
+- **`target_type` est un `ENUM` en base (`init.sql:312`) sans liste blanche côté code**, ni à la
+  création (`cve.py:490`) ni au `PUT` — alors que `scan_source`, juste à côté, en a une ;
+- **le scheduler ne filtre pas les machines archivées** (`scheduler.py:191,206,211`) alors que
+  l'interface les exclut (`index.php:290-294`) : une machine sélectionnée puis archivée continue d'être
+  scannée. Et une cible `machines` dont le `target_value` est illisible **retombe sur tout le parc**
+  (`scheduler.py:198-209`) ;
+- `min_cvss` non borné (500 au lieu de 400) et non converti au `PUT` ; `name` non vérifié non vide au
+  `PUT` ; noms de colonnes interpolés en f-string (liste fermée, donc non injectable, mais à ne pas
+  recopier) ;
+- **`loadSchedules` est branché pour tous les rôles** (`js/main.js:991`) alors que le bloc n'existe que
+  pour `role >= 2` : un rôle 1 émet un `GET /cve_schedules` à chaque chargement, 403 avalé ;
+- **`confirm()` natif** à la suppression (`js/main.js:865`) — proscrit dans le portage ;
+- i18n : 6 littéraux PHP traduisibles (dont tout le champ « Source CVE », qui n'a aucune clé) et
+  **26 chaînes en dur dans le JS** ; pluriels fabriqués par concaténation ; la description humaine du
+  cron est produite **en Python** (`cve.py:460-474`), donc non traduisible — à trancher au portage.
+
+**Le couplage avec le scheduler, qui commande ce que Laravel pourra écrire.** `next_run` a trois
+écrivains, tous en `datetime` **naïf** : `cve.py:504`, `cve.py:562`, et `scheduler.py:118` via
+`_advance_schedule`, qui l'écrit **avant** l'exécution (fix v1.37.14) et saute l'exécution si l'`UPDATE`
+échoue. Donc : Laravel **ne doit jamais écrire `last_run`**, ni laisser `next_run` NULL sur une ligne
+`enabled = 1` — la requête de `scheduler.py:614` déclencherait immédiatement — ni déclencher un scan à
+la création. *(couplage repris de l'inventaire, non revérifié ligne à ligne.)*
+
+**Le test existant `tests/e2e/go-cve-schedules.mjs` nettoie bien derrière lui** (préfixe `TEST_`,
+nettoyage en entrée **et** en `finally`), mais **son seul test d'interface ne peut pas échouer** :
+branche conditionnelle et résultat du clic simplement journalisé (`:98-113`). Il ne couvre ni le clamp,
+ni `cron_preview`, ni les gardes, ni le formulaire, ni `target_type` autre que `all`, ni `next_run`.
+
+#### S5 et S6 — trois constats vérifiés à la main
+
+1. **`POST /cve_reprioritize` n'a NI rôle NI permission** (`cve.py:227-231`) : `require_api_key` +
+   `require_machine_access` + `threaded_route`. Un rôle 1 portant `can_scan_cve` et disposant d'une
+   machine attribuée déclenche donc **1458 `UPDATE` sur `cve_findings`** — la seule écriture du module
+   ouverte au rôle 1. La passerelle du portage la transmet déjà (`/cve_` en liste blanche, absent de
+   `ADMIN_SEULEMENT`) : le backend est le rempart unique.
+2. **Une panne réseau ne rend pas une erreur : elle détruit des données.** `enrich_findings`
+   (`backend/cve_enrich.py:243-250`) rattrape **lui-même** les deux échecs — EPSS et KEV — et ne les
+   journalise qu'en `debug`, en rendant normalement. La branche 503 de `cve.py:270-274` est donc
+   inatteignable pour une panne réseau, et l'`UPDATE` écrit `1 if f.get('kev') else 0`, soit **`kev = 0`
+   pour tous les findings**, `epss_score` à NULL et `priority_score` recalculé sur le CVSS seul. L'écran
+   affiche « Re-priorisation terminée — KEV: 0, EPSS: 0 ». **Un clic pendant une coupure vers CISA
+   effface le drapeau des CVE réellement exploitées**, sans trace au-dessus de `debug`.
+3. **La table `cve_whitelist` n'a aucun lecteur.** Hors tests, deux requêtes en tout : son propre
+   listing (`cve.py:604`) et sa suppression (`cve.py:658`). Le scanner ne la consulte jamais,
+   `expires_at` n'est évalué nulle part. **Blanchir une CVE n'a aucun effet observable** — ni exclusion
+   du scan suivant, ni marquage. Porter S5 tel quel offrirait une capacité qui n'existe pas côté
+   serveur : à trancher avant, pas après.
+
+#### S5 et S6 — le reste, repris de l'inventaire
+
+- **`whitelisted_by` vient du CLIENT** (`cve.py:628`, envoyé par `main.js:1020`) : une acceptation de
+  risque peut être signée du nom de n'importe qui. `tickets.created_by`, lui, vient bien de la session
+  (`tickets.py:114`). `cve_remediation` n'a **aucune colonne d'auteur**, et `cve_reprioritize` ne laisse
+  aucune trace : **aucune des quatre écritures n'est journalisée**.
+- **un changement de statut écrase quatre champs.** Le client n'envoie que `{cve_id, machine_id,
+  status}` ; l'`ON DUPLICATE KEY UPDATE` (`cve.py:731-733`) réaffecte les cinq colonnes, donc
+  `assigned_to`, `deadline`, `resolution_note` et `resolved_at` sont vidés — ce qui défait en silence
+  l'auto-résolution du scanner (`cve_scanner.py:1092`).
+- **le select de suivi n'affiche jamais l'état stocké** : aucune option `selected`, et le JS ne fait
+  **aucun `GET /cve_remediation`**. La cellule montre `-` même quand une remédiation existe.
+- **`cve_remediation.status` est un `ENUM` non contrôlé** : un statut inventé produit un **500 non
+  géré**, pas un 400 (la route n'a qu'un `try/finally`). L'ENUM contient `resolved`, que l'interface
+  n'offre pas. Et `cve_whitelist` a une clé unique sur `(cve_id, machine_id)` avec `machine_id` NULLable
+  : InnoDB traitant les NULL comme distincts, l'`ON DUPLICATE KEY UPDATE` **ne se déclenche jamais**
+  pour une entrée globale — chaque POST crée une ligne de plus.
+- **`whitelistCve` est du code MORT** (`main.js:1013-1026`) : aucun élément d'interface ne l'appelle,
+  et elle est la seule consommatrice de `window._cveConfig.username`. C'est elle qui porte le seul
+  `prompt()` du périmètre.
+- **les six colonnes d'enrichissement ne sont pas dans `init.sql`** : elles viennent de la migration
+  `054`. Le legacy les **nomme dans son `SELECT` et trie dessus** (`cve_scanner.py:1230-1241`) : sans la
+  migration, `GET /cve_results` rend 500 et **toute la consultation** tombe, muette. Le portage de S3 ne
+  les sélectionne pas, donc il n'en dépend pas — **porter S6 introduira cette dépendance**.
+- i18n : 15 chaînes en dur hors code mort, dont **deux vocabulaires pour un même état**
+  (`Open`/`Accepte` dans le select, `Ouverte`/`Acceptee` dans le toast). Une clé déclarée en FR et EN et
+  jamais utilisée : `js.cve_reprio_running`, le bouton affichant `…` en dur.
+
+#### Ce que S5 et S6 ne pourront pas mesurer sans fabriquer des données
+
+Mesurable tel quel : les gardes de page, les refus de `POST /tickets`, `/cve_remediation` et
+`/cve_whitelist` pour un rôle 1, le fait que la passerelle **transmet** `/cve_reprioritize` (le 403
+venant alors du backend, et cette distinction *est* la mesure), et la sixième colonne du portage.
+
+Exige des données, donc une décision : **toute écriture d'un rôle 1 autorisé** — il n'existe aucun
+compte rôle 1 avec `can_scan_cve` **et** une ligne `user_machine_access`, c'est **D-5** ; l'écrasement
+des quatre champs, qui demande une ligne préexistante complète ; les doublons de whitelist globale ; et
+la destruction du drapeau KEV, qui demanderait de couper l'accès à CISA **et** des findings déjà marqués
+— probablement à laisser en lecture de code, en le disant.
+
+**Un avertissement qui vaut pour toute suite de S5 ou S6** : appeler `POST /cve_reprioritize` sur la
+machine 1 **réécrit les six colonnes d'enrichissement des 1458 findings du seul scan complet du parc**,
+sans retour en arrière. Une telle suite doit viser un scan de fixture qu'elle a créé, ou relever les six
+colonnes avant et après pour les restaurer. Et créer une ligne `cve_remediation` **fait apparaître une
+section et cinq tuiles** dans le rapport de conformité, ce qui change son empreinte SHA-256 — les
+assertions actuelles y survivent (bornes inférieures, forme de l'empreinte), mais il faut le savoir
+avant, pas le découvrir en route.
+
+**Numéros d'écart libres : à partir de E-51.**
+
+**S4** : quatre écritures en base, un `@require_role(2)` à respecter **côté vue aussi** (E-26), la
+clé i18n manquante du `confirm()`, et E-28 à trancher. Le scheduler reste Python
+(`backend/scheduler.py:614-628`) : Laravel n'écrit que la table, il ne déclenche rien. Test existant
+à reprendre : `tests/e2e/go-cve-schedules.mjs`.
+
+**S4 — porté le 2026-08-20** (v1.37.25) : `PlanificationsCve` + `PlanificationsCveController`, le
+bloc de planification ajouté à `scan-cve.blade.php`, `public/js/planification-cve.js`, et un fichier de
+langue `planif` (**63 = 63** clés). Cinq routes internes sous **`role:2`** + `perm:can_scan_cve` — le
+bloc du legacy vit sous `$role >= 2` et ses routes portent `require_role(2)` : la garde est reprise cran
+par cran, la consultation restant ouverte au rôle 1.
+
+Suite `go-page-cve-planification` : **20 PASS côté portage, 16 côté legacy** (les quatre écarts sont
+mesurés et rendus en constat).
+
+**Aucune dépendance ajoutée** : `dragonmantank/cron-expression`, déjà présent comme dépendance du
+framework, valide une expression et calcule deux occurrences successives — donc l'intervalle. Il rend la
+**même échéance** que `croniter` côté Python, vérifié.
+
+Ce que S4 a refermé : **E-51** (le clamp anti-fréquence n'était pas rejoué à la modification — mesuré
+d'abord dans le code, puis **prouvé en fonctionnement** : un `PUT` avec `* * * * *` rendait 200 et la
+base portait l'expression), **E-52** (routes internes plutôt que la passerelle), **E-53** (la phrase de
+récurrence produite en Python, donc intraduisible, remplacée par les cinq prochaines dates), **E-54**
+(`created_by` jamais écrit), **E-55** (trois validations manquantes, dont un `ENUM` sans liste blanche
+qui rendait un **500 en HTML** au lieu d'un 400), **E-56** (le `confirm()` natif et l'appel émis pour un
+rôle qui n'a pas le bloc).
+
+**Ce qui reste au backend, et attend une décision** : les cinq routes Python sont inchangées. Un rôle 2
+sans `can_scan_cve` peut donc toujours créer, modifier et supprimer une planification, et le clamp y
+reste contournable par un `PUT`.
+
+### La sûreté a commandé la conception du test, et c'est le point à retenir de S4
+
+Une planification **arme le scheduler**, démarré **sans condition** par `backend/server.py:240-247` :
+aucune variable d'environnement ne le gouverne, il tourne comme thread dans `rootwarden_python`,
+**invisible à `ps`**, se réveille toutes les 60 s et prend toute ligne `enabled = 1` dont l'échéance est
+passée. Un test qui crée une planification par minute **peut déclencher un vrai scan SSH**, sur
+`srv-zabbix` qui est en production.
+
+La parade est **structurelle** : toutes les planifications créées visent `target_type = 'tag'` avec un
+**tag qui n'existe pas**. La branche correspondante (`scheduler.py:190-197`) fait une jointure interne
+sur `machine_tags` : zéro machine, zéro SSH. **`all` et `machines` sont interdits comme cibles de
+test** — `machines` avec une liste vide ou illisible **retombe sur tout le parc**
+(`scheduler.py:198-209`). Vérifié après chaque rejeu : un seul scan CVE en base, celui du 25/07, et zéro
+planification résiduelle.
+
+**S5** : premier lot avec un effet **hors du parc** — sortie HTTP vers Jira/GLPI/ServiceNow derrière
+le garde SSRF de `ticketing._post`. E-27 et E-29 s'y règlent.
+
+**S5 — porté le 2026-08-21** (v1.37.26) : `SuiviCve` + `SuiviCveController`, la sixième colonne du
+tableau devenue fonctionnelle, et un fichier de langue `suivi` (**21 = 21** clés). Deux routes internes
+sous `role:1` + `perm:can_scan_cve`. Suite `go-page-cve-suivi` : **10 PASS côté portage, 6 côté
+legacy**.
+
+Ce que S5 a refermé : **E-57** (l'état stocké jamais affiché, un changement de statut qui efface trois
+champs, l'`ENUM` non contrôlé qui rendait un 500), **E-58** (le ticket passe par la passerelle — seule
+exception du module, parce qu'il appelle un fournisseur ITSM externe — et son bouton est désormais
+**désactivé avec son explication** quand le backend refusera).
+
+Ce que S5 **ne** porte pas, et le dit : **E-59** la whitelist, capacité inerte — la table n'a aucun
+lecteur ; **E-60** l'attribution d'un changement de statut, impossible — `cve_remediation` n'a aucune
+colonne d'auteur et la migration est interdite au portage.
+
+Trois mesures de rendu ont été nécessaires : la sixième colonne a élargi le tableau de 1048 à 1203 px
+avec le bouton hors du champ, et c'est le **résumé** — la colonne d'appoint — qui a dû céder, de 46 à
+28 caractères. La version a reçu un `nowrap` : elle se coupait sur deux lignes et **doublait la hauteur
+de chaque ligne**.
+
+**S6** : la route réécrit en bloc les scores de tous les findings du dernier scan, et son résultat
+dépend de deux services externes (FIRST.org EPSS, CISA KEV), avec un 503 si indisponibles.
+L'attente du test doit viser **le contenu**, jamais un délai.
+
+**S6 — porté le 2026-08-21** (v1.37.27) : cinq des six colonnes d'enrichissement de la migration 054
+entrent dans `ScansCve::resultats()`, et le tri devient `kev DESC, priority_score DESC, sévérité, CVSS`
+— **c'est le portage de S3 qui était fautif ici, pas le legacy** (E-61). Le portage dépend donc
+désormais de la migration 054, ce que l'inventaire annonçait.
+
+Suite de caractérisation `go-page-cve-priorite` : **8 PASS sur le legacy, 14 sur le portage**. Base
+rouge relevée avant portage : 4 PASS / 5 FAIL, ce qui prouve que la suite pouvait échouer.
+
+Ce que S6 a refermé : **E-61** (les cinq vulnérabilités réellement exploitées enterrées derrière 103
+CRITICAL, et le `priority_label` calculé mais jamais montré), **E-62** (la pastille KEV du legacy peinte
+par une classe Tailwind purgée — contraste **1,06:1**, portée à **6,47:1**), **E-63** (les deux marques
+ajoutées avaient rouvert le défaut de largeur que S5 venait de fermer : le bouton de ticket ressorti du
+champ, la hauteur de ligne de 54 à 63 px, et un tableau débordant sans que le cadre enregistre un
+défilement — donc une colonne inatteignable), **E-64** (la re-priorisation déclenchée sur un simple clic
+côté legacy, désormais précédée d'une décision qui nomme les 1458 lignes réécrites et l'absence de
+retour).
+
+Ce que S6 **ne** porte pas, et le dit : l'attribution d'une re-priorisation, faute de colonne d'auteur
+et de droit de migrer (même limite que E-60). Et la suite ne déclenche **jamais** `/cve_reprioritize` :
+elle mesure au réseau qu'aucun appel n'est parti, et le geste lui-même est conditionné à la cible, parce
+que sur le legacy il n'y a rien à cliquer sans détruire les données mesurées.
+
+**S7a — porté le 2026-08-21** (v1.37.28) : le bouton de scan, le panneau de décision qui nomme le coût
+(SSH, minutes, remplacement du résultat, **rapport par courriel**), la jauge d'avancement, la lecture du
+STATUT avant le flux, et l'annonce d'une erreur même sans `machine_id`. Suite
+`go-page-cve-scan-refus` : **12 PASS sur le legacy, 16 sur le portage**. Base rouge relevée avant
+portage : 10 PASS / 3 FAIL.
+
+Ce que S7a a refermé : **E-65** (aucun déclenchement de scan sur le portage, et un état vide qui
+affirmait le contraire), **E-66** (les deux silences du legacy : le statut HTTP jamais lu, et un
+événement d'erreur sans `machine_id` envoyé à `results-undefined`), **E-67** (le scan déclenché au clic,
+sans annoncer ni la session SSH, ni la durée, ni le courriel), **E-68** (le garde-fou de débit et le
+verrou du scan sont par PROCESSUS avec `workers = 4` — mesuré, **non corrigé**, décision de
+l'exploitant).
+
+**S7b — LE SCAN QUI ABOUTIT, EN ATTENTE.** Il envoie un rapport par courriel à une adresse réelle, écrit
+une ligne `cve_scans` que les suites S3 à S6 lisent, et résout automatiquement les remédiations. Deux
+scans réels ont démarré par accident pendant S7a, tous deux interrompus avant tout envoi (voir E-68).
+Avant de porter S7b : rendre `go-page-cve-export` indépendante — elle code en dur
+`MACHINE_SANS_SCAN = 2` avec « machine existante mais jamais scannée : 404 » et `?scan_id=2`.
+
+**S7 en dernier**, et c'est le seul qui touche les machines. Ce qu'il faut avoir en tête :
+- c'est un **flux**, pas un JSON (§3) ;
+- neuf commandes SSH en lecture seule, aucun `sudo`, rien de modifié sur la cible (§3) ;
+- deux **429** structurels que le legacy avale en silence (E-23) : le test de caractérisation doit
+  *constater* ce silence côté legacy avant de l'exiger côté Laravel ;
+- E-25 à corriger ;
+- une cascade d'effets de bord à un seul clic, dont **l'auto-résolution des remédiations** (§3) ;
+- tests existants à reprendre : `tests/e2e/05-cve-scan.test.mjs`, `tests/e2e/go-security.mjs`.
+
+### Ce qui ne sera pas porté sans arbitrage explicite
+
+`whitelistCve` (`main.js:1013-1026`) est du **code mort** : une seule occurrence dans tout
+`legacy/` et `laravel/`, sa déclaration. Aucun `onclick`, aucun écouteur, aucun HTML. Elle est la
+seule consommatrice de `_cfg.username`, qui meurt avec elle. La capacité « accepter un faux
+positif » existe pourtant côté serveur (`GET`/`POST`/`DELETE /cve_whitelist`) et **personne n'a
+jamais pu la demander depuis cette page**. Un seul cas mort ici, là où `update/` en avait trois ;
+même verdict : **ne pas le porter**, l'offrir est une décision produit. À noter aussi que
+`whitelisted_by` y était fourni par le client — l'attribution d'une acceptation de risque était
+falsifiable. Si la capacité est un jour offerte, elle doit venir de `get_current_user()`.
+
+Jamais atteintes par ce frontend, à laisser où elles sont : `POST /cve_scan_all` (`scanAll()` boucle
+des appels unitaires), `GET /cve_history`, `GET /cve_remediation`, `GET /cve_remediation/stats`
+(`compliance_report.php` recalcule ces chiffres en SQL local), et le paramètre `per_machine_cvss`,
+documenté dans l'OpenAPI mais jamais envoyé.
+
+---
+
+## 6. Les décisions à prendre avant S2
+
+- **D-1 — TRANCHÉE le 2026-08-20 : le portage restreint à `role >= 2`.** Décision de l'exploitant.
+  Le portage appliquera donc la garde que l'en-tête du fichier annonce depuis toujours, et non celle
+  que son `checkAuth` appliquait. À porter dans S2, avec une entrée dans `PARITE.md` : c'est une
+  divergence VOULUE avec le legacy, pas un oubli. Le legacy lui-même n'est pas modifié par cette
+  décision — il est archivé au moment où S2 aboutit.
+  Reste ouvert : faut-il une lecture pour un rôle 1 sur SES machines seulement ? Rien ne l'exige
+  aujourd'hui, la page n'ayant jamais su cloisonner ; à rouvrir si un usage se manifeste.
+- **D-2 — le hash d'intégrité.** Retirer `totp_secret` et `ssh_key` de l'antécédent (§2) rend
+  l'empreinte recalculable, mais **change la valeur du hash** : les rapports déjà émis ne se
+  vérifieront plus contre la nouvelle formule. À dire dans le CHANGELOG.
+- **D-3 — E-32, la synthèse parc au rôle 1** dans `index.php` : même nature que D-1, sur une autre
+  page. À trancher avec elle, pour ne pas laisser les deux pages en désaccord.
+- **D-4 — E-28**, le clamp cron manquant en `PUT` : le rejouer côté Laravel, c'est corriger un
+  défaut backend depuis le frontend. Le backend reste intact sauf autorisation ; la parade côté vue
+  seule est contournable.
+
+Voir `PARITE.md` pour les écarts E-23 à E-32, `DEPRECIATION.md` pour l'archivage du module quand
+les huit sous-lots seront portés, et `METHODE-SOUS-LOT.md` pour l'ordre de travail de chacun.

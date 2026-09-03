@@ -1,10 +1,39 @@
 [🇫🇷 Version francaise](README.md)
 
-# RootWarden v1.37.1
+# RootWarden v1.37.47
 
 > **RootWarden** is a **DevSecOps** platform for centralized Linux server administration.
 > Deploy it on your infrastructure to manage SSH, updates, firewall, Fail2ban,
 > systemd services, sshd_config audit and CVE vulnerabilities - from a single interface.
+
+## 🚧 Ongoing migration to Laravel — TWO portals run side by side
+
+RootWarden is changing frontend. During the migration, **two interfaces run in parallel**
+against the same database and the same Python backend:
+
+| | port | role |
+|---|---|---|
+| **Laravel port** (`laravel/`) | **8444** | the target — receives pages one at a time |
+| **legacy portal** (`legacy/`) | **8443** | the reference, deprecated part by part |
+
+**Measured on 2026-08-23**: **14 of 33 menu entries ported**, **9 legacy parts archived**,
+two modules fully deprecated (`update/`, `supervision/`). The foundation is complete —
+authentication with mandatory second factor, navigation, backend gateway, FR/EN i18n.
+**The migration is not finished**, and the target is a **direct switchover in v2.0**, with
+no long coexistence.
+
+A menu entry that is not ported yet is shown with a marker and opens the legacy portal in a
+new tab: a link that changes portal without saying so betrays the user.
+
+**Two capabilities block the switchover**, each affecting 6 of 10 active accounts: **2FA
+enrolment** and the **required password change** exist only in the legacy portal. Figures
+and next steps: **[ROADMAP.md](ROADMAP.md)** (French).
+
+The work is documented under [`docs/migration/`](docs/migration/) —
+[`PARITE.md`](docs/migration/PARITE.md) lists the **93 measured divergences** between the
+two portals, each with its evidence.
+
+---
 
 ## 🆕 v1.24 → v1.37 — Advanced DevSecOps (⚠️ beta, dev-tested only)
 
@@ -57,7 +86,7 @@ Post-audit wave of features. Each feature is a full vertical slice (idempotent m
 - Vertical list with **"Last deployment"** column, color-coded (green <30d, yellow 30-90d, red >90d, italic gray if never).
 - Last deploy date pulled from `user_logs` (excludes dry-runs), rendered in browser timezone.
 - "Deploy multi" / "Dry-run multi" purple buttons activate as soon as >1 server is selected. Iterates N servers, deploys to all non-system users, aggregated results with per-server details.
-- Collateral CSP fix: rolled back the nonce in `csp_header_value()` (CSP3 was ignoring `unsafe-inline` -> all inline scripts in the repo were silently broken). Re-activation procedure documented in `www/includes/csp_nonce.php` for after the full inline-scripts migration.
+- Collateral CSP fix: rolled back the nonce in `csp_header_value()` (CSP3 was ignoring `unsafe-inline` -> all inline scripts in the repo were silently broken). Re-activation procedure documented in `legacy/includes/csp_nonce.php` for after the full inline-scripts migration.
 
 ## What's new in v1.21.0 — OWASP Top 10 Security Hardening
 
@@ -191,7 +220,8 @@ chmod 600 srv-docker.env
 > The `start.sh` script automatically secures permissions and checks for default secrets.
 
 ### Access
-- Interface: **https://localhost:8443**
+- **Laravel port (the target): http://localhost:8444** — see "Ongoing migration" above
+- Legacy portal (the reference, being deprecated): **https://localhost:8443**
 - Superadmin account: auto-generated password on first run.
   Check: `docker exec <php_container> cat /var/www/html/.first_run_credentials`
   Password change is mandatory on first login.
@@ -269,10 +299,10 @@ Reference files:
 
 A `down -v` deletes volumes (database). On restart, `init.sql` creates accounts
 with invalid placeholders. `install.sh` must run to generate real passwords.
-If the `www/.installed` flag still exists (bind mount), remove it:
+If the `legacy/.installed` flag still exists (bind mount), remove it:
 
 ```bash
-rm -f www/.installed
+rm -f legacy/.installed
 ./start.sh -d
 docker exec <php_container> cat /var/www/html/.first_run_credentials
 ```

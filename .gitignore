@@ -9,9 +9,13 @@ node_modules/
 tests/e2e/go-test-pentest.mjs
 tests/e2e/*-pentest.mjs
 package-lock.json
+# ... sauf celui du harnais E2E : sans lui `npm ci` refuse de tourner et
+# seul `npm install` passe, ce qui laisse chaque poste resoudre ses propres
+# versions. Le LOT de tests n'est reproductible qu'a cette condition.
+!tests/e2e/package-lock.json
 vendor/
 !vendor/composer/
-!www/vendor/.htaccess
+!legacy/vendor/.htaccess
 
 # Secrets — NE JAMAIS commiter ces fichiers
 srv-docker.env
@@ -20,7 +24,7 @@ srv-docker.env.bak.*
 !srv-docker.env.example
 !*.env.example
 .first_run_credentials
-www/.first_run_credentials
+legacy/.first_run_credentials
 
 # Certificats SSL generes localement
 certs/*.pem
@@ -32,15 +36,20 @@ backend/ssl/
 # Logs — generes au runtime
 *.log
 backend/logs/
-www/logs/
-!www/logs/.htaccess
+legacy/logs/
+!legacy/logs/.htaccess
 
 # Backups — generes automatiquement
 backend/backups/
 backups/
-# Exception : www/backups/ est du CODE (page UI de gestion des sauvegardes), pas du stockage
-!www/backups/
-!www/backups/**
+# Exception : legacy/backups/ est du CODE (page UI de gestion des sauvegardes), pas du stockage.
+# L'archivage la deplace dans legacy/_deprecated/ : sans cette seconde exception, le dossier
+# archive retombe sous la regle `backups/` et tout fichier qu'on y ajouterait deviendrait
+# invisible. Les fichiers deja suivis survivent au deplacement, ce qui masque le probleme.
+!legacy/backups/
+!legacy/backups/**
+!legacy/_deprecated/backups/
+!legacy/_deprecated/backups/**
 
 # Base de donnees locale
 mysql/data/
@@ -56,12 +65,16 @@ backend/tests/__pycache__/
 *.swp
 *.swo
 
-# Claude Code
-.claude/
+# Claude Code : tout est ignore (settings locaux, dumps de skills tiers) SAUF
+# les skills projet rw-* (conventions RootWarden partagees avec le repo).
+.claude/*
+!.claude/skills/
+.claude/skills/*
+!.claude/skills/rw-*/
 .mcp.json
 
 # Flag premier demarrage (genere par install.sh)
-www/.installed
+legacy/.installed
 
 # OS
 .DS_Store
@@ -69,9 +82,11 @@ Thumbs.db
 
 # Screenshots E2E (generes par Puppeteer)
 tests/e2e/screenshots/
+# Captures prises a la racine (rendus PDF, planches d'ecrans) : artefacts, jamais suivis.
+screenshots/
 
 # Artefacts temporaires
-www/_ul
+legacy/_ul
 
 # Frontend build
 frontend/node_modules/

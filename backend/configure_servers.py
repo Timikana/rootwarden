@@ -56,9 +56,81 @@ from ssh_utils import (
 _USERNAME_RE = re.compile(r'^[a-zA-Z0-9._-]{1,32}$')
 
 
+# Motifs de refus d'un nom de compte. CE SONT DES CODES, pas des phrases :
+# l'ecran les affiche et doit pouvoir SEPARER les causes. « pas de bouton parce
+# que le nom est invalide » et « pas de bouton parce que je n'ai pas la
+# permission » sont deux causes pour un meme vide, et un texte libre ne se
+# distingue pas par programme.
+MOTIF_NOM_VIDE = 'vide'
+MOTIF_NOM_TROP_LONG = 'trop_long'
+MOTIF_NOM_COMPOSANT_DE_CHEMIN = 'composant_de_chemin'
+MOTIF_NOM_CARACTERES_INTERDITS = 'caracteres_interdits'
+
+
+def _motif_nom_invalide(username):
+    """Rend le CODE du motif de refus, ou None si le nom est valide.
+
+    UNE SEULE REGLE, DEUX FORMES. `_valid_username` en derive plutot que de
+    porter sa propre copie : une regle recopiee finit par diverger de celle qui
+    decide, et ce chantier en compte deja trois occurrences (E-195, E-196,
+    E-197). Ici la question « valide ? » et la question « pourquoi pas ? » ont
+    la meme source, par construction.
+
+    L'ordre des tests porte le sens, il n'est pas arbitraire : un nom vide
+    passerait `strip('.') == ''` et serait annonce « composant de chemin », ce
+    qui serait faux. Le motif le plus PRECIS gagne.
+    """
+    nom = str(username or '')
+    if not nom:
+        return MOTIF_NOM_VIDE
+    if len(nom) > 32:
+        return MOTIF_NOM_TROP_LONG
+    if nom.strip('.') == '':
+        # `.`, `..`, `...` — E-197. Total pour la classe, la ou tester deux
+        # valeurs a la main laisserait passer la troisieme.
+        return MOTIF_NOM_COMPOSANT_DE_CHEMIN
+    if not _USERNAME_RE.match(nom):
+        return MOTIF_NOM_CARACTERES_INTERDITS
+    return None
+
+
 def _valid_username(username) -> bool:
-    """True si username est un nom de compte Linux sur (alphanumerique + . _ -, 1-32)."""
-    return bool(username) and bool(_USERNAME_RE.match(str(username)))
+    """True si username est un nom de compte Linux sur (alphanumerique + . _ -, 1-32).
+
+    E-197. La classe de caracteres seule ne suffit pas : elle accepte `.` et
+    `..`, qui ne sont pas des noms de compte mais des COMPOSANTS DE CHEMIN. Or
+    ce nom est interpole dans des chemins executes en root — la cle SSH
+    (`/home/<nom>/.ssh/authorized_keys`) et les deux fichiers sudoers. Mesure du
+    2026-08-27 :
+
+        '..'  ->  rm -f /.ssh/authorized_keys        (et /etc pour le legacy)
+        '.'   ->  rm -f /home/.ssh/authorized_keys   (et /etc/sudoers.d)
+
+    Le nom vient de `server_user_inventory`, donc de ce qui a ete lu dans le
+    `/etc/passwd` de la machine — et ce scan ne valide pas ce qu'il insere.
+
+    CE N'EST PAS UNE ELEVATION DE PRIVILEGE : seul le root de cette machine peut
+    poser un tel nom, et la commande s'execute sur cette meme machine. Ce qui
+    est reel est un `rm -f` root sur un chemin qui n'est PAS celui vise.
+
+    POURQUOI PAS L'EXPRESSION STRICTE QUI EXISTE DEJA DEUX FOIS DANS LE DEPOT
+    `sudo_manager.py:32` et `sftp_manager.py:34` portent `^[a-z_][a-z0-9_-]{0,31}$`,
+    identiques a l'octet, et elles refusent bien `.` et `..`. Les reprendre ici
+    etait la premiere idee — elle CASSE le cas normal. Mesure sur les 41 noms
+    reels du parc : elle refuserait **`Debian-exim`**, **`Debian-snmp`** et
+    **`Timikana`**. Les deux premiers sont des comptes systeme Debian standard,
+    presents sur toute machine du parc.
+
+    La raison est un DOMAINE, pas une severite : ces deux modules valident des
+    noms que RootWarden GERE, ou la regle de `useradd` est la bonne. Ce fichier
+    valide des noms DECOUVERTS dans le `/etc/passwd` d'une machine reelle, ou
+    les majuscules existent. Trois implementations, mais DEUX notions — les
+    fondre serait E-195 a nouveau.
+
+    Le correctif est donc etroit : la classe de caracteres reste, et ce qui est
+    refuse est ce qui n'est fait que de points.
+    """
+    return _motif_nom_invalide(username) is None
 
 # ===================================================
 # Classe CustomFormatter pour Gérer l'Absence du Champ 'machine'
@@ -212,12 +284,45 @@ def setup_logging(log_file: str):
 # d'accumuler) et on purge l'ancien fichier a nom nu. Le compte de service
 # (/etc/sudoers.d/rootwarden, gere par routes/ssh.py) n'est JAMAIS touche.
 _SUDOERS_PREFIX = 'rootwarden-'
-_RESERVED_SA_USER = 'rootwarden'  # compte de service : son fichier /etc/sudoers.d/rootwarden est intouchable
+_RESERVED_SA_USER = Config.NOM_COMPTE_SERVICE  # son /etc/sudoers.d/<nom> est intouchable
+# Le nom vient de `Config`, source unique partagee avec l'authentification.
+# Le recopier ici ferait deux valeurs qui finiraient par diverger.
 
 
 def _sudoers_target(username: str) -> str:
     """Chemin unifie du fichier sudoers.d d'un utilisateur gere."""
     return f"/etc/sudoers.d/{_SUDOERS_PREFIX}{username}"
+
+
+def _absence_verifiee(channel, chemins, logger=None) -> bool:
+    """Vrai si AUCUN des chemins n'existe plus sur la machine distante.
+
+    E-192. `execute_command_as_root` rend la SORTIE, jamais le code : il le
+    calcule sur son chemin `service_account` (`ssh_utils.py:831`) et le JETTE,
+    et il le jette aussi en depaquetant `execute_as_root`. Un `rm -f` refuse est
+    donc indiscernable d'un `rm -f` reussi pour tous ses appelants.
+
+    On ne verifie donc pas la COMMANDE mais son EFFET — c'est la regle du
+    chantier : « une reussite annoncee n'est pas une reussite verifiee ».
+
+    LE MARQUEUR EST POSITIF ET FAIL-CLOSED, et il est assemble par
+    CONCATENATION SHELL. Sur les machines en mode `su`/`sudo` interactif, le
+    canal ECHOTE la commande envoyee (v1.37.11) : un marqueur ecrit en clair
+    reviendrait dans la sortie sans que rien n'ait ete verifie. La ligne echotee
+    porte `__RW_""ABSENT_OK__`, la sortie reelle porte `__RW_ABSENT_OK__` — et
+    on le cherche comme LIGNE ENTIERE, jamais en sous-chaine.
+
+    Tout ce qui n'est pas ce marqueur exact vaut « non verifie ».
+    """
+    tests = " && ".join(f"test ! -e {c}" for c in chemins)
+    try:
+        sortie = execute_command_as_root(
+            channel, f'{tests} && echo "__RW_""ABSENT_OK__"', logger=logger) or ''
+    except Exception as e:
+        if logger:
+            logger.error(f"_absence_verifiee : sonde echouee ({e})")
+        return False
+    return any(ligne.strip() == '__RW_ABSENT_OK__' for ligne in str(sortie).splitlines())
 
 
 def _purge_legacy_sudoers(channel, username: str, logger=None) -> None:
@@ -348,8 +453,20 @@ def remove_from_sudoers(channel, username: str, logger=None):
         return
     try:
         # Supprime le fichier unifie ET l'ancien fichier a nom nu (naming pre-fix),
-        # pour ne laisser AUCUNE regle residuelle. Le compte de service rootwarden
-        # (/etc/sudoers.d/rootwarden) est protege par _purge_legacy_sudoers.
+        # pour ne laisser AUCUNE regle residuelle.
+        #
+        # Portee de la garde de `_purge_legacy_sudoers`, ecrite precisement
+        # parce que la formulation precedente a induit TROIS lectures fausses le
+        # 2026-08-27 : elle ne s'applique que si `username` — un utilisateur
+        # GERE par le portail — vaut litteralement `rootwarden`. C'est un
+        # garde-fou de COLLISION DE NOMS, pas une protection generale du fichier
+        # du compte de service : cette fonction n'est jamais appelee avec autre
+        # chose qu'un nom d'utilisateur du portail, donc elle ne croise pas
+        # `/etc/sudoers.d/rootwarden` dans le cas ordinaire.
+        #
+        # Corollaire, et il compte : RIEN ici ne retire un fichier sudoers
+        # ORPHELIN — sans compte porteur. Aucune routine du produit ne balaie ce
+        # repertoire.
         execute_command_as_root(channel, f"rm -f {_sudoers_target(username)}", logger=logger)
         _purge_legacy_sudoers(channel, username, logger=logger)
         if logger:
@@ -515,6 +632,25 @@ def deploy_user_config(channel, user: dict, logger=None):
         )
         execute_command_as_root(channel, key_command, logger=logger)
     else:
+        # ══ C'EST ICI QU'UN COMPTE INACTIF PERD SA CLE ══════════════════════
+        #
+        # E-195, et cette phrase est le correctif — il n'y a pas de code a
+        # changer. Cette branche est la COMPENSATION qui rend correct le fait
+        # que `configure_users` laisse les comptes inactifs hors de sa boucle
+        # de revocation : ils ne gardent pas leur acces pour autant, ils le
+        # perdent ici.
+        #
+        # Trois fonctions maintiennent ensemble une propriete que personne
+        # n'avait ecrite, et qui n'etait donc vraie que par accident :
+        #   `configure_users`      met le compte inactif hors de la revocation
+        #   `deploy_user_config`   (ICI) lui retire sa cle
+        #   `configure_user`       (branche inactive) lui retire son sudo
+        # Le preflight, lui, l'annonce comme REVOQUE — et il dit vrai.
+        #
+        # Retirer ce `rm -f` « parce que la branche inactive ne fait rien
+        # d'utile » rendrait un acces a chaque compte desactive du parc, en
+        # silence, et le preflight continuerait d'annoncer une revocation qui
+        # n'aurait plus lieu.
         if logger:
             logger.info(f"[{username}] Suppression de la cle SSH.")
         execute_command_as_root(channel, f"rm -f {authorized_keys_path}", logger=logger)
@@ -564,8 +700,15 @@ class ServerConfigurator:
     Pour chaque machine, la classe se charge de :
       - Se connecter via SSH avec retry automatique.
       - Mettre à jour le .bashrc root.
-      - Nettoyer les utilisateurs non autorisés (clean_up_users).
       - Créer/configurer les utilisateurs autorisés (configure_users).
+
+    ⚠ Cette liste annonçait aussi « nettoyer les utilisateurs non autorisés
+    (clean_up_users) ». C'est FAUX depuis que l'appel a été retiré : `configure`
+    n'appelle que `configure_users`. La méthode existe encore, plus bas, et
+    personne ne l'appelle — voir l'avertissement qui la précède.
+
+    Le dire compte, parce qu'une docstring qui annonce une étape absente
+    n'informe pas : elle INVITE à rétablir l'appel.
 
     Attributs :
         machine       (dict): Métadonnées de la machine (id, name, ip, port, user, password, root_password).
@@ -641,6 +784,40 @@ class ServerConfigurator:
             self.configure_users(root_channel)
         self.logger.info(f"=== Configuration terminée pour la machine : {self.name} ===")
 
+    # ══ ⚠ CODE MORT, ET LE RETABLIR DETRUIRAIT 69 COMPTES (E-213) ══════════
+    #
+    # `clean_up_users` n'a AUCUN appelant dans tout le depot — mesure du
+    # 2026-08-28. `configure()` n'appelle que `configure_users`. Elle ne
+    # detruit donc rien aujourd'hui.
+    #
+    # CE QU'ELLE FERAIT SI ON RETABLISSAIT L'APPEL — ET LE CHIFFRE D'ABORD
+    # ECRIT ICI ETAIT FAUX D'UN FACTEUR ~35, DANS LE SENS QUI ALARME.
+    #
+    # Il annoncait « 69 comptes que le portail affiche comme exclus recevraient
+    # un `userdel -r` ». C'est le compte des lignes `excluded` de l'inventaire,
+    # et **l'inventaire n'est pas l'entree de cette methode** : la liste des
+    # candidats vient de la MACHINE, filtree par
+    #
+    #     awk -F: '$3 >= 1001 {print $1}' /etc/passwd        (ligne 842)
+    #
+    # Les UID < 1001 n'y apparaissent jamais. Mesure du 2026-08-28 :
+    #
+    #     server_user_inventory, status = 'excluded' . 69 lignes
+    #       -> dont UID >= 1001 ........................ 2
+    #       -> et ces 2 sont `nobody` (65534), deja dans _PROTECTED_USERS
+    #       -> donc reellement supprimes AUJOURD'HUI ... 0
+    #
+    # CE QUI RESTE VRAI, ET C'EST L'ESSENTIEL : `user_exclusions` est VIDE (0
+    # ligne). Les deux magasins ont diverge — la migration 030 les a copies UNE
+    # fois, rien ne les synchronise depuis — et c'est le PREMIER que cette
+    # methode lit. La seule protection restante serait donc la liste des six
+    # noms systeme, sur un parc dont l'inventaire peut lui-meme etre faux
+    # (E-187). **Le danger reste entier ; il ne repose simplement pas sur le
+    # nombre qu'on croyait.**
+    #
+    # Son retrait est recommande et releve d'un arbitrage en cours. En
+    # attendant, cet avertissement remplace l'invitation que portait la
+    # docstring de la classe.
     def clean_up_users(self, channel):
         """
         Nettoie les utilisateurs non autorisés sur la machine, en tenant compte des exclusions.
@@ -729,12 +906,29 @@ class ServerConfigurator:
           retire la cle SSH et le sudo SANS supprimer le compte
         """
         mid = self.machine['id']
-        authorized_names = set()
+
+        # ══ CE N'EST PAS « QUI GARDE L'ACCES » — C'EST « QUI A ETE TRAITE » ══
+        #
+        # E-195. Cet ensemble s'appelait `authorized_names`, et le preflight
+        # (`routes/ssh.py`) appelle `authorized` un ensemble calcule autrement :
+        # `… JOIN user_machine_access … WHERE u.active = 1`. Deux noms
+        # identiques pour DEUX NOTIONS DIFFERENTES, dans deux fichiers.
+        #
+        # Celui-ci ne filtre PAS sur `active`, et c'est correct : son seul role
+        # est de dire qui `configure_user` a deja pris en charge, donc qui n'a
+        # pas besoin de la boucle de revocation ci-dessous. Un compte INACTIF y
+        # figure — et il perd quand meme sa cle, par un autre chemin : voir la
+        # branche `else` de `deploy_user_config`, ou la compensation est ecrite.
+        #
+        # Les fusionner serait une ERREUR : le preflight cesserait d'annoncer
+        # les revocations de comptes inactifs, qui ont pourtant bien lieu. Il
+        # SOUS-annoncerait ce qui va etre detruit.
+        comptes_traites = set()
 
         # 1. Deployer les users autorises
         for user in self.all_users:
             if mid in user.get('allowed_servers', []):
-                authorized_names.add(user.get('name'))
+                comptes_traites.add(user.get('name'))
                 self.configure_user(channel, user)
 
         # 2. Retirer les cles des users managed qui ont perdu l'acces
@@ -752,13 +946,52 @@ class ServerConfigurator:
             self.logger.warning(f"Impossible de charger l'inventaire : {e}")
             managed_users = set()
 
-        revoked = managed_users - authorized_names
+        revoked = managed_users - comptes_traites
         for uname in revoked:
-            self.logger.info(f"[{uname}] Acces revoque - retrait cle SSH et sudo (compte conserve).")
+            # ══ UNE REVOCATION ANNONCEE N'EST PAS UNE REVOCATION FAITE ═══════
+            #
+            # E-192. Cette boucle journalisait « Acces revoque » AVANT d'agir,
+            # puis jetait le resultat des deux gestes. Elle pouvait donc
+            # affirmer qu'un acces etait ferme alors qu'il restait OUVERT.
+            #
+            # C'est l'inverse d'E-183, et c'est pire : E-183 detruisait une
+            # donnee vraie, qui se repare en rescannant. Celle-ci produit une
+            # FAUSSE ATTESTATION — personne ne rouvre un dossier de conformite
+            # clos.
+            #
+            # Le nom vient de `server_user_inventory`, donc de ce qui a ete lu
+            # dans le `/etc/passwd` de la machine, et il n'etait PAS valide
+            # avant d'etre interpole dans un `rm -f` root. Ce n'est pas une
+            # elevation de privilege — seul le root de cette machine peut poser
+            # un tel nom, et la commande s'execute sur cette meme machine —
+            # mais un nom porteur d'un espace ou d'un `;` fait echouer le
+            # retrait EN SILENCE, ce qui est exactement le defaut ci-dessus.
+            if not _valid_username(uname):
+                self.logger.error(
+                    f"[{uname!r}] REVOCATION REFUSEE : nom de compte invalide en "
+                    f"inventaire. Aucun geste emis, l'acces reste en l'etat.")
+                continue
+
+            self.logger.info(f"[{uname}] Revocation DEMANDEE - retrait cle SSH et sudo (compte conserve).")
             try:
                 ak_path = f"/home/{uname}/.ssh/authorized_keys"
                 execute_command_as_root(channel, f"rm -f {ak_path}", logger=self.logger)
                 remove_from_sudoers(channel, uname, logger=self.logger)
+
+                # Le VERDICT se lit sur l'etat de la machine, pas sur le fait
+                # d'avoir envoye les commandes.
+                chemins = [ak_path, _sudoers_target(uname)]
+                if uname != _RESERVED_SA_USER:
+                    chemins.append(f"/etc/sudoers.d/{uname}")
+
+                if _absence_verifiee(channel, chemins, logger=self.logger):
+                    self.logger.info(
+                        f"[{uname}] Acces REVOQUE et verifie : cle SSH et regles sudo absentes.")
+                else:
+                    self.logger.error(
+                        f"[{uname}] REVOCATION NON VERIFIEE : au moins un de "
+                        f"{chemins} subsiste ou n'a pas pu etre lu. "
+                        f"L'ACCES DOIT ETRE CONSIDERE COMME ENCORE OUVERT.")
             except Exception as e:
                 self.logger.error(f"[{uname}] Erreur retrait acces : {e}")
 

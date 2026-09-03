@@ -1,0 +1,2683 @@
+/*
+ * Feuille de style RootWarden v2.0 — ecrite a la main, AUCUNE etape de
+ * construction. Ce qui est ecrit ici est ce qui est servi.
+ *
+ * Jetons d'abord, classes ensuite. Le theme sombre suit la preference du
+ * systeme ; il redefinit UNIQUEMENT des jetons, jamais des regles.
+ */
+
+:root {
+    --rw-fond: #f4f6f9;
+    --rw-surface: #ffffff;
+    --rw-surface-2: #f8fafc;
+    --rw-bordure: #d7dee8;
+    /* Bord de defilement : sombre en clair, clair en sombre. */
+    --rw-bord-defilement: rgba(15, 23, 42, .28);
+    --rw-texte: #16202e;
+    --rw-texte-doux: #5b6b80;
+    --rw-accent: #1d4ed8;
+    --rw-accent-texte: #ffffff;
+    --rw-accent-doux: #e8efff;
+    --rw-danger: #b91c1c;
+    --rw-danger-fond: #fef2f2;
+    --rw-succes: #15803d;
+    --rw-succes-fond: #f0fdf4;
+    --rw-avertissement: #a16207;
+    --rw-avert-fond: #fefce8;
+    --rw-rayon: 10px;
+    --rw-espace: 16px;
+    --rw-ombre: 0 1px 3px rgba(16, 24, 40, .08), 0 8px 24px rgba(16, 24, 40, .06);
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --rw-fond: #0f1722;
+        --rw-surface: #17202e;
+        --rw-surface-2: #1c2637;
+        --rw-bordure: #2a3746;
+        --rw-bord-defilement: rgba(148, 173, 209, .40);
+        --rw-texte: #e8eef6;
+        --rw-texte-doux: #9fb0c4;
+        --rw-accent: #5b8cff;
+        --rw-accent-texte: #0b1220;
+        --rw-accent-doux: #1b2942;
+        --rw-danger: #fca5a5;
+        --rw-danger-fond: #2a1618;
+        --rw-succes: #6ee7a8;
+        --rw-succes-fond: #16281f;
+        --rw-avertissement: #fcd34d;
+        --rw-avert-fond: #2a2410;
+        --rw-ombre: 0 1px 3px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .35);
+    }
+}
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--rw-fond);
+    color: var(--rw-texte);
+    font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Ecrans d'authentification
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.rw-centre {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--rw-espace);
+}
+
+/*
+ * `hidden` doit CACHER, meme quand la classe pose un `display`.
+ *
+ * La feuille de style du navigateur applique `[hidden] { display: none }` avec
+ * une specificite nulle : n'importe quelle regle de composant la bat. Mesure
+ * qui a impose ceci : `.rw-panneau-decision { display: flex }` rendait
+ * `panneau.hidden = true` sans aucun effet — le panneau de decision du
+ * redemarrage restait a l'ecran, et le test, qui lisait l'ATTRIBUT et non le
+ * rendu, le declarait cache.
+ *
+ * Le projet cache par `hidden` et non par une classe : cette regle rend cette
+ * convention fiable pour tous les composants, presents et a venir.
+ */
+[hidden] { display: none !important; }
+
+.rw-carte {
+    width: 100%;
+    max-width: 420px;
+    background: var(--rw-surface);
+    border: 1px solid var(--rw-bordure);
+    border-radius: var(--rw-rayon);
+    box-shadow: var(--rw-ombre);
+    padding: 30px 30px 26px;
+}
+
+.rw-carte--large { max-width: 720px; }
+
+/*
+ * Carte de formulaire POSEE DANS UNE PAGE, par opposition a la carte centree
+ * d'un ecran de connexion. `max-width: 420px` y laissait deux colonnes a
+ * l'etroit et 1 200 px de vide a cote : la page a de la largeur, le formulaire
+ * s'en sert.
+ */
+.rw-carte--pleine { max-width: none; padding: 22px 24px 18px; }
+
+.rw-titre {
+    margin: 0 0 4px;
+    font-size: 20px;
+    font-weight: 650;
+    letter-spacing: -.01em;
+}
+
+.rw-sous-titre {
+    margin: 0 0 22px;
+    color: var(--rw-texte-doux);
+    font-size: 14px;
+}
+
+/* Fil d'etapes : dire ou l'on en est evite de faire deviner. */
+.rw-etapes {
+    display: flex;
+    gap: 6px;
+    margin: 0 0 22px;
+    font-size: 12px;
+    color: var(--rw-texte-doux);
+}
+
+.rw-etapes__pas {
+    flex: 1;
+    padding-top: 7px;
+    border-top: 3px solid var(--rw-bordure);
+}
+
+.rw-etapes__pas--fait { border-top-color: var(--rw-succes); }
+.rw-etapes__pas--courant { border-top-color: var(--rw-accent); color: var(--rw-texte); font-weight: 600; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Formulaires
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.rw-champ { margin-bottom: 16px; }
+
+.rw-etiquette {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 13px;
+    font-weight: 550;
+    color: var(--rw-texte-doux);
+}
+
+.rw-saisie {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--rw-bordure);
+    border-radius: 8px;
+    background: var(--rw-surface-2);
+    color: var(--rw-texte);
+    font: inherit;
+}
+
+.rw-saisie:focus {
+    outline: 2px solid var(--rw-accent);
+    outline-offset: 1px;
+    border-color: var(--rw-accent);
+}
+
+/* Le code TOTP se lit chiffre par chiffre : chasse fixe et lettres espacees. */
+.rw-saisie--code {
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 22px;
+    letter-spacing: .35em;
+    text-align: center;
+}
+
+/* Aide sous un champ : dit quoi saisir, pas seulement ce qui est attendu. */
+.rw-aide {
+    margin: 6px 0 0;
+    font-size: 12px;
+    color: var(--rw-texte-doux);
+}
+
+/*
+ * Pied de formulaire. L'action principale va A DROITE, la ou l'oeil la cherche
+ * apres avoir lu le formulaire. Un bouton pleine largeur ne se justifie que
+ * lorsqu'il est la SEULE action possible et que la carte est etroite.
+ */
+.rw-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 22px;
+    padding-top: 18px;
+    border-top: 1px solid var(--rw-bordure);
+}
+
+.rw-actions__gauche { margin-right: auto; }
+
+.rw-bouton {
+    padding: 10px 18px;
+    border: 0;
+    border-radius: 8px;
+    background: var(--rw-accent);
+    color: var(--rw-accent-texte);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.rw-bouton:hover { filter: brightness(1.07); }
+.rw-bouton:focus-visible { outline: 2px solid var(--rw-texte); outline-offset: 2px; }
+
+.rw-bouton--discret {
+    background: transparent;
+    color: var(--rw-texte-doux);
+    border: 1px solid var(--rw-bordure);
+    font-weight: 550;
+}
+
+.rw-bouton--discret:hover { background: var(--rw-surface-2); color: var(--rw-texte); filter: none; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Messages
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.rw-erreur {
+    margin: 0 0 18px;
+    padding: 11px 13px;
+    border: 1px solid var(--rw-danger);
+    border-radius: 8px;
+    background: var(--rw-danger-fond);
+    color: var(--rw-danger);
+    font-size: 14px;
+}
+
+/* LE PENDANT DE `.rw-erreur` POUR UNE REUSSITE. Le socle avait une boite pour
+   dire ce qui a echoue et rien pour dire ce qui a marche : un enregistrement
+   reussi se signalait donc du meme gris que le reste de la page. Memes
+   dimensions que `.rw-erreur`, pour que les deux messages occupent la meme place
+   et ne fassent pas sauter la mise en page en se remplacant. */
+.rw-confirmation {
+    margin: 0 0 18px;
+    padding: 11px 13px;
+    border: 1px solid var(--rw-succes);
+    border-radius: 8px;
+    background: var(--rw-succes-fond);
+    color: var(--rw-succes);
+    font-size: 14px;
+}
+
+/* LE TROISIEME ETAT, entre `.rw-erreur` et `.rw-confirmation`. Il ne dit ni
+   « c'est cassé » ni « c'est fait » : il previent d'un cout qu'on est en train
+   d'accepter. Sous-lot V8 : un releve de parc joint des machines de PRODUCTION,
+   et l'ecrire en rouge d'erreur ferait croire a une panne, en vert de reussite a
+   une confirmation. Memes dimensions que les deux autres, pour la meme raison :
+   les trois messages occupent la meme place et ne font pas sauter la mise en
+   page en se remplacant. */
+.rw-avertissement {
+    margin: 0 0 18px;
+    padding: 11px 13px;
+    border: 1px solid var(--rw-avertissement);
+    border-radius: 8px;
+    background: var(--rw-avert-fond);
+    color: var(--rw-avertissement);
+    font-size: 14px;
+}
+
+/* TROIS EFFETS ENUMERES, pas une phrase qui les noie. Sous-lot V9 : enregistrer
+   une configuration distante SAUVEGARDE, ECRIT et REDEMARRE un service — dire
+   « enregistrer » cache les deux derniers. Une classe explicite plutot que le
+   style par defaut d'un `ul` : la feuille ne definit rien pour les listes, donc
+   le rendu aurait dependu d'un reset qu'on n'a pas mesure. */
+.rw-liste-effets {
+    margin: 8px 0 0;
+    padding-left: 20px;
+    list-style: disc;
+}
+
+.rw-liste-effets li { margin: 2px 0; }
+
+/*
+ * UNE SEQUENCE SE NUMEROTE, ELLE NE SE PUCE PAS.
+ *
+ * `.rw-liste-effets` enumere des effets — leur ordre n'a pas de sens, une puce
+ * convient. Un guide de procedure, lui, tient tout son interet de son ORDRE :
+ * « deployer la cle » AVANT « effacer le mot de passe » n'est pas un detail de
+ * presentation, c'est la difference entre une migration et un verrouillage.
+ * Modificateur additif plutot que seconde classe : la premiere reste ce qu'elle
+ * est, et `.rw-etapes` n'est pas reemployable ici — ses etats `--fait` et
+ * `--courant` annoncent une progression, or ce guide ne suit personne.
+ */
+.rw-liste-effets--ordonnee { list-style: decimal; }
+
+.rw-note {
+    margin: 22px 0 0;
+    padding-top: 16px;
+    border-top: 1px solid var(--rw-bordure);
+    color: var(--rw-texte-doux);
+    font-size: 13px;
+}
+
+.rw-lien { color: var(--rw-accent); }
+
+.rw-encart {
+    margin: 0 0 22px;
+    padding: 13px 15px;
+    border: 1px solid var(--rw-bordure);
+    border-left: 3px solid var(--rw-accent);
+    border-radius: 8px;
+    background: var(--rw-surface);
+    color: var(--rw-texte-doux);
+    font-size: 14px;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Gabarit du portail
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.rw-portail {
+    display: grid;
+    grid-template-columns: 252px minmax(0, 1fr);
+    min-height: 100vh;
+}
+
+/* ── Barre laterale ─────────────────────────────────────────────────────── */
+
+.rw-laterale {
+    display: flex;
+    flex-direction: column;
+    background: var(--rw-surface);
+    border-right: 1px solid var(--rw-bordure);
+    position: sticky;
+    top: 0;
+    height: 100vh;      /* hauteur FIXE : c'est elle qui borne la zone qui defile */
+    overflow: hidden;   /* sans quoi la liste deborde sous le pied et se coupe */
+}
+
+.rw-laterale__marque {
+    display: block;
+    flex-shrink: 0;
+    padding: 15px 18px;
+    font-weight: 650;
+    font-size: 15px;
+    color: var(--rw-texte);
+    text-decoration: none;
+    border-bottom: 1px solid var(--rw-bordure);
+}
+
+/*
+ * Legende du menu, ecrite UNE FOIS. Avant, chaque entree non portee repetait
+ * « ancien portail » : 31 fois a l'ecran pour un superadmin, ce qui noyait les
+ * libelles au lieu de les servir.
+ */
+.rw-laterale__legende {
+    flex-shrink: 0;
+    padding: 9px 14px;
+    border-bottom: 1px solid var(--rw-bordure);
+    background: var(--rw-surface-2);
+    font-size: 11px;
+    line-height: 1.4;
+    color: var(--rw-texte-doux);
+}
+
+.rw-laterale__legende .rw-fleche { color: var(--rw-accent); }
+
+/* ── Le menu, commun a la barre laterale et au tiroir ───────────────────── */
+
+.rw-menu {
+    flex: 1 1 auto;
+    min-height: 0;      /* indispensable : sans lui un enfant flex ne defile pas */
+    overflow-y: auto;
+    padding: 6px 8px 12px;
+}
+
+.rw-menu__section {
+    padding: 13px 10px 5px;
+    font-size: 10px;
+    font-weight: 650;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--rw-texte-doux);
+}
+
+.rw-menu__lien {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    border-radius: 7px;
+    color: var(--rw-texte);
+    text-decoration: none;
+    font-size: 14px;
+}
+
+.rw-menu__lien:hover { background: var(--rw-surface-2); }
+
+.rw-menu__lien--actif {
+    background: var(--rw-accent-doux);
+    color: var(--rw-accent);
+    font-weight: 600;
+}
+
+.rw-menu__libelle {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/*
+ * Marqueur des pages non portees : une simple fleche, expliquee une fois par
+ * la legende. `flex-shrink: 0` l'empeche d'etre ecrase par un libelle long —
+ * un marqueur large de zero ne previent personne.
+ */
+.rw-menu__marqueur {
+    flex-shrink: 0;
+    font-size: 12px;
+    line-height: 1;
+    color: var(--rw-texte-doux);
+}
+
+.rw-menu__lien--externe:hover .rw-menu__marqueur { color: var(--rw-accent); }
+
+/* ── Colonne principale ─────────────────────────────────────────────────── */
+
+.rw-principal {
+    display: flex;
+    flex-direction: column;
+    min-width: 0; /* sans quoi un tableau large fait deborder toute la grille */
+}
+
+.rw-entete {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 11px 24px;
+    background: var(--rw-surface);
+    border-bottom: 1px solid var(--rw-bordure);
+    position: sticky;
+    top: 0;
+    z-index: 5;
+}
+
+/* ── UN TITRE LONG NE POUSSE PLUS RIEN HORS DU BANDEAU ────────────────────
+ *
+ * `.rw-entete` est `display: flex` SANS `flex-wrap` et sans `overflow`, et
+ * `.rw-entete__titre` n'avait ni `min-width: 0` ni gestion de debordement. Or un
+ * element flex a `min-width: auto` par defaut : **il ne peut pas rétrécir sous
+ * sa largeur de contenu minimale.**
+ *
+ * Selon les largeurs, la meme cause produit DEUX symptomes differents — et c'est
+ * ce qui a fait diverger deux diagnostics sur ce defaut :
+ *
+ *   - le titre se replie sur deux lignes, le bandeau grandit, et ce qui est
+ *     centre verticalement se decale ;
+ *   - ou la ligne flex DEBORDE a droite, et le contenu le plus a droite
+ *     (deconnexion, selecteur de langue) sort de l'ecran.
+ *
+ * Les trois proprietes ci-dessous ferment les deux : le titre peut retrecir, il
+ * ne se replie plus, et il se termine par des points de suspension. **La
+ * justesse du correctif ne depend donc pas de savoir lequel des deux symptomes
+ * on a observe** — c'est ce qui le rend posable avant que le desaccord soit
+ * tranche.
+ *
+ * `title` n'est pas ajoute sur l'element : le titre tronque est deja celui de
+ * l'onglet du navigateur, donc l'information n'est pas perdue.
+ */
+.rw-entete__titre {
+    font-weight: 600;
+    font-size: 15px;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Le compte et la deconnexion vivent DANS L'EN-TETE, la ou on les cherche —
+   et non en pied de barre laterale, ou ils bornaient la liste. */
+.rw-entete__compte {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 13px;
+    color: var(--rw-texte-doux);
+}
+
+.rw-entete__bascule {
+    display: none;
+    cursor: pointer;
+    font-size: 20px;
+    line-height: 1;
+    padding: 2px 8px;
+    border-radius: 6px;
+    color: var(--rw-texte-doux);
+}
+
+.rw-entete__bascule:hover { background: var(--rw-surface-2); }
+
+/*
+ * Le contenu occupe la LARGEUR DISPONIBLE. Pas de `max-width` sur la page :
+ * un parc de machines se lit en tableau large, l'etrangler a 960 px est une
+ * regression d'usage. Seule la prose se borne, par .rw-prose.
+ */
+.rw-contenu {
+    flex: 1;
+    padding: 26px var(--rw-marge-laterale) 40px;
+    width: 100%;
+}
+
+/* Un bloc de texte long ne se lit pas au-dela de ~72 caracteres par ligne. */
+.rw-prose { max-width: 68ch; }
+
+/* ── Grille de cartes : c'est elle qui remplit les grands ecrans ─────────── */
+
+.rw-grille {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+    margin-top: 20px;
+}
+
+.rw-tuile {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 16px 18px;
+    background: var(--rw-surface);
+    border: 1px solid var(--rw-bordure);
+    border-radius: var(--rw-rayon);
+}
+
+.rw-tuile__titre { font-weight: 600; font-size: 14px; }
+.rw-tuile__texte { font-size: 13px; color: var(--rw-texte-doux); margin: 0; }
+
+.rw-tuile__valeur {
+    font-size: 26px;
+    font-weight: 650;
+    letter-spacing: -.02em;
+    line-height: 1.15;
+}
+
+.rw-tuile__lien { margin-top: auto; padding-top: 10px; font-size: 13px; }
+
+/* Etat vide : dire ce qui manque ET quoi faire. */
+.rw-vide {
+    padding: 24px 26px;
+    border: 1px dashed var(--rw-bordure);
+    border-radius: var(--rw-rayon);
+    color: var(--rw-texte-doux);
+}
+
+/* Le texte reste aligne a gauche et borne : un paragraphe centre sur 1900 px
+   se relit ligne par ligne, l'oeil perd le debut de la ligne suivante. */
+.rw-vide p { max-width: 68ch; margin: 0; }
+
+.rw-vide__titre { font-weight: 600; color: var(--rw-texte); margin-bottom: 6px; }
+
+/*
+ * « RIEN A MONTRER » ET « LA LECTURE A ECHOUE » NE SE RESSEMBLENT PAS.
+ *
+ * Pose au sous-lot F2 de `fail2ban/`. Le legacy sort par `return` dans les deux
+ * cas, laissant la section cachee : les deux situations produisent exactement
+ * le meme ecran — rien (E-153). Or elles n'appellent pas le meme geste : l'une
+ * se constate, l'autre se reessaie. La variante d'ERREUR garde la forme de
+ * l'etat vide et change son signal, plutot que d'emprunter le bandeau d'erreur
+ * d'un formulaire, qui annoncerait une saisie fautive.
+ */
+.rw-vide--erreur {
+    border-style: solid;
+    border-color: var(--rw-danger);
+    background: var(--rw-danger-fond);
+}
+.rw-vide--erreur .rw-sous-titre-fort { color: var(--rw-danger); }
+
+/* Une adresse IP se compare CHIFFRE A CHIFFRE : en chasse proportionnelle, deux
+   adresses voisines ne s'alignent pas et la comparaison demande un effort. */
+.rw-tableau__mono {
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+/* L'ACTION D'UN ETAT VIDE A BESOIN DE SON PROPRE ESPACE. `.rw-vide p` est a
+   `margin: 0` — juste pour du texte, faux des qu'un bouton s'y trouve : sa
+   hauteur de ligne recouvrait alors la derniere ligne du paragraphe au-dessus,
+   qui se lisait barree. Vu a l'image, invisible a toute assertion DOM. */
+.rw-vide__action { margin-top: 16px; }
+
+/* ── Tiroir mobile ──────────────────────────────────────────────────────── */
+
+.rw-tiroir { display: none; }
+
+.rw-tiroir__voile {
+    position: fixed;
+    inset: 0;
+    background: rgba(8, 12, 18, .55);
+    cursor: pointer;
+}
+
+.rw-tiroir__panneau {
+    position: fixed;
+    inset: 0 auto 0 0;
+    display: flex;
+    flex-direction: column;
+    width: 276px;
+    max-width: 86vw;
+    background: var(--rw-surface);
+    border-right: 1px solid var(--rw-bordure);
+    box-shadow: var(--rw-ombre);
+}
+
+.rw-tiroir__entete {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    padding: 13px 16px;
+    border-bottom: 1px solid var(--rw-bordure);
+    font-weight: 650;
+}
+
+.rw-tiroir__fermer {
+    cursor: pointer;
+    font-size: 20px;
+    line-height: 1;
+    padding: 0 6px;
+    color: var(--rw-texte-doux);
+}
+
+/* Etat ouvert : pilote par la case a cocher, sans JavaScript. */
+.rw-tiroir__bascule:checked ~ .rw-portail .rw-tiroir {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+}
+
+/* ── Sous 900 px : la barre laterale cede la place au tiroir ────────────── */
+
+@media (max-width: 900px) {
+    .rw-portail { grid-template-columns: minmax(0, 1fr); }
+    .rw-laterale { display: none; }
+    .rw-entete__bascule { display: block; }
+    /*
+     * ══ CE LIBELLE-LA, ET PAS « TOUT SPAN » ══════════════════════════════
+     *
+     * La regle etait `.rw-entete__compte span { display: none }`. Elle visait le
+     * libelle « Connecte en tant que … » et en masquait TROIS :
+     *
+     *   - le libelle du compte            <- voulu
+     *   - la pastille de notification     <- un `<span class="rw-badge">`
+     *   - la LANGUE ACTIVE                <- un `<span class="rw-langues__actif">`
+     *
+     * Consequence vue a l'image en 390 px : le selecteur de langue n'affichait
+     * plus que `EN`, donc **la langue courante n'etait plus indiquee** — un
+     * utilisateur en francais voyait un unique bouton `EN` sans savoir ou il en
+     * etait. Et le compteur de notifications disparaissait sur mobile, ce que
+     * personne n'avait releve.
+     *
+     * Corrige par la PRECISION et non par des exceptions : une regle large
+     * rattrapee par des `display: inline-flex` demanderait une exception de plus
+     * a chaque `<span>` ajoute dans l'en-tete, et un oubli ne se verrait qu'a
+     * l'image. *Un selecteur qui attrape trop se resserre ; il ne se rustine
+     * pas.*
+     */
+    .rw-entete__nom { display: none; }
+    /* La marge laterale se resserre sur petit ecran, et le jeton la porte :
+     * le pied la suit sans qu'on ait a l'y ecrire une seconde fois. */
+    :root { --rw-marge-laterale: 16px; }
+    .rw-contenu { padding: 20px var(--rw-marge-laterale) 32px; }
+}
+
+.rw-inline { display: inline; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Selecteur de langue
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.rw-langues {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px;
+    border: 1px solid var(--rw-bordure);
+    border-radius: 7px;
+    background: var(--rw-surface-2);
+    font-size: 11px;
+    font-weight: 650;
+    letter-spacing: .04em;
+}
+
+.rw-langues__lien,
+.rw-langues__actif {
+    padding: 3px 8px;
+    border-radius: 5px;
+    line-height: 1.2;
+}
+
+.rw-langues__lien {
+    color: var(--rw-texte-doux);
+    text-decoration: none;
+}
+
+.rw-langues__lien:hover { background: var(--rw-surface); color: var(--rw-texte); }
+
+.rw-langues__actif {
+    background: var(--rw-accent);
+    color: var(--rw-accent-texte);
+}
+
+/*
+ * Sur les ecrans d'authentification il n'y a pas d'en-tete : le selecteur se
+ * pose en bas a droite. Il doit rester atteignable AVANT toute connexion — une
+ * personne qui ne lit pas le francais doit pouvoir basculer pour comprendre
+ * l'ecran de connexion lui-meme.
+ */
+.rw-langues-flottant {
+    position: fixed;
+    right: 18px;
+    bottom: 18px;
+    z-index: 10;
+}
+
+@media (max-width: 900px) {
+    /* En mobile l'en-tete masque le libelle du compte : le selecteur, lui,
+       reste — c'est une commande, pas une information. */
+    /*
+     * Cette ligne retablissait `.rw-langues` que la regle large masquait. Le
+     * selecteur etant desormais precis, elle n'a plus d'objet — mais elle est
+     * CONSERVEE, parce que `.rw-langues` est aussi rendu hors de l'en-tete
+     * (`.rw-langues-flottant`) et que la remettre a `inline-flex` ici garde le
+     * comportement identique si quelqu'un relargit la regle un jour.
+     */
+    .rw-entete__compte .rw-langues { display: inline-flex; }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Filtres et tableaux
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.rw-barre-filtres {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 12px;
+    margin: 20px 0 16px;
+}
+
+.rw-filtre { display: flex; flex-direction: column; gap: 5px; }
+
+.rw-filtre__etiquette {
+    font-size: 11px;
+    font-weight: 650;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--rw-texte-doux);
+}
+
+.rw-saisie--compacte { width: auto; min-width: 190px; padding: 7px 10px; font-size: 14px; }
+
+/*
+ * Le cadre porte le defilement horizontal, PAS le corps de la page : un
+ * tableau large doit glisser dans sa boite, jamais faire glisser tout l'ecran.
+ */
+/*
+ * Le cadre porte le defilement horizontal. Sur un ecran etroit, la derniere
+ * colonne — celle des actions — sort du champ SANS que rien ne le signale :
+ * une capture a 390 px montrait deux lignes dont les boutons de decision
+ * etaient invisibles et introuvables.
+ *
+ * Les ombres de bord le disent, sans une ligne de JavaScript. Les deux voiles
+ * `local` glissent avec le contenu et recouvrent l'ombre du cote ou il n'y a
+ * plus rien a atteindre ; les deux ombres `scroll` restent collees au cadre.
+ * Resultat : une ombre a droite tant qu'il reste des colonnes a droite.
+ */
+.rw-tableau-cadre {
+    overflow-x: auto;
+    border: 1px solid var(--rw-bordure);
+    border-radius: var(--rw-rayon);
+    background:
+        linear-gradient(to right, var(--rw-surface) 40%, transparent) left center / 34px 100% no-repeat local,
+        linear-gradient(to left, var(--rw-surface) 40%, transparent) right center / 34px 100% no-repeat local,
+        radial-gradient(farthest-side at 0 50%, var(--rw-bord-defilement), transparent) left center / 15px 100% no-repeat scroll,
+        radial-gradient(farthest-side at 100% 50%, var(--rw-bord-defilement), transparent) right center / 15px 100% no-repeat scroll,
+        var(--rw-surface);
+}
+
+.rw-tableau {
+    /*
+     * `min-width` ET NON `width`. Avec `width: 100%`, un tableau dont les
+     * cellules exigent plus que la place offerte deborde de sa propre boite SANS
+     * que le cadre enregistre un defilement : `scrollWidth` reste egal a
+     * `clientWidth`, l'indicateur de bord ne s'affiche pas, et la derniere
+     * colonne devient litteralement INATTEIGNABLE — ni visible, ni accessible
+     * par defilement. Mesure a 1 400 px avant correction : colonne de suivi
+     * rognee de 78 px, `scroll` = `client` = 1 098.
+     *
+     * Avec `min-width`, le tableau prend la largeur qu'il lui faut, le cadre
+     * defile, et l'ombre de bord de S5 previent qu'il reste des colonnes.
+     */
+    min-width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+.rw-tableau thead th {
+    position: sticky;
+    top: 0;
+    padding: 10px 14px;
+    background: var(--rw-surface-2);
+    border-bottom: 1px solid var(--rw-bordure);
+    text-align: left;
+    font-size: 11px;
+    font-weight: 650;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--rw-texte-doux);
+    white-space: nowrap;
+}
+
+.rw-tableau tbody td {
+    padding: 9px 14px;
+    border-top: 1px solid var(--rw-bordure);
+    vertical-align: top;
+}
+
+.rw-tableau tbody tr:hover { background: var(--rw-surface-2); }
+
+.rw-tableau__discret { font-size: 12px; color: var(--rw-texte-doux); white-space: nowrap; }
+
+/* Message pleine largeur : chargement, erreur, ou etat vide. */
+.rw-tableau__message { padding: 30px 20px; text-align: center; color: var(--rw-texte-doux); }
+.rw-tableau__message-titre { font-weight: 600; color: var(--rw-texte); margin-bottom: 6px; }
+.rw-tableau__message-aide { max-width: 60ch; margin: 0 auto; font-size: 13px; }
+
+/* ── Etiquettes et pastilles ────────────────────────────────────────────── */
+
+/*
+ * PASTILLE DE CATEGORIE — a ne pas confondre avec `.rw-etiquette`, qui est le
+ * LIBELLE d'un champ de formulaire.
+ *
+ * Ces deux regles ont porte le meme nom pendant plusieurs vagues. La seconde
+ * l'emportant, tous les libelles de formulaire du portail etaient rendus en
+ * pastille bleue — y compris « Identifiant » et « Mot de passe » sur l'ecran
+ * de connexion, le tout premier ecran du produit. Aucune assertion ne l'a vu ;
+ * la capture, si. C'est exactement le defaut `escHtml()` defini deux fois
+ * releve dans le legacy, reproduit ici.
+ */
+.rw-badge {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 5px;
+    background: var(--rw-accent-doux);
+    color: var(--rw-accent);
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.rw-pastille {
+    display: inline-block;
+    padding: 2px 9px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 650;
+    white-space: nowrap;
+}
+
+/*
+ * ══ POURQUOI UN JETON DE FOND, ET NON UNE TEINTE DE LA COULEUR DU TEXTE ═════
+ *
+ * `color-mix(in srgb, <couleur> X%, transparent)` sur une surface presque
+ * blanche produit un fond de DEMI-TON, et poser la MEME couleur en texte
+ * dessus ne peut structurellement pas atteindre 4,5:1 : la teinte rapproche le
+ * fond du texte. Les CINQ regles construites ainsi echouaient le seuil AA en
+ * theme clair — 3,60 a 3,96:1 — et les cinq passaient en theme sombre, ou la
+ * teinte s'ECARTE au contraire d'un texte clair. Un defaut qui ne se voit que
+ * dans un theme sur deux.
+ *
+ * Mesure du 2026-08-27, sous-lot F1, sur les couleurs COMPOSEES et non
+ * declarees : le fond etant translucide, sa valeur nominale ne dit rien de ce
+ * que l'oeil voit. Quatrieme occurrence dans ce projet d'une pastille juste
+ * en HTML et illisible a l'ecran.
+ *
+ * `--rw-danger` ne figurait pas dans le lot : il avait deja son
+ * `--rw-danger-fond` PALE (#fef2f2, 5,91:1). C'est ce modele qui est etendu ici
+ * a `--rw-succes` et `--rw-avertissement`.
+ *
+ * Les fonds de LIGNE (`.rw-diff__ligne--*`, `.rw-ligne-sensible`) gardent leur
+ * `color-mix` : ils portent le texte ORDINAIRE, sombre sur clair, mesure entre
+ * 13,4 et 14,6:1. Ce n'est pas le meme defaut, et les aligner par symetrie
+ * aurait efface une distinction reelle.
+ */
+.rw-pastille--ok      { background: var(--rw-succes-fond); color: var(--rw-succes); }
+.rw-pastille--echec   { background: var(--rw-danger-fond); color: var(--rw-danger); }
+.rw-pastille--attente { background: var(--rw-surface-2); color: var(--rw-texte-doux); border: 1px solid var(--rw-bordure); }
+
+/*
+ * Une commande journalisee peut etre tres longue et contenir des caracteres de
+ * shell : elle se coupe n'importe ou plutot que de faire deborder la colonne.
+ */
+.rw-code {
+    display: block;
+    max-width: 60ch;
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Onglets, decisions en ligne, boutons colores
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.rw-onglets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin: 20px 0 16px;
+    padding: 3px;
+    border: 1px solid var(--rw-bordure);
+    border-radius: 9px;
+    background: var(--rw-surface-2);
+    width: fit-content;
+}
+
+.rw-onglet {
+    padding: 7px 14px;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--rw-texte-doux);
+    font: inherit;
+    font-size: 14px;
+    font-weight: 550;
+    cursor: pointer;
+}
+
+.rw-onglet:hover { background: var(--rw-surface); color: var(--rw-texte); }
+
+.rw-onglet--actif {
+    background: var(--rw-accent);
+    color: var(--rw-accent-texte);
+    font-weight: 600;
+}
+
+/* Colonne de decisions : les boutons restent groupes et ne s'etirent pas. */
+.rw-tableau__actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+}
+
+.rw-tableau__actions .rw-bouton { padding: 5px 12px; font-size: 13px; }
+
+.rw-bouton--succes { background: var(--rw-succes); color: var(--rw-accent-texte); }
+.rw-bouton--danger { background: var(--rw-danger); color: var(--rw-accent-texte); }
+
+/*
+ * Un LIEN stylé en bouton ne garde pas son soulignement : il se lit comme un
+ * bouton ou comme un lien, pas comme les deux. Vu a l'image sur « Les lancer
+ * depuis l'ancien portail » (module ssh/), mais le defaut existait deja sur
+ * « Exporter en CSV » du scan CVE — un `<a class="rw-bouton">` de plus l'aurait
+ * simplement rendu plus visible.
+ */
+a.rw-bouton, a.rw-bouton:hover { text-decoration: none; }
+
+/* UN BOUTON QUI EST UN LIEN RESTE UNE BOITE. Un `<a>` est en ligne : quand son
+   libelle depasse la largeur disponible — a 390 px, « Ouvrir sur l'ancien
+   portail ↗ » — le texte passe a la ligne mais la BOITE, elle, sort du cadre par
+   la droite, remplissage compris. En `inline-block` elle se replie proprement.
+   Vu a l'image sur mobile, aucune assertion DOM ne le voit. */
+a.rw-bouton { display: inline-block; }
+
+/*
+ * Entre le discret et le rouge : une action qui MODIFIE la machine sans etre
+ * exceptionnelle. La barre du module `update/` en porte quatre destructives ;
+ * les peindre toutes en rouge revient a n'en signaler aucune. Le rouge reste
+ * pour ce qui interrompt un service — reparation dpkg, redemarrage.
+ */
+.rw-bouton--avertissement {
+    background: var(--rw-avertissement);
+    color: var(--rw-accent-texte);
+}
+
+.rw-bouton:disabled {
+    opacity: .45;
+    cursor: not-allowed;
+    filter: none;
+}
+
+/*
+ * Confirmation EN LIGNE, dans la ligne concernee. Elle remplace `confirm()` et
+ * `prompt()` : ces boites natives ne se stylent pas, sortent du flux de la
+ * page, et masquent justement la ligne sur laquelle on decide.
+ */
+.rw-panneau-decision {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 14px;
+    padding: 14px 16px;
+    background: var(--rw-surface-2);
+    border-left: 3px solid var(--rw-danger);
+}
+
+.rw-panneau-decision__actions { display: flex; gap: 8px; margin-left: auto; }
+
+.rw-etiquette-champ {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    flex: 1;
+    min-width: 260px;
+    font-size: 11px;
+    font-weight: 650;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--rw-texte-doux);
+}
+
+.rw-etiquette-champ .rw-saisie { text-transform: none; letter-spacing: normal; font-weight: 400; }
+
+/*
+ * UN CHAMP QUI ATTEND DEUX CARACTERES NE FAIT PAS 1 339 PIXELS.
+ *
+ * `.rw-etiquette-champ` est en `flex: 1` parce que d'autres panneaux y font
+ * saisir un nom de fichier ou un nom de machine — on ne la touche pas. Mesure du
+ * 2026-08-27 sur le champ de recopie du panneau de decision de `fail2ban/` :
+ * 1 339 px a 1920, 819 px a 1400, 323 px a 390. Un champ de 1 339 px pour y
+ * taper le NOMBRE de machines touchees, dans le panneau qui garde le geste le
+ * plus dangereux du module : il n'invite pas a la precision au moment precis ou
+ * l'on en veut.
+ *
+ * Modificateur ADDITIF, applique dans la vue qui en a besoin : aucun autre
+ * panneau n'est traverse. Et il ne mord pas a 390 px, ou 14ch depasse la place
+ * disponible.
+ */
+.rw-saisie--court { max-width: 14ch; }
+
+/* MEME RAISON QUE LA LIGNE AU-DESSUS, POUR L'AIDE. `.rw-etiquette-champ` met
+   TOUTE l'etiquette en capitales gras : juste pour un intitule de champ,
+   illisible pour une phrase. Seule `.rw-saisie` etait remise a plat — vu a
+   l'image en V10a, chaque champ portait cinq lignes de capitales sous lui. Place
+   ici, juste apres, parce qu'a specificite egale l'ORDRE tranche. */
+.rw-etiquette-champ .rw-aide {
+    text-transform: none;
+    letter-spacing: normal;
+    font-weight: 400;
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+/* UN CHOIX A QUATRE VALEURS N'A PAS BESOIN DE 1100 PX. `.rw-etiquette-champ`
+   est en `flex: 1` : son `<select>` s'etirait sur toute la colonne restante, et
+   sur 1920 px le menu des plateformes traversait la moitie de la page. Borner le
+   `<select>` seul ne suffit pas — l'enveloppe garde la place et renvoie le
+   bouton voisin a l'autre bout de la carte. C'est donc l'ENVELOPPE qui se
+   borne. Vu a l'image, invisible a toute assertion DOM. */
+.rw-etiquette-champ--borne { flex: 0 0 auto; min-width: 0; }
+
+/* SPECIFICITE EGALE, DONC C'EST L'ORDRE QUI TRANCHE : cette regle doit rester
+   APRES `.rw-etiquette-champ`, sinon son `flex: 1` la remporte et le bornage
+   n'a aucun effet — premiere version ecrite 380 lignes plus haut, sans effet. */
+
+.rw-pastille--info   { background: var(--rw-accent-doux); color: var(--rw-accent); }
+.rw-pastille--neutre { background: var(--rw-surface-2); color: var(--rw-texte-doux); border: 1px solid var(--rw-bordure); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   En-tete de page, tuiles de resume, region d'annonce
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/*
+ * Titre a gauche, action principale a DROITE, sur la meme ligne. Le titre
+ * garde `rw-prose` sur son texte : sans cela, la description occupe toute la
+ * largeur et pousse le bouton hors du champ visuel sur un grand ecran.
+ */
+.rw-entete-page {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.rw-entete-page__actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    /*
+     * PAS de `flex-shrink: 0` : le bloc gardait sa largeur naturelle et
+     * debordait de l'ecran au lieu de se replier — a 390 px, « Actualiser
+     * toutes les 5 s » sortait du champ, coupe net. Il peut retrecir, et son
+     * contenu passe a la ligne.
+     */
+    flex-wrap: wrap;
+    min-width: 0;
+}
+
+/*
+ * Quatre chiffres de resume tiennent sur une ligne des 1000 px. La grille
+ * generale demande 280 px minimum, ce qui les casserait en deux rangees de
+ * deux sur un ecran moyen — pour quatre nombres et une legende courte, c'est
+ * de la place perdue.
+ */
+/*
+ * 160 px et non 190 : sur un telephone, 190 ne laisse passer qu'UNE colonne,
+ * et les quatre tuiles repoussent le tableau — la donnee — sous quatre ecrans
+ * de contexte. A 160, elles tiennent deux par deux. Sur un grand ecran cela ne
+ * change rien : `auto-fit` effondre les pistes vides et les quatre tuiles
+ * s'etirent sur toute la largeur.
+ */
+.rw-grille--compacte { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+.rw-grille--compacte .rw-tuile { padding: 14px 15px; }
+
+.rw-tuile__valeur--ok     { color: var(--rw-succes); }
+.rw-tuile__valeur--alerte { color: var(--rw-danger); }
+
+/*
+ * Region d'annonce, en remplacement des bulles fugaces. Une bulle qui
+ * s'efface au bout de trois secondes n'informe personne d'un scan qui vient
+ * de changer ce qui est affiche ; celle-ci reste, et `aria-live` la fait
+ * annoncer. Vide, elle n'occupe aucune place.
+ */
+.rw-annonce {
+    margin: 14px 0 0;
+    font-size: 13px;
+    color: var(--rw-texte-doux);
+}
+
+.rw-annonce:empty { display: none; }
+.rw-annonce--ok    { color: var(--rw-succes); font-weight: 550; }
+.rw-annonce--echec { color: var(--rw-danger); font-weight: 550; }
+
+/*
+ * Detail d'un ecart, sous sa pastille. Le legacy le cache dans un attribut
+ * `title` : invisible au doigt, au clavier et au lecteur d'ecran, alors que
+ * c'est la seule information de la page qui dise quoi faire.
+ */
+.rw-detail-ecart {
+    margin: 5px 0 0;
+    max-width: 34ch;
+    font-size: 12px;
+    line-height: 1.35;
+    color: var(--rw-texte-doux);
+}
+
+.rw-tableau__fort { font-weight: 600; white-space: nowrap; }
+
+/* Liste de guidage dans un encart : trois actions, trois lignes lisibles. */
+.rw-liste-guide {
+    margin: 8px 0 0;
+    padding-left: 18px;
+}
+
+.rw-liste-guide li { margin-top: 5px; line-height: 1.45; }
+
+/*
+ * Le panneau de decision porte parfois un texte avant ses champs — un titre et
+ * son aide. Il passe alors en colonne pour que l'explication precede la saisie
+ * au lieu de la cotoyer.
+ */
+.rw-panneau-decision__texte { flex: 1 1 100%; }
+.rw-panneau-decision__texte .rw-aide { margin: 4px 0 0; }
+
+/*
+ * Un NOM DE FICHIER n'est pas une commande.
+ *
+ * `.rw-code` coupe n'importe ou (`overflow-wrap: anywhere`) parce qu'une
+ * commande journalisee peut mesurer des centaines de caracteres et contenir des
+ * caracteres de shell. Applique a un nom de fichier dans une colonne etroite,
+ * cela donne « rootwa / rden_b / ackup_ » sur six lignes : illisible, et
+ * impossible a comparer d'un coup d'oeil — alors que c'est precisement ce qu'on
+ * demande a l'utilisateur au moment de confirmer une restauration.
+ *
+ * Le nom reste donc d'une piece. Le depassement appartient au cadre du tableau,
+ * qui defile et le DIT.
+ */
+.rw-code--fichier {
+    max-width: none;
+    overflow-wrap: normal;
+    word-break: normal;
+    white-space: nowrap;
+}
+
+/*
+ * Case a cocher avec son libelle, alignee sur les autres commandes de vue.
+ * La zone cliquable couvre le texte : viser une case de 13 px au doigt est
+ * un exercice, et le libelle est deja la.
+ */
+.rw-case {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 2px;
+    font-size: 13px;
+    color: var(--rw-texte-doux);
+    cursor: pointer;
+}
+
+.rw-case input { width: 15px; height: 15px; cursor: pointer; accent-color: var(--rw-accent); }
+.rw-case:hover { color: var(--rw-texte); }
+
+/*
+ * Les commandes de VUE s'alignent par le bas, comme les champs qu'elles
+ * cotoient, et se replient : a 390 px, « Actualiser toutes les 5 s » sortait
+ * du champ, la ligne d'actions ne pouvant pas passer a la ligne.
+ */
+.rw-entete-page__actions { align-items: flex-end; flex-wrap: wrap; }
+
+/* Libelle d'un champ pose dans un `<label>` englobant, avec son aide dessous. */
+.rw-champ__etiquette {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 13px;
+    font-weight: 550;
+    color: var(--rw-texte-doux);
+}
+
+.rw-champ .rw-aide { display: block; margin-top: 5px; }
+
+/*
+ * Annonce d'AVERTISSEMENT : ni une reussite, ni un echec. Sert a prevenir
+ * d'une regle que le backend appliquera — par exemple qu'un ticket manuel
+ * existe deja pour la machine choisie et que creer le rouvrira.
+ */
+.rw-annonce--attention { color: var(--rw-avertissement); font-weight: 550; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Recherche globale
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/*
+ * Le champ est l'objet principal de la page : il prend la largeur, borne
+ * seulement pour ne pas devenir une ligne de 1 800 px qu'on relit mal.
+ */
+/*
+ * `display: block` n'est pas decoratif : un `<label>` est EN LIGNE par defaut,
+ * et `max-width` ne s'applique pas a un element en ligne. Sans lui, le champ
+ * s'etendait sur 1 375 px — une ligne de saisie qu'on relit mal.
+ */
+.rw-recherche { display: block; max-width: 780px; margin-bottom: 8px; }
+
+.rw-saisie--large { padding: 13px 15px; font-size: 16px; }
+
+/* Une categorie de resultats. Les liens se touchent, separes d'un filet. */
+.rw-resultats { display: flex; flex-direction: column; margin-top: 4px; }
+
+.rw-resultat {
+    position: relative;
+    display: block;
+    padding: 9px 10px;
+    border-top: 1px solid var(--rw-bordure);
+    border-radius: 6px;
+    color: inherit;
+    text-decoration: none;
+}
+
+.rw-resultat:first-child { border-top: 0; }
+.rw-resultat:hover { background: var(--rw-surface-2); }
+.rw-resultat:focus-visible { outline: 2px solid var(--rw-accent); outline-offset: -2px; }
+
+.rw-resultat__titre  { font-size: 14px; font-weight: 550; }
+.rw-resultat__detail { margin-top: 2px; font-size: 12px; color: var(--rw-texte-doux); }
+
+/*
+ * Meme marqueur que dans le menu pour « cela ouvre l'ancien portail ». La
+ * legende n'est pas repetee sur chaque ligne — l'encart de la page l'explique
+ * une fois, et le `title` la porte entree par entree.
+ */
+.rw-resultat--externe { padding-right: 26px; }
+
+.rw-resultat__marqueur {
+    position: absolute;
+    top: 10px;
+    right: 8px;
+    font-size: 12px;
+    color: var(--rw-texte-doux);
+}
+
+.rw-vide__texte { margin-top: 6px; font-size: 13px; }
+
+/*
+ * Bouton de relevé, pose dans une cellule : trois par ligne sur un tableau de
+ * treize colonnes. Il reste lisible sans elargir la colonne.
+ */
+.rw-bouton--minuscule { padding: 3px 8px; font-size: 12px; }
+
+/*
+ * La colonne d'actions se REPLIE dans une largeur bornee.
+ *
+ * Elle tenait sur une ligne tant qu'elle portait trois relevés ; U4 y a ajoute
+ * les deux planifications. Cinq boutons en file poussaient la colonne entiere
+ * hors du champ — a 1920 px, seul le premier restait visible, et la borner ne
+ * changeait rien : elle etait DERNIERE de treize colonnes. Elle est donc
+ * remontee juste apres le nom du serveur, et se replie dans une largeur bornee.
+ * Une capacite qu'on n'atteint qu'en decouvrant le defilement horizontal n'est
+ * pas offerte ; les donnees, elles, se parcourent en defilant sans dommage.
+ *
+ * `flex-wrap` reste pose sur la VARIANTE : `.rw-tableau__actions` sert aussi
+ * aux pages d'approbation et de sauvegarde, ou le repli n'a rien a faire.
+ */
+.rw-tableau__actions--releves {
+    flex-wrap: wrap;
+    /* Plancher ET plafond : sans plancher, le tableau donne a la colonne sa
+       largeur minimale et empile les cinq boutons un par ligne. */
+    min-width: 210px;
+    max-width: 230px;
+    white-space: normal;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Journal d'execution (module update/, sous-lot U2)
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/*
+ * BUG-201 — `.rw-journal` ETAIT DEFINIE DEUX FOIS, ET LA SECONDE GAGNAIT.
+ *
+ * Cette regle-ci ne portait qu'une marge : c'est l'enveloppe de SECTION du
+ * journal d'execution. Mille lignes plus bas, une seconde `.rw-journal`
+ * definissait le cadre complet d'un `<pre>` de fichier — bordure, fond, chasse
+ * fixe, `white-space: pre-wrap`, `max-height: 380px`, `overflow: auto`. A
+ * specificite egale l'ORDRE tranche : la seconde l'emportait, et la `<section>`
+ * de `mises-a-jour.blade.php` en heritait de tout.
+ *
+ * Quatre consequences, etablies en lisant les regles plutot qu'un rendu :
+ *   — son `<h2>` et son `<p>` passaient en CHASSE FIXE. Ni `.rw-sous-titre-fort`
+ *     ni `.rw-sous-titre` ne posent de `font-family` : ils heritaient ;
+ *   — `white-space: pre-wrap` etait herite par ces paragraphes, donc les retours
+ *     a la ligne du GABARIT devenaient des retours a la ligne rendus ;
+ *   — la section devenait une boite bornee a 380 px qui defile, et ce
+ *     defilement s'IMBRIQUE avec celui de `.rw-journal__general` (190 px) des
+ *     que celui-ci porte du contenu — ce qui explique qu'une mesure prise
+ *     journal VIDE n'ait vu qu'une seule boite ;
+ *   — la marge voulue (28 px en tete) etait remplacee par `10px 0`.
+ *
+ * Septieme occurrence de la famille `.rw-etiquette`, et la parade du projet est
+ * de RENOMMER, jamais de surcharger. On renomme celle qui a UN seul appelant :
+ * l'autre en a sept (`services/`, `cles-ssh`, `chatops`, trois de
+ * `supervision/`, et `docker.js`), et son nom decrit bien ce qu'elle fait.
+ */
+.rw-journal-section { margin-top: 28px; }
+
+.rw-sous-titre-fort {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 650;
+    letter-spacing: -.01em;
+}
+
+/*
+ * Journal GENERAL. Le legacy rend un cadre equivalent mais ne l'alimente
+ * jamais : son `appendLog` y est defini deux fois et la seconde definition
+ * ecrase la premiere. Ici il recoit vraiment les messages sans serveur.
+ */
+.rw-journal__general {
+    max-height: 190px;
+    overflow-y: auto;
+    padding: 12px 14px;
+    border: 1px solid var(--rw-bordure);
+    border-radius: var(--rw-rayon);
+    background: var(--rw-surface-2);
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+/* Vide, il dit qu'il est vide plutot que d'etre un rectangle muet. */
+.rw-journal__general.rw-journal--vide::before {
+    content: attr(aria-label);
+    color: var(--rw-texte-doux);
+    font-family: inherit;
+}
+
+.rw-journal__general.rw-journal--vide { color: var(--rw-texte-doux); }
+
+/* Les panneaux se rangent cote a cote des qu'il y a la place. */
+.rw-journal__panneaux {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 14px;
+    margin-top: 14px;
+}
+
+.rw-journal__panneaux:empty { display: none; }
+
+.server-log-window {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--rw-bordure);
+    border-radius: var(--rw-rayon);
+    background: var(--rw-surface);
+    overflow: hidden;
+}
+
+/* L'en-tete ne defile pas : on doit savoir de quel serveur on lit les lignes. */
+.log-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--rw-bordure);
+    background: var(--rw-surface-2);
+}
+
+.log-header .server-name { font-size: 13px; font-weight: 600; }
+
+.log-follow-toggle {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    color: var(--rw-texte-doux);
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.log-follow-toggle input { accent-color: var(--rw-accent); cursor: pointer; }
+
+.log-window {
+    max-height: 240px;
+    overflow-y: auto;
+    padding: 10px 12px;
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+/*
+ * Une ligne de journal peut porter une sortie de commande : elle se coupe
+ * plutot que d'elargir le panneau, et garde ses espaces.
+ */
+.log-line {
+    margin: 0;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.log-line.error    { color: var(--rw-danger); }
+.log-line.ok       { color: var(--rw-succes); }
+.log-line.progress { color: var(--rw-accent); }
+.log-line.info     { color: var(--rw-texte); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Actions groupees sur la selection (module update/, sous-lot U3)
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/*
+ * Variante de `.rw-actions` posee ENTRE la barre de filtres et le tableau : le
+ * trait du haut ferait un second separateur juste sous celui des filtres.
+ * `flex-wrap` est porte par la VARIANTE, pas par `.rw-actions` : une regle
+ * globale pour un cas particulier casse les pages qui n'ont rien demande.
+ */
+.rw-actions--groupe {
+    flex-wrap: wrap;
+    margin-top: 14px;
+    padding-top: 0;
+    border-top: none;
+}
+
+/*
+ * Le compteur occupe la gauche et repousse l'action a droite. Il dit ce qui
+ * manque AVANT le geste : sans machine cochee, le constat ne partira pas.
+ */
+.rw-actions__compteur {
+    margin: 0 auto 0 0;
+    min-width: 0;
+    font-size: 13px;
+    color: var(--rw-texte);
+}
+
+.rw-actions__compteur[data-nombre="0"] { color: var(--rw-texte-doux); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Apercu de planification (module update/, sous-lot U4)
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/*
+ * Ce que le backend va REELLEMENT ecrire, montre avant le geste. La reserve
+ * — « et chaque annee ensuite », « toujours le lundi » — se distingue par la
+ * teinte : ce n'est pas une erreur, c'est un ecart entre le mot choisi dans la
+ * liste et ce que cron sait exprimer.
+ */
+.rw-apercu {
+    margin: 4px 0 18px;
+    padding: 10px 12px;
+    border-left: 3px solid var(--rw-accent);
+    border-radius: 0 var(--rw-rayon) var(--rw-rayon) 0;
+    background: var(--rw-surface-2);
+    font-size: 13px;
+    line-height: 1.55;
+    overflow-wrap: anywhere;
+}
+
+.rw-apercu--incomplet {
+    border-left-color: var(--rw-bordure);
+    color: var(--rw-texte-doux);
+}
+
+.rw-apercu--reserve { border-left-color: var(--rw-avertissement); }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Rapport de conformite (module security/, sous-lot S2a)
+   ───────────────────────────────────────────────────────────────────────────── */
+
+/* Une page a SEPT sections. Sans separation, elles se lisent comme un seul mur
+   de tableaux — la capture a 1920 le montrait avant toute assertion. Verifie
+   absent de la feuille avant d'etre ajoute : une classe deja prise se renomme,
+   elle ne se surcharge pas. */
+.rw-section {
+    margin: 30px 0 0;
+    padding-top: 22px;
+    border-top: 1px solid var(--rw-bordure);
+}
+.rw-section:first-of-type { margin-top: 18px; }
+.rw-section__entete {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+/* La note de posture : trois teintes, parce qu'un F rendu comme un A ne
+   signale rien. Le rouge est reserve a ce qui exige une action — D et F. */
+.rw-badge--ok        { background: var(--rw-succes-fond);   color: var(--rw-succes); }
+.rw-badge--attention { background: var(--rw-avert-fond);    color: var(--rw-avertissement); }
+.rw-badge--alerte    { background: var(--rw-danger-fond);                                        color: var(--rw-danger); }
+.rw-badge--note      { min-width: 2.1em; text-align: center; font-size: 13px; font-weight: 700; }
+
+/* UN COMPTE DE ZERO NE DOIT PAS CRIER. La pastille de base est a la couleur
+   d'accent : un « 0 » machines assignees y prenait le meme poids visuel qu'un
+   « 12 », alors qu'il dit precisement qu'il n'y a rien. Contraste verifie sur
+   les deux themes. */
+/* UNE PRECISION SOUS UN LIBELLE, PAS A COTE. En ligne, la description d'un
+   profil etirait sa colonne a 780 px sur un ecran de 1920 et poussait les
+   quatre autres a droite : le tableau devenait illisible alors qu'aucune
+   assertion ne bougeait. Vu a l'image. */
+.rw-cellule-note { display: block; margin-top: 2px; }
+
+/* UNE ETIQUETTE DE LIGNE SE LIT A GAUCHE, PRES DE SA VALEUR. `.rw-tableau` ne
+   stylait que les `th` du `thead` : un `th scope="row"` dans le corps retombait
+   sur le defaut du navigateur — centre, et sur une colonne de 690 px l'etiquette
+   se retrouvait au milieu du vide, a l'autre bout de la valeur qu'elle nomme.
+   `width: 1%` + `nowrap` reduisent la colonne a ce que le texte demande.
+   Vu a l'image, aucune assertion DOM ne le voit. */
+.rw-tableau tbody th[scope="row"] {
+    width: 1%;
+    padding: 10px 14px;
+    text-align: left;
+    white-space: nowrap;
+    font-weight: 600;
+    color: var(--rw-texte-doux);
+}
+
+/* MAIS SUR PETIT ECRAN, C'EST L'ETIQUETTE QUI CEDE. A 390 px, un libelle en
+   `nowrap` prenait 215 des 350 px disponibles et repoussait la VALEUR hors du
+   cadre : on gardait le mot et on perdait la donnee. Repliee sur deux lignes,
+   l'etiquette laisse la valeur lisible. Vu a l'image. */
+@media (max-width: 700px) {
+    .rw-tableau tbody th[scope="row"] { white-space: normal; }
+}
+
+.rw-badge--neutre {
+    background: var(--rw-surface-2);
+    color: var(--rw-texte-doux);
+    border: 1px solid var(--rw-bordure);
+}
+
+/* Le rapport s'imprime : c'est sa raison d'etre. La barre laterale, l'en-tete et
+   les actions n'ont rien a faire sur le papier, et une section ne doit pas se
+   couper en deux pages au milieu d'un tableau. */
+@media print {
+    .rw-laterale, .rw-entete, .rw-tiroir, .rw-entete-page__actions, .rw-annonce { display: none !important; }
+    .rw-contenu { padding: 0 !important; }
+    .rw-section { break-inside: avoid; border-top-color: #ccc; }
+    .rw-tableau-cadre { overflow: visible !important; }
+}
+
+/* Une colonne d'appoint s'efface quand la place manque, pour que la colonne qui
+   porte l'information ACTIONNABLE revienne dans le champ. A 390 px, la colonne
+   « Ecarts » du rapport de conformite — la raison d'etre du tableau — etait
+   entierement hors ecran ; l'IP, elle, ne sert qu'a confirmer un nom de serveur
+   deja unique. Meme lecon que la colonne d'actions des mises a jour : une
+   information qu'on n'atteint qu'en decouvrant le defilement horizontal n'est
+   pas offerte. */
+@media (max-width: 720px) {
+    .rw-colonne-secondaire { display: none; }
+    /*
+     * A 390 px, le tableau defile deja et la colonne de suivi — sa raison d'etre
+     * — est hors du champ. C'est donc L'APPOINT qui cede : le pourcentage EPSS
+     * est un affinage de la priorite, la pastille KEV est un constat
+     * d'exploitation. La premiere se retire, la seconde reste, et la hauteur de
+     * ligne retombe de 85 px a une seule ligne.
+     */
+    .rw-cve-epss { display: none; }
+    /*
+     * A 390 px le tableau defile de 230 px, et la pastille KEV se trouvait
+     * COUPEE EN DEUX au bord du cadre : le signal le plus important de la page
+     * n'etait plus qu'un liseré rouge tant qu'on n'avait pas defile. Elle passe
+     * donc devant la severite. « KEV HIGH 7.8 » se lit moins bien que
+     * « HIGH 7.8 KEV » sur un grand ecran — mais sur un petit, ce qui compte est
+     * ce qu'on voit SANS defiler.
+     */
+    .rw-cve-marques .rw-badge--kev { order: -1; }
+}
+
+/* Ne se montre QUE lorsque la place manque. Sert a ramener dans le champ ce que
+   `.rw-colonne-secondaire` vient d'en retirer — pas a dupliquer un contenu :
+   les deux classes sont complementaires, jamais visibles ensemble. */
+.rw-etroit-seul { display: none; }
+@media (max-width: 720px) {
+    /* `white-space: normal` explicitement : la cellule hote porte
+       `.rw-tableau__fort`, donc `nowrap`, et le detail en heritait — il se
+       coupait net au bord du cadre au lieu de se replier sur deux lignes.
+       `max-width` en `ch` ne sert a rien tant que le texte ne peut pas revenir
+       a la ligne. */
+    .rw-etroit-seul {
+        display: block;
+        white-space: normal;
+        max-width: 30ch;
+    }
+}
+
+/* Variante EN LIGNE de la precedente. La regle large passe en `display: block`,
+   ce qui casse une pastille dont le texte doit rester sur la ligne du score. */
+.rw-etroit-seul--inline { display: none; }
+@media (max-width: 720px) {
+    .rw-etroit-seul--inline { display: inline; white-space: nowrap; }
+}
+
+/* ── Consultation des scans CVE (sous-lot S3) ──────────────────────────────
+   Un tableau de 1458 lignes ne se deploie pas d'office : le bloc est replie et
+   son resume DIT qu'il s'ouvre. C'est un `<button>` et non un `<div>` cliquable,
+   pour rester atteignable au clavier. */
+.rw-repliable {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    margin: 12px 0 0;
+    padding: 9px 12px;
+    background: var(--rw-surface-2);
+    border: 1px solid var(--rw-bordure);
+    border-radius: var(--rw-rayon);
+    color: var(--rw-texte);
+    font: inherit;
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+}
+.rw-repliable:hover { border-color: var(--rw-accent); }
+.rw-repliable__chevron {
+    display: inline-block;
+    color: var(--rw-texte-doux);
+    font-size: 15px;
+    line-height: 1;
+    transition: transform .15s ease;
+}
+/* Le chevron pivote quand le bloc est ouvert : l'etat se lit sans le deplier. */
+.rw-repliable[aria-expanded="true"] .rw-repliable__chevron { transform: rotate(90deg); }
+.rw-repliable__aide {
+    margin-left: auto;
+    color: var(--rw-texte-doux);
+    font-size: 12px;
+}
+
+/* Compteur a gauche, action a droite — meme regle que `.rw-actions`. */
+.rw-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 10px;
+}
+
+/* Etat vide a l'interieur d'une carte : le meme discours, moins d'air. */
+.rw-vide--compact { margin: 10px 0 0; padding: 14px 16px; }
+
+/* Un intitule que seuls les lecteurs d'ecran voient. Le champ de recherche porte
+   un `placeholder`, qui n'est PAS un nom accessible. */
+.rw-visuellement-cache {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* Le tableau des vulnerabilites : la CLE d'abord, l'appoint qui s'efface.
+   Vu a l'image et nulle part ailleurs — l'identifiant se coupait sur TROIS
+   lignes (« CVE- / 2026- / 53046 »), et le resume, en s'etalant, poussait la
+   colonne de suivi hors du champ. C'est precisement la colonne dont l'absence
+   etait le defaut du legacy : la retablir puis la chasser de l'ecran n'aurait
+   rien regle. */
+.rw-cve-id { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.rw-cve-resume {
+    /* 28ch et non 46 depuis le sous-lot S5 : la colonne de suivi porte un
+       selecteur et un bouton, et c'est elle l'ACTIONNABLE. Le resume est
+       l'appoint — il cede la place, et son texte entier reste en infobulle.
+       Mesure : 1203 px de tableau pour 1048 px de cadre avant, le bouton de
+       ticket hors du champ. */
+    /* 24ch depuis S6 : la cellule de severite porte desormais la pastille KEV et
+       le pourcentage EPSS, et ces deux marques ont repris 78 px a la colonne de
+       suivi. L'appoint cede encore, pour que le tableau tienne SANS defiler a
+       1 400 px — le defilement reste la solution des ecrans etroits, pas celle
+       d'un ecran de bureau. */
+    max-width: 24ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+@media (max-width: 900px) {
+    .rw-cve-resume { max-width: 18ch; }
+}
+
+/*
+ * SOUS 1 500 px, LE RESUME S'EFFACE ENTIEREMENT.
+ *
+ * Mesure a 1 400 px avec les marques de S6 : tableau 1 121 px pour un cadre de
+ * 1 048 — 73 px de defilement, et dans ces 73 px se trouvait le BOUTON DE TICKET
+ * de S5. C'est exactement le defaut que S5 avait ferme en ramenant le resume de
+ * 46ch a 28ch, et que les deux marques d'enrichissement viennent de rouvrir.
+ *
+ * Le resume est l'appoint, le bouton est l'action : c'est l'appoint qui cede, et
+ * la forme la plus franche du renoncement est l'effacement. A 24ch il affichait
+ * de toute facon « In the Linux kernel, the … » sur les 1 458 lignes du parc,
+ * soit un en-tete de phrase identique partout — il ne distinguait plus rien. A
+ * 1 920 px il revient en entier, et l'identifiant CVE reste un lien vers la
+ * description complete a toutes les largeurs.
+ *
+ * L'effacement se fait par `display: none` : la cellule RESTE dans le document,
+ * donc la ligne garde ses six cellules et le tableau ne se desaligne pas de son
+ * en-tete — c'est le defaut que le legacy porte encore (E-49).
+ */
+@media (max-width: 1500px) {
+    .rw-cve-resume { display: none; }
+}
+
+/* Sous 720 px il ne reste que quatre colonnes — identifiant, paquet, severite,
+   suivi — et elles sont toutes essentielles : on ne peut plus en effacer. Ce qui
+   reste a gagner, c'est la place PERDUE. On resserre donc les cellules et on
+   abrege le prefixe de l'identifiant, pour que la SEVERITE, qui est la donnee qui
+   decide, revienne dans le champ sans defilement. Mesure a 390 px : 427 px de
+   tableau avant, 306 px de cadre. */
+@media (max-width: 720px) {
+    .rw-tableau td.rw-cve-id,
+    .rw-tableau th.rw-cve-id { padding-left: 8px; padding-right: 8px; }
+    .rw-tableau tbody td { padding-left: 8px; padding-right: 8px; }
+    .rw-cve-prefixe { display: none; }
+}
+
+/* La colonne de suivi (sous-lot S5) a repris de la largeur au tableau, et deux
+   defauts sont apparus a l'image — nulle part ailleurs :
+
+   - la VERSION se coupait sur deux lignes (« 6.12.90+deb13- » / « amd64 »), ce
+     qui DOUBLAIT la hauteur de chaque ligne. Une version de paquet ne se lit pas
+     coupee, et 41 px de ligne valent mieux que 78 ;
+   - le selecteur et le bouton de la cellule de suivi s'EMPILAIENT, et le bouton
+     se retrouvait rogne au bord du cadre. Ils tiennent sur une ligne. */
+.rw-cve-version { white-space: nowrap; }
+.rw-cve-suivi {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+.rw-cve-suivi select { min-width: 7.5em; }
+
+@media (max-width: 720px) {
+    /* Sous 720 px les deux colonnes d'appoint sont deja masquees, et il ne reste
+       que l'identifiant, le paquet, la severite et le suivi — toutes
+       decisionnelles. Le SELECTEUR est l'action premiere ; la creation de ticket
+       est secondaire, et pour un compte sans la permission elle est de toute
+       facon desactivee. Elle s'efface donc, et le selecteur perd sa largeur
+       minimale : c'est ce qui ramene l'action dans le champ. */
+    .rw-cve-suivi [data-rw^="cve-ticket-"] { display: none; }
+    .rw-cve-suivi select { min-width: 0; }
+}
+
+/*
+ * ENRICHISSEMENT EPSS / KEV — sous-lot S6.
+ *
+ * LA PASTILLE KEV EST LE SIGNAL LE PLUS IMPORTANT DE LA PAGE : elle dit qu'une
+ * faille est REELLEMENT exploitee, et c'est a ce titre qu'elle passe devant les
+ * severites elevees jamais exploitees. Elle est donc PLEINE, la ou les autres
+ * badges se contentent d'un fond pale.
+ *
+ * Cote legacy elle est peinte par `bg-rose-600` — une classe Tailwind absente du
+ * CSS compile, PurgeCSS ne gardant que celles qu'il a vues. Fond non peint,
+ * texte `text-white` : contraste mesure au navigateur 1,06:1, donc illisible,
+ * alors que le HTML, lui, est parfaitement correct. Le couple retenu ici est
+ * celui de `.rw-bouton--danger`, defini PAR THEME dans les deux sens : rouge
+ * fonce / blanc en clair, rose clair / bleu nuit en sombre.
+ */
+.rw-badge--kev {
+    background: var(--rw-danger);
+    color: var(--rw-accent-texte);
+    font-weight: 700;
+    letter-spacing: .02em;
+}
+
+/*
+ * La probabilite d'exploitation. Rendue en pourcent : entre 0,0008 et 0,9455 on
+ * hesite, entre « 0 % » et « 95 % » non. Au-dela de 50 % l'exploitation est plus
+ * probable qu'improbable, et la valeur cesse d'etre un chiffre parmi d'autres.
+ */
+.rw-cve-epss {
+    font-size: 11px;
+    color: var(--rw-texte-doux);
+    white-space: nowrap;
+}
+.rw-cve-epss--haut { color: var(--rw-danger); font-weight: 600; }
+
+/*
+ * LA CELLULE DE SEVERITE NE SE REPLIE PAS. Elle porte maintenant trois marques
+ * — severite, KEV, EPSS — et a 1 400 px elle se coupait en deux lignes : la
+ * hauteur de CHAQUE ligne du tableau passait de 54 a 63 px, soit 1 458 lignes
+ * rallongees pour un repli. Elle prend donc la largeur qu'il lui faut, et c'est
+ * le resume — colonne d'appoint, deja bornee et tronquee — qui cede.
+ */
+.rw-cve-severite { white-space: nowrap; }
+.rw-cve-marques { display: inline-flex; align-items: center; gap: 5px; }
+/* Un finding non enrichi le DIT : une case vide se lit « aucun risque ». */
+.rw-cve-epss--absent { font-style: italic; }
+
+/* Le filtre KEV partage la barre des severites sans etre une severite. */
+.rw-onglet--kev { border-color: var(--rw-danger); color: var(--rw-danger); }
+.rw-onglet--kev.rw-onglet--actif { background: var(--rw-danger); color: var(--rw-accent-texte); }
+
+/*
+ * La ligne qui EXPLIQUE le tri, et l'action qui le rafraichit. L'explication
+ * prend la place restante, le bouton reste a droite : un HIGH au-dessus d'un
+ * CRITICAL ressemble a un defaut tant que la page ne dit pas pourquoi.
+ */
+.rw-cve-priorite-barre {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin: 10px 0 6px;
+}
+.rw-cve-priorite-barre .rw-cve-priorite-note { flex: 1 1 24ch; margin: 0; }
+
+/*
+ * AVANCEMENT D'UN SCAN — sous-lot S7a.
+ *
+ * Aucune jauge n'existait dans le portage : celle du legacy est faite de classes
+ * Tailwind, et un scan dure plusieurs MINUTES. Sans signe de vie, la page semble
+ * figee et l'utilisateur reclique — ce qui, sur le legacy, relancait un scan.
+ *
+ * La jauge se remplit par la largeur d'un enfant plutot que par une couleur de
+ * fond en degrade : la largeur est ce que le flux fournit (paquet courant sur
+ * total), et c'est aussi ce qu'un test peut mesurer.
+ */
+.rw-scan-avancement {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 10px 0;
+}
+.rw-scan-avancement .rw-aide { margin: 0; }
+
+.rw-jauge {
+    height: 6px;
+    border-radius: 3px;
+    background: var(--rw-surface-2);
+    border: 1px solid var(--rw-bordure);
+    overflow: hidden;
+}
+.rw-jauge__part {
+    display: block;
+    height: 100%;
+    width: 0;
+    background: var(--rw-accent);
+    transition: width .25s ease-out;
+}
+
+/*
+ * LISTE A COCHER — sous-lot K1 du module `ssh/`.
+ *
+ * Ce n'est pas un tableau : chaque entree est une DECISION (cocher ou non), pas
+ * une ligne de donnees a comparer colonne par colonne. Une liste dit cela mieux
+ * qu'un tableau a une seule colonne utile, et elle n'a pas besoin de defiler
+ * lateralement — ce qui evite d'emblee tout le probleme de largeur qu'E-63 a
+ * coute au tableau des CVE.
+ *
+ * L'etiquette englobe la case ET le texte : toute la ligne devient cliquable,
+ * alors qu'une case de 16 px est une cible minuscule au doigt.
+ */
+.rw-liste-selection {
+    list-style: none;
+    margin: 12px 0;
+    padding: 0;
+    border: 1px solid var(--rw-bordure);
+    border-radius: 8px;
+    overflow: hidden;
+}
+.rw-liste-selection__ligne + .rw-liste-selection__ligne {
+    border-top: 1px solid var(--rw-bordure);
+}
+.rw-liste-selection__etiquette {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    cursor: pointer;
+}
+.rw-liste-selection__etiquette:hover { background: var(--rw-surface-2); }
+.rw-liste-selection__corps { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.rw-liste-selection__nom { font-weight: 550; display: flex; align-items: center; gap: 6px; }
+.rw-liste-selection__detail {
+    font-size: 12px;
+    color: var(--rw-texte-doux);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+/* Une ligne masquee par un filtre sort du flux : elle ne doit pas laisser de
+   bordure orpheline derriere elle. */
+.rw-liste-selection__ligne[hidden] { display: none; }
+
+/*
+ * RAPPORT DU CONSTAT AVANT DEPLOIEMENT — sous-lot K2 du module `ssh/`.
+ *
+ * Le legacy deverse ce rapport dans une fenetre de texte monospace unique, ou la
+ * ligne la plus importante du module — les acces qui vont etre REVOQUES — se
+ * perd au milieu de l'inventaire, des versions d'OS et de l'espace disque. Ici
+ * chaque machine a son bloc, et la revocation se distingue.
+ */
+.rw-preflight__machine {
+    background: var(--rw-surface);
+    border: 1px solid var(--rw-bordure);
+    border-left: 3px solid var(--rw-danger);
+    border-radius: var(--rw-rayon);
+    padding: 12px 14px;
+}
+.rw-preflight__entete { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; }
+.rw-preflight__titre { margin: 8px 0 2px; font-weight: 550; }
+.rw-preflight__liste {
+    margin: 0 0 4px;
+    padding-left: 22px;
+    font-size: 13px;
+    color: var(--rw-texte-doux);
+}
+/* Une revocation n'est pas une information de meme poids qu'une version d'OS. */
+.rw-preflight__liste--danger { color: var(--rw-danger); font-weight: 550; }
+
+/*
+ * JOURNAL DE DEPLOIEMENT — sous-lot K3 du module `ssh/`.
+ *
+ * Un journal se lit en chasse fixe et defile ; c'est le seul endroit du portage
+ * ou cela se justifie, parce que les lignes viennent d'un fichier ou l'alignement
+ * porte du sens. Chaque ligne est un element a part, pose par `textContent` :
+ * le legacy y faisait `innerHTML +=`, ce qui transformait le nom d'une machine
+ * en fragment de document.
+ */
+.rw-journal {
+    margin: 10px 0;
+    padding: 12px 14px;
+    max-height: 380px;
+    overflow: auto;
+    background: var(--rw-surface-2);
+    border: 1px solid var(--rw-bordure);
+    border-radius: var(--rw-rayon);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+.rw-journal__erreur { color: var(--rw-danger); font-weight: 550; }
+.rw-journal__fin { color: var(--rw-texte-doux); font-style: italic; margin-top: 6px; }
+
+/* ── Enrôlement du second facteur ─────────────────────────────────────────
+   Le QR est un SVG produit par le serveur (le conteneur n'a ni gd ni
+   imagick). On lui impose un fond BLANC quel que soit le thème : les
+   lecteurs de QR lisent des modules sombres sur fond clair, et un SVG posé
+   sur un fond sombre devient illisible — un contraste inversé ne se voit pas
+   dans le DOM, seulement à la caméra. */
+.rw-qr {
+    background: #fff;
+    padding: 12px;
+    border-radius: 10px;
+    width: fit-content;
+    margin: 0 auto 14px;
+    line-height: 0;
+}
+.rw-qr svg { display: block; width: 220px; height: 220px; }
+
+/* La clé en clair, pour qui ne peut pas scanner. Coupée en morceaux lisibles
+   plutôt qu'en une ligne qui déborde à 390 px. */
+.rw-secret {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.9rem;
+    letter-spacing: 0.08em;
+    word-break: break-all;
+    text-align: center;
+    background: var(--rw-surface-2);
+    border: 1px solid var(--rw-bordure);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin: 0 0 18px;
+    color: var(--rw-texte);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Sous-navigation des pages d'administration — sous-lot D6a
+
+   `admin_page.php` porte trois onglets JavaScript sous une seule URL. Le
+   portage en fait trois PAGES, reliees par le composant `.rw-onglets` deja
+   existant : ce sont des onglets, ils s'affichent donc comme des onglets. Seule
+   difference, ce sont des LIENS et non des boutons — d'ou la levee du
+   soulignement, comme pour `a.rw-bouton`.
+
+   L'onglet courant porte `aria-current="page"` EN PLUS de sa classe : un
+   lecteur d'ecran annonce l'attribut, il ne voit pas la couleur de fond.
+   ══════════════════════════════════════════════════════════════════════════ */
+a.rw-onglet { text-decoration: none; display: inline-block; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Étiquettes et notes d'une machine — sous-lot D6b
+
+   Chaque geste est un FORMULAIRE, pas un `fetch` : les quatre gestes du legacy
+   meurent sur un jeton CSRF que son enrobage n'injecte pas pour cette famille
+   d'URL. Un formulaire n'a pas de plomberie à oublier — mais il faut qu'il ne
+   casse pas la ligne, d'où les `display: inline` ci-dessous.
+   ══════════════════════════════════════════════════════════════════════════ */
+.rw-bloc-secondaire {
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px solid var(--rw-bordure);
+}
+
+.rw-jetons {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin: 6px 0 10px;
+}
+
+.rw-jetons__forme { display: inline; }
+
+.rw-jetons__retrait {
+    margin-left: 4px;
+    padding: 0 2px;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    line-height: 1;
+    cursor: pointer;
+    opacity: .65;
+}
+
+.rw-jetons__retrait:hover { opacity: 1; color: var(--rw-danger); }
+
+.rw-ligne-note {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--rw-bordure);
+    font-size: 14px;
+}
+
+.rw-ligne-note:last-of-type { border-bottom: 0; }
+
+.rw-ligne-note__forme { margin-left: auto; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Case a cocher et son libelle, sur la MEME ligne — sous-lot D6b
+
+   `.rw-champ` empile ses enfants : sur une case a cocher, cela met le carre
+   AU-DESSUS du texte qu'il gouverne, et la relation entre les deux se perd.
+   Vu a l'image, et seulement a l'image — aucune assertion DOM ne l'aurait
+   releve, le libelle etant bien present et bien associe.
+
+   L'etiquette englobe la case ET le texte : toute la ligne devient cliquable,
+   la ou un carre de 16 px est une cible minuscule au doigt.
+   ══════════════════════════════════════════════════════════════════════════ */
+.rw-champ--case {
+    /* `.rw-champ` n'est qu'une marge : sans `display: flex` ici,
+       `flex-direction` ne gouverne rien, et le libelle — qui est un
+       `.rw-etiquette`, donc `display: block` — passe a la ligne suivante.
+       Premiere correction restee sans effet pour cette raison. */
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 10px;
+    cursor: pointer;
+}
+
+.rw-champ--case > input[type="checkbox"] {
+    flex: 0 0 auto;
+    width: 16px;
+    height: 16px;
+    margin-top: 2px;
+}
+
+.rw-champ--case > span { display: flex; flex-direction: column; gap: 2px; }
+
+/*
+ * Une ligne de tableau qui porte une machine de PRODUCTION.
+ *
+ * Posee au sous-lot B1 de `bashrc/`. Le legacy affiche `srv-zabbix` avec la
+ * meme case a cocher que les machines d'essai : rien ne la distingue, et la page
+ * permet de la cocher avec `root` puis de deployer. Le defaut ne se voyait qu'a
+ * l'image.
+ *
+ * La teinte porte sur la LIGNE et non sur une cellule : c'est la ligne entiere
+ * qu'on parcourt du regard avant de cocher, et un marqueur dans une seule
+ * colonne se rate quand on vise la case a l'autre bout.
+ *
+ * Le badge `.rw-badge--alerte` reste : la couleur seule ne suffit pas — elle ne
+ * dit rien a qui ne la distingue pas, et rien du tout a un lecteur d'ecran.
+ */
+.rw-ligne-sensible > td {
+    background: color-mix(in srgb, var(--rw-danger) 7%, transparent);
+}
+.rw-ligne-sensible > td:first-child {
+    box-shadow: inset 3px 0 0 var(--rw-danger);
+}
+
+/*
+ * Un DIFF unifie. Pose au sous-lot B2 de `bashrc/`.
+ *
+ * `.rw-code--fichier` avait ete detourne pour ca : il porte `white-space:
+ * nowrap` parce qu'il est fait pour UN NOM DE FICHIER. Le diff s'affichait donc
+ * sur une seule ligne — or c'est sa structure ligne a ligne qui fait toute son
+ * utilite. Un diff a plat ne se lit pas, il se devine.
+ *
+ * Les lignes ajoutees et retirees se distinguent par une COULEUR *et* par leur
+ * signe `+`/`-`, qui vient du format lui-meme : la couleur seule ne dit rien a
+ * qui ne la distingue pas.
+ */
+.rw-diff {
+    margin: 8px 0 0;
+    padding: 10px 12px;
+    border: 1px solid var(--rw-bordure);
+    border-radius: 8px;
+    background: var(--rw-surface-2);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    white-space: pre;
+    overflow-x: auto;
+    max-height: 420px;
+    overflow-y: auto;
+}
+.rw-diff__ligne { display: block; }
+.rw-diff__ligne--ajout   { background: color-mix(in srgb, var(--rw-succes) 14%, transparent); }
+.rw-diff__ligne--retrait { background: color-mix(in srgb, var(--rw-danger) 12%, transparent); }
+.rw-diff__ligne--entete  { color: var(--rw-texte-doux); font-weight: 650; }
+
+/*
+ * Une zone de saisie qui contient du CODE. Posee au sous-lot B3 de `bashrc/`.
+ *
+ * `.rw-saisie` herite de la police du document — proportionnelle. Le gabarit
+ * `.bashrc` est du shell, et il s'appuie sur des bannieres `# =====` alignees :
+ * en proportionnel, l'alignement se perd et l'indentation cesse de se lire.
+ * Vu a l'image.
+ *
+ * `tab-size: 4` pour que les tabulations du fichier ne s'affichent pas comme
+ * huit colonnes, ce qui deplacerait tout ce qui suit.
+ */
+.rw-saisie--code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    tab-size: 4;
+    white-space: pre;
+    overflow-wrap: normal;
+}
+
+/*
+ * ══ LA FRISE D'ACTIVITE ═════════════════════════════════════════════════════
+ *
+ * Posee au sous-lot F2 de `fail2ban/`, et sa hauteur est le point.
+ *
+ * Le legacy ecrit `<div id="stats-chart" class="flex items-end gap-1 h-32">` et
+ * donne a chaque barre une hauteur en POURCENTAGE. `h-32` etant absente du CSS
+ * compile — PurgeCSS ne garde que ce qu'il a vu —, le cadre mesure **0 px**, et
+ * un pourcentage de zero fait zero : les trois barres declarent 4 %, 100 % et
+ * 12,5 % et sont rendues a **0 px**. La carte s'affiche vide, et elle a l'air
+ * normale (E-159, quatrieme occurrence de cette famille dans ce projet).
+ *
+ * Deux regles en sortent :
+ *   — la hauteur du cadre est posee ICI, dans le CSS du socle, jamais par une
+ *     classe utilitaire ;
+ *   — les barres recoivent une hauteur en PIXELS, calculee par le script sur
+ *     `clientHeight`. Aucune hauteur relative a un parent dont la hauteur
+ *     pourrait ne pas exister.
+ */
+.rw-frise {
+    margin: 12px 0 6px;
+    padding: 10px 12px 0;
+    border: 1px solid var(--rw-bordure);
+    border-radius: var(--rw-rayon);
+    background: var(--rw-surface);
+    overflow-x: auto;
+}
+.rw-frise__barres {
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    height: 148px;
+    min-width: 100%;
+}
+/*
+ * UNE BARRE PORTE SA VALEUR, ET SA VALEUR SE LIT.
+ *
+ * `title` ne suffit pas : il n'apparait qu'au survol, donc jamais au doigt et
+ * jamais sur une capture. Le nombre est donc ECRIT au-dessus de la barre, et
+ * `aria-label` porte la phrase complete pour un lecteur d'ecran.
+ */
+.rw-frise__barre {
+    flex: 1 1 0;
+    min-width: 10px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 3px;
+}
+.rw-frise__valeur {
+    font-size: 11px;
+    font-weight: 650;
+    color: var(--rw-texte-doux);
+    line-height: 1;
+}
+.rw-frise__corps {
+    width: 100%;
+    border-radius: 3px 3px 0 0;
+    background: var(--rw-accent);
+}
+/* La couleur dit ce qui DOMINE dans la journee, pas seulement « il y a eu un
+   ban » : un jour de debans se lisait en vert comme un jour vide. */
+.rw-frise__corps--ban   { background: var(--rw-danger); }
+.rw-frise__corps--unban { background: var(--rw-succes); }
+.rw-frise__corps--mixte {
+    background: linear-gradient(to top, var(--rw-succes) var(--rw-part-unban, 50%),
+                                        var(--rw-danger) var(--rw-part-unban, 50%));
+}
+/*
+ * L'AXE DES DATES EST VISIBLE, PAS SURVOLE. Le legacy ne met les dates que dans
+ * `title` : invisibles au doigt, invisibles a un lecteur d'ecran, invisibles sur
+ * une capture. Une frise de 30 jours sans axe ne se lit pas.
+ */
+.rw-frise__axe {
+    display: flex;
+    gap: 3px;
+    margin-top: 6px;
+    padding-bottom: 8px;
+    min-width: 100%;
+}
+.rw-frise__date {
+    flex: 1 1 0;
+    min-width: 10px;
+    text-align: center;
+    font-size: 10px;
+    color: var(--rw-texte-doux);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.rw-frise__legende {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0 0 4px;
+    font-size: 12px;
+    color: var(--rw-texte-doux);
+}
+.rw-frise__cle {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    margin-left: 10px;
+}
+.rw-frise__cle:first-child { margin-left: 0; }
+.rw-frise__cle--ban   { background: var(--rw-danger); }
+.rw-frise__cle--unban { background: var(--rw-succes); }
+
+/* Une valeur non resolue se DIT, elle ne se devine pas : un identifiant de
+   compte absent de la table reste lisible, et se signale comme tel. */
+.rw-non-resolu {
+    font-style: italic;
+    color: var(--rw-texte-doux);
+}
+
+/*
+ * ══ UN FICHIER DISTANT, TEL QU'IL EST ═══════════════════════════════════════
+ *
+ * Pose au sous-lot F3 de `fail2ban/`. Le contenu d'un fichier de configuration
+ * ou d'un journal se lit en chasse fixe : l'indentation y porte du sens, et une
+ * ligne de journal s'aligne colonne par colonne avec la suivante.
+ *
+ * Il ne se replie PAS : replier une ligne de configuration en change la lecture
+ * — une ligne repliee ressemble a deux directives. Le bloc defile donc
+ * lateralement, et l'ombre de bord le dit.
+ *
+ * Il n'est pas « vert sur noir ». Ce costume de terminal fait passer pour un
+ * flux vivant ce qui est un fichier lu une fois, et il a fait lire
+ * « [FICHIER ABSENT] » comme une directive de configuration (E-161). Une
+ * surface de page, une bordure, et le fait que ce soit du code se dit par la
+ * chasse.
+ */
+.rw-fichier {
+    margin: 8px 0 0;
+    padding: 12px 14px;
+    max-height: 420px;
+    overflow: auto;
+    border: 1px solid var(--rw-bordure);
+    border-radius: var(--rw-rayon);
+    background: var(--rw-surface-2);
+    color: var(--rw-texte);
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.55;
+    white-space: pre;
+    tab-size: 4;
+}
+
+/*
+ * ══ UNE LISTE D'ETATS ═══════════════════════════════════════════════════════
+ *
+ * Chaque ligne est un CONSTAT — ce service est installe, celui-la non — et non
+ * une decision : ce n'est donc ni une liste a cocher, ni un tableau, dont les
+ * colonnes n'auraient qu'une valeur utile.
+ *
+ * L'etat s'ecrit en MOT. Le legacy le rend par `opacity-50`, une classe
+ * utilitaire : la distinction tient a un purge pres, et elle ne dit rien a un
+ * lecteur d'ecran.
+ */
+.rw-liste-etats {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 10px;
+}
+/*
+ * LA LIGNE EST BORNEE, ET C'EST LE `margin-left: auto` QUI L'IMPOSE.
+ *
+ * `__jails` pousse ses marques a droite (`margin-left: auto`), ce qui ALIGNE les
+ * marques en colonne d'une ligne a l'autre — une affordance reelle : c'est ce qui
+ * permet de balayer la liste des services de `services/` et celle de la liste
+ * blanche. Mais sur une section pleine largeur, ce meme `auto` envoie la donnee
+ * a l'autre bout de l'ecran.
+ *
+ * Mesure du 2026-08-27, ecart entre un nom et la date qui le QUALIFIE :
+ *
+ *     1920 px   1281 / 1289 / 1219 px      <- les deux bouts de l'ecran
+ *     1400 px    761 /  769 /  699 px
+ *      390 px     19 /   27 /  -43 px      <- repli sur deux lignes, correct
+ *
+ * Le defaut est donc une DISTANCE, pas la structure : on la borne plutot que de
+ * retirer `auto`, ce qui echangerait une affordance contre la correction d'un
+ * symptome. Le cout assume est une incoherence visuelle — des cadres plus
+ * etroits que le reste de la section.
+ *
+ * `max-width` en `ch` et non en `px` : la borne suit la taille du texte, comme
+ * `.rw-prose` (68ch). Et elle ne mord PAS sous 78ch, donc le repli mobile
+ * mesure a 19-27 px est inchange — c'etait le critere de recette.
+ */
+.rw-liste-etats__ligne {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding: 9px 12px;
+    border: 1px solid var(--rw-bordure);
+    border-radius: var(--rw-rayon);
+    background: var(--rw-surface);
+    max-width: 78ch;
+}
+/* Un service absent s'efface SANS disparaitre : le contraste du texte reste
+   au-dessus du seuil, seule la surface recule. */
+.rw-liste-etats__ligne--absent {
+    background: var(--rw-surface-2);
+    border-style: dashed;
+}
+.rw-liste-etats__nom { font-weight: 650; min-width: 8ch; }
+.rw-liste-etats__jails {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+    margin-left: auto;
+}
+
+/* En-tete de section portant une action a droite — fermer un panneau, par
+   exemple. Pose au sous-lot F4 de `fail2ban/`. */
+.rw-section__tete {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+/*
+ * UNE LISTE DE FAITS : un intitule, une valeur. Ni tableau — il n'y a qu'une
+ * colonne utile — ni prose, qui noierait les nombres.
+ */
+.rw-faits {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 26px;
+    margin: 10px 0 18px;
+}
+.rw-faits__bloc { display: flex; flex-direction: column; gap: 2px; }
+.rw-faits dt {
+    font-size: 11px;
+    font-weight: 650;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--rw-texte-doux);
+}
+.rw-faits dd { margin: 0; font-size: 15px; font-weight: 650; }
+
+.rw-champ--espace { margin-top: 14px; }
+.rw-titre--espace { margin-top: 16px; }
+
+/* Trois reglages cote a cote sur grand ecran, empiles au doigt. Pose au
+   sous-lot F5 de `fail2ban/`. */
+.rw-grille-champs {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 14px;
+    margin: 14px 0 4px;
+}
+
+/*
+ * Pied de page du portail : le NUMERO DE VERSION, et rien d'autre.
+ *
+ * Discret par construction — c'est une information de tracabilite, pas un
+ * contenu. Il se lit quand on le cherche et ne prend pas la place de ce qui est
+ * au-dessus. Pas de bordure haute : le `main` porte deja sa fin, et une ligne de
+ * plus ferait croire a une section.
+ */
+/* ── LE PIED N'EST PAS DANS `.rw-contenu`, DONC IL N'HERITE PAS SA MARGE ──
+ *
+ * `<footer class="rw-pied">` est un FRERE de `<main class="rw-contenu">`
+ * (`portail.blade.php:99` contre `:82-84`). Il ne recevait donc aucune marge
+ * laterale, et avec `text-align: right` son texte se collait au bord droit de la
+ * fenetre — 24 px plus a droite que tout le reste de la page. Vu a l'image en
+ * 1920 ET en 1400 : ce n'etait pas une troncature, c'etait un contact.
+ *
+ * LA MARGE EST UN JETON PARTAGE, PAS UN NOMBRE RECOPIE. Deux valeurs egales
+ * posees cote a cote divergent — c'est ce que la marge de defilement a coute
+ * cette semaine. Ici `.rw-contenu` et `.rw-pied` lisent la MEME variable, donc
+ * ils ne peuvent plus s'ecarter.
+ */
+.rw-pied {
+    padding: 18px var(--rw-marge-laterale) 26px;
+    color: var(--rw-texte-doux);
+    font-size: 12px;
+    text-align: right;
+}
+
+/* ── UNE TUILE QUI EST UN LIEN ────────────────────────────────────────────
+ *
+ * Les raccourcis de l'accueil sont des `<a>` qui portent `.rw-tuile`. Deux
+ * choses a corriger par rapport a une tuile d'affichage :
+ *
+ *   - le SOULIGNEMENT de lien saute. Un element se lit comme une tuile OU comme
+ *     un lien, pas comme les deux — meme regle que `a.rw-bouton` ;
+ *   - il faut une AFFORDANCE au survol et au clavier. Une tuile cliquable qui
+ *     ne reagit pas ne se distingue pas d'une tuile morte, et `:focus-visible`
+ *     est la moitie qu'on oublie : au clavier, sans lui, rien ne dit ou l'on est.
+ */
+.rw-tuile--lien {
+    text-decoration: none;
+    color: inherit;
+    transition: border-color .12s ease, box-shadow .12s ease;
+}
+
+.rw-tuile--lien:hover {
+    border-color: var(--rw-accent);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, .08);
+}
+
+.rw-tuile--lien:focus-visible {
+    outline: 2px solid var(--rw-accent);
+    outline-offset: 2px;
+}
+
+/* L'APPOINT D'UNE VALEUR : le second nombre d'un couple (« 1 de vos machines
+ * · 3 au parc »). Il doit se lire comme une precision, pas comme une seconde
+ * valeur de meme poids — sinon les deux se disputent la lecture et le compteur
+ * ne dit plus lequel est le sien. */
+.rw-tuile__appoint {
+    font-size: 14px;
+    font-weight: 400;
+    color: var(--rw-texte-doux);
+}
+
+/* ── E-241b : CE QUI EST AMENE A L'ECRAN NE DOIT PAS FINIR SOUS L'EN-TETE ──
+ *
+ * `.rw-entete` est `position: sticky; top: 0; z-index: 5`. Tout ce qui defile
+ * passe donc DESSOUS — c'est le comportement voulu d'un en-tete collant, et un
+ * exploitant qui defile a la molette s'en sort en remontant.
+ *
+ * CE QUI N'EST PAS VOULU, c'est qu'un defilement PROGRAMMATIQUE y depose sa
+ * cible. Mesure du portage : 12 appels a `scrollIntoView`, dont **8 en
+ * `block: 'nearest'`**. Or `'nearest'` defile du MINIMUM necessaire : si
+ * l'element est juste au-dessus de la fenetre, il le pose au bord haut —
+ * c'est-a-dire SOUS l'en-tete. Le panneau de decision qu'on vient d'ouvrir, ou
+ * le journal qu'on vient d'alimenter, arrive donc a moitie cache.
+ *
+ * `scroll-padding-top` sur le conteneur de defilement corrige les DOUZE d'un
+ * coup, et couvrira la navigation par ancre le jour ou une page en aura — le
+ * portage n'en a aucune aujourd'hui (mesure), mais `documentation.php` en porte
+ * 54 et son portage les heritera.
+ *
+ * UNE REGLE PLUTOT QU'UNE ENUMERATION DE CIBLES : enumerer les selecteurs
+ * concernes aurait demande de les tenir a jour a chaque panneau ajoute, et un
+ * oubli ne se voit pas — le panneau s'ouvre, il est simplement a moitie sous
+ * l'en-tete.
+ *
+ * ══ LE NOMBRE, ET POURQUOI IL N'EST PAS DERIVABLE ═══════════════════════
+ *
+ * Premier jet : 64 px, estimes EN LISANT le CSS (`padding: 11px`, texte de
+ * 15px, une bordure) — soit ~44 px, arrondis vers le haut par prudence.
+ *
+ * **La hauteur RENDUE est 65 px.** L'estimation etait fausse de 21 px, et le
+ * plancher ne couvrait pas : 64 < 65. Mesure au rendu par la session 7, dont
+ * l'assertion etait ecrite pour NE PAS dependre de cette regle — c'est
+ * precisement pour cela qu'elle a pu la trouver courte.
+ *
+ * *Un test qui depend d'une propriete la mesure mal ; un test qui la mesure n'en
+ * depend pas.*
+ *
+ * ══ AUCUNE DERIVATION CSS N'EXISTE, ET C'EST CE QUI DECIDE ══════════════
+ *
+ * Il n'y a aucun moyen, en CSS, de lire la hauteur RENDUE d'un element dans une
+ * propriete personnalisee : pas d'`attr()` pour les longueurs, rien qui remonte
+ * une boite. La derivation demandee est donc impossible ici.
+ *
+ * ET DONNER A `.rw-entete` UNE HAUTEUR FIXE serait pire que le probleme. Elle
+ * porte `$titre`, qui depend de la page, plus un bloc de compte, une cloche et
+ * un selecteur de langue ; `@media (max-width: 900px)` change deja ce qui s'y
+ * affiche. Une hauteur figee y couperait du contenu le jour ou un titre est
+ * long. Un `min-height` ne fermerait rien non plus : il empeche l'en-tete de
+ * rapetisser, pas de GRANDIR — et c'est grandir qui rend la marge courte.
+ *
+ * ══ CE QUI TIENT A LA PLACE ═════════════════════════════════════════════
+ *
+ * Un nombre dont la justesse NE DEPEND PAS de la precision de la mesure : 88 px
+ * pour un en-tete de 65, soit 23 px francs. Une erreur de lecture comme la
+ * mienne ne le rendrait plus court.
+ *
+ * Et la relation est GARDEE AILLEURS : l'assertion de la suite compare la marge
+ * EFFECTIVE a la hauteur RENDUE, donc elle rougit si l'en-tete grandit. **La
+ * derivation vit dans la mesure, pas dans le CSS** — dit ici pour que personne
+ * ne croie que ce nombre se maintient tout seul.
+ */
+:root {
+    --rw-defilement-marge: 88px;
+    /* La marge laterale du contenu ET du pied. Un seul endroit : ils sont freres
+     * dans le gabarit, donc rien ne les aligne sinon cette variable. */
+    --rw-marge-laterale: 24px;
+}
+
+html { scroll-padding-top: var(--rw-defilement-marge); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+ * LA REGION D'ALERTES DE L'ACCUEIL — E-264
+ *
+ * Bloc NEUF : aucune regle existante n'est touchee. Il n'emploie que des
+ * jetons deja definis, donc le theme sombre suit sans regle en plus.
+ *
+ * Contrastes mesures AVANT d'ecrire, dans les DEUX themes — clair puis
+ * sombre : 5.91 / 4.76 / 5.82 et 9.02 / 10.72 / 4.60. Tous >= 4.5 (AA).
+ * Aucune assertion DOM ne voit un contraste, et la pastille KEV a 1,06:1 a
+ * coute une vague entiere en etant juste dans le HTML.
+ * ══════════════════════════════════════════════════════════════════════════ */
+.rw-alertes {
+    display: grid;
+    gap: 8px;
+    margin: 0 0 24px;
+}
+
+.rw-alertes__titre {
+    margin: 0 0 2px;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.rw-alerte {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    padding: 10px 14px;
+    border: 1px solid;
+    border-radius: 10px;
+    font-size: 14px;
+    text-decoration: none;
+}
+
+.rw-alerte--grave     { color: var(--rw-danger);        background: var(--rw-danger-fond); border-color: var(--rw-danger); }
+.rw-alerte--attention { color: var(--rw-avertissement); background: var(--rw-avert-fond);  border-color: var(--rw-avertissement); }
+.rw-alerte--info      { color: var(--rw-accent);        background: var(--rw-accent-doux); border-color: var(--rw-accent); }
+
+/* LA COULEUR N'EST PAS LE SEUL CANAL. Une personne qui ne distingue pas le
+ * rouge du jaune doit pouvoir lire la gravite : la FORME du marqueur change
+ * aussi, et le texte de l'alerte nomme le fait sans dependre du ton. */
+.rw-alerte__marque { flex-shrink: 0; font-size: 14px; line-height: 1; }
+
+/* LE NOMBRE PORTE L'INFORMATION : c'est le texte qui cede, jamais lui. */
+.rw-alerte__nombre {
+    flex-shrink: 0;
+    font-weight: 700;
+    font-size: 16px;
+    font-variant-numeric: tabular-nums;
+}
+
+.rw-alerte__texte {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.rw-alerte__lien {
+    flex-shrink: 0;
+    margin-left: auto;
+    font-size: 12px;
+    opacity: .75;
+}
+
+a.rw-alerte:hover { filter: brightness(.97); }
+a.rw-alerte:focus-visible { outline: 2px solid var(--rw-accent); outline-offset: 2px; }
+
+/* UNE VERIFICATION QUI N'A PAS TOURNE N'EST PAS UN CALME. Ce bandeau porte le
+ * ton « attention » parce que son sujet est l'ignorance, pas la panne. */
+.rw-alertes__illisible {
+    padding: 10px 14px;
+    border: 1px dashed var(--rw-avertissement);
+    border-radius: 10px;
+    background: var(--rw-avert-fond);
+    color: var(--rw-avertissement);
+    font-size: 13px;
+}
+
+.rw-alertes__vide {
+    margin: 0;
+    color: var(--rw-texte-doux);
+    font-size: 14px;
+}
+
+/* Sur un ecran etroit le texte passe a la ligne plutot que de se tronquer :
+ * la place verticale ne manque pas, la place laterale si. */
+/* A 390 px, `flex-wrap` renvoyait le TEXTE a la ligne suivante des qu'il ne
+ * tenait pas — « ⚠ 1 » restait seul sur sa ligne, et un nombre separe de son
+ * libelle se lit comme un marqueur egare. `flex: 1 1 0` le laisse RETRECIR et
+ * se replier sur place : il reste a cote du nombre, seul le lien passe dessous.
+ * Vu a l'image a 390 px ; aucune assertion DOM ne distingue ces deux mises en
+ * page, elles ont exactement les memes noeuds. */
+@media (max-width: 640px) {
+    .rw-alerte { flex-wrap: wrap; }
+    .rw-alerte__texte { flex: 1 1 0; overflow: visible; white-space: normal; }
+    .rw-alerte__lien { margin-left: 0; }
+}

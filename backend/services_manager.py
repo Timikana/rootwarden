@@ -11,7 +11,13 @@ from ssh_utils import execute_as_root
 
 _log = logging.getLogger(__name__)
 
-_SERVICE_RE = re.compile(r'^[a-zA-Z0-9@._:-]+$')  # systemd unit names: alphanum + @._:-
+# E-182 : le premier caractere ne peut etre ni `-` ni `.`.
+# `-.mount` est le nom de l'unite du systeme de fichiers RACINE dans systemd, et
+# `-.slice` la tranche racine. Tous deux franchissaient cette classe ET
+# `_check_protected`. L'effet n'est PAS etabli et ne doit pas l'etre : le geste a
+# eprouver serait un `systemctl stop` sur la racine.
+# Aucun nom de service reel ne commence par l'un de ces deux caracteres.
+_SERVICE_RE = re.compile(r'^[a-zA-Z0-9@_:][a-zA-Z0-9@._:-]*$')  # systemd unit names
 
 PROTECTED_SERVICES = [
     'sshd', 'ssh', 'systemd-journald', 'systemd-logind',
@@ -146,9 +152,32 @@ def get_service_status(client, root_password: str, service: str) -> dict:
 
 # ── Actions ────────────────────────────────────────────────────────────────
 
+def _radical_unite(service: str) -> str:
+    """Rend le RADICAL d'une unite systemd : ce qui precede le premier `.` ou `@`.
+
+    E-150. `_check_protected` comparait sur `service.replace('.service','')`, donc
+    il ne connaissait qu'UNE forme d'unite. `ssh.socket`, `sshd.socket` et
+    `ssh@.service` passaient au travers — et sur un hote a activation par socket,
+    ce qui est le defaut sur Debian recente, arreter `ssh.socket` coupe l'acces
+    SSH, **y compris celui de RootWarden**.
+
+    Le radical ferme la famille ENTIERE, y compris les types d'unite qui
+    n'existent pas encore dans ce code : `.socket`, `.timer`, `.path`,
+    `.target`, et les instances `@`.
+
+    Il SUR-protege legerement — un service nomme `ssh.quelquechose` serait
+    refuse. C'est la bonne direction : le cout d'un refus est un message, celui
+    d'une coupure est l'acces a la machine.
+    """
+    base = (service or '').strip()
+    for separateur in ('@', '.'):
+        base = base.split(separateur, 1)[0]
+    return base
+
+
 def _check_protected(service: str):
-    """Leve une ValueError si le service est protege."""
-    base = service.replace('.service', '').strip()
+    """Leve une ValueError si le service est protege. Voir `_radical_unite`."""
+    base = _radical_unite(service)
     if base in PROTECTED_SERVICES:
         raise ValueError(f"Service protege, action interdite : {base}")
 

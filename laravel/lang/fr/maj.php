@@ -1,0 +1,223 @@
+<?php
+
+// lang/fr/maj.php - Mises a jour Linux, sous-lot U1 (parc et filtres).
+
+return [
+    'title' => 'Mises a jour Linux',
+    'desc'  => 'Le parc Linux geré par RootWarden : version installee, disponibilite, planification '
+             . 'des mises a jour de securite et dernier redemarrage.',
+
+    // Portage partiel — dit a l'ecran plutot que masque.
+    'partiel_titre' => 'Ce que cette page ne reprend pas',
+    'partiel_texte' => "Tout ce que l'ancien portail proposait sur les mises a jour est "
+                     . "desormais ici. Deux capacites du serveur ne sont volontairement pas "
+                     . "reprises : la mise a jour de paquets choisis et l'exclusion de "
+                     . "paquets. L'ancienne page en portait le code, mais aucun bouton ne "
+                     . "les atteignait.",
+
+    // Filtres
+    'filtres_titre'   => 'Filtrer le parc',
+    'f_environment'   => 'Environnement',
+    'f_criticality'   => 'Criticite',
+    'f_network'       => 'Type de reseau',
+    'f_tag' => 'Etiquette',
+    'tip_tag' => 'Filtre sur les etiquettes posees par l\'administration du parc.',
+    'tip_tag_vide' => 'Aucune etiquette n\'est posee sur le parc : rien a filtrer.',
+    'tag_aucune' => 'Aucune etiquette au parc',
+    'tous'            => 'Tous',
+    'btn_filter'      => 'Filtrer',
+    'btn_refresh'     => 'Rafraichir la liste',
+    'tip_refresh'     => 'Relit le parc. Aucune machine n\'est jointe.',
+
+    // Colonnes
+    'th_selection'     => 'Selection',
+    'th_name'          => 'Serveur',
+    'th_linux'         => 'Version Linux',
+    'th_last_check'    => 'Dernier controle',
+    'th_ip_port'       => 'Adresse',
+    'th_status'        => 'Disponibilite',
+    'th_secu_schedule' => 'MAJ securite planifiee',
+    'th_last_exec'     => 'Derniere execution',
+    'th_last_reboot'   => 'Dernier redemarrage',
+    'th_env'           => 'Environnement',
+    'th_criticality'   => 'Criticite',
+    'th_network'       => 'Reseau',
+    'th_actions'       => 'Relevés',
+
+    // Relevés par machine
+    'btn_version' => 'Version',
+    'tip_version' => 'Interroge la machine pour lire sa version Linux. Sans effet sur elle.',
+    'btn_statut'  => 'Disponibilite',
+    'tip_statut'  => 'Teste la joignabilite du port SSH. Sans effet sur la machine.',
+    'btn_reboot'  => 'Dernier redemarrage',
+    'tip_reboot'  => 'Lit la date du dernier demarrage. Sans effet sur la machine.',
+
+    // Journal d'execution (U2)
+    'journal_titre' => 'Journal d\'execution',
+    'journal_desc' => 'Ce que RootWarden a fait sur les serveurs pendant cette visite. Un panneau par machine, plus un journal general. Rien n\'est conserve d\'une visite a l\'autre — la tracabilite durable est dans le journal des commandes.',
+    'journal_general' => 'Journal general',
+    'journal_vide' => 'Aucune activite pour l\'instant.',
+    'btn_vider' => 'Vider le journal',
+    'tip_vider' => 'Efface l\'affichage. N\'efface aucune trace enregistree.',
+    'suivre' => 'Suivre',
+    'suivre_aide' => 'Descend automatiquement sur les nouvelles lignes. Se decoche si vous remontez lire.',
+
+    // Etats
+    'non_verifie' => 'Non verifie',
+    'inconnu'     => 'Inconnu',
+    'aucune'      => 'N/A',
+    'en_cours'    => 'Releve en cours...',
+
+    'vide'      => 'Aucune machine a afficher',
+    'vide_aide' => 'Le parc est vide, ou aucune machine ne vous est attribuee.',
+    'vide_filtre'      => 'Aucune machine ne correspond a ce filtre',
+    'vide_filtre_aide' => 'Revenez a « Tous » sur les trois listes pour retrouver le parc complet.',
+
+    'maj_ok'      => 'Parc relu a :heure — :nombre machine(s).',
+    'filtre_ok'   => ':nombre machine(s) apres filtrage.',
+    'err_load'    => 'Impossible de relire le parc.',
+    'err_releve'  => 'Le releve a echoue.',
+    'releve_ok'   => 'Releve termine.',
+
+    // Sous-lot U3 — constat « paquets en attente »
+    'btn_paquets' => 'Paquets en attente',
+    'tip_paquets' => 'Interroge chaque machine retenue et liste ses paquets a mettre a jour. N\'installe rien.',
+    'selection'      => ':nombre machine(s) retenue(s).',
+    'selection_vide' => 'Aucune machine retenue — cochez au moins une ligne.',
+    'aucune_selection' => 'Aucune machine retenue : cochez au moins une ligne avant de lancer le constat.',
+    'paquets_en_cours' => 'Constat des paquets en attente...',
+    'paquets_err'      => 'Le constat des paquets a echoue.',
+    'paquets_aucun'    => 'Aucun paquet en attente.',
+    'paquets_aucun_reserve' => 'Ce constat lit l\'index local de la machine. Il ne garantit pas que cet index a pu etre rafraichi : un depot injoignable donne le meme resultat qu\'un systeme a jour.',
+    'paquets_nombre'   => ':nombre paquet(s) a mettre a jour :',
+    'paquets_fin'      => 'Constat termine sur :nombre machine(s).',
+    'paquets_fin_partielle' => 'Constat termine, mais :nombre machine(s) n\'ont pas repondu.',
+
+    // Sous-lot U4 — planification
+    'btn_planifier'      => 'Planifier',
+    'tip_planifier'      => "Ecrit un cron sur la machine : mise a jour complete (apt-get upgrade) a l'heure choisie.",
+    'btn_planifier_secu' => 'Planifier securite',
+    'tip_planifier_secu' => "Ecrit un cron sur la machine : mises a jour de securite seules, et enregistre la date en base.",
+
+    'f_date'   => 'Date',
+    'f_time'   => 'Heure',
+    'f_repeat' => 'Recurrence',
+
+    'repeat_none'    => 'Ne pas repeter',
+    'repeat_daily'   => 'Tous les jours',
+    'repeat_weekly'  => 'Toutes les semaines',
+    'repeat_monthly' => 'Tous les mois',
+
+    'btn_cancel'     => 'Annuler',
+    'btn_save_sched' => 'Enregistrer la planification',
+    'tip_save_sched' => "Ecrit le fichier cron sur la machine distante, en root, et redemarre cron.",
+
+    'titre_general' => 'Planifier une mise a jour',
+    'titre_secu'    => 'Planifier une mise a jour de securite',
+    'desc_general'  => 'Sur :machine — apt-get update puis apt-get upgrade, journalise dans /var/log/auto_update.log.',
+    'desc_secu'     => 'Sur :machine — mises a jour de securite seules, journalisees dans /var/log/auto_security_update.log. La date planifiee est aussi enregistree en base.',
+
+    'apercu_incomplet' => 'Choisissez une date et une heure pour voir ce qui sera ecrit sur la machine.',
+    'apercu_daily'     => 'Tous les jours a :heure',
+    'apercu_weekly'    => 'Tous les :jour a :heure',
+    'apercu_monthly'   => 'Le :jour de chaque mois a :heure',
+    'apercu_none'      => 'Le :jour/:mois a :heure',
+
+    'reserve_annuel'  => "— et chaque annee ensuite : cron n'a pas de champ annee, « ne pas repeter » ne s'arrete jamais.",
+    'reserve_lundi'   => "— la planification generale place toujours l'hebdomadaire le lundi, quelle que soit la date choisie.",
+    'reserve_premier' => '— la planification generale place toujours le mensuel le premier du mois, quel que soit le jour choisi.',
+
+    'j_lundi'    => 'lundis',
+    'j_mardi'    => 'mardis',
+    'j_mercredi' => 'mercredis',
+    'j_jeudi'    => 'jeudis',
+    'j_vendredi' => 'vendredis',
+    'j_samedi'   => 'samedis',
+    'j_dimanche' => 'dimanches',
+
+    'sched_incomplet' => "Indiquez une date et une heure avant d'enregistrer.",
+    'sched_en_cours'  => 'Ecriture du cron sur la machine...',
+    'sched_pose'      => 'Cron pose : :cron',
+    'sched_ok'        => 'Planification enregistree sur :machine.',
+    'sched_err'       => "L'ecriture du cron a echoue.",
+
+    // Sous-lot U5 — redemarrage
+    'btn_reboot_action' => 'Redemarrer',
+    'tip_reboot_action' => "Coupe les sessions et interrompt les services des machines retenues. Soumis a l'approbation d'un second administrateur.",
+
+    'reboot_titre'        => 'Redemarrer les machines retenues',
+    'reboot_machines'     => ':nombre machine(s) : :machines',
+    'reboot_consequences' => 'Toutes les sessions SSH ouvertes seront coupees, et les services (web, base de donnees) interrompus le temps du redemarrage.',
+    'reboot_quatre_yeux'  => "Un redemarrage demande l'accord d'un second administrateur : votre demande sera mise en attente, pas executee. Une demande deja en attente pour la meme machine n'est pas dupliquee, et garde le delai qu'elle portait.",
+
+    'reboot_delai'    => 'Quand',
+    'reboot_delai_0'  => 'Immediatement',
+    'reboot_delai_5'  => 'Dans 5 minutes',
+    'reboot_delai_15' => 'Dans 15 minutes',
+    'reboot_delai_60' => 'Dans 1 heure',
+
+    'reboot_consigne'         => 'Recopiez le nombre de machines (:nombre) pour activer le bouton',
+    'btn_reboot_confirmer'    => 'Redemarrer',
+    'reboot_en_cours'         => 'Envoi de la demande de redemarrage...',
+    'reboot_demande'          => 'Demande de redemarrage pour :machine',
+    'reboot_attente'          => "Demande d'approbation #:id creee : un second administrateur doit la valider avant tout redemarrage.",
+    'reboot_envoye'           => 'Redemarrage envoye a la machine.',
+    'reboot_fenetre'          => 'Redemarrage refuse : hors fenetre de maintenance autorisee.',
+    'reboot_err'              => 'La demande de redemarrage a echoue.',
+    'reboot_fin'              => 'Redemarrage envoye a :nombre machine(s).',
+    'reboot_fin_attente'      => ":nombre demande(s) d'approbation en attente. Rien n'a redemarre.",
+    'reboot_fin_partielle'    => ':nombre machine(s) ont refuse la demande.',
+
+    // Sous-lot U6a — simulation et mises a jour de securite
+    'btn_simulation' => 'Simuler',
+    'tip_simulation' => "Montre ce qu'une mise a jour changerait, sans rien installer. Rafraichit l'index des paquets de la machine.",
+    'btn_secu_action' => 'Mises a jour de securite',
+    'tip_secu_action' => 'Installe les mises a jour de securite. Action destructive : elle modifie les paquets installes.',
+
+    'secu_titre'        => 'Appliquer les mises a jour de securite',
+    'secu_machines'     => ':nombre machine(s) : :machines',
+    'secu_consequences' => 'Les paquets concernes seront remplaces par leur version corrigee, sans redemarrage. Un service peut etre relance pendant l operation.',
+    'secu_verrous'      => "Si apt ou dpkg tourne deja sur la machine, cette action les ARRETE de force, supprime leurs verrous et repare la base dpkg avant de continuer. Une installation en cours ailleurs sera donc interrompue.",
+    'secu_consigne'     => 'Recopiez SECURITE pour activer le bouton',
+    'secu_mot'          => 'SECURITE',
+    'btn_secu_confirmer' => 'Appliquer',
+
+    'flux_debut'         => 'Connexion a :machine...',
+    'flux_fini'          => 'Termine.',
+    'flux_err'           => "La commande n'a pas pu etre lancee.",
+    'flux_fin_partielle' => ':nombre machine(s) ont echoue.',
+
+    'simulation_en_cours' => 'Simulation en cours...',
+    'simulation_fin'      => 'Simulation terminee sur :nombre machine(s). Rien n a ete installe.',
+
+    'secu_en_cours' => 'Mises a jour de securite en cours...',
+    'secu_fin'      => 'Mises a jour de securite terminees sur :nombre machine(s).',
+
+    // Sous-lot U6b — mise a jour complete et reparation dpkg
+    'btn_complete' => 'Mise a jour complete',
+    'tip_complete' => 'Met a jour TOUS les paquets, pas seulement ceux de securite. Action destructive.',
+    'btn_dpkg'     => 'Reparation dpkg',
+    'tip_dpkg'     => "Arrete de force les processus apt et dpkg, supprime leurs verrous, puis repare la base des paquets.",
+
+    'complete_titre'        => 'Mettre a jour tous les paquets',
+    'complete_consequences' => 'apt full-upgrade remplace TOUS les paquets ayant une version plus recente, pas seulement ceux qui corrigent une faille. Des services peuvent etre relances, et des fichiers de configuration remplaces.',
+    'complete_reserve'      => "Si apt ou dpkg tourne deja sur la machine, cette action les ARRETE de force, supprime leurs verrous et repare la base dpkg avant de continuer. Une installation en cours ailleurs sera interrompue.",
+    'complete_mot'          => 'MISE A JOUR',
+    'complete_consigne'     => 'Recopiez MISE A JOUR pour activer le bouton',
+    'complete_bouton'       => 'Mettre a jour',
+    'complete_en_cours'     => 'Mise a jour complete en cours...',
+    'complete_fin'          => 'Mise a jour complete terminee sur :nombre machine(s).',
+
+    'dpkg_titre'        => 'Reparer la base des paquets',
+    'dpkg_consequences' => "Les processus apt, apt-get et dpkg en cours sont TUES (killall -9), leurs quatre fichiers de verrou supprimes, puis dpkg --configure -a termine les installations laissees a moitie.",
+    'dpkg_reserve'      => "A n'utiliser que si la machine refuse toute mise a jour pour cause de verrou. Une installation legitime en cours sera perdue en l'etat, et devra etre relancee.",
+    'dpkg_mot'          => 'REPARER',
+    'dpkg_consigne'     => 'Recopiez REPARER pour activer le bouton',
+    'dpkg_bouton'       => 'Reparer',
+    'dpkg_en_cours'     => 'Reparation dpkg en cours...',
+    'dpkg_fin'          => 'Reparation terminee sur :nombre machine(s).',
+    'dpkg_err'          => 'La reparation a echoue.',
+
+    'err_reseau'      => 'La passerelle est injoignable. Rien n a ete envoye a la machine.',
+    'action_machines' => ':nombre machine(s) : :machines',
+];

@@ -1,0 +1,46 @@
+-- ============================================================
+-- Migration 064 - Un troisieme etat pour supervision_agents
+-- Version : 1.38.99
+-- ============================================================
+-- `supervision_agents` est un inventaire PAR PRESENCE une ligne existe, ou
+-- elle n existe pas. Apres un geste partiel, les deux seules ecritures
+-- possibles AFFIRMENT quelque chose de faux
+--
+--   garder la ligne  -> affirme un agent present
+--   supprimer        -> affirme qu il n y a rien
+--
+-- Aucune des deux n est vraie quand le paquet demeure et que la configuration
+-- est partie. Troisieme occurrence du motif, apres
+-- `machines.service_account_deployed` et `wazuh_agents.status`
+--
+-- LE VOCABULAIRE EST DERIVE, PAS INVENTE
+--   `wazuh_agents.status` (034_wazuh.sql) porte deja les cinq valeurs qui
+--   decrivent un agent sur une machine, et `unknown` y dit exactement je ne
+--   sais pas ce qu il y a sur cette machine. On reprend la MEME enumeration et
+--   le MEME defaut, parce que deux tables soeurs qui decrivent le meme objet ne
+--   doivent pas avoir deux vocabulaires. Une regle appliquee ailleurs se
+--   remonte de la, elle ne se recalcule pas
+--
+-- POURQUOI `never_connected` COMME DEFAUT
+--   C est celui de `wazuh_agents`, et il est juste ici le seul INSERT de
+--   `supervision.py` ne pose pas cette colonne, donc chaque deploiement prendra
+--   le defaut, et un agent qui vient d etre installe n a effectivement pas
+--   encore rendu compte
+--
+-- CE QUE CETTE MIGRATION NE FAIT PAS
+--   Elle ne change AUCUN comportement. Rien n ecrit `unknown` aujourd hui la
+--   colonne existe, et le code qui la remplira viendra ensuite. C est
+--   volontaire nommer l etat avant de choisir une valeur, et une colonne posee
+--   sur une table vide ne casse rien
+--
+-- IDEMPOTENCE
+--   Le runner tolere errno 1060 colonne en double. Rejouer cette migration sur
+--   une base qui porte deja la colonne est sans effet
+--
+-- FENETRE
+--   `supervision_agents` porte 0 ligne mesure le 2026-09-01. Sans donnee, il n y
+--   a aucune valeur a retro-attribuer et aucun choix a faire sur l existant. La
+--   fenetre se ferme au PREMIER agent enregistre
+-- ============================================================
+
+ALTER TABLE supervision_agents ADD COLUMN status ENUM('active','disconnected','never_connected','pending','unknown') NOT NULL DEFAULT 'never_connected'

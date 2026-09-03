@@ -1,0 +1,41 @@
+--- a/backend/scheduler.py
++++ b/backend/scheduler.py
+@@ -225,8 +225,37 @@
+                     "aucun scan lance", schedule.get('id'), schedule.get('target_value')
+                 )
+                 return
+-        else:
++        elif schedule['target_type'] == 'all':
++            # ══ E-281 : « TOUT LE PARC » EST UN CHOIX, PLUS UN REPLI ═════════
++            #
++            # Cette requete etait dans le `else`. Elle recevait donc DEUX
++            # intentions que rien ne distinguait ensuite : « j'ai choisi tout le
++            # parc », et « je n'ai pas compris ta portee ». Aucune trace, ni a
++            # l'execution ni apres coup, ne disait laquelle avait produit le scan.
+             cur.execute(f"SELECT {base_cols} FROM machines WHERE {vivantes_nues}")
++        else:
++            # ══ ECHEC FERME — ET IL COUVRE UN CAS QUE `a345e65` NE VOIT PAS ══
++            #
++            # Ce correctif complete `a345e65`, il ne le refait pas : cette
++            # branche-la a deja rendu la cible `machines` fail-closed et exclu
++            # les archivees partout. Ce qu'elle ne fait pas, c'est distinguer
++            # `all` d'une portee incomprise — son dernier `else` prend encore
++            # tout le parc vivant.
++            #
++            # Et ce chemin EST atteignable, par le schema et non par le code :
++            # `cve_scan_schedules.target_type` est NULLABLE, la ou celui de
++            # `ssh_audit_schedules` est NOT NULL. Or `cve.py` fait
++            # `data.get('target_type', 'all')` : sur un `null` JSON EXPLICITE,
++            # `.get` rend `None` — la cle existe, le defaut ne joue pas — et
++            # `NULL` s'insere sans erreur. Eprouve des deux cotes, en
++            # transaction annulee.
++            #
++            # « Je ne sais pas quoi scanner » ne doit jamais vouloir dire
++            # « scanne tout ».
++            _log.warning(
++                "Planification %s : portee illisible (target_type=%r), "
++                "aucun scan lance", schedule.get('id'), schedule.get('target_type'))
++            cur.execute(f"SELECT {base_cols} FROM machines WHERE 1=0")
+ 
+         machines = cur.fetchall()
+     finally:
