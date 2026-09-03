@@ -5,6 +5,37 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.38.199] - 2026-09-03
+
+### Corrige
+- **Le cache Blade compile naissait `root` dans un repertoire `www-data` — cause des
+  500 sur TOUTES les pages du portage.** `laravel/docker-entrypoint.sh` fait
+  `chown -R www-data:www-data storage bootstrap/cache` (ligne 25) **puis**
+  `php artisan view:cache` (ligne 44) — et cette derniere tourne en root, le script
+  s'executant avant le passage a Apache. Les 151 gabarits compiles naissaient donc
+  `root:root` (111 mesures tels quels) dans un repertoire `www-data` : PHP ne pouvait
+  plus les reecrire, et toute modification d'une vue faisait echouer `touch()` a la
+  recompilation. Le socle etant inclus partout, **une seule vue desynchronisee
+  suffisait a faire tomber le portail entier** — 28 pages d'erreur servies en sept
+  minutes le 2026-09-03. Un `chown` du seul `storage/framework/views` est ajoute
+  APRES `view:cache` : idempotent, meme motif que la ligne 25.
+
+### Notes d'exploitation
+- **Prend effet au prochain demarrage du conteneur** — le redemarrage n'est pas fait
+  ici. Applique AVANT la bascule, il change de nature : le premier demarrage produit
+  un cache `www-data`, donc il n'y a jamais rien a normaliser apres coup.
+- **La cause etait RECREEE a chaque demarrage** : normaliser le cache a la main ne
+  tenait pas. Et un `view:cache` lance en `www-data` NE rattrape PAS l'existant —
+  `www-data` peut CREER dans ce repertoire mais pas ECRASER un fichier `root`.
+  Mesure : les 28 echecs n'ont rien ecrit, le compile du socle est reste `root:root`
+  et date de 07:48:46 pendant toute la fenetre.
+- **Ce qui reste ouvert et n'est pas fait ici** : `docker-compose.prod.yml` ne declare
+  pas le service `laravel` (il durcit `python`, `php`, `db`). Apres la bascule, le
+  portail de production serait le seul service sans `cap_drop`, `read_only`, `tmpfs`
+  ni `user` non-root. Attention : `read_only` casserait la compilation Blade sans un
+  `tmpfs` sur `storage/framework/views` — et avec ce `tmpfs`, le `chown` ci-dessus
+  devient indispensable a chaque demarrage. Porte a la DSI, attend l'exploitant.
+
 ## [1.38.198] - 2026-09-03
 
 ### Corrige

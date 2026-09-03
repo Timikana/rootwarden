@@ -43,5 +43,20 @@ fi
 # `php artisan optimize` pour les trois.
 php artisan view:cache --no-interaction >/dev/null 2>&1 || true
 
+# `view:cache` ci-dessus tourne en ROOT : ce script s'execute avant le passage a
+# Apache, alors que le repertoire vise appartient a `www-data` depuis le `chown`
+# du debut. Les gabarits compiles naissent donc `root:root` dans un repertoire
+# `www-data`, PHP ne peut plus les reecrire, et TOUTE modification d'une vue fait
+# echouer `touch()` a la recompilation -> 500 sur toutes les pages, le socle
+# etant inclus partout.
+#
+# Mesure du 2026-09-03 : 111 compiles sur 151 appartenaient a root, et 28 pages
+# d'erreur ont ete servies en sept minutes. Detail et parades dans
+# `docs/migration/PIEGE-CACHE-BLADE.md`.
+#
+# Sans cette ligne la cause est RECREEE a chaque demarrage : normaliser a la main
+# ne tient pas. Idempotente, et meme motif que le `chown` du debut de ce script.
+chown -R www-data:www-data storage/framework/views 2>/dev/null || true
+
 
 exec "$@"
