@@ -71,6 +71,36 @@ window.rwStepUp = (function () {
             enAttente = { action: action, rejouer: rejouer };
             o.champ.value = '';
             o.panneau.hidden = false;
+            /*
+             * ⚠ `center`, ET CE MANQUE A ETE MESURE SUR CE PANNEAU-CI.
+             *
+             * Le module ne defilait pas du tout. Mesure d'une autre session
+             * sur les deux pages et les deux grandes largeurs :
+             *
+             *   /politiques  @1920   champ y=1008   dans la vue
+             *   /politiques  @1400   champ y=905    SOUS LE PLI
+             *   /acces-sftp  @1920   champ y=1085   SOUS LE PLI
+             *   /acces-sftp  @1400   champ y=905    SOUS LE PLI
+             *
+             *   panneau : 177 px de haut, dont 102 visibles dans 3 cas sur 4
+             *
+             * **Ce n'est PAS le defaut de F6** : l'en-tete collant s'arrete a
+             * 65 px et ne recouvre jamais ce panneau. C'est l'autre
+             * consequence du meme manque — il tombe sous le pli.
+             *
+             * ET CE QUI COMPTE N'EST PAS LE POURCENTAGE, C'EST CE QUI EST
+             * COUPE : les 75 px manquants portent LE CHAMP DE SAISIE ET LE
+             * BOUTON. L'utilisateur lit qu'on lui demande un code a six
+             * chiffres et ne voit pas ou le taper. Il peut defiler — c'est une
+             * friction, pas un blocage — mais un panneau de defi qui s'ouvre
+             * sans montrer sa saisie est l'ecran qu'on abandonne.
+             *
+             * `center` et non `nearest` : `nearest` fait le defilement
+             * MINIMUM, donc il aligne en haut, exactement la ou l'en-tete
+             * collant recouvrirait — le defaut que F6 a paye. Meme idiome que
+             * `fail2ban.js:1012`, repris et non reecrit.
+             */
+            o.panneau.scrollIntoView({ block: 'center' });
             o.champ.focus();
         }
 
