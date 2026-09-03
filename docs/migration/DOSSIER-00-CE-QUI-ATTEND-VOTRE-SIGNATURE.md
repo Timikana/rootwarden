@@ -489,3 +489,87 @@ peut porter des échecs qui n'appartiennent pas au code mesuré. »*
     equivalent hors incident : 167 · ~2663 · 5
 
 **La réserve était fondée : la ligne de base portait bien 50 échecs qui n'appartiennent pas au code.**
+
+---
+
+## ⛔ 12:25 — LE PORTAIL DE DEMAIN EST LE SEUL SERVICE DE PRODUCTION NON DURCI
+
+**Trouvé par la session 4, vérifié par moi. C'est le fait le plus décisif de la journée pour la bascule,
+et il n'est dans aucun document du chantier.**
+
+    docker-compose.prod.yml  (superposition de production)
+      services declares :  python · php · db
+      durcissement       :  cap_drop 4 · read_only 4 · tmpfs 3 · user 2 · security_opt 4
+                            -> toutes pour ces TROIS services
+
+      « laravel » : 0 occurrence      TEMOIN : « php » -> 3, l'instrument voit bien
+
+> **Après la bascule, le conteneur Laravel devient LE portail — et il est le seul service de production
+> sans `cap_drop`, sans `read_only`, sans `tmpfs`, sans `user` non-root.**
+
+**Dit du côté qui décide** : *le `php` legacy est durci **aujourd'hui**, et le conteneur qui le remplace ne
+l'est pas.* **Sur ce point précis, la bascule est une RÉGRESSION DE DURCISSEMENT DE LA PORTE D'ENTRÉE — pas
+un statu quo.**
+
+**Ce n'est pas un oubli de rédaction** : *`prod.yml` a été écrit quand `laravel` n'existait pas.* **Et
+aucun document du chantier ne mentionne `cap_drop` — 0 occurrence dans `docs/migration/`.**
+
+### ⚠ Et ça ne se recopie pas : les trois sujets sont UN SEUL GESTE
+
+    `read_only: true` casserait la compilation Blade
+      -> il faut un `tmpfs` sur storage/framework/views
+      -> et alors le cache est RECONSTRUIT A CHAQUE DEMARRAGE, par l'entrypoint, EN ROOT
+      -> donc la ligne `chown` n'est plus une commodite : elle est INDISPENSABLE
+
+**`DOSSIER-07` porte donc trois choses qui n'en font qu'une** :
+
+    1. la ligne `chown -R www-data:www-data storage/framework/views` apres l'entrypoint:44
+    2. le durcissement de `laravel` dans `prod.yml` (cap_drop · read_only + tmpfs · user)
+    3. la legende du menu conditionnee (le patch gele de la session 3)
+
+---
+
+## ⚠ CORRECTION 12:25 — l'étape 1 de mon geste est INSENSIBLE
+
+**J'avais prescrit** : *« RELEVER les propriétaires du cache compilé en PRODUCTION → si `root` y figure, le
+piège est armé. »*
+
+    origin/main   docker-compose.yml  240 lignes   service `^  laravel:` = 0
+    HEAD          docker-compose.yml  306 lignes   service `^  laravel:` = 1
+    TEMOIN        `^  python:` = 1 dans les DEUX refs
+
+**`origin/main` ne déclare pas le service `laravel`. Le répertoire que ma commande interrogerait
+n'existe pas.**
+
+> **Elle rendrait « pas de piège » là où la réponse est « pas encore ».** *Une universelle négative est
+> vraie à vide — ici sur la mesure censée décider d'une signature.* **Le geste n'est pas faux : il est
+> INSENSIBLE. Il rend le même résultat quand le piège est absent et quand il est simplement à venir.**
+
+### Ce que ça change au correctif — il passe de rattrapage à PRÉREQUIS
+
+**La ligne `chown` appliquée AVANT la fusion fait que le premier démarrage en production produit un cache
+`www-data`.** *Il n'y a alors jamais rien à normaliser après coup.*
+
+**Et mon étape 2 — « normaliser le cache » — était de toute façon défaite au démarrage suivant**, puisque
+`docker-entrypoint.sh:44` défait l'intention de la ligne 25 pour les fichiers qu'elle crée.
+
+**La séquence corrigée :**
+
+```
+AVANT la fusion :
+  1. ajouter la ligne `chown` apres docker-entrypoint.sh:44
+  2. declarer `laravel` dans docker-compose.prod.yml, avec son durcissement
+     (cap_drop · read_only + tmpfs sur storage/framework/views · user non-root)
+
+la fusion :
+  3. git merge   (846 commits, a sec PROPRE)
+  4. appliquer 063 · 064 · 065
+  5. docker compose up -d      <- OBLIGATOIRE : `./www` n'existe plus
+  6. git push
+
+CONTROLE :  une requete -> 200 ;  et `Utime failed` au journal = le piege a mordu
+```
+
+**Les points 1 et 2 sont des écritures hors de mon périmètre** (`laravel/docker-entrypoint.sh`,
+`docker-compose.prod.yml`) — *ils appartiennent à une session de portage, et le point 2 touche
+`cap_drop`/`read_only`/`user`, donc il exige votre mot.*
