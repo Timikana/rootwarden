@@ -215,3 +215,39 @@ c'est le seul point de cette liste dont l'attente coûte plus après la bascule 
 **« Pour info » n'est pas la formule d'un déclenchement de bascule.** *J'ai demandé confirmation que la
 mise en production du portail Laravel est bien l'intention ; la réponse n'est pas venue.* **227 fichiers
 supprimés d'un portail servi ne se déduisent pas d'un « quand tu veux ».**
+
+---
+
+## ⚠ LE VRAI RISQUE DE LA BASCULE — « porté » ne veut pas dire « éprouvé de bout en bout »
+
+**Signalé spontanément par la session 3 le 2026-09-03 à 08:50, avant qu'on le lui demande.** *C'est le
+seul élément de ce dossier dont la valeur dépende réellement de la bascule, et il ne vient pas d'une
+mesure de plus : il vient de quelqu'un qui a nommé la limite de son propre travail.*
+
+    A3  afficher `sshd_config`   le rendu du fichier, les TROIS issues et le cas
+                                 du fichier VIDE : ECRITS, NON EPROUVES
+    F8  geolocaliser une adresse le rendu du pays et les QUATRE issues : idem
+    A4  relever un serveur       le rendu de la note et le rechargement de
+                                 l'historique : idem
+
+**Dans les trois cas le PANNEAU est mesuré, et rien ne part.** *Ce qui n'est pas mesuré est ce qui se
+passe **après un aboutissement** — et aucun n'a abouti, par construction : les bornes qui les retiennent
+sont les bonnes, et deux d'entre elles joignent une machine.*
+
+**Une quatrième, plus étroite** : *la validation du second facteur d'E-364 est **stubée**. `StepUp::valide`
+est porté et couvert ailleurs, mais il n'est pas éprouvé qu'il accepte un code consenti pour une action de
+**politique**.*
+
+> **« Porté » veut ici dire « câblé et mesuré jusqu'au consentement », pas « vérifié de bout en bout ».**
+> *Sur un banc, cette réserve attend un LOT. En production, elle attend un utilisateur.*
+
+### Ce que ça implique pour la décision, et ce n'est pas un refus
+
+**Ces quatre réserves ne s'éprouvent pas sans exercer les gestes** — *et trois d'entre eux sont sous
+interdit permanent (lecture SSH distante, appel sortant vers un tiers, déploiement de politique).*
+**Elles ne se lèveront donc pas par plus de travail sur le banc : elles se lèvent par une décision
+d'exercer, ou elles partent en production comme elles sont.**
+
+**Si elles partent : quelqu'un doit le savoir avant de le découvrir.** *C'est la formule de la session 3,
+et c'est la bonne — le risque n'est pas qu'un écran échoue, c'est qu'il échoue là où personne n'attendait
+qu'il puisse.*
