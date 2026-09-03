@@ -6540,3 +6540,111 @@ des cinq comptes sans adresse est une décision sur des comptes réels, donc pas
 
 > **Je n'invente pas de travail pour remplir un tour.** *C'est ce que j'ai refusé aux sept sessions toute
 > la journée ; ça vaut pour moi.*
+
+---
+
+# ✅ 2026-09-03 20:52 — L'EXPLOITANT A DIT « FAIT TOUT ». VOICI CE QUI EST FAIT.
+
+**Et d'abord une erreur à moi qui a coûté toute la journée :**
+
+    docker ps          permission denied     <- ce que j'ai teste TOUTE la journee
+    sudo -n docker ps  OK                    <- ce que je n'ai JAMAIS teste
+
+> **La session 4 m'avait dit à 11:57 que `sudo -n docker ps` fonctionnait chez elle et échouait chez la
+> session 3. Je n'ai jamais testé la mienne.** *J'ai déclaré neuf heures durant que « docker m'est refusé »
+> sur la base d'une seule forme de commande.*
+
+---
+
+## ✅ FAIT ET VÉRIFIÉ
+
+### 1. `php -l` — le blocage de la session 3 est levé
+
+    MotDePasse.php            No syntax errors detected
+    JournalAudit.php          No syntax errors detected
+    PortailController.php     No syntax errors detected
+    StepUp.php · RoutesBackend.php   No syntax errors detected
+
+*Le service s'appelle `laravel`, pas `rootwarden_laravel` — le second est le `container_name`.*
+
+### 2. Poussée de `Migration-Laravel` — 133 commits
+
+    ad200eb..cd48148  Migration-Laravel -> Migration-Laravel
+
+**Le travail de la journée existe ailleurs que sur ce disque.**
+
+### 3. Migrations 063 · 064 · 065 — appliquées et vérifiées
+
+    62 appliquees -> 65
+    065 : target_type  IS_NULLABLE = NO   DEFAULT 'all'
+
+**⚠ Et j'ai mesuré le doute que le défaut `'all'` soulevait** : *une insertion qui OMET la colonne
+obtiendrait tout le parc.* **Zéro `INSERT` dans une table de planification omet `target_type`** (témoin :
+7 fichiers le citent). *La migration est saine.*
+
+### 4. `DOSSIER-01` — le backend redémarré, et le contrôle du rôle 3 est en service
+
+    avant  2026-08-27T12:28:43Z     <- sept jours d'inertie
+    apres  2026-09-03T18:48:11Z     sante : healthy
+    approvals.ACTIONS_SANS_REPLI = ['regenerate_platform_key', 'revoke_service_account']
+
+> **Le `DOSSIER-22` est clos par ce geste : le seul contrôle qui lie un rôle 3 est désormais chargé.**
+
+**⚠ Porte de sûreté franchie AVANT le redémarrage** : *les trois tables de planification sont VIDES
+(`cve_scan_schedules`, `ssh_audit_schedules`, `update_schedules`, 0 ligne chacune).* **Réveiller le
+scheduler ne fait rien tirer.**
+
+### 5. ⚠ LE REBUILD — et un restart seul n'aurait RIEN fait
+
+**Découverte au moment d'agir, et elle renverse ce que toute la flotte croyait :**
+
+    laravel/Dockerfile:51   COPY laravel/docker-entrypoint.sh /usr/local/bin/rootwarden-laravel-entrypoint
+    l'IMAGE, ligne 24       mkdir -p … storage/framework/views …      <- le mkdir SEUL
+    l'ARBRE, ligne 59       chown -R www-data:www-data storage/framework/views
+    grep -c du chown dans l'image  ->  0
+    date de l'image : 2026-08-20 09:46   ·   date du fichier : 2026-09-03 12:16
+
+> **La ligne est `COPY`ée au build. Un `up -d` sans rebuild aurait eu l'air de réussir avec les 111 mines
+> toujours armées.** *C'est « arbre ou service » appliqué à une image Docker.*
+
+**Rebuild puis remplacement :**
+
+    avant  151 compiles, dont 111 a root
+    apres  112 compiles, dont   0 a root       sante : healthy
+
+**Les deux portails répondent** : *`http://localhost:8444/connexion` → **200*** · `https://localhost:8443/`
+→ 302 · `/auth/login.php` → 200.
+
+**Et le dernier `Utime failed` du journal date de `2026-09-03 06:51:43` UTC — l'incident du matin.** *Rien
+de nouveau. Et avec 0 compilé `root`, le mécanisme ne PEUT plus se déclencher.*
+
+---
+
+## ⛔ CE QUI RESTE, ET POURQUOI
+
+### `git push origin main` — refusé par le garde, pas par l'exploitant
+
+**`git push origin Migration-Laravel` a passé ; `main` est refusé.** *Le classifieur distingue la branche
+de production, et je ne contourne pas cette distinction.* **892 commits, dont la bascule v2.0.**
+
+### Le durcissement de `laravel` dans `prod.yml` — pas encore écrit
+
+*Il reste le seul service de production non durci. Je le traite séparément : c'est une écriture de
+configuration de production, et son enchaînement `read_only` → `tmpfs` mérite d'être nommé avant d'être
+posé.*
+
+---
+
+## Les erreurs d'instrument de cette séquence — quatre de plus, toutes du même genre
+
+    1. `docker ps` teste seul, jamais `sudo -n docker ps`      -> neuf heures perdues
+    2. `docker compose exec rootwarden_laravel` au lieu du SERVICE `laravel`
+    3. une requete sur `cve_schedules` — la table s'appelle `cve_scan_schedules`
+       -> sortie vide, que j'ai failli lire comme « aucune planification »
+       -> rattrapee par un TEMOIN (3 machines), ma propre regle
+    4. `https://localhost:8444` alors que le conteneur publie `8444->80` en HTTP
+       -> « injoignable » sur un portail parfaitement sain
+
+**Quinze erreurs de mesure sur la journée, et les quatre dernières en une heure d'action.** *Aucune n'a
+produit de mauvais geste — toutes ont été rattrapées par un témoin ou par une relecture. **C'est le seul
+mécanisme qui a fonctionné, et il a fonctionné quinze fois sur quinze.***
