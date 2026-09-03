@@ -128,10 +128,20 @@ const C = CIBLE === 'laravel'
         aucunServeur: '[data-rw="audit-ssh-aucun-serveur"]',
         lectureSeule: '[data-rw="audit-ssh-politique-lecture-seule"]',
         creer: '[data-rw="audit-ssh-planif-creer"]',
+        serveur: '[data-rw="audit-ssh-serveur"]',
+        config: '[data-rw="audit-ssh-config"]',
+        panneau: '[data-rw="audit-ssh-panneau"]',
+        panneauTitre: '[data-rw="audit-ssh-panneau-titre"]',
+        panneauTexte: '[data-rw="audit-ssh-panneau-texte"]',
+        panneauEffets: '[data-rw="audit-ssh-panneau-effets"]',
+        panneauConfirmer: '[data-rw="audit-ssh-panneau-confirmer"]',
+        panneauFermer: '[data-rw="audit-ssh-panneau-fermer"]',
         cgu: /\/cgu/, accepte: '[data-rw="cgu-accepter"]' }
     : { connexion: '/auth/login.php?lang=fr', page: '/ssh-audit/',
         parc: null, borne: null, illisible: null, aucunServeur: null,
-        lectureSeule: null, creer: null,
+        lectureSeule: null, creer: null, serveur: null, config: null,
+        panneau: null, panneauTitre: null, panneauTexte: null,
+        panneauEffets: null, panneauConfirmer: null, panneauFermer: null,
         cgu: /terms\.php/, accepte: 'button[name="accept_terms"]' };
 
 let echecs = 0;
@@ -381,6 +391,152 @@ try {
 
     // ══ 3. LE TEMOIN — SANS LUI, LA SUITE NE MESURE RIEN ═════════════════
     let temoinVu = false;
+    await etape('A3 : le panneau de lecture de sshd_config, et on ne confirme pas', async () => {
+        if (CIBLE !== 'laravel') {
+            constate('lecture de sshd_config', 'SANS OBJET — A3 n\'existe que sur le portage');
+
+            return;
+        }
+        /*
+         * ══ A3 — CE QUI SE MESURE SANS JOINDRE PERSONNE ══════════════════
+         *
+         * `POST /ssh-audit/config` OUVRE UNE SESSION SSH REELLE
+         * (`ssh_audit.py`). Le geste est porte et JAMAIS exerce : son auteur
+         * l'a mesure cable, et a declare lui-meme que le rendu du fichier, la
+         * separation des trois issues et le cas du fichier vide sont **ECRITS
+         * ET NON EPROUVES** — il faut le mot de l'exploitant pour les couvrir.
+         *
+         * Ce qui se mesure ici est le PANNEAU, et `ouvrePanneau` ne lit que le
+         * catalogue : aucune requete ne part avant la confirmation, et cette
+         * suite ne la prend jamais.
+         *
+         * DEUX BRANCHES, et la premiere est celle qui regresserait en silence :
+         *   sans serveur choisi -> panneau ouvert, confirmation MASQUEE,
+         *                          `gesteConfirme = null` — fail-closed
+         *   avec un serveur     -> le panneau NOMME le serveur, confirmation
+         *                          offerte
+         *
+         * ⛔ Le serveur choisi n'est JAMAIS `srv-zabbix`, meme pour un panneau
+         *    qui ne part pas : le filet l'avorterait, mais on ne s'appuie pas
+         *    sur le filet pour un choix qu'on controle.
+         */
+        const avantA3 = passees.length;
+        const bouton = await page.$(C.config);
+        if (! bouton) {
+            verifie('le geste de lecture de sshd_config est OFFERT', false,
+                'ancre `audit-ssh-config` absente : A3 n\'est pas rendu');
+
+            return;
+        }
+
+        // ── a. SANS serveur : le panneau s'ouvre et REFUSE de confirmer ──
+        await page.evaluate((sel) => {
+            const s0 = document.querySelector(sel.serveur);
+            if (s0) { s0.value = ''; s0.dispatchEvent(new Event('change', { bubbles: true })); }
+        }, C);
+        await dors(300);
+        await bouton.click();
+        await dors(700);
+        const sans = await page.evaluate((sel) => {
+            const p = document.querySelector(sel.panneau);
+            const x = document.querySelector(sel.panneauTexte);
+            const c = document.querySelector(sel.panneauConfirmer);
+
+            return {
+                ouvert: p !== null && p.offsetParent !== null,
+                texte: x ? (x.innerText || '').replace(/\s+/g, ' ').trim() : '',
+                confirme: c !== null && c.offsetParent !== null,
+            };
+        }, C);
+        constate('sans serveur', `panneau ${sans.ouvert ? 'ouvert' : 'FERME'}, confirmation `
+            + `${sans.confirme ? 'OFFERTE' : 'masquee'} — « ${sans.texte.slice(0, 70)} »`);
+        verifiePortage('sans serveur, le panneau DIT pourquoi et ne confirme pas',
+            sans.ouvert && sans.texte.length > 0 && ! /:[a-z_]{3,}/.test(sans.texte)
+                && ! sans.confirme,
+            ! sans.ouvert ? 'aucun panneau'
+                : sans.confirme ? 'la confirmation est OFFERTE sans cible : elle ferait consentir a rien de nommable'
+                    : sans.texte.length === 0 ? 'le panneau est vide' : `jeton non traduit : ${sans.texte}`);
+        const fermer1 = await page.$(C.panneauFermer);
+        if (fermer1) { await fermer1.click(); await dors(400); }
+
+        // ── b. AVEC un serveur, jamais la production ────────────────────
+        const opts = await page.$$eval(`${C.serveur} option`,
+            (ns) => ns.map((n) => `${n.value}|${(n.textContent || '').trim()}`).filter((o) => ! o.startsWith('|')));
+        constate('serveurs offerts', opts.join(' · ') || '(aucun)');
+        const sur = opts.find((o) => o && ! /zabbix/i.test(o));
+        if (! sur) {
+            constate('panneau avec serveur',
+                'SANS OBJET — aucun serveur hors production n\'est offert, et on ne choisit pas'
+                + ' la production pour ouvrir un panneau');
+
+            return;
+        }
+        const idSur = sur.split('|')[0];
+        verifie('le serveur choisi n\'est PAS la production',
+            ! /zabbix/i.test(sur) && idSur !== String(MACHINE_PRODUCTION),
+            `choisi : ${sur}`, sur);
+        await page.select(C.serveur, idSur);
+        await dors(400);
+        await bouton.click();
+        await dors(800);
+        const avec = await page.evaluate((sel) => {
+            const p = document.querySelector(sel.panneau);
+            const t = document.querySelector(sel.panneauTitre);
+            const x = document.querySelector(sel.panneauTexte);
+            const e = document.querySelector(sel.panneauEffets);
+            const c = document.querySelector(sel.panneauConfirmer);
+
+            return {
+                ouvert: p !== null && p.offsetParent !== null,
+                titre: t ? (t.innerText || '').replace(/\s+/g, ' ').trim() : '',
+                texte: x ? (x.innerText || '').replace(/\s+/g, ' ').trim() : '',
+                effets: e ? (e.innerText || '').replace(/\s+/g, ' ').trim() : '',
+                confirme: c !== null && c.offsetParent !== null,
+                libelle: c ? (c.innerText || '').trim() : '',
+            };
+        }, C);
+        constate('avec serveur', avec.ouvert
+            ? `« ${avec.titre} » — confirmation ${avec.confirme ? `offerte (« ${avec.libelle} »)` : 'ABSENTE'}`
+            : 'panneau NON ouvert');
+        verifiePortage('avec un serveur, le panneau porte un titre ET un texte',
+            avec.ouvert && avec.titre.length > 0 && avec.texte.length > 0,
+            ! avec.ouvert ? 'aucun panneau'
+                : `titre ${avec.titre.length} car., texte ${avec.texte.length} car. —`
+                  + ' un panneau vide fait consentir a un geste que rien ne nomme');
+        /*
+         * IL NOMME SA CIBLE. Un panneau qui dit « lire la configuration » sans
+         * dire SUR QUOI fait consentir a un geste dont on ignore la portee —
+         * et ce geste-la ouvre une session SSH.
+         */
+        const nomSur = sur.split('|')[1] || '';
+        verifiePortage('le panneau NOMME le serveur vise',
+            `${avec.titre} ${avec.texte} ${avec.effets}`.includes(nomSur.split(' ')[0]),
+            `« ${nomSur} » n'apparait pas : le panneau ne dit pas sur quelle machine il porte`);
+        verifiePortage('la confirmation est OFFERTE, et cette suite ne la prend PAS',
+            avec.confirme && avec.libelle.length > 0,
+            ! avec.confirme ? 'aucun bouton de confirmation' : 'le bouton n\'a pas de libelle');
+        verifiePortage('aucun jeton non traduit dans le panneau',
+            avec.titre.length > 0 && avec.texte.length > 0
+                && ! /:[a-z_]{3,}/.test(`${avec.titre} ${avec.texte} ${avec.effets} ${avec.libelle}`),
+            avec.titre.length === 0 || avec.texte.length === 0
+                ? 'panneau vide : rien a verifier, et un vert ici serait une absence'
+                : `${avec.titre} | ${avec.texte}`);
+
+        // ── c. AU RESEAU : ouvrir le panneau ne lit rien ────────────────
+        const parties = passees.slice(avantA3);
+        constate('requetes de l\'etape', parties.length
+            ? parties.map((p) => `${p.methode} ${p.route}`).join(' | ') : '(aucune)');
+        verifie('OUVRIR le panneau n\'a declenche AUCUNE lecture distante',
+            ! parties.some((p) => /\/ssh-audit\/config/.test(p.route)),
+            parties.filter((p) => /\/ssh-audit\/config/.test(p.route))
+                .map((p) => `${p.methode} ${p.route}`).join(' | '),
+            parties.some((p) => /\/ssh-audit\/config/.test(p.route))
+                ? '' : 'aucun appel a /ssh-audit/config');
+
+        const fermer2 = await page.$(C.panneauFermer);
+        if (fermer2) { await fermer2.click(); await dors(400); }
+    });
+
     await etape('le collecteur voit un POST (temoin)', async () => {
         /*
          * On EMET un POST depuis la page, vers un chemin qui n'existe pas. S'il
