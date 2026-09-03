@@ -5314,3 +5314,64 @@ session 3.** Deux raisons de ne pas m'en servir, et la seconde suffirait seule :
 **Donc l'objet est rendu, pas exécuté.** Et il diffère des douze autres sur un
 point : ceux-là attendent une décision, **celui-ci bloque du travail déjà fait**
 — un patch prêt, éprouvé à sec, qui ne peut pas être livré.
+
+
+## §7 — LE « TREIZIÈME OBJET » N'EN EST PAS UN : `DOSSIER-00` le portait depuis 08:56
+
+**Correction écrite vingt minutes après l'objet qu'elle corrige.**
+
+`DOSSIER-00-CE-QUI-ATTEND-VOTRE-SIGNATURE.md:279` porte déjà la section
+**« SECOND RISQUE DE BASCULE — éditer une vue peut faire tomber TOUT le portail,
+sans instrument »**, écrite le 2026-09-03 et mesurée à **08:56**, soit **trois
+heures avant** que je l'annonce comme neuve. Et elle est **plus complète que la
+mienne** :
+
+    ce que j'ai mesure            ce que DOSSIER-00 portait deja
+    151 compiles, 111 root        les MEMES chiffres, 151 et 111
+    le mecanisme                  + le message exact « Utime failed: Operation not permitted »
+    l'incident de ce matin        + un SECOND, le 2026-09-01 15:30, autre session
+    « un patch est bloque »       + « la fusion change 831 FICHIERS dont des vues Blade »
+    « rendre le cache a www-data » + le geste en TROIS etapes, dont RELEVER la prod
+                                  + l'avertissement UTC/CEST sur la lecture du journal
+
+**Le cadrage qui compte n'est pas le mien.** J'ai décrit la petite conséquence —
+un patch de légende non livrable. `DOSSIER-00` décrit la grande : **la mise en
+production rend chaque vue touchée plus récente que son compilé, donc le portail
+répond 500 jusqu'à ce que quelqu'un s'en aperçoive.** Le premier bloque une
+session ; le second casse la bascule.
+
+> **HUITIÈME ERREUR DU JOUR, ET C'EST LA MÊME QUE LA TROISIÈME** : annoncer comme
+> neuf ce qu'un document du chantier portait déjà. *Cette fois j'ai en plus
+> remesuré des chiffres identiques à ceux qui y étaient écrits* — 151 et 111 —
+> ce qui aurait dû m'alerter : **retomber exactement sur les chiffres d'autrui
+> n'est pas une confirmation quand on ne savait pas qu'ils existaient, c'est le
+> signe qu'on refait un travail fait.**
+
+### Ce qui SUBSISTE de mon tour, et c'est peu
+
+- **une réponse à leur seule question ouverte qui me concerne.** `DOSSIER-00:333`
+  liste comme non mesuré : *« combien de suites du LOT en cours ont traversé la
+  fenêtre de sept minutes ; la ligne de base peut porter des échecs qui
+  n'appartiennent pas au code mesuré. »* **Mesuré et attribué : 7 suites,
+  50 FAIL sur 55, et 50 PASS perdus en plus** — équivalent hors incident
+  **167 · ~2663 · 5** ;
+- **un refus de substituer mes permissions à celles d'un pair** : `sudo -n docker
+  ps` fonctionne chez moi et échoue chez la session 3. Ce n'est pas une mesure,
+  c'est une limite — et elle tient indépendamment de `DOSSIER-00`.
+
+### Et la vraie leçon de §7, qui n'est pas un objet de plus
+
+**Vingt-et-un dossiers existent** (`DOSSIER-00` à `DOSSIER-21`, sans 14). Je
+récitais « onze objets », puis douze, puis treize, **sans avoir jamais croisé ma
+liste avec l'ensemble des dossiers**. Le croisement montre au moins sept sujets
+absents de mon énumération — `04` gestes distants, `10` deux expositions, `12`
+deux comptes, `16` import CSV (trois décisions), `18` full Laravel et pentest,
+`19` sudo fail-open, `21` liste blanche orpheline.
+
+> **`DOSSIER-00` EST L'AUTORITÉ SUR CE QUI ATTEND UNE SIGNATURE, PAS MON §7.** Il
+> classe par *ce que ça demande* (A production · B travail fait hors service ·
+> C correctifs écrits · D décisions), il est tenu à jour — commité à 10:58, ajout
+> à 11:55 — et il porte déjà les quatre patchs que je croyais y manquer. **Mon
+> rôle est d'y renvoyer, pas de tenir une liste parallèle** : une seconde liste
+> ne se synchronise jamais, elle divergence en silence, et c'est exactement ce
+> qu'elle vient de faire.
