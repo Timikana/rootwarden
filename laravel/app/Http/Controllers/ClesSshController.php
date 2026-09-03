@@ -21,8 +21,21 @@ use Illuminate\View\View;
  * decision de l'exploitant, a prendre avec D-1 pour ne pas laisser deux pages en
  * desaccord. Voir `PARITE.md`.
  *
- * K1 n'appelle AUCUNE route du backend. Le declenchement du deploiement (K4) et
- * la lecture de son flux (K3) restent sur l'ancien portail, et la page le dit.
+ * ⚠ CE COMMENTAIRE PORTAIT LA MEME ERREUR QUE LE LIBELLE, EN PLUS LARGE.
+ *
+ * Il disait « K1 n'appelle AUCUNE route du backend » et « la lecture de son
+ * flux (K3) reste sur l'ancien portail ». Mesure du 2026-09-03 :
+ *
+ *     /preflight_check   appelee   (`url_preflight`, `cles-ssh.js:224`)
+ *     /logs              appelee   (`url_journal`,   `cles-ssh.js:390`)
+ *     /deploy            NON appelee
+ *
+ * K3 EST porte. Seul K4 — le declenchement — reste sur l'ancien portail, et
+ * c'est cela que la page dit desormais.
+ *
+ * *Un commentaire pose a cote du geste porte l'autorite du geste : celui-ci
+ * affirmait une propriete que le fichier n'avait plus, et il etait plus large
+ * que le libelle qu'il accompagnait.*
  */
 class ClesSshController extends Controller
 {

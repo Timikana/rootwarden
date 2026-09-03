@@ -31,7 +31,33 @@ return [
     'annuler' => 'Annuler',
     'confirmer_titre' => 'Deployer les cles SSH sur ces serveurs ?',
     'confirmer_avertissement' => "Sur chaque serveur coche, et en tant que root : le paquet sudo est installe s'il manque, les comptes habilites sont crees, leur fichier authorized_keys est REECRIT, et une politique sudoers est posee. Les cles de tout compte ayant perdu son habilitation sont REVOQUEES. Rien de tout cela n'est reversible depuis cette page.",
-    'non_porte' => "Le declenchement du deploiement et la lecture de son journal ne sont pas encore portes.",
+    /*
+     * ⚠ UNE CONJONCTION DONT UN MEMBRE EST DEVENU FAUX.
+     *
+     *   avant  « Le declenchement du deploiement ET LA LECTURE DE SON JOURNAL
+     *            ne sont pas encore portes. »
+     *
+     *   mesure du 2026-09-03, croisement geste par geste :
+     *     /deploy   NON appelee   -> la premiere moitie est VRAIE
+     *     /logs     EXACTE        -> la seconde est FAUSSE
+     *       `ClesSshController.php:93`  'url_journal' => url('/api/gateway/logs')
+     *       `cles-ssh.js:390`           await fetch(L.url_journal, …)
+     *
+     * **Une phrase qui dit « A et B ne sont pas portes » se lit comme
+     * entierement vraie quand seul A l'est encore.** Septieme occurrence de
+     * cette forme, apres `serveurs`, `bashrc`, `fail2ban`, `ssh_audit`,
+     * `groups` et `superv`.
+     *
+     * ⚠ ET UNE URL FOURNIE N'EST PAS UNE URL LUE — la distinction a deja
+     * coute une mesure. C'est le `fetch` qui tranche, pas le passage de la
+     * variable au gabarit.
+     *
+     * `description` porte la meme idee en plus court — « le deploiement
+     * lui-meme reste sur l'ancien portail » — et elle est JUSTE. *La
+     * formulation qui a survecu est celle qui n'affirmait qu'UNE chose : une
+     * conjonction est un pari sur la stabilite de DEUX faits.*
+     */
+    'non_porte' => "Le declenchement du deploiement n'est pas encore porte : il reste sur l'ancien portail.",
     'non_porte_lien' => "Les lancer depuis l'ancien portail",
     // ── Le constat avant deploiement (sous-lot K2) ──────────────────────────
     'verifier' => 'Verifier les prerequis',
