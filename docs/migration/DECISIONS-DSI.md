@@ -5573,3 +5573,94 @@ vaut — une page de réglages n'est pas une destination de navigation.*
 
 **`:1628` est en cours d'épreuve, avec la réserve de son autrice : elle ne touche pas son portage, donc
 elle la lira en lectrice, et elle dira « je ne peux pas conclure » plutôt que « elle tient ».**
+
+---
+
+## ⛔ RECTIFICATION 11:15 — `:1628` est CASSÉ : ma valeur était exacte, sa PORTÉE était fausse
+
+**Trois sur trois. Cassé par la session 3, qui a lu un AUTRE OBJET que moi. Vérifié par moi.**
+
+### Il y a DEUX conteneurs PHP, et un seul a un `php.ini`
+
+    laravel/Dockerfile:14   FROM php:8.4-apache
+                     :22   docker-php-ext-install … opcache
+                     ---   AUCUNE copie de php.ini  ->  tous les DEFAUTS
+
+    php/Dockerfile:100      COPY php/php.ini /usr/local/etc/php/php.ini
+    docker-compose.yml:11   dockerfile: ./php/Dockerfile
+                     :12   container_name: rootwarden_php     <- C'EST LE LEGACY
+
+    php/php.ini:246  opcache.enable = 1
+              :259  opcache.revalidate_freq = 60          <-- ⚠ SOIXANTE SECONDES
+              :265  opcache.enable_cli = 1
+              :269  opcache.validate_timestamps = On
+
+> **Mes trois valeurs `(1, 1, 2)` sont exactement les DÉFAUTS de PHP.** *Elles étaient justes — pour le
+> conteneur du PORTAGE, qui n'a pas de `php.ini`. C'est aussi pourquoi ma recherche dans `conf.d/` ne
+> rendait rien : il n'y avait rien à trouver là.*
+
+**Ce qui était faux est ma conclusion** : *j'avais écrit que la propriété « gouverne la totalité des
+correctifs du portage ET DU LEGACY ».* **Un fichier PHP modifié dans le legacy reste non relu pendant
+jusqu'à 60 secondes.**
+
+### ⚠ La leçon est sur ma RÉSERVE, pas sur ma mesure — et c'est nouveau
+
+**J'avais déclaré une réserve** : *« une mesure prise dans un processus qui n'est pas celui qui sert est
+une inférence »* — la divergence CLI / SAPI de service.
+
+    php/php.ini:265   opcache.enable_cli = 1
+
+> **Si j'avais fait la MÊME mesure CLI dans le conteneur du LEGACY, j'aurais lu 60 et trouvé le défaut.**
+> *La SAPI n'était pas le problème ; le CONTENEUR l'était.*
+
+**Cinquième fois de la matinée qu'une propriété vraie d'un objet voyage vers un autre — et la PREMIÈRE où
+elle voyage MALGRÉ une réserve déclarée.**
+
+> **Une réserve qui nomme le mauvais risque RASSURE au lieu de protéger.** *Elle m'a fait paraître
+> prudente sur l'axe où il n'y avait rien, et elle a couvert l'axe où était le défaut.*
+
+### Ce que ça coûte, et pourquoi ça touche les mesures de parité
+
+**Le legacy est la cible de RÉFÉRENCE des mesures de parité.** *Un correctif appliqué au legacy et
+vérifié tout de suite peut paraître inerte pendant une minute.*
+
+> **Assez long pour tromper un humain, assez court pour disparaître avant qu'on cherche.**
+
+**Et rien ne purge le bytecode** — *mesuré : 3 occurrences de `opcache_reset`/`opcache_invalidate` dans
+tout l'arbre, **toutes les trois dans `vendor/`** (Symfony, Laravel), aucune dans du code applicatif.*
+**Seuls le temps ou un redémarrage du conteneur l'effacent.**
+
+*⚠ Écart de relevé à déclarer : la session 3 annonçait **0** sur 3169 fichiers ; je trouve **3**, toutes
+inapplicables. Même conclusion, ensembles scannés différents — et le dire coûte une phrase.*
+
+### Deux objets, deux bornes, et c'est leur conjonction qui tranche
+
+    MA mesure     un processus REEL, mais dans la mauvaise SAPI et le mauvais conteneur
+    SA lecture    la BONNE source, sans savoir si elle est deployee
+                  -> `docker` lui refuse l'acces, comme a moi
+
+**Pour le PORTAGE, les deux concordent** : *ma valeur `2` mesurée dans le conteneur Laravel s'accorde avec
+l'absence de `php.ini` que sa lecture trouve dans le Dockerfile.* **Deux objets différents, même réponse —
+c'est ce qui rend cette moitié sûre.**
+
+**Pour le LEGACY, personne n'a mesuré le processus.** *« 60 s » est une lecture du DÉPÔT, pas une mesure du
+serveur.*
+
+### Ce qu'il reste à faire, et ce n'est ni elle ni moi
+
+**Lire `opcache.revalidate_freq` dans `rootwarden_php` EN SERVICE, par une requête HTTP** — *un
+`phpinfo()` derrière une garde, ou une page de diagnostic existante.* **`docker exec` ne répond pas à la
+question : il mesurerait encore une autre SAPI.**
+
+### Bilan : trois points aveugles éprouvés, TROIS cassés
+
+    :3896   casse — le GESTE de groupe n'excluait pas les archivees
+    :3165   casse — `notifications.reglages`, page gardee que rien n'atteint
+    :1628   casse — valeur juste, portee fausse, et la reserve pointait a cote
+
+> **Trois sur trois, en trois heures, sur des arbitrages qu'aucun geste n'attendait.** *Le quatrième —
+> `:4024` — n'est pas éprouvé.* **Et le taux n'autorise aucune confiance : il autorise l'inverse.**
+
+**Et la session 3 maintient sa réserve d'origine, correctement** : *« je n'ai été un bon contradicteur sur
+celle-ci que par accident — j'ai cherché la configuration parce que je ne pouvais pas la mesurer, et c'est
+ce détour qui a montré qu'il y avait deux conteneurs. »*
