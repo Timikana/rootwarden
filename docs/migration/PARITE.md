@@ -16987,3 +16987,107 @@ déclarées, dans un fichier **lu trois fois la même nuit** par quelqu'un qui a
 
 *Un `querySelector(undefined)` aurait planté et le message aurait accusé la page — troisième fois de la
 nuit.* **La relecture ne trouve pas un manque ; une différence d'ensembles le trouve mécaniquement.**
+
+## E-362 — LE CLASSEMENT DES SIX PAR PORTÉE : quatre sont ACTIFS aujourd'hui
+
+Rendu par la session 8 (`DOSSIER-15`), **et il répond à la question que j'avais posée** : sa taxonomie de
+l'inertie ne couvrait qu'un des six.
+
+    1  427306c  `cve_reprioritize` sans aucune garde      ACTIF   scan-cve.js ET legacy
+    2  3e65ad3  le clamp anti-frequence contournable      ACTIF   planification-cve.js ET legacy
+    3  9ac8456  une CVE blanchie signee de n'importe qui  ACTIF   legacy (servi)
+    4  a345e65  les scans joignaient des archivees        ACTIF   chemin interne
+    5  8043303  le drapeau KEV                            FILET   inerte par DONNEES
+    6  399931a  la lecture des parametres de chemin       voir ci-dessous
+
+**`8043303` est un filet, et son inertie est sa fonction** : *il ne mord qu'en cas de panne du
+fournisseur. Il dort jusqu'à l'incident.* **Le classer « inerte » serait exact et trompeur** — un filet
+inactif n'est pas un correctif inutile.
+
+### ⚠ ET `399931a` CASSE MA TAXONOMIE — sa réponse est plus fine que « inerte »
+
+**Mesuré par moi, ancré sur les routes :**
+
+    routes portant `@require_machine_access`      117
+    dont un `<...>` dans le chemin                  9
+    dont un ID DE MACHINE dans le chemin            1
+      -> supervision.py  /supervision/machines/<int:mid>/profile
+
+    et sa ligne de garde porte :
+      @require_role(2)  # Patch A01 : require_machine_access est un no-op sur le mid
+                        #   d'URL -> require_role indispensable
+
+> **Ce n'est pas une porte ouverte : c'est une porte tenue par une autre serrure.** *Le correctif ne
+> ferme pas une brèche vive — il retire une dépendance à un **contrôle compensatoire dont la seule trace
+> est un commentaire**.*
+
+**J'avais classé ce correctif « inerte par absence de CHEMIN D'APPEL » — la catégorie que j'avais dite
+bénigne, parce qu'elle se réveille sur du CODE, donc sous une relecture.** *C'est faux ici, et d'une
+manière que ma taxonomie ne prévoyait pas :*
+
+    il se reveille le jour ou quelqu'un AJOUTE une route prenant un id de machine au chemin
+    -> c'est bien un changement de CODE
+    -> MAIS le diff qui le declenche AJOUTE UNE ROUTE et ne touche pas le garde
+    -> donc la relecture de ce diff NE PEUT PAS le voir
+
+**Quatrième catégorie : réveil par du code, invisible dans le diff qui le déclenche.** *Ma coupure en
+trois — porteur, données, chemin d'appel — supposait que « réveil par du code » impliquait « visible en
+relecture ». La condition de réveil et le lieu de sa visibilité sont deux choses.*
+
+### Et elle a formé une hypothèse alarmante puis l'a réfutée elle-même
+
+**Elle a cru que V13 — rattacher un serveur à un profil, porté cette nuit à 01:49 — venait de réveiller
+ce défaut**, *« j'avais déjà la phrase »*.
+
+    V13 passe par  POST /supervision/profils        routes Laravel propres
+    et NON par     /supervision/machines/<mid>/profile
+    seul appelant de la route a <mid> : legacy/_deprecated/.../profiles.js — ARCHIVE
+
+**Il n'a rien réveillé.** *Une hypothèse formée sur la proximité du sujet — « V13 touche les profils de
+machines, donc… » — et réfutée par la mesure du chemin réellement emprunté.*
+
+### Ce que le dossier ne fait PAS, et il l'écrit
+
+> *Je classe la PORTÉE, pas la justesse.* **Les 318 `pytest` de la branche ne sont pas rejoués.** Et il
+> **ne recommande aucune fusion** : *la règle du dépôt est qu'un patch de sécurité ne se fusionne que sur
+> validation verbale explicite, et un dossier ne la remplace pas.*
+
+**Un dossier qui déclare ce qu'il ne prouve pas est utilisable ; celui qui laisse croire qu'il prouve
+tout ne l'est pas.**
+
+## E-363 — LE FORMAT D'UNE DURÉE : un troisième piège d'horloge, distinct des deux autres
+
+    ps -o etime=   ->  `01:56`  et  `04:49`
+    ce sont des MINUTES:SECONDES, lues comme des heures:minutes
+
+**Elle a donc cru un moment que le LOT tournait depuis presque cinq heures**, et *horodaté un dossier à
+10:20 alors qu'il était 08:21* (corrigé, `7fa55c5`).
+
+> **« 1 h 56 sur un LOT de 3 h » est parfaitement crédible.** *Une valeur plausible et fausse ne se
+> signale pas d'elle-même* — et c'est la troisième forme de piège temporel de ce chantier, **distincte des
+> deux autres** :
+>
+>     le DECALAGE      hote en CEST, conteneurs en UTC : deux heures
+>     la PEREMPTION    un releve est une photo d'un systeme qui bouge
+>     le FORMAT        `etime` s'etend de MM:SS a DD-HH:MM:SS selon la duree  <- neuf
+
+**La parade** : `ps -o lstart=` rend une date absolue et ne change pas de forme. *Elle l'a employée pour
+me confirmer le départ à 08:16:26 — au chiffre près.*
+
+## E-364 — MON GARDE DE BANC A SERVI, ET IL A RENDU LES DEUX ÉTATS
+
+**Premier usage réel de `banc-libre.sh`, écrit ce matin :**
+
+    moi   08:17   OCCUPE — pid 1296802  node go-socle-navigation.mjs
+    elle  08:21   OCCUPE — pid 1298127  node go-socle-i18n.mjs
+
+**Deux sessions, deux instants, deux suites différentes nommées.** *L'instrument suit le LOT et ne se
+contente pas de dire « quelque chose tourne ».*
+
+**Et son avertissement a fonctionné comme prévu** : elle relève qu'*« il rend `RIEN VU` avec
+l'avertissement qu'il n'est pas libre, et dit d'aller demander la fenêtre — c'est la correction que je
+t'avais faite hier, rendue en outil »*.
+
+*Le qualificateur de cache a rendu `0` sur la fenêtre du LOT au même moment* : aucune reconstruction
+depuis le départ, donc **aucun FAIL de délai ne pourra lui être attribué pour l'instant** — ce qui est
+précisément le service qu'on attend de lui.
