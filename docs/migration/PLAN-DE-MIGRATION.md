@@ -5189,3 +5189,66 @@ prétendu le contraire, c'était faux (E-280 deuxième passe, retiré en quatri�
 Le redémarrage ne devient un remède **que** s'il est précédé de l'application.
 *Le même geste est neutre ou réparateur selon ce qui a été écrit avant lui — et
 c'est exactement pourquoi il ne se présente pas comme un bénéfice acquis.*
+
+
+## §7 — DOUZIÈME OBJET, CORRIGÉ : quatre patchs vivants, et un piégé qui s'applique
+
+**Mesuré le 2026-09-03 10:55 sur l'artefact, pas sur le compte rendu.** La
+session 4 a persisté (`81a29d1`, `4c82ec9`) ce qui ne vivait qu'en session, et le
+**tri a rapporté plus que la copie** : il y avait **sept** patchs dans un
+scratchpad, pas deux.
+
+    docs/migration/patchs-en-attente/
+      01-E-231-psk-illisible.patch                            applicable sur HEAD
+      02-E-280-portee-scheduler.patch                         applicable sur HEAD
+      03-telegraf-jeton-en-clair.patch                        applicable sur HEAD
+      04-E-281-apres-fusion-NE-PAS-APPLIQUER-SUR-HEAD.patch   APRÈS FUSION SEULEMENT
+      QUARANTAINE-perime-refait-par-a345e65.patch             ⚠ NE PAS APPLIQUER
+      README.md
+
+Deux périmés ont été retirés (`E-280-entree`, appliqué en v1.38.180 ;
+`e187-forme`, dont le contenu est **déjà dans l'arbre**), et la distinction qui
+les a démasqués mérite d'être gardée :
+
+> **Un patch qui refuse peut être PÉRIMÉ ou viser un AUTRE ARBRE. Les deux
+> refusent identiquement.** Ce qui les sépare est de **chercher son contenu dans
+> l'arbre** — le nom du fichier ne porte pas cette différence, seule la mesure la
+> porte. Sans elle, les deux périmés auraient été persistés comme vivants.
+
+### ⚠ LE PIÈGE : le quarantainé PASSE `git apply --check` sur HEAD
+
+Il passe **parce que** `HEAD` n'a pas le correctif de la branche. Un lecteur
+pressé y verrait un patch valide, l'appliquerait, et rendrait **conflictuelle une
+fusion aujourd'hui propre, sur le hunk le plus sensible du dépôt**. Il est
+conservé et non supprimé, son état dans son **nom** : *le supprimer garantirait
+qu'on le réécrive une troisième fois, le laisser nommé comme un correctif
+garantirait qu'on l'applique.*
+
+### ⚠ CE QUI NE DOIT PAS SE LIRE COMME UNE FERMETURE
+
+Le patch **04 ne s'applique QU'APRÈS la fusion**. Donc si la fusion n'est pas
+dans le même geste :
+
+> **« les patchs sont appliqués » ne veut PAS dire « E-280 est fermé ».**
+> `_run_scheduled_scan` garde ses branches ouvertes, c'est-à-dire que **la moitié
+> CVE d'E-280 reste entière** — réserve de la session 4, à porter à l'exploitant
+> avec le geste, pas après.
+
+### Ce qui reste à faire porter, et ce n'est pas à moi
+
+`DIFFS-PRETS-NON-APPLIQUES.md` porte désormais les artefacts avec leur régime
+(mesuré : 3 mentions d'E-280, 2 d'E-281, 2 d'E-231). **`DOSSIER-00-CE-QUI-ATTEND-VOTRE-SIGNATURE.md`
+en porte encore ZÉRO** — le document qui liste ce qui attend une signature ne
+mentionne aucun des quatre.
+
+⚠ **Et je ne recompte pas §7 ici.** Deux des quatre patchs recoupent
+probablement des objets déjà listés — le jeton telegraf a son
+`DOSSIER-13-JETON-TELEGRAF-EN-CLAIR.md`, et E-231/PSK figurait dans la file de la
+session 4. **Le nombre d'objets de §7 se REMESURE par différence d'ensembles, il
+ne se récite pas** (E-312) : je l'ai récité à onze pendant que le douzième
+n'existait dans aucun fichier.
+
+*Note d'instrument : mon `find -maxdepth 3` a rendu ZÉRO fichier de patch, parce
+qu'ils sont à la profondeur 4. Seul un témoin positif (`version.txt`, rendu) m'a
+évité d'écrire « aucun artefact » une seconde fois — l'outil marchait, ma BORNE
+était fausse, et les deux se lisent pareil.*
