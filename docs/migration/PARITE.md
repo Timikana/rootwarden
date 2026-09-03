@@ -16900,3 +16900,90 @@ passés par le runner.**
 **`10 + 9 = 19`, et 19 est le compte total de la suite.** *Un défaut réel n'aurait pas conservé la
 somme* — c'est la signature d'un basculement en masse, pas d'une régression. **L'ordre de grandeur est
 le dernier filet, et il a tenu.**
+
+## E-359 — UN TROISIÈME ÉTAT PARTAGÉ : le cache de vues, qu'aucun garde ne voit
+
+**Manque connu de l'instrumentation, inscrit comme tel et non comme une tâche.**
+
+    arbre          `lib-arbre.mjs`, mtime           ->  INSTRUMENTE (la porte eprouvee)
+    base           TOTP, drapeaux, fixtures          ->  AUCUN INSTRUMENT
+    cache de vues  `artisan view:clear` + `view:cache` ->  AUCUN INSTRUMENT
+
+**Ces commandes ne sont pas scopées** : une session les a lancées pour **deux** de ses vues, **les 112
+gabarits ont été recompilés**, ceux des autres compris.
+
+### Sa SIGNATURE, mesurée — et c'est ce qui le rend instrumentable
+
+    storage/framework/views          112 gabarits
+    le plus ancien   05:48:46 UTC
+    le plus recent   05:48:47 UTC
+    -> les 112 dans DEUX SECONDES
+
+> **Une reconstruction se signe par un AMAS** : beaucoup de fichiers partageant un `mtime` à la seconde.
+> **Une compilation paresseuse normale ne fait pas ça** — un fichier à la fois, étalé.
+>
+> *Le cache est donc distinguable de son propre fonctionnement nominal, et c'est la condition pour
+> l'instrumenter.* **Sans cette signature, on ne pouvait que constater après coup qu'une reconstruction
+> avait eu lieu.**
+
+*(Et j'en ai mesuré une SECONDE, à 07:48 CEST, plus récente que celle rapportée à 07:42 : la session qui
+écrivait huit fichiers au même moment. Le phénomène est fréquent, pas exceptionnel.)*
+
+### ⚠ CE SERA UN QUALIFICATEUR, JAMAIS UN BLOQUEUR
+
+**La distinction qui l'interdit est de la session 7** :
+
+> *Une reconstruction ne peut pas changer ce que la page rend — mais une première compilation coûte 2 à
+> 4,6 s contre 0,21 en cache. Donc un FAIL de **DÉLAI** peut en venir, jamais un FAIL de **CONTENU**.*
+
+**Un garde qui bloquerait là-dessus arrêterait des mesures pour une cause qui n'affecte pas le contenu**
+— et *bloquer des exécutions pour une cause que la plupart ne subissent pas fabrique l'obstacle qu'on
+contourne, et un garde contourné ne garde rien.*
+
+    forme retenue : `CACHE RECONSTRUIT (n gabarits en Δs)` A COTE du verdict, sans le changer
+    -> un FAIL de delai devient INTERPRETABLE
+    -> aucun FAIL de contenu n'est EXCUSE
+
+**Non écrit à ce jour, et la raison est la règle de la session 7 appliquée à mon propre outil** :
+*l'éprouver dans les deux sens exige de déclencher une reconstruction, donc de perturber qui mesure.*
+**Un instrument qu'on ne peut pas éprouver ne s'écrit pas.** À poser quand le banc sera libre **et** sans
+mesure en vol — *les deux conditions, parce que « rien ne tourne » n'est pas « personne ne va lancer ».*
+
+## E-360 — CE QU'ON COUVRE EN PREMIER EST CE QU'ON VIENT D'ÉCRIRE
+
+**Diagnostic de la lacune de R4, et il est plus dur que « j'ai oublié ».**
+
+    couvert    le formulaire · l'annonce de portee · le scan de masse
+               -> trois etapes ecrites parce que trois sous-lots venaient de les livrer
+    non couvert  le bouton de SUPPRESSION, present depuis R2
+               -> `grep supprimer` rendait 0, et c'etait le SEUL geste irreversible de la page
+
+> **Ce qu'on couvre en premier est ce qu'on vient d'écrire, pas ce qui coûte le plus cher.** *Un geste
+> livré il y a deux sous-lots ne se rappelle à personne ; un geste livré ce matin se couvre tout seul.*
+
+**Et rien dans la méthode de la session 7 ne l'aurait fait trouver** — *c'est la session 3 qui l'a nommé
+en demandant sa fenêtre, et son `grep supprimer -> 0` qui l'a chiffré.* **Le manque a été trouvé par la
+coordination, pas par la mesure.**
+
+### Corollaire pour la couverture : trier par IRRÉVERSIBILITÉ, pas par récence
+
+*La liste des gestes d'une page ordonnée par « ce qui vient d'être livré » place le plus dangereux
+n'importe où.* **Ordonnée par ce qui ne se répare pas, elle le place premier.**
+
+## E-361 — UN INSTRUMENT QUI AVOUE SON TAUX DE FAUX POSITIFS EST EMPLOYABLE
+
+    la sonde des 24 gardes « sans objet »   1 vrai, 23 faux, ET RIEN SUR SA PRECISION
+    le controle d'ensembles des ancres      3 vrais, 1 faux POSITIF DECLARE
+
+**Le rapport est comparable ; l'aveu fait toute la différence.**
+
+> **Un instrument dont on connaît le taux de faux positifs est utilisable ; un instrument silencieux sur
+> ses limites ne l'est pas.** *Le second se croit, donc il coûte le temps de vérifier ce qu'il accuse ; le
+> premier se lit, donc on sait où regarder.*
+
+**Et le contrôle d'ensembles a trouvé ce qu'aucune relecture ne trouve** : trois ancres lues sans être
+déclarées, dans un fichier **lu trois fois la même nuit** par quelqu'un qui avait ajouté la même ancre à
+**deux autres suites** sans voir qu'elle manquait ici.
+
+*Un `querySelector(undefined)` aurait planté et le message aurait accusé la page — troisième fois de la
+nuit.* **La relecture ne trouve pas un manque ; une différence d'ensembles le trouve mécaniquement.**
