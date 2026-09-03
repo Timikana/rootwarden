@@ -6763,3 +6763,67 @@ retire en le datant.*
 > **« Une réserve périmée devient une fausse alarme, et une fausse alarme use le crédit du fichier qui la
 > porte. »** *C'est le meilleur argument que j'aie lu pour daterretirer une réserve plutôt que de la
 > laisser dormir.*
+
+---
+
+# ✅✅ 23:00 — LA CI DE `main` EST VERTE
+
+    run 33803915986   conclusion : SUCCESS
+    13 jobs verts · 1 rouge, TOLERE (`sast-semgrep-custom`, continue-on-error)
+    origin/main = 304a604, v1.38.199
+
+**C'est la première fois que la bascule passe la CI.** *Elle n'y était jamais passée : les déclencheurs ne
+couvrent que `main`, et `main` n'avait reçu la fusion qu'à 20:42 ce soir.*
+
+## Le chemin, en trois rouges dont aucun ne disait ce qu'il semblait dire
+
+    ROUGE 1  « Tests PHPUnit echoue »
+             -> disait en fait : AUCUN test ne tourne
+             -> cause : git ne suit pas les repertoires vides, `tests/Unit` absent
+                du depot, PHPUnit refuse la suite, `php artisan test` meurt AVANT
+             -> correctif : un `.gitkeep` (09f2be0)
+             -> revelation : 285 tests et 923 assertions tournaient dans le vide
+
+    ROUGE 2  « 4 tests echouent »
+             -> c'etaient QUATRE EPINGLES legitimes, et la session 5 a mesure
+                AVANT de realigner : 31->35 fichiers JS, 60->68 sites d'appel,
+                liste a examiner 4->4, LES MEMES
+             -> huit sites neufs, aucun n'entre dans la liste
+             -> resultat : 302 passed, 969 assertions, 0 failed
+
+    ROUGE 3  `sast-semgrep-custom`, TOLERE
+             -> dit « une analyse echoue » et dit « SEPT REGLES SUR DIX
+                n'analysent rien » (DOSSIER-23)
+             -> 3 mortes par erreur de motif, 4 filtrees par `--severity=ERROR`
+             -> n'a JAMAIS ete vert : 19 executions, 0 success
+
+## ⚠ Et le cinquième rouge a trouvé un défaut dans le test lui-même
+
+**En inscrivant neuf routes manquantes, une assertion a rougi** : *« la passerelle est la **SEULE** route
+authentifiée sans rôle ».*
+
+    son assertion gelait deja HUIT noms
+
+> **Le titre promettait une unicité que le code ne vérifiait pas — et il l'a promise jusqu'à ce qu'une
+> route légitime le contredise.** *C'est le défaut que ce chantier poursuit partout — un texte qui affirme
+> plus que son code — **trouvé dans notre propre test**, par un rouge que personne ne pouvait voir tant
+> que le lanceur mourait avant de lancer.*
+
+**Renommé pour dire ce qu'il fait, et son message exige désormais une raison écrite.**
+
+## Et la formulation finale de la règle, meilleure que la mienne et que la sienne
+
+> **« C'est la PROPRIÉTÉ qui a trouvé quelque chose, pas l'empreinte. L'épingle m'a seulement dit OÙ
+> regarder. »**
+
+*Une épingle seule meurt par réflexe ; une propriété seule est aveugle aux changements qui ne la touchent
+pas.* **Le couple garde, et il se répartit le travail : l'épingle localise, la propriété juge.**
+
+## L'état de la bascule au 2026-09-03 23:00
+
+    origin/main            304a604 · v1.38.199 · CI VERTE
+    php artisan test       302 passed · 969 assertions · 0 failed
+    pytest                 640 passed · 1 skipped · 2 xfailed
+    backend                redemarre, sain — les 20 modules inertes EN SERVICE
+    cache de vues          0 compile a root (etait 111)
+    migrations             base a 65 (etaient 62)
