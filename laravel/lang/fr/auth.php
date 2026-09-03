@@ -56,7 +56,33 @@ return [
     'erreur_code_deja_utilise'   => 'Ce code a déjà été utilisé. Attendez le prochain code.',
     'erreur_trop_de_tentatives'  => 'Trop de tentatives. Patientez une minute.',
     'erreur_sans_secret'         => 'Aucun second facteur n\'est configuré sur ce compte.',
-    'changement_requis'          => "Votre mot de passe doit être changé. Cette page n'est pas encore portée : effectuez le changement depuis l'ancien portail.",
+    /*
+     * ⚠ CE BANDEAU ENVOYAIT AILLEURS, 48 LIGNES AU-DESSUS DU FORMULAIRE.
+     *
+     * Il disait « cette page n'est pas encore portee : effectuez le changement
+     * depuis l'ancien portail ». Or `profil.blade.php:56` porte le formulaire,
+     * `web.php:111` sa route, et `MotDePasse.php:192` remet
+     * `force_password_change` a zero. **Le formulaire est sur la page qui
+     * affirmait qu'il n'y etait pas.**
+     *
+     * Cinquieme occurrence du defaut signature de ce chantier — une phrase
+     * vraie a l'ecriture, devenue fausse quand la capacite a ete portee, sans
+     * que rien ne la touche. Et la plus couteuse des cinq :
+     *
+     *   perdre un bouton SE VOIT.
+     *   envoyer l'utilisateur ailleurs alors que le bouton est la NE SE VOIT PAS.
+     *
+     * MESURE DU 2026-09-03, et elle corrige DANS LES DEUX SENS le releve qui
+     * m'a ete transmis :
+     *   12 comptes actifs (et non 10), 8 porteurs du drapeau (et non 6)
+     *   MAIS 5 des 8 sont des comptes `e2e_test_*` crees par les suites
+     *   -> TROIS comptes reels concernes, dont `superadmin`
+     * « 67 % des comptes actifs » serait exact et trompeur : ce qui compte est
+     * le nombre de personnes, pas le nombre de lignes.
+     *
+     * Le bandeau reste CONDITIONNEL — une reserve sans objet devient un decor.
+     */
+    'changement_requis'          => "Votre mot de passe doit être changé. Le formulaire est sur cette page, juste en dessous.",
 
     // Migration
     'ouvrir_ancien_portail' => 'Ouvrir l\'ancien portail',

@@ -9,7 +9,11 @@
     @endif
 
     {{-- ══ SOUS-LOT A2 : LE CHANGEMENT DE MOT DE PASSE ═══════════════════════
-         L'un des DEUX blocages de la v2.0. Six comptes actifs sur dix portent
+         L'un des DEUX blocages de la v2.0. ⚠ CE CHIFFRE ETAIT PERIME. Remesure le
+           2026-09-03 : 12 comptes actifs, 8 porteurs du drapeau — mais CINQ
+           d'entre eux sont des comptes `e2e_test_*` crees par les suites. TROIS
+           comptes reels sont concernes, dont `superadmin`. « Six sur dix »
+           portent
          `force_password_change = 1`, dont `superadmin` : la page ANNONCAIT
          l'exigence par le bandeau ci-dessus et renvoyait vers l'ancien portail,
          qui n'existera plus apres la bascule.
