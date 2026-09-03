@@ -75,6 +75,45 @@ jour : la decision appartient a l'exploitant. Signale le 2026-08-17.
 
 ---
 
+## E-375 — une CONJONCTION dont un membre etait devenu faux
+
+**Corrige le 2026-09-03 (`v1.38.197`), module `ssh/`.**
+
+```
+avant   'non_porte' => "Le declenchement du deploiement ET LA LECTURE DE SON
+                        JOURNAL ne sont pas encore portes."
+```
+
+**Mesure, croisement geste par geste :**
+
+    /deploy   NON appelee   -> la premiere moitie est VRAIE
+    /logs     EXACTE        -> la seconde est FAUSSE
+              `ClesSshController.php:93`  'url_journal' => url('/api/gateway/logs')
+              `cles-ssh.js:390`           await fetch(L.url_journal, …)
+
+**Une phrase qui dit « A et B ne sont pas portes » se lit comme entierement vraie
+quand seul A l'est encore.** Septieme occurrence de cette forme, apres `serveurs`,
+`bashrc`, `fail2ban`, `ssh_audit`, `groups` et `superv`.
+
+**Et le commentaire d'en-tete du controleur portait la meme erreur en plus large** —
+un commentaire pose a cote du geste porte l'autorite du geste. Les deux sont corriges
+dans le meme commit, FR et EN ensemble (parite 46 = 46).
+
+**`ssh.description` n'a PAS ete touchee** : elle dit « le deploiement lui-meme reste
+sur l'ancien portail », et elle est JUSTE. *La formulation qui a survecu est celle qui
+n'affirmait qu'UNE chose : **une conjonction est un pari sur la stabilite de DEUX
+faits**.*
+
+**⚠ Reserve de verification.** `php -l` n'est pas disponible sur l'hote et `docker`
+refuse l'acces : la syntaxe est controlee structurellement (blocs de commentaires
+equilibres, aucun `/*` imbrique, crochets et parentheses equilibres hors
+commentaires), avec un temoin qui detecte un fichier volontairement casse. **Le
+controle reseau ne couvre PAS ces fichiers** : `/cles-ssh` rend 302 sans session, et
+l'ecran de connexion n'emploie aucune cle `ssh.*`. *A confirmer par un rendu
+authentifie.*
+
+---
+
 ## E-02 — Le filtrage des routes backend compare des SEGMENTS, pas des prefixes
 
 **Cible legacy : compare par debut de chaine. Cible Laravel : compare par segment.**

@@ -5,6 +5,32 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.38.197] - 2026-09-03
+
+### Corrige
+- **`ssh/` — une conjonction dont un membre etait devenu faux (E-375).** Le libelle
+  `ssh.non_porte` annoncait que « le declenchement du deploiement ET la lecture de son
+  journal ne sont pas encore portes ». Le croisement geste par geste rend `/deploy` NON
+  appelee mais `/logs` EXACTE (`ClesSshController.php:93` fournit `url_journal`,
+  `cles-ssh.js:390` la `fetch`). Une phrase qui dit « A et B ne sont pas portes » se lit
+  entierement vraie quand seul A l'est encore — septieme occurrence de cette forme.
+  Le commentaire d'en-tete de `ClesSshController` portait la meme erreur en plus large et
+  est corrige dans le meme commit. FR et EN ensemble, parite 46 = 46 verifiee sur les jeux
+  de cles. `ssh.description` n'est PAS touchee : elle n'affirmait qu'une chose, et c'est
+  ce qui l'a fait survivre.
+
+### Notes d'exploitation
+- **Reserve declaree** : `php -l` absent de l'hote et `docker` inaccessible ; syntaxe
+  controlee structurellement avec temoin. Le controle reseau ne couvre pas ces fichiers
+  (`/cles-ssh` rend 302 sans session). A confirmer par un rendu authentifie.
+- **Le second correctif assigne — conditionner la legende du menu — N'EST PAS applique**,
+  et c'est un blocage reel : `layouts/portail.blade.php` a son compile appartenant a
+  `root` dans un repertoire `www-data` ou je ne peux pas ecrire. Toute modification de
+  cette vue fait echouer `touch()` a la recompilation et rend **500 sur toutes les pages**
+  (28 pages d'erreur mesurees ce matin, voir `docs/migration/PIEGE-CACHE-BLADE.md`).
+  **Il faut un `view:cache` cote root, ou un redemarrage du conteneur, dans le meme
+  geste que l'ecriture.**
+
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
 > **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.196** et n'a jamais ete

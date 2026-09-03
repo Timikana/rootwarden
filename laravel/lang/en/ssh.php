@@ -31,7 +31,12 @@ return [
     'annuler' => 'Cancel',
     'confirmer_titre' => 'Deploy SSH keys to these servers?',
     'confirmer_avertissement' => 'On every checked server, as root: the sudo package is installed if missing, entitled accounts are created, their authorized_keys file is REWRITTEN, and a sudoers policy is installed. Keys belonging to any account that lost its entitlement are REVOKED. None of this can be undone from this page.',
-    'non_porte' => 'Starting the deployment and reading its log are not ported yet.',
+    // A conjunction whose second member became false — see the note in
+    // `lang/fr/ssh.php`. `/deploy` is not called (true), but `/logs` IS:
+    // `ClesSshController.php:93` then a `fetch` at `cles-ssh.js:390`. A
+    // sentence saying "A and B are not ported" reads as entirely true when
+    // only A still is. `description`, which asserts only ONE thing, held.
+    'non_porte' => 'Starting the deployment is not ported yet: it stays on the legacy portal.',
     'non_porte_lien' => 'Run them from the legacy portal',
     // ── The pre-deployment check (sub-batch K2) ─────────────────────────────
     'verifier' => 'Check prerequisites',
