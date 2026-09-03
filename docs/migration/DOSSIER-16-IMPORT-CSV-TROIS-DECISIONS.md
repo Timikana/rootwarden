@@ -60,7 +60,52 @@ maillon.*
 
 **Donc `mid ∈ allowed_servers` ⟹ `sudo_policies[mid]` existe ⟹ la troisième branche ne tire JAMAIS.**
 
-### Et le fait réel est plus net que « inerte » : le déploiement RETIRE le sudo
+### ⚠⚠ RÉVISION 10:20 — E-130 est RENVERSÉE : le geste de rôle 3 est SANS EFFET LUI AUSSI
+
+**Relevé par la session 3, cinq affirmations revérifiées par moi une par une.**
+
+    051:7    sudo_preset ENUM(…) NOT NULL DEFAULT 'none'
+             -> la colonne n'est JAMAIS nulle, `policy_for_machine` toujours un dict plein
+             -> la branche du repli est MORTE PAR LE SCHEMA, pas par le collecteur
+
+    toggle_sudo.php:61   UPDATE users SET sudo = ? WHERE id = ?      <- users.sudo SEUL
+    seul ECRIVAIN de sudo_preset :  update_server_access.php:123     (verifie : les autres
+                                    fichiers ne font que LIRE, backend en lecture seule)
+    declencheur SQL de rattrapage : AUCUN CREATE TRIGGER dans les migrations
+    051:37-38  rattrapage A UN COUP : WHERE u.sudo=1 AND uma.sudo_preset='none'
+               -> les comptes crees APRES ne sont JAMAIS convertis
+
+> **`users.sudo` ne confère plus rien sur aucune machine — ni par l'import, NI PAR LE GESTE DE RÔLE 3 que
+> la caractérisation cite comme la référence bien gardée.** *Le seul chemin d'octroi vivant est la liste
+> déroulante de préréglage de `manage_access.php`.*
+
+**Donc E-130 n'est PAS « une escalade par fichier ».** *C'est une **interface de privilège qui mente dans
+les deux sens** : elle montre accordé ce qui ne l'est pas, et le déploiement défait silencieusement ce
+qu'elle affiche — **y compris pour un rôle 3 accomplissant le geste légitime.***
+
+**Et le commentaire posé juste au-dessus de la branche décrit un cas que le schéma rend impossible :**
+
+    # policy=None -> fallback bool users.sudo
+
+*Un commentaire qui affirme plus que le code — la classe traquée tout au long de ce chantier, sur le
+chemin même dont il s'agit.*
+
+### ⚠ LA SÉVÉRITÉ N'EST PAS NULLE : ELLE EST DIFFÉRÉE — et elle décide de l'ORDRE
+
+> **Le jour où quelqu'un répare `toggle_sudo.php` en écrivant aussi `sudo_preset`, tout compte portant
+> `users.sudo = 1` obtiendrait `NOPASSWD: ALL` sur chaque machine qu'il atteint** — *les comptes importés
+> sans garde inclus.*
+
+    1. FERMER la colonne `sudo` a l'import   (role 3 + coercition + compte-rendu par ligne)
+    2. SEULEMENT ENSUITE reparer le chemin d'octroi
+
+**Réparer (2) avant (1) armerait par un correctif ce que le correctif venait empêcher.**
+
+*C'est l'argument le plus fort pour l'issue (a), et il ne dit plus « aligner l'import sur le geste
+dédié » — **le geste dédié est cassé aussi.*** **Il dit : fermer la porte avant de rebrancher le
+courant.**
+
+### Le fait intermédiaire, qui reste vrai : le déploiement RETIRE le sudo
 
 **Avec `preset = 'none'`, c'est la DEUXIÈME branche qui tire — `remove_from_sudoers`.**
 
