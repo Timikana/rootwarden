@@ -2,19 +2,20 @@
   "genere_par": "laravel/tests/Outils/analyse-appelants.mjs --instantane",
   "dossier": "laravel/public/js",
   "totaux": {
-    "fichiers": 31,
-    "appels": 60,
-    "verifie": 28,
+    "fichiers": 35,
+    "appels": 68,
+    "verifie": 30,
     "flux": 7,
-    "delegue": 21,
+    "delegue": 27,
     "delegue_sans_lecteur": 2,
     "ignore": 2,
     "illisible": 0
   },
   "empreintes": {
-    "acces-sftp.js": "558a0929f6338813",
+    "acces-sftp.js": "22fd143b2372c73a",
     "approbations.js": "874aa42ba41121f0",
-    "bashrc.js": "b1f82c8e4b9408f5",
+    "audit-ssh.js": "33e9c4a747adf6d0",
+    "bashrc.js": "ad6d75455290bf31",
     "chatops.js": "607141666c99b287",
     "cle-plateforme.js": "847da8fc8e2f3f9c",
     "cles-ssh.js": "de7d0a5777ba4594",
@@ -22,8 +23,9 @@
     "comptes.js": "b60f1d1ae2a77e0b",
     "derive-config.js": "d9d473c325b78901",
     "docker.js": "9dd84e29d334ce14",
-    "fail2ban.js": "ae10645cca4d5129",
+    "fail2ban.js": "7b61fb71c08ed9df",
     "graylog.js": "068cf30f0033ad59",
+    "groupes.js": "eb529d80d9d4e39c",
     "journal-audit.js": "b6605a328e06b3d8",
     "journal-commandes.js": "08b632c466f896d2",
     "journal-execution.js": "2ef18e23c29006cc",
@@ -34,15 +36,17 @@
     "pare-feu.js": "b02d82e5896ea8cf",
     "permissions.js": "235d89f13fc92fb3",
     "planification-cve.js": "c79107cc1487417b",
-    "politiques.js": "8e61ae3bbe5db4c8",
+    "politiques.js": "a5a3932f7cb1273a",
     "recherche.js": "6daca37c7755f94e",
     "sauvegardes.js": "3f2a80b29a1d48ea",
     "scan-cve.js": "4bdbcbe21b0f9515",
     "serveurs.js": "75ac0ff9843b8717",
     "services.js": "a8fc3aa9607c974c",
-    "supervision.js": "78a9d78512f387a6",
+    "step-up.js": "d4a4ecccbf870548",
+    "supervision.js": "e1ee09190066011e",
     "taches.js": "e2f38dc14fa64973",
-    "tickets.js": "1b9803433b017d1e"
+    "tickets.js": "1b9803433b017d1e",
+    "wazuh.js": "c87a0aad1e41596f"
   },
   "a_examiner": [
     {
@@ -59,6 +63,7 @@
         "/journal-audit/verifier"
       ],
       "origine": null,
+      "prefixe": "",
       "fichier_consulte_success": false
     },
     {
@@ -71,6 +76,7 @@
       "verdict": "ignore",
       "chemins_appelants": [],
       "origine": null,
+      "prefixe": null,
       "fichier_consulte_success": false
     },
     {
@@ -83,6 +89,7 @@
       "verdict": "delegue_sans_lecteur",
       "chemins_appelants": [],
       "origine": null,
+      "prefixe": "",
       "fichier_consulte_success": false
     },
     {
@@ -95,6 +102,7 @@
       "verdict": "ignore",
       "chemins_appelants": [],
       "origine": null,
+      "prefixe": null,
       "fichier_consulte_success": true
     }
   ]
