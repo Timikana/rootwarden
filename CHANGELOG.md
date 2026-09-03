@@ -7,7 +7,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.191** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.192** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2170,6 +2170,85 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.192 — E-362 : `profil` disait d'aller ailleurs 48 lignes AU-DESSUS du formulaire — et la page se CONTREDISAIT
+
+**Cinquieme occurrence du defaut signature, et la plus couteuse.**
+
+    profil.blade.php:8    « Votre mot de passe doit etre change. Cette page n'est pas
+                            encore portee : effectuez le changement depuis l'ancien portail. »
+    profil.blade.php:56   <form action="{{ route('profil.mot-de-passe') }}">
+    web.php:111           POST /profil/mot-de-passe -> changerMotDePasse
+    MotDePasse.php:192    'force_password_change' => 0    <- il REMET le drapeau a zero
+
+**Le formulaire est sur la page qui affirmait qu'il n'y etait pas.**
+
+> **Perdre un bouton SE VOIT. Envoyer l'utilisateur ailleurs alors que le bouton est la NE SE VOIT
+> PAS.** *Ce n'est pas un libelle perime, c'est un libelle qui DETOURNE.*
+
+#### ⚠ ET LA PAGE PORTAIT LES DEUX AFFIRMATIONS, A 48 LIGNES D'ECART
+
+    :8    « cette page n'est pas encore portee … depuis l'ancien portail »
+    :~19  « Le changement de mot de passe et les sessions ouvertes, EUX, se gerent
+            DESORMAIS SUR CETTE PAGE. »   (`profil.non_porte_texte`)
+
+*Cadrage plus juste que « libelle perime » : **la page se contredisait**, et l'une des deux
+affirmations avait raison.* Elle a ete corrigee vers celle qui etait vraie.
+
+#### Le chiffre transmis etait faux DANS LES DEUX SENS, et sa correction change la lecture
+
+    releve transmis    6 comptes actifs sur 10
+    mesure du 03/09    12 actifs, 8 porteurs du drapeau
+    MAIS               5 des 8 sont des comptes `e2e_test_*` crees par les suites
+    -> TROIS comptes reels concernes, dont `superadmin`
+
+**« 67 % des comptes actifs » serait exact et trompeur.** *Ce qui compte est le nombre de personnes,
+pas le nombre de lignes.* Le chiffre perime vivait aussi dans un commentaire de la vue — il y est
+desormais **date**, et corrige a cote de l'ancien plutot qu'a sa place.
+
+#### Les trois controles demandes, et ce qu'ils ont donne
+
+    1. lecteurs de la cle hors catalogues   1   (`profil.blade.php:8`)
+    2. suites qui l'assertent               0
+    3. le bandeau reste CONDITIONNEL        `@if ($changementRequis)` intact
+                                            — une reserve sans objet devient un decor
+
+#### ⚠ TROIS DE MES PROPRES INSTRUMENTS ONT MENTI, DANS LA MEME PASSE
+
+1. **Mon assertion a mordu sur MA PROPRE PROSE.** Elle cherchait « ancien portail » dans les 400
+   caracteres suivant la cle — et mon commentaire cite la phrase corrigee. Rien n'a ete ecrit.
+   Corrigee pour porter sur **la VALEUR**, extraite par expression reguliere. *Quatrieme fois cette
+   nuit qu'une sonde compte le commentaire qui l'explique.*
+2. **Un `grep -c` bash a rendu 0 sur une ligne qui existe** — `@if ($changementRequis)`, presente une
+   fois, forme exacte verifiee en Python. *Un faux zero d'un instrument est indiscernable d'une
+   absence reelle ; c'est la mesure Python qui fait foi, et c'est elle que je cite.*
+3. **Mon controle a l'echelle de la PAGE a crie a tort.** « renvoi vers l'ancien portail : true » —
+   il vient de `profil.non_porte_texte`, une declaration **legitime et encore vraie** : les
+   connexions memorisees ne sont pas listees ici. *Mon attente etait fausse, pas la page.*
+
+*Et le troisieme est celui qui a servi* : c'est en verifiant CETTE fausse alarme que j'ai lu la
+phrase voisine et vu que la page se contredisait.
+
+#### Mesures
+
+    GET /profil                        200   (rw-test-super)
+    formulaire present                 true
+    identifiants `auth.*` a l'ecran    []
+    erreurs JavaScript                 []
+    parite i18n                        FR=36 EN=36, JEUX DE CLES compares
+
+#### ⛔ CE QUI N'A PAS ETE MESURE, ET POURQUOI
+
+**Le bandeau lui-meme n'a pas ete rendu.** Il est conditionne a `force_password_change`, et **aucun
+compte de test permis ne le porte** : les trois comptes reels concernes sont `superadmin` et deux
+comptes nominatifs, et `rw-test-user` est dans les interdits permanents.
+
+*Le poser sur un compte de test modifierait un etat partage que d'autres suites lisent — c'est
+precisement le defaut qui a fait rougir une mesure de ce banc : une fixture posant
+`force_password_change` casse les mesures concurrentes sans qu'aucun fichier ne bouge.*
+
+Ce qui est verifie : le catalogue, l'unicite du lecteur, la conditionnalite du bandeau et l'absence
+d'identifiant a l'ecran. **Ce qui ne l'est pas : le texte tel qu'un compte concerne le lira.**
 
 ### v1.38.191 — E-361 : `ssh_audit` A4, relever un serveur — LA ONZIEME ET DERNIERE
 

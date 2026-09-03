@@ -56,7 +56,11 @@ return [
     'erreur_code_deja_utilise'  => 'This code has already been used. Wait for the next one.',
     'erreur_trop_de_tentatives' => 'Too many attempts. Wait one minute.',
     'erreur_sans_secret'        => 'No second factor is configured on this account.',
-    'changement_requis'         => 'Your password must be changed. This page is not ported yet: change it from the previous portal.',
+    // This banner sent the user away, 48 lines above the form that does the
+    // job — see the note in `lang/fr/auth.php`. Fifth occurrence of the
+    // signature defect: losing a button SHOWS; sending someone elsewhere while
+    // the button is right there DOES NOT.
+    'changement_requis'         => 'Your password must be changed. The form is on this page, just below.',
 
     // Migration
     'ouvrir_ancien_portail' => 'Open the previous portal',
