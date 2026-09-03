@@ -4960,3 +4960,82 @@ politique autorise un DÉPLOIEMENT SUDO pendant quinze minutes.*
 **Tant que le défi n'est pas porté dans ces deux modules, `legacy/auth/step_up.php` ne peut pas être
 archivé** — *sinon le déploiement et le retrait des politiques `sudo` et `sftp`, et leur rollback,
 deviennent inatteignables : la garde refuse, et il n'y a plus de repli.*
+
+---
+
+## Tour de 08:35 — la fusion est AUTORISÉE, et rien ne change encore
+
+**Banc OCCUPÉ (`go-page-cve-consultation.mjs`), LOT rendu vers 11:15. Écriture `docs/` seule.**
+
+### ⚠ L'exploitant a levé l'interdit de fusion — et la portée n'est pas confirmée
+
+**À 08:29** : *« tu peux merge sur main pour info et push quand tu veux ! quand l'équipe est prête »*, et
+il a créé une branche `legacy` **« pour pas perdre le legacy »**.
+
+    origin/main ... HEAD   ->  0 / 820 commits
+    831 fichiers, +203 668 / -1 043
+    www/    227 SUPPRIMES        legacy/  227 CREES     <- c'est le RENOMMAGE
+
+> **Cette fusion EST la bascule v2.0.** *Il l'a annoncée « pour info ».* **Je lui ai demandé de
+> confirmer que la mise en production du portail Laravel est bien l'intention ; il n'a pas répondu.**
+
+**Je n'ai rien fusionné, et pas seulement à cause du silence :**
+
+    1. le LOT tourne — une fusion reecrit 831 fichiers SOUS la mesure
+    2. migrations 063 · 064 · 065 non appliquees, et 065_target_type_non_nul.sql
+       EST la garde en base d'E-280
+    3. `git push` reste REFUSE par le garde d'auto-mode de ma session
+       -> un `main` local a 820 commits d'avance que personne ne voit est PIRE
+          qu'une attente
+
+**Et sa branche `legacy` protège d'un risque qui n'est pas celui qu'il croit** : *le legacy n'est pas
+effacé par la fusion — il devient `legacy/` et reste servi.* **Je le lui ai dit : c'est une ceinture
+utile, pas un filet porteur.**
+
+**`security/backend-cve` reste DEHORS.** *Non mentionnée, et un patch de sécurité exige une validation
+verbale explicite.*
+
+### ✅ ARBITRAGE : la légende du menu se CONDITIONNE, elle ne se supprime pas
+
+    Navigation.php  'legacy' apparait 2 fois  ->  le MECANISME du marqueur EXISTE
+                    0 entree le porte
+    portail.blade.php:26 et :119  legende rendue SANS CONDITION, deux fois
+
+**Une réserve sans objet devient un décor — mais la supprimer crée le défaut MIROIR** : *le jour où une
+entrée reprendrait le marqueur, la flèche apparaîtrait sans rien pour l'expliquer.* **Une légende
+conditionnelle se corrige seule dans les deux sens.**
+
+### La septième conjonction, et la version courte a survécu
+
+    ssh.php 'non_porte'  « le declenchement du deploiement ET LA LECTURE DE SON
+                           JOURNAL ne sont pas encore portes »
+    /deploy  non appelee                     VRAI
+    /logs    cles-ssh.js:390 fetch           FAUX
+
+**`description` porte la même idée en plus court — *« le déploiement lui-même reste sur l'ancien
+portail »* — et elle est JUSTE.** *Elle a survécu parce qu'elle ne conjoignait rien.* **C'est la
+meilleure démonstration de la règle qu'on ait eue : ce n'est pas la longueur qui périme un libellé,
+c'est le ET.**
+
+### ⚠ L'indicateur doc/code, deuxième fois : sa définition exclut l'ingénierie
+
+    par la definition du tour   2 code / 7 doc  =  3,5 pour 1
+    travail reel                5 code (+ 2 feat(lot), 1 test(e2e)) / 4 doc equipe
+
+**La définition — `feat`/`fix` touchant `laravel/` ou `backend/` — exclut TOUT le harnais de test.**
+*`f2464d5` a livré un qualificateur du cache de vues éprouvé sur sept témoins ; il ne compte pas.* **Et
+3 des 7 doc sont à moi.**
+
+> **Deuxième tour où cet indicateur franchit son seuil sans mesurer ce qu'il prétend.** *Un seuil qu'on
+> franchit deux fois pour deux raisons différentes, toutes deux dans sa définition, n'est pas un seuil :
+> c'est un artefact.*
+
+### Ce que la flotte a trouvé et que je n'avais pas
+
+**E-364** : *je disais « les deux écrans n'offrent pas le défi » — c'était le symptôme.* **La cause était
+le helper partagé qui avalait `step_up_required` : l'écran ne POUVAIT pas savoir qu'on le lui
+demandait.** *Aucun des deux écrans ne pouvait la voir depuis sa propre page.*
+
+**E-365** : *le panneau s'ouvrait sous le pli, les 75 px coupés portaient la saisie.* **Un défi de second
+facteur dont le champ est hors écran est un refus déguisé en panne** — la garde tenait, et personne
+n'aurait pu la satisfaire. *Visible à l'image seulement.*
