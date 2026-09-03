@@ -5664,3 +5664,92 @@ question : il mesurerait encore une autre SAPI.**
 **Et la session 3 maintient sa réserve d'origine, correctement** : *« je n'ai été un bon contradicteur sur
 celle-ci que par accident — j'ai cherché la configuration parce que je ne pouvais pas la mesurer, et c'est
 ce détour qui a montré qu'il y avait deux conteneurs. »*
+
+---
+
+## ⛔ RECTIFICATION DE LA RECTIFICATION — 11:30 : ma conclusion sur les 60 s tombe, le défaut est PIRE
+
+**Le Lead a l'accès `docker`, a fait la mesure que je réclamais, et elle renverse ce que j'avais écrit il
+y a quinze minutes.**
+
+    le fichier DANS le conteneur servi   opcache.revalidate_freq = 60  (:259, NON commentee)
+    le fichier du depot                  IDENTIQUE, 11751 octets des deux cotes
+    ce que PHP RAPPORTE                  opcache.revalidate_freq => 2 => 2
+                                         opcache.enable_cli      => Off   (le fichier dit 1)
+    temoin                               php -d opcache.revalidate_freq=99 -i  ->  99 => 99
+                                         -> la directive EST honoree quand elle vient d'ailleurs
+
+> **Le fichier est le bon, la valeur est la bonne, et elle ne s'applique pas.** *C'est la troisième
+> possibilité que ni le Lead ni moi n'avions envisagée : je craignais un conteneur construit depuis un
+> état ancien — il a vérifié, le fichier est identique au dépôt à l'octet près.*
+
+### Ce qui tombe
+
+**« Un `.php` du legacy reste non relu jusqu'à 60 s » est FAUX.** *La valeur effective est `2`, la même
+que le portage.* **Les mesures de parité ne sont pas menacées par ce mécanisme, et j'avais alerté le Lead
+à tort.**
+
+### Ce qui le remplace, et c'est plus grave
+
+> **Quelqu'un a réglé l'opcache du legacy, et ce réglage ne fait rien.** *`enable_cli`,
+> `revalidate_freq` — non appliqués.*
+
+**Une configuration silencieusement ignorée est pire qu'une configuration absente** : *elle a l'air d'un
+réglage, elle se lit comme un réglage, et personne ne la remet en question.* **Je l'ai lue comme active ;
+le Lead aussi, jusqu'à comparer au rapporté.**
+
+### ⚠ Et une explication plus simple que celle du Lead, mesurable depuis le dépôt seul
+
+**Son hypothèse : `zend_extension=opcache` chargé par `conf.d`, donc APRÈS le parsing de `php.ini`, et
+les directives de l'extension arrivées trop tôt sont perdues.** *Plausible. En voici une plus simple, et
+l'asymétrie est INVERSE de ce que nous croyions tous les deux :*
+
+    php/Dockerfile      LEGACY    FROM php:8.4-apache   ·   « opcache » : 0 occurrence
+                                  -> ni `docker-php-ext-install`, ni `docker-php-ext-enable`
+                                  ... et php/php.ini le CONFIGURE sur 4 directives (:246 :259 :265 :269)
+
+    laravel/Dockerfile  PORTAGE   FROM php:8.4-apache   ·   opcache INSTALLE explicitement (:22)
+                                  ... et AUCUN php.ini ne le configure
+
+    php/php.ini : aucun `zend_extension`
+
+> **Les deux conteneurs sont désaccordés, en sens OPPOSÉS.** *Le legacy configure une extension que son
+> Dockerfile n'installe pas ; le portage installe une extension que rien ne configure.*
+
+**⚠ Ce que ça n'établit PAS** : *le Lead mesure `revalidate_freq => 2 => 2`, ce qui suppose l'extension
+CHARGÉE — une directive non enregistrée n'apparaîtrait pas.* **Donc opcache est bien là, et il vient de
+l'image de base ou d'ailleurs, pas de ce Dockerfile.** *Je ne peux pas trancher entre les deux mécanismes
+sans l'accès au conteneur.*
+
+### Ce qui reste NON mesuré, et ma demande d'origine reste non satisfaite
+
+    MESURE      la valeur en CLI, dans le conteneur servi, avec son temoin
+    NON MESURE  la valeur sous la SAPI APACHE — celle qui SERT
+                -> la SAPI charge le meme php.ini et le meme conf.d, donc le meme
+                   mecanisme s'applique « tres probablement ». Ce n'est pas mesure.
+
+**Le Lead le dit lui-même et refuse de créer un endpoint de diagnostic pendant le LOT — c'est la bonne
+conduite.** *Il me rend une valeur, un témoin et une réserve, pas une conclusion sur le portail servi.*
+
+### Bilan : QUATRE points aveugles, QUATRE cassés
+
+    :3896   le GESTE de groupe n'excluait pas les archivees
+    :3165   `notifications.reglages` — page gardee que rien n'atteint
+    :1628   valeur juste, portee fausse
+    :1628 bis  et ma RECTIFICATION de :1628 etait fausse aussi
+
+> **Le quatrième est le mien sur le troisième.** *J'ai corrigé un arbitrage faux par une conclusion
+> fausse, en quinze minutes, et avec une alerte envoyée au Lead entre les deux.*
+
+**Et c'est la DEUXIÈME fois que ma réserve nomme le mauvais risque** : *j'avais écrit « la SAPI n'est pas
+celle qui sert » — le défaut est que la directive n'est appliquée dans AUCUNE des deux.* **Une réserve qui
+nomme le mauvais risque rassure au lieu de protéger.**
+
+### Et une erreur du Lead, qu'il déclare avant qu'on la trouve
+
+    son premier motif : `^[; ]*opcache\.`   <- il ACCEPTE un `;` initial
+                        -> il aurait compte une ligne COMMENTEE comme active
+
+**En l'occurrence les lignes ne l'étaient pas, donc son résultat était juste.** *Encore une réponse bonne
+tirée d'un motif faux — le second de sa matinée, après son `0` sur les confirmations.* **Et il ne l'a vu
+qu'en cherchant pourquoi le fichier et le rapporté divergeaient, pas en relisant son motif.**
