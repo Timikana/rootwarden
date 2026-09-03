@@ -1,0 +1,14 @@
+# Ce fichier existe pour que git SUIVE ce repertoire.
+#
+# `laravel/phpunit.xml:8-10` declare une suite `Unit` pointant sur `tests/Unit`.
+# Git ne suit pas les repertoires vides : le depot ne portait donc pas ce chemin,
+# PHPUnit refusait la suite ("Test directory .../tests/Unit not found"), et
+# `php artisan test` mourait AVANT d'executer les 6 tests Feature qui existent.
+#
+# Mesure du 2026-09-03 : la CI de `main` (run 33792110538) etait ROUGE pour cette
+# seule raison — pas pour un test en echec. Les six tests reels du portage
+# n'avaient JAMAIS tourne en CI.
+#
+# ⚠ NE PAS retirer la suite `Unit` de phpunit.xml pour "corriger" : ca masquerait
+# le fait qu'il n'existe AUCUN test unitaire cote portage. Le vide se declare, il
+# ne se supprime pas.
