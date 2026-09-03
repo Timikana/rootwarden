@@ -417,3 +417,75 @@ reste entière.* **« Les patchs sont appliqués » ne veut pas dire « E-280 es
 
 **Le 09 reste en tête** : *son prérequis est un mot de passe. Le 19 exige le rôle 3, le 21 exige une
 session et des machines attribuées, le 20 exige un accès en base.*
+
+---
+
+## ⚠ CORRECTION 12:10 du « second risque de bascule » — surestimé pour la PRODUCTION, exact pour l'hôte de dev
+
+**Ma section de 08:56 écrivait : « la mise en production rend chaque vue touchée plus récente que son
+compilé, et le portail répond 500 ». Mesuré, c'est vrai d'un hôte qui a DÉJÀ un cache — et la production
+n'en a pas.**
+
+    origin/main   `rootwarden_laravel` : 0 occurrence dans docker-compose.yml
+                  laravel/docker-entrypoint.sh : ABSENT
+    -> la production n'a AUCUN gabarit Laravel compile a ecraser
+
+**Donc la bascule ne fait PAS tomber la production** : *le premier démarrage du conteneur neuf construit
+le cache de zéro, et il n'y a aucun fichier `root` préexistant à écraser.* **Le piège s'arme pour la
+PREMIÈRE ÉDITION DE VUE qui suivra, pas au moment de la bascule.**
+
+**Sur CET hôte de développement, en revanche, la mesure tient** : *151 compilés dont 111 `root`, et la
+fusion rend 50 vues plus récentes.* **Ici le 500 est réel.**
+
+### ⛔ Et un fait neuf qui inverse la neutralité de `DOSSIER-07`
+
+    laravel/docker-entrypoint.sh
+      :25  chown -R www-data:www-data storage bootstrap/cache
+      :44  php artisan view:cache            <- EN ROOT, avant `exec`
+      :47  exec "$@"
+
+**La ligne 44 défait l'intention de la 25 pour les fichiers qu'elle crée. La cause est RECRÉÉE à chaque
+démarrage.**
+
+> **`DOSSIER-07` — recréer `rootwarden_laravel` — n'est donc PAS neutre : il RÉARME le piège.** *151
+> compilés à nouveau `root`.* **Le signer sans corriger l'entrypoint reconstitue la cause qu'on croyait
+> traiter.**
+
+**Le correctif durable est une ligne, après la 44** :
+
+    chown -R www-data:www-data storage/framework/views
+
+*Idempotente, même motif que la ligne 25.* **Et elle se signe DANS `DOSSIER-07`, qui attend déjà — aucune
+interruption de plus.**
+
+### ⚠ Et le correctif que j'avais relayé était FAUX
+
+**J'ai écrit** : *« un `view:cache` exécuté en tant que `www-data` produit des fichiers `www-data`, donc
+PHP recompile seul. »* **Il échouerait.**
+
+    repertoire  laravel/storage/framework/views   www-data:www-data 755
+    fichiers    111 d'entre eux                   root:root 755
+
+**`www-data` peut CRÉER dans ce répertoire ; il ne peut pas ÉCRASER un fichier `root`.** *J'avais lu la
+permission du RÉPERTOIRE pour celle du FICHIER — et je l'ai relayé à l'exploitant comme le bon geste.*
+
+### ✅ Une borne qui déclasse l'urgence
+
+    mines ACTIVES : 0     (50 sources, 151 compiles, 0 source plus recente qu'un compile)
+
+**Les 111 sont LATENTS.** *C'est un prérequis, pas un incendie — et ça permet de le traiter dans le lot de
+`DOSSIER-07` au lieu d'une interruption dédiée.*
+
+### La borne que ce dossier déclarait non mesurée est maintenant close
+
+**Il listait** : *« combien de suites du LOT ont traversé la fenêtre de sept minutes ; la ligne de base
+peut porter des échecs qui n'appartiennent pas au code mesuré. »*
+
+    167 executions · 2613 PASS · 55 FAIL
+      50 FAIL  l'incident du cache — 7 suites, et ~50 PASS perdus en plus
+       4 FAIL  defaut de SUITE (E-374)
+       1 FAIL  defaut REEL du LEGACY (go-bashrc-b4) — A NE PAS CORRIGER
+       0 FAIL  imputable au PORTAGE
+    equivalent hors incident : 167 · ~2663 · 5
+
+**La réserve était fondée : la ligne de base portait bien 50 échecs qui n'appartiennent pas au code.**
