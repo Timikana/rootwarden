@@ -366,3 +366,54 @@ processus.*
 les sessions, la base n'a pas été relevée* · *qu'une session SSH s'ouvre réellement : le démontrer
 demanderait de lancer le geste réservé.* **Le défaut de code est établi ; son caractère actif ne l'est
 pas.**
+
+---
+
+## ⚠ AJOUT 11:55 — ce que cet index n'a jamais mentionné : QUATRE PATCHS PRÊTS, et deux dossiers neufs
+
+**Relevé par la session 4 : cet index ne mentionne aucun des quatre patchs en attente.** *Elle a mesuré
+que c'est moi qui tiens ce fichier — `git log` le confirme — et elle n'y a donc pas écrit. Correct.*
+
+### Les quatre patchs, avec leur régime d'application
+
+    01-E-231-psk-illisible ....... s'applique sur HEAD     `apply --check` passe
+    02-E-280-portee-scheduler .... s'applique sur HEAD     passe
+    03-telegraf-jeton-en-clair ... s'applique sur HEAD     passe   (ma decision, DOSSIER-13)
+    04-E-281-apres-fusion ........ exige a345e65           passe APRES fusion,
+                                                           REFUSE sur HEAD
+
+**Artefacts dans `docs/migration/patchs-en-attente/` avec leur README, plus un QUARANTAINÉ qui s'applique
+sur `HEAD` et ne doit pas l'être.**
+
+**⚠ Et la réserve part avec le n°04** : *sans la fusion de `security/backend-cve`, la moitié CVE d'E-280
+reste entière.* **« Les patchs sont appliqués » ne veut pas dire « E-280 est fermé ».**
+
+### Et deux dossiers écrits ce matin qui ne sont pas dans les sections ci-dessus
+
+    DOSSIER-19   le prereglage sudo le PLUS RESTRICTIF accorde le root complet
+                 repli fail-open dans `add_to_sudoers`. Defaut de PRODUCTION.
+                 -> geste : retirer le fail-open, retirer les deux prereglages du menu,
+                    et RELEVER LA BASE (des lignes deja ecrites repliront au prochain
+                    deploiement, longtemps apres la disparition du menu)
+
+    DOSSIER-20   la chaine d'audit dit « intacte » avec 1460 lignes hors chaine,
+                 et elles servent de COUVERTURE. 757 -> 1460 en onze jours.
+                 -> geste : sceller D'ABORD (ca leve le blocage qui a cree les
+                    sept sites nus), corriger les ecrivains ENSUITE
+
+    DOSSIER-21   une liste blanche a survecu a ses pages
+                 -> `apt-get full-upgrade` en root par requete forgee, des le role 1
+                 ✅ SEUL point de cette liste dont la BASCULE soit le REMEDE
+
+### ⚠ Le classement par « ce que ça demande » tient toujours, avec ces trois-là inserés
+
+    A · LA PRODUCTION, prerequis BAS
+        09  le second facteur derivable du MOT DE PASSE          <- toujours en tete
+        19  le prereglage le plus restrictif accorde le root
+        21  une requete forgee lance apt-get en root des le role 1
+        13  un secret en clair
+        20  la chaine d'audit ne discrimine plus une ligne ajoutee
+        12  deux comptes a votre nom
+
+**Le 09 reste en tête** : *son prérequis est un mot de passe. Le 19 exige le rôle 3, le 21 exige une
+session et des machines attribuées, le 20 exige un accès en base.*
