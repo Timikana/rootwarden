@@ -190,3 +190,36 @@ requête forgée envoyant explicitement une chaîne vide — ce n'est pas une ca
 
 **Le geste urgent reste le vôtre** : *un `SELECT` sur `supervision_config` en production, et une
 **rotation** si un jeton y figure.* **Sur le banc : 0 ligne.**
+
+---
+
+## ⚠ AJOUT DU 2026-09-03, 03:52 — l'écran affiche `********`, et c'est ce qui rend le défaut invisible
+
+**Ce n'est pas un fait nouveau** : le masquage est là depuis `2129a2c` (11/04), le commit qui a créé le
+module. *Je l'ai d'abord lu comme un correctif récent, et la datation par `git log -S` le dément.*
+
+**Mais il change ce que l'exploitant VOIT :**
+
+    :2310   if result.get('telegraf_output_token'):
+    :2311       result['telegraf_output_token'] = '********'      <- a la LECTURE
+    :2341   telegraf_token = data.get('telegraf_output_token', '')
+    :2342   if telegraf_token == '********':
+    :2343       telegraf_token = None    # garder l'existant       <- a l'ECRITURE
+
+    grep "encrypt.*telegraf|telegraf.*encrypt|decrypt.*telegraf"   ->  AUCUN
+
+> **Le masquage est un correctif d'AFFICHAGE ; il n'a jamais été un correctif de STOCKAGE.** *Le jeton
+> n'est pas réémis vers le navigateur, et il est en clair dans la base.*
+
+**Et c'est la forme la plus coûteuse du défaut** : *une personne qui ouvre la page voit `********` et en
+conclut, raisonnablement, que le jeton est protégé.* **Le seul indice du contraire est un commentaire qui
+annonce un chiffrement qui n'existe pas — donc le seul artefact qui pourrait alerter est celui qui
+rassure à tort.**
+
+**Ça ne change pas la recommandation** — chiffrer à l'écriture, déchiffrer à la lecture, en une seule
+paire. *Ça change l'urgence de la vérification en production* : **on ne peut pas savoir si un jeton est
+en clair en regardant l'écran.** Il faut un `SELECT`.
+
+**Ce qui reste non mesuré** : *je n'ai pas interrogé la base de production.* La question — **y a-t-il un
+jeton Telegraf enregistré ?** — décide entre « défaut à corriger » et « défaut à corriger **et** secret à
+faire tourner ».
