@@ -17413,3 +17413,80 @@ tableau bash à plusieurs noms par ligne ; et un `awk` sur `backend/logs/` a ren
 **« 0 ligne »** là où la lecture était **refusée** — seul un `tail` qui échoue
 bruyamment l'a révélé. **Un instrument qui ne peut pas lire rend exactement la
 même sortie qu'un objet absent.**
+
+
+## E-372 — CORRECTION : ma section « ce faux positif déplace un diagnostic » était fausse
+
+**Le faux positif du garde reste vrai** — la session 7 le confirme comme un défaut
+de son instrument et le corrigera après le LOT, `lib-arbre.mjs` étant lu par
+toutes les suites en cours. **Ce qui tombe est tout ce que j'en ai déduit.**
+
+**1. Les sept `supervision` en ECHEC ne sont pas une nouvelle occurrence : ce
+sont LES 54.** Mes propres comptes — 9 · 7 · 9 · 5 · 10 · 7 · 7 — **font 54**, et
+ce sont les 54 circonscrits à 08:57 par la session 7 et la DSI. Les échecs sont
+horodatés **08:45:56 → 08:51:59**, donc vieux de deux heures et demie quand je
+les ai lus, et **réparés depuis 08:52**.
+
+> **J'ai lu un bloc contigu pour la première fois et je l'ai pris pour une
+> première occurrence.** Un journal est cumulatif : *la date d'une lecture n'est
+> pas la date de l'événement* — c'est la même faute que « la position dans le fil
+> n'est pas la date », commise cette fois sur un fichier au lieu d'une
+> conversation.
+
+**2. Et l'arbre n'a JAMAIS été l'accusé.** La cause mesurée est le **cache de
+vues Blade** :
+
+    sources des vues   utilisateur:utilisateur      compilés   root:root
+    une source plus récente que son compilé -> PHP (www-data) recompile
+    -> touch() sur un fichier root -> « Utime failed » -> 500
+    -> le socle étant inclus partout, TOUT le portage tombe
+
+Armé par un `git checkout` sur une vue : **le contenu est restitué, la DATE est
+réarmée.** Et les lignes de FAIL le disaient en clair — `statut 500` — donc ma
+question « redirection ou régression ? » n'avait ni l'une ni l'autre pour
+réponse : une redirection aurait rendu 302, une régression 200 avec des
+assertions fausses.
+
+> **J'ai éliminé l'arbre par une mesure juste, au service d'une accusation que
+> personne ne portait** — puis proposé deux hypothèses de remplacement, état
+> partagé en base et régression réelle, qui chassaient un fantôme.
+
+⚠ **QUATRIÈME FOIS DU JOUR, ET LA PLUS CHÈRE : le mécanisme exact était dans ma
+propre mémoire de travail** — *`git checkout` sur une vue Blade restitue le
+CONTENU et arme une panne par la DATE ; cache compilé en root, `touch()` refuse.*
+Je l'ai relu **après** avoir écrit mes deux hypothèses. La règle du jour ne dit
+donc pas seulement « lire les documents du chantier avant de mesurer » : elle dit
+**lire ce qu'on sait déjà**, et un index de mémoire se consulte comme un registre.
+
+## E-373 — une action de masse émet UNE requête pour DEUX machines cochées
+
+**Mesuré par la session 7 dans LOT3**, `go-bashrc-b4 --legacy`, 14 PASS / 1 FAIL,
+**isolé du bloc d'incident** :
+
+    FAIL  une requête part par machine cochée
+          — 1 machine(s) visée(s) pour 2 cochées
+
+**Ni 500, ni panne d'environnement, ni effet d'horloge** : c'est un défaut de
+COMPORTEMENT, et le seul FAIL de LOT3 qui ne s'explique pas par l'incident du
+cache de vues. Les sept `supervision` sont l'incident, `ssh-flux` est le garde qui
+crie à vide (E-372), `navigation` est ma référence en retard — **`b4` est la seule
+trouvaille du lot.**
+
+Ce qui le rend conséquent plutôt qu'anecdotique : `MODULE-BASHRC.md:235-247`
+établit que **la machine de production figure dans le tableau des cibles avec une
+case à cocher identique aux autres**, et que l'écran permet de cocher production
+puis de déployer en deux clics sous une confirmation générique. Un écran qui
+n'agit pas sur tout ce qu'il montre comme coché est donc doublement trompeur :
+
+> **Une action de masse qui vise moins que ce qui est coché ne « fait pas
+> moins » — elle rend l'opérateur incapable de savoir sur quoi il a agi.** Et
+> l'erreur symétrique serait pire : *le même défaut de comptage qui vise 1 sur 2
+> pourrait, sur un autre chemin, viser 2 sur 1.* La propriété à établir n'est pas
+> « le nombre visé est petit », c'est **« le nombre visé est CELUI qui est
+> coché »**.
+
+Aucun écart n'était ouvert sur cette classe : le registre ne portait qu'une
+mention de « machine cochée », et elle concerne K4 (`:16146`). Traitement à part
+annoncé par la session 7. **Régime à nommer avant tout correctif** — la suite a
+mesuré la cible `legacy` ; que le portage Laravel présente ou non le même défaut
+n'est PAS mesuré, et ne doit pas être supposé dans un sens ni dans l'autre.
