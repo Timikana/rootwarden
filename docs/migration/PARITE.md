@@ -17793,3 +17793,84 @@ son nom exact** — pas dans un souvenir de sortie. **Deuxième borne, dérivée
 ligne de base** : le LOT du 02/09 rendait **1 seul FAIL**, attribué à
 `update-u2` ; si `config-ecriture` y avait rendu 4 FAIL, cette ligne de base
 serait fausse. *Les deux ne peuvent pas être vrais ensemble.*
+
+
+## E-373 — TRANCHÉ : le portage ne porte pas le défaut, il fait structurellement l'inverse
+
+**Rendu par la session 3, vérifié indépendamment le 2026-09-03 11:57.**
+
+    bashrc.js:89-93    machineUnique() -> la machine cochee S'IL N'Y EN A QU'UNE, sinon null
+    bashrc.js:183-187   si 0 cochee  -> message « choisir »
+                        si mid null  -> message « plusieurs cochees »   (DISTINCT du precedent)
+
+**Le portage n'émet pas une requête par machine cochée : il en émet une pour UNE
+machine, et refuse quand plusieurs sont cochées, avec un message distinct du cas
+vide.** Les deux moitiés que j'avais demandées sont établies séparément — le
+nombre visé égale le nombre coché (le geste n'agit que si `coché == 1`), et aucune
+machine non cochée n'est joignable (`mid` vient exclusivement de
+`choisies[0].value`). ⚠ **L'erreur symétrique que je craignais — viser 2 pour 1 —
+est structurellement impossible : `mid` est un SCALAIRE, pas une liste.**
+
+**Et le geste lui-même n'est pas porté.** Vérifié par mes propres moyens, témoin
+positif compris :
+
+    chemins d'ecriture `bashrc/(deploy|apply)` dans laravel/   0 fichier
+    TEMOIN : chemins de lecture `bashrc/(preview|template|users)`   1 fichier
+
+`bashrc.js:230-236` le dit : *« Le sélecteur de mode appartient au DÉPLOIEMENT
+(B4) ; tant qu'il n'est pas porté… »* — **B4 n'est pas porté.**
+
+### ⚠ Ce que ça fait à la lecture de la ligne de base, et il faut le dire
+
+Le FAIL de `go-bashrc-b4` est un **défaut réel du legacy**, mesuré sur la cible
+`legacy`, et **le legacy meurt**. Donc :
+
+> **Ce FAIL restera rouge et ne doit PAS être corrigé.** Il est l'un des 5 « FAIL
+> réels » de la ligne de base du 2026-09-03 — mais *réel* ne veut pas dire
+> *à corriger* : un défaut d'un composant qu'on retire est une **dette qui
+> s'éteint d'elle-même**. Le compter avec les autres surestime le travail
+> restant.
+
+Ligne de base relue avec cette attribution : **167 · 2613 · 55**, dont 50 d'un
+incident clos, **1 défaut legacy à ne pas corriger**, et **4 d'un défaut de suite**
+(E-374). **Zéro défaut du portage.**
+
+## E-376 — deux causes distinctes, un seul message : et le même fichier sait faire mieux vingt lignes plus haut
+
+**Trouvé par la session 3 au passage** de E-373, dans `laravel/public/js/bashrc.js` :
+
+    :222   if (mid === null || comptes.length === 0) {
+               contenuApercu.textContent = textes.apercu_vide; return;
+           }
+
+« Aucune machine unique » et « aucun compte sélectionné » rendent **le même
+texte**. L'opérateur ne peut pas savoir laquelle des deux choses corriger.
+
+**Et c'est incohérent DANS LE MÊME FICHIER** : `chargeComptes` sépare
+soigneusement ces deux causes en deux messages (`:183-187`), l'aperçu les
+fusionne. *Le fichier prouve qu'il sait faire mieux vingt lignes plus haut.*
+
+> ⚠ **HUITIÈME OCCURRENCE de la famille « un détail affiché du mauvais côté de sa
+> condition », et la première en version DOUCE** : le message n'est pas *faux*, il
+> est *insuffisamment discriminant*. Les sept précédentes affichaient un détail
+> sous le mauvais verdict ; celle-ci affiche **un détail vrai pour deux états
+> différents**, ce qui a le même effet — envoyer chercher au mauvais endroit.
+
+Non corrigé : deux clés i18n à créer FR **et** EN. Laissé en écart plutôt
+qu'emporté dans un commit qui n'était pas le sien — *bon réflexe, et c'est la
+règle du commit par chemins vue de l'autre côté.*
+
+⚠ **ET LA RECTIFICATION D'INSTRUMENT QUI VA AVEC, à ne pas perdre** : le message
+de refus est `textes.plusieurs_cochees || ''`, donc **une clé non transmise
+rendrait un refus SILENCIEUX** — le défaut serait revenu par une autre porte. Le
+premier relevé a rendu `fr=False en=False` sur deux clés, **faux positif
+alarmant**, parce qu'il confondait *la clé du tableau* et *la clé de traduction* :
+
+    :68   'choisir'           => __('bashrc.comptes_choisir')
+    :69   'plusieurs_cochees' => __('bashrc.comptes_plusieurs')
+
+Les 27 clés demandées existent en FR et en EN (témoin : 27 demandées, 0
+manquante), et la chaîne complète tient — clé JS → clé du tableau → clé de
+traduction → présente dans les deux catalogues. **Ce faux positif était crédible
+parce qu'il collait trop bien au défaut cherché** : *un résultat qui confirme
+l'hypothèse qu'on porte mérite une seconde mesure, pas une inscription.*
