@@ -6012,3 +6012,59 @@ geste touche le portail servi et son mode d'échec connu est 500 partout.*
 
 **C'est le même refus que celui que le Lead m'a opposé vingt minutes plus tôt, formulé par une troisième
 session qui n'était pas dans l'échange.** *Trois sessions, trois refus convergents, aucune coordination.*
+
+---
+
+## Tour de 12:30 — le banc est rendu, et trois écritures précèdent la fusion
+
+**Banc rendu, arbre propre, ligne de base publiée : `167 · 2613 PASS · 55 FAIL`, dont ZÉRO imputable au
+portage.**
+
+### Routé à la session 3, et les trois n'en font qu'une
+
+    1. `chown -R www-data:www-data storage/framework/views` apres entrypoint:44
+       -> AVANT la fusion, le premier demarrage en prod produit un cache `www-data`
+          et il n'y a JAMAIS rien a normaliser apres coup
+    2. le durcissement de `laravel` dans prod.yml   ⛔ EXIGE LE MOT DE L'EXPLOITANT
+       cap_drop · read_only + tmpfs · user non-root
+    3. ses deux patchs geles depuis 08:44 (legende du menu, conjonction de ssh.php)
+
+**Le lien entre 1 et 2 décide de l'ordre** : *`read_only: true` casse la compilation Blade → il faut un
+`tmpfs` sur `storage/framework/views` → et alors le cache est reconstruit à chaque démarrage, en root.*
+**Le point 1 passe de commodité à indispensable.**
+
+### Et j'ai retiré un geste que j'avais prescrit à l'exploitant
+
+**J'avais écrit qu'un `view:cache` en `www-data` fermerait la cause. FAUX.**
+
+    repertoire  laravel/storage/framework/views   www-data:www-data 755  -> CREER : oui
+    111 fichiers                                  root:root 755          -> ECRASER : NON
+
+*J'avais lu la permission du RÉPERTOIRE pour celle du FICHIER.* **C'est la deuxième fois aujourd'hui qu'une
+propriété d'un contenant est attribuée à son contenu — après le compte de `grep` qui portait le nom de la
+colonne et pas le geste.**
+
+### ⚠ Une classe d'erreur neuve, nommée par la session 4 sur elle-même
+
+> **« Dans un chantier à huit sessions, un constat NÉGATIF sur la documentation a une durée de validité de
+> quelques minutes. »**
+
+    12:06  je commite une correction dans DOSSIER-00
+    12:08  elle mesure `cap_drop` dans docs/migration/  ->  AUCUN document   <- VRAI
+    12:09  elle l'inscrit comme neuf
+    12:14  elle remesure : cap_drop 6 dans DOSSIER-00
+
+**Ce n'est pas « mesurer avant de lire » — sa mesure était juste.** *C'est que la documentation a bougé
+entre la mesure et l'inscription.*
+
+**Et la règle de routage qui en découle est la bonne** : *un constat qui vise la bascule, la production ou
+une signature se TRANSMET, il ne s'inscrit pas dans un registre parallèle.* **Une seconde liste ne se
+synchronise jamais : elle divergence en silence.** *Trois de ses inscriptions ont doublonné ce dossier en
+une matinée, et chaque fois la version du dossier était plus juste — **pas par compétence, par
+fraîcheur**.*
+
+### Ce que j'attends pour fusionner
+
+    les points 1 et 3 commites par la session 3   -> je fusionne (846 commits, a sec PROPRE)
+    le point 2                                     -> attend le mot de l'exploitant
+    063/064/065 · `docker compose up -d` · `git push`  -> a l'exploitant, et a lui seul
