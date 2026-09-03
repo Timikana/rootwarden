@@ -5485,3 +5485,91 @@ lieu de déplacer sa portée.*
                                 est reserve a l'exploitant
 
 **Le défaut de CODE est établi ; son caractère ACTIF aujourd'hui ne l'est pas.**
+
+---
+
+## ⛔ RECTIFICATION 11:00 — `:3165` est CASSÉ : il y a bien un TROISIÈME portage injoignable
+
+**Cassé par la session 3, à qui j'avais demandé d'essayer. Vérifié par moi.**
+
+    web.php:578   GET  /notifications/preferences -> NotificationsController::reglages
+                  middleware ['role:3', 'perm:can_admin_portal']
+                  name('notifications.reglages')
+    Controller:134  return view('notifications-reglages', [ … ])   <- c'est bien UNE PAGE
+    web.php:580   POST meme chemin -> notifications.preferences.poser
+
+    citations du NOM de route, par `glob`+`io.open` (insensible a .gitignore) :
+      laravel/routes/web.php    <- SA PROPRE DECLARATION
+      total = 1
+
+    citations du CHEMIN hors web.php :
+      notifications-reglages.js:40   fetch('/notifications/preferences'…)
+      <- la page vers SON PROPRE POST
+
+    Navigation : 0
+
+**Une page complète, gardée, portée — et rien n'y mène.**
+
+### Pourquoi je l'ai manquée : j'ai énuméré par MODULE, elle a énuméré par ROUTE
+
+    mon releve   notifications   nav=0  vues=2  js=2   -> « clearee »
+    la realite   `notifications`           role:1, liee depuis le SOCLE (portail:68)
+                 `notifications.reglages`  role:3, liee de NULLE PART
+
+> **Mon compte `vues=2` mesurait les liens vers la page VOISINE.** *Un module peut être atteignable
+> pendant qu'une de ses pages ne l'est pas — et le préfixe partagé rend la confusion invisible : les deux
+> s'appellent « notifications ».*
+
+**Encore une propriété vraie d'un objet, attribuée à un autre.** *C'est la classe de toute la matinée, et
+c'est la quatrième fois.*
+
+**Second facteur d'invisibilité** : *la page est `role:3` **et** `can_admin_portal`.* **Seul un
+superadministrateur pourrait la voir — donc personne ne s'est jamais étonné de ne pas la trouver.**
+
+### ⚠ Et sa méthode alarme là où la mienne dédouanait — elle le dit avant qu'on le trouve
+
+    la mienne   6 candidates, avec des FAUX NEGATIFS
+    la sienne   13 candidates, dont 8 FAUX POSITIFS (cibles de `fetch`, redirections)
+
+> **Aucun des deux n'est bon seul.** *Il a fallu une étape qui n'est dans aucune de nos deux méthodes
+> d'origine : **discriminer page / point-d'appel par la présence d'une VUE**.*
+
+### ✅ ARBITRAGE — un lien contextuel sur `notifications`, conditionné au rôle 3
+
+**Le précédent existe et il est exact** — `cles-api`, `role:3` + `perm:can_manage_api_keys`, liée depuis
+`comptes.blade.php:15-19` :
+
+    @if ((int) session('role_id', 0) >= 3)
+        <a data-rw="comptes-lien-cles-api" href="{{ route('cles-api') }}">…</a>
+    @endif
+
+    et son commentaire porte deja ma convention :
+    « Reservee au role 3 : l'afficher plus bas menerait a un 403. »
+
+**Décision : le même patron, sur la page `notifications`.** *`data-rw`, i18n FR/EN dans le même commit,
+et la condition `role_id >= 3`.*
+
+**Et la condition sur le seul rôle est EXACTE, mesuré** :
+
+    ExigePermission.php:35-36   if ($roleId >= 3) { return $suite($requete); }
+
+*Un rôle 3 franchit donc toujours `perm:can_admin_portal` — **aucun trou entre ce que le lien montre et
+ce que la garde accepte**.* **Les deux couches s'accordent ici, ce qui est rare dans ce dépôt : le
+portage court-circuite au rôle 3 comme `helpers.py` le fait côté backend.**
+
+**Pas une entrée de menu** : *le précédent `cles-api` a choisi le lien contextuel, et le même raisonnement
+vaut — une page de réglages n'est pas une destination de navigation.*
+
+### Ce que ça dit de mes deux « questions closes »
+
+**J'ai demandé qu'on casse deux de mes quatre points aveugles. Les DEUX sont tombés en deux heures.**
+
+    :3896   casse — le GESTE de groupe n'excluait pas les archivees
+    :3165   casse — un troisieme portage injoignable existe
+
+> **Deux universelles négatives, toutes deux fausses, toutes deux dispensant de travail, et aucune n'avait
+> jamais été relue.** *Le taux est de 2 sur 2 — ce qui ne se conclut pas sur deux essais, mais qui ne
+> laisse pas non plus supposer que les deux restantes tiennent.*
+
+**`:1628` est en cours d'épreuve, avec la réserve de son autrice : elle ne touche pas son portage, donc
+elle la lira en lectrice, et elle dira « je ne peux pas conclure » plutôt que « elle tient ».**
