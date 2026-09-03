@@ -333,3 +333,173 @@ tranche ni l'une ni l'autre.
 - **Chercher qui a déjà écrit le correctif avant d'en écrire un.** E-175 a été relevé aujourd'hui
   et son correctif dormait depuis six jours sur une branche non fusionnée. Une trouvaille se
   confronte à ce qui existe, pas seulement au tronc.
+
+---
+
+## 7. Seconde relecture de `8043303` et `399931a` — 2026-09-03
+
+**Demandée par le DSI**, qui les signalait comme non relus. **Ils l'étaient** :
+§2.2 et §2.4 de ce document, du 2026-08-21. Cette section ne les remplace pas —
+elle répond aux **questions neuves** posées avec la demande, et **une des deux
+repose sur une prémisse fausse**.
+
+Lecture seule : aucun geste, aucune fusion, aucune écriture hors `docs/`.
+
+### 7.1 `8043303` — l'arbitrage produit demandé N'EXISTE PAS
+
+Le DSI demande : *« le correctif REFUSE le scan entier quand l'enrichissement
+échoue. Est-ce le bon choix ? […] refuser fait dépendre la détection de la
+disponibilité d'un service TIERS. »* Et il demande de le mesurer sans le trancher.
+
+**Mesuré : le refus ne porte pas sur le scan.**
+
+```
+git show 8043303 -- backend/routes/cve.py | grep '^@@'
+   @@ -273,6 +273,32 @@ def cve_reprioritize():
+```
+
+**L'unique hunk côté routes est ajouté DANS `cve_reprioritize()`.** Le chemin de
+scan n'est pas touché. Et il n'y a **qu'un seul lecteur** des deux drapeaux dans
+tout le backend :
+
+```
+git grep -n "kev_echoue\|epss_echoue" security/backend-cve -- 'backend/*.py'
+   cve_enrich.py   : les definitions et la production
+   routes/cve.py:311 : LE SEUL LECTEUR
+```
+
+Et `cve_enrich.py:24` le documente en clair : *« le scan CVE n'échoue jamais à
+cause de l'enrichissement »*.
+
+> **Le correctif fait exactement la distinction que le DSI craignait qu'il
+> écrase** : pendant un **scan**, des findings non enrichis s'écrivent ; pendant
+> une **re-priorisation**, écrire du vide est refusé. §2.2 le disait déjà, et la
+> mesure du hunk le confirme. **Il n'y a pas d'arbitrage à remonter à
+> l'exploitant.**
+
+### 7.2 `8043303` — ce qu'il ne ferme pas : deux observations, aucune bloquante
+
+**a) Le refus est plus LARGE que le défaut.** Le défaut était l'effacement de
+`kev` (`1 if f.get('kev') else 0` → 0 partout). Le refus, lui, se déclenche sur
+`kev_echoue` **ou** `epss_echoue`. Une panne EPSS seule bloque donc une
+re-priorisation dont les données KEV sont intactes.
+
+**C'est un élargissement délibéré et défendable** — `priority_score` se recalcule
+sur les deux — mais il vaut d'être dit : *le correctif est fail-closed sur un axe
+que le défaut ne touchait pas.*
+
+**b) Rien ne DATE les données conservées.** Le message dit *« les données
+existantes ne sont pas écrasées »*, ce qui est juste. Mais ni la réponse ni
+l'écran ne disent **de quand** date le dernier enrichissement réussi. Un
+exploitant qui relit un tableau KEV après trois refus successifs ne peut pas
+savoir s'il regarde des données d'hier ou de trois semaines. **Non bloquant, hors
+périmètre de ce correctif** — c'est une capacité manquante, pas un défaut
+introduit.
+
+### 7.3 `399931a` — LA MOITIÉ « PARAMÈTRES DE CHEMIN » N'A AUCUN EFFET, ET PAS POUR LA RAISON ANNONCÉE
+
+Le DSI classe ce correctif *« inerte par absence de porteur, compensé »* et me
+demande de remesurer. **Mesuré : l'inertie est RÉELLE, et sa cause est
+STRUCTURELLE — pas une absence de porteur.**
+
+Relevé par AST sur les 230 routes de `backend/routes/` :
+
+| mesure | valeur |
+|---|---|
+| routes portant `@require_machine_access` | **116** *(le DSI dit 114)* |
+| routes avec un paramètre de chemin | 34 |
+| … dont un paramètre nommé `machine_id`/`server_id`/`mid` | **4** |
+| routes portant le décorateur **ET** un paramètre de chemin | **9** |
+| … dont un nommé machine | **1** |
+
+**Mon « 4 » de §2.4 et le « 1 » du DSI sont tous deux justes : ils répondent à
+deux questions.** Le mien compte les routes dont le décorateur *lirait* le
+paramètre s'il était appliqué ; le sien compte celles où il *est* appliqué.
+
+Et voici la structure :
+
+```
+/supervision/overrides/<int:machine_id>   GET   role:2 + perm   PAS de decorateur
+/supervision/overrides/<int:machine_id>   POST  role:2 + perm   PAS de decorateur
+/supervision/agents/<int:machine_id>      GET   role:2 + perm   PAS de decorateur
+/supervision/machines/<int:mid>/profile         role:2 + perm   decorateur PRESENT
+```
+
+**La seule route qui porte les deux exige `role:2`** — et
+`check_machine_access` commence par `if role_id >= 2: return True`. **Le
+décorateur y est donc inerte.** C'est la réserve de §2.4, désormais mesurée sur
+la population entière plutôt que sur une route.
+
+**Et l'ajouter aux trois autres ne changerait rien** : elles exigent aussi
+`role:2`. **Aucune route ne peut bénéficier de la lecture des paramètres de
+chemin, et aucun porteur futur ne l'activerait** — il faudrait un appelant de
+rôle 1, que les quatre routes refusent avant le décorateur.
+
+> **La distinction porte.** *« Inerte par absence de porteur »* se réveille au
+> premier `UPDATE` sur `permissions` — c'est le porteur dormant d'E-236.
+> *« Inerte par structure »* ne se réveille pas : il faudrait changer les gardes
+> de rôle des quatre routes. **La seconde est stable, et c'est une meilleure
+> nouvelle que ce que le DSI classait.** Mais elle rend le message de commit
+> faux pour une raison plus profonde qu'une circonstance.
+
+**Le correctif reste juste et souhaitable** : il ferme le piège pour toute route
+future, et **son autre moitié — collecter TOUTES les sources au lieu de la
+première — ferme réellement E-175.**
+
+### 7.4 Le piège de la CONJONCTION, appliqué à `399931a` — et il paie
+
+Le DSI prévient : *« une conjonction dont un membre devient faux se lit comme
+entièrement vraie ; si un message annonce deux choses, vérifie les DEUX
+séparément. »*
+
+`399931a` annonce **deux** changements. Vérifiés séparément :
+
+| moitié | verdict |
+|---|---|
+| collecter **toutes** les sources au lieu de la première | **ferme E-175**, réel, mesuré |
+| lire les **paramètres de chemin** | **aucun effet, par structure** (§7.3) |
+
+**Le message se lit comme entièrement vrai parce que sa première moitié l'est.**
+
+### 7.5 Deux tentatives de CASSER `399931a` — les deux se sont refermées
+
+**a) Faux positif par homonyme.** Le patch lit désormais les `kwargs` : une route
+portant un paramètre de chemin **homonyme désignant autre chose** se mettrait à
+refuser à tort. Balayage : les **4** noms trouvés désignent tous réellement une
+machine. Les 8 autres paramètres sous le décorateur sont `<platform>`, hors de la
+liste de clés. **Aucun homonyme. Fermé.**
+
+**b) Garde sans objet.** Le docstring admet que sans identifiant, la route passe
+sans contrôle. Balayage des 116 routes portant le décorateur, à la recherche de
+celles où **aucune** clé lue n'apparaît : **1 résultat**, `/update_zabbix`.
+
+**Lu plutôt qu'accepté** — cette sonde a déjà annoncé 24 gardes « sans objet »
+là où il y en avait 1 :
+
+```python
+@bp.route('/update_zabbix', methods=['POST'])
+@require_api_key
+@require_machine_access
+def update_zabbix():
+    """Redirect temporaire vers le nouveau module supervision."""
+    return redirect('/supervision/zabbix/deploy', code=307)
+```
+
+**Faux positif** : la route ne fait rien, et sa cible porte `role:2` +
+`perm:can_manage_supervision` + `require_machine_access`. **Fermé.** *Troisième
+fois que cette classe de sonde surdéclare, et toujours du côté qui alarme.*
+
+### 7.6 Verdict sur ces deux commits
+
+**Aucun des deux n'introduit de régression, de contournement ni de promesse
+fausse sur le CODE.** `8043303` fait ce qu'il annonce, sans arbitrage produit à
+remonter. `399931a` ferme E-175 par sa première moitié ; **sa seconde moitié est
+structurellement inerte, et son message de commit revendique une couverture
+qu'elle n'apporte pas.**
+
+**Correction demandée : au message de `399931a` uniquement, pas au code.** C'est
+la même demande qu'en §2.4, maintenant étayée par la population complète.
+
+**Je ne fusionne rien** — la règle du dépôt exige un accord verbal explicite de
+l'exploitant pour un patch de sécurité, et cet accord porte sur
+`Migration-Laravel`, pas sur cette branche.
