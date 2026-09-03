@@ -6068,3 +6068,583 @@ fraîcheur**.*
     les points 1 et 3 commites par la session 3   -> je fusionne (846 commits, a sec PROPRE)
     le point 2                                     -> attend le mot de l'exploitant
     063/064/065 · `docker compose up -d` · `git push`  -> a l'exploitant, et a lui seul
+
+---
+
+## ✅ LA FUSION EST FAITE — 2026-09-03 12:40, `4742438`
+
+**Autorisée par l'exploitant (« go ! on merge faut tout faire »), exécutée après vérification à sec.**
+
+    main   0 / 892 commits par rapport a origin/main
+    conflits : 0
+    www/ ABSENT · legacy/ PRESENT · laravel/ PRESENT
+    docker-compose.yml:21   - ./legacy:/var/www/html
+    laravel/docker-entrypoint.sh:59   chown -R www-data:www-data storage/framework/views
+    version : 1.38.199
+
+### ⚠ ET J'AI FAILLI CASSER LES DEUX PORTAILS — la mesure que je n'avais pas faite
+
+    il n'existait AUCUNE branche `main` locale
+    `git checkout main` aurait fait : 558 fichiers, 140 insertions, 69 211 SUPPRESSIONS
+      -> `laravel/` disparait, `legacy/` redevient `www/`
+
+**Or `docker-compose.yml` monte `./legacy` ET `./laravel`.** *Entre le `checkout` et le `merge`, les deux
+portails auraient servi un montage VIDE — et sept sessions auraient vu un arbre saccagé.*
+
+> **Un geste dont l'état FINAL est correct peut avoir un état TRANSITOIRE destructeur.** *J'avais vérifié
+> que la fusion était propre ; je n'avais pas vérifié le chemin pour y arriver.* **C'est la classe de la
+> journée, appliquée au geste le plus important : la propriété du résultat attribuée au parcours.**
+
+**Parade employée** : `git worktree add -b main <chemin séparé> origin/main`, fusion dans cet arbre.
+*L'arbre partagé n'a pas bougé — même `HEAD` (`3055dec`), zéro fichier modifié, avant comme après. Les
+conteneurs montent le chemin partagé, donc ils n'ont rien vu.*
+
+### Ce que la session 3 a corrigé de mon ordre, et elle avait raison
+
+**J'avais écrit « le banc est libre, prends tes deux patchs d'abord ». Faux pour l'un des deux.**
+
+    proprietaires des compiles a cet instant : {'root': 111, 'www-data': 40}
+    le portage REPOND : /connexion -> HTTP 200
+
+> **Le blocage de la légende du menu n'a jamais été le banc : c'est la propriété du cache.**
+> *`portail.blade.php` a son compilé `root`, le portage sert des requêtes, et la ligne d'entrypoint ne
+> prend effet qu'au REDÉMARRAGE.* **Committer la légende maintenant rendrait 500 à la première requête —
+> et cette fois sans pouvoir défaire par la date, le changement de contenu étant voulu.**
+
+**L'ordre contraint, qui est le sien :**
+
+    1. la ligne d'entrypoint       FAIT (3055dec)
+    2. la fusion                   FAIT (4742438)
+    3. `docker compose up -d`      A L'EXPLOITANT -> le cache renait `www-data`
+    4. ALORS la legende            session 3, sans privilege, un commit d'une ligne
+
+**Et sa preuve sur `view:cache` en `www-data` est élégante** : *les 28 échecs de 08:44 n'ont RIEN écrit —
+le compilé du socle est resté `root:root` daté de 07:48:46 pendant toute la fenêtre.* **Un geste qui
+échoue 28 fois de suite ne progresse pas.**
+
+### ⛔ CE QUI RESTE, ET QUI N'EST À PERSONNE D'AUTRE QU'À L'EXPLOITANT
+
+    les migrations 063 · 064 · 065        dont 065 = la garde en base d'E-280
+    `docker compose up -d`                OBLIGATOIRE : ./www n'existe plus
+    declarer `laravel` dans prod.yml      cap_drop · read_only + tmpfs · user
+                                          -> AUJOURD'HUI le SEUL service de prod non durci
+    `git push`                            refuse par le garde de ma session
+
+**La fusion vit dans un arbre de travail séparé et sur la branche locale `main`. Elle n'est pas publiée.**
+*Rien n'a été déployé, aucun conteneur redémarré, aucune migration appliquée.*
+
+---
+
+## Tour de 12:35 — la fusion est faite, et le dernier bloquant vient d'être assigné
+
+**Banc libre, arbre propre, `main` local à 892 commits d'avance.**
+
+### Production de l'heure
+
+    3 code / 20 doc      = 6,7 pour 1   -> sixieme franchissement
+
+    3055dec  fix(socle)   le cache Blade naissait root dans un repertoire www-data
+    69f8f58  fix(bashrc)  un message d'apercu qui prescrivait le mauvais remede
+    f759662  fix(ssh)     une conjonction dont un membre etait devenu faux
+
+**Je ne l'attaque pas une sixième fois.** *L'heure a produit la fusion (892 commits), la ligne de base
+(`167 · 2613 PASS · 55 FAIL`, zéro imputable au portage), et le constat de durcissement. **Un seuil
+franchi six fois pour six causes différentes, toutes dans sa définition, mesure sa définition.***
+
+### ✅ ASSIGNÉ — la réinitialisation de mot de passe, à `gestion-ssh-key-c6`
+
+**C'était le seul bloquant du « full Laravel » que personne ne portait.** *Elle avait rendu ses deux
+relectures de sécurité ; elle était la bonne.*
+
+**Quatre contraintes arbitrées, dont une que la plupart des portages ratent :**
+
+    la reponse ne doit PAS reveler si l'adresse existe
+      -> meme message dans les deux cas, sinon le formulaire public devient
+         un ORACLE D'ENUMERATION DE COMPTES
+
+*Plus : lire les deux fichiers legacy en entier avant d'écrire · jeton à durée bornée et usage unique ·
+et **ne pas exercer l'envoi de courriel** — un envoi sortant publie quelque chose.*
+
+### ⚠ Et une contrainte de banc qui n'est PAS le banc
+
+**Je l'ai prévenue de ce que j'avais moi-même mal compris ce matin** :
+
+    111 des 151 compiles appartiennent a `root` dans un repertoire `www-data`
+    -> toucher une vue dont le compile est `root` rend 500 sur toute page qui l'inclut
+    la ligne d'entrypoint qui ferme la cause est COMMITEE (3055dec)
+       mais elle ne prend effet qu'au REDEMARRAGE, qui appartient a l'exploitant
+
+**Consigne** : *créer des vues NEUVES (pas de compilé `root`), ne pas toucher `layouts/portail.blade.php`,
+et me prévenir AVANT d'écrire si le portage exige de modifier une vue existante.* **La session 3 est
+bloquée sur exactement ça depuis 08:44, et j'avais mis son blocage sur le compte du banc.**
+
+### L'état des sept sessions
+
+    c1   l'octroi des politiques sudo (sudo_preset)     en cours
+    c6   la REINITIALISATION DE MOT DE PASSE            assignee a l'instant
+    94   le pentest — angles 6 et 1 rendus              angle suivant a choisir
+    0b   l'inventaire d'archivage — bloc A actionable   16 fichiers non apparies
+    4f   parite, references du LOT, defauts de suite    routage corrige
+    5f   la spec de qualification RGPD                  le PORT reste a faire
+    ec   la ligne de base publiee                       libre
+
+**Ce qui n'est assigné à personne, et c'est volontaire** : *le durcissement de `laravel` dans `prod.yml`
+attend le mot de l'exploitant, et la légende du menu attend son `docker compose up -d`.*
+
+---
+
+## 13:25 — HIBP : un dédouanement VÉRIFIÉ, et une distinction qui vaut d'être gardée
+
+**La session 5 a pris la question ouverte que j'avais notée, l'a répondue, et a CORRIGÉ SA PROPRE
+QUESTION dans le sens qui l'affaiblit.** *Elle me l'a signalé en nommant le fait : « je te le signale dans
+le sens qui DÉDOUANE — celui où personne ne vient corriger une exagération ».*
+
+**Revérifié par moi, comme ma propre règle l'exige** (*un résultat qui arrange doit être remesuré PAR
+RÈGLE, puisqu'il ne le sera pas par réflexe*) :
+
+    legacy/auth/password_policy.php     (et NON legacy/includes/ — mon chemin etait faux)
+      :81  « Opt-in via env HIBP_ENABLED=true »
+      :82  « Si HIBP injoignable (reseau, timeout), on fail-open »   <- DECLARE au docstring
+      :35  passwordPolicyCheckComplexity   LOCAL
+      :50  passwordPolicyCheckHistory      LOCAL
+      :89  passwordPolicyCheckHIBP         RESEAU
+
+**Sa question disait : « la politique de complexité tombe pendant une panne réseau ». C'est faux, et elle
+le retire.** *Une coupure fait tomber **un contrôle sur trois** — celui du corpus de fuites. Longueur,
+classes et non-réutilisation sont locaux.*
+
+### La distinction qu'elle pose, et je la garde
+
+> **« Un fail-open DÉCLARÉ et un fail-open HÉRITÉ ne se traitent pas pareil. »**
+
+    HIBP   repli DECLARE au docstring · JOURNALISE a l'execution · BORNE a 3 s
+           + `HIBP_ENABLED=false` a l'exemple, « opt-in » a l'ARCHITECTURE,
+             « off par defaut » au CHANGELOG
+           -> la plateforme ne revendique PAS une protection qu'elle n'exerce pas
+
+    la limite de debit (a)   repli justifie par une raison QUI N'A PLUS D'OBJET
+                             (la table existe), et non presente comme un arbitrage
+
+**C'est le contraire du motif qu'on traque, et ça vaut d'être dit aussi.**
+
+### ⚠ Et une divergence d'OBJET entre nos deux mesures, pas de fait
+
+    elle (conteneur EN SERVICE)   HIBP_ENABLED=[]      temoin MAIL_ENABLED=[true]
+    moi (fichier d'EXEMPLE)       HIBP_ENABLED=false   MAIL_ENABLED=false
+
+**Les deux disent « pas `true` », donc la conclusion tient — par deux objets distincts.** *C'est « arbre ou
+service » pour la sixième fois de la semaine, et cette fois nous étions d'accord sans mesurer la même
+chose.*
+
+### ✅ Elle a aussi corrigé son §3.1 dans le sens qui AGGRAVE
+
+**Elle avait écrit** : *« la limite échoue ouverte sur erreur de base »*. **Vrai et insuffisant.**
+
+> **Même avec une base parfaitement saine, elle ne borne pas l'attaque qu'elle existe pour borner** — *le
+> compteur compte des JETONS ÉMIS, pas des DEMANDES REÇUES.* **« J'avais mesuré son mode de PANNE sans
+> mesurer son mode NOMINAL. »**
+
+### ✅ Et elle améliore ma propre exigence sur l'assertion d'inatteignabilité
+
+**J'avais exigé** : *une assertion « aucune vue ne lie cette route », verte maintenant, rouge dès que le
+lien sera posé.*
+
+> **Son ajout** : *« je regarderai aussi que l'assertion échoue pour la BONNE raison — une assertion
+> "aucune vue ne lie cette route" peut virer au vert parce que le balayage ne regarde plus au bon
+> endroit. **Un test d'inatteignabilité doit porter son propre témoin**, sinon il vieillit en silence. »*
+
+**C'est meilleur que mon exigence, et c'est la règle du témoin appliquée à un test au lieu d'une mesure.**
+*Une assertion négative sans témoin est une universelle négative vraie à vide — et je l'avais prescrite
+sans témoin, le jour où j'ai passé la matinée à l'exiger des autres.*
+
+### Et elle endosse le `Mail::queue`, qui était à elle
+
+> *« Une prescription n'est pas moins une affirmation qu'un constat — elle mérite la même mesure, et je ne
+> l'avais pas mesurée. »*
+
+**Je l'avais relayée sans la mesurer non plus.** *Nous l'avons donc commise à deux : elle en prescrivant,
+moi en transmettant.* **Et c'est la session 3, celle qui devait l'écrire, qui l'a arrêtée — le pair qui va
+AGIR dessus, pour la troisième fois aujourd'hui.**
+
+---
+
+## Tour de 13:35 — les trois déclarations restantes sont VRAIES, et mon compteur a raté du code
+
+### ⚠ D'abord une erreur à moi : il y avait du code, mon motif ne le voyait pas
+
+    mon compteur : `feat|fix` sur laravel|backend   ->  0
+    la realite   : a7b0885  refactor(mdp)  12:56    <- du CODE
+                   c61dea9  chore(scripts) 12:52    <- un OUTIL
+
+**Le motif exclut `refactor`, `chore` et `test`.** *Huitième compte de la journée qui ne porte pas son
+objet, et c'est encore un des miens.* **Le vrai rapport de l'heure est 2 d'ingénierie contre 6 de
+documentation, dont 4 doc sont des audits demandés par l'exploitant.**
+
+### ✅ VÉRIFICATION D'ÉTAT — les trois déclarations restantes tiennent
+
+**Quatre déclarations de ce chantier se sont révélées fausses. Ces trois-là sont vraies, mesurées avec
+témoins :**
+
+    bashrc:123      « les gestes de deploiement ne sont pas encore portes »
+                    /bashrc/deploy  -> AUCUN APPELANT
+                    /bashrc/restore -> AUCUN APPELANT
+                    TEMOIN /bashrc/ -> 5 fichiers   -> l'instrument VOIT le module
+
+    politiques:114  « l'annulation d'un deploiement n'est pas encore portee »
+    sftp:111        idem
+                    /policy/rollback -> RoutesBackend.php SEUL
+                    TEMOINS /policy/sudo/ -> 6 fichiers · /policy/sftp/ -> 2
+
+### ⚠ Et le piège que ce relevé a évité de justesse
+
+**`/policy/rollback` apparaît dans `RoutesBackend.php`.** *Un compte naïf y aurait lu un APPELANT et
+déclaré le libellé faux — cinquième occurrence apparente du défaut signature.*
+
+> **Or `RoutesBackend.php` est le fichier qui DÉCLARE le chemin dans les motifs step-up.** *Le fichier qui
+> LISTE un chemin n'est pas le fichier qui l'APPELLE.*
+
+**C'est la même classe que les huit autres de la journée** : *une propriété vraie d'un objet — « ce chemin
+est mentionné » — attribuée à un autre — « ce chemin est appelé ».* **Ici elle aurait produit une fausse
+alarme au lieu d'un dédouanement, ce qui est le sens le moins coûteux — mais elle aurait fait retirer
+trois libellés justes.**
+
+### Aucune session n'est à l'arrêt — et je ne leur invente pas de tâche
+
+    c1   porte le flux de reinitialisation (4a)  ·  a livre a7b0885, prerequis du portage
+    c6   a livre la spec + HIBP + un DETECTEUR des pages qu'aucune vue ne lie (c61dea9)
+    94   le pentest, angles 6 et 1 rendus
+    0b   l'inventaire d'archivage, bloc A actionnable
+    4f   parite et references du LOT, routage corrige
+    5f   la spec de qualification RGPD rendue
+    ec   la ligne de base publiee
+
+**Trois sessions sont sur la même capacité — c1 porte, c6 relit, et j'arbitre.** *C'est de la concentration,
+pas de la redondance : le partage auteur/relecteur a été demandé par la relectrice elle-même, pour ne pas
+être auditrice de son propre code sur un flux d'authentification.*
+
+**Et `c61dea9` mérite d'être noté** : *un détecteur des pages du portage qu'aucune vue ne lie.* **C'est
+l'outil qui aurait trouvé `notifications.reglages` sans qu'on la cherche — construit le jour où on l'a
+trouvée à la main.**
+
+---
+
+## Tour de 14:35 — ⚠ « arrêt de flotte » était TROP FORT (voir la rectification en fin de section)
+
+### La mesure, et le discriminant que ce matin m'a appris
+
+    depuis 13:35, dans TOUT l'arbre :
+      commits                                   1   <- le mien
+      fichiers non commites                     0
+      fichiers modifies (hors vendor/storage)   1   <- DECISIONS-DSI.md, le mien
+      ingenierie                                0
+
+**Ce matin j'ai pris un silence de `ps` pour une session muette alors qu'elle rédigeait.** *Cette fois j'ai
+mesuré l'ARBRE : zéro fichier non commité, un seul fichier touché en une heure.* **`ps` mesure la charge ;
+l'arbre mesure le travail. C'est un arrêt, pas une rédaction.**
+
+### Relancé, et par une QUESTION avant une consigne
+
+    c1   le flux de reinitialisation (4a)
+         -> je lui ai donne la mesure AVANT la consigne, et j'ai nomme
+            l'hypothese que je ne peux pas mesurer : « si tu attendais
+            quelque chose de moi, dis-le »
+         -> et j'ai propose de REVOIR mon exigence d'assertion d'inatteignabilite
+            si elle coute plus cher que le portage
+
+    94   l'angle 3 du pentest — les gestes de masse sans parametre de portee
+         -> avec le quatrieme DEJA MESURE par moi, pour qu'elle ne le refasse pas
+
+**Je n'ai relancé que deux postes sur sept.** *Les cinq autres ont rendu leur assignation ; leur inactivité
+est un état, pas un manquement — et inventer une tâche pour remplir un tour est ce que la relance doit
+empêcher.*
+
+### ✅ Et j'ai vérifié que je ne suis pas la cause du blocage de `c1`
+
+    l'option A       confirmee, et sa condition (que `c6` relise) est REMPLIE
+    la fusion        deja faite, elle n'attend RIEN de la session 3
+    la liste de 5    arbitree
+    (a) (b) (c)      arbitres
+
+**Il ne reste aucun arbitrage en attente de moi sur cette capacité.** *Donc si elle est bloquée, la cause
+est ailleurs — ou c'est mon exigence de test qui coûte trop cher, et je le lui ai demandé explicitement.*
+
+### Ce qui n'a pas bougé, et je le redis sans le combler
+
+**Le `docker compose up -d` appartient à l'exploitant. Je l'ai remonté trois fois.**
+
+    il debloque l'etape 4b : le lien de connexion, la legende du menu, `sudo_preset`
+    et il fait renaitre le cache de vues en `www-data`, ce qui desarme les 111 mines
+
+**Trois sessions ont refusé de le faire à sa place, sans coordination.** *Le Lead, la session 4 qui en a les
+moyens techniques, et moi.* **La porte n'est pas l'accès, c'est son mot.**
+
+### ⛔ RECTIFICATION 14:50 — « arrêt de flotte » était plus fort que ma mesure
+
+**Relevé par la session 3.**
+
+    c61dea9   12:52:35   le detecteur de pages sans lien       187 lignes
+    a7b0885   12:56:05   l'extraction dans MotDePasse.php      +65 -3
+    ma fenetre de 14:35 s'ouvrait a 13:35  ->  39 minutes APRES le dernier
+
+**Mes deux relevés étaient exacts pour leurs fenêtres** — *j'avais bien compté ces deux commits au tour de
+13:35.* **Mais mon inférence était trop forte** : *« arrêt de flotte » et « zéro ingénierie de toute la
+flotte » se lisent comme **rien du tout**, alors que le fait est **rien depuis une heure, après deux
+commits dans l'heure précédente**.*
+
+> **Une session au milieu d'une tâche a légitimement des creux, et ma formule ne laissait pas de place à
+> ça.** *Une fenêtre qui s'ouvre après le geste rend « rien n'a bougé » : vrai de l'intervalle, faux de la
+> journée.*
+
+**Consigne que je m'applique** : *pour juger d'un arrêt, ouvrir la fenêtre sur la JOURNÉE et pas sur
+l'heure.* **L'heure sert à voir ce qui est arrivé ; la journée sert à juger si quelque chose est arrêté.**
+
+### ⚠ TROISIÈME ERREUR D'ATTRIBUTION DE LA JOURNÉE, ET TROIS CAUSES DIFFÉRENTES
+
+    08:35   j'attribue au Lead deux trouvailles qui n'etaient pas de lui
+            cause : ADJACENCE de deux lignes dans `git log`
+    11:50   j'attribue a moi le datage de `ssh-flux`, qui etait du Lead
+            cause : je l'avais CONFIRME, pas trouve
+    14:35   j'attribue a `c6` le detecteur `c61dea9`, qui est de la session 3
+            cause : PROXIMITE DE SUJET — `c6` venait de parler de temoins
+
+**Et la session 3 me l'avait annoncé** : *elle m'avait dit que `tests/e2e/` est dans ses interdits
+d'écriture, donc qu'elle portait l'exigence dans `scripts/`.* **L'information était dans le message
+précédent.**
+
+> **« La mesure se refait, l'attribution non »** — *phrase du Lead ce matin, que j'ai inscrite puis refaite
+> deux fois.*
+
+### ✅ Et son détecteur dépasse mon exigence — je la retire comme condition
+
+    43 pages · 32 au menu · 5 sans lien, toutes DECLAREES avec leur raison
+    et il rougit DANS LES DEUX SENS : une page toleree qui gagne un lien fait
+    echouer le script -> il FORCE a retirer la tolerance
+
+**Je demandais une assertion sur une route ; elle a livré une surveillance de la CLASSE**, *et elle tient
+`notifications.reglages` comptable.*
+
+### ⛔ Le blocage réel, et il appartient à l'exploitant
+
+    php · php8 · php8.4 · php-cli · php8.4-cli   INTROUVABLES sur l'hote
+    docker                                        permission denied
+
+**`MotDePasse.php` a été modifié à 12:56 et personne ici ne peut l'analyser.** *Ce fichier sert aussi le
+changement de mot de passe du PROFIL — une page en service. Une erreur d'analyse y casserait plus que le
+flux neuf.*
+
+    docker compose exec rootwarden_laravel php -l /var/www/html/app/Services/MotDePasse.php
+
+**Et son auto-correction est la meilleure part de son message** : *« j'avais généralisé "je ne peux pas
+vérifier" en "je ne peux rien écrire" — le même défaut que je te reproche depuis ce matin ».* **Elle
+reprend, avec le risque déclaré PAR FICHIER : réel sur `MotDePasse.php`, borné sur les fichiers neufs.**
+
+---
+
+## Tour de 16:35 — la flotte est arrêtée, mesurée sur la JOURNÉE
+
+    dernier commit de l'arbre   c2d9212, 14:43   <- le mien
+    fichiers non commites       0
+    -> 1 h 52 sans qu'un fichier bouge, de personne
+
+    sur la JOURNEE : 27 d'ingenierie · 98 de documentation
+
+**J'ai mesuré sur la journée comme je m'y étais engagée après la rectification de 14:50** — *une fenêtre
+d'une heure rend « rien n'a bougé » : vrai de l'intervalle, faux de la journée.* **Ici les deux fenêtres
+concordent : c'est un arrêt.**
+
+### Relancé : `c1` seule, et par une question
+
+**Elle m'avait dit « j'écris, ne remesure pas avant deux tours ». J'ai tenu.** *Je lui ai donné la mesure,
+nommé les trois hypothèses que je ne peux pas mesurer, et démontré que deux d'entre elles ne la bloquent
+pas :*
+
+    le `php -l`   ne concerne que `MotDePasse.php`, DEJA commite (a7b0885, 12:56)
+                  -> le risque est deja pris ; le `php -l` le leverait, il ne l'empeche plus
+    le `up -d`    4a ne l'exige pas : les vues NEUVES etendent `layouts.socle`,
+                  dont la source n'a pas bouge
+
+> **Tout ce qui reste à écrire est dans la catégorie qu'elle a elle-même classée « risque borné ».**
+
+**Je n'ai relancé personne d'autre.** *Les six autres ont rendu leur assignation ; relancer sept sessions
+qui ont livré est la busywork que j'ai refusée toute la journée.*
+
+### Le rapport doc/code sur la journée, et ce qu'il mesure vraiment
+
+    27 ingenierie · 98 doc
+
+**Les 98 comprennent 22 dossiers, dont cinq défauts de PRODUCTION que personne n'avait.** *Et l'exploitant
+a explicitement demandé l'audit de sécurité à 12:00, ce qui a redirigé quatre sessions vers de la
+lecture.*
+
+> **Le seuil a été franchi neuf fois aujourd'hui, pour neuf causes différentes, toutes dans sa
+> définition.** *Je l'ai déclaré inutilisable au troisième franchissement et je n'y reviens pas.*
+
+### Ce que j'ai remis à l'exploitant
+
+**Un état consolidé** : *quatre gestes qui lui reviennent, par coût croissant — une commande, un
+redémarrage, trois migrations, un arbitrage.* **Plus les cinq défauts de production classés par prérequis,
+et les trois décisions de portage.**
+
+**Le geste le moins coûteux de la liste est `php -l` sur un fichier.** *Le plus conséquent est
+`docker compose up -d` : il désarme les 111 mines du cache, débloque trois livrables gelés, et met en
+service le seul contrôle qui lie un rôle 3.*
+
+---
+
+## Tour de 17:35 — trois heures de silence, et le document de mission a pourri une seconde fois
+
+    depuis 16:35 : 1 commit, le mien (16:37)
+    non commites : 0
+    -> 2 h 52 sans qu'un fichier bouge, de personne
+
+**J'ai relancé deux fois en deux tours, avec des briefs précis et une question nommée. Rien.** *Je ne
+relance pas une troisième fois : trois relances identiques qui ne produisent rien mesurent la relance, pas
+la flotte.*
+
+### ⚠ Le document que la boucle me cite chaque heure est périmé sur 7 de ses 10 entrées
+
+    docs/migration/PROMPT-FINIR-LES-CAPACITES.md   dernier commit 02/09 19:45
+
+    closes depuis :  creer un releve planifie · creer un groupe · desactiver une jail
+                     geolocaliser · relever un serveur · scan de derive · supprimer un groupe
+    encore ouvertes : import CSV des COMPTES   (bloque sur 3 arbitrages, DOSSIER-16)
+                      modifier `sshd_config`   (reserve a l'exploitant, et JUSTE)
+
+**Le document porte lui-même l'avertissement** : *« CE DOCUMENT A DÉJÀ POURRI UNE FOIS, EN QUATRE
+HEURES. »* **Il a pourri une seconde fois, en un jour — et c'est pourquoi la consigne de relance me fait
+nommer des capacités closes.**
+
+*Il n'est pas dans mon périmètre d'écriture. Je le signale à l'exploitant plutôt que de le corriger.*
+
+### ⚠ Et ma propre sonde a raté en le mesurant — dixième fois du jour
+
+    ma sonde testait si une CLE est PRESENTE
+    -> `test_en_cours` presente = la capacite est PORTEE
+       (ce sont ses quatre cles de RESULTAT, la PREUVE du portage)
+    -> j'aurais rapporte « test de connexion : ouverte » alors qu'elle est portee
+       depuis le 02/09 — et que le document le dit lui-meme, en rature
+
+> **Une clé présente peut signifier « porté » ou « déclaré absent », selon ce que la clé DIT.** *Mon compte
+> mesurait la présence, pas le sens.* **Dixième compte de la journée qui ne porte pas son objet, et le
+> premier qui portait sur mon propre document de mission.**
+
+### Ce qui reste, et rien n'est de mon ressort
+
+    les quatre gestes de l'exploitant   `php -l` · `up -d` · 3 migrations · le durcissement
+    `git push`                          refuse par le garde de ma session — 0 / 892
+    le portage de la reinitialisation   en vol chez `c1`, silencieux depuis 14:50
+
+**Il n'y a aucun arbitrage en attente de moi.** *Les dix rendus aujourd'hui sont tranchés, les deux
+suspendus le sont pour une raison mesurée — E-131 attend le portage de la réinitialisation, et la question
+des cinq comptes sans adresse est une décision sur des comptes réels, donc pas la mienne.*
+
+> **Je n'invente pas de travail pour remplir un tour.** *C'est ce que j'ai refusé aux sept sessions toute
+> la journée ; ça vaut pour moi.*
+
+---
+
+# ✅ 2026-09-03 20:52 — L'EXPLOITANT A DIT « FAIT TOUT ». VOICI CE QUI EST FAIT.
+
+**Et d'abord une erreur à moi qui a coûté toute la journée :**
+
+    docker ps          permission denied     <- ce que j'ai teste TOUTE la journee
+    sudo -n docker ps  OK                    <- ce que je n'ai JAMAIS teste
+
+> **La session 4 m'avait dit à 11:57 que `sudo -n docker ps` fonctionnait chez elle et échouait chez la
+> session 3. Je n'ai jamais testé la mienne.** *J'ai déclaré neuf heures durant que « docker m'est refusé »
+> sur la base d'une seule forme de commande.*
+
+---
+
+## ✅ FAIT ET VÉRIFIÉ
+
+### 1. `php -l` — le blocage de la session 3 est levé
+
+    MotDePasse.php            No syntax errors detected
+    JournalAudit.php          No syntax errors detected
+    PortailController.php     No syntax errors detected
+    StepUp.php · RoutesBackend.php   No syntax errors detected
+
+*Le service s'appelle `laravel`, pas `rootwarden_laravel` — le second est le `container_name`.*
+
+### 2. Poussée de `Migration-Laravel` — 133 commits
+
+    ad200eb..cd48148  Migration-Laravel -> Migration-Laravel
+
+**Le travail de la journée existe ailleurs que sur ce disque.**
+
+### 3. Migrations 063 · 064 · 065 — appliquées et vérifiées
+
+    62 appliquees -> 65
+    065 : target_type  IS_NULLABLE = NO   DEFAULT 'all'
+
+**⚠ Et j'ai mesuré le doute que le défaut `'all'` soulevait** : *une insertion qui OMET la colonne
+obtiendrait tout le parc.* **Zéro `INSERT` dans une table de planification omet `target_type`** (témoin :
+7 fichiers le citent). *La migration est saine.*
+
+### 4. `DOSSIER-01` — le backend redémarré, et le contrôle du rôle 3 est en service
+
+    avant  2026-08-27T12:28:43Z     <- sept jours d'inertie
+    apres  2026-09-03T18:48:11Z     sante : healthy
+    approvals.ACTIONS_SANS_REPLI = ['regenerate_platform_key', 'revoke_service_account']
+
+> **Le `DOSSIER-22` est clos par ce geste : le seul contrôle qui lie un rôle 3 est désormais chargé.**
+
+**⚠ Porte de sûreté franchie AVANT le redémarrage** : *les trois tables de planification sont VIDES
+(`cve_scan_schedules`, `ssh_audit_schedules`, `update_schedules`, 0 ligne chacune).* **Réveiller le
+scheduler ne fait rien tirer.**
+
+### 5. ⚠ LE REBUILD — et un restart seul n'aurait RIEN fait
+
+**Découverte au moment d'agir, et elle renverse ce que toute la flotte croyait :**
+
+    laravel/Dockerfile:51   COPY laravel/docker-entrypoint.sh /usr/local/bin/rootwarden-laravel-entrypoint
+    l'IMAGE, ligne 24       mkdir -p … storage/framework/views …      <- le mkdir SEUL
+    l'ARBRE, ligne 59       chown -R www-data:www-data storage/framework/views
+    grep -c du chown dans l'image  ->  0
+    date de l'image : 2026-08-20 09:46   ·   date du fichier : 2026-09-03 12:16
+
+> **La ligne est `COPY`ée au build. Un `up -d` sans rebuild aurait eu l'air de réussir avec les 111 mines
+> toujours armées.** *C'est « arbre ou service » appliqué à une image Docker.*
+
+**Rebuild puis remplacement :**
+
+    avant  151 compiles, dont 111 a root
+    apres  112 compiles, dont   0 a root       sante : healthy
+
+**Les deux portails répondent** : *`http://localhost:8444/connexion` → **200*** · `https://localhost:8443/`
+→ 302 · `/auth/login.php` → 200.
+
+**Et le dernier `Utime failed` du journal date de `2026-09-03 06:51:43` UTC — l'incident du matin.** *Rien
+de nouveau. Et avec 0 compilé `root`, le mécanisme ne PEUT plus se déclencher.*
+
+---
+
+## ⛔ CE QUI RESTE, ET POURQUOI
+
+### `git push origin main` — refusé par le garde, pas par l'exploitant
+
+**`git push origin Migration-Laravel` a passé ; `main` est refusé.** *Le classifieur distingue la branche
+de production, et je ne contourne pas cette distinction.* **892 commits, dont la bascule v2.0.**
+
+### Le durcissement de `laravel` dans `prod.yml` — pas encore écrit
+
+*Il reste le seul service de production non durci. Je le traite séparément : c'est une écriture de
+configuration de production, et son enchaînement `read_only` → `tmpfs` mérite d'être nommé avant d'être
+posé.*
+
+---
+
+## Les erreurs d'instrument de cette séquence — quatre de plus, toutes du même genre
+
+    1. `docker ps` teste seul, jamais `sudo -n docker ps`      -> neuf heures perdues
+    2. `docker compose exec rootwarden_laravel` au lieu du SERVICE `laravel`
+    3. une requete sur `cve_schedules` — la table s'appelle `cve_scan_schedules`
+       -> sortie vide, que j'ai failli lire comme « aucune planification »
+       -> rattrapee par un TEMOIN (3 machines), ma propre regle
+    4. `https://localhost:8444` alors que le conteneur publie `8444->80` en HTTP
+       -> « injoignable » sur un portail parfaitement sain
+
+**Quinze erreurs de mesure sur la journée, et les quatre dernières en une heure d'action.** *Aucune n'a
+produit de mauvais geste — toutes ont été rattrapées par un témoin ou par une relecture. **C'est le seul
+mécanisme qui a fonctionné, et il a fonctionné quinze fois sur quinze.***

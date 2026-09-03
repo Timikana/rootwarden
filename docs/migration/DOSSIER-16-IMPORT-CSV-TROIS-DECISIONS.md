@@ -228,3 +228,138 @@ disparaît avec lui, ce qui est le seul effet **favorable** de l'inaction. **Mai
   documentation qui l'établit* ;
 - **E-129**, le garde SSRF en trois copies comparant des préfixes de chaîne : *nommé au plan comme
   correctif de production à décider, hors du périmètre de ce dossier.*
+
+---
+
+# ⚠ AJOUT 12:50 — E-131 : cinq comptes portent DÉJÀ l'état que votre décision produirait
+
+**Remesuré par la session 5, en base. Mon chiffre était hérité et faux dans les deux sens.**
+
+    comptes ACTIFS                                    12   (je portais 10)
+    `force_password_change = 1`                        8   (je portais 6)
+    SANS adresse de courriel                           6
+    LES DEUX A LA FOIS                                 5   <- personne n'avait celui-la
+
+**Le flux de réinitialisation s'indexe sur l'adresse** — `WHERE email = ? AND active = TRUE`.
+
+> **Cinq comptes actifs doivent déjà changer leur mot de passe et n'ont aucune adresse. La
+> réinitialisation en libre-service ne les atteint pas, par construction.** *Ils exigent un geste
+> d'administration.*
+
+### Ce que ça change à la décision E-131
+
+**J'avais recommandé : `email` obligatoire ET forcer `force_password_change`.** *Puis j'ai suspendu cette
+recommandation faute de chemin de réinitialisation. Voici la version corrigée :*
+
+    porter la reinitialisation est NECESSAIRE et NON SUFFISANT
+      -> elle debloque 3 des 8 comptes forces ; les 5 autres restent hors d'atteinte
+
+**Donc rendre `email` OBLIGATOIRE à l'import n'est pas un raffinement de confort : c'est ce qui empêche de
+créer un sixième, un septième compte dans cet état.** *La recommandation `email` obligatoire est **renforcée**
+par cette mesure ; la recommandation `force_password_change` reste conditionnée au portage de la
+réinitialisation.*
+
+**Et une question qui vous revient et que je ne tranche pas** : *les cinq comptes existants — les
+raccroche-t-on (leur poser une adresse), ou les laisse-t-on à un geste d'administration ?* **Ce n'est pas
+du portage : c'est une décision sur des comptes réels.**
+
+---
+
+## ⚠ Et deux défauts du legacy à NE PAS porter à l'identique — vérifiés par moi
+
+### a) La limite de débit échoue OUVERTE, et sa justification n'a plus d'objet
+
+    legacy/auth/forgot_password.php:53   } catch (PDOException $e) {
+                                  :54       // Si la table n'existe pas encore …
+                                  :55       return true;
+
+**Toute `PDOException` désarme les 3 demandes/IP/heure** — *pas seulement une table absente : connexion
+perdue, verrou, droits.* **Et la table EXISTE** (`mysql/migrations/016_password_reset_tokens.sql`), donc la
+justification écrite ne couvre plus rien. **Le portage doit échouer FERMÉ.**
+
+### b) L'oracle de TEMPS n'est pas refermé — le correctif a égalisé le MAUVAIS terme
+
+    adresse INCONNUE  :115   password_hash(bin2hex(random_bytes(32)))
+    adresse CONNUE    :87    password_hash($token)
+                      + UPDATE + INSERT
+                      :110   sendPasswordResetEmail(...)   <- SMTP SYNCHRONE dans la requete
+
+**Un envoi SMTP dure des ordres de grandeur de plus qu'un bcrypt.** *Le correctif a égalisé le terme le
+moins coûteux et laissé le plus coûteux d'un seul côté : **la branche « l'adresse existe » est nettement
+plus lente**.* **L'énumération subsiste, inversée par rapport à l'implémentation naïve.**
+
+> **C'est « le commentaire affirme plus que le code » dans sa forme la plus retorse : la mesure qu'il
+> décrit est RÉELLE, elle porte sur le MAUVAIS TERME.** *Le message identique, lui, est bien là et
+> correct — c'est le temps qui trahit.*
+
+**Le portage doit sortir l'envoi de la requête** (`Mail::queue`). *Non exercé : le démontrer demanderait de
+chronométrer des requêtes avec envoi réel, ce qui est un interdit du chantier.*
+
+### ✅ Et ce qui est BIEN fait et se reprend tel quel
+
+    jeton   32 octets · bcrypt en base, JAMAIS en clair · 1 heure
+            re-valide AVANT l'ecriture (protection double-soumission)
+            consomme, et TOUS les autres jetons du compte invalides
+    message identique dans les deux branches, hors du `if`
+
+**La table `password_reset_tokens` se reprend telle quelle.**
+
+**⚠ Et un corollaire à connaître** : *un compte ayant perdu son mot de passe ET son second facteur n'a
+aucun chemin, ni avant ni après le portage.*
+
+---
+
+## ⚠ AJOUT 13:05 — un TROISIÈME défaut : la limite de débit ne borne QUE les adresses qui existent
+
+**Trouvé en cherchant à savoir si fermer (a) bornait (b). Ça ne le bornait pas, et voici pourquoi.**
+
+    :80   if ($user) {                              <- adresse CONNUE
+    :92       INSERT INTO password_reset_tokens (…, ip_address)
+    :110      sendPasswordResetEmail(...)
+    :111  } else {                                  <- adresse INCONNUE
+    :115      password_hash(...)          <- RIEN n'est insere
+    :116  }
+
+    et la limite compte :
+      SELECT COUNT(*) FROM password_reset_tokens WHERE ip_address = ? AND created_at >= …
+      $maxRequests = 3 · $windowSeconds = 3600
+
+> **Sonder une adresse INCONNUE n'insère aucune ligne, donc ne compte JAMAIS dans les 3 demandes par IP et
+> par heure.** *La limite ne borne que les demandes pour des adresses qui **existent**.*
+
+**Elle est exactement à l'envers de son objet : elle freine l'utilisateur légitime et laisse
+l'énumération libre.**
+
+### Ce que ça a détruit de mon propre raisonnement
+
+**J'allais rendre l'arbitrage « ferme (a), ça borne (b), donc porte ».** *C'était faux : (a) fermé ne
+borne rien, puisque les sondes d'énumération ne créent pas de lignes.* **Le compteur est au mauvais
+endroit, et c'est le seul des trois défauts qui rende (b) coûteux à exploiter.**
+
+### ✅ ARBITRAGE RENDU — trois gestes, et le troisième est le seul qui compte
+
+    (a)  la limite echoue FERME sur PDOException          perimetre de la session 3  -> FERMER
+    (c)  le COMPTEUR compte les TENTATIVES, pas les
+         jetons emis — quel que soit le resultat           perimetre de la session 3  -> FERMER
+    (b)  l'oracle de TEMPS (SMTP synchrone, 15 s)          HORS perimetre             -> DECLARER
+
+**Avec (c), l'énumération passe d'illimitée à 3 sondes par IP et par heure.** *L'oracle subsiste et devient
+coûteux au lieu d'être trivial.* **Résidu honnête à écrire au commit : une limite par IP ne borne pas un
+attaquant distribué. (c) RENCHÉRIT (b), il ne le ferme pas.**
+
+### ⛔ Et le correctif que j'avais prescrit pour (b) est INOPÉRANT — retiré
+
+    laravel/.env.example:57      QUEUE_CONNECTION=sync
+    laravel/config/queue.php:16  defaut 'database' si la variable manque
+    table `jobs` dans mysql/migrations/ : AUCUNE
+      TEMOIN : le meme motif trouve `password_reset_tokens` -> 1 fichier
+
+**Avec `sync`, `Mail::queue()` exécute le travail EN LIGNE : le temps ne bouge pas d'un millième.**
+
+> **C'est un correctif qui se LIT comme fait et ne fait RIEN** — la classe exacte que ce chantier démonte
+> depuis ce matin, et je l'ai prescrite. *La session 3 a refusé de l'écrire, et elle a énuméré les quatre
+> issues alternatives avant de conclure qu'aucune n'était dans son périmètre.*
+
+**Et sa mesure rend (b) plus grave que ma formulation** : *`mail_helper.php` pose `$mail->Timeout = 15`.*
+**La branche « l'adresse existe » est bornée par quinze secondes — observable en UNE requête, à l'œil. Et
+le maximum est atteint quand le SMTP est en panne : une panne de courriel rend l'énumération triviale.**
