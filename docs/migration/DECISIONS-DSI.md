@@ -5753,3 +5753,48 @@ nomme le mauvais risque rassure au lieu de protéger.**
 **En l'occurrence les lignes ne l'étaient pas, donc son résultat était juste.** *Encore une réponse bonne
 tirée d'un motif faux — le second de sa matinée, après son `0` sur les confirmations.* **Et il ne l'a vu
 qu'en cherchant pourquoi le fichier et le rapporté divergeaient, pas en relisant son motif.**
+
+### Tranché par les dates — l'extension vient de l'image de base (mesure du Lead, 11:35)
+
+    conf.d/docker-php-ext-opcache.ini   23 octets   2026-08-05 02:29:53   root:root
+    opcache.so                          meme date
+    image du PROJET construite          2026-08-20T14:57   -> quinze jours APRES
+
+**`opcache` vient donc de `php:8.4-apache` lui-même, activé par le `conf.d` de l'image officielle.** *Le
+Dockerfile du legacy ne l'installe pas, et **n'a pas à le faire** — mon reproche était mal formé.*
+
+**Le désaccord des deux conteneurs est réel, et sa forme change** : *le legacy ne configure pas une
+extension ABSENTE — il configure une extension **fournie par l'image de base**, et sa configuration n'est
+pas appliquée.*
+
+**Et le Lead sépare ce qu'il a mesuré de ce qu'il infère, sans que je le lui demande :**
+
+    MESURE   opcache vient de l'image de base · le projet n'y touche pas ·
+             l'extension EST chargee · les valeurs du php.ini ne sont PAS appliquees
+    INFERE   `conf.d` scanne APRES `php.ini`, donc l'extension s'enregistre trop tard
+
+**Il refuse de le prouver** : *cela demanderait de déplacer la directive dans un `conf.d/zz-opcache.ini`
+et de remesurer — une écriture dans un conteneur servi, pendant un LOT.* **La cause est plausible et non
+mesurée ; le FAIT l'est.**
+
+### Les deux formulations de cette heure qui valent d'être gardées
+
+> **« Une mesure fausse dort ; une rectification fausse VOYAGE, parce qu'elle a l'autorité de la
+> correction. »**
+
+*Je l'ai transmise comme une **alerte opérationnelle** — « ça touche tes mesures de parité ».* **Un pair
+pouvait bâtir dessus immédiatement, et c'était le troisième relais de la matinée.** **Conséquence : une
+rectification se vérifie avec le MÊME soin qu'une décision, et pas moins sous prétexte qu'elle
+corrige — l'élan de la correction est précisément ce qui fait sauter la mesure.**
+
+> **« Une réserve juste sur le mauvais axe est une CAUTION, pas une garde. »**
+
+*Deuxième fois le même matin.* **Une réserve déclarée est lue comme une preuve de soin — c'est ce qui la
+rend couvrante.**
+
+### Et ce qui a réellement attrapé les quatre, puisqu'aucune relecture ne l'a fait
+
+- **un pair QUI ALLAIT AGIR DESSUS** — deux fois ;
+- **la méfiance envers un chiffre qui tombe trop bien** : *le Lead a trouvé ses deux motifs faux à
+  résultat juste parce qu'un `0` était **trop net** et une divergence fichier/rapporté **trop propre**.*
+  **« Ce n'est pas de la rigueur, c'est de la méfiance envers un chiffre qui tombe trop bien. »**
