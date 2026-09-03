@@ -110,3 +110,46 @@ d'horodatage est presque toujours celui qui coupe l'historique en deux.*
 
 **Le scheduler n'est pas en défaut** et il faut le redire : il compare `next_run <= now` avec la même
 horloge, dans le même conteneur. **Rien ne se déclenche trop tôt.** Le défaut est un **affichage**.
+
+
+---
+
+# ⚠ LES ARTEFACTS EXISTENT DÉSORMAIS — `docs/migration/patchs-en-attente/`
+
+**Ajouté le 2026-09-03.** Ce document décrivait des patchs qui **n'existaient nulle part sur le
+disque** : ils vivaient dans un scratchpad de session, donc dans `/tmp`. Le Lead l'a mesuré — aucun
+`.patch` dans l'arbre, `git stash` vide, aucune mention d'E-280 ni d'E-281 ici ni dans `DOSSIER-00`.
+
+> **Un patch vérifié qui ne vit que dans un contexte de session n'attend pas une signature : il attend
+> une compaction.** *Le journal n'est pas l'autorité, l'artefact l'est.*
+
+Et le précédent est dans nos propres documents : `RELECTURE-SECURITY-BACKEND-CVE.md` signale des
+sessions ayant re-trouvé, re-mesuré et re-rédigé `a345e65`, écrit douze jours plus tôt. **Le coût du
+travail perdu n'est pas de le refaire une fois — c'est de le refaire à chaque session.**
+
+## Les quatre vivants, avec leur régime
+
+| patch | régime de génération | contrôle |
+|---|---|---|
+| `01-E-231-psk-illisible` | **HEAD** | `git apply --check` passe |
+| `02-E-280-portee-scheduler` | **HEAD** | passe |
+| `03-telegraf-jeton-en-clair` | **HEAD** | passe |
+| `04-E-281-apres-fusion` | **`a345e65`**, après fusion | passe sur l'arbre post-fusion, **et REFUSE sur `HEAD`** |
+
+**Le refus du 04 est le contrôle** : un apport destiné à l'après-fusion qui s'appliquerait *aussi* sur
+`HEAD` viserait les mauvaises lignes.
+
+## Un quarantainé, et il s'applique — c'est le danger
+
+`QUARANTAINE-perime-refait-par-a345e65.patch` **passe** sur `HEAD`, parce que `HEAD` n'a pas le
+correctif de la branche. Son contenu est **déjà écrit** dans `security/backend-cve` : l'appliquer
+rendrait conflictuelle une fusion aujourd'hui propre, sur le hunk le plus sensible du dépôt.
+**Conservé, jamais supprimé** — pour que personne ne le réécrive une troisième fois.
+
+## Deux retirés, et la distinction qui a servi à trier
+
+`E-280-portee-entree` (appliqué en `v1.38.180`) et `e187-forme` (contenu présent dans l'arbre,
+vérifié par témoin positif).
+
+> **Un patch qui refuse peut être PÉRIMÉ ou viser un AUTRE ARBRE.** Les deux se distinguent en
+> cherchant son contenu dans l'arbre — *pas en relisant son nom.*
