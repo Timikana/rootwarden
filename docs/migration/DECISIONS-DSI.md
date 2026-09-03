@@ -6437,3 +6437,54 @@ flux neuf.*
 **Et son auto-correction est la meilleure part de son message** : *« j'avais généralisé "je ne peux pas
 vérifier" en "je ne peux rien écrire" — le même défaut que je te reproche depuis ce matin ».* **Elle
 reprend, avec le risque déclaré PAR FICHIER : réel sur `MotDePasse.php`, borné sur les fichiers neufs.**
+
+---
+
+## Tour de 16:35 — la flotte est arrêtée, mesurée sur la JOURNÉE
+
+    dernier commit de l'arbre   c2d9212, 14:43   <- le mien
+    fichiers non commites       0
+    -> 1 h 52 sans qu'un fichier bouge, de personne
+
+    sur la JOURNEE : 27 d'ingenierie · 98 de documentation
+
+**J'ai mesuré sur la journée comme je m'y étais engagée après la rectification de 14:50** — *une fenêtre
+d'une heure rend « rien n'a bougé » : vrai de l'intervalle, faux de la journée.* **Ici les deux fenêtres
+concordent : c'est un arrêt.**
+
+### Relancé : `c1` seule, et par une question
+
+**Elle m'avait dit « j'écris, ne remesure pas avant deux tours ». J'ai tenu.** *Je lui ai donné la mesure,
+nommé les trois hypothèses que je ne peux pas mesurer, et démontré que deux d'entre elles ne la bloquent
+pas :*
+
+    le `php -l`   ne concerne que `MotDePasse.php`, DEJA commite (a7b0885, 12:56)
+                  -> le risque est deja pris ; le `php -l` le leverait, il ne l'empeche plus
+    le `up -d`    4a ne l'exige pas : les vues NEUVES etendent `layouts.socle`,
+                  dont la source n'a pas bouge
+
+> **Tout ce qui reste à écrire est dans la catégorie qu'elle a elle-même classée « risque borné ».**
+
+**Je n'ai relancé personne d'autre.** *Les six autres ont rendu leur assignation ; relancer sept sessions
+qui ont livré est la busywork que j'ai refusée toute la journée.*
+
+### Le rapport doc/code sur la journée, et ce qu'il mesure vraiment
+
+    27 ingenierie · 98 doc
+
+**Les 98 comprennent 22 dossiers, dont cinq défauts de PRODUCTION que personne n'avait.** *Et l'exploitant
+a explicitement demandé l'audit de sécurité à 12:00, ce qui a redirigé quatre sessions vers de la
+lecture.*
+
+> **Le seuil a été franchi neuf fois aujourd'hui, pour neuf causes différentes, toutes dans sa
+> définition.** *Je l'ai déclaré inutilisable au troisième franchissement et je n'y reviens pas.*
+
+### Ce que j'ai remis à l'exploitant
+
+**Un état consolidé** : *quatre gestes qui lui reviennent, par coût croissant — une commande, un
+redémarrage, trois migrations, un arbitrage.* **Plus les cinq défauts de production classés par prérequis,
+et les trois décisions de portage.**
+
+**Le geste le moins coûteux de la liste est `php -l` sur un fichier.** *Le plus conséquent est
+`docker compose up -d` : il désarme les 111 mines du cache, débloque trois livrables gelés, et met en
+service le seul contrôle qui lie un rôle 3.*
