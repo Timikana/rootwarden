@@ -104,3 +104,86 @@ format `MM:SS` sous l'heure — comme des heures et des minutes : `04:49` lu « 
 
 **Le classement lui-même ne dépend d'aucune horloge** : il est établi par les appelants et les
 décorateurs, qui ne bougent pas avec l'heure. *La correction porte sur l'en-tête, pas sur le fond.*
+
+---
+
+# RELECTURE — première partie, 2026-09-03 10:45
+
+**Demandée par l'exploitant : « l'audit de sécurité a été faite ? ».** *Réponse honnête : cette branche
+n'avait JAMAIS été relue depuis le 21 août — treize jours. Le classement ci-dessus portait sur la PORTÉE,
+et je l'avais écrit : « je classe la portée, pas la justesse ». Voici la justesse, sur les trois
+correctifs que je me suis attribués.*
+
+**Les trois autres (`9ac8456`, `427306c`, `a345e65`) sont chez la session 4.**
+
+---
+
+## ⚠ FINDING 1 — `3e65ad3` : le clamp anti-fréquence reste CONTOURNABLE
+
+**Le correctif s'appelle « le clamp anti-fréquence des scans planifiés était contournable ». Il l'est
+encore, par un autre chemin.**
+
+### Ce que le correctif fait de bien, et il faut le dire
+
+    _valide_planification(data, creation)
+      « UNE SEULE FONCTION POUR LES DEUX CHEMINS, et c'est tout l'objet du correctif »
+
+**C'est l'architecture juste** — *le défaut de garde-sur-un-seul-chemin est celui que ce dépôt paie le plus
+souvent.* **Et la validation est complète** : nom requis et borné, cron valide et calculable, CVSS
+numérique et dans `[0,10]`, source connue, type de cible connu, tag requis, au moins un serveur
+sélectionné. *Elle porte même un commentaire sur `1406` en mode strict, qui rendrait un 500 au lieu d'un
+400.*
+
+### Le défaut
+
+    def _intervalle_cron(expression):
+        it = croniter(expression)
+        premiere = it.get_next(datetime)
+        seconde  = it.get_next(datetime)
+        return int((seconde - premiere).total_seconds())
+
+    _INTERVALLE_MINIMUM = 600
+    if intervalle < _INTERVALLE_MINIMUM: -> refus
+
+> **Il mesure l'écart entre les deux PROCHAINES exécutions, depuis l'instant de la soumission.** *Pour un
+> cron à écarts IRRÉGULIERS, ce n'est pas l'écart minimum.*
+
+**Démontré par simulation, pas déduit d'un motif** — `0,59 * * * *`, qui tire à `:00` et `:59` de chaque
+heure, donc avec des écarts alternés de 3540 s puis 60 s :
+
+    soumise a 10:30  ->  le correctif mesure    60 s   REFUSE
+    soumise a 10:59  ->  le correctif mesure  3540 s   ⚠ ACCEPTE
+    soumise a 11:00  ->  le correctif mesure    60 s   REFUSE
+    ... alors que l'ecart MINIMUM REEL est de 60 s dans les trois cas
+
+**La planification admise tire donc un scan CVE deux fois à une minute d'intervalle, chaque heure** — *ce
+que le commentaire du correctif lui-même désigne comme le danger :* **« lançait un scan par minute → ban
+OpenCVE upstream + DoS interne ».**
+
+### Gravité, et ses bornes
+
+**Le contournement exige de soumettre pendant la fenêtre du petit écart.** *C'est étroit, et ce n'est pas
+aléatoire : c'est déterministe, trivialement reproductible, et **une planification se soumet une fois et
+tourne indéfiniment**.*
+
+**Ce n'est pas une escalade** : la route reste gardée par `require_api_key` + `require_role(2)`. *C'est un
+garde de fréquence qui ne tient pas sa promesse, sur une route qui ouvre des sessions SSH.*
+
+### Le correctif du correctif
+
+> **Mesurer le minimum sur une FENÊTRE d'exécutions, pas le premier écart.** *Par exemple les gaps des N
+> premières occurrences (N ≈ 50, ou toutes celles des 24 prochaines heures), et refuser si le **minimum**
+> passe sous le plancher.*
+
+**Et la propriété à asserter dans le test** : *« la même expression rend le même verdict quelle que soit
+l'heure de soumission ».* **Le test actuel ne peut pas l'attraper : il fixe implicitement l'instant.**
+
+---
+
+## Les deux autres, en cours
+
+    8043303   le drapeau KEV      relecture en cours
+    399931a   le garde d'acces machine   relecture en cours
+              ⚠ ne PAS s'appuyer sur mon classement du DOSSIER-15 pour celui-la :
+                deux de mes conclusions sur la chaine `users.sudo` ont ete
+                RENVERSEES ce matin, dont une par moi-meme.
