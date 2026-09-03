@@ -623,3 +623,51 @@ entre dans le lot déjà constitué, il n'en ouvre pas un nouveau.*
 **Et une piste que j'avais donnée comme la plus prometteuse ne donne rien** : *le motif de la « liste
 blanche orpheline » (`DOSSIER-21`) est SPÉCIFIQUE aux modules dont la page a été portée **et retirée**.*
 **Les quatre routes de masse ont des appelants vivants. Ma généralisation était la faute, pas la mesure.**
+
+---
+
+## ⚠ AJOUT 21:00 — la CI ne se déclenche QUE sur `main` : la bascule n'a jamais été analysée
+
+**Confié à la session 4 sur demande de l'exploitant, après mesure.**
+
+    .github/workflows/ci.yml   un seul workflow, 14 jobs
+    declencheurs :  push: branches: [main]  ·  pull_request: branches: [main]
+                    -> RIEN D'AUTRE
+
+> **Les 133 commits poussés ce soir sur `Migration-Laravel` n'ont déclenché AUCUN job.** *Et les 892
+> commits de la bascule n'ont jamais passé `lint`, `test`, `sast`, ni `gitleaks`.*
+
+**C'est la confirmation d'un constat de ce matin** — *« gitleaks présenté comme un contrôle pré-poussée
+n'avait rien inspecté »* — **et il vaut pour les quatorze jobs, pas seulement pour celui-là.**
+
+### ⚠ La conséquence qui vous concerne directement
+
+**Le jour où `git push origin main` aura lieu, les quatorze jobs partiront d'un coup sur 892 commits de
+code jamais analysé.** *Ce n'est pas un risque de production — c'est un risque de RÉSULTAT : un premier
+passage sur autant de code neuf produira probablement des rouges, et il faudra les trier.*
+
+**Mieux vaut le savoir avant que pendant.**
+
+### Trois autres faits mesurés
+
+    sast-semgrep-custom   `continue-on-error: true`, libelle « advisory »
+                          -> un job advisory qui echoue en permanence est un job
+                             ETEINT qui a l'air ALLUME. Etat actuel NON mesure.
+
+    jobs de DEPLOIEMENT   0
+                          grep deploy|ssh-action|rsync|scp|kubectl|helm -> 0
+                          -> il n'y a PAS de CD. Le deploiement est `maj.sh`, a la main.
+
+    auto-tag              needs: 8 jobs · if: ref == main && event == push
+                          permissions: contents: write
+
+### La question qui vous revient, et que je ne tranche pas
+
+**Faut-il une CD, ou `maj.sh` suffit-il ?** *`maj.sh` fait `git pull` + `env-merge` + `build` +
+`db_migrate.py` + `up -d`, et il touche la production.* **Une CD ferait la même chose sans main humaine —
+ce qui est un gain de régularité et une perte de porte de décision.** *La session 4 vous apportera ce que
+l'un fait que l'autre ne fait pas ; le choix est le vôtre.*
+
+**⛔ Et une borne que j'ai posée** : *ne rien écrire dans `ci.yml` sans votre mot.* **Un workflow est un
+effet sortant : il tourne sur l'infrastructure de GitHub avec un `GITHUB_TOKEN`, et `auto-tag` porte
+`contents: write`.**
