@@ -6325,3 +6325,55 @@ pas de la redondance : le partage auteur/relecteur a été demandé par la relec
 **Et `c61dea9` mérite d'être noté** : *un détecteur des pages du portage qu'aucune vue ne lie.* **C'est
 l'outil qui aurait trouvé `notifications.reglages` sans qu'on la cherche — construit le jour où on l'a
 trouvée à la main.**
+
+---
+
+## Tour de 14:35 — arrêt de flotte MESURÉ, et j'ai relancé deux postes
+
+### La mesure, et le discriminant que ce matin m'a appris
+
+    depuis 13:35, dans TOUT l'arbre :
+      commits                                   1   <- le mien
+      fichiers non commites                     0
+      fichiers modifies (hors vendor/storage)   1   <- DECISIONS-DSI.md, le mien
+      ingenierie                                0
+
+**Ce matin j'ai pris un silence de `ps` pour une session muette alors qu'elle rédigeait.** *Cette fois j'ai
+mesuré l'ARBRE : zéro fichier non commité, un seul fichier touché en une heure.* **`ps` mesure la charge ;
+l'arbre mesure le travail. C'est un arrêt, pas une rédaction.**
+
+### Relancé, et par une QUESTION avant une consigne
+
+    c1   le flux de reinitialisation (4a)
+         -> je lui ai donne la mesure AVANT la consigne, et j'ai nomme
+            l'hypothese que je ne peux pas mesurer : « si tu attendais
+            quelque chose de moi, dis-le »
+         -> et j'ai propose de REVOIR mon exigence d'assertion d'inatteignabilite
+            si elle coute plus cher que le portage
+
+    94   l'angle 3 du pentest — les gestes de masse sans parametre de portee
+         -> avec le quatrieme DEJA MESURE par moi, pour qu'elle ne le refasse pas
+
+**Je n'ai relancé que deux postes sur sept.** *Les cinq autres ont rendu leur assignation ; leur inactivité
+est un état, pas un manquement — et inventer une tâche pour remplir un tour est ce que la relance doit
+empêcher.*
+
+### ✅ Et j'ai vérifié que je ne suis pas la cause du blocage de `c1`
+
+    l'option A       confirmee, et sa condition (que `c6` relise) est REMPLIE
+    la fusion        deja faite, elle n'attend RIEN de la session 3
+    la liste de 5    arbitree
+    (a) (b) (c)      arbitres
+
+**Il ne reste aucun arbitrage en attente de moi sur cette capacité.** *Donc si elle est bloquée, la cause
+est ailleurs — ou c'est mon exigence de test qui coûte trop cher, et je le lui ai demandé explicitement.*
+
+### Ce qui n'a pas bougé, et je le redis sans le combler
+
+**Le `docker compose up -d` appartient à l'exploitant. Je l'ai remonté trois fois.**
+
+    il debloque l'etape 4b : le lien de connexion, la legende du menu, `sudo_preset`
+    et il fait renaitre le cache de vues en `www-data`, ce qui desarme les 111 mines
+
+**Trois sessions ont refusé de le faire à sa place, sans coordination.** *Le Lead, la session 4 qui en a les
+moyens techniques, et moi.* **La porte n'est pas l'accès, c'est son mot.**
