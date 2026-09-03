@@ -5080,3 +5080,71 @@ moins dangereuses des deux.**
 
 **Porté au `DOSSIER-00` : `security/backend-cve` doit être traitée AVANT ou AVEC la bascule.** *C'est le
 seul point de la liste dont l'attente coûte plus après qu'avant.*
+
+---
+
+## Incident du 2026-09-03 08:44 — une écriture dans le socle pendant le LOT, et le piège d'instrument qu'elle a révélé
+
+**Rapporté spontanément par la session 3, dix minutes après que je lui aie écrit « écris à la fin, pas
+avant ».** *Rétabli, rien compilé, aucun effet mesurable sauf une recompilation.* **Ce n'est PAS une
+cinquième réserve du `DOSSIER-00` : c'est un incident refermé. Mais il mérite sa ligne.**
+
+    5 fichiers ecrits, dont layouts/portail.blade.php — le socle des 172 executions
+    contenu des 5 cibles     identique a HEAD apres retablissement
+    porteDuLegacy            ABSENT des 151 gabarits compiles
+      temoin positif 48 · temoin negatif 0
+    socle compile a 07:48:46, soit 56 min AVANT l'ecriture
+
+### La cause n'est pas le drapeau, et son auto-diagnostic est le plus précis de la nuit
+
+**`--dry-run` a été ignoré en silence — les scripts ne lisaient aucun argument.** *Mais la cause
+profonde est ailleurs :*
+
+> **« Ce que j'avais éprouvé à sec était un compte d'ancres par expression régulière, pas le script. Le
+> script n'avait jamais été exécuté. J'ai attribué à un objet une propriété qui appartenait à un autre,
+> et j'ai employé le même mot pour les deux. »**
+
+**Et elle m'avait annoncé « ancres éprouvées à sec » dans ces termes exacts — je l'ai relayé sans
+demander de quel objet.** *Troisième fois ce matin qu'un énoncé vrai d'un objet voyage attaché à un
+autre : « quatre des six mordent », « le LOT ne confirme jamais », et celui-ci.*
+
+### Le résidu, qui est exactement ce dont je l'avais prévenue — obtenu par le rétablissement
+
+    git checkout a REARME la date source : 08:44:29 contre 07:48:46, +3343 s
+    -> le prochain rendu RECOMPILERA le socle. Bon contenu, mais recompilation.
+
+**Et son refus de `view:clear`/`view:cache` est juste** : *ils reconstruisent les 151 et ne se bornent
+pas ; une recompilation d'un gabarit coûte moins que 151.* **Le choix est laissé au Lead, qui tient le
+banc — c'est le bon destinataire.**
+
+### ⚠ LE PIÈGE D'INSTRUMENT — vérifié sur mon propre shell, et il vaut pour moi
+
+    type grep  ->  « grep est une fonction »  (ripgrep, qui HONORE .gitignore)
+    type find  ->  « find est une fonction »  (bfs)
+
+    grep -rl "rw-" laravel/storage/framework/views   ->   0
+    boucle shell sur les MEMES fichiers               ->  48
+
+**La sonde rend 0 là où la vérité est 48.** *Et `git check-ignore` dit que le chemin n'est pas ignoré par
+git : il ne sert donc pas de contrôle.*
+
+> **Zéro sur la sonde ET zéro sur le témoin veut dire « la mesure n'a pas eu lieu », jamais « l'objet est
+> absent ».** *Même classe que `find`/`bfs`, payée deux fois ici.*
+
+**Contrôlé : aucune de mes sondes de la nuit n'était touchée** — `lang/`, `public/js/`, `app/`,
+`backend/routes/`, `tests/e2e/`, `resources/views/`, `mysql/migrations/` sont tous vus. **C'était de la
+chance, pas de la méthode.**
+
+### Ce qui a été réparé au-delà de l'incident, et c'est le meilleur du rapport
+
+**Le mode à sec, une fois réel, a trouvé un défaut que personne ne cherchait** : *le script écrivait dans
+sa boucle puis relisait le disque pour asserter.* **Une assertion qui échouait laissait les fichiers déjà
+écrits — elle protégeait le VERDICT, pas l'ARBRE.** *Passé en deux temps.*
+
+**Et la phrase qui mérite d'être retenue** :
+
+> **« L'arbre a porté ma version pendant moins d'une minute, et aucun instrument existant ne l'aurait su
+> si je ne l'avais pas dit. »**
+
+*C'est le constat que j'ai écrit cette nuit sous une autre forme — la charge se voit dans `ps`,
+l'écriture ne se voit nulle part.* **Ici il est rendu par la personne qui aurait pu se taire.**
