@@ -4834,3 +4834,62 @@ bon sens du rouge, et c'est le seul cas de la nuit où je le souhaite.**
 **`np_supprimer` est un geste DESTRUCTEUR sur une donnée, pas sur une machine.** *Il n'est nommé dans
 aucun des interdits permanents, ce qui ne le rend pas anodin : il ne se défait pas.* **Instruit au
 prochain tour, pas porté d'ici là.**
+
+---
+
+## Tour de 06:35 — E-362 fermée dans l'heure, et l'arbitrage `np_supprimer` rendu
+
+**`ff3379b` à 05:42.** *Banc libre, arbre propre.*
+
+### E-362 vérifiée
+
+    fr/auth.php:85 · en/auth.php:63   « Le formulaire est sur cette page, juste
+                                        en dessous. »   parite tenue, MEME commit
+    « ancien portail »                 0 occurrence dans la cle
+    @if ($changementRequis)            le bandeau reste CONDITIONNEL
+
+**Cinquième occurrence du défaut signature, et la PREMIÈRE fermée dans l'heure où elle a été trouvée.**
+*Les quatre précédentes ont vécu entre trois et seize jours.*
+
+### ✅ ARBITRAGE : `groups.np_supprimer` se porte — et je l'avais réservé à tort
+
+**Je l'avais mis de côté au tour précédent au motif qu'il DÉTRUIT.** *C'était une réserve fondée sur le
+mot, pas sur la mesure.*
+
+    groups.py:213-225   require_api_key · require_role(2) · require_permission('can_admin_portal')
+                        DELETE FROM machine_groups WHERE id = %s
+    055_machine_groups.sql:30-31   ON DELETE CASCADE sur les DEUX cles etrangeres
+    grep group_id sur backend/     groups.py SEUL
+    scheduler.py                   aucun target_type 'group'
+
+**Trois fondements** : *il ne touche aucune machine* · *trois gardes concordantes, dont une permission* ·
+*aucun consommateur ailleurs, donc aucune référence pendante après coup.*
+
+> **Ce que « destructeur » recouvrait ici, c'est l'effacement d'un GROUPEMENT.** *Le parc est intact.
+> Réserver un portage sur la gravité d'un verbe plutôt que sur la portée mesurée du geste, c'est la même
+> erreur que d'autoriser sur la magnitude — dans l'autre sens.*
+
+**Le panneau doit nommer le groupe, le nombre de membres, dire que la suppression ne se défait pas — et
+dire que les MACHINES ne sont pas supprimées.** *La peur qu'aura la personne devant l'écran porte sur le
+mauvais objet ; un panneau qui ne la dissipe pas fait hésiter sur ce qui n'est pas en jeu.* **Même
+principe que F8 : porter le fait rassurant autant que le fait alarmant.**
+
+### ⚠ Un soupçon que j'ai formé et clos, et je l'écris parce qu'un soupçon ouvert se propage
+
+**La docstring annonce « les membres statiques partent en cascade ». J'ai cherché la forme du
+`DOSSIER-13`** — *un commentaire qui annonce un mécanisme qui n'existe pas.* **Les deux clés étrangères
+existent, `ON DELETE CASCADE` sur les deux. Le commentaire dit vrai.**
+
+*J'ai cherché un défaut par sa FORME et pas par son objet. La forme était la bonne, le défaut n'était pas
+là — et c'est le bon dénouement d'une sonde écrite pour accuser.*
+
+### Ce qui reste hors des onze
+
+    step_up_requis   la re-authentification n'est portee NULLE PART. Ce n'est pas un
+                     ecran, c'est un MECANISME — et `anonymize_user.php` (RGPD art.17)
+                     est deja ferme deux fois pour cette raison. A INSTRUIRE, pas a porter.
+    reste_titre      import CSV des COMPTES, distinct de celui des SERVEURS.
+                     A inventorier avant d'estimer.
+
+**Le second est du portage. Le premier ne l'est peut-être pas** — *un mécanisme d'authentification qui
+manque n'est pas une capacité qu'on porte à la demande d'un tour de boucle.*
