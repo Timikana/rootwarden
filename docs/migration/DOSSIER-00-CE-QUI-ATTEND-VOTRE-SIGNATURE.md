@@ -251,3 +251,25 @@ d'exercer, ou elles partent en production comme elles sont.**
 **Si elles partent : quelqu'un doit le savoir avant de le découvrir.** *C'est la formule de la session 3,
 et c'est la bonne — le risque n'est pas qu'un écran échoue, c'est qu'il échoue là où personne n'attendait
 qu'il puisse.*
+
+### ⚠ Et le LOT qui tourne ne réduira PAS cette réserve — mesuré
+
+**Le Lead l'a signalé avant que sa ligne de base tombe, « parce qu'après il sera trop tard pour
+l'entendre ». Vérifié de mon côté :**
+
+    go-page-groupes.mjs     0 clic sur une confirmation
+    go-page-audit-ssh.mjs   0 clic sur une confirmation
+    go-fail2ban-f7.mjs      0 clic sur une confirmation
+
+> **Quand le LOT rendra « 172 exécutions · ~2650 PASS », ce nombre confirmera les PANNEAUX, pas les
+> ISSUES.** *Le LOT et cette réserve sont orthogonaux : aucun volume d'exécutions ne la fera bouger.*
+
+**Et il faut borner la phrase, sinon elle se fait démolir sur un détail** : *le harnais **sait** cliquer
+une confirmation — six suites le font* (`go-adm-permissions`, `go-adm-comptes-distants`,
+`go-page-maintenance`, `go-page-supervision-ecriture`, `go-page-graylog-g2`,
+`go-page-supervision-releve`). **Ce n'est donc pas « le harnais ne confirme jamais » : c'est « il ne peut
+pas confirmer CES trois-là », parce que les confirmer, c'est exercer le geste interdit.**
+
+**Pourquoi ça mérite d'être écrit ici** : *un grand nombre vert se lit comme une couverture.* **« 2650
+PASS » et « on ne sait pas ce qui se passe après un aboutissement » sont tous les deux vrais en même
+temps, et le premier fera oublier le second.**
