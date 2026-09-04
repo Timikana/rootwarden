@@ -8702,3 +8702,95 @@ mesure que je venais de prioriser.**
 **Et le test qui les trouve, qu'elle applique désormais** : *« qu'est-ce qui existe et n'y est pas ? » —
 question qui se pose en ÉNUMÉRANT L'ENSEMBLE COMPLET, jamais en relisant la liste.* **Sur `lib-arbre.mjs`
 c'est `git ls-files` qui a rendu les 34, pas la relecture.**
+
+## Tour de 19:35 (2026-09-04) — LA MISSION DE PORTAGE N'A PLUS DE CIBLE QUI NE SOIT PAS INTERDITE
+
+### 1) PRODUCTION — fenêtre 17:40 → 19:35, `--all`
+
+    CODE 1  ·  DOC 5 (3 miens, 2 autres)  ·  TEST 1
+    doc/code brut 5,00   ·   sans mes docs 2,00
+
+**⚠ Et l'attaque de ce rapport ne porte pas sur l'équipe : elle porte sur MA RÉPARTITION.** *J'ai
+distribué QUATRE lots de MESURE et UN lot de code. Un rapport doc/code de 5 est la conséquence
+arithmétique de ce choix, pas un symptôme d'évitement.*
+
+**Ce choix était juste — les quatre lots ont évité quatre duplications et fermé la question de la
+population. Mais il ne peut plus l'être : la mesure est finie.**
+
+### 2) ⛔ ET C'EST LE CONSTAT DU TOUR : IL N'Y A PLUS DE CAPACITÉ À PORTER QUI SOIT AUTORISÉE
+
+**Relevé mécanique des déclarations « non porté » restantes du portage :**
+
+    24 cles `np_*` sur 45 catalogues fr (temoin : 45 lus)
+      groups.php      10   dont np_cve, np_cve_detail, np_cve_membres,
+                           np_cve_prod, np_cve_derive
+      ssh_audit.php   10   dont np_parc, np_parc_detail, np_config,
+                           np_config_detail
+      wazuh.php        4   np_titre, np_liste, np_ouvrir, np_reserve
+
+**Et le reste (`np_titre`, `np_ouvrir`, `np_fermer`) est du CHROME de panneau, pas un aveu d'absence — la
+session 3 l'a établi : les `np_*` sont devenues des PANNEAUX D'AVERTISSEMENT.**
+
+> **Chaque déclaration substantielle qui reste pointe un geste qui est sur ma liste d'INTERDITS :**
+>
+>     np_cve*      le scan CVE de MASSE           interdit
+>     np_parc*     relever TOUT LE PARC           interdit
+>     np_config*   MODIFIER `sshd_config`         interdit
+>     wazuh        les 9 gestes, dont 6 SSH       interdits
+>     et 3 des 9 ne DOIVENT PAS etre portes tels quels (DOSSIER-27)
+
+**Donc l'étape 2 de la consigne — « nommer UNE capacité précise à porter » — n'a plus de cible valide pour
+cinq des sept sessions. Je ne vais pas en inventer.**
+
+### ✅ CE QUI RESTE, ET C'EST TOUT
+
+    session 6 (QA)   le test unitaire de `Comptes::roleAutorise` — fonction
+                     PURE (aucun `DB::`), la table de verite d'E-385 sans
+                     aucun compte
+    session 1        aligner la creation MANUELLE d'un compte sur l'import
+                     (deja assignee ce tour, mesuree encore ouverte)
+    l'exploitant     la POUSSEE (DOSSIER-28) · le DOSSIER-25 · le SMTP ·
+                     les deux fusions · le redemarrage · les gestes destructeurs
+
+### ⚠⚠ 3) ET LE VERROU QUE J'AVAIS PRIORISÉ ÉTAIT **VERT ET INCAPABLE D'ÉCHOUER**
+
+**`c0def46`. Quatre mutations, ZÉRO rouge :**
+
+    R1  le compte SANS secret envoye au PORTAIL        0 rouge (2 skips)
+    R2  le compte AVEC secret contourne le defi        0 rouge (2 skips)
+    R3  l'echeance n'est plus verifiee                 0 rouge
+    R4  le jeton n'est plus verifie contre son hache   0 rouge
+
+**Deux causes, toutes deux dans l'instrument :**
+
+    1. `capaciteAbsente()` INFERAIT la presence de la capacite depuis
+       L'ARRIVEE. Laisser passer la requete la fait retomber sur
+       `session.authentifiee`, qui redirige vers `/connexion` — LA MEME SORTIE
+       que « le cookie n'est pas lu ».
+       -> le defaut que le fichier existe pour attraper etait INDISCERNABLE
+          de l'absence de la capacite.
+
+    2. les temoins asseraient « pas servi DIRECTEMENT ». Un jeton expire ou
+       forge ACCEPTE rend `Defi`, donc une redirection — qui SATISFAIT cette
+       assertion.
+
+> **UN TÉMOIN DOIT EXIGER LE REFUS, PAS L'ABSENCE DE SERVICE.** *« Non servi » et « refusé » ne sont pas la
+> même propriété, parce qu'une redirection satisfait les deux.*
+
+**Et ce qui l'a dit : la lecture des ROUGES ET DES VERTS. R1 et R2 rendaient 7 et 6 verts au lieu de 8 —
+deux tests SKIPPAIENT.** *Un zéro rouge accompagné d'un compte de verts qui BAISSE n'est pas un verrou qui
+tient : c'est un verrou qui s'absente.*
+
+**⚠ Mon « il cesse d'être vert par vacuité » était donc faux DEUX fois** : *il n'était pas seulement d'état
+inconnu — il était structurellement incapable d'échouer, et il l'est resté après l'arrivée de la
+capacité.*
+
+### ✅ ET LA CAPACITÉ, ELLE, EST ARRIVÉE JUSTE — et par construction
+
+    `decide(?string): DecisionRestauration`, depot injectable
+    l'enumeration n'a que TROIS cas -> l'acces au PORTAIL n'est pas
+    « jamais rendu », il est INEXPRIMABLE
+
+**Les deux moitiés passent, y compris celle qui porte le contournement du legacy : un compte SANS secret
+TOTP obtient l'ENRÔLEMENT.** *C'est la fiche `feedback_garde_par_construction` appliquée telle qu'elle est
+écrite — et c'est la seule chose de la journée qu'aucune péremption ne peut atteindre.*
