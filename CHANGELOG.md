@@ -5,6 +5,65 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.40.1] - 2026-09-04
+
+### Securite - E-390 : le geste qui ECRIT etait garde, celui qui LIT non
+
+**Symptome.** `POST /ssh-audit/config` — la lecture de `sshd_config` sur une
+machine — portait `@require_api_key` + `@require_machine_access` et **rien
+d'autre**, tandis que sa jumelle d'ecriture `POST /ssh-audit/save-config` porte
+`@require_role(2)`. Or les deux portails exigent la meme permission a l'etage
+page : `legacy/ssh-audit/index.php:12-13` (`checkPermission('can_audit_ssh')`)
+et `laravel/routes/web.php:229` (`['role:1', 'perm:can_audit_ssh']`).
+
+**Ce que le trou rendait atteignable.** `legacy/documentation.php` est un forgeur
+de requetes graphique — champ d'endpoint libre, corps JSON libre, present au MENU
+PRINCIPAL et garde par `checkAuth([ROLE_USER, ...])` (cf. E-389 et
+`docs/migration/RELEVE-ANGLES-4-ET-5.md`). Un compte role 1 **sans**
+`can_audit_ssh` pouvait donc lire le `sshd_config` de ses machines assignees :
+`PermitRootLogin`, `AllowUsers`, les ports, les methodes d'authentification. Ce
+n'est pas un secret — c'est une carte du serveur.
+
+**Correctif.** `@require_permission('can_audit_ssh')` sur cette seule route,
+placee entre `@require_api_key` et `@require_machine_access`. **Pas
+`@require_role(2)`** : les deux pages admettent un role 1 porteur de la
+permission, et un role 2 au backend aurait defait la page qu'il sert — meme
+raison qu'E-389, quatrieme occurrence du jour de ce mode de defaillance du
+durcissement.
+
+**⚠ Trois routes du meme module restent nues, et c'est un ordre, pas un oubli.**
+`/ssh-audit/scan` (`:124`, joint la machine), `/ssh-audit/results` (`:319`,
+historique des scores et comptes de findings) et `/ssh-audit/backups` (`:636`,
+joint la machine). Les trois sont des lectures de posture de securite gardees par
+`can_audit_ssh` aux deux pages : meme correctif attendu, sur arbitrage separe.
+Le balayage complet du module est inscrit en commentaire a cote de la garde, pour
+qu'une liste de un ne se lise pas comme un module traite.
+
+**Tests.** `ruff` vert, import REEL du module (`require_permission` etait deja
+importe ici, contrairement a `updates.py`). Placement verifie par AST. Suite
+complete : **667 passed, 5 skipped, 2 xfailed, 0 FAILED** — et
+`test_les_connues_sont_TOUJOURS_TROUVEES` verifie PASSED et non SKIPPED, la
+session 6 ayant reprise sa liste entre-temps (`59484cb`).
+
+**Notes d'exploitation.** `backend/**.py` est lu au demarrage : INERTE jusqu'au
+redemarrage de `rootwarden_python`.
+
+### ⚠ Precondition de redemarrage signalee (aucun code ici)
+
+E-280 refuse `target_type = 'all'` a l'entree de `POST /ssh-audit/schedules`
+(`ssh_audit.py:826`). **Les deux ecrans offrent encore cette portee** — cote
+portage `AuditSshController::PORTEES` la porte en PREMIER element, donc comme
+option par defaut ; cote legacy elle vit a quatre endroits. Le refus etant inerte
+jusqu'au redemarrage, **le redemarrage transformerait un ecran fonctionnel en
+ecran qui refuse son propre defaut.** Arbitrage rendu : la garde RESTE (un `all`
+deliberement choisi est une planification recurrente et non surveillee sur tout
+le parc, production comprise — le durcissement du planificateur ferme les
+accidents, rien ne fermait l'intention), le portage cesse d'offrir la valeur, et
+le legacy n'est pas touche par decision assumee. Zero ligne en base
+(`ssh_audit_schedules`, temoin `machines` = 3) : rien a preserver.
+
+---
+
 ## [1.40.0] - 2026-09-04
 
 ### Ajoute
