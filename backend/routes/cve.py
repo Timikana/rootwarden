@@ -477,6 +477,12 @@ def cron_preview():
         return jsonify({'valid': False, 'error': str(e)[:200]})
 
 
+# Liste fermee des portees offertes a la creation (E-388). Releve du
+# portage : PlanificationsCve::CIBLES. 'all' en est absent DES DEUX
+# cotes — il reste lisible, il n'est plus proposable.
+PORTEES = ('tag', 'machines')
+
+
 @bp.route('/cve_schedules', methods=['POST'])
 @require_api_key
 @require_role(2)
@@ -487,11 +493,37 @@ def create_cve_schedule():
     name = (data.get('name') or '').strip()
     cron_expr = (data.get('cron_expression') or '0 3 * * *').strip()
     min_cvss = float(data.get('min_cvss', 7.0))
-    target_type = data.get('target_type', 'all')
-    target_value = data.get('target_value', '')
+    # E-388 : pas de defaut FABRIQUE. `('target_type') or ''` et non
+    # `.get(..., 'all')` : une cle presente a `null` rend None, et le
+    # defaut ne se declenche pas. Un champ absent, vide ou nul tombe
+    # donc hors de la liste fermee — le refus est obtenu SANS branche.
+    target_type = (data.get('target_type') or '').strip()
+    target_value = (data.get('target_value') or '').strip()
     scan_source = str(data.get('scan_source', 'hybrid')).lower()
     if scan_source not in ('fast', 'hybrid', 'precise'):
         scan_source = 'hybrid'
+
+    # ══ E-388 : « TOUT LE PARC » N'EST PLUS OFFERT A LA CREATION ═════════
+    #
+    # `PORTEES` ne contient PAS 'environment' : ni l'ecran ni l'executeur
+    # CVE ne le connaissent (`scheduler.py` n'a que tag et machines). Une
+    # valeur que l'executeur ne sait pas lire finirait dans son echec
+    # ferme — l'accepter ici ne creerait qu'une planification muette.
+    #
+    # Cette garde ferme la CREATION. Elle ne ferme ni la lecture ni
+    # l'execution d'une ligne 'all' deja en base : `scheduler.py` porte
+    # une branche 'all' explicite. Cesser d'offrir n'est pas cesser de
+    # savoir lire.
+    if target_type == 'all':
+        return jsonify({'success': False, 'message':
+            "Portee 'all' refusee a la creation : choisis 'tag' ou 'machines'. "
+            "Les planifications 'all' existantes continuent de fonctionner."}), 400
+    if target_type not in PORTEES:
+        return jsonify({'success': False, 'message':
+            f"target_type requis, parmi {', '.join(PORTEES)}"}), 400
+    if not target_value:
+        return jsonify({'success': False, 'message':
+            f"target_value requis pour la portee '{target_type}'"}), 400
 
     if not name:
         return jsonify({'success': False, 'message': 'Nom requis'}), 400
@@ -553,6 +585,19 @@ def update_cve_schedule(schedule_id):
                     val = str(val).lower()
                     if val not in ('fast', 'hybrid', 'precise'):
                         val = 'hybrid'
+                # E-388 : sans ceci la garde de creation serait DECORATIVE.
+                # Cette boucle ecrivait `target_type` sans aucun controle :
+                # une planification 'tag' se repointait sur 'all' — ou sur
+                # n'importe quelle chaine — par une simple modification.
+                # Le champ ABSENT du corps n'entre pas dans la boucle : une
+                # ligne 'all' existante reste modifiable sur ses autres
+                # colonnes, conformement a « fermer la creation, pas la
+                # lecture ».
+                if field == 'target_type' and (val or '') not in PORTEES:
+                    return jsonify({'success': False, 'message':
+                        f"target_type invalide : {val!r}. Attendu parmi "
+                        f"{', '.join(PORTEES)}. La portee 'all' ne se pose "
+                        "plus par modification."}), 400
                 updates.append(f"{field} = %s")
                 params.append(val)
 

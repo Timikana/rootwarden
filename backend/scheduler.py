@@ -187,28 +187,67 @@ def _run_scheduled_scan(schedule: dict):
         # NULL apres avoir suivi l'onboarding "supprime les MDP de la BDD").
         base_cols = ("id, name, ip, port, user, password, root_password, "
                      "service_account_deployed")
-        if schedule['target_type'] == 'tag' and schedule['target_value']:
+        # ══ E-388 : LE CHEMIN CVE N'AVAIT AUCUNE DES QUATRE PROTECTIONS ═════
+        #
+        # Miroir de ce que E-280 a tranche sur le chemin SSH (meme fichier,
+        # plus bas). Ce n'est pas une politique neuve : c'est la meme,
+        # appliquee au second chemin qui l'ignorait encore.
+        #
+        # Ce que ce bloc rendait AVANT — quatre etats, un seul resultat :
+        #   target_type = 'all'          -> tout le parc   (intention)
+        #   target_type vide / inconnu   -> tout le parc   (illisible)
+        #   'tag' sans valeur            -> tout le parc   (case blanche)
+        #   'machines' liste vide        -> tout le parc   (rien de coche)
+        # Les trois derniers sont des ACCIDENTS promus en scan recurrent de
+        # tout le parc, `srv-zabbix` compris.
+        #
+        # Et aucune des requetes ne filtrait `lifecycle_status` : le chemin
+        # SSH exclut les machines archivees depuis E-280, celui-ci les
+        # scannait. Corrige ici aussi.
+        NON_ARCHIVEE = "(lifecycle_status IS NULL OR lifecycle_status != 'archived')"
+        NON_ARCHIVEE_M = "(m.lifecycle_status IS NULL OR m.lifecycle_status != 'archived')"
+        AUCUNE = f"SELECT {base_cols} FROM machines WHERE 1=0"
+
+        if schedule['target_type'] == 'tag' and schedule.get('target_value'):
             cur.execute(
                 f"SELECT m.{base_cols.replace(', ', ', m.')} "
                 "FROM machines m "
                 "INNER JOIN machine_tags mt ON m.id = mt.machine_id "
-                "WHERE mt.tag = %s",
+                f"WHERE mt.tag = %s AND {NON_ARCHIVEE_M}",
                 (schedule['target_value'],)
             )
-        elif schedule['target_type'] == 'machines' and schedule['target_value']:
+        elif schedule['target_type'] == 'machines' and schedule.get('target_value'):
             try:
                 ids = json.loads(schedule['target_value'])
-            except (json.JSONDecodeError, TypeError):
+                ids = [int(x) for x in ids if isinstance(x, int) or str(x).isdigit()]
+            except Exception:
                 ids = []
             if ids:
                 fmt = ','.join(['%s'] * len(ids))
                 cur.execute(
-                    f"SELECT {base_cols} FROM machines WHERE id IN ({fmt})", ids
+                    f"SELECT {base_cols} FROM machines WHERE id IN ({fmt}) "
+                    f"AND {NON_ARCHIVEE}", ids
                 )
             else:
-                cur.execute(f"SELECT {base_cols} FROM machines")
+                # Rien de coche ne veut pas dire tout : c'etait le 4e accident.
+                _log.error("Planification CVE %s ignoree : portee 'machines' sans "
+                           "identifiant lisible — AUCUNE machine scannee",
+                           schedule.get('id'))
+                cur.execute(AUCUNE)
+        elif schedule['target_type'] == 'all':
+            # « Tout le parc » reste un CHOIX executable : une ligne 'all' deja
+            # en base continue de tourner. `cve.py` a cesse de l'OFFRIR a la
+            # creation ; cesser d'offrir n'est pas cesser de savoir lire.
+            cur.execute(f"SELECT {base_cols} FROM machines WHERE {NON_ARCHIVEE}")
         else:
-            cur.execute(f"SELECT {base_cols} FROM machines")
+            # Echec ferme : « je ne sais pas quoi scanner » ne doit jamais
+            # vouloir dire « scanne tout ».
+            _log.error(
+                "Planification CVE %s ignoree : portee illisible "
+                "(target_type=%r, target_value %s) — AUCUNE machine scannee",
+                schedule.get('id'), schedule.get('target_type'),
+                'vide' if not schedule.get('target_value') else 'presente')
+            cur.execute(AUCUNE)
 
         machines = cur.fetchall()
     finally:
