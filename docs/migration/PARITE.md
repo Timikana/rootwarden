@@ -8,6 +8,56 @@ Un ecart non ecrit ici est une regression, pas un choix.
 
 ---
 
+## E-393 — un jeton « se souvenir de moi » survivant DEFAIT le changement de mot de passe
+
+**Corrige le 2026-09-04 (`v1.39.10`), AVANT le portage qui rendrait le defaut atteignable.**
+*Releve par la session 6 en preparant le verrou de « Se souvenir de moi ».*
+
+### Le defaut, dans du code que je venais de deplacer
+
+    MotDePasse::applique
+      :237  DB::transaction(…)      password_history + users.password
+      :295  try { purge remember_tokens } catch { Log::warning }   <- HORS transaction
+
+**Si la purge echoue, le changement de mot de passe REUSSIT quand meme** — et un jeton emis
+sous l'ANCIEN secret continue de restituer l'identite. *Le changement n'a donc pas atteint son
+objet, et reussir en le disant serait mentir.*
+
+**J'avais deplace ce bloc le matin meme en extrayant `applique()` sans reviser sa forme.**
+
+### ⚠ POURQUOI LE CORRIGER MAINTENANT, ET PAS APRES
+
+> **Aujourd'hui c'est inoffensif : le portage ne remplit JAMAIS `remember_tokens` — il vide
+> une table qu'il n'ecrit pas.** *Le trou nait au moment ou l'on porte « Se souvenir de moi ».*
+
+**C'est la forme « un defaut qui protege par accident cesse de proteger quand on corrige
+l'accident », et l'instant present est la seule fenetre ou le correctif ne coute rien.**
+
+### La forme stricte existait deja dans le depot
+
+    Comptes::anonymise:566-578   purge SIX tables DANS sa transaction, sans try/catch
+
+*Ce n'etait donc pas un arbitrage a rendre mais une incoherence a resoudre du bon cote.*
+**Correction d'un enonce de la session 6 : elle ecrivait que l'anonymisation « est dans la
+meme forme ». Elle est ATOMIQUE.**
+
+### Les deux purges divergent DELIBEREMENT
+
+    remember_tokens   DANS la transaction. Un jeton survivant defait le geste.
+    active_sessions   en meilleur effort, et E-203 dit pourquoi : elle ne ferme
+                      que les sessions de l'ANCIEN portail — celles du portage
+                      vivent en FICHIERS. Faire echouer un changement de mot de
+                      passe parce qu'on n'a pas pu fermer des sessions d'un
+                      portail qu'on demonte serait un mauvais echange.
+
+### Reserves
+
+- **Le geste n'est pas exerce** : provoquer l'echec de la purge exigerait de casser la table.
+  *La propriete est etablie par LECTURE — la purge est dans le bloc de la transaction, et
+  l'assertion le verifie par les positions relatives dans le fichier.*
+- Pas de binaire PHP sur l'hote de cette session ; equilibres identiques a `HEAD`.
+
+---
 ## E-392 — dix rejeux 2FA fermaient l'etape du second facteur pour TOUTE une adresse
 
 **Corrige le 2026-09-04 (`v1.39.9`).** *Trouve par la session 4, verifie par la DSI, et la
