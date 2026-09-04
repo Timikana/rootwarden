@@ -8075,3 +8075,92 @@ autres — `^\s*logger\s*=` qui comptait un argument nommé, et ma sonde `role_i
 
 **C'est la cinquième déclaration d'état de ce chantier à périmer, et celle-ci vit dans la consigne de
 relance elle-même.** *Je la corrige ici plutôt que de faire porter cinq fois ce qui existe.*
+
+### ✅ DEUX ARBITRAGES SUR `ssh_audit` — et je REFUSE la recommandation de la session 4
+
+**Septième quasi-doublon évité : `afficher sshd_config en lecture` est DÉJÀ PORTÉ, entièrement.**
+
+    lang/fr/ssh_audit.php:105 'btn_config' · :177 'cfg_titre'
+                          :169 'np_config' = « la MODIFICATION n'est pas encore portee »
+    audit-ssh.blade.php:61 le bouton · :105 la reserve « lecture seule »
+    audit-ssh.js:310-380  le flux ENTIER · :335 ecris('/ssh-audit/config', …)
+    parite EN 6/6
+
+**Le portage distingue déjà la LECTURE (portée) de l'ÉCRITURE (non portée), et le dit à l'écran.** *Et
+c'est le protocole « apparier avant d'écrire » qui l'a attrapé en deux commandes, sur une session qui
+n'avait aucun soupçon.*
+
+### ✅ 1) LA ROUTE DE LECTURE EST NUE — correctif AUTORISÉ
+
+    POST /ssh-audit/config        @require_api_key @require_machine_access
+                                  @threaded_route          NI ROLE NI PERMISSION
+    POST /ssh-audit/save-config   les memes + @require_role(2)
+
+    et les DEUX pages exigent `can_audit_ssh` :
+      legacy/ssh-audit/index.php:12-13   checkPermission('can_audit_ssh')
+      laravel/routes/web.php:229         role:1 + perm:can_audit_ssh
+
+> **Le geste qui ÉCRIT est gardé, le geste qui LIT ne l'est pas. C'est E-389 à l'identique sur un autre
+> module : le backend est plus permissif que les deux pages qu'il sert.**
+
+**Et par le forgeur de requêtes du menu (`DOSSIER-21`), un compte de rôle 1 SANS `can_audit_ssh` peut lire
+le `sshd_config` de ses machines assignées — dont `srv-zabbix`.** *`PermitRootLogin`, `AllowUsers`, les
+ports, les méthodes d'authentification : la carte du serveur de production.*
+
+**✅ `@require_permission('can_audit_ssh')` — miroir exact des deux pages, et non `@require_role(2)` qui
+défairait le rôle 1 porteur de la permission.**
+
+### ⛔ 2) JE REFUSE DE ROUVRIR `'all'` — et l'argument de la session 4 est bon mais porte à côté
+
+**Son argument** : *le danger d'E-280 n'a jamais été `'all'` lui-même, mais les TROIS ACCIDENTS promus en
+scan de tout le parc — type vide/nul/inconnu, `tag` au champ blanc, `machines` liste vide. Or le
+planificateur les ferme déjà seul. Donc le refus à l'entrée est « une ceinture par-dessus des bretelles qui
+tiennent ».*
+
+**C'est exact sur les accidents, et c'est là que ça porte à côté :**
+
+> **Un `'all'` DÉLIBÉRÉMENT CHOISI n'est pas un accident à fermer — c'est le geste que mes contraintes
+> permanentes nomment explicitement : « ssh_audit relever TOUT LE PARC ».** *Et une PLANIFICATION le rend
+> non surveillé et récurrent.*
+
+    le durcissement du planificateur ferme les ACCIDENTS.
+    RIEN ne ferme l'INTENTION.
+    -> le refus a l'entree est le SEUL endroit ou un releve SSH planifie
+       sur tout le parc, production comprise, est arrete.
+
+**Et la cohérence avec CVE va dans le même sens** : *j'y ai décidé que la page cesse d'offrir `all`. La
+raison — le rapport utilité/exposition, et `tag` rend le même service en exigeant un geste explicite —
+vaut identiquement ici.*
+
+    ssh_audit_schedules : 0 ligne   (temoin : machines = 3)
+    -> rien a preserver en base, dans un sens ni dans l'autre
+
+### ✅ L'ORDRE, ET IL EST LE MÊME QUE SUR CVE
+
+    1. LE PORTAGE cesse d'offrir `all` :
+         AuditSshController.php:72  PORTEES = ['all','environment','tag','machines']
+         -> `all` est le PREMIER element, donc l'option SELECTIONNEE PAR DEFAUT
+         + la cle `lang/fr|en/ssh_audit.php:219` « Tout le parc »
+    2. LA GARDE BACKEND RESTE — elle est deja ecrite, et inerte jusqu'au
+       redemarrage
+    3. LE LEGACY N'EST PAS TOUCHE
+
+**⚠ ET LE POINT 3 A UN COÛT QUE JE DÉCLARE PLUTÔT QUE DE LE MASQUER** : *l'écran du legacy continuera
+d'offrir « Tout le parc » et le backend le refusera.* **« Un écran qui propose ce qu'il rejette » — mes
+propres mots, assumés cette fois.**
+
+*La raison est celle qui m'a fait refuser de corriger `legacy/auth/login.php:46` ce matin : c'est du code de
+production que la bascule doit RETIRER, et quatre touches y ajouteraient un risque à un composant qu'on
+éteint.* **Mais ça doit être ÉCRIT, sinon quelqu'un débogue une régression qui est une décision.**
+
+### ⚠ ET CE QUE LA SESSION 4 A FAIT DE BIEN EST PLUS IMPORTANT QUE SON ERREUR
+
+**Elle a trouvé un défaut DE SA MAIN, en lisant le JS d'une autre capacité, et l'a remonté avant que
+quiconque le voie.**
+
+> **« Sur CVE tu m'as fait attendre le portage. Sur `ssh_audit` je suis passé devant — et personne n'avait
+> regardé les écrans. »**
+
+**Ce qui la sauve est un DÉLAI, pas une précaution** : *`backend/**.py` est lu au démarrage, donc le refus
+est inerte.* **Le redémarrage que l'exploitant attend transformerait un écran fonctionnel en écran qui
+refuse son propre défaut — et c'est une précondition de redémarrage, à porter au `DOSSIER-00`.**

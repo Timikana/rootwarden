@@ -725,3 +725,35 @@ existante n'est plus dangereux — et deux l'ont été depuis, réseau vérifié
 c'est cette vérification qui a révélé un `<option value="all">` que ma propre consigne avait manqué.* **Une
 contrainte périmée qui force à regarder reste utile — mais elle doit être datée pour qu'on sache la
 remesurer, pas récitée.**
+
+---
+
+## ⚠ 2026-09-04, 16:45 — UNE PRÉCONDITION AU REDÉMARRAGE QUE VOUS ATTENDEZ
+
+**Le redémarrage du backend appliquerait une garde ÉCRITE MAIS INERTE, et deux écrans ne sont pas encore
+d'accord avec elle.**
+
+    ssh_audit.py:816   PORTEES = ('tag','environment','machines')
+              :826     `target_type == 'all'`  ->  400, par DECISION
+
+    AuditSshController.php:72   PORTEES = ['all','environment','tag','machines']
+                                -> « Tout le parc » est l'option SELECTIONNEE
+                                   PAR DEFAUT
+    legacy/ssh-audit/index.php:237   <option value="all">
+    legacy/ssh-audit/js/main.js:737 · :741 · :759   trois replis sur 'all'
+
+    ssh_audit_schedules : 0 ligne   (temoin : machines = 3)
+
+> **Aujourd'hui les deux écrans fonctionnent parce que la garde n'est pas chargée. Après le redémarrage,
+> créer un relevé planifié sans changer la portée renverra une erreur.**
+
+**✅ Le geste qui l'évite est UNE ligne côté portage** (retirer `'all'` de `PORTEES`, et sa clé de
+libellé), *et il est routé.* **⛔ Le legacy, lui, n'est pas touché — il meurt, et quatre touches y
+ajouteraient un risque à un composant qu'on éteint.**
+
+    -> l'ecran du LEGACY continuera d'offrir « Tout le parc » et le backend
+       le refusera. C'est une DECISION, pas une regression : ne la faites pas
+       deboguer.
+
+**Ordre sûr : la ligne du portage, PUIS le redémarrage.** *L'inverse laisse une fenêtre où le portail porté
+refuse son propre défaut.*
