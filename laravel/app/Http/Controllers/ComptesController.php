@@ -94,7 +94,7 @@ class ComptesController extends Controller
 
     public function creer(Request $requete): RedirectResponse
     {
-        [$auteur] = $this->qui($requete);
+        [$auteur, $roleAuteur] = $this->qui($requete);
         $nom = trim((string) $requete->input('name', ''));
         if ($nom === '' || mb_strlen($nom) > 255) {
             return back()->with('erreur', __('comptes.err_nom'));
@@ -106,6 +106,37 @@ class ComptesController extends Controller
         $role = (int) $requete->input('role_id', 1);
         if (! in_array($role, Comptes::ROLES, true)) {
             $role = 1;
+        }
+
+        /*
+         * ══ ANTI-ESCALADE — REPRISE DU LEGACY, ELLE MANQUAIT ICI ══════════
+         *
+         * La liste fermee `Comptes::ROLES` bornait le role a [1,2,3] et rien ne
+         * le bornait au role de l'AUTEUR. Or cette route est gardee `role:2`,
+         * et `ExigeRole` compare avec `<` : un compte de role 2 porteur de
+         * `can_admin_portal` la franchit. Il pouvait donc creer un
+         * SUPERADMINISTRATEUR.
+         *
+         * Le legacy s'en protege, et son commentaire dit l'incident qui l'a fait
+         * ecrire (`manage_users.php:88-89`) : quelqu'un *« creait un superadmin,
+         * recevait le magic-link sur son email et prenait le controle »*. La
+         * regle est a `:92` — un non-superadmin ne cree qu'un role
+         * STRICTEMENT inferieur au sien.
+         *
+         * ⚠ ET LA FORME COMPTE. Le legacy pose ici une COERCITION, pas un refus,
+         * et il l'ANNONCE : son propre commentaire dit *« feedback utilisateur
+         * (toast) au lieu d'un clamp silencieux »*. On reprend les deux — la
+         * coercition ET l'annonce. Un rang ramene sans le dire ferait croire au
+         * demandeur qu'il a cree un administrateur.
+         *
+         * *La MODIFICATION de role, elle, REFUSE (`manage_roles.php:154`). Les
+         * deux formes sont voulues : creer avec un rang moindre reste utile,
+         * modifier vers un rang interdit n'a aucun sens.*
+         */
+        $rangRamene = false;
+        if ($roleAuteur < 3 && $role >= $roleAuteur) {
+            $role = 1;
+            $rangRamene = true;
         }
 
         $id = DB::table('users')->insertGetId([
@@ -124,9 +155,24 @@ class ComptesController extends Controller
             'sudo' => 0,
             'force_password_change' => 1,
         ]);
-        $this->journalise($auteur, "Creation du compte '{$nom}' (role={$role})");
+        // La coercition entre dans la TRACE : une decision de rang qui n'est pas
+        // journalisee ne se retrouve pas, et c'en est une.
+        $this->journalise($auteur, "Creation du compte '{$nom}' (role={$role})"
+            . ($rangRamene ? ' [rang ramene a 1 : anti-escalade]' : ''));
 
-        return back()->with('succes', __('comptes.cree', ['nom' => $nom, 'id' => $id]));
+        /*
+         * ⚠ UN SEUL MESSAGE, ET IL PASSE PAR `succes`.
+         *
+         * Mon premier jet posait un `avertissement` — une cle que
+         * `comptes.blade.php` NE RENDAIT PAS (elle n'affiche que `succes` et
+         * `erreur`, `:36-37`), et qui n'avait qu'une seule occurrence dans tout
+         * le portage : la mienne. La coercition aurait donc ete SILENCIEUSE,
+         * derriere une annonce qui n'atteignait aucun ecran — exactement le
+         * defaut que cette annonce existe pour eviter.
+         */
+        return back()->with('succes', $rangRamene
+            ? __('comptes.cree_rang_ramene', ['nom' => $nom, 'id' => $id])
+            : __('comptes.cree', ['nom' => $nom, 'id' => $id]));
     }
 
     /* ═══ Mot de passe ═════════════════════════════════════════════════════ */

@@ -8,6 +8,73 @@ Un ecart non ecrit ici est une regression, pas un choix.
 
 ---
 
+## E-385 — le portage permettait a un ROLE 2 de creer un SUPERADMINISTRATEUR
+
+**Corrige le 2026-09-04 (`v1.39.3`).** *Trouve en inventoriant l'import CSV des comptes,
+sur une capacite deja portee que personne n'avait rouverte.*
+
+### Le trou, et pourquoi la liste fermee ne le fermait pas
+
+    web.php:642-643        POST /comptes  ->  ['role:2', 'perm:can_admin_portal']
+    ExigeRole:22           if (role_id < $minimum) abort(403)   -> un role 2 PASSE
+    ComptesController      $role borne par `Comptes::ROLES` = [1,2,3]
+                           `[$auteur] = $this->qui($requete)`   <- le role de
+                           l'AUTEUR etait recupere puis JETE par la destructuration
+
+**La liste fermee bornait le role a des valeurs VALIDES, pas a des valeurs PERMISES.**
+*Deux proprietes differentes, et seule la premiere etait verifiee.*
+
+> **Un compte de role 2 porteur de `can_admin_portal` pouvait donc creer un
+> SUPERADMINISTRATEUR.**
+
+### Le legacy s'en protege, et son commentaire dit l'incident
+
+    manage_users.php:88-89   « creait un superadmin, recevait le magic-link sur son
+                               email et prenait le controle »
+                    :92      if ($myRole < 3 && $role_id >= $myRole) { $role_id = 1; }
+
+*C'est un incident HISTORIQUE, et le portage l'avait reouvert.*
+
+### ⚠ ET LA FORME COMPTE — le legacy a DEUX formes de la meme regle
+
+    manage_users.php:92-94   CREATION      -> COERCITION a 1, et son propre commentaire
+                                              dit « feedback utilisateur (toast) au
+                                              lieu d'un clamp SILENCIEUX »
+    manage_roles.php:154     MODIFICATION  -> REFUS par exception
+
+**Les deux sont voulues : creer avec un rang moindre reste utile, modifier vers un rang
+interdit n'a aucun sens.** *On reprend la premiere — coercition ET annonce — plus une
+trace au journal : une decision de rang qui n'est pas journalisee ne se retrouve pas.*
+
+*Correction d'un enonce que la session DSI et moi partagions : « la coercition de
+`role_id` est silencieuse » est vrai de la copie de **l'import** (`import_csv.php:156`),
+FAUX de celle de la **creation**, qui annonce. Le legacy porte trois copies de cette
+regle — `manage_users:92`, `manage_roles:154`, `import_csv:156` — et elles n'ont pas la
+meme forme.*
+
+### ⚠ Le defaut que j'ai failli livrer en le corrigeant
+
+Mon premier jet posait `->with('avertissement', ...)`. **`comptes.blade.php:36-37` ne rend
+que `succes` et `erreur`**, et `avertissement` n'avait **qu'une occurrence dans tout le
+portage : la mienne.**
+
+> **La coercition aurait donc ete silencieuse, derriere une annonce qui n'atteignait aucun
+> ecran — exactement le defaut que cette annonce existe pour eviter.**
+
+*Un seul message desormais, par la cle que la vue AFFICHE, et il dit les deux faits : le
+compte est cree, et il l'est au role « Utilisateur ».*
+
+### Reserves
+
+- **Non mesurable ici** : combien de comptes de role 2 portent `can_admin_portal`
+  aujourd'hui. `docker` refuse a cette session. *Le garde est le defaut, quelle que soit
+  l'atteignabilite du jour — et `can_admin_portal` s'accorde depuis `/permissions`.*
+- Pas de binaire PHP sur cet hote ; equilibres identiques a `HEAD` sur les trois fichiers,
+  parite FR/EN 72 = 72, et l'application demarre (200 sur `/connexion`, temoin 404).
+- **La route n'est pas exercee** : `POST /comptes` exige une session de role 2 et la
+  creation d'un compte n'est pas un geste que j'exerce sans mot.
+
+---
 ## E-384 — l'export RGPD article 20 : PORTE, avec trois divergences assumees
 
 **Porte le 2026-09-04 (`v1.39.2`).** Specification de reference :

@@ -87,6 +87,7 @@ return [
     'supprime' => 'Compte « :nom » supprimé.',
     'anonymise' => "Compte « :nom » anonymisé. :nombre ligne(s) de journal conservée(s).",
     'err_soi_meme' => "Vous ne pouvez pas agir sur votre propre compte.",
+    'cree_rang_ramene' => 'Compte « :nom » créé (identifiant :id) — mais avec le rôle « Utilisateur » : vous ne pouvez créer qu\'un rôle inférieur au vôtre.',
     'err_rang' => "Impossible d'agir sur un compte de rôle égal ou supérieur au vôtre.",
     'err_dernier_sa' => "C'est le dernier super-administrateur actif : il ne peut pas être retiré.",
     'err_journal_present' => "Ce compte porte :nombre ligne(s) de journal d'audit : la suppression les emporterait et romprait la chaîne. Anonymisez-le.",
