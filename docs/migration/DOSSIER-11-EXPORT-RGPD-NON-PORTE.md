@@ -116,3 +116,76 @@ capacité disparaîtra dans le geste le moins surveillé de tout le chantier.*
 - **s'il existe d'autres capacités réglementaires dans le même cas.** `anonymize_user.php` (RGPD
   art. 17) est mentionné au §8 du plan comme **fermé deux fois** — aucun appelant, et sa marque de
   step-up inobtenable. **Il faut le vérifier au même titre**, et ce n'est pas fait ici.
+
+---
+
+# ✅ PORTÉ le 2026-09-04 (`a48df2c`, v1.39.2) — et une divergence à ARBITRER
+
+**L'export est porté et vérifié par moi, fichier par fichier.** *Les trois arbitrages sont appliqués, et
+l'un mieux que je ne l'avais spécifié.*
+
+    ExportRgpd.php · ExportRgpdController.php · JournalAudit.php · lang/{fr,en}/profil.php
+    php -l : tous OK    ·    parite FR/EN : 42 = 42
+
+    :228  '_tronque' => $total > count($lignes)   + `_total` et `_exportees`
+    :244  mb_substr($s['session_id'], 0, 8) . '...'      la troncature est gardee
+    :182  « ne devient JAMAIS un objet portant `_error` »  le TYPE reste stable
+    ctrl:64  le journal d'audit est ecrit AVANT la lecture — l'ordre du legacy est tenu
+
+> **Et le commentaire des lignes 202-203 dit une chose que je n'avais pas spécifiée** : *« Le compte total
+> est lu SÉPARÉMENT de la page exportée : sans lui, "1000 lignes" et "exactement 1000 lignes existantes"
+> sont la même sortie. »* **C'est la règle du témoin, appliquée à un export.**
+
+---
+
+## ⚠ MAIS LE PORTAGE EST PLUS STRICT QUE LE LEGACY, ET ÇA BLOQUE HUIT COMPTES
+
+    web.php:98    Route::middleware(['session.authentifiee','session.revoquee',
+                                     'mot.de.passe.a.changer'])->group(…)
+    web.php:122     Route::get('/profil/donnees-personnelles', ExportRgpdController::class)
+                    -> DANS ce groupe
+
+    ChangementMotDePasseExige:99   EXEMPTES = ['profil', 'profil.mot-de-passe']
+                            :144   redirect()->route('profil', ['force_change' => 1])
+
+    le LEGACY   export.php:27   checkAuth([ROLE_USER, ROLE_ADMIN, ROLE_SUPERADMIN])
+                                AUCUNE garde sur force_password_change
+                                (la ligne 62 cite la colonne, mais dans le SELECT
+                                 des donnees EXPORTEES — ce n'est pas une garde)
+
+    mesure en base :  8 comptes actifs portent `force_password_change = 1`
+
+> **Huit des douze comptes actifs ne peuvent PAS exercer leur droit de portabilité sur le portage, alors
+> qu'ils peuvent sur le legacy.**
+
+**Et ça se compose avec le `DOSSIER-24`** : *cinq de ces huit n'ont aucune adresse de courriel, la
+réinitialisation n'est pas portée, et le portage n'envoie rien.* **Ils sont donc bloqués sur le changement
+de mot de passe ET sur l'export.**
+
+---
+
+## ⛔ L'ARBITRAGE, ET IL N'EST PAS À MOI
+
+**Le correctif tient en une ligne** — *ajouter `'profil.donnees-personnelles'` à `EXEMPTES`.* **Je ne
+l'écris pas, parce que la décision balance une obligation légale contre une posture de sécurité.**
+
+    POUR l'exemption
+      le droit de portabilite (art. 20) n'est pas conditionne a un changement
+        de mot de passe
+      le legacy ne le conditionne pas
+      huit comptes actifs sont bloques aujourd'hui, dont cinq sans recours
+
+    CONTRE l'exemption
+      `force_password_change` peut avoir ete pose PARCE QU'UN COMPTE EST SUSPECT
+      et exporter toutes les donnees personnelles est exactement ce qu'un
+        attaquant qui detient le mot de passe voudrait faire
+      -> l'exempter ouvrirait cette porte pendant la fenetre ou le compte est
+         justement considere comme compromis
+
+**Le commentaire du middleware (`:46`) dit « l'exemption tient en DEUX entrées » — c'est un choix
+raisonné, pas un oubli. En ajouter une troisième demande une raison de même niveau.**
+
+*Une troisième voie existe et je la nomme sans la recommander* : **exempter l'export SEULEMENT quand le
+drapeau n'a pas été posé par un geste d'administration** — *mais rien en base ne distingue aujourd'hui
+« forcé par politique d'expiration » de « forcé par suspicion ».* **Ce serait donc une colonne à ajouter,
+et un autre chantier.**
