@@ -77,11 +77,62 @@ import { join } from 'node:path';
 
 const RACINE = new URL('../../', import.meta.url).pathname;
 
+/*
+ * ══ TROIS RACINES, ET NON UNE LISTE BLANCHE POUR L'UNE DES TROIS ══════════
+ *
+ * `legacy` et `backend` etaient deja donnes en RACINE ; `laravel` seul portait
+ * une enumeration de huit sous-repertoires. Mesure du 2026-09-04 : 34 fichiers
+ * SUIVIS par git vivaient sous `laravel/` hors de ces huit, et parmi eux
+ *
+ *     laravel/public/index.php        le controleur frontal — toute page
+ *     laravel/public/.htaccess        les reecritures, donc le routage
+ *     laravel/Dockerfile              +  docker-entrypoint.sh : regime IMAGE
+ *     laravel/composer.json/.lock     l'autochargement
+ *     laravel/database/migrations/    le schema que les pages rendent
+ *     laravel/phpunit.xml             (celui-la meme que 09f2be0 a du reparer)
+ *
+ * Une ecriture sur `public/index.php` pendant une fenetre changeait TOUTES les
+ * pages et mon garde rendait « 0 modifie ». **Un angle mort d'une liste blanche
+ * ne se trompe pas du cote qui alarme : il DEDOUANE**, et un garde qui dedouane
+ * a tort est exactement la place ou l'on ne cherche plus.
+ *
+ * ══ POURQUOI LA RACINE NE RAMENE PAS LE BRUIT QU'ON CRAINDRAIT ════════════
+ *
+ * Parce que le tri ne se fait pas ici. Deux filtres, tous deux par FICHIER :
+ * `JAMAIS_SERVI` (plus bas) et `git check-ignore`. Mesure du 2026-09-04, sur
+ * les 10 178 fichiers presents sous `laravel/` :
+ *
+ *     ignores par git, PAR FICHIER          9 845    (dont vendor/, .env,
+ *                                                    storage/**, bootstrap/cache/*)
+ *     retenus                                 333    dont 11 `.gitignore` immobiles
+ *     retenus dans un chemin de cache           0    hors ces `.gitignore`
+ *
+ * ⚠ ET J'AI FAILLI CONCLURE L'INVERSE. `git check-ignore laravel/storage/
+ * framework/views` — le REPERTOIRE — rend « non ignore », et j'en avais deduit
+ * 113 vues compilees dans l'empreinte, donc un mecanisme inutilisable. Chaque
+ * FICHIER de ce repertoire est pourtant ignore, par un `.gitignore` local
+ * portant `*`. **Interroger un garde sur le mauvais objet rend un verdict
+ * faux, et celui-la se trompait du cote qui alarme** : il m'aurait fait garder
+ * l'angle mort au nom d'un bruit qui n'existe pas.
+ *
+ * ══ CE QUE `laravel/version.txt` FERA APPARAITRE, ET C'EST VOULU ═══════════
+ *
+ * Ce fichier existe sur l'hote a 0 octet et n'est pas suivi. Ce n'est pas une
+ * ecriture : c'est le POINT DE MONTAGE que Docker cree sous le montage englobant
+ * `./laravel:/var/www/html`, pour y attacher `legacy/version.txt` en lecture
+ * seule (`docker inspect`, 2026-09-04 : Source=legacy/version.txt, RW=false ;
+ * dans le conteneur le chemin rend `1.39.5`). Il entre donc dans l'empreinte, et
+ * sa mtime bouge a chaque demarrage du conteneur SANS qu'un octet soit ecrit.
+ *
+ * **Le signaler est juste** : un redemarrage du conteneur pendant une fenetre
+ * change le regime SERVICE au milieu de la mesure. Ce qu'il faut savoir le lire :
+ * un ECART qui ne nomme que ce seul chemin dit « le conteneur a redemarre »,
+ * pas « une session a ecrit ».
+ */
+
 /** Ce qui est SERVI par chaque portail, par regime de lecture. */
 export const CHEMINS_SERVIS = {
-    laravel: ['laravel/app', 'laravel/routes', 'laravel/resources/views',
-              'laravel/lang', 'laravel/public/css', 'laravel/public/js',
-              'laravel/config', 'laravel/bootstrap'],
+    laravel: ['laravel'],
     legacy:  ['legacy'],
     backend: ['backend'],
 };
