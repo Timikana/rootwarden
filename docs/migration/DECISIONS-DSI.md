@@ -8235,3 +8235,32 @@ session y a répondu sur son propre périmètre avant que la réponse arrive.**
 l'intention », elle dit « la pièce que j'ai écrite pour la propreté est celle qui l'exécute ».* **Un
 fail-closed et une branche explicite se ressemblent — l'un refuse ce qu'il ne comprend pas, l'autre
 autorise ce qu'il comprend.**
+
+### ⛔ MA CONSIGNE DISAIT « SA CLÉ DE LIBELLÉ » AU SINGULIER — il y en avait trois, et deux devaient RESTER
+
+    `planif_portee_all`      le libelle de l'OPTION            -> mort, RETIRE
+    `planif_cible_parc`      AFFICHE une ligne EXISTANTE (js :508, :764)  -> GARDE
+    `planif_cible_ambigue`   mon propre avertissement E-280 (js :541)     -> GARDE
+
+> **Retirer `planif_cible_parc` aurait montré une portée VIDE sur une planification qui relève tout le
+> parc. Le pire des deux états.**
+
+**Deuxième fois aujourd'hui que « cesser d'OFFRIR n'est pas cesser de SAVOIR LIRE » sauve un libellé — la
+première était `planif.cible_all` sur CVE, gardé contre ma consigne pour la même raison.** *Je répète donc
+la même erreur de consigne à trois heures d'intervalle, sur le même mécanisme, dans deux modules.*
+
+**Et ce qui la corrige n'est pas une résolution : c'est de demander le COMPTE avant de dire « sa clé ».**
+*Un singulier dans une consigne est une affirmation de cardinalité, et je n'avais mesuré aucune des deux
+fois.*
+
+### ⚠ ET LE REPLI JUSTIFIÉ PAR UN RAISONNEMENT D'AFFICHAGE, SUR UN CHEMIN DE SOUMISSION
+
+    audit-ssh.js:458 et :517   repli `: 'all'`
+    la justification ECRITE : « "parc" vaut mieux qu'un selecteur vide, qui
+      se lit comme une panne »
+
+**Le raisonnement est juste POUR L'AFFICHAGE. La ligne 517 est sur le chemin de la SOUMISSION.**
+
+> **Un repli d'affichage placé sur un chemin d'écriture produit le défaut le plus large, avec un commentaire
+> qui le défend.** *C'est la forme la plus coûteuse : un défaut ratifié par son propre commentaire — comme
+> le scelleur du `DOSSIER-25`.*
