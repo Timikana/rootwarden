@@ -170,3 +170,54 @@ inclus ou non.*
     definition retenue pour le §1 : les fichiers dont le nom correspond a
     `test_*.py` ou `*Test.php`. Sur cette base : 46 / 50, ecart 4, et ce
     sont les quatre verrous nommes.
+
+---
+
+# ⛔ CORRECTION — mon « v1.39.4 » n'était pas faux, il était SOUS-SPÉCIFIÉ. Le numéro dépend de VOTRE stratégie d'intégration.
+
+**Une session a mesuré `./scripts/version.sh` sur la branche et obtenu `1.39.728`, en face de mon
+`v1.39.4`. Aucun des deux n'est faux : ils décrivent deux intégrations différentes, et mon dossier n'avait
+pas nommé la sienne.**
+
+    le jalon              602b285 (INF-004, 27/08), `VERSION-JALON` = 1.39
+    origin/main aujourd'hui    `--first-parent` depuis le jalon :     3
+    HEAD (branche lineaire)                                          728
+    etiquettes existantes      v1.39.1 · v1.39.2 · v1.39.3
+                               -> coherentes avec le compte de 3
+
+    ✅ SI VOUS FUSIONNEZ (le motif etabli de ce depot) :
+       une fusion = UN pas en `--first-parent`  ->  3 + 1 = 4
+       -> etiquette `v1.39.4`
+
+    ✅ SI `main` DEVIENT HEAD (avance rapide, ou poussee directe de main) :
+       l'historique first-parent devient celui de la branche  ->  728
+       -> etiquette `v1.39.728`
+
+**LE DISCRIMINANT EST MESURÉ, et il désigne la fusion :**
+
+    le sommet de `main` est `304a604`, « Merge Migration-Laravel — les
+    quatre epingles realignees », et `git rev-list --parents -1 main` rend
+    TROIS jetons : le commit et DEUX parents.
+    -> `main` a deja integre cette branche PAR FUSION.
+
+> **Donc si vous refaites ce que vous avez déjà fait, l'étiquette sera `v1.39.4`. Si vous poussez `main` à
+> l'identique de la branche, elle sera `v1.39.728`.**
+
+**La conclusion du dossier ne bouge pas — le bump de `VERSION-JALON` doit précéder la poussée — mais
+l'AMPLEUR de l'incohérence dépend de vous** : *un décalage d'un correctif, ou un numéro à trois chiffres en
+face d'un portail qui affiche `1.40.5`.*
+
+## ⚠ ET C'EST UNE RÈGLE QUE J'AVAIS INSCRITE DEUX TOURS PLUS TÔT SANS L'APPLIQUER
+
+    « Le nombre n'est pas une propriete du CODE, c'est une propriete du
+      CHEMIN pris dans l'histoire. » — porte a ce dossier au tour precedent
+
+**Je l'ai écrite, puis j'ai annoncé un numéro sans nommer le chemin.** *C'est la forme la plus fréquente de
+mes fautes du jour : la règle est au registre, et le geste suivant ne la consulte pas.*
+
+## ✅ ET LE CHIFFRE AFFICHÉ A BOUGÉ DEUX FOIS PENDANT CE TOUR
+
+    `legacy/version.txt`   1.40.3 -> 1.40.4 (E-397) -> 1.40.5 (E-399)
+
+**L'écart préexistait ; il s'élargit de deux correctifs par tour de travail.** *Ce n'est pas une dérive
+qu'on rattrape : c'est un compteur qui court tant que le jalon ne le rejoint pas.*
