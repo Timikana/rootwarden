@@ -85,3 +85,88 @@ s'accumule hors service, et que le jour où l'une d'elles compte, elle ne sera p
 
 > **C'est la forme la plus discrète de ce chantier : neuf sessions ont passé la journée à poser des gardes,
 > et aucune n'était en service. Personne n'a menti — chacun a mesuré son arbre.**
+
+---
+
+# ⚠ AJOUT — UNE PRÉCONDITION À LA POUSSÉE : deux identités de version divergent sur le MINEUR
+
+**Trouvé par la session 2 en vérifiant une correction que je lui avais faite, et mesuré par moi.**
+
+    AFFICHEE   `legacy/version.txt`, le pied de page, le CHANGELOG   1.40.4
+    ETIQUETEE  derivee de `VERSION-JALON`                            1.39.N
+
+    `VERSION-JALON`                     `1.39`, UN SEUL commit :
+                                        602b285, 2026-08-27, jamais rebump
+    `--first-parent` depuis le jalon    origin/main : 3   ·   HEAD : 718
+    etiquettes existantes               v1.39.1 · v1.39.2 · v1.39.3
+                                        (temoin : 30 etiquettes au total)
+                                        -> coherentes avec le compte de 3
+
+> **Le dériveur fonctionne exactement comme conçu. Le défaut est que `VERSION-JALON` n'a pas bougé quand
+> l'équipe a commencé à écrire `1.40.x`.**
+
+**Conséquence concrète de la poussée** : *une fusion compte pour UN pas en `--first-parent`, donc le compte
+sur `main` passerait de 3 à 4.* **La release s'appellerait `v1.39.4` pendant que le portail affiche
+`1.40.4`.** *Qui cherche la version du pied de page dans les étiquettes ne la trouvera pas.*
+
+**Et rien ne compare les deux** : *`version.txt` est assigné à la main, le jalon aussi, et aucun contrôle
+ne vérifie que leur mineur s'accorde.*
+
+## ✅ CE QUE JE TRANCHE : `VERSION-JALON` passe à `1.40`, AVANT la poussée
+
+    ⛔ pas l'option « ramener l'affichage a 1.39.x » : `1.40` a ete pose
+       deliberement quand « se souvenir de moi » est arrive (E-394) — c'est
+       une capacite neuve, donc un mineur neuf. C'est l'affichage qui a
+       raison.
+    ⛔ pas l'option « assumer deux identites » : c'est ce qui est en place,
+       et c'est la seule des trois qui soit certainement fausse — deux
+       identites que personne ne compare ne sont pas assumees, elles sont
+       ignorees.
+    ✅ le jalon rejoint l'affichage. Et le compte de correctif repart de ce
+       commit, donc la prochaine etiquette sera `v1.40.x` — monotone
+       au-dessus de `v1.39.3`.
+
+**⚠ ORDRE CONTRAINT, et c'est pour cela que ça vit dans ce dossier** : *si la poussée précède le bump, la
+fusion crée `v1.39.4` d'abord, et cette étiquette-là ne se retire pas proprement.* **Le bump du jalon, puis
+la poussée.**
+
+*Le geste est une ligne dans un fichier qui n'est pas de mon périmètre. Il est routé, et il n'a AUCUN effet
+avant votre poussée — `auto-tag` ne tourne que sur `main`.*
+
+## ⚠ UNE BORNE À CONNAÎTRE, qui n'est pas un défaut
+
+    `version.sh` sur HEAD rend `1.39.718`. Sur `main`, `1.39.3`.
+
+> **Le nombre n'est pas une propriété du CODE, c'est une propriété du CHEMIN pris dans l'histoire.** *Une
+> fusion compte pour un pas ; une branche linéaire compte chacun de ses commits.*
+
+**Sans conséquence pour `auto-tag`, qui ne tourne que sur `main`. Trompeur pour qui invoque `version.sh`
+ailleurs** — *il obtient `1.39.718` et pourrait le croire.*
+
+## ⚠ ET UN TITRE DE JOB QUI NOMME LA SOURCE ABANDONNÉE
+
+    ci.yml:459   « # Job 6 : Tag version automatique (depuis version.txt) »
+    le job en lit ZERO ligne de CODE, et `:486` explique pourquoi la source
+    a ete abandonnee
+
+> **Un commentaire de TITRE survit au changement qu'un commentaire de CORPS documente : le second dit la
+> vérité, le premier la contredit — et c'est le premier qu'on lit en survolant.**
+
+*Même famille que les commentaires qui affirment une garde plus stricte que le code ; ici c'est une SOURCE
+qui est fausse. Une ligne à corriger, dans le même geste que le bump.*
+
+## ⛔ ET UNE CORRECTION À MON PROPRE §1 : le compte de fichiers de test portait un nombre sans son objet
+
+    ce que j'ai ecrit   46 sur origin/main / 50 en local
+    une autre mesure    58 / 62, puis 54 avec un filtre `.py|.php`
+
+**Les totaux diffèrent, l'ÉCART est 4 dans les deux cas.** *Nous comptions deux populations : `test_*.py`
+et `*Test.php` seuls, contre tous les fichiers des répertoires de test — `Doubles/`, `Support/`, `Outils/`
+inclus ou non.*
+
+> **C'est l'écart qui porte la conclusion, donc elle tient. Mais un nombre sans son objet invite au faux
+> désaccord — et il vaut mieux qu'un dossier porte la DÉFINITION que le total.**
+
+    definition retenue pour le §1 : les fichiers dont le nom correspond a
+    `test_*.py` ou `*Test.php`. Sur cette base : 46 / 50, ecart 4, et ce
+    sont les quatre verrous nommes.
