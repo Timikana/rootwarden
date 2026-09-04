@@ -8,6 +8,39 @@ Un ecart non ecrit ici est une regression, pas un choix.
 
 ---
 
+## E-383 — une legende qui decrivait un marqueur que plus aucune entree ne porte
+
+**Corrige le 2026-09-04 (`v1.39.1`), socle.**
+
+Le gabarit expliquait la fleche « ↗ » — *« les entrees marquees menent a l'ancien
+portail »* — **aux DEUX endroits qui rendent le menu** : barre laterale (`:25`) et tiroir
+mobile (`:118`). Or le menu est passe a **32 entrees `route` et ZERO `legacy`** (`b6c7280`,
+R1). La legende decrivait donc un marqueur que plus rien ne porte.
+
+    mesure : 'route' 32 · 'legacy' 0 · 'cle' 32     temoin : une cle inventee -> 0
+
+### Pourquoi un PREDICAT et non une suppression
+
+**La supprimer serait correct aujourd'hui et faux le jour ou une entree repasse en
+`legacy`** — et ce menu est passe de 24 a 32 entrees en deux semaines. Un
+`Navigation::porteDuLegacy(array $menu)` conditionne les deux rendus, et la legende
+reapparaitra d'elle-meme.
+
+**Le predicat teste l'ABSENCE de `route`, pas la presence de `legacy`.** *L'invariant
+documente est « une entree porte l'une OU l'autre, jamais les deux » ; une entree qui
+n'aurait ni l'une ni l'autre — un defaut — serait traitee comme non portee, donc la legende
+s'afficherait. Le sens de l'erreur va vers le trop-dire, pas vers le silence.*
+
+### ⚠ Reserve de verification
+
+**Ce gabarit n'est PAS exerce par mon controle reseau** : `/connexion` etend
+`layouts.socle`, pas `layouts.portail`, et toute page de portail exige une session.
+Controles faits : appariement des directives Blade — `@if` **3 ouvertures / 3 fermetures**
+apres contre 1/1 avant, avec temoin (un `@if` sans `@endif` est bien detecte) — et ecarts de
+depouillement **identiques** a `HEAD`. *Pas de binaire PHP sur l'hote de cette session.*
+
+---
+
 ## E-382 — l'octroi d'une politique sudo : PORTE, et la liste sure n'est pas l'ENUM
 
 **Porte le 2026-09-04 (`v1.39.0`), greffe sur `/permissions` — PAS un nouvel ecran.**

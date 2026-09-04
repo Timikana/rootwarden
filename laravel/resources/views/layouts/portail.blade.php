@@ -22,9 +22,22 @@
 
         {{-- La legende explique la fleche UNE FOIS, au lieu de repeter
              « ancien portail » sur chaque entree non portee. --}}
+        {{-- ⚠ CONDITIONNEE, ET NON SUPPRIMEE. Elle expliquait la fleche « ↗ »
+             alors que le menu est passe a 32 entrees `route` et ZERO
+             `legacy` : elle decrivait un marqueur qu'aucune entree ne
+             porte plus. La supprimer serait correct aujourd'hui et faux
+             des qu'une entree repasse en `legacy` — ce menu est passe de
+             24 a 32 en une nuit. Le predicat la rend juste dans les deux
+             regimes, et personne n'a a se souvenir de la remettre.
+        
+             AUX DEUX ENDROITS : barre laterale ET tiroir mobile. Le
+             second est celui qu'on oublie, et celui que personne ne
+             regarde. --}}
+        @if (\App\Support\Navigation::porteDuLegacy($menu ?? []))
         <p class="rw-laterale__legende">
             <span class="rw-fleche">↗</span> {{ __('nav.legende_ancien_portail') }}
         </p>
+        @endif
 
         <nav class="rw-menu">
             @include('composants.entrees-menu', ['variante' => 'laterale'])
@@ -115,9 +128,22 @@
                 <span>{{ config('app.name') }}</span>
                 <label class="rw-tiroir__fermer" for="rw-tiroir" title="{{ __('nav.fermer_menu') }}">✕</label>
             </div>
+            {{-- ⚠ CONDITIONNEE, ET NON SUPPRIMEE. Elle expliquait la fleche « ↗ »
+                 alors que le menu est passe a 32 entrees `route` et ZERO
+                 `legacy` : elle decrivait un marqueur qu'aucune entree ne
+                 porte plus. La supprimer serait correct aujourd'hui et faux
+                 des qu'une entree repasse en `legacy` — ce menu est passe de
+                 24 a 32 en une nuit. Le predicat la rend juste dans les deux
+                 regimes, et personne n'a a se souvenir de la remettre.
+            
+                 AUX DEUX ENDROITS : barre laterale ET tiroir mobile. Le
+                 second est celui qu'on oublie, et celui que personne ne
+                 regarde. --}}
+            @if (\App\Support\Navigation::porteDuLegacy($menu ?? []))
             <p class="rw-laterale__legende">
                 <span class="rw-fleche">↗</span> {{ __('nav.legende_ancien_portail') }}
             </p>
+            @endif
             <div class="rw-menu">
                 @include('composants.entrees-menu', ['variante' => 'tiroir'])
             </div>
