@@ -314,3 +314,82 @@ visible ; la 3 se paie par une capacité disparue que personne ne cherche.
 > bloc B. Ils sont **archivables en DERNIER dans leur chaîne**, après le portage du
 > préréglage sudo, de l'import CSV de comptes et de l'onboarding — ou après un
 > arbitrage explicite d'abandon de ces trois capacités.
+
+---
+
+## 6. Question 3 appliquée au BLOC A — **mesure du 2026-09-04 15:19 CEST**
+
+### 6.1 La réponse à la question posée : les deux endpoints sont archivables
+
+| fichier | le geste qu'il porte | le portage le porte-t-il ? | Q3 |
+|---|---|---|---|
+| `adm/api/audit_verify.php` | vérifier l'intégrité de la chaîne | **oui** — `web.php:995` `/journal-audit/verifier`, `journal-audit.js:100` | **pas le seul accès** |
+| `adm/api/audit_seal.php` | sceller les lignes orphelines | **oui** — `JournalAudit.php:255` `scelle()`, `:281` `->update(['prev_hash','self_hash'])`, bouton `audit-sceller` | **pas le seul accès** |
+| `adm/includes/audit_log.php` | l'écriture **scellée à l'insertion** | 4 écrivains Laravel la font | non bloquant par Q3 — **bloqué par Q2** (18 requérants) |
+
+**Les deux endpoints sortent donc archivables des trois questions.** Le helper
+reste, pour la raison déjà établie au §BLOC A.
+
+### 6.2 ⚠ Mais la question 3 a fait apparaître autre chose, et c'est plus lourd
+
+    user_logs, base du banc, 2026-09-04 15:19 CEST
+      6240 lignes  ·  1484 SANS empreinte (23,8 %)  ·  4756 scellees
+      derniere non scellee : 2026-09-03 09:21:40
+
+    ECRIVAINS DE user_logs, TOUTES COUCHES ET TOUTES FORMES : 25
+      5 scellent a l'insertion  ·  20 ecrivent NU  ->  80 %
+
+| couche | écrivains | scellent |
+|---|---|---|
+| `backend/` (Python, `INSERT INTO` brut) | 11 | **0** |
+| `laravel/` | 6 | 4 |
+| `legacy/` | 8 | **1** — `audit_log.php:118`, et c'est le seul |
+
+**Le scellement est un geste MANUEL** — un bouton `audit-sceller` avec un mode
+simulation. L'intégrité de la chaîne d'audit dépend donc de quelqu'un qui appuie.
+
+### 6.3 ⚠ Et la conséquence que l'archivage va produire
+
+`legacy/adm/includes/audit_log.php:118` est **le seul écrivain scellant du
+legacy**, et il porte **21 arcs**. Quand le legacy tombera, il tombera avec.
+
+> **Après la migration, le scellement à l'insertion n'existera plus que dans les 4
+> écrivains Laravel. Les 11 écrivains Python, qui écrivent tous nu, ne bougent
+> pas.** La proportion de lignes non scellées ne va donc pas diminuer avec
+> l'extinction du legacy : **elle va augmenter.**
+
+Ce n'est pas une objection à l'archivage — c'est une conséquence qu'il faut avoir
+choisie plutôt que subie. Et elle relève de la classe 3 : *rien ne casse, et une
+propriété du produit se dégrade sans qu'aucune mesure existante la surveille.*
+
+### 6.4 ⚠ ET J'AI FAILLI PUBLIER L'INVERSE — la même faute qu'au §5.1, autre forme
+
+`MotDePasse.php:300-306` porte ce commentaire :
+
+> *« LE JOURNAL S'ECRIT NU, **comme partout ailleurs**. […] la chaîne n'est PAS
+> calculée à l'insertion : elle l'est par un scellement séparé. […] Calculer la
+> chaîne ici, seul, la casserait. »*
+
+**J'ai d'abord conclu que ce commentaire MENTAIT** — huitième « en-tête qui ment »,
+j'allais l'annoncer. Ma sonde avait trouvé **5 écrivains, dont 4 scellaient** :
+dans ce cadre, `MotDePasse` était l'exception et « comme partout ailleurs » était
+faux.
+
+**Ma sonde ne voyait qu'UNE FORME SYNTAXIQUE** :
+`DB::table('user_logs')->insert([…])`. Elle était aveugle à
+`DB::insert('INSERT INTO user_logs …')` — SQL brut, présent dans le portage lui-même
+(`ExigePermission.php:73`) — **et aux onze écrivains Python**.
+
+> **Le commentaire dit VRAI : 80 % des écritures sont nues, et son raisonnement
+> tient — calculer la chaîne dans un seul écrivain sur vingt-cinq ne réparerait
+> rien.** Ce sont les 4 écrivains scellants qui sont l'exception.
+
+**C'est la même faute qu'au §5.1 et le même jour : un instrument qui ne connaît
+qu'une écriture de la chose qu'il compte.** Là c'était le nom de base contre le
+chemin résolu ; ici c'est l'ORM contre le SQL brut. Et cette fois l'erreur
+n'aurait pas produit un faux zéro mais **une accusation**, contre un commentaire
+juste — et contre l'auteur qui avait pris la peine de justifier son choix.
+
+*Ce qui l'a attrapée : une famille d'actions massivement non scellées
+(« Permission refusee » ×710) que mes cinq écrivains n'expliquaient pas.* **Un
+reste inexpliqué dans la mesure, pas une relecture.**
