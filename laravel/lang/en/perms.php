@@ -36,6 +36,17 @@ return [
     'err_machine' => 'That machine does not exist.',
     'err_auto_acces' => 'You cannot grant yourself machine access.',
     'err_step_up' => 'This gesture requires confirmation with your second factor.',
+    'acces_aucun' => '— no access',
+    'preset_none' => 'Access, no sudo',
+    'preset_all_nopasswd' => 'Access + full sudo, no password',
+    'preset_restart_services' => 'Access + systemctl restart/reload',
+    'preset_apt_only' => 'Access + apt (⚠ root-equivalent)',
+    'preset_read_logs' => 'Access + read logs',
+    'acces_aide' => 'The chosen preset is saved now and applied at the NEXT deployment — it changes nothing on the server before that.',
+    'acces_absents' => 'Two presets from the database format are not offered: the product cannot store the service list or the free-form rules they require, and a deployment would replace them with full sudo.',
+    'acces_apt_avert' => '"Access + apt" is ROOT-EQUIVALENT: installing a package can yield a root shell. It is not narrower than full sudo.',
+    'acces_nopasswd_derive' => 'Whether a password is required follows from the preset and is not chosen here: only "full sudo" waives it. The legacy portal let the two be combined freely.',
+    'err_preset' => 'This sudo preset is not offered.',
     'err_reseau' => 'The portal did not answer (status :statut). Nothing was changed.',
 
     // The eighteen permissions, named one by one.

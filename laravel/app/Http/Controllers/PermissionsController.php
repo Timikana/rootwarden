@@ -68,9 +68,11 @@ class PermissionsController extends Controller
         $comptes = $this->comptes->liste();
         $droits = [];
         $acces = [];
+        $presets = [];
         foreach ($comptes as $c) {
             $droits[$c['id']] = $this->permissions->pour($c['id']);
             $acces[$c['id']] = $this->permissions->machinesDe($c['id']);
+            $presets[$c['id']] = $this->permissions->presetsDe($c['id']);
         }
 
         return view('permissions', [
@@ -78,6 +80,14 @@ class PermissionsController extends Controller
             'permissions' => $this->permissions->toutes(),
             'droits' => $droits,
             'acces' => $acces,
+            'presets' => $presets,
+            /*
+             * La liste FERMEE vient du SERVICE, pas de la vue : c'est la meme
+             * qui valide cote serveur. Deux listes divergeraient, et celle qui
+             * decide n'est pas celle qu'on lit.
+             */
+            'presetsProposes' => Permissions::PRESETS,
+            'presetsAbsents' => Permissions::PRESETS_ABSENTS,
             'machines' => $machines->liste(),
             // Sous-lot D5b : la moitie de `manage_permissions.php` que D5 avait
             // laissee dehors. Lue en base ; l'octroi passe par la passerelle,
@@ -181,16 +191,43 @@ class PermissionsController extends Controller
             return response()->json(['success' => false, 'message' => __('perms.err_valeur')], 422);
         }
         $accorde = $requete->boolean('value');
-        $err = $this->permissions->definitAcces($id, $machine, $accorde, $auteur, $roleAuteur);
+
+        /*
+         * `has()` pour l'EXISTENCE, `input() ?? ''` pour la valeur.
+         * `ConvertEmptyStringsToNull` est dans le groupe `web` : `input('preset')`
+         * rend `null` pour une chaine vide, ce qui est indiscernable d'un champ
+         * non soumis. Ici la distinction compte — « ne touche pas au prereglage »
+         * n'est pas « mets-le a vide ».
+         */
+        $preset = $requete->has('preset')
+            ? (string) ($requete->input('preset') ?? '')
+            : null;
+
+        $err = $this->permissions->definitAcces($id, $machine, $accorde, $auteur, $roleAuteur, $preset);
         if ($err !== null) {
             return response()->json(['success' => false, 'message' => __($err)], 403);
         }
+        $trace = $accorde ? 'Octroi' : 'Retrait';
+        if ($accorde && $preset !== null) {
+            // Un octroi de PRIVILEGE se trace avec le privilege accorde : sans le
+            // prereglage, le journal ne dit pas ce qui a ete donne.
+            $trace .= " (sudo: {$preset})";
+        }
         $this->journalise($auteur,
-            ($accorde ? 'Octroi' : 'Retrait') . " de l'acces machine #{$machine} pour le compte #{$id}");
+            $trace . " de l'acces machine #{$machine} pour le compte #{$id}");
 
+        /*
+         * `preset` est rendu pour que l'ECRAN affiche ce que le serveur a ECRIT,
+         * et non ce qui lui a ete demande. Sur un ecran de privilege la
+         * difference compte : une liste qui montre « sudo complet » alors que la
+         * base porte autre chose ferait decider la suite sur une croyance
+         * fausse. Un octroi sans prereglage explicite vaut `none` — c'est le
+         * defaut de la colonne (051), pas une absence de decision.
+         */
         return response()->json([
             'success' => true,
             'actif' => $accorde,
+            'preset' => $accorde ? ($preset ?? 'none') : null,
             'message' => $accorde ? __('perms.acces_accorde') : __('perms.acces_retire'),
         ]);
     }

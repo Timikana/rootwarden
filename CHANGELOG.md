@@ -5,6 +5,48 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.39.0] - 2026-09-04
+
+### Ajoute
+- **L'octroi d'une politique sudo par (compte, machine) est PORTE (E-382).** Greffe sur
+  `/permissions`, pas un nouvel ecran : l'octroi d'acces etait deja porte, il manquait trois
+  colonnes de `user_machine_access`. `manage_access.php` etait **la seule facon vivante
+  d'accorder un sudo** — demonter le legacy la retirait, sur un produit dont c'est l'objet.
+
+### ⛔ Une capacite volontairement PLUS ETROITE que le legacy, et c'est un correctif
+- **Cinq prereglages proposes, pas les sept de l'ENUM.** `systemctl_specific` exige une liste
+  de services qu'aucune colonne ne porte ; `custom` exige `sudo_custom_rules`, qui n'a **aucun
+  ecrivain** dans tout le depot. `sudo_manager.render_policy` leve `ValueError` dans les deux
+  cas, et `add_to_sudoers` rattrape cette exception en repliant sur `NOPASSWD: ALL`. Un
+  administrateur du legacy qui choisit le prereglage le plus restrictif du menu obtient donc
+  le root complet sans mot de passe. **La liste sure est celle de ce que `render_policy` rend,
+  pas celle que la base accepte.** Les deux absentes sont declarees a l'ecran avec leur raison.
+- **`apt_only` est annonce EQUIVALENT ROOT**, d'apres son propre docstring : `apt install`
+  permet d'obtenir un interpreteur root. Aucun ecran ne le disait.
+- **Un acces sans prereglage vaut `none`**, donc le deploiement RETIRE le sudo. L'ecran
+  annoncait « acces accorde » sans le dire.
+
+### Retire, et declare
+- **Le choix independant de `sudo_nopasswd`** : il se deduit du prereglage. Le legacy en fait
+  une case libre, ce qui autorise la paire incoherente `all_nopasswd` + `nopasswd = 0` ;
+  `restart_services` sans mot de passe etait exprimable et ne l'est plus ici.
+- **`sudo_runas`** : ecrit `'root'` cote serveur, aucun champ. Le legacy le valide par une
+  expression reguliere alors que son interface envoie toujours `'root'`.
+
+### Tests et ⚠ reserves
+- Parite FR/EN **78 = 78** sur les jeux de cles, et chaque prereglage de la liste fermee a son
+  libelle dans les deux catalogues (temoin : un prereglage invente n'en a pas). `node --check`
+  vert avec temoin. Le detecteur `scripts/pages-sans-lien.py` reste a 0.
+- **La syntaxe PHP n'est pas verifiee** : aucun binaire PHP sur l'hote de cette session et
+  `docker` refuse. Les ecarts de mon depouillement sont identiques avant et apres sur les
+  quatre fichiers PHP, mesures contre `HEAD`. **A confirmer :**
+  `php -l` sur `app/Services/Permissions.php`, `app/Http/Controllers/PermissionsController.php`,
+  `lang/fr/perms.php`, `lang/en/perms.php`.
+- **La vue n'est pas exercee au reseau** : `/permissions` exige `role:3` et rend 302 sans
+  session. L'application demarre (200 sur `/connexion`, temoin 404 sur une URL absente).
+- **Aucun deploiement n'est exerce.** L'ecran ecrit en base ; l'application des politiques est
+  le geste reserve a l'exploitant.
+
 ## [1.38.199] - 2026-09-03
 
 ### Corrige
