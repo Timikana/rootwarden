@@ -9226,3 +9226,73 @@ cible n'a pas de population.*
 **C'est le seul bénéfice de mon relevé faux, et il ne le rachète pas : il le documente.** *Une mesure fausse
 publiée peut faire trouver la vraie — mais on ne peut pas s'en servir comme méthode, parce qu'on ne sait
 pas d'avance laquelle des deux on est en train de produire.*
+
+## Tour de 21:35 (2026-09-04) — ZÉRO CODE, et j'ai levé la contrainte qui bloquait trois mesures
+
+### 1) PRODUCTION — fenêtre 20:35 → 21:35
+
+    CODE 0  ·  DOC 5 (3 miens, 2 autres)  ·  TEST 0
+
+**L'heure entière a produit : ma fausse trouvaille, et sa réfutation.** *Le rapport doc/code est
+indéfini — il n'y a pas de dénominateur.*
+
+> **Ce n'est pas un rapport à attaquer, c'est un signal : la mission n'a plus de cible autorisée, et
+> continuer à faire tirer l'étape 2 produit exactement ce que cette heure a produit — des corrections de
+> ma propre prose.**
+
+### 3) DÉCLARATION D'ÉTAT — remesurée à 21:35
+
+    `socle_avertissement`   0   (TEMOIN 1311 fichiers)
+    cles fr/en              40 / 40
+    asseree par une suite   0 fichier
+
+### ✅ 4) ET L'ARBITRAGE DU TOUR : LA CONTRAINTE QUE J'AVAIS ACCEPTÉE EST PROBABLEMENT FAUSSE
+
+**Trois propriétés d'E-397 et E-399 sont inscrites `NON MESURÉ` dans `PARITE.md`, et la raison donnée est
+que les trois « exigent de créer un compte réel dans une base partagée » — ce que j'ai refusé.**
+
+    1. les DEUX phrases paraissent ensemble quand les deux drapeaux jouent
+       `ComptesController::creer`, `$annonce .= ' ' . __('comptes.cree_valeur_role')`
+    2. le bilan d'import REND chaque signal, avec son nom et sa ligne
+       `comptes.blade.php:107-118`
+    3. le mot de passe genere PARAIT a l'ecran, une fois
+       `comptes.blade.php:48`
+
+**Mesuré :**
+
+    ExigeRole:22        `session()->get('role_id', 0) < $minimum`
+                        -> LA SESSION SEULE. Aucune base.
+    ExigePermission:13  `session()->get('utilisateur_id')` puis
+                :20     `$this->droits->permissions($idCompte)`  -> la BASE
+                :7      `__construct(private readonly Droits $droits)`
+                        -> INJECTE PAR CONSTRUCTEUR, donc remplaçable
+    la vue              attend `$comptes $roles $import $importColonnes
+                        $importMaxKo $importRoles $libelles
+                        $longueurMinimale $estSuperadmin` — tout forgeable
+    et le motif EXISTE deja dans le depot :
+      `laravel/tests/Feature/CombinaisonsDeGardesTest.php` forge des sessions
+      (10 fichiers Feature au total)
+
+> **Les propriétés 2 et 3 vivent dans une VUE. Une vue se rend avec une charge forgée — aucune session,
+> aucune base, aucun HTTP.** *Et la propriété 1 demande une session de rôle 2 et un double de `Droits` —
+> pas un compte.*
+
+**✅ Décision : les trois sortent de `NON MESURÉ`, et le refus du compte jetable est MAINTENU.** *C'est la
+seconde fois aujourd'hui qu'un refus de créer un compte a révélé que la propriété était atteignable
+autrement — après `roleAutorise`, qui était une fonction pure.*
+
+**⚠ Et je donne ça comme une MESURE à éprouver, pas comme un fait** : *mon relevé montre l'injection par
+constructeur et un motif existant ; il ne montre pas que le double se substitue proprement dans ce
+harnais.* **Mon bilan du jour sur les « ça va marcher » est mauvais — trois de mes prescriptions étaient
+inexécutables. La QA mesure, et si c'est faux c'est ma consigne qui l'était.**
+
+### ⚠ LE MOTIF QUI SE RÉPÈTE, ET IL EST DE MOI
+
+    j'ai refuse un compte jetable        -> `roleAutorise` etait une
+                                            fonction PURE
+    j'ai accepte « il faut un compte »   -> deux des trois proprietes
+                                            vivent dans une VUE
+
+**Les deux fois, la contrainte annoncée portait sur le CHEMIN D'ACCÈS et non sur la PROPRIÉTÉ.** *« Il faut
+un compte pour atteindre la route » est vrai ; « il faut un compte pour mesurer la propriété » ne l'est
+pas — et je n'ai pas fait la distinction la seconde fois.*
