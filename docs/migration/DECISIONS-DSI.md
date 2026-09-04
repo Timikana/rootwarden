@@ -7331,3 +7331,42 @@ donc employé un discriminant mécanique qui ne demande aucun outil :**
 `logger=_log` — un ARGUMENT NOMMÉ — pour une définition.* **Il m'a rendu « `logger` est défini dans
 `scheduler.py` (2) » alors qu'il ne l'est nulle part.** *Je ne l'ai pas relayé, et la seule raison est
 que 42 contre 0 était un rapport trop net pour un fichier qui utiliserait les deux.*
+
+### ⚠ CORRECTION — j'avais mal enregistré le mandat de la session 5
+
+**J'ai écrit « tu es en lecture seule sur le code, et je l'ai enregistré ». C'est faux par excès.**
+
+    lecture SEULE   `laravel/app` · `laravel/routes` · les vues ·
+                    `backend/routes` · `legacy/`      <- le code APPLICATIF
+    ecriture PLEINE `laravel/tests/` · `backend/tests/` · `docs/migration/QA-*.md`
+
+> **Et la nuance n'est pas administrative : « un défaut que je qualifie et transmets se corrige une fois ;
+> un défaut que je verrouille par un test ne revient pas ».** *Les deux tiers de ce qu'elle a livré cette
+> semaine sont des verrous — E-90, `set_group`, `install_all`, E-237, E-280, l'import CSV, la création de
+> groupe.*
+
+**La réduire à la lecture aurait supprimé la moitié qui EMPÊCHE au lieu de CONSTATER.** *Et je l'avais
+inscrit au registre comme un fait sur son périmètre, donc c'était en train de devenir vrai par ma
+répartition.*
+
+### ✅ ET LA FORMULATION QUE JE GARDE DE LA JOURNÉE, ELLE EST D'ELLE
+
+> **« Un commentaire est une DONNÉE à mesurer quand il affirme, et un ARGUMENT à lire quand il justifie. »**
+
+**Les deux fautes de la journée sont les deux moitiés de cette confusion, et elles sont opposées :**
+
+    moi          j'ai TRANCHE contre deux commentaires qui JUSTIFIAIENT, sans
+                 les lire — `web.php:113-121` (l'export RGPD) et le panneau
+                 d'installation de parc. Le depot avait deja l'argument.
+    la session 5 elle a RELAYE un commentaire de `groupes.js:231` comme une
+                 MESURE, et il etait faux.
+
+**Et son autre acquis du jour est un instrument, pas une leçon :**
+
+> **« Le grain de la mesure doit égaler le grain de la question. Un instrument juste pour son usage
+> d'origine devient faux dès qu'on l'emploie pour une question plus fine, et il ne prévient pas — il rend
+> une valeur plausible. »**
+
+*C'est la forme générale du piège de son analyseur de préfixes, et de mon motif `logger\s*=` qui comptait
+un argument nommé pour une définition. Deux instruments justes, deux questions plus fines, deux valeurs
+plausibles.*
