@@ -226,8 +226,31 @@ rules:
     paths:
       # migrate_crypto.php est par design un re-encrypt CBC->AEAD pour les
       # vieilles donnees. Toleré le temps de la migration complete.
+      #
+      # ── LE `**/` EST DELIBERE, ET SA RAISON N'EST PAS CELLE QU'ON CROIT ──
+      #
+      # Le journal CI porte un avertissement de depreciation : sous
+      # Semgrepignore v2, `'legacy/auth/migrate_crypto.php'` sera interprete
+      # comme `'/legacy/auth/migrate_crypto.php'`, c'est-a-dire ANCRE a la
+      # racine du scan.
+      #
+      # ⚠ MESURE DU 2026-09-04 : cet ancrage NE CASSERAIT PAS l'exclusion.
+      # Le job lance `semgrep … .` sans `working-directory`, donc la racine du
+      # scan EST la racine du depot ; et `git ls-files` place le fichier a
+      # exactement `legacy/auth/migrate_crypto.php` depuis cette racine. Le
+      # motif epelle donc deja le chemin complet : la forme ancree matcherait
+      # le meme et unique fichier. **Ce n'est pas un defaut a echeance.**
+      #
+      # Ce que le `**/` apporte reellement : l'independance a la racine du
+      # scan. Le jour ou le job scannerait un sous-repertoire, ou ou `.`
+      # deviendrait un chemin, la forme ancree cesserait de porter — la forme
+      # non ancree, non. C'est de l'hygiene, pas une course.
+      #
+      # ⚠ ET CE RAISONNEMENT N'EST PAS UNE MESURE : il applique la semantique
+      # gitignore, semgrep etant indisponible ici. Ce qui le refuterait : que
+      # semgrep v2 ancre a autre chose que la racine du scan.
       exclude:
-        - 'legacy/auth/migrate_crypto.php'
+        - '**/legacy/auth/migrate_crypto.php'
     message: |
       AES-CBC sans MAC = malleable (bit-flipping). Utiliser AES-GCM (AEAD) :
       openssl_encrypt($data, 'aes-256-gcm', $key, OPENSSL_RAW_DATA, $iv, $tag)
