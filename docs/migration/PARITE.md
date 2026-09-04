@@ -8,6 +8,89 @@ Un ecart non ecrit ici est une regression, pas un choix.
 
 ---
 
+## E-390 — deux de MES declarations, l'une inerte et l'autre fausse
+
+**Code corrige en `7eabe64`** (2026-09-04). *⚠ Ce commit cite « Ecart E-388 » et « v1.39.6 » :
+les DEUX sont faux, et la cause est dite au bas de cette fiche.*
+
+### 1. « INERTE » N'EST PAS « FERME »
+
+    planification-cve.js:209   const brut = el('sched-target').value || 'all';   <- SUBSISTAIT
+
+Mon correctif d'E-387 avait pose `let type = ''` deux lignes plus bas **et laisse ce repli en
+place**, avec un commentaire annoncant *« le repli ne vaut plus tout le parc »* **a deux lignes
+d'un repli intact.**
+
+*Il etait inerte : `'all'` ne correspond ni a `tag:` ni a `multi`.* **Mais inerte n'est pas
+ferme — il se reveillait au premier commit qui rebrancherait `brut` sur `type`.** Et un
+selecteur pourvu d'options ne rend jamais une valeur vide : ce repli ne protegeait de rien.
+
+> **J'avais annonce « six etages fermes ». Cinq l'etaient.** *La ligne part ; elle ne se
+> documente pas.*
+
+### 2. UNE CAUSE FAUSSE DANS UN COMMENTAIRE QUE J'AVAIS ECRIT
+
+    web.php:113-121   « 6 d'entre eux n'ont pas d'adresse de courriel pour le LEVER seuls »
+
+**Le courriel ne leve rien** : `changerMotDePasse` ne lit que `current_password`. *Il sert a
+recuperer un mot de passe OUBLIE, et un compte qui l'a oublie n'atteint AUCUNE route.*
+
+La propriete declaree est juste — une contrainte d'ORDRE dont le remede est deja exempte.
+**C'est sa CAUSE qui etait fausse, et je l'avais refutee moi-meme quelques heures plus tot.**
+
+> ⚠ **Une session tierce a repris ce cadrage mot pour mot, en le lisant ICI et non dans le
+> dossier corrige.** *Le dossier porte la verite, le commentaire porte l'autorite, et c'est le
+> commentaire qui voyage. Une rectification qui ne va pas la ou la source est LUE ne rectifie
+> rien.*
+
+### ⚠ ET LA FAUTE DE PROCEDURE QUI A PRODUIT DEUX ENONCES FAUX DANS `7eabe64`
+
+    python3 -c '... assert prochain == 388 ...' ; git commit …
+                                                ^ point-virgule
+
+**L'assertion a mordu — le registre etait passe a E-389 pendant que j'ecrivais — donc la
+fiche, le CHANGELOG et le `version.txt` n'ont PAS ete ecrits. Et le `git commit` a tourne
+quand meme**, parce que je l'avais enchaine par `;` au lieu de `&&`.
+
+> **C'est « un controle qui ne commande pas l'action », pour la quatrieme fois de la journee —
+> et cette fois dans le SHELL, pas dans le script.** *Le commit porte donc un numero d'ecart
+> qui appartient a autrui (E-388 est la moitie BACKEND d'E-387) et une version que personne
+> n'a jamais ecrite.*
+
+**Il n'est pas amendable** : deux commits d'une autre session se sont empiles au-dessus, et
+reecrire son historique pour corriger mon message coute plus que la fiche que voici. **Parade
+tenue depuis : `&&` entre le controle et le geste.**
+
+---
+
+## E-391 — une conjonction dont un membre etait devenu faux, sur `groups`
+
+**Corrigee le 2026-09-04 (`v1.39.8`).**
+
+    'groups.portee_texte', AFFICHEE a groupes.blade.php:23 :
+      « La suppression ET le scan CVE de masse passent encore par l'ancien portail »
+
+**La suppression EST portee. Verifiee depuis TROIS couches autres que le JS**, parce que la
+contradiction utile vient d'une autre couche et non d'un autre lecteur :
+
+    passerelle   `/groups` en liste blanche, et `correspond()` fait
+                 `$chemin === $entree || str_starts_with($chemin, $entree . '/')`
+                 -> `/groups/12` est couvert, `/groupsecret` ne l'est pas
+    backend      groups.py:213  @bp.route('/groups/<int:group_id>', methods=['DELETE'])
+    vue          aucun controle en dur : il est construit par le JS — coherent
+
+**Le second membre, lui, est EXACT** : les quatre mentions de `cve_scan` dans `groupes.js`
+sont des COMMENTAIRES (`:453`, `:540`, `:544`, `:545`), et la seule action envoyee est
+`drift_scan` (`:521`).
+
+> **Neuvieme occurrence de la conjonction dont un membre devient faux**, apres `ssh`,
+> `serveurs`, `bashrc`, `fail2ban`, `ssh_audit`, `superv` et les deux du jour. *Une phrase qui
+> dit « A et B ne sont pas portes » se lit comme entierement vraie quand seul A l'est encore.*
+
+**Et le fragment final a suivi** : *« chaque bouton explique ce qu'il engage »* devient *« son
+bouton »* — un seul renvoie desormais.
+
+---
 ## E-387 — une planification CVE sans portee armait un scan SSH sur la PRODUCTION
 
 **Corrige le 2026-09-04 (`v1.39.5`).** *Le defaut « tout le parc » vivait a QUATRE etages, et
