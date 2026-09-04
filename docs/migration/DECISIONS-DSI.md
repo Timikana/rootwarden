@@ -8340,3 +8340,67 @@ refusé.**
 **C'est la formulation qui manquait à ma question posée à la session 2. Un plancher sur le compte de tests
 COLLECTÉS est à un test de suite ce que `PLANCHER_ROUTES_GARDEES` est à un invariant : la borne qui
 distingue « rien à signaler » de « rien n'a été lu ».**
+
+### ⚠ J'AI APPLIQUÉ SA LEÇON À MOI, ET ELLE MORD — « ROTATION » NOMME DEUX GESTES DIFFÉRENTS
+
+**La session 4 a trouvé que sa PROPRE sortie contenait la réponse et qu'elle ne l'avait pas lue :**
+
+    454:#### INF-004 — la version se DÉRIVE, elle ne s'assigne plus
+
+> **« Un sommaire n'est pas une lecture. Et un titre qui répond à une question qu'on ne s'est pas encore
+> posée ne se remarque pas. »** *Son relevé de structure devait servir à décider quoi lire ; il n'a servi
+> qu'à la rassurer sur le fait d'avoir regardé.*
+
+**J'ai donc testé la même exposition sur moi. `PLAN-DE-MIGRATION.md` fait 5454 lignes et ma mémoire de
+travail dit « à LIRE en entier au début de chaque tour ». Je ne l'ai pas fait aujourd'hui.**
+
+    scell        10 occurrences      rotation     21
+    role_id       8                  onboarding    3
+    remember/souvenir  0             semgrep       0
+    reinitialisation   0             SMTP          1
+    TEMOIN « migration »            32
+
+    et un titre qui touche un arbitrage RENDU IL Y A DEUX HEURES :
+    4730: ⚠⚠ RETIRÉ — « LA ROTATION EST LE SEUL REMÈDE À UNE CLÉ COMPROMISE »
+          ÉTAIT FAUX (E-226, 2026-08-27)
+
+### ✅ MA DÉCISION TIENT — mais pour une raison que je dois maintenant NOMMER
+
+**Lu en entier : ce paragraphe retiré parle de la rotation de la clé PLATEFORME SSH
+(`regenerate_platform_key`), qui ne révoque rien parce que deux des trois écritures d'`authorized_keys` sont
+des AJOUTS.**
+
+**Ma décision de préserver `migrate_crypto.php` porte sur la rotation de la clé de CHIFFREMENT — le
+re-chiffrement des secrets EN BASE, d'`OLD_SECRET_KEY` vers `SECRET_KEY`. Deux objets, deux gestes.**
+
+> **⚠ « ROTATION » NOMME DEUX CHOSES DIFFÉRENTES DANS CE DÉPÔT, et le plan en porte 21 occurrences.**
+>
+>     la rotation de la cle PLATEFORME SSH        ne revoque PAS -> n'est pas
+>       (`regenerate_platform_key`)               un remede a une compromission
+>     la rotation de la cle de CHIFFREMENT        re-chiffre les secrets en base,
+>       (`migrate_crypto.php`)                    et son SEUL geste complet est
+>                                                 le fichier qu'on archivait
+
+**C'est le sixième homonyme de la journée, et le premier qui soit dans le VOCABULAIRE du projet plutôt que
+dans son code.** *Les cinq autres étaient des fonctions, des `try/catch`, des branches. Celui-ci est un mot —
+donc il ne se voit dans aucun diff, et il traversera l'archivage intact.*
+
+**✅ Ce que je change : je nomme désormais la mienne « rotation de la clé de CHIFFREMENT (secrets en base) »
+partout, et jamais « la rotation ».** *Sans quoi quelqu'un rapprochera mon dossier de la section retirée du
+plan et conclura que mon argument est celui qui a été démenti.*
+
+### ⚠ ET LE PLAN M'AVAIT DÉJÀ NOMMÉE POUR LA MÊME FAUTE, LE 28 AOÛT
+
+    ligne ~4790 : « UN FAIT SANS HEURE EST UNE OPINION SUR LE PASSE (2026-08-28) »
+      « Le cas du DSI : deux sessions lui ont annonce LA MEME divergence en se
+        CONTREDISANT [...] Les deux etaient vraies a leur instant et perimees
+        au sien, dans des sens OPPOSES. »
+      « A sept sessions qui commitent en continu, un releve transmis est une
+        PHOTOGRAPHIE, pas un etat. »
+
+**J'ai récité « 111 compilés root » pendant un jour et demi et je l'ai transmis à trois sessions
+aujourd'hui.** *C'est la même faute, sept jours plus tard, dans le même rôle, et elle était écrite dans le
+document que je suis censée lire en entier à chaque tour.*
+
+> **La parade adoptée par tout le monde le 28 août est celle que j'ai « adoptée » ce matin comme une
+> nouveauté : dater chaque fait qu'on transmet.** *Je ne l'ai pas apprise aujourd'hui — je l'ai réapprise.*
