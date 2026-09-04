@@ -8,6 +8,74 @@ Un ecart non ecrit ici est une regression, pas un choix.
 
 ---
 
+## E-387 — une planification CVE sans portee armait un scan SSH sur la PRODUCTION
+
+**Corrige le 2026-09-04 (`v1.39.5`).** *Le defaut « tout le parc » vivait a QUATRE etages, et
+le portage en portait trois.*
+
+    etage 1  PlanificationsCve:52    `all` dans la liste fermee ET comme defaut
+    etage 2  PlanificationsCve:156   `?? 'all'` a la VALIDATION
+    etage 3  PlanificationsCve:188   `?? 'all'` a l'ECRITURE
+    etage 4  planification-cve.js:210  `let type = 'all'` en repli
+    ---      cve.py:490              `data.get('target_type', 'all')`, 0 controle
+    ---      `_run_scheduled_scan`   0 filtre `archived` -> LES 3 machines,
+                                     dont `srv-zabbix`, qui est la PRODUCTION
+
+> **Il n'y avait meme pas besoin d'ecrire `all` : OMETTRE le champ suffisait.**
+
+### La garde existait, et elle ne couvrait pas le cas qui compte
+
+Vingt lignes plus bas, `:159-171` refuse deja une cible `machines` dont la liste est vide ou
+illisible, avec ce commentaire : *« cote scheduler une cible dont la valeur ne se decode pas
+RETOMBE SUR TOUT LE PARC. Accepter la ligne, c'est armer un scan complet. »*
+
+**Le raisonnement etait ecrit. Il n'avait pas ete applique au cas ou la retombee est la
+valeur ELLE-MEME.** *Et une mesure precedente avait conclu le cas ferme sur un `400 « Type de
+cible inconnu »` — vrai des types HORS liste, et `all` etait DEDANS.*
+
+### Le geste, et il est plus large que « retirer une constante »
+
+    CIBLES              ['tag', 'machines']  — `all` retire
+    les DEUX defauts    `?? ''` : une chaine vide, un `null` ou un champ absent
+                        tombent hors de la liste, donc sont REFUSES.
+                        Du fail-closed sans branche supplementaire.
+    le repli du JS      `let type = ''` — quatrieme etage, que la consigne
+                        recue ne mentionnait pas
+    la VUE              `<option value="all">` RETIREE — elle n'etait pas dans
+                        la consigne non plus, et sans elle le formulaire aurait
+                        propose une valeur que le serveur refuse
+
+**⚠ C'est une capacite RETIREE, donc elle se declare** : `planif.portee_exigee`, FR et EN,
+affichee sous le selecteur. *Elle se reconstitue par une etiquette ou une liste explicite de
+machines — ce qui EST le point : nommer ce qu'on va joindre.*
+
+**⚠ Et le libelle `planif.cible_all` est CONSERVE.** *`planification-cve.js:60` en a besoin
+pour NOMMER une ligne existante de type `all` : cesser de l'offrir n'est pas cesser de savoir
+le lire. Le retirer aurait fait afficher une portee VIDE sur une planification qui joint tout
+le parc — le pire des deux etats.*
+
+### ⚠ L'ORDRE DE CE CORRECTIF N'EST PAS REVERSIBLE
+
+La garde symetrique dans `cve.py:490` **attend ce commit**. *Si le backend refusait `all`
+avant que le portage cesse de l'envoyer, la planification CVE du portage casserait — et un
+correctif de securite qui casse la fonctionnalite qu'il protege se fait defaire dans la
+semaine.*
+
+### Verifications et reserves
+
+    node --check              vert
+    parite FR/EN              64 = 64
+    "all" dans le code du service   0     (les comparaisons d'AFFICHAGE du JS restent)
+    reseau                    200 /connexion · 302 /scan-cve · 404 temoin
+
+- **Le geste n'est pas exerce** : aucune planification n'a ete creee, et je n'en cree pas —
+  une planification de test peut declencher un vrai scan SSH.
+- **`cve_scan_schedules` porte 0 ligne** d'apres la session DSI. *Je ne peux pas le verifier :
+  `docker` refuse a cette session. S'il en portait une de type `all`, elle continuerait de
+  fonctionner — seule la CREATION est fermee — et c'est pour ca que le libelle est conserve.*
+- Pas de binaire PHP sur l'hote de cette session.
+
+---
 ## E-386 — l'import CSV de COMPTES : porte, et plus etroit que le legacy sur trois points
 
 **Porte le 2026-09-04 (`v1.39.4`), sous-lot D6c.** *La moitie SERVEURS de

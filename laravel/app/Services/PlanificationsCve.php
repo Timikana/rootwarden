@@ -49,7 +49,35 @@ class PlanificationsCve
      * `scan_source` juste a cote l'est : une cible hors liste produisait un 500
      * avec une page HTML au lieu d'un 400.
      */
-    public const CIBLES = ['all', 'tag', 'machines'];
+    /**
+     * Les portees ACCEPTEES A LA CREATION. `all` n'y est plus, et il en etait
+     * aussi le DEFAUT — a quatre etages.
+     *
+     * ══ CE QUE `all` ARMAIT ═══════════════════════════════════════════════
+     *
+     *   etage 1  ce service            `all` dans la liste ET comme defaut
+     *   etage 2  `planification-cve.js`  `let type = 'all'` en repli
+     *   etage 3  `cve.py:490`          `data.get('target_type', 'all')`, 0 controle
+     *   etage 4  `_run_scheduled_scan` 0 filtre `archived` -> LES 3 machines,
+     *                                  dont `srv-zabbix`, qui est la PRODUCTION
+     *
+     * **Il n'y avait meme pas besoin d'ecrire `all` : OMETTRE le champ suffisait
+     * a armer un scan SSH sur la production.**
+     *
+     * Le raisonnement etait deja ecrit vingt lignes plus bas, pour `machines` :
+     * *« une cible dont la valeur ne se decode pas RETOMBE SUR TOUT LE PARC.
+     * Accepter la ligne, c'est armer un scan complet. »* Il n'avait pas ete
+     * applique au cas ou la retombee est la valeur ELLE-MEME.
+     *
+     * ⚠ UNE PORTEE NE SE DEVINE PLUS : elle est EXIGEE. Une chaine vide, un
+     * `null` ou un champ absent tombent hors de cette liste, donc sont REFUSES.
+     * C'est du fail-closed obtenu sans branche supplementaire.
+     *
+     * *La capacite « tout le parc » est RETIREE de la creation, et c'est declare
+     * a l'ecran. Elle se reconstitue par une etiquette ou par une liste
+     * explicite de machines — ce qui EST le point : nommer ce qu'on va joindre.*
+     */
+    public const CIBLES = ['tag', 'machines'];
 
     /** @return list<object> */
     public function liste(): array
@@ -153,7 +181,10 @@ class PlanificationsCve
         }
 
         if ($creation || array_key_exists('target_type', $d)) {
-            $cible = (string) ($d['target_type'] ?? 'all');
+            // PAS de defaut. Un champ absent rend '' , qui n'est pas dans
+            // CIBLES, donc refuse. Le defaut `'all'` faisait de l'omission un
+            // scan du parc entier.
+            $cible = (string) ($d['target_type'] ?? '');
             if (! in_array($cible, self::CIBLES, true)) {
                 $refus['target_type'] = 'cible_inconnue';
             } elseif ($cible === 'tag' && trim((string) ($d['target_value'] ?? '')) === '') {
@@ -185,7 +216,10 @@ class PlanificationsCve
             'cron_expression' => $expr,
             'min_cvss'        => (float) ($d['min_cvss'] ?? 0),
             'scan_source'     => (string) ($d['scan_source'] ?? 'hybrid'),
-            'target_type'     => (string) ($d['target_type'] ?? 'all'),
+            // Ici non plus. `refus()` a deja exige une valeur de CIBLES ; si la
+            // cle manquait malgre tout, on ecrit '' — visible et inerte — plutot
+            // que `all`, qui serait silencieux et joindrait tout.
+            'target_type'     => (string) ($d['target_type'] ?? ''),
             'target_value'    => (string) ($d['target_value'] ?? ''),
             // JAMAIS NULL sur une ligne active : le scheduler declencherait dans
             // la minute.

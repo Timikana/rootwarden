@@ -5,6 +5,37 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.39.5] - 2026-09-04
+
+### Securite
+- **Une planification CVE sans portee explicite armait un scan SSH sur la PRODUCTION
+  (E-387).** Le defaut « tout le parc » vivait a quatre etages dans le portage : dans la liste
+  fermee, dans le defaut de la validation, dans celui de l'ecriture, et dans le repli du JS.
+  **Omettre le champ suffisait** — et `_run_scheduled_scan` ne filtre pas les machines
+  archivees, donc joignait les trois machines dont `srv-zabbix`, qui est la production.
+- **Une portee est desormais EXIGEE** : une chaine vide, un `null` ou un champ absent tombent
+  hors de la liste fermee, donc sont refuses. Du fail-closed sans branche supplementaire.
+- **L'option « tout le parc » est retiree du formulaire**, et son retrait est **declare** sous
+  le selecteur (`planif.portee_exigee`, FR et EN). La portee se reconstitue par une etiquette
+  ou une liste explicite de machines.
+
+### Conserve deliberement
+- **Le libelle `planif.cible_all`.** `planification-cve.js:60` en a besoin pour NOMMER une
+  planification existante de type `all` : cesser de l'offrir n'est pas cesser de savoir le
+  lire, et le retirer aurait affiche une portee VIDE sur une planification qui joint tout le
+  parc.
+
+### Note d'ordre
+- **Ce commit doit preceder la garde symetrique de `cve.py:490`.** Si le backend refusait
+  `all` avant que le portage cesse de l'envoyer, la planification CVE du portage casserait —
+  et un correctif de securite qui casse la fonctionnalite qu'il protege se fait defaire.
+
+### Reserves
+- **Le geste n'est pas exerce** : aucune planification creee, et je n'en cree pas — une
+  planification de test peut declencher un vrai scan SSH.
+- `cve_scan_schedules` porterait 0 ligne ; non verifiable ici (`docker` refuse). Une ligne
+  existante de type `all` continuerait de fonctionner : seule la CREATION est fermee.
+
 ## [1.39.4] - 2026-09-04
 
 ### Ajoute
