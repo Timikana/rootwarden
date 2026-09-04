@@ -757,3 +757,59 @@ ajouteraient un risque à un composant qu'on éteint.**
 
 **Ordre sûr : la ligne du portage, PUIS le redémarrage.** *L'inverse laisse une fenêtre où le portail porté
 refuse son propre défaut.*
+
+---
+
+## ✅ 2026-09-04, 17:00 — LA PRÉCONDITION DE REDÉMARRAGE EST LEVÉE
+
+**`882ad9b`, v1.40.1, E-395. Le portage n'offre plus « Tout le parc », et il y avait SIX étages là où ma
+consigne en nommait deux.**
+
+    1. AuditSshController:72   `all` PREMIER de PORTEES -> option par DEFAUT   ferme
+    2. `planif_portee_all`     le libelle de cette option                     retire
+    3. audit-ssh.js:458        repli `: 'all'`                                 -> ''
+    4. audit-ssh.js:517        idem, sur le chemin de SOUMISSION               -> ''
+    5. la VUE                  rien a faire — voir plus bas
+    6. la COLONNE              `DEFAULT 'all'` en base                        DECLARE
+
+**Le redémarrage du backend n'a donc plus cette conséquence.** *L'écran du legacy, lui, continuera d'offrir
+« Tout le parc » et le backend le refusera — décision inchangée, et écrite au tour précédent.*
+
+## ⚠ CE QUI RESTE, ET C'EST UNE MIGRATION — donc votre mot
+
+    cve_scan_schedules.target_type   enum('all','tag','machines')
+                                     NOT NULL  DEFAULT 'all'
+    ssh_audit_schedules.target_type  enum('all','tag','environment','machines')
+                                     NOT NULL  DEFAULT 'all'
+    les deux tables : 0 ligne        (temoin : machines = 3)
+
+> **Un `INSERT` qui omet `target_type` obtient `'all'` PAR LA BASE.**
+
+**⚠ ET JE NOTE HONNÊTEMENT L'URGENCE : ce n'est PAS un trou vivant.** *Les deux chemins d'entrée envoient
+désormais toujours la valeur, et les deux backends refusent `'all'`. Le mode de défaillance d'un appelant
+fautif est un 400, pas un relevé silencieux.*
+
+    ce que ca vaut   de la DEFENSE EN PROFONDEUR : aujourd'hui la surete
+                     vient du CODE, et le schema la contredit
+    le geste         retirer le DEFAULT des deux colonnes — un INSERT qui
+                     omet la portee ECHOUERAIT alors, au lieu de viser le parc
+    le risque        NUL sur l'existant : 0 ligne dans les deux tables, et
+                     les deux appelants envoient toujours la valeur
+
+**Je ne le présente pas comme urgent. Je le présente parce qu'un jour un troisième appelant naîtra, et que
+ce jour-là le schéma décidera à sa place.**
+
+## ✅ ET UNE RÈGLE DE CONCEPTION QUI SORT DE CE GESTE, réutilisable
+
+    audit-ssh.blade.php:194   @foreach (AuditSshController::PORTEES as $portee)
+      -> la vue construit ses options DEPUIS la constante
+
+    scan-cve, lui, avait la liste ECRITE A LA MAIN dans le gabarit
+      -> c'est pour cela qu'il fallait l'y retirer aussi, et pourquoi ma
+         consigne d'alors etait incomplete
+
+> **Une liste rendue depuis sa source ne peut pas la contredire.** *Partout où une vue écrit à la main une
+> liste que le serveur valide, les deux divergeront un jour.*
+
+**C'est le même gain que « la restauration rend une DÉCISION » : la propriété tient par la CONSTRUCTION,
+pas par la vigilance.** *Et c'est la seule espèce de garde que ce chantier n'ait jamais vue se périmer.*
