@@ -188,3 +188,53 @@ portait `AND a.id IS NULL` sur une table sans colonne `id` et rendait 500 sans `
 donc au vert sur une page cassée : **distinguer « zéro mesuré » de « je n'ai pas su
 lire »**, et mesurer l'URL finale avant de conclure (une redirection rend le même
 observable qu'une vue vide).
+
+## §5 — ⚠ `go-security.mjs` CRÉE UNE PLANIFICATION DE SCAN CVE SUR TOUT LE PARC
+
+**Mesure du 2026-09-04 11:1x.** Remesure : `grep -n "cve_schedules" go-security.mjs`
+et `sed -n '/^SUITES_LARAVEL=(/,/^)/p' ../../scripts/rejouer-lot.sh | grep -cx go-security`
+(→ `0`, idem `SUITES_LEGACY` : elle n'est dans **aucun** lot).
+
+    go-security.mjs:48   POST /api_proxy.php/cve_schedules
+                         body: { target_type: 'all', target_value: '' }
+    :56                  check('POST avec CSRF -> 200', ok === 200)
+
+**Elle crée délibérément une planification dont la portée est `all`, et elle asserte
+que la création RÉUSSIT.** Elle la supprime ensuite (`:61-65`) — mais entre la création
+et la suppression, le planificateur peut la prendre.
+
+### POURQUOI C'EST UN GESTE DE MASSE, ET NON UNE ÉCRITURE DE TEST
+
+`backend/scheduler.py:171` — `_run_scheduled_scan` n'a **aucun filtre
+`lifecycle_status`** (témoin : `_run_scheduled_ssh_audit` en porte quatre). Trois
+chemins y mènent au parc entier :
+
+    target_type = 'tag' SANS valeur      -> le `else`   -> SELECT ... FROM machines
+    target_type = 'machines' + JSON illisible -> ids=[]  -> SELECT ... FROM machines
+    tout autre target_type ('all' compris)    -> le `else` -> SELECT ... FROM machines
+
+> **Un scan CVE ouvre une session SSH PAR MACHINE et envoie un courriel par machine à
+> résultats.** *Sur `all`, `srv-zabbix` — la production — est incluse.*
+
+⛔ **Ne pas l'enrôler. Ne pas la lancer.** *Même classe que `go-wazuh.mjs` (§4) : un
+artefact qui a l'air inoffensif, hors de tout relevé, et qu'un `node go-security.mjs`
+suffit à déclencher.* Le retrait n'est pas pris ici.
+
+### CE QUI EST SÛR, ET QUI A ÉTÉ MESURÉ POUR L'ÉTABLIR
+
+`go-page-cve-planification.mjs` **est dans le LOT** et crée des planifications — elle
+est **sûre**, et la chaîne le montre :
+
+    target_type = 'tag', target_value = 'rw-e2e-aucune-machine'  (NON VIDE)
+      -> scheduler:190  INNER JOIN machine_tags WHERE mt.tag = %s
+      -> le tag ne porte 0 machine (mesure)  ->  ZERO cible, PAS de repli
+    target_type hors ENUM ('nimporte-quoi')
+      -> laravel 400 « Type de cible inconnu »  ->  rien cree
+      -> legacy  500                            ->  rien cree non plus
+    planifications residuelles `rw-e2e%` en base : 0
+
+⚠ **Et la nuance qui compte** : la note « cible sûre = tag inexistant » est **juste
+seulement si la valeur est NON VIDE**. Un `target_type='tag'` avec `target_value=''`
+tombe dans le `else` et prend le parc entier. *C'est la condition `and
+schedule['target_value']` de la ligne 190 qui fait toute la différence, et elle est
+facile à perdre en recopiant.*
