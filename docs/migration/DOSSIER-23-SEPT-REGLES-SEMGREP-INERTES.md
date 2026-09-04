@@ -193,3 +193,77 @@ par le harnais.** *Sans ce chiffre, une règle SAINE aurait été « réparée �
 **SI RIEN N'EST FAIT** : *le job reste rouge en permanence et toléré — donc une garde qui alarme toujours,
 c'est-à-dire une garde qui n'attrape plus rien. Et on ne saura pas si les trois règles « vivantes »
 tournent.*
+
+---
+
+# ✅ 2026-09-04, 17:20 — LA QUESTION OUVERTE EST FERMÉE. Et j'avais publié une non-mesure comme un fait.
+
+## 1. ⛔ D'ABORD MA FAUTE : « les journaux ne sont plus récupérables » était FAUX
+
+**J'avais écrit au §1 que je ne pouvais pas répondre parce que `gh run view --log` rend 0 ligne. Remesuré :**
+
+    run 33803915986 (le VERT)     --log ->      0 ligne
+    run 33797467515 (un ROUGE)    --log -> 47 962 lignes
+                                  --log-failed ->  560 lignes
+
+> **J'ai testé UN run — le vert, dont les journaux ont disparu — et publié une universelle.** *Et mon
+> « témoin » était le listing des jobs, qui prouvait que l'API répond : pas que les journaux sont
+> récupérables.* **Un témoin sur le mauvais axe est une caution, pas une garde — et je l'ai écrit dans un
+> dossier que l'exploitant lit.**
+
+## 2. ✅ LA RÉPONSE, MESURÉE DANS LE JOURNAL : LA PASSE N'ABORTE PAS
+
+    19:37:18   semgrep-core rule validation failed (PatternParseError)
+    19:37:19   … puis le scan CONTINUE :
+
+    « Scanning 1305 files tracked by git with 6 Code rules »
+        Language   Rules   Files
+        php            2     425
+        python         4      62
+
+    [ERROR] Rule parse error : rw-shell-fstring-execute-as-root
+    [ERROR] Rule parse error : rw-php-echo-unescaped-var
+    [ERROR] Rule parse error : rw-flask-route-without-api-key
+
+**Donc l'hypothèse haute est écartée : le jeu custom n'a PAS produit zéro analyse depuis le 2026-05-19.**
+
+    10 regles declarees
+     6 chargees (les `ERROR` — `--severity=ERROR` ecarte les 4 `WARNING`)
+     3 echouent au parse
+    -> TROIS regles s'appliquent reellement, sur 1305 fichiers
+
+> **Une garde qui tourne et qui rate 70 % de son objet.** *Moins grave que « rien ne tourne », et le
+> rapport ne le dit pas : le job est simplement rouge, et `continue-on-error` l'absorbe.*
+
+## 3. ⚠ ET LE JOURNAL PORTE UN DÉFAUT DATÉ QUE PERSONNE N'AVAIT VU
+
+    Rule semgrep.rw-aes-cbc-encrypt contains an exclude pattern
+    'legacy/auth/migrate_crypto.php' that will SOON BE INTERPRETED as
+    '/legacy/auth/migrate_crypto.php' to comply with the Semgrepignore v2
+    and Gitignore specifications.
+
+**L'exclusion cessera de porter sur le fichier et ne couvrira plus que la racine du dépôt. La règle
+commencera donc à mordre sur `legacy/auth/migrate_crypto.php`.**
+
+> **Et c'est exactement le fichier que j'ai décidé aujourd'hui de PRÉSERVER comme outil — le seul geste qui
+> termine une rotation de la clé de CHIFFREMENT.** *Il utilise AES-CBC légitimement, pour déchiffrer
+> l'ancien. La règle produirait donc un faux positif permanent sur un fichier qu'on garde exprès.*
+
+    ✅ le correctif est dans le message d'avertissement lui-meme :
+       `'**/legacy/auth/migrate_crypto.php'`  pour rester NON ancre
+    -> a poser avec les reparations de motifs, pas apres
+
+**C'est un défaut à ÉCHÉANCE : il n'existe pas encore, il est annoncé. La seule occasion de le corriger
+sans incident est maintenant, pendant qu'on est dans le fichier.**
+
+## 4. CE QUE ÇA CHANGE POUR VOUS : RIEN, sauf que le §1 est plus précis
+
+    ce que je vous disais   « on ne saura pas si les trois vivantes tournent
+                             avant la premiere CI apres la fusion »
+    ce qui est vrai         elles tournent, sur 1305 fichiers, depuis toujours.
+                            La fusion ne repond a rien — elle AJOUTE la
+                            regle reparee qui est livrable, et retire deux
+                            fausses pistes.
+
+**La fusion reste utile et son urgence baisse.** *Ce qui reste à votre signature est inchangé : la fusion et
+la poussée de `security/semgrep-regles-mortes`.*
