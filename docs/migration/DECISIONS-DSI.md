@@ -8445,3 +8445,71 @@ sujet.*
 **Je n'y ai donc ajouté qu'une chose : l'ajout du pair, celui qui n'y était pas.** *« Un sommaire n'est pas
 une lecture » vaut aussi pour ma propre mémoire : je l'écris plus que je ne la relis, et huit sessions y
 écrivent.*
+
+## ⏸ PAUSE — 2026-09-04, 17:30, demandée par l'exploitant
+
+**Les sept sessions sont arrêtées. Aucun push, aucune fusion, aucun redémarrage, aucune migration. Le banc
+est rendu.**
+
+### ⚠ UNE SEULE MESURE DU JOUR N'A PAS ÉTÉ PRISE, ET C'EST LA PREMIÈRE À REPRENDRE
+
+**J'ai écrit à la QA que son verrou « se souvenir de moi » « cesse d'être vert par vacuité » puisque la
+capacité est livrée. Elle corrige, et elle a raison :**
+
+> **Son état est INCONNU. J'avais interdit de lancer une suite, donc personne ne l'a jouée.**
+
+    capacite arrivee JUSTE   -> PASS (les deux moities et les quatre temoins
+                                     deviennent porteurs)
+    capacite arrivee FAUSSE  -> FAIL (« un compte SANS secret aboutit sur … »)
+
+**Le fichier est conçu pour que la bascule SE VOIE — un `skip` qui disparaît, ou un rouge nommé. Mais il
+faut la LIRE.**
+
+> **« Le test cesse d'être vert par vacuité » se lit facilement comme « il est vert ».** *C'est le motif qui
+> a coûté le plus cher cette semaine : une prudence qui devient un verdict à la première recopie.*
+
+**✅ À LA REPRISE, PREMIER GESTE : jouer `4948bdf` (le verrou « se souvenir de moi ») contre la capacité
+livrée par `c6aaf5b`.** *C'est la seule propriété du jour dont personne n'a lu le verdict — et elle garde
+une porte d'authentification.*
+
+### CE QUI ATTEND L'EXPLOITANT, ÉTAT AU MOMENT DE LA PAUSE
+
+    🔴 DOSSIER-25   le bouton « Sceller » casse la chaine d'audit,
+                    IRREVERSIBLEMENT. 462 paires mordent au premier clic.
+                    Correctif d'UNE ligne, qui exige un second regard.
+                    ⚠ ORDRE CONTRAINT : si l'on veut savoir quelque chose des
+                    389 lignes du 12-15 aout, il faut chercher AVANT de sceller.
+    🔴 DOSSIER-21   un compte role 1 (id=2) assigne a `srv-zabbix` peut lancer
+                    `apt full-upgrade` en PROD par le forgeur du menu.
+                    Le correctif backend est POSE ; l'assignation du compte
+                    est une donnee de production, donc votre decision.
+    📌 DOSSIER-24   le SMTP — canal de PREMIERE DELIVRANCE, pas une commodite :
+                    aucun compte NOUVEAU ne peut recevoir son mot de passe.
+    📌 DOSSIER-15   fusion ET POUSSEE de `security/backend-cve` (6 correctifs)
+    📌 DOSSIER-23   fusion ET POUSSEE de `security/semgrep-regles-mortes`
+    📌              le redemarrage du backend (20 modules inertes en attente)
+    📌              le durcissement `laravel` de `prod.yml`
+    📌              la rotation de `MAIL_SMTP_PASSWORD`, expose par ma commande
+    📌              une migration NON URGENTE : retirer `DEFAULT 'all'` des
+                    deux colonnes `target_type`
+
+### ET LE COMPTE DE LA JOURNÉE, TEL QU'IL EST
+
+**Neuf de mes consignes, décisions ou mesures ont été réfutées par des pairs. Les neuf avaient raison.**
+
+    2 prerequis INEXECUTABLES poses par moi
+    2 consignes a CARDINALITE fausse (« sa cle de libelle », au singulier,
+      deux fois, sur le meme mecanisme, dans deux modules)
+    1 retractation FAUSSE, sur la foi d'un commentaire d'en-tete lu pour
+      une mesure — et elle a voyage comme consigne
+    1 heuristique de ciblage : un CORRELAT promu en MECANISME
+    1 universelle publiee apres avoir teste UN cas
+    1 chiffre recite un jour et demi, sous forme d'INTERDIT
+    1 homonyme dans le VOCABULAIRE, qui aurait pu invalider un arbitrage
+
+> **Ce qui a tenu n'est aucune de nos règles — chacun a enfreint la sienne à moins d'une heure
+> d'intervalle. Ce qui a tenu, c'est qu'à chaque fois quelqu'un d'autre a mesuré.**
+>
+> *Et le corollaire de la QA, qui m'empêche d'en faire un compliment : « un refus qu'on croit sur parole ne
+> vaut rien de plus qu'une consigne qu'on suit sur parole ». Les deux fois, ce qui a tranché est que l'un
+> de nous soit allé LIRE LE CODE.*
