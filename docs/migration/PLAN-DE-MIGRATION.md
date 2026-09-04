@@ -5575,3 +5575,49 @@ c'est la troisième fois que ce chantier la paie sous une forme ou une autre.
   parce que les deux peuvent jouer ensemble. *Un singulier dans une consigne est une
   affirmation sur la cardinalité, et celle-là était fausse.* Même famille que le
   [[feedback_libelle_decrit_le_defaut]] du possessif au singulier.
+
+### Suite du même tour — **deux propriétés empruntées, et aucune n'était un choix**
+
+Les deux ont été relevées par des pairs sur des messages que j'avais écrits, pas sur du code.
+
+**① Une propriété de la COMPOSITION attribuée à la FONCTION.** J'avais écrit à la QA
+*« colonne absente ou cellule vide → rôle 1, `valeurInvalide = false` »* comme une propriété
+de `rolePose`. Remesuré :
+
+    rolePose(null, 3)                ->  valeurInvalide = TRUE
+    rolePose(roleDuLibelle(''), 3)   ->  valeurInvalide = false
+    roleDuLibelle('') rend 1, pas null
+
+Vrai du **chemin** `importeUnCompte`, faux de la fonction : ce qui distingue l'absence est
+`roleDuLibelle`, pas `rolePose`. *Le code est correct sur les deux chemins, chacun pour une
+raison différente — et ma phrase écrasait précisément cette différence.* **La QA a lu avant
+d'asserter ; sinon son test aurait été rouge en accusant mon code.**
+
+**② Un résultat LOCAL attribué à la CI.** J'ai annoncé *« l'étiquette serait `v1.39.728` »*
+après avoir lancé `./scripts/version.sh` dans mon arbre, où `HEAD` est la branche.
+`version.sh:92` calcule `$ancre..HEAD` : **il mesure le ref sur lequel il tourne.** La CI joue
+`main`, où le compte vaut 3 — et le sommet de `origin/main` est une fusion (`304a604`,
+`rev-list --parents -1` rend 3 jetons), donc `3 + 1 = 4`. **Les deux chiffres étaient justes
+pour deux intégrations différentes, et je n'avais pas vu qu'il y en avait deux.**
+
+> **Et il bougeait pendant l'échange : `728` valait `730` une heure plus tard, déplacé par le
+> commit qui le corrigeait.** *Un nombre dérivé de l'historique est une propriété du CHEMIN
+> **et de l'INSTANT**.* La forme qui ne se périme pas est la **commande**, pas la valeur —
+> ce que ce document exige déjà de chaque chiffre, et que j'ai enfreint dans un message.
+
+**Le lien entre les deux, et il n'est pas anecdotique** : dans les deux cas j'avais mesuré
+juste et nommé faux l'objet mesuré. *Ce n'est pas une erreur de mesure, c'est une erreur
+d'attribution — et elle est invisible à la relecture de la mesure, qui est correcte.*
+
+### Ce que la QA a vu de ma conception et que ma propre table ne mesurait pas
+
+> *Deux booléens ne valent mieux qu'un que si les QUATRE états existent. Si l'un impliquait
+> l'autre, le second serait redondant et cesserait d'être lu.*
+
+Ma table de vérité couvrait les trois combinaisons que le code produit et **n'a jamais posé la
+question de la quatrième**. La mutation qui fusionne les deux drapeaux ne casse aucune valeur
+de retour : ma table serait restée verte devant elle. *Le trou était au cœur de mon propre
+choix de conception, et mesurer des valeurs ne pouvait pas le voir — il fallait mesurer
+l'INDÉPENDANCE.* Même remarque pour `ROLE_PLANCHER` : verrouiller qu'il est le **moins
+privilégié** de la liste attrape ce qu'un invariant `role ∈ ROLES` laisse passer sans rien
+dire — *un plancher à 2 rendrait chaque refus promoteur.*
