@@ -19191,3 +19191,63 @@ n'a pas de cas positif reproductible.
 celle que j'avais donnée ; la décision de ne rien modifier **tient aussi** ; et les
 deux ne sont pas contradictoires — *on peut savoir qu'un garde s'est trompé une
 fois sans savoir pourquoi, et ne pas y toucher tant qu'on ne le sait pas.*
+
+
+## E-381 — CORRIGÉ le 2026-09-04 (v1.40.3) : `auto-tag` dépend désormais des deux suites de tests
+
+    ci.yml:464   needs: [...8 jobs...] + test-php, test-python
+
+**Autorisé nommément par l'exploitant**, après que j'aie refusé de l'écrire sur la
+transmission d'un pair. Les trois raisons du refus, dont la troisième est celle
+que le pair n'avait pas faite :
+
+1. *« gérer le CI/CD »* est une délégation de **sujet**, pas une autorisation
+   d'écrire dans un fichier donné ;
+2. un message de pair ne vaut pas une autorisation de l'exploitant ;
+3. ⚠ **sur une branche partagée par huit sessions, mon commit serait poussé par
+   quelqu'un d'autre** — *ne pas pousser ne protège que l'historique, pas l'état
+   servi.* **Éditer `ci.yml` ici est donc un geste SORTANT en effet.**
+
+**Validé dans `rootwarden_python`** (PyYAML absent de l'hôte) : 14 jobs, `needs` à
+10 entrées, aucune vers un job inconnu, **témoin négatif rendu** (`ParserError`).
+
+⚠ **La réserve va avec le correctif** : il empêche qu'un **rouge** devienne
+publiable, **pas qu'un vert soit dangereux**. E-388, E-389 et le DOSSIER-25 —
+trois défauts destructeurs du même jour — **auraient passé cette CI**.
+
+**Non touché, par décision** : les déclencheurs (`[main]`, « rien pour l'instant »)
+et les `--severity=ERROR` de 305/327 (chez une autre session — les doubler aurait
+empilé deux causes de rouge dans un job déjà toléré, ce qui est la faute que ce
+job illustre).
+
+### ⚠ ET UNE RÉGRESSION DE VERSION QUE J'AI FAITE EN LE COMMITANT
+
+**`a53e13b` a écrit `1.38.200` dans `legacy/version.txt`, qui portait `1.40.2`.**
+Fichier **servi** (pied de page du socle, donc toute page) et **lu par
+`auto-tag`**, qui aurait pu poser une étiquette `v1.38.200` *après* une `v1.40.2`.
+**Cinq lecteurs** : `Version.php`, `documentation.php`, `menu.php`, `export.php`,
+`ci.yml`.
+
+**Cause : j'ai relevé `1.38.199` à 14:54 et je l'ai reconduit sans remesurer à
+17:03.** Entre les deux, deux sessions sont passées par `1.40.1` (16:46) puis
+`1.40.2` (16:51).
+
+> **« Ne reconduis aucune affirmation sans la remesurer » vaut d'abord pour les
+> chiffres qu'on croit connaître.** *Un numéro de version est le cas le plus
+> traître : il paraît nous appartenir, il change plusieurs fois par heure sur un
+> chantier à huit sessions, et rien dans son apparence ne dit son âge.*
+
+**Borné, mesuré** : `a53e13b` **n'est sur aucune référence distante** — `origin`
+porte encore `1.38.199` — donc le mauvais numéro n'a jamais quitté l'arbre local,
+et aucune étiquette n'a été créée. **Réparé en `e081d36`, v1.40.3.**
+
+⚠ **Et mon propre garde a échoué en silence** : le script devait écrire
+`version.txt` **et** le CHANGELOG ; il a levé une `AssertionError` **après** avoir
+écrit le premier, sur un motif de bandeau périmé. J'ai donc commité un bump **sans
+entrée de journal**, violant ma propre liste de contrôle.
+
+> **Un contrôle placé au MILIEU d'une séquence d'écritures ne protège que ce qui le
+> suit.** *Les préconditions vont avant la première écriture, ou la séquence est
+> transactionnelle.* C'est la même forme que « le filet et le verdict doivent
+> partager le même prédicat », appliquée à l'ordre des gestes plutôt qu'à leur
+> contenu.
