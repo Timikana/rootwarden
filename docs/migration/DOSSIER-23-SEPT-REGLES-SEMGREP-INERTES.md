@@ -105,3 +105,91 @@ jamais mordre sans que rien ne le dise.*
 - **ce que les trois vivantes trouveraient** sur le dépôt actuel — *donc l'ampleur du tri du point 5* ;
 - **rien n'a été écrit** dans `.github/` ni `.semgrep/`. *Un workflow est un effet sortant : il tourne sur
   l'infrastructure de GitHub avec un `GITHUB_TOKEN`, et `auto-tag` porte `contents: write`.*
+
+---
+
+# ✅ 2026-09-04, 16:10 — LES TROIS MOTIFS SONT RÉPARÉS, ET DEUX NE SONT PAS LIVRABLES
+
+**Et la raison n'est pas que le motif résiste : c'est que la propriété visée n'est pas exprimable par un
+moteur de motifs.** *Branche `security/semgrep-regles-mortes` (`5590e9d` + `2cad24c`), non fusionnée, non
+poussée.*
+
+## 1. CE QUE J'AI MESURÉ MOI-MÊME, ET QUI BORNE LE DÉGÂT
+
+    run 33803915986 (2026-09-03 20:43, le dernier VERT) :
+      « SAST cross-langue (semgrep) »                          SUCCESS
+      « SAST regles custom RootWarden (semgrep, advisory) »     FAILURE
+
+**Ce sont DEUX jobs distincts. Le jeu semgrep générique tourne et passe ; seul le jeu CUSTOM est mort.**
+*La couverture semgrep du dépôt n'est donc pas nulle — c'est la couche maison qui l'est.*
+
+**⛔ Et je ne peux PAS répondre à la question qui reste** : *`semgrep-core rule validation failed`
+abortait-il TOUTE la passe custom, ou seulement les trois règles fautives ?* **Les journaux des exécutions
+ne sont plus récupérables (`gh run view --log` rend 0 ligne — témoin d'instrument posé).**
+
+> **Si c'est toute la passe, les trois règles dites « vivantes » n'ont jamais tourné non plus, et le jeu
+> custom a produit ZÉRO analyse depuis le 2026-05-19.** *La première exécution après le correctif y
+> répondra. C'est l'information la plus précieuse des deux changements en cours.*
+
+## 2. ✅ LES TROIS ARBITRAGES, RENDUS
+
+| règle | état | décision |
+|---|---|---|
+| `rw-php-echo-unescaped-var` | 0 occurrence dans `legacy/`, sous les deux formes | ✅ **ACTIVER** — aucun bruit, et son office est de rougir le jour où une occurrence apparaît |
+| `rw-shell-fstring-execute-as-root` | **84** candidats, presque tous validés en amont | ⛔ **NE PAS ACTIVER** — réparation syntaxique conservée, règle désactivée AVEC sa raison |
+| `rw-flask-route-without-api-key` | **3** faux positifs PERMANENTS sur 230 routes | ⛔ **NE PAS ACTIVER** en semgrep — **convertir en invariant AST** |
+
+**Pourquoi refuser la règle 1, et c'est l'argument de la session 5 que je reprends :**
+
+> **Une règle qui compile et trouve TOUT est aussi inutile qu'une qui ne trouve rien — et elle redevient du
+> décor PLUS VITE, parce que 84 lignes rouges se scrollent alors qu'une erreur de compilation se lit.**
+
+*« Y a-t-il une interpolation ? » n'est pas « la valeur est-elle sûre ? », et l'idiome NORMAL de ce dépôt
+est l'interpolation VALIDÉE (`_validate_service_name`, `_valid_username`, un chemin littéral). La propriété
+visée est un flux source → sink : elle demande `mode: taint`, que personne ici ne peut valider.*
+
+**Pourquoi convertir la règle 3 plutôt que la supprimer** : *ses 3 exceptions sont légitimes et DOCUMENTÉES
+à leur site — un jeton HMAC borné au `machine_id` pour un cron distant, une signature Slack, une sonde de
+vie statique.* **La propriété reste vraie et vaut d'être gardée ; c'est l'INSTRUMENT qui est faux.**
+
+> **Et le dépôt possède déjà l'instrument juste, qui marche** : `test_invariant_machine_id.py` mesure une
+> classe entière contre une liste d'exceptions ARGUMENTÉES et n'assère que l'ÉCART. *C'est exactement ce
+> que `--severity=ERROR` ne sait pas faire.*
+
+## 3. ✅ ET LE VRAI LIVRABLE N'EST AUCUNE DES TROIS RÈGLES
+
+**`backend/tests/test_invariant_semgrep_motifs.py` (163 lignes) : tout motif Python du fichier de règles
+DOIT compiler.**
+
+    il aurait attrape les trois a l'ECRITURE, le 2026-05-19
+    et il porte les deux moities : les 3 motifs fautifs REELS doivent etre
+    REJETES, et 3 formes idiomatiques doivent PASSER
+
+> **Trois règles de sécurité ont vécu 3 mois et demi sans jamais compiler, dans un job toléré par
+> `continue-on-error`. Le correctif durable n'est pas de meilleurs motifs : c'est un contrôle qui refuse un
+> motif qui ne compile pas.**
+
+## 4. ⚠ DEUX FAUX PAS DE L'INSTRUMENT, ET LE PREMIER EST DU MÊME GENRE QUE LE DÉFAUT
+
+    1. le harnais substituait les metavariables PARTOUT, f-strings comprises
+       -> il ACCEPTAIT le motif de la regle 1
+       = un faux PASS sur le defaut meme que le test existe pour trouver
+    2. il remplacait le `...` d'argument par un identifiant
+       -> il accusait `rw-subprocess-shell-true` d'une faute inexistante
+
+**Ce qui a servi de vérité terrain : le compte du journal CI — TROIS erreurs rapportées, quatre annoncées
+par le harnais.** *Sans ce chiffre, une règle SAINE aurait été « réparée ».*
+
+## 5. CE QUI VOUS REVIENT
+
+    ✅ les trois arbitrages ci-dessus            rendus, rien a signer
+    📌 la FUSION de `security/semgrep-regles-mortes`   votre regle
+    📌 sa POUSSEE                                 meme cran : la branche
+       n'existe que localement, comme `security/backend-cve`
+    📌 et la reponse au §1 arrive avec la premiere execution de CI apres
+       la fusion — c'est elle qui dira si le jeu custom a produit
+       QUELQUE CHOSE depuis le 19 mai
+
+**SI RIEN N'EST FAIT** : *le job reste rouge en permanence et toléré — donc une garde qui alarme toujours,
+c'est-à-dire une garde qui n'attrape plus rien. Et on ne saura pas si les trois règles « vivantes »
+tournent.*
