@@ -69,13 +69,20 @@ apres (0). Suite complete : **667 passed, 5 skipped, 2 xfailed, 0 FAILED** —
 compte de `skipped` inchange par ce correctif, et aucune des trois routes ne
 figurait dans la liste connue de `test_invariant_machine_id.py`.
 
-**⚠ Collision de version a signaler, non resolue ici.** `882ad9b` (« tout le parc
-retire des planifications ») et `f92cdcf` (E-390) revendiquent **tous deux
-v1.40.1** : la seconde session a lu `legacy/version.txt` avant que le bump de la
-premiere n'atterrisse. Les deux entrees coexistent donc sous le meme numero dans
-ce fichier. **Aucune des deux n'a ete renumerotee** — renumeroter l'entree d'une
-autre session, alors que l'auto-tag de la CI lit ce fichier, est un arbitrage
-d'exploitation. Ce correctif prend 1.40.2 et laisse la collision visible.
+**⚠ Deux entrees portaient v1.40.1 — fusionnees, et ma premisse etait FAUSSE.**
+`882ad9b` et `f92cdcf` revendiquaient tous deux ce numero, la seconde session
+ayant lu `legacy/version.txt` avant que le bump de la premiere n'atterrisse. Je
+l'avais signale comme une collision **au motif que l'auto-tag de la CI lit ce
+fichier** : il ne le lit plus. `ci.yml` fait `VERSION=$(./scripts/version.sh)`,
+qui DERIVE le correctif par `rev-list --count --first-parent` depuis
+`VERSION-JALON` et **echoue plutot que de deviner** (INF-004, ferme apres que
+trois sessions ont revendique le meme numero le 2026-08-27). Temoins :
+`git tag -l 'v1.40*'` rend **0**, contre 3 pour `v1.39*` et 30 au total.
+`version.txt` est une chaine d'AFFICHAGE — 9 consommateurs, aucun identifiant de
+livraison. **Les deux entrees ont donc ete FUSIONNEES sous un en-tete unique, et
+aucune n'a ete renumerotee** : renumeroter suggererait que ce numero porte une
+autorite qu'il n'a pas. Le depot avait deja ferme ce mode de defaillance en
+rendant le numero NON PORTEUR, plutot qu'en disciplinant huit sessions.
 
 **Notes d'exploitation.** `backend/**.py` est lu au demarrage : INERTE jusqu'au
 redemarrage de `rootwarden_python`.
@@ -83,6 +90,15 @@ redemarrage de `rootwarden_python`.
 ---
 
 ## [1.40.1] - 2026-09-04
+
+> **Deux commits portent ce numero** — `882ad9b` (« tout le parc » retire des
+> planifications) et `f92cdcf` (E-390) : la seconde session a lu
+> `legacy/version.txt` avant que le bump de la premiere n'atterrisse. Les deux
+> entrees sont **fusionnees ici, sans renumerotage**. Renumeroter suggererait que
+> ce numero porte une autorite qu'il n'a pas : l'etiquette de la CI est **derivee**
+> (`ci.yml` -> `scripts/version.sh`, `rev-list --count` depuis `VERSION-JALON`) et
+> ne consulte plus ce fichier depuis INF-004. `version.txt` est une chaine
+> d'AFFICHAGE (9 consommateurs), pas un identifiant de livraison.
 
 ### Securite — precondition au redemarrage
 - **« Tout le parc » est retire des planifications de releve SSH (E-395).** Le backend refuse
@@ -118,8 +134,6 @@ redemarrage de `rootwarden_python`.
   jamais dans son code. `node --check` vert, parite FR/EN 107 = 107, equilibres identiques a
   `HEAD`, reseau 200/302/404.
 - **L'ecran n'est pas exerce** (`/audit-ssh` exige une session). Pas de binaire PHP sur l'hote.
-
-## [1.40.1] - 2026-09-04
 
 ### Securite - E-390 : le geste qui ECRIT etait garde, celui qui LIT non
 
