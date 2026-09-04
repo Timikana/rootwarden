@@ -253,6 +253,37 @@ class MotDePasse
                 'password_updated_at' => now(),
                 'force_password_change' => 0,
             ]);
+
+            /*
+             * ══ LES JETONS « SE SOUVENIR DE MOI » MEURENT DANS LA MEME
+             *    TRANSACTION, ET C'EST DELIBERE ═════════════════════════════
+             *
+             * Cette purge etait en MEILLEUR EFFORT, hors transaction et sous
+             * `try/catch` — j'ai deplace le bloc ce matin en extrayant
+             * `applique()` sans reviser sa forme. La session 6 l'a releve avant
+             * que je remplisse la table.
+             *
+             * **Un jeton qui survit a un changement de mot de passe DEFAIT ce
+             * changement** : il restitue l'identite sous l'ANCIEN secret. Le
+             * changement n'a donc pas atteint son objet, et reussir en le disant
+             * serait mentir. **Echouer visiblement vaut mieux que reussir
+             * faussement** : la transaction annule tout, la personne voit une
+             * erreur, et son ancien mot de passe reste le bon — un etat
+             * coherent, meme s'il est desagreable.
+             *
+             * ⚠ AUJOURD'HUI C'EST INOFFENSIF, parce que le portage ne remplit
+             * JAMAIS `remember_tokens` : il vide une table qu'il n'ecrit pas.
+             * **Le trou nait au moment ou je porte « Se souvenir de moi ».**
+             * C'est la forme « un defaut qui protege par accident cesse de
+             * proteger quand on corrige l'accident », et le corriger AVANT est
+             * la seule fenetre ou il ne coute rien.
+             *
+             * *La forme stricte existait deja dans ce depot : `Comptes::anonymise`
+             * purge les six tables DANS sa transaction, sans `try/catch`. Ce
+             * n'etait donc pas un arbitrage a rendre, mais une incoherence a
+             * resoudre du bon cote.*
+             */
+            DB::table('remember_tokens')->where('user_id', $idCompte)->delete();
         });
 
         /*
@@ -289,12 +320,16 @@ class MotDePasse
             }
             $requete->delete();
         } catch (\Throwable $e) {
+            /*
+             * CELLE-CI reste en meilleur effort, et les deux politiques
+             * divergent DELIBEREMENT : son echec ne defait pas le changement de
+             * mot de passe. E-203 mesure qu'elle ne ferme que les sessions de
+             * l'ANCIEN portail — celles du portage vivent en FICHIERS et ne sont
+             * pas dans cette table. Faire echouer un changement de mot de passe
+             * parce qu'on n'a pas pu fermer des sessions d'un portail qu'on
+             * demonte serait un mauvais echange.
+             */
             Log::warning('purge active_sessions', ['erreur' => $e->getMessage()]);
-        }
-        try {
-            DB::table('remember_tokens')->where('user_id', $idCompte)->delete();
-        } catch (\Throwable $e) {
-            Log::warning('purge remember_tokens', ['erreur' => $e->getMessage()]);
         }
 
         /*

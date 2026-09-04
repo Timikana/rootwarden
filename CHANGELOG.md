@@ -5,6 +5,27 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.39.10] - 2026-09-04
+
+### Securite
+- **Un jeton « se souvenir de moi » survivant defaisait le changement de mot de passe
+  (E-393).** La purge de `remember_tokens` etait en meilleur effort et HORS transaction : si
+  elle echouait, le changement reussissait quand meme et un jeton emis sous l'ancien secret
+  continuait de restituer l'identite. Elle entre dans la transaction — **echouer visiblement
+  vaut mieux que reussir faussement.**
+- ⚠ **Corrige AVANT le portage qui rendrait le defaut atteignable** : le portage ne remplit
+  jamais `remember_tokens` aujourd'hui, donc le trou est inoffensif — et il naitrait au moment
+  ou l'on porte la capacite. *La forme « un defaut qui protege par accident cesse de proteger
+  quand on corrige l'accident ».*
+- **La purge d'`active_sessions` reste en meilleur effort, deliberement** : E-203 mesure
+  qu'elle ne ferme que les sessions de l'ancien portail. Les deux politiques divergent et le
+  code le dit.
+
+### Reserves
+- Le geste n'est pas exerce (il faudrait casser la table) ; la propriete est etablie par
+  lecture, l'assertion verifiant les positions relatives dans le fichier. Pas de binaire PHP
+  sur l'hote de cette session.
+
 ## [1.39.9] - 2026-09-04
 
 ### Corrige
