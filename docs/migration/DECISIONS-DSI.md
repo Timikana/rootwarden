@@ -8872,3 +8872,95 @@ faux, sur un autre objet — et la brièveté de l'objet est ce qui l'a produite
 
 **Le verrou tient, et il tient au sens fort : les rouges apparaissent ET le compte de verts baisse — donc
 aucun test ne s'absente.**
+
+### ⚠⚠ « UNE REMÉDIATION DONT LA POPULATION EST VIDE N'EST PAS UN NO-OP » — et j'ai audité mes dossiers là-dessus
+
+**La session 1 avait annoncé une remédiation visant « les comptes créés par l'import », via le prédicat
+`force_password_change = 0`. Mesuré par elle avant d'agir :**
+
+    l'import PORTE n'a JAMAIS cree de compte ici
+      (0 evenement « Import CSV: N comptes importes » ; les 2 du 26/08 sont
+       du legacy)
+    et les 4 comptes que son predicat SELECTIONNE sont :
+      `opsuser` · `rw-test-user` · `rw-test-admin` · `rw-test-super`
+      -> 188 fichiers de tests les citent
+
+> **« Suivre ma note aurait fait tourner leurs mots de passe et cassé le banc. Une remédiation dont la
+> population est vide n'est pas un no-op : c'est un GESTE DESTRUCTEUR QUI ATTEND QUELQU'UN
+> D'OBÉISSANT. »**
+
+**Sa cause est exactement nommée** : *« j'avais décrit la population par une CATÉGORIE et fourni un
+PRÉDICAT, sans vérifier que le prédicat sélectionne la catégorie ».*
+
+### ✅ ET C'EST UNE ATTAQUE DIRECTE SUR MON RÔLE — j'ai donc audité mes 28 dossiers
+
+**Ma fonction est d'écrire à l'exploitant des gestes exacts. Si un de mes dossiers décrit une population
+par catégorie et fournit un prédicat non vérifié, j'ai écrit un geste destructeur qui attend son
+obéissance.**
+
+    28 dossiers lus (temoin)
+    portant un GESTE + un PREDICAT sur la meme ligne : 4
+      DOSSIER-06   `DELETE FROM iptables_rules WHERE server_id = ?`
+                   -> CITATION de code existant, pas une prescription. Et sa
+                      seconde ligne est une QUESTION a verifier, bien posee.
+      DOSSIER-13   « si un jeton existe : le faire TOURNER »
+                   -> et j'y ai ecrit « sur le banc : 0 ligne » PLUS « c'est
+                      le seul fait que je ne peux pas mesurer »
+      DOSSIER-16   citation de `toggle_sudo.php:61`
+      DOSSIER-17   « un SELECT, puis une rotation SI un jeton est la »
+
+**Aucun ne porte le défaut. Et la raison est structurelle, pas de la chance :**
+
+> **Mes gestes sont conditionnés à une MESURE QUE L'EXPLOITANT FAIT — « si un jeton y figure » — et non à
+> un prédicat dont j'affirme qu'il sélectionne une catégorie.**
+
+**⚠ Mais je le dois à une limite, pas à une méthode** : *`DOSSIER-13` a cette bonne forme parce que je ne
+POUVAIS pas mesurer la production. Si j'avais pu, j'aurais écrit un prédicat.* **La forme juste devient donc
+une règle explicite : un geste ne se prescrit jamais par un prédicat que je n'ai pas exécuté — et s'il se
+prescrit ainsi, je donne le COMPTE et les IDENTIFIANTS qu'il rend, pas la catégorie visée.**
+
+*Le seul de mes dossiers qui nomme une population le fait par IDENTIFIANT mesuré — `DOSSIER-21`, « compte
+role1 id=2 → machine id=1 ». C'est la forme la plus forte : un identifiant ne se réinterprète pas.*
+
+### ⛔ ET MA CONSIGNE PORTAIT UNE FAUSSE CARDINALITÉ POUR LA TROISIÈME FOIS AUJOURD'HUI
+
+**J'avais écrit : « la fonction peut rendre LAQUELLE des deux coercitions a joué ». Un singulier.**
+
+> **Les deux peuvent jouer ENSEMBLE : une valeur invalide devient le plancher, que l'autorisation peut à
+> son tour refuser — et alors les deux sont vraies.** *Un singulier aurait forcé à en taire une, ce qui est
+> le défaut que ma décision corrigeait.*
+
+    la forme retenue, et elle est meilleure : `App\Support\RolePose`,
+    `readonly`, DEUX booleens INDEPENDANTS et NOMMES
+      `valeurInvalide`  -> VALIDITE
+      `rangRamene`      -> SECURITE
+    « on se trompe sur une POSITION de tuple, pas sur un NOM »
+
+    troisieme fois du jour :
+      « sa cle de libelle » (singulier)  -> il y en avait TROIS   x2
+      « laquelle des deux »              -> les deux a la fois
+
+**C'est un motif chez moi, pas trois accidents : j'affirme une cardinalité que je n'ai pas mesurée.**
+*Parade : ne plus écrire « la clé », « laquelle », « le fichier » dans une consigne — écrire « les clés (je
+n'ai pas compté) » et laisser la mesure décider.*
+
+### ✅ CINQUIÈME ET SIXIÈME ÉTAGE : morts, et c'est la BASE qui le tranche
+
+    JetonMemorisation:189   `(int) ($compte->role_id ?? 1)`
+    users.role_id           DEFAULT 1 en schema
+    information_schema      IS_NULLABLE = NO, COLUMN_DEFAULT = 1
+
+**`NOT NULL` ⇒ le `?? 1` ne peut pas se déclencher, et les deux seuls écrivains posent toujours la colonne
+⇒ le défaut du schéma non plus.** *Deux replis qui RESSEMBLENT à une fabrication et n'en sont pas.*
+
+> **Ce qui les tranche est la NULLABILITÉ EN BASE, pas la lecture du code.** *Un `??` se lit comme un repli
+> vivant ; seul le schéma dit s'il peut jouer.*
+
+### ✅ ET LE POINT 1 A RENDU PLUS QUE SON ÉNONCÉ
+
+**Les DEUX chemins de création étaient faux, chacun du défaut que l'autre n'avait pas** : *la création
+manuelle hachait `random_bytes` ET posait `force_password_change = 1` — un compte inaccessible sur un écran
+qui annonce une réussite ; l'import remettait le mot de passe SANS le drapeau.* **La bonne paire prend un
+terme de chacun.**
+
+*C'est ma décision d'« aligner l'un sur l'autre » qui était courte : aucun des deux n'était le modèle.*
