@@ -8264,3 +8264,79 @@ fois.*
 > **Un repli d'affichage placé sur un chemin d'écriture produit le défaut le plus large, avec un commentaire
 > qui le défend.** *C'est la forme la plus coûteuse : un défaut ratifié par son propre commentaire — comme
 > le scelleur du `DOSSIER-25`.*
+
+### ✅ LA COLLISION DE VERSION N'A AUCUN EFFET SUR L'ÉTIQUETAGE — le dépôt l'a déjà réglé
+
+**La session 4 a signalé deux entrées `## [1.40.1]` et craint que l'auto-tag en soit affecté, « puisqu'il
+lit `legacy/version.txt` ». Mesuré : IL NE LE LIT PLUS.**
+
+    ci.yml:475-487, commentaire INF-004 :
+      « LA VERSION SE DERIVE, ELLE NE SE LIT PLUS. Cette etape lisait
+        `legacy/version.txt`, c'est-a-dire un numero POSE A LA MAIN — et le
+        repli `|| echo "0.0.0"` transformait un fichier absent en version
+        plausible, donc en tag plausible. Un numero assigne est valide au
+        moment ou on l'ECRIT, pas au moment ou un autre l'EMPLOIE :
+        TROIS COMMITS DE TROIS SESSIONS ONT REVENDIQUE LE MEME LE 2026-08-27. »
+
+    l'etape fait : VERSION=$(./scripts/version.sh)
+    et `version.sh` derive le correctif du depot lui-meme —
+      `rev-list --count --first-parent <ancre VERSION-JALON>..HEAD`,
+      et il ECHOUE plutot que de deviner.
+
+> **Le mode de défaillance exact que la session 4 décrit s'est produit le 27 août, à trois sessions, et il a
+> été fermé AU NIVEAU DE LA CI parce qu'une numérotation par session ne peut pas être rendue fiable.**
+
+**⚠ Cinquième fois aujourd'hui que le dépôt portait déjà l'analyse — et la PREMIÈRE où il portait aussi le
+CORRECTIF, appliqué des semaines plus tôt, pour le défaut qu'on me remontait.**
+
+    etiquettes v1.40*   AUCUNE     (temoins : v1.39* -> 3, total -> 30)
+
+### ✅ CE QUE `version.txt` EST VRAIMENT — mesuré, et ça dissout l'inquiétude
+
+    9 consommateurs reels, sur 816 fichiers balayes :
+      docker-compose.yml · docker-compose.prod.yml
+      laravel/app/Support/Version.php
+      laravel/resources/views/layouts/portail.blade.php
+      legacy/menu.php · legacy/documentation.php · legacy/profile/export.php
+      scripts/rejouer-lot.sh · scripts/version.sh
+
+> **`version.txt` est une CHAÎNE D'AFFICHAGE, pas un IDENTIFIANT.** *Ce qui identifie une livraison est
+> DÉRIVÉ (`VERSION-JALON` + compte de commits), donc unique par construction.*
+
+**Deux sessions qui « revendiquent 1.40.1 » ne collisionnent donc sur rien : le fichier porte ce qui a
+atterri en dernier, et l'étiquette ne le consulte pas.**
+
+**✅ Décision : le seul artefact à réparer est le TITRE dupliqué du CHANGELOG. Fusionner les deux entrées
+`[1.40.1]` en une, puisque rien ne les distingue en aval.** *Ne renuméroter NI l'une NI l'autre : un
+renumérotage suggérerait que le numéro porte une autorité qu'il n'a pas.*
+
+**⛔ Et je ne pose PAS de règle de protocole sur le bump.** *La session 4 écrit « si le protocole doit
+changer, deux sessions qui bumpent en parallèle le referont » — c'est vrai, et c'est déjà accepté : le
+dépôt a choisi de rendre le numéro non porteur plutôt que de discipliner huit sessions.* **Discipliner
+aurait échoué ; dériver ne peut pas.**
+
+### ✅ ET SON GARDE-FOU A ATTRAPÉ SON PROPRE PIÈGE
+
+**`AuditSshController.php` sortait comme appelant de `/ssh-audit/results`. Un appel côté serveur aurait
+été cassé par la garde — `require_permission` lit `get_current_user()`, et un appel sans session est
+refusé.**
+
+    mesure hors commentaires : UNE occurrence, et c'est un LIEN vers le legacy
+      (`config('app.url_legacy') . '/ssh-audit/'`)
+    le reste etait un docblock qui ENUMERE les routes lues par le sous-lot A1
+
+> **Le piège de l'ancre dans la prose, refait — et cette fois attrapé par le garde-fou avant l'écriture.**
+> *C'est le même que `/policy/rollback` dans `RoutesBackend.php`, qui m'avait presque fait retirer trois
+> libellés justes.*
+
+### 📌 ET SON POINT SUR LES `skip` MONTE PLUS HAUT QUE SON PÉRIMÈTRE
+
+    verifier un test NOMMEMENT en `-v` est LOCAL et ne monte pas a l'echelle
+    ce qui monte : `--strict-markers` + un PLANCHER (un `assert` sur le compte
+    de collectes)
+    -> « un skip doit etre une DECISION nommee, pas un effet de bord d'un
+        import manquant »
+
+**C'est la formulation qui manquait à ma question posée à la session 2. Un plancher sur le compte de tests
+COLLECTÉS est à un test de suite ce que `PLANCHER_ROUTES_GARDEES` est à un invariant : la borne qui
+distingue « rien à signaler » de « rien n'a été lu ».**
