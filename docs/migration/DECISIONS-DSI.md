@@ -7399,3 +7399,77 @@ refusée, avec le commentaire « accepter la ligne, c'est armer un scan complet 
 aujourd'hui que le dépôt portait déjà l'argument.**
 
 **✅ La session 4 est débloquée pour la garde d'entrée de `cve.py:490`.**
+
+### ⚠⚠ LA TROISIÈME QUESTION — « ce fichier est-il le SEUL ACCÈS à un geste NON porté ? »
+
+**La session 3 a résolu le graphe de dépendances du legacy (303 arcs, 25 cibles, 5 non résolus et tous
+identifiés) et a trouvé une question que personne n'avait posée. Elle est la plus dangereuse des trois.**
+
+    1. le geste est-il porte cote laravel ?          <- ce qu'on mesurait
+    2. le fichier est-il REQUIS par un autre ?       <- la passe des liens entrants
+    3. le fichier est-il le SEUL ACCES a un geste NON porte ?   <- JAMAIS POSEE
+
+> **La 2 se paie par un incident visible. La 3 se paie par une capacité disparue que personne ne cherche.**
+> *Rien ne tombe : aucun 500, aucun lien mort, aucune suite rouge. La capacité cesse simplement
+> d'exister.*
+
+**`adm/admin_page.php` et `index.php` figuraient dans son bloc B comme portés et ARCHIVABLES. Ils sont le
+seul accès à trois capacités qu'elle donnait pour non portées.**
+
+### ✅ ET LA MESURE RÉDUIT LES TROIS À UNE
+
+    manage_access.php:275  le prereglage sudo
+      -> PORTE depuis 11:10 AUJOURD'HUI (`22df110`, v1.39.0)
+      -> `Permissions.php:321` fait `->update(['sudo_preset' => $preset, …])`
+         c'est un ECRIVAIN, pas une mention (temoin : 3 ecritures dans le
+         fichier, et les 4 colonnes de la migration 051 y sont)
+      -> son verdict « NON PORTE » avait QUATRE HEURES
+
+    import_csv.php:44      l'import CSV de comptes
+      -> EN COURS, session 1, sous-lot D6c
+
+    onboarding.php:162     l'onboarding
+      -> NON PORTE, et c'est le seul vrai : 0 occurrence sur 316 fichiers
+         `laravel/` balayes (glob+io.open, temoin 316 > 300)
+
+### ✅ L'ARBITRAGE, RENDU APRÈS AVOIR LU CE QUE C'EST
+
+**`onboarding.php` (221 lignes) est un ASSISTANT DE PREMIÈRE CONFIGURATION affiché sur le tableau de bord.
+Cinq étapes AUTO-DÉTECTÉES — 2FA, clé SSH, keypair de plateforme, retrait des mots de passe, premier
+relevé SSH — chacune avec un lien vers la page concernée. Il n'écrit RIEN, sauf le drapeau de masquage.**
+
+    valeur   maximale sur une installation NEUVE
+             quasi nulle sur une installation deja configuree
+    cout de portage   faible : cinq comptes en lecture + un drapeau.
+             Aucun geste destructeur, aucune session SSH.
+
+> ⛔ **NE PAS ABANDONNER — PORTER.** *Et l'argument décisif est celui de la session 3 : son absence est
+> INDÉTECTABLE par quiconque travaille sur une installation déjà configurée.* **C'est-à-dire par nous
+> tous. Le produit est auto-hébergé : la capacité vaut pour des déploiements que personne ici ne verra.**
+
+**Décision sur l'ordre d'archivage : `admin_page.php` et `index.php` sortent du bloc B et s'archivent en
+DERNIER de leur chaîne, après le portage de l'onboarding et la livraison de l'import CSV de comptes.** *Le
+préréglage sudo ne les retient plus.*
+
+### ✅ ET LA RÈGLE QUE J'ADOPTE, ELLE EST D'ELLE ET ELLE ME VISE
+
+> **« Je date mes mesures et pas mes interdits. »**
+
+**Le plan impose à chaque chiffre de porter sa commande de remesure. Aucune de mes CONSIGNES ne porte sa
+date.** *C'est exactement ce qui a fait voyager « 111 compilés root » pendant un jour et demi, sous la
+forme d'un interdit — la forme la plus obéie et la moins remesurée.*
+
+**Désormais : tout interdit que j'envoie porte la date de sa mesure et la commande qui la refait.**
+
+### ⚠ ET SON AUTO-CAPTURE EST LE CAS LE PLUS DÉSAGRÉABLE DE LA SÉRIE
+
+**Une version intermédiaire de son instrument rendait `0` POUR TOUT LE BLOC B — et `0` est LA BONNE
+RÉPONSE.** *Le témoin l'a tuée sur place : `audit_log.php` devait rendre beaucoup, il rendait zéro.*
+
+> **Un résultat juste et une mesure nulle sont INDISCERNABLES à la lecture.** *Sans témoin, elle publiait
+> la bonne conclusion obtenue par un instrument mort — et personne n'aurait jamais su.*
+
+**Et ses deux premiers instruments se trompaient en sens OPPOSÉS** : *le nom de base SURCOMPTE
+(`index.php` en désigne DIX, `notifications.php` est une sous-chaîne de `manage_notifications.php` → 21
+requérants pour un fichier qui n'en a aucun) ; le chemin relatif au dépôt SOUS-COMPTE, parce que les
+`require` PHP sont relatifs au fichier → 7 là où la vérité est 21.*
