@@ -111,13 +111,31 @@ Route::middleware(['session.authentifiee', 'session.revoquee', 'mot.de.passe.a.c
      * aucun parametre n'est offert.
      *
      * ⚠ CONSEQUENCE DU GROUPE, DECLAREE : `mot.de.passe.a.changer` est un
-     * intergiciel de ce groupe. Un compte portant `force_password_change` est
-     * donc renvoye vers son profil et ne peut PAS exporter avant d'avoir change
-     * son mot de passe. C'est la parite avec le legacy, et c'est defendable —
-     * mais la population concernee est reelle : **8 comptes actifs sur 12**
-     * portent ce drapeau (mesure du 2026-09-03), et 6 d'entre eux n'ont pas
-     * d'adresse de courriel pour le lever seuls. Ce sont les memes qui attendent
-     * un geste d'administration.
+     * intergiciel de ce groupe. Un compte portant `force_password_change` doit
+     * donc changer son mot de passe AVANT d'exporter.
+     *
+     * **C'est une contrainte d'ORDRE, pas un blocage**, et c'est ce que la
+     * premiere redaction de ce commentaire disait mal. Le remede est deja
+     * exempte — `EXEMPTES = ['profil', 'profil.mot-de-passe']` dans
+     * `ChangementMotDePasseExige` — et il est de toute facon obligatoire : le
+     * compte atteint son profil, y change son mot de passe, puis exporte.
+     *
+     * ⚠ CE QUE CE COMMENTAIRE AFFIRMAIT ET QUI ETAIT FAUX : *« 6 comptes n'ont
+     * pas d'adresse de courriel pour LEVER ce drapeau seuls »*. Le courriel ne
+     * leve rien — `PortailController::changerMotDePasse` ne lit que
+     * `current_password`, aucun jeton, aucun envoi. Le courriel sert a recuperer
+     * un mot de passe OUBLIE, et un compte qui l'a oublie n'atteint AUCUNE
+     * route, exemptee ou non.
+     *
+     * Le chiffre, lui, tient : **8 comptes actifs sur 12** portaient ce drapeau
+     * au 2026-09-03. Leur blocage reel n'est pas ici — c'est un mot de passe
+     * qu'ils ne connaissent pas, et il se leve par un geste d'administration ou
+     * par le flux de reinitialisation, non porte.
+     *
+     * *Cette rectification est arrivee tard parce que j'avais corrige le dossier
+     * et laisse debout le commentaire : une autre session a repris ce cadrage en
+     * le lisant ICI. Le dossier porte la verite, le commentaire porte
+     * l'autorite — et c'est le commentaire qui voyage.*
      */
     Route::get('/profil/donnees-personnelles', ExportRgpdController::class)
         ->name('profil.donnees-personnelles');

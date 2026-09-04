@@ -206,10 +206,16 @@
 
     /** Ce que le formulaire va envoyer. */
     function saisie() {
-        const brut = el('sched-target').value || 'all';
-        // Le repli ne vaut PLUS « tout le parc ». Une chaine vide est refusee
-        // par le serveur, la ou `'all'` armait un scan du parc entier en
-        // silence — et ce repli etait le quatrieme etage du meme defaut.
+        // AUCUN REPLI. Cette ligne portait `|| 'all'`, et mon correctif d'E-387
+        // l'avait laissee en place : le commentaire qui suivait annoncait « le
+        // repli ne vaut plus tout le parc » a DEUX LIGNES d'un repli intact.
+        //
+        // Il etait inerte — `'all'` ne correspond ni a `tag:` ni a `multi`, donc
+        // `type` restait vide et le serveur refusait — mais **inerte n'est pas
+        // ferme** : il se reveillait au premier commit qui rebrancherait `brut`
+        // sur `type`. Et un selecteur pourvu d'options ne rend jamais une valeur
+        // vide, donc ce repli ne protegeait de rien.
+        const brut = el('sched-target').value;
         let type = '';
         let valeur = '';
         if (brut.startsWith('tag:')) { type = 'tag'; valeur = brut.slice(4); }
