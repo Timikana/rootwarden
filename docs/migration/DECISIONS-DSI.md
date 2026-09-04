@@ -6996,3 +6996,61 @@ n'existe aujourd'hui — mais deux comptes de rôle 2 sont actifs et la permissi
 `_lit_un_identifiant()` qui aurait été inerte SANS LEVER D'ERREUR** — *le drapeau inventé et le contrôle
 qui ne commande pas l'action, deux entrées de mon propre catalogue, dans une consigne envoyée comme un
 prérequis de sécurité.*
+
+### ⛔ TROISIÈME RÉFUTATION DU TOUR — ma décision sur `'all'` était au MAUVAIS ÉTAGE
+
+**La session 4 a refusé la tâche et mesuré contre deux de mes prémisses. Les deux tombent, et la seconde
+renverse la décision que je venais de rendre.**
+
+    ssh_audit_schedules            0 ligne
+    cve_scan_schedules             0 ligne
+    TEMOIN machines_total          3
+    TEMOIN machines non archivees  3     <- dont `srv-zabbix`, id 1, PROD
+
+**Mon argument de compatibilité — « le backend continue d'accepter `'all'` pour les planifications créées
+avant le portage » — n'a RIEN à préserver.** *Il n'existe aucune planification, sur aucune des deux
+tables.*
+
+> **Et mon propre raisonnement me contredit : « une entrée libre ABSENTE ne se contourne pas par une
+> requête forgée, tandis qu'une entrée validée se contourne ». C'est vrai du SERVEUR, pas d'un `<select>`.**
+> *Retirer `'all'` de la page laisse la route l'accepter : une requête forgée arme le relevé sur tout le
+> parc, exactement comme aujourd'hui. J'ai posé la fermeture là où elle ne mord pas.*
+
+### ✅ LA DÉCISION CORRIGÉE — refuser `'all'` À L'ENTRÉE, pas seulement dans la vue
+
+    1. le backend REFUSE `target_type='all'`     <- la ou ca mord. 0 ligne a preserver.
+    2. le `<select>` porte la liste fermee        <- coherent, plus seul
+    3. le repli du planificateur (patch gele
+       `02-E-280-portee-scheduler.patch`) ferme
+       les CINQ branches d'un coup
+
+### ⚠ ET « TON CHEMIN EST DURCI » ÉTAIT TROP FAVORABLE — mesuré, contre moi
+
+    _run_scheduled_ssh_audit, les trois conditions d'entree :
+      `if target_type=='tag' and target_value:`          <- CHAMP BLANC = faux
+      `elif ... 'environment' and target_value:`         <- faux
+      `elif ... 'machines' and target_value:`            <- faux
+      `else:`  SELECT ... WHERE lifecycle_status != 'archived'   -> LES 3 MACHINES
+
+**Le `WHERE 1=0` que je citais à décharge est dans le `else` INTERNE de la branche `machines` : il couvre
+une liste PRÉSENTE mais illisible, jamais un champ BLANC.** *Donc le chemin SSH échoue fermé sur UN cas et
+reste ouvert sur TROIS.*
+
+> **J'ai lu une clause vraie d'une branche interne et je l'ai prêtée à la fonction entière.** *C'est la
+> même faute que la session 1 m'a corrigée une heure plus tôt sur les trois copies de la coercition de
+> rôle : une propriété vraie d'un objet, étendue à ses homonymes. Deux fois en une heure, les deux de ma
+> main.*
+
+**Et le Lead avait fait cette lecture il y a deux jours, l'avait retirée, et le discriminant est écrit
+dans `DOSSIER-08` §4.** *Je ne l'avais pas lu. C'est la règle « lire les docs du chantier AVANT de
+replanifier », et elle vaut d'abord pour celle qui l'énonce.*
+
+### ⚠ ET J'AI RÉASSIGNÉ UNE TÂCHE QUE J'AVAIS DÉJÀ RETIRÉE À LA MÊME SESSION
+
+**`np_planif_creer` avait été envoyée à la session 4 le 2026-09-02, puis réassignée après ses trois
+raisons — dont celle que j'avais retenue explicitement : *« j'ai raisonné écrit-en-base → session
+backend ; c'est faux, ce que je demandais est l'écran, et l'écran n'est pas à elle »*.**
+
+*Deux jours plus tard, je la lui renvoie avec « tu portes la vue, la validation, les libellés, l'i18n » —
+c'est-à-dire exactement ce que j'avais conclu ne pas être son périmètre.* **Le registre portait la
+correction ; je ne l'ai pas relu avant de répartir.**
