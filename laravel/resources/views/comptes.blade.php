@@ -59,8 +59,12 @@
              disque du conteneur (pilote `file`).
 
              Le prix est celui de ce motif : recharger repropose le formulaire, et
-             les secrets disparaissent. C'est voulu. --}}
-        <section class="rw-carte rw-carte--pleine" data-rw="comptes-import-secrets">
+             les secrets disparaissent. C'est voulu.
+
+             ⚠ CE BLOC SERT LES DEUX CHEMINS DE CREATION — l'import CSV et la
+             creation unitaire. Il s'appelait `comptes-import-secrets` quand il
+             n'en servait qu'un ; ce nom serait devenu faux. --}}
+        <section class="rw-carte rw-carte--pleine" data-rw="comptes-secrets-remis">
             <h2 class="rw-sous-titre">{{ __('comptes.imp_secrets_titre') }}</h2>
             <p class="rw-prose rw-alerte rw-alerte--attention">{{ __('comptes.imp_mdp_avert') }}</p>
             <div class="rw-tableau-cadre">
