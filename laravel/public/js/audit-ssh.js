@@ -455,12 +455,17 @@
      * parc » vaut mieux qu'un selecteur vide, qui se lit comme une panne.
      */
     function majValeur() {
-        var type = planifPortee ? planifPortee.value : 'all';
+        // Repli VIDE, plus « all ». Le commentaire ci-dessus choisissait « tout
+        // le parc » pour ne pas afficher un selecteur vide — un raisonnement
+        // d'AFFICHAGE, qui produisait le defaut le plus large a la SOUMISSION.
+        var type = planifPortee ? planifPortee.value : '';
         if (! planifValeur || ! planifValeurBloc) { return; }
         planifValeur.innerHTML = '';
         dis(planifValeurAide, '');
 
-        if (type === 'all') {
+        // `!type` couvre le repli : sans selecteur, on ne demande pas une
+        // valeur pour une portee qu'on ne connait pas.
+        if (! type || type === 'all') {
             planifValeurBloc.hidden = true;
             return;
         }
@@ -514,7 +519,7 @@
     if (planifValider) {
         planifValider.addEventListener('click', function () {
             var nom = (planifNom && planifNom.value || '').trim();
-            var type = planifPortee ? planifPortee.value : 'all';
+            var type = planifPortee ? planifPortee.value : '';
             var valeur = (type !== 'all' && planifValeur) ? planifValeur.value : '';
 
             // LES DEUX REFUS SONT DES TEXTES, jamais un blocage muet.
@@ -523,7 +528,13 @@
                 if (planifNom) { planifNom.focus(); }
                 return;
             }
-            if (type !== 'all' && ! valeur) {
+            /*
+             * `! type` D'ABORD : sans selecteur, le repli valait « all » et
+             * cette garde ne tirait pas — on soumettait donc un releve du parc
+             * entier sans valeur. Desormais l'absence de portee REFUSE, comme
+             * une valeur manquante.
+             */
+            if (! type || (type !== 'all' && ! valeur)) {
                 dis(planifMessage, t('planif_valeur_requise'));
                 return;
             }
