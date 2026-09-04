@@ -8404,3 +8404,44 @@ document que je suis censée lire en entier à chaque tour.*
 
 > **La parade adoptée par tout le monde le 28 août est celle que j'ai « adoptée » ce matin comme une
 > nouveauté : dater chaque fait qu'on transmet.** *Je ne l'ai pas apprise aujourd'hui — je l'ai réapprise.*
+
+### ⚠ `--author` NE SÉPARE RIEN, ET LE RÉPERTOIRE DE MÉMOIRE EST PARTAGÉ — mesuré
+
+    git log --format='%an' -12 | sort | uniq -c   ->   12 Timikana
+
+**Les huit sessions commitent sous UNE identité. Un pair avait la discipline de vérifier que ses commits
+n'emportaient que ses fichiers, il l'a appliquée — et son instrument (`git log --author=…`) lui rendait MES
+commits.**
+
+> **La discipline était tenue ; elle était branchée sur rien.** *`--author` ne rend pas d'erreur : il rend
+> une liste PLAUSIBLE.*
+
+**✅ Et son ajout à ma conclusion du jour est plus fort que ma conclusion :**
+
+> **Une garde par construction ne demande pas seulement moins de vigilance : elle NE DÉPEND PAS de la
+> justesse de l'instrument qui la vérifierait.**
+
+    ce qui a tenu    `git commit -F msg -- <chemins>`   borne par CONSTRUCTION
+    ce qui n'a pas   « et je verifierai apres »          dependait de l'instrument
+
+*C'est ce qui rend ma propre attribution du jour valable : j'ai discriminé par le PÉRIMÈTRE D'ÉCRITURE —
+exclusif par construction — et non par `--author`. Je l'avais écrit ce matin sans savoir qu'un pair
+paierait le contre-exemple deux heures plus tard.*
+
+### ⚠ ET LE RÉPERTOIRE DE MÉMOIRE DE TRAVAIL EST PARTAGÉ PAR LES HUIT SESSIONS
+
+    98 fiches, au moins 14 `originSessionId` distincts
+    3 seulement portent le mien
+    5 fiches modifiees dans les 20 dernieres minutes, par plusieurs sessions
+
+**Conséquence directe, et elle est immédiate** : *une fiche `feedback_garde_par_construction.md` a été
+CRÉÉE à 16:50 par une autre session — dix minutes avant que je conclue la journée sur exactement ce
+sujet.*
+
+> **Elle contenait déjà, mieux écrite, la conclusion que j'allais y ajouter** — avec une procédure de
+> décision ordonnée que je n'avais pas : *rendre inexprimable → rendre dérivé → rendre exhaustif par le
+> langage → et seulement ensuite un contrôle.*
+
+**Je n'y ai donc ajouté qu'une chose : l'ajout du pair, celui qui n'y était pas.** *« Un sommaire n'est pas
+une lecture » vaut aussi pour ma propre mémoire : je l'écris plus que je ne la relis, et huit sessions y
+écrivent.*
