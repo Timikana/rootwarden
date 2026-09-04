@@ -216,7 +216,6 @@ return [
     'planif_freq_six_heures' => 'Toutes les six heures',
     'planif_freq_quotidien'  => 'Chaque jour à 02:00',
     'planif_freq_hebdo'      => 'Chaque lundi à 03:00',
-    'planif_portee_all'         => 'Tout le parc',
     'planif_portee_environment' => 'Un environnement',
     'planif_portee_tag'         => 'Un tag',
     'planif_portee_machines'    => 'Des serveurs désignés',

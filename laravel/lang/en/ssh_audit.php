@@ -140,7 +140,6 @@ return [
     'planif_freq_six_heures' => 'Every six hours',
     'planif_freq_quotidien'  => 'Every day at 02:00',
     'planif_freq_hebdo'      => 'Every Monday at 03:00',
-    'planif_portee_all'         => 'The whole fleet',
     'planif_portee_environment' => 'One environment',
     'planif_portee_tag'         => 'One tag',
     'planif_portee_machines'    => 'Named servers',

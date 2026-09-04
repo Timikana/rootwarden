@@ -8,6 +8,77 @@ Un ecart non ecrit ici est une regression, pas un choix.
 
 ---
 
+## E-395 — « tout le parc » sur `ssh_audit` : SIX etages, et un que la vue rendait inoffensif
+
+**Corrige le 2026-09-04 (`v1.40.1`). Precondition au redemarrage que l'exploitant attend.**
+
+    backend  ssh_audit.py:816  PORTEES = ('tag','environment','machines')
+                       :826    `target_type == 'all'` -> 400, par DECISION
+             -> garde ECRITE mais INERTE : les `.py` sont lus au DEMARRAGE
+
+> **Aujourd'hui l'ecran fonctionne parce que la garde n'est pas chargee. Apres le redemarrage,
+> il proposerait ce que le serveur rejette.**
+
+### Les six etages, ENUMERES par moi — la consigne recue en annoncait deux
+
+    1. AuditSshController:72   `all` PREMIER de PORTEES -> option par DEFAUT     FERME
+    2. planif_portee_all       le libelle de cette option, devient mort          RETIRE
+    3. audit-ssh.js:458        `planifPortee ? … : 'all'`  repli                 -> ''
+    4. audit-ssh.js:517        idem, sur le chemin de SOUMISSION                 -> ''
+    5. la VUE                  RIEN A FAIRE — voir ci-dessous
+    6. la COLONNE              `DEFAULT 'all'` en base — hors de portee, DECLARE
+
+**⚠ Sur 3 et 4, le commentaire du fichier disait pourquoi le repli valait `all`** : *« "parc"
+vaut mieux qu'un selecteur vide, qui se lit comme une panne »*. **C'etait un raisonnement
+d'AFFICHAGE, et il produisait le defaut le plus large a la SOUMISSION.** *Le repli vaut
+desormais `''`, et la garde de valeur refuse — `! type` d'abord.*
+
+### ✅ ETAGE 5 : LA VUE N'AVAIT RIEN, ET C'EST CE QUI LA SAUVE
+
+    audit-ssh.blade.php:194   @foreach (AuditSshController::PORTEES as $portee)
+                       :195   <option value="{{ $portee }}">{{ __('…planif_portee_' . $portee) }}
+
+**Elle construit ses options DEPUIS la constante.** *Sur `scan-cve` la liste etait ecrite a la
+main dans le gabarit (E-387) : retirer la constante y aurait laisse une `<option>` que le
+serveur refuse — un ecran proposant ce qu'il rejette, pire que les deux etats.*
+
+> **Une liste rendue depuis sa source ne peut pas la contredire.** *C'est le meme gain que le
+> type sans cas « portail » d'E-394 : la propriete tient par la construction, pas par la
+> vigilance.*
+
+### ⚠ DEUX LIBELLES A GARDER, ET LA CONSIGNE DISAIT « SA CLE » AU SINGULIER
+
+    planif_portee_all      le libelle de l'OPTION            -> MORT, retire
+    planif_cible_parc      AFFICHE une ligne existante       -> GARDE (js :508, :764)
+    planif_cible_ambigue   l'avertissement E-280             -> GARDE (js :541)
+
+**Retirer `planif_cible_parc` aurait fait afficher une portee VIDE sur une planification qui
+releve tout le parc** — le pire des deux etats. *Cesser d'offrir n'est pas cesser de savoir
+lire, et c'est la deuxieme fois du jour que cette distinction sauve un libelle.*
+
+### Ce qui n'est PAS touche, et c'est une DECISION
+
+**Le legacy** (`ssh-audit/index.php:237`, `js/main.js:737/741/759`) offre aussi « tout le parc »
+et le backend le refusera. *Meme raison que le refus de corriger `legacy/auth/login.php:46` :
+du code de production que la bascule retire, et y toucher ajouterait un risque a un composant
+qu'on eteint.* **L'ecran du legacy proposera ce que le serveur rejette, et c'est inscrit pour
+que personne ne le debogue.**
+
+### Verifications et reserves
+
+    la cle COMPOSEE `planif_portee_` + portee : les TROIS restantes sont a 1/1
+      dans les deux catalogues ; `all` est a 0/0
+    `planif_portee_all` : 1 occurrence dans le TEXTE du controleur, 0 dans son
+      CODE — c'est ma prose qui l'explique, pas un appel
+    node --check vert · parite FR/EN 107 = 107 · equilibres identiques a HEAD
+    reseau : 200 /connexion, 302 /audit-ssh, temoin 404
+
+- **L'ecran n'est pas exerce** : `/audit-ssh` exige une session. *Le rendu des trois options
+  restantes n'est donc pas observe — seulement la resolution de leurs cles.*
+- **`ssh_audit_schedules` porterait 0 ligne** (chiffre de la DSI, non verifiable ici).
+- Pas de binaire PHP sur l'hote de cette session.
+
+---
 ## E-394 — « Se souvenir de moi » : PORTE, et le contournement du legacy N'EST PAS porte
 
 **Porte le 2026-09-04 (`v1.40.0`).** *Le portage VIDAIT une table qu'il ne remplissait jamais

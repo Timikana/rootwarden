@@ -7,6 +7,43 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [1.40.1] - 2026-09-04
 
+### Securite — precondition au redemarrage
+- **« Tout le parc » est retire des planifications de releve SSH (E-395).** Le backend refuse
+  desormais cette portee par decision (`ssh_audit.py:826`), mais sa garde est **inerte tant que
+  le processus n'a pas redemarre** : apres le redemarrage, l'ecran proposerait ce que le serveur
+  rejette. **`all` etait le premier element de la liste, donc l'option selectionnee par
+  defaut.**
+- **Six etages ferm(es), la consigne recue en annoncait deux** : la constante, le libelle de
+  l'option, et **deux replis dans le JS** dont un sur le chemin de soumission — leur commentaire
+  justifiait `all` par un raisonnement d'AFFICHAGE (« mieux qu'un selecteur vide »), ce qui
+  produisait le defaut le plus large a la SOUMISSION.
+- **La vue n'avait rien a corriger** : elle construit ses `<option>` depuis la constante. Sur
+  `scan-cve` la liste etait ecrite a la main et il fallait l'y retirer aussi (E-387). *Une liste
+  rendue depuis sa source ne peut pas la contredire.*
+
+### Conserve deliberement
+- **`planif_cible_parc` et `planif_cible_ambigue`** : ils AFFICHENT une planification existante
+  de portee `all`. Les retirer aurait montre une portee **vide** sur un releve du parc entier.
+  Seul `planif_portee_all`, le libelle de l'option devenue impossible, est retire.
+- **Le legacy n'est pas touche** : il offrira « tout le parc » et le serveur le rejettera. C'est
+  une decision — du code de production que la bascule retire — et elle est inscrite pour que
+  personne ne la debogue.
+
+### ⛔ Un etage hors de portee, declare
+- La colonne est `enum(...) NOT NULL DEFAULT 'all'`. Un `INSERT` omettant `target_type`
+  obtiendrait `all` **par la base**. Le portage l'envoie toujours et le backend le refuse : le
+  mode de defaillance est un 400, pas un releve silencieux. Une migration n'est pas de mon
+  ressort.
+
+### Tests et reserves
+- Cle composee verifiee : les trois portees restantes ont leur libelle dans les deux catalogues
+  (temoin : `all` a 0/0). `planif_portee_all` n'apparait plus que dans une PROSE du controleur,
+  jamais dans son code. `node --check` vert, parite FR/EN 107 = 107, equilibres identiques a
+  `HEAD`, reseau 200/302/404.
+- **L'ecran n'est pas exerce** (`/audit-ssh` exige une session). Pas de binaire PHP sur l'hote.
+
+## [1.40.1] - 2026-09-04
+
 ### Securite - E-390 : le geste qui ECRIT etait garde, celui qui LIT non
 
 **Symptome.** `POST /ssh-audit/config` — la lecture de `sshd_config` sur une
