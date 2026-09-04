@@ -160,6 +160,11 @@ class InventaireDesGardesTest extends TestCase
          *   accueil, cgu (GET+POST), profil        l'ecran de tout compte
          *   profil/mot-de-passe, profil/step-up*   ses propres identifiants
          *   profil/sessions/fermer                 ses propres sessions
+     *   profil/donnees-personnelles            SES propres donnees — export
+     *       RGPD art. 20, FIDELE au legacy qui l'ouvre a tout compte connecte
+     *       des le role 1. L'identifiant vient de la SESSION, aucun parametre
+     *       n'est offert : il n'y a pas d'objet a garder au-dela de
+     *       l'authentification.
          *   documentation                          FIDELE au legacy, qui pose
          *       `checkAuth([1,2,3])` sans aucun `checkPermission` : son seul
          *       cloisonnement est un SEUIL DANS LA PAGE (`role >= 2` sur cinq
@@ -183,6 +188,7 @@ class InventaireDesGardesTest extends TestCase
             'GET cgu',
             'GET documentation',
             'GET profil',
+            'GET profil/donnees-personnelles',
             'POST cgu',
             'POST profil/mot-de-passe',
             'POST profil/sessions/fermer',

@@ -94,6 +94,14 @@ class TableDesGardes
             ['GET', 'documentation', []],
             ['GET', 'wazuh', ['role:2', 'perm:can_manage_wazuh']],
             ['POST', 'serveurs/importer', ['role:2', 'perm:can_admin_portal']],
+            ['POST', 'comptes/importer', ['role:2', 'perm:can_admin_portal']],
+            // Export RGPD art. 20. AUCUNE garde de role, et c'est FIDELE :
+            // `legacy/profile/export.php:27` fait
+            // `checkAuth([ROLE_USER, ROLE_ADMIN, ROLE_SUPERADMIN])` — tout compte
+            // connecte, des le role 1. L'identifiant vient de la SESSION et aucun
+            // parametre n'est offert : il n'y a pas d'objet a garder au-dela de
+            // l'authentification.
+            ['GET', 'profil/donnees-personnelles', []],
             ['GET', 'notifications/preferences', ['role:3', 'perm:can_admin_portal']],
             ['POST', 'notifications/preferences', ['role:3', 'perm:can_admin_portal']],
             ['POST', 'notifications/tout-lire', ['role:1']],
