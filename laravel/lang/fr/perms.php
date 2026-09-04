@@ -38,6 +38,17 @@ return [
     'err_machine' => 'Cette machine n\'existe pas.',
     'err_auto_acces' => 'Vous ne pouvez pas vous accorder un accès machine à vous-même.',
     'err_step_up' => 'Ce geste demande une confirmation par votre second facteur.',
+    'acces_aucun' => '— aucun accès',
+    'preset_none' => 'Accès, sans sudo',
+    'preset_all_nopasswd' => 'Accès + sudo complet, sans mot de passe',
+    'preset_restart_services' => 'Accès + systemctl restart/reload',
+    'preset_apt_only' => 'Accès + apt (⚠ équivalent root)',
+    'preset_read_logs' => 'Accès + lecture des journaux',
+    'acces_aide' => 'Le préréglage choisi est enregistré maintenant et appliqué au PROCHAIN déploiement — il ne change rien sur la machine avant.',
+    'acces_absents' => 'Deux préréglages du format de la base ne sont pas proposés : le produit ne peut pas enregistrer la liste de services ni les règles libres qu\'ils exigent, et un déploiement les remplacerait par un sudo complet.',
+    'acces_apt_avert' => '« Accès + apt » est ÉQUIVALENT ROOT : installer un paquet permet d\'obtenir un interpréteur de commandes root. Il n\'est pas plus étroit que le sudo complet.',
+    'acces_nopasswd_derive' => 'L\'exigence de mot de passe se déduit du préréglage et ne se choisit pas ici : seul « sudo complet » en dispense. L\'ancien portail permettait de combiner les deux librement.',
+    'err_preset' => 'Ce préréglage sudo n\'est pas proposé.',
     'err_reseau' => 'Le portail n\'a pas répondu (statut :statut). Rien n\'a été modifié.',
 
     // Les dix-huit permissions, nommees une a une.

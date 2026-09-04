@@ -119,11 +119,57 @@
         dis(r.corps.message, 'ok');
     }
 
+    /**
+     * Le prereglage sudo d'un couple (compte, machine). UN seul controle porte
+     * tout l'etat : chaine vide = pas d'acces, sinon un prereglage de la liste
+     * fermee du serveur.
+     *
+     * LA LISTE REVIENT A SON ETAT CONFIRME tant que le serveur n'a pas repondu,
+     * comme la case a cocher. Et elle affiche ensuite `r.corps.preset` — ce que
+     * le serveur a ECRIT — jamais la valeur demandee : une liste qui montrerait
+     * « sudo complet » alors que la base porte autre chose ferait decider la
+     * suite sur une croyance fausse. Sur un ecran de privilege c'est le defaut
+     * le plus couteux.
+     */
+    async function changePreset(liste) {
+        const voulu = liste.value;
+        const avant = liste.dataset.actuel || '';
+        liste.value = avant;
+        liste.disabled = true;
+
+        const corps = { machine_id: liste.dataset.machineId, value: voulu ? 1 : 0 };
+        if (voulu) { corps.preset = voulu; }
+
+        const r = await appelle(`/permissions/${liste.dataset.userId}/acces`, corps);
+        liste.disabled = false;
+
+        if (r.corps && r.corps.step_up_required) {
+            dis(r.corps.message, 'attention');
+
+            return demandeStepUp(r.corps.action, async () => {
+                liste.value = voulu;
+                await changePreset(liste);
+            });
+        }
+        if (! r.corps) { dis(garnis(L.err_reseau, { statut: r.statut }), 'echec'); return; }
+        if (! r.ok || ! r.corps.success) { dis(r.corps.message, 'echec'); return; }
+
+        const ecrit = typeof r.corps.preset === 'string' ? r.corps.preset : '';
+        liste.value = ecrit;
+        liste.dataset.actuel = ecrit;
+        dis(r.corps.message, 'ok');
+    }
+
     document.addEventListener('change', (ev) => {
         const c = ev.target;
-        if (c instanceof HTMLInputElement && c.type === 'checkbox'
-            && (c.dataset.permission || c.dataset.machineId)) {
+        // `dataset.machineId` a QUITTE les cases a cocher : les machines sont
+        // desormais une liste de prereglages. Le laisser dans la condition
+        // ci-dessous ferait croire qu'un chemin existe encore ici.
+        if (c instanceof HTMLInputElement && c.type === 'checkbox' && c.dataset.permission) {
             bascule(c);
+        }
+        if (c instanceof HTMLSelectElement && c.dataset.machineId) {
+            changePreset(c);
         }
     });
     document.addEventListener('click', (ev) => {

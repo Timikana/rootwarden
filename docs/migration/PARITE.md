@@ -8,6 +8,104 @@ Un ecart non ecrit ici est une regression, pas un choix.
 
 ---
 
+## E-382 — l'octroi d'une politique sudo : PORTE, et la liste sure n'est pas l'ENUM
+
+**Porte le 2026-09-04 (`v1.39.0`), greffe sur `/permissions` — PAS un nouvel ecran.**
+
+`manage_access.php` etait **la seule facon vivante d'accorder un sudo**, sur un produit dont
+c'est l'objet : demonter le legacy la retirait. L'octroi/retrait d'acces etait deja porte
+(`Permissions::definitAcces`, route `POST /permissions/{id}/acces`, `role:3` +
+`can_admin_portal`, anti-escalade reprise de `update_server_access.php:66`) — il manquait
+**trois colonnes**.
+
+### ⛔ LA LISTE FERMEE EST DE CINQ, PAS DES SEPT DE L'ENUM
+
+    proposes   none · all_nopasswd · restart_services · apt_only · read_logs
+    ABSENTS    systemctl_specific · custom
+
+**Ces deux valeurs ne peuvent pas fonctionner, et leur echec est FAIL-OPEN :**
+
+    sudo_manager.py:124   render_preset_systemctl_specific -> ValueError si services VIDE
+                  :144   render_preset_custom             -> ValueError si regles VIDES
+    configure_servers.py:369-377   except (ValueError, ImportError) -> policy = None
+                                   -> content = "<user> ALL=(ALL:ALL) NOPASSWD: ALL"
+
+Et **rien ne peut remplir leur entree** : la migration 051 ajoute quatre colonnes et
+**aucune colonne de services n'existe** ; `sudo_custom_rules` est citee dans cinq fichiers
+dont **aucun ecrivain** (deux documents, le `SELECT` du collecteur, un `.pyc`, le
+`ADD COLUMN`). Or `update_server_access.php:109` accepte les sept.
+
+> **Un administrateur qui choisit dans le legacy « systemctl services specifiques » — le
+> prereglage le PLUS restrictif du menu — obtient `NOPASSWD: ALL` sur cette machine au
+> deploiement suivant.** *Le portage ne propose donc que ce que `render_policy` REND. La
+> liste sure n'est pas celle que la base accepte.*
+
+**Les deux absentes se DECLARENT a l'ecran, avec leur raison** — et pas « pas encore
+porte », qui promettrait un portage la ou c'est un defaut de schema.
+
+### Ce que l'ecran dit et que personne ne disait
+
+    `apt_only` est EQUIVALENT ROOT       tire de son propre docstring
+                                         (`sudo_manager.py:95-99`) : `apt install`
+                                         permet un interpreteur root. Il n'est PAS
+                                         plus etroit que le sudo complet.
+    « applique au PROCHAIN deploiement » c'est ce que dit le commentaire de la colonne
+    un acces sans prereglage vaut `none` `NOT NULL DEFAULT 'none'` -> le deploiement
+                                         RETIRE le sudo. L'ecran disait « acces
+                                         accorde » sans le dire.
+
+### Deux capacites RETIREES, declarees
+
+    `sudo_nopasswd` independant   derive du prereglage : seul `all_nopasswd` en dispense.
+                                  Le legacy en fait une case libre, ce qui autorise la
+                                  paire incoherente `all_nopasswd` + `nopasswd = 0`.
+                                  `restart_services` sans mot de passe etait exprimable
+                                  et ne l'est plus ici.
+    `sudo_runas`                  ecrit `'root'` cote serveur, aucun champ. Le legacy le
+                                  valide par une expression reguliere alors que son
+                                  interface envoie TOUJOURS `'root'` — une entree libre
+                                  absente ne se contourne pas.
+
+### Choix de rendu, et ils repondent a des defauts deja payes
+
+**UN SEUL controle par (compte, machine)** : une case a cocher plus une liste
+autoriseraient une combinaison impossible — coche sans prereglage, ou prereglage sans
+acces. « Pas d'acces » est une valeur de la liste ; aucun etat n'est inexprimable.
+
+**Les trois avertissements sont rendus UNE FOIS**, hors de la boucle des comptes : les y
+placer les aurait repetes autant de fois qu'il y a de comptes — le defaut des « 31 fois
+ancien portail » vu a l'image sur le menu.
+
+**L'ecran affiche le prereglage que le SERVEUR A ECRIT** (`'preset'` dans la reponse), pas
+celui qui a ete demande. *Sur un ecran de privilege, montrer « sudo complet » alors que la
+base porte autre chose ferait decider la suite sur une croyance fausse.*
+
+**Les cles de `presetsDe()` sont castees en entier** : `pluck()` conserve le type du
+pilote, et une cle chaine ferait tomber le `?? 'none'` de la vue sur une machine qui porte
+pourtant un privilege — l'ecran afficherait « sans sudo » sur un compte qui a le sudo
+complet.
+
+### ⛔ Ce qui n'est PAS fait ici
+
+**Aucun deploiement.** L'ecran ecrit en base ; l'application est le geste reserve
+(`configure_servers.py` lors d'un deploiement).
+
+### ⚠ Reserves
+
+- **La syntaxe PHP n'est pas verifiee** : aucun binaire PHP sur l'hote de cette session,
+  `docker` refuse. Controle structurel seulement — les ecarts de parentheses, crochets et
+  accolades de mon depouillement sont **identiques avant et apres** sur les quatre fichiers
+  PHP, mesures contre `HEAD`. `node --check` est vert sur le JS, avec temoin.
+- **La vue n'est pas exercee au reseau** : `/permissions` exige `role:3` et rend 302 sans
+  session. L'application demarre (200 sur `/connexion`, temoin 404), mais une erreur
+  d'analyse dans ces fichiers ne se manifesterait qu'a l'ouverture de cette page.
+- **Le repli fail-open de `add_to_sudoers` n'est pas corrige** — c'est `backend/`, et il
+  entre dans le lot du redemarrage. Le portage ne l'atteint plus par sa liste fermee, mais
+  les lignes deja ecrites par le legacy avec `systemctl_specific` ou `custom` restent en
+  base et repliront au prochain deploiement.
+
+---
+
 ## E-01 — Le rejeu d'un code TOTP doit etre refuse
 
 **Cible legacy : accepte (defaut). Cible Laravel : REFUSE — corrige le 2026-08-17.**
