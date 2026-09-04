@@ -228,3 +228,89 @@ partie** — il porte un geste (voir §3).
 **Donc : le bloc A est actionnable, le bloc C aussi, le bloc B ne l'est pas encore
 page par page.** Ce qui manque n'est pas de la mesure de masse, c'est
 l'appariement geste par geste des 16 fichiers `adm/includes/` et `auth/` ci-dessus.
+
+---
+
+## 5. La passe des liens entrants, faite — et **une TROISIÈME question qui manquait**
+
+**Mesure du 2026-09-04.** J'avais écrit que les blocs B, C et D n'avaient pas reçu
+la passe. Elle est faite, par un **graphe de dépendances résolu** : chaque
+`require`/`include` est résolu en chemin absolu depuis le fichier qui le porte —
+**303 arcs vers 25 cibles**, 5 non résolus et tous identifiés (`vendor/autoload`,
+un chemin de langue dynamique, des auto-références).
+
+### 5.1 Pourquoi ni le nom ni le chemin ne marchent, et ce qui a été essayé
+
+**Deux instruments ont échoué avant celui-ci, dans les deux sens :**
+
+| instrument | défaut | preuve |
+|---|---|---|
+| **nom de base** | **surcompte** — `notifications.php` est une *sous-chaîne* de `manage_notifications.php` ; `audit_log.php` désigne DEUX fichiers ; `index.php` en désigne **dix** | il rendait 21 requérants pour `adm/audit_log.php`, qui n'en a aucun |
+| **chemin relatif au dépôt** | **sous-compte** — les `require` PHP sont **relatifs** (`__DIR__ . '/../includes/…'`), donc `adm/includes/audit_log.php` n'apparaît nulle part tel quel | il rendait **7** là où la vérité est **21** |
+
+*Et une version intermédiaire rendait **0 pour tout le bloc B*** — une exclusion en
+arrière qui rejetait le `/` des `__DIR__ . '/…'`. **Le témoin l'a tuée sur place** :
+`adm/includes/audit_log.php` devait rendre beaucoup, il rendait zéro. Sans ce
+témoin je publiais « aucune des 26 n'est requise », qui se trouve être **la bonne
+réponse obtenue par un instrument mort**.
+
+### 5.2 Le résultat : 25 fichiers seulement sont REQUIS
+
+    db.php                        60 requerants        footer.php                 18
+    auth/verify.php               56                   includes/howto_tip.php     15
+    head.php                      25                   adm/includes/crypto.php     8
+    menu.php                      24                   includes/totp_crypto.php    5
+    auth/functions.php            24                   auth/step_up.php            5
+    adm/includes/audit_log.php    18 fichiers (21 arcs) includes/feature_flags.php  4
+    includes/lang.php             19                   auth/password_policy.php    4
+
+**Ce sont les seuls dont l'archivage casse autre chose que des LIENS.** Le socle
+du §BLOC D est donc confirmé et, pour la première fois, **ordonné par poids**.
+
+### 5.3 Bloc B et bloc C : les verdicts TIENNENT
+
+    BLOC B (26 pages)  requises par un autre fichier : 0
+    BLOC C (2 « MORT ») liens entrants en CODE        : 0  (temoin : 26 pour audit_log.php)
+
+### 5.4 ⚠ Mais la question que je posais n'était pas la seule qui compte
+
+La passe des liens entrants répond à *« qu'est-ce qui CASSE si je retire ce
+fichier ? »*. Elle ne répond pas à :
+
+> **« Quel geste devient INATTEIGNABLE si je retire ce fichier ? »**
+
+Et le graphe rend la réponse d'un coup. **Neuf fichiers n'ont qu'UN SEUL
+requérant** :
+
+    adm/admin_page.php  est le SEUL acces a 7 fichiers :
+        includes/manage_users.php      :243      includes/manage_servers.php   :270
+        includes/manage_roles.php      :245      includes/manage_permissions   :277
+        includes/manage_access.php     :275   ⚠  includes/manage_notifications :279
+        includes/import_csv.php        :44    ⚠
+
+    index.php  est le SEUL acces a :
+        includes/onboarding.php        :162   ⚠
+
+**Or les trois marqués ⚠ portent des capacités NON PORTÉES** (§3) : le préréglage
+sudo, l'import CSV de comptes, l'accueil des nouveaux comptes.
+
+> **`adm/admin_page.php` et `index.php` figurent dans mon BLOC B comme portés et
+> archivables. Les archiver ne casserait RIEN — et supprimerait du produit les
+> trois dernières capacités non portées, en laissant leurs fichiers sur le
+> disque.** Aucune erreur 500, aucun lien mort, aucune suite rouge. La capacité
+> cesse simplement d'exister.
+
+### 5.5 Les trois questions, et pourquoi elles ne se déduisent pas l'une de l'autre
+
+    1. le geste est-il PORTE cote laravel/ ?          -> ce que je mesurais
+    2. le fichier est-il REQUIS par un autre ?        -> la passe, oubliee au bloc A
+    3. le fichier est-il le SEUL ACCES a un geste
+       NON porte ?                                    -> personne ne l'avait posee
+
+**La 3 est la dangereuse, parce que rien ne tombe.** La 2 se paie par un incident
+visible ; la 3 se paie par une capacité disparue que personne ne cherche.
+
+> **Conséquence opérationnelle** : `adm/admin_page.php` et `index.php` sortent du
+> bloc B. Ils sont **archivables en DERNIER dans leur chaîne**, après le portage du
+> préréglage sudo, de l'import CSV de comptes et de l'onboarding — ou après un
+> arbitrage explicite d'abandon de ces trois capacités.
