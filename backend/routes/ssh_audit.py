@@ -119,6 +119,7 @@ def _save_audit_result(machine_id, result, config_raw, ssh_version, audited_by):
 
 @bp.route('/ssh-audit/scan', methods=['POST'])
 @require_api_key
+@require_permission('can_audit_ssh')
 @require_machine_access
 @threaded_route
 def ssh_audit_scan():
@@ -314,6 +315,7 @@ def ssh_audit_fleet():
 
 @bp.route('/ssh-audit/results', methods=['GET'])
 @require_api_key
+@require_permission('can_audit_ssh')
 @require_machine_access
 @threaded_route
 def ssh_audit_results():
@@ -380,12 +382,10 @@ def ssh_audit_results():
 # ⚠ Court-circuit au role 3 (`helpers.py:338`) : un superadmin passe SANS porter
 # la ligne. Voulu — mais ce garde ne s'applique donc pas a tous.
 #
-# ⚠ TROIS ROUTES DU MEME MODULE RESTENT NUES, et c'est un choix d'ordre, pas un
-# oubli : `/ssh-audit/scan` (l.124, joint la machine), `/ssh-audit/results`
-# (l.319, historique des scores et comptes de findings) et `/ssh-audit/backups`
-# (l.636, joint la machine). Les trois sont des lectures de posture de securite
-# gardees par `can_audit_ssh` aux deux pages : meme correctif attendu, sur
-# arbitrage separe.
+# ✅ E-391 : LES TROIS AUTRES ROUTES NUES DU MODULE SONT FERMEES (meme garde).
+# `/ssh-audit/scan`, `/ssh-audit/results` et `/ssh-audit/backups` portent
+# desormais `@require_permission('can_audit_ssh')`. Le module n'a plus de route
+# sans role ni permission — verifie par le balayage AST, pas par cette liste.
 @require_permission('can_audit_ssh')
 @require_machine_access
 @threaded_route
@@ -659,6 +659,7 @@ def ssh_audit_toggle():
 
 @bp.route('/ssh-audit/backups', methods=['POST'])
 @require_api_key
+@require_permission('can_audit_ssh')
 @require_machine_access
 @threaded_route
 def ssh_audit_backups():

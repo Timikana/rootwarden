@@ -5,6 +5,83 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.40.2] - 2026-09-04
+
+### Securite - E-391 : les trois dernieres routes nues de `ssh_audit`
+
+**Suite d'E-390, en UN commit et non trois.** Trois commits successifs sur le
+meme defaut du meme module se lisent comme un module traite alors qu'il ne l'est
+pas — c'est exactement le reproche qu'E-390 s'adressait a lui-meme en inscrivant
+son reste en commentaire.
+
+**Symptome.** Apres E-390, trois routes du module n'avaient toujours ni role ni
+permission, alors que les deux pages qui les servent exigent `can_audit_ssh`
+(`legacy/ssh-audit/index.php:12-13`, `laravel/routes/web.php:229`) :
+
+| route | ce qu'elle fait |
+|---|---|
+| `POST /ssh-audit/scan` | **joint la machine** — `get_sshd_config`, audit complet d'un serveur |
+| `GET /ssh-audit/results` | historique des scores, grades et comptes de findings par machine |
+| `POST /ssh-audit/backups` | **joint la machine** — `list_backups` |
+
+Atteignables par un role 1 sans la permission via le forgeur de requetes de
+`legacy/documentation.php` (cf. E-389, E-390 et
+`docs/migration/RELEVE-ANGLES-4-ET-5.md`).
+
+**Le depot portait deja l'analyse, avec l'aveu que sa parade n'en etait pas une.**
+`laravel/public/js/audit-ssh.js:27-33`, verbatim :
+
+> `GET /ssh-audit/results` ne porte NI role NI permission : sa seule borne est
+> `require_machine_access`, inerte des le role 2. Ce qui la referme est la ligne
+> `if not machine_id: return 400` de son CORPS — un controle de VALIDITE, pas un
+> controle d'acces. On passe donc toujours le parametre, et on ne compte pas sur
+> ce filet.
+
+Un defaut documente depuis des jours et corrige aujourd'hui n'est pas la meme
+histoire qu'un defaut decouvert.
+
+**Correctif.** `@require_permission('can_audit_ssh')` sur les trois, entre
+`@require_api_key` et `@require_machine_access`. Le balayage AST **apres**
+correctif rend **0 route sans role ni permission** dans le module. Le commentaire
+d'E-390 qui annoncait ces trois routes comme restantes a ete remplace : il etait
+devenu faux, et un commentaire faux sur un garde se lit comme un etat.
+
+**⚠ CONSEQUENCE ACCEPTEE, ecrite ici pour que personne ne la debogue.**
+`legacy/adm/health_check.php:226` appelle `POST /ssh-audit/backups`. Comme
+`require_permission` lit les droits **en base** (`helpers.py:320-346`), **la
+sonde « SSH Audit Backups » de cette page echouera en 403 pour un compte de
+role 2 qui ne porte pas `can_audit_ssh`** (le role 3 court-circuite a `:338`).
+Decision assumee : `health_check.php` est la page que les consignes du chantier
+interdisent d'ouvrir — elle ECRIT sur `srv-zabbix` en production AU CHARGEMENT
+(cf. E-224). Degrader une de ses sondes reduit une capacite non desiree.
+
+**Aucun appelant serveur-a-serveur, verifie.** `AuditSshController.php` mentionne
+`GET /ssh-audit/results` dans son docblock, ce qui ressemble a un appelant : la
+recherche **hors commentaires** ne rend qu'un lien vers le legacy
+(`config('app.url_legacy') . '/ssh-audit/'`). Les trois routes ne sont donc
+appelees que depuis des sessions utilisateur (`legacy/ssh-audit/js/main.js`,
+`laravel/public/js/audit-ssh.js`), ou l'identite resolue est celle du compte —
+plus `health_check.php` ci-dessus. Sans cette verification, une garde qui lit
+`get_current_user()` aurait pu refuser un appel serveur depourvu de session.
+
+**Tests.** `ruff` vert, import REEL du module. Balayage AST avant (4 nues) et
+apres (0). Suite complete : **667 passed, 5 skipped, 2 xfailed, 0 FAILED** —
+compte de `skipped` inchange par ce correctif, et aucune des trois routes ne
+figurait dans la liste connue de `test_invariant_machine_id.py`.
+
+**⚠ Collision de version a signaler, non resolue ici.** `882ad9b` (« tout le parc
+retire des planifications ») et `f92cdcf` (E-390) revendiquent **tous deux
+v1.40.1** : la seconde session a lu `legacy/version.txt` avant que le bump de la
+premiere n'atterrisse. Les deux entrees coexistent donc sous le meme numero dans
+ce fichier. **Aucune des deux n'a ete renumerotee** — renumeroter l'entree d'une
+autre session, alors que l'auto-tag de la CI lit ce fichier, est un arbitrage
+d'exploitation. Ce correctif prend 1.40.2 et laisse la collision visible.
+
+**Notes d'exploitation.** `backend/**.py` est lu au demarrage : INERTE jusqu'au
+redemarrage de `rootwarden_python`.
+
+---
+
 ## [1.40.1] - 2026-09-04
 
 ### Securite — precondition au redemarrage
