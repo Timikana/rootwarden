@@ -8,6 +8,108 @@ Un ecart non ecrit ici est une regression, pas un choix.
 
 ---
 
+## E-386 — l'import CSV de COMPTES : porte, et plus etroit que le legacy sur trois points
+
+**Porte le 2026-09-04 (`v1.39.4`), sous-lot D6c.** *La moitie SERVEURS de
+`import_csv.php` etait deja portee (`ServeursController::importer`) ; il ne restait que la
+moitie COMPTES, et `comptes.blade.php:24` le declarait.*
+
+### Le motif suivi est celui du PORTAGE, pas celui du legacy
+
+    bilan       lignes · crees · manquantes · tronque · erreurs
+    erreurs     PAR LIGNE : ['ligne' => n, 'nom' => ..., 'texte' => ...]
+    plafond     IMPORT_MAX_LIGNES = 500, et ce qui depasse est DIT
+    en-tete     colonnes exigees verifiees, `manquantes` rendu
+
+*Le portage avait deja cette forme (`Serveurs.php:369`). Trois implementations d'une meme
+regle finissent par diverger, et il y en avait une qui marche.*
+
+### UNE SEULE implementation de l'anti-escalade, deux appelants
+
+`Comptes::roleAutorise($demande, $roleAuteur)` porte la liste fermee **et** la coercition.
+`ComptesController::creer` l'appelle desormais aussi — **sa copie en ligne, ecrite une heure
+plus tot pour E-385, a ete retiree.**
+
+> *Le legacy porte TROIS copies de cette regle et elles n'ont deja pas la meme forme :
+> `manage_users:92` coerce ET annonce, `manage_roles:154` refuse, `import_csv:156` coerce en
+> SILENCE. C'est exactement ce qu'on evite en n'en ayant qu'une.*
+
+### Trois divergences, toutes DECLAREES a l'ecran
+
+**1. `sudo` exige le role 3, et la coercition SE DIT.** Le legacy ecrit `users.sudo` depuis
+le CSV sans aucun controle de role (`:162`, `:166`) alors que son geste dedie
+(`toggle_sudo.php:26`) exige `ROLE_SUPERADMIN` — c'est E-130. Ici la valeur est coercee a 0
+et **le compte-rendu par ligne le dit** : *un importeur qui croit avoir accorde sudo et ne
+l'a pas accorde prendra la decision suivante sur une croyance fausse.*
+
+**2. `email` devient OBLIGATOIRE.** Le legacy l'accepte vide (`:159`), et fabrique alors des
+comptes sans acces ni recuperation — E-131, **en serie**.
+
+**3. Le mot de passe genere est RENDU, une fois.** Le legacy le jette (`:148`). Ici il est
+affiche a l'issue de l'import et **n'est enregistre nulle part**.
+
+*⚠ L'arbitrage a change entre hier et aujourd'hui, et pour une raison mesuree : hier
+« forcer `force_password_change` », aujourd'hui « afficher une fois ». **Le portage n'envoie
+aucun courriel** (`MAIL_MAILER=log`) et le flux de reinitialisation n'est pas porte — forcer
+un changement sans canal de delivrance aurait fabrique des comptes definitivement
+inaccessibles, en serie.*
+
+### ⚠ Une divergence de RENDU, declaree contre la norme de son propre ecran
+
+`comptes.blade.php` porte une norme plus stricte que `ClesApiController` : le panneau
+`comptes-secret` ne met **jamais** un secret dans le HTML de la page — il arrive par une
+reponse AJAX et le JS l'injecte, *parce que le legacy le placait dans la page d'ou il partait
+dans l'historique du navigateur* (E-113).
+
+**Ici les secrets sont N, et ils SONT dans le HTML** — mais dans le corps d'une reponse a un
+POST, qui n'entre pas dans l'historique comme une URL rejouable. C'est le motif de
+`ClesApiController`, choisi pour sa raison : *un message de session les deposerait sur le
+disque du conteneur (pilote `file`)*. **Le prix est celui de ce motif : recharger repropose
+le formulaire et les secrets disparaissent.**
+
+### Ce que le portage NE fait pas, et c'est mieux
+
+**Aucune ligne dans `permissions`.** Le legacy insere **15 colonnes NOMMEES** a zero. Or
+`Permissions::pour()` traite l'absence de ligne comme « aucun droit » et `definit()` en cree
+une au premier reglage — et `Permissions::toutes()` lit les colonnes dans le **SCHEMA**. *Une
+liste de 15 noms codee en dur omettrait silencieusement une permission ajoutee apres le
+portage : la meme raison qui a fait CONSERVER le `SELECT *` de l'export RGPD (E-384).*
+
+### ⚠ ET UNE DECLARATION DEVENUE FAUSSE, RETIREE AVEC SES CLES
+
+`comptes.blade.php` portait un encart *« ne reste que l'import CSV »* avec un lien vers
+`admin_page.php`. **Le laisser aurait fait d'un ecran qui OFFRE la capacite un ecran qui la
+declare absente.** Il part, avec `reste_titre`, `reste_texte` et `reste_lien` — verifie : 0
+reference restante.
+
+### Verifications
+
+    39 classes rw-* employees, 0 absente de rw.css      temoin : .rw-zzz -> False
+    58 cles employees par la vue, 0 absente             temoin : zzz_invente -> False
+    `role_` signale : cle COMPOSEE preexistante (2 occurrences dans HEAD),
+      et role_1/2/3 existent dans les deux catalogues
+    parite FR/EN 92 = 92 apres retrait des trois cles
+    equilibres identiques a HEAD sur les six fichiers
+
+**Reseau — et c'est la verification la plus forte de la serie :**
+
+    POST /comptes/importer  sans jeton  ->  419
+    POST /comptes           sans jeton  ->  419   TEMOIN : meme garde
+    POST /zzz-inexistant    sans jeton  ->  404   TEMOIN : route absente
+
+*La route resout et herite de la garde de falsification. Un 404 aurait dit qu'elle n'existe
+pas, un 500 qu'un fichier ne s'analyse pas.*
+
+### Reserves
+
+- **Le geste n'est pas exerce** : aucun compte n'a ete cree. `POST /comptes/importer` exige
+  une session de role 2 et un jeton, et creer des comptes en serie n'est pas un geste que
+  j'accomplis sans mot.
+- Pas de binaire PHP sur l'hote de cette session.
+- **La politique de mot de passe des MACHINES** (E-132) reste une divergence assumee du
+  legacy, hors de ce sous-lot : elle concerne l'import de SERVEURS.
+
+---
 ## E-385 — le portage permettait a un ROLE 2 de creer un SUPERADMINISTRATEUR
 
 **Corrige le 2026-09-04 (`v1.39.3`).** *Trouve en inventoriant l'import CSV des comptes,

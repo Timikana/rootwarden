@@ -5,6 +5,56 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.39.4] - 2026-09-04
+
+### Ajoute
+- **L'import CSV de COMPTES est porte (E-386, sous-lot D6c).** `POST /comptes/importer`, meme
+  garde que la creation unitaire. La moitie SERVEURS de `import_csv.php` etait deja portee ;
+  celle-ci etait la derniere capacite du legacy qui n'ecrit sur aucune machine.
+- **Le motif suivi est celui du portage** — bilan avec `lignes/crees/manquantes/tronque`, un
+  canal d'erreurs PAR LIGNE, un plafond de 500 lignes dont le depassement est DIT — et non
+  celui du legacy, qui n'a ni plafond ni compte-rendu par ligne.
+
+### Plus etroit que le legacy, et declare a l'ecran
+- **`sudo` exige le role 3, et la coercition se dit par ligne.** Le legacy ecrit `users.sudo`
+  depuis le CSV sans aucun controle de role, alors que son geste dedie exige le role 3 (E-130).
+- **`email` devient obligatoire.** Le legacy l'accepte vide et fabrique alors des comptes sans
+  acces ni recuperation, en serie (E-131).
+- **Le mot de passe genere est rendu UNE FOIS** au lieu d'etre jete. L'arbitrage a change
+  depuis hier, et pour une raison mesuree : le portage n'envoie aucun courriel
+  (`MAIL_MAILER=log`) et le flux de reinitialisation n'est pas porte, donc forcer un
+  changement sans canal de delivrance aurait fabrique des comptes definitivement
+  inaccessibles.
+
+### Consolide
+- **`Comptes::roleAutorise()`** porte desormais la liste fermee ET l'anti-escalade, et
+  `ComptesController::creer` l'appelle : **sa copie en ligne, ecrite une heure plus tot pour
+  E-385, est retiree.** Le legacy porte trois copies de cette regle, de deux formes
+  differentes.
+- **Aucune ligne dans `permissions` a la creation.** Le legacy insere 15 colonnes nommees a
+  zero ; `Permissions::pour()` traite l'absence comme « aucun droit » et `toutes()` lit le
+  schema. Une liste codee en dur omettrait une permission ajoutee apres le portage — la meme
+  raison qui a fait conserver le `SELECT *` de l'export RGPD.
+
+### Retire
+- **L'encart « ne reste que l'import CSV »** et ses trois cles i18n. Le laisser aurait fait
+  d'un ecran qui offre la capacite un ecran qui la declare absente. Verifie : 0 reference
+  restante.
+
+### Tests
+- 39 classes `rw-*` employees, aucune absente de `rw.css` (temoin : une classe inventee est
+  bien vue absente). 58 cles employees par la vue, aucune absente des deux catalogues (temoin
+  idem). Parite FR/EN **92 = 92**. Equilibres identiques a `HEAD` sur les six fichiers.
+- **Reseau** : `POST /comptes/importer` sans jeton rend **419**, comme `POST /comptes`
+  (temoin), la ou une route absente rend **404** (temoin). La route resout et herite de la
+  garde de falsification.
+
+### Reserves
+- **Le geste n'est pas exerce** : aucun compte n'a ete cree. Pas de binaine PHP sur l'hote de
+  cette session.
+- La politique de mot de passe des MACHINES (E-132) reste une divergence assumee, hors de ce
+  sous-lot.
+
 ## [1.39.3] - 2026-09-04
 
 ### Securite

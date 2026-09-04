@@ -44,6 +44,9 @@ use Illuminate\View\View;
  */
 class ComptesController extends Controller
 {
+    /** Borne de taille du fichier importe, en kio — meme valeur que `serveurs`. */
+    private const IMPORT_MAX_KO = 512;
+
     public function __construct(
         private readonly Comptes $comptes,
         private readonly JournalAudit $journal,
@@ -80,6 +83,27 @@ class ComptesController extends Controller
 
     public function __invoke(Request $requete): View
     {
+        return $this->rendu($requete);
+    }
+
+    /**
+     * Le rendu commun. `secretsImport` n'est JAMAIS lu depuis la session.
+     *
+     * ══ L'IMPORT NE REDIRIGE PAS, ET C'EST DELIBERE ═══════════════════════
+     *
+     * Chaque compte importe recoit un mot de passe genere qui n'existe qu'une
+     * fois. Le faire transiter par un message de session le deposerait sur le
+     * disque du conteneur — le pilote est `file`. Meme motif que
+     * `ClesApiController`, et meme prix, connu et assume : recharger la page
+     * apres un import repropose le formulaire au navigateur.
+     *
+     * @param  list<array{nom: string, mdp: string}>  $secretsImport
+     */
+    private function rendu(
+        Request $requete,
+        ?array $import = null,
+        array $secretsImport = [],
+    ): View {
         [, $roleId] = $this->qui($requete);
 
         return view('comptes', [
@@ -87,7 +111,40 @@ class ComptesController extends Controller
             'roles' => Comptes::ROLES,
             'estSuperadmin' => $roleId >= 3,
             'longueurMinimale' => Comptes::LONGUEUR_MINIMALE,
+            'importMaxKo' => self::IMPORT_MAX_KO,
+            'importColonnes' => Comptes::IMPORT_COLONNES,
+            'importRoles' => array_keys(Comptes::IMPORT_ROLES),
+            'import' => $import,
+            'secretsImport' => $secretsImport,
         ]);
+    }
+
+    /**
+     * L'import CSV de comptes — sous-lot D6c, la moitie COMPTES de
+     * `legacy/adm/includes/import_csv.php`. La moitie SERVEURS est portee
+     * ailleurs (`ServeursController::importer`).
+     *
+     * `mimes:csv,txt` se lit sur le CONTENU par Laravel, pas sur l'extension : un
+     * `.csv` renomme depuis un binaire est refuse ici plutot que de finir dans
+     * `fgetcsv`.
+     */
+    public function importer(Request $requete): View
+    {
+        $valide = $requete->validate([
+            'fichier' => ['required', 'file', 'mimes:csv,txt', 'max:' . self::IMPORT_MAX_KO],
+        ], [], ['fichier' => __('comptes.imp_champ')]);
+
+        [$auteur, $roleAuteur] = $this->qui($requete);
+
+        $resultat = $this->comptes->importeCsv($valide['fichier']->getRealPath(), $roleAuteur);
+
+        if ($resultat['bilan']['crees'] > 0) {
+            // Le NOMBRE, jamais les noms ni les secrets : le journal est lisible
+            // par qui peut lire le journal, et un mot de passe n'y a pas sa place.
+            $this->journalise($auteur, 'Import CSV: ' . $resultat['bilan']['crees'] . ' comptes importes');
+        }
+
+        return $this->rendu($requete, $resultat['bilan'], $resultat['secrets']);
     }
 
     /* ═══ Creation ═════════════════════════════════════════════════════════ */
@@ -103,10 +160,13 @@ class ComptesController extends Controller
             return back()->with('erreur', __('comptes.err_nom_pris'));
         }
         $courriel = filter_var(trim((string) $requete->input('email', '')), FILTER_VALIDATE_EMAIL) ?: null;
-        $role = (int) $requete->input('role_id', 1);
-        if (! in_array($role, Comptes::ROLES, true)) {
-            $role = 1;
-        }
+        // La liste fermee ET l'anti-escalade, en UN appel : `roleAutorise()` porte
+        // les deux, et l'import CSV appelle la meme. Deux copies divergeraient —
+        // le legacy en a trois, dont une muette.
+        [$role, $rangRamene] = $this->comptes->roleAutorise(
+            (int) $requete->input('role_id', 1),
+            $roleAuteur,
+        );
 
         /*
          * ══ ANTI-ESCALADE — REPRISE DU LEGACY, ELLE MANQUAIT ICI ══════════
@@ -133,11 +193,6 @@ class ComptesController extends Controller
          * deux formes sont voulues : creer avec un rang moindre reste utile,
          * modifier vers un rang interdit n'a aucun sens.*
          */
-        $rangRamene = false;
-        if ($roleAuteur < 3 && $role >= $roleAuteur) {
-            $role = 1;
-            $rangRamene = true;
-        }
 
         $id = DB::table('users')->insertGetId([
             'name' => $nom,

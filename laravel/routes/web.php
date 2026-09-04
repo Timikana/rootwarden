@@ -641,6 +641,17 @@ Route::middleware(['session.authentifiee', 'session.revoquee', 'mot.de.passe.a.c
      */
     Route::post('/comptes', [ComptesController::class, 'creer'])
         ->middleware(['role:2', 'perm:can_admin_portal'])->name('comptes.creer');
+    /*
+     * L'import CSV de comptes — sous-lot D6c. MEME garde que la creation
+     * unitaire : ce geste cree des comptes, et il ne doit pas etre plus
+     * accessible que le formulaire qui en cree un.
+     *
+     * La reponse REND LA VUE au lieu de rediriger : chaque compte importe recoit
+     * un mot de passe genere qui n'existe qu'une fois, et un message de session
+     * le deposerait sur le disque (pilote `file`).
+     */
+    Route::post('/comptes/importer', [ComptesController::class, 'importer'])
+        ->middleware(['role:2', 'perm:can_admin_portal'])->name('comptes.importer');
     Route::post('/comptes/{id}/mot-de-passe', [ComptesController::class, 'motDePasse'])
         ->whereNumber('id')->middleware(['role:2', 'perm:can_admin_portal'])->name('comptes.mot-de-passe');
     Route::post('/comptes/{id}/cle-ssh', [ComptesController::class, 'cleSsh'])
