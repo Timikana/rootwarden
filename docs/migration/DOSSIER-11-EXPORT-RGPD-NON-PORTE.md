@@ -267,3 +267,76 @@ traçabilité du §6 couvre le même besoin sans changer le schéma.*
 **Le geste est une ligne dans `ChangementMotDePasseExige:99`.** *Il n'est pas dans mon périmètre
 d'écriture — je le route à la session de portage, avec ce raisonnement, pour qu'elle l'inscrive en
 commentaire à côté de la troisième entrée.*
+
+---
+
+# ⛔ RÉTRACTATION — la décision d'hier est ANNULÉE. L'exemption ne sera pas posée.
+
+**2026-09-04, 14:45.** *La session de portage a refusé d'écrire ma décision et a mesuré contre elle. Elle
+a raison, et c'est ma prémisse « CERTAIN » qui tombe.*
+
+## Ce que j'ai mesuré, après son objection
+
+    EXEMPTES = ['profil', 'profil.mot-de-passe']
+                ^^^^^^^^   ^^^^^^^^^^^^^^^^^^^^
+                l'ECRAN    le GESTE qui change le mot de passe
+                           -> tous DEUX deja exemptes
+
+    PortailController::changerMotDePasse  ne lit que `current_password` (:250)
+                                          AUCUN courriel, AUCUN jeton
+
+> **Un compte portant le drapeau atteint donc `/profil`, y change son mot de passe, et exporte ensuite.**
+> *Ce n'est pas un blocage : c'est une CONTRAINTE D'ORDRE, dont le remède est déjà exempté et de toute
+> façon obligatoire.*
+
+    ce que j'ecrivais   « 8 comptes ne peuvent pas exercer un droit legal,
+                          dont 5 sans AUCUN recours »            FAUX
+    ce qui est vrai     8 comptes doivent changer leur mot de passe AVANT
+                          d'exporter, sur un ecran deja ouvert a eux
+
+**Et « sans recours » nommait un autre problème** : *un mot de passe OUBLIÉ.* **Un compte qui ne connaît
+pas son mot de passe ne se connecte pas — donc il n'atteint AUCUNE route, exemptée ou non. L'exemption
+n'aurait rien changé pour eux.** *Leur problème est le flux de réinitialisation, qui attend le SMTP
+(`DOSSIER-24`).*
+
+## ⚠ Et le commentaire de la route dit déjà tout — je ne l'avais pas lu jusqu'au bout
+
+    web.php:113-121  « CONSEQUENCE DU GROUPE, DECLAREE [...] ne peut PAS exporter
+                       avant d'avoir change son mot de passe. C'est la parite avec
+                       le legacy, et c'est defendable »
+
+**La propriété était DÉCLARÉE au site de la route, assumée, et argumentée. J'ai tranché contre un choix
+raisonné sans avoir lu son raisonnement.** *Et une imprécision y subsiste, que je corrige ici : le
+courriel n'a rien à voir avec la LEVÉE du drapeau — il ne sert qu'à récupérer un mot de passe oublié.*
+
+## Ce que l'échange coûtait réellement
+
+    on PERDAIT   la propriete « cette liste ne contient que ce qui LIBERE »,
+                 ecrite dans le fichier comme « le SEUL endroit du portage ou
+                 allonger une liste d'exemptions AFFAIBLIT la garde »
+    on GAGNAIT   la levee d'une contrainte d'ORDRE au remede deja ouvert
+
+**On n'échange pas une garde contre rien.** *Le résidu que je qualifiais d'acceptable l'était ; il n'y
+avait simplement aucune raison de le prendre.*
+
+## ✅ LA DÉCISION QUI REMPLACE : ne rien exempter, et viser le VRAI blocage
+
+    1. `EXEMPTES` reste a DEUX entrees.        rien a ecrire
+    2. le vrai blocage des 8 comptes = un mot de passe qu'ils ne connaissent
+       pas -> geste d'administration, OU le flux de reinitialisation, qui
+       attend le SMTP (DOSSIER-24, point 2, mot de l'exploitant)
+
+## ⚠ CE QUE JE RETIENS, ET C'EST LA DEUXIÈME FOIS DANS LA MÊME DÉCISION
+
+**Deux arguments porteurs sont tombés sur cette seule décision.** *Le premier — « l'attaquant peut déjà
+tout lire en naviguant » — je l'ai cassé moi-même par la mesure, et je l'ai dit contre moi. Le second, je
+ne l'ai pas vu.*
+
+> **Et le sens n'est pas symétrique : celui que j'ai attrapé seule ALARMAIT ; celui qui a survécu
+> EXEMPTAIT.** *Retirer l'argument qui inquiète laisse intact celui qui rassure — et c'est celui-là qui
+> écrit dans le code.*
+
+**L'instrument qui l'a attrapé est le même que les trois fois précédentes : un pair qui allait AGIR sur la
+décision, pas une relecture.** *Voir `feedback_negatif_exige_un_temoin` et
+`feedback_rectification_fausse_voyage` — je viens d'en fournir un cinquième cas, et cette fois ma
+rectification n'a pas eu le temps de voyager.*
