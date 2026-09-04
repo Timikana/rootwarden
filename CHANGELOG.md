@@ -5,6 +5,36 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.39.9] - 2026-09-04
+
+### Corrige
+- **Dix rejeux 2FA fermaient l'etape du second facteur pour toute une adresse (E-392).**
+  `journalise()` etait appele avant l'aiguillage sur le verdict, donc un rejeu s'inscrivait en
+  `success = 0` avec `step = '2fa'` — et `ipBloquee()` compte exactement ces lignes. Un bureau
+  derriere un NAT partage une adresse, et un rejeu est le cas legitime le plus banal : meme
+  compte, second appareil, meme fenetre de trente secondes. **Un rejeu n'est pas un echec
+  d'identifiant : c'est une soumission en double d'un identifiant VALIDE — il doit etre inscrit
+  et ne doit pas compter.**
+- `journalise()` recoit desormais le **verdict** et non un booleen : une seule place decide
+  `success` ET `step`, qui ne peuvent donc plus se contredire. L'etape `2fa_rejeu` est distincte,
+  et `ipBloquee()` cesse de voir les rejeux **sans que son filtre change**. Les trois compteurs
+  homologues du legacy filtrent la meme valeur : ils cessent de les voir aussi.
+
+### ⛔ Ce que ce correctif ne ferme PAS, mesure et hors perimetre
+- **`legacy/auth/login.php:50` compte toute ligne `success = 0` SANS filtre d'etape, avec un
+  seuil de 5.** Cinq rejeux fermaient donc deja l'etape de CONNEXION du legacy — a la moitie du
+  seuil et sur un autre ecran. Changer l'etape ne l'en sort pas. **Pour le portage le correctif
+  est suffisant** : aucun de ses compteurs ne lit `login_attempts` sans filtre d'etape.
+
+### Conserve deliberement
+- `erreur_code_deja_utilise` reste distinct d'`erreur_code_invalide` : oracle faible, et c'est
+  la seule information qui dise a la personne legitime d'attendre la fenetre suivante plutot que
+  de ressaisir.
+
+### Reserves
+- **Le geste n'est pas exerce** : provoquer un rejeu exige une session et un code TOTP valide
+  resoumis dans sa fenetre. Pas de binaire PHP sur l'hote de cette session.
+
 ## [1.39.8] - 2026-09-04
 
 ### Corrige
