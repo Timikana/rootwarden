@@ -124,3 +124,107 @@ son propre site la casserait — c'est exactement le raisonnement qui a produit 
   helper ou un ORM sous un autre nom échapperait à cette recherche — déclarée étroite par son autrice* ;
 - **si une insertion nue malveillante a déjà eu lieu.** *Par construction, c'est ce que ce défaut rend
   indécidable — et c'est la raison pour laquelle il faut sceller maintenant plutôt que d'enquêter.*
+
+---
+
+# ⚠ 2026-09-04, 16:20 — LA MIGRATION VA DÉGRADER CETTE PROPRIÉTÉ, et mon compte d'écrivains était FAUX
+
+## 1. MON CHIFFRE DE « 7 ÉCRIVAINS NUS » ÉTAIT MESURÉ PAR UN INSTRUMENT PARTIEL
+
+    ce que je portais   7 ecrivains nus
+    mesure du 04/09     25 ecrivains  ·  5 scellent  ·  20 ecrivent NU (80 %)
+                          backend/ Python   11 ecrivains,  0 scellent
+                          laravel/           6 ecrivains,  4 scellent
+                          legacy/            8 ecrivains,  1 scelle
+                                             <- `audit_log.php:118`, LE SEUL
+
+**Mon relevé ne connaissait qu'une forme d'écriture. Il était aveugle au SQL brut
+(`DB::insert('INSERT INTO user_logs …')`, présent dans le portage lui-même) et aux onze écrivains Python.**
+
+## 2. LA MESURE EN BASE, VÉRIFIÉE DE MON CÔTÉ
+
+    TOTAL             6240
+    sans empreinte    1484   (23,8 %)
+    avec empreinte    4756
+
+    composition des lignes NON scellees :
+      Connexion reussie                            389
+      Permission refusee : can_admin_portal        281
+      Permission refusee : can_scan_cve            156
+      Permission refusee : can_view_compliance     141
+      Permission refusee : can_manage_platform_key  59
+      Mise a jour du mot de passe                   43
+      Permission refusee : can_deploy_keys          43
+      Permission refusee : can_manage_fail2ban      30
+
+**⚠ Et ce que cette composition ajoute : les 710 lignes « Permission refusée » viennent
+d'`ExigePermission.php:73` — un écrivain du PORTAGE, en SQL brut. Les 43 « Mise à jour du mot de passe »
+viennent de `MotDePasse.php`, également le PORTAGE.**
+
+> **Au moins 753 des 1484 lignes non scellées sont déjà écrites par le PORTAGE, pas par le legacy.**
+> *Les 389 « Connexion réussie » ne sont pas attribuables au nom de l'action seul — les deux portails
+> journalisent la connexion, et je ne le suppose pas.*
+
+## 3. 🔴 LA CONSÉQUENCE, ET ELLE EST DE LA CLASSE « RIEN NE TOMBE »
+
+    `legacy/adm/includes/audit_log.php:118` est le SEUL ecrivain SCELLANT du
+    legacy, et il porte 21 arcs. Quand le legacy tombera, il tombera avec.
+
+    apres l'extinction : le scellement a l'insertion n'existe plus que dans
+    les 4 ecrivains Laravel. Les 11 ecrivains Python ne bougent pas.
+
+> **La proportion de lignes non scellées ne diminuera pas avec l'extinction du legacy : ELLE VA
+> AUGMENTER.** *Aucune suite ne rougit, aucune page ne casse, et une propriété d'intégrité du produit se
+> dégrade sans qu'aucune mesure existante la surveille.*
+
+## 4. ⛔ ET LE SCELLEMENT EST UN BOUTON MANUEL — donc la fenêtre est SANS BORNE
+
+**Ce qui décide de la valeur de cette chaîne n'est pas le nombre d'écrivains scellants : c'est le DÉLAI
+entre l'insertion et le scellement.** *Une ligne scellée tardivement est protégée contre les modifications
+POSTÉRIEURES au scellement, pas contre celles qui l'ont précédé.*
+
+**Un scellement déclenché à la main, avec un mode simulation, laisse cette fenêtre ouverte
+indéfiniment — et personne ne la surveille.**
+
+## 5. ✅ CE QUE JE TRANCHE (la direction), ET ⛔ CE QUI VOUS REVIENT (le geste)
+
+    ⛔ NE PAS tenter de sceller dans chaque ecrivain.
+       `MotDePasse.php:300-306` a raison et son commentaire le dit :
+       « calculer la chaine ici, seul, la CASSERAIT ». Une chaine exige un
+       ordre sequentiel ; 25 ecrivains dans trois langages ne peuvent pas le
+       tenir. Vingt-cinq correctifs produiraient une chaine incoherente.
+
+    ✅ LA DIRECTION JUSTE : fermer la FENETRE, pas multiplier les scelleurs.
+       Un scellement PERIODIQUE reduit la fenetre a son intervalle et ne
+       touche aucun ecrivain.
+
+    📌 CE QUI VOUS REVIENT, ET POURQUOI :
+       le mecanisme serait une tache d'ORDONNANCEUR — et l'ordonnanceur de ce
+       depot tourne dans un fil INVISIBLE a `ps`, a deja tourne en quatre
+       exemplaires, et son verrou de chef est recent. Y ajouter une tache
+       est un geste sur un composant a l'historique charge, qui ne prend
+       effet qu'au REDEMARRAGE.
+
+**SI RIEN N'EST FAIT** : *l'extinction du legacy retirera le seul scelleur qu'il portait, la proportion de
+lignes nues augmentera, et la chaîne d'audit continuera de rendre « intègre » — parce qu'elle ne mesure
+que les lignes qu'elle a scellées.* **C'est le défaut le plus discret de ce dossier : une garde qui répond
+juste sur un périmètre qui rétrécit.**
+
+## 6. ⚠ ET UNE ACCUSATION A ÉTÉ ÉVITÉE — le détail vaut plus que le résultat
+
+**La session 3 allait publier que `MotDePasse.php:300-306` MENTAIT (« le journal s'écrit nu, comme partout
+ailleurs ») — huitième « en-tête qui ment » du chantier. Sa sonde voyait 5 écrivains dont 4 scellants :
+dans ce cadre, `MotDePasse` était l'exception et son commentaire était faux.**
+
+**Le commentaire dit VRAI. 80 % des écritures sont nues, et ce sont les 4 scellants qui sont l'exception.**
+
+> **Une accusation se propage et fait « corriger » du code sain. C'est pire qu'un faux zéro.**
+
+**⚠ Et ce qui l'a attrapée n'est pas un témoin — c'est un RESTE INEXPLIQUÉ : 710 lignes « Permission
+refusée » que ses cinq écrivains n'expliquaient pas.**
+
+> **« Le chiffre qui ne se referme pas est le meilleur détecteur d'instrument partiel — meilleur que le
+> témoin, qui ne valide que la forme qu'on lui a donnée. »**
+
+*C'est une correction à la règle que ce chantier applique depuis une semaine, et elle est juste : un témoin
+positif prouve que l'instrument LIT, pas qu'il lit TOUT.*
