@@ -393,3 +393,76 @@ juste — et contre l'auteur qui avait pris la peine de justifier son choix.
 *Ce qui l'a attrapée : une famille d'actions massivement non scellées
 (« Permission refusee » ×710) que mes cinq écrivains n'expliquaient pas.* **Un
 reste inexpliqué dans la mesure, pas une relecture.**
+
+---
+
+## 7. ⛔ Trouvé en fermant la Q3 : **le scellement porté casserait la chaîne**
+
+**Mesure du 2026-09-04 15:26 CEST.** Ce n'est pas une question d'archivage — c'est
+un défaut destructeur et irréversible, trouvé en cherchant si `audit_seal.php`
+était le seul accès à son geste. **Il ne l'est pas ; mais son homologue porté est
+faux.**
+
+### 7.1 La régression, par comparaison des deux implémentations
+
+    legacy/adm/api/audit_seal.php:78-82
+        if ($prevSelf === null) {
+            $pending[] = [$r['id'], $lastHash, $computed];
+            $lastHash = $computed;        <-- LA TETE AVANCE
+        }
+
+    laravel/app/Services/JournalAudit.php:178-187
+        if ($l->self_hash === null) {
+            $aSceller[] = [$l->id, $tete, $this->empreinte($tete, ...)];
+            continue;                      <-- $tete N'AVANCE PAS
+
+**Toutes les orphelines reçoivent donc le MÊME `prev_hash`.** Deux orphelines
+consécutives suffisent à produire une chaîne incohérente.
+
+### 7.2 Atteignable, et irréversible
+
+    POST /journal-audit/sceller            web.php:1031
+    journal-audit.js  simule (?simulation=1), affiche « N a sceller »,
+                      puis confirmeScellement() ECRIT
+
+`scelle()` écrit avec `->whereNull('self_hash')` — le garde-fou repris du legacy.
+**Une fois les lignes écrites elles ne sont plus nulles : le même outil ne peut plus
+les corriger.** Et `verifie()` rapporterait `CHAINON_ROMPU`, donc `scelle()`
+refuserait de retourner (`arret_sur_incoherence`). **Chaîne cassée ET outil bloqué.**
+
+Ampleur mesurée : **1484 orphelines**, paires consécutives dès les ids 91/92,
+92/93, 96/97. Le défaut mord au premier clic, pas dans un cas limite.
+
+### 7.3 La cause — **le bon raisonnement, la mauvaise référence**
+
+`JournalAudit.php:180-183` justifie explicitement la tête immobile :
+
+> *« La tête N'AVANCE PAS : c'est ce que fait `audit_log_raw`, et c'est donc ce que
+> la chaîne inscrite en base signifie. »*
+
+**C'est vrai d'`audit_log_raw`, qui insère UNE ligne à la fois. Ce n'est pas vrai
+d'un SCELEUR, qui en traite un lot.** L'auteur a comparé son code à
+`audit_log_raw` alors que son homologue est `audit_seal.php`.
+
+> **Un commentaire peut citer un comportement RÉEL d'une fonction RÉELLE et rester
+> faux, parce que c'est la mauvaise fonction de référence.** Ce n'est pas un
+> « en-tête qui ment » : c'est un en-tête juste sur le mauvais objet — et c'est plus
+> difficile à voir, parce que le vérifier confirme la citation.
+
+### 7.4 Et le trou d'août : la chaîne l'a ENJAMBÉ
+
+    Connexion reussie, SCELLEES   4563   2026-05-26 -> 2026-09-03
+    Connexion reussie, NUES        389   2026-08-12 12:38 -> 2026-08-15 12:54
+
+**Un seul écrivain de cette chaîne existe dans les trois couches** :
+`legacy/auth/login.php:201`, qui SCELLE. Aucun dans `laravel/` ni `backend/`, dans
+les deux orthographes. **Les 389 viennent donc du même endroit que les 4563** — un
+bloc contigu de trois jours, avec du scellé avant et après.
+
+`audit_log_raw` chaîne depuis « la dernière ligne dont `self_hash` n'est pas NULL » :
+**il enjambe les orphelines sans les voir.** La chaîne répond donc « intègre »
+aujourd'hui avec 389 lignes de connexion d'août en dehors d'elle.
+
+*Je ne sais pas ce qui s'est passé du 12 au 15 août et je ne le suppose pas.* Ce que
+la mesure établit : le trou existe, il est contigu, et la chaîne l'a refermé
+par-dessus.
