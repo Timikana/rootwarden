@@ -19403,3 +19403,120 @@ et le mot de passe aura disparu. C'est la propriete recherchee.
 « PAS de `force_password_change` » en le justifiant, et cette justification etait un
 raisonnement juste transporte sur un objet dont il ne decrivait plus les premisses. Un
 commentaire qui JUSTIFIE est un argument — et un argument se relit quand son objet bouge.*
+
+
+## E-398 — deux identités de version coexistent et divergent sur le MINEUR, sans mécanisme qui les relie
+
+**Mesuré le 2026-09-04 19:45, et trouvé en acceptant une correction de la DSI** —
+elle m'a détrompée sur `auto-tag` (il ne lit plus `version.txt`, il **dérive**), et
+cette correction en découvre une autre.
+
+    AFFICHEE   pied de page du socle + CHANGELOG    1.40.4
+    ETIQUETEE  releases, derivees du jalon          v1.39.N
+
+    VERSION-JALON                      `1.39`, UN SEUL commit (602b285, 27/08), jamais bump
+    compte --first-parent depuis lui   origin/main : 3      HEAD : 716
+    derniere etiquette distante        v1.39.3              -> coherent avec le 3
+
+**Le dériveur fonctionne exactement comme conçu** : sur `main`, 3 commits
+first-parent depuis le jalon donnent `v1.39.3`, et l'épreuve `--epreuve` passe
+(toutes les propriétés tiennent, y compris « un jalon absent fait échouer »).
+
+> **Le défaut n'est pas dans le mécanisme : il est que `VERSION-JALON` n'a pas
+> bougé quand l'équipe a commencé à écrire `1.40.x`.** *Le portail affichera
+> `1.40.4` et la release s'appellera `v1.39.4` — qui cherche la version du pied de
+> page dans les étiquettes ne la trouvera pas.*
+
+**Et rien ne relie les deux** : `version.txt` est assigné à la main, le jalon aussi,
+et aucun contrôle ne compare leur mineur. *`DECISIONS-DSI.md:8304` documente le
+mécanisme — « DÉRIVÉ, donc unique par construction » — mais l'écart n'est
+documenté nulle part* (mesuré : 0 document, témoin positif rendu sur le mécanisme).
+
+⚠ **Corollaire mesuré sur la dérivation, qui n'est pas un défaut mais une borne à
+connaître** : le compte est `--first-parent`, donc il dépend de **la référence**.
+`716` sur `Migration-Laravel` contre `3` sur `main`, parce qu'une fusion compte
+pour **un** pas en first-parent alors qu'une branche linéaire compte chacun de ses
+commits. *Le nombre n'est pas une propriété du CODE, c'est une propriété du CHEMIN
+pris dans l'histoire.* **Lancer `version.sh` hors de `main` rend un numéro sans
+signification** — ce qui est sans conséquence pour `auto-tag`, qui ne tourne que
+sur `main`, et trompeur pour un humain qui l'invoque ailleurs.
+
+### Et un commentaire qui nomme une source abandonnée
+
+    ci.yml:459   « # Job 6 : Tag version automatique (depuis version.txt) »
+    le job lit version.txt : 0 ligne de CODE (mesure hors commentaires)
+
+**Le titre du job nomme exactement la source qu'INF-004 a délibérément
+abandonnée**, et le commentaire de `:486` explique lui-même pourquoi — *« cette
+étape lisait `legacy/version.txt`, c'est-à-dire un numéro POSÉ À la main… un
+numéro assigné devient une version plausible, donc un tag plausible »*.
+
+> **Un commentaire de titre survit au changement qu'un commentaire de corps
+> documente.** *Le second dit la vérité, le premier la contredit, et c'est le
+> premier qu'on lit en survolant.* Même famille que les commentaires qui affirment
+> un accès plus strict que le code — ici c'est une **source** qui est fausse, pas
+> une garde.
+
+### Ce que cette entrée doit à une correction reçue
+
+J'avais écrit en E-381 que ma régression de `version.txt` « aurait pu poser une
+étiquette `v1.38.200` après une `v1.40.2` ». **C'est FAUX** : `auto-tag` ne lit pas
+ce fichier. **Le dépôt s'était protégé de cette faute par construction le 27/08**,
+précisément parce que trois sessions l'avaient commise ce jour-là.
+
+*Et cette correction m'arrangeait — elle réduisait la gravité de ma propre erreur —
+donc je l'ai mesurée deux fois avant de l'accepter : `ci.yml:461-491` ne porte
+aucune lecture de `version.txt`, et le seul `run:` du job est
+`VERSION=$(./scripts/version.sh)`.* **Une correction favorable se vérifie comme une
+défavorable, et c'est en la vérifiant que l'écart de mineur est apparu.**
+
+
+## E-398 bis — cet écart a été DÉCOMMITÉ par le `reset --soft` d'un pair, et il ne survivait que dans l'arbre
+
+**Relevé le 2026-09-04 20:05, sur le reflog.** Séquence reconstituée :
+
+    5e02519  un pair livre E-397
+    b6caf17  un pair commite son plan
+    dcbbd8d  commit « docs(lead): la mission de portage n'a plus de cible autorisee »
+    6f60a71  commit (AMEND) du meme message   <- l'amend a vise dcbbd8d
+    5631fd1  MON inscription d'E-398
+    dcbbd8d  reset: moving to dcbbd8d          <- la restauration
+    d186224  puis 85cb4dd
+
+**Le `reset --soft` a écarté `6f60a71` ET `5631fd1`.** Mesure :
+
+    E-398 dans HEAD    0 occurrence      ecarts dans HEAD  : 375
+    E-398 dans l'index 1                 ecarts dans l'arbre : 376
+    E-398 dans l'arbre 1                 TEMOIN E-396 dans HEAD : 1
+
+> **Mon inscription ne survivait que parce que l'arbre et l'index la portaient
+> encore.** *Un `git checkout` ou un second `reset --hard` l'aurait effacée sans
+> trace, et rien dans `git log` ne l'aurait signalée manquante.*
+
+### Ce que le pair a fait juste, et où sa vérification s'est arrêtée
+
+**Il a signalé son geste, restauré `dcbbd8d` à l'identique et l'a vérifié** — 1
+fichier, 92 insertions, le bon message. *C'est une vérification correcte.* **Elle
+portait sur le commit qu'il visait, pas sur celui qu'il ne savait pas exister.**
+
+> **Une vérification juste sur le mauvais périmètre a exactement la forme d'une
+> vérification suffisante.** *Il a comparé l'avant et l'après du commit amendé ;
+> personne ne compare l'avant et l'après de `HEAD`.* C'est la même famille que
+> « une mesure juste sur le mauvais objet ressemble à une confirmation », prise
+> cette fois sur l'étendue d'un geste plutôt que sur son objet.
+
+**Et sa propre leçon est la bonne, je la reprends telle quelle :**
+
+> *« Le pathspec protège le contenu du commit, il ne choisit pas le commit
+> amendé : `HEAD` est un état partagé de plus. Sur ce dépôt, ne pas amender du
+> tout. »*
+
+**Corollaire que j'ajoute** : `git commit -- <chemins>` me protège de committer le
+travail d'autrui, **et ne protège pas mon travail d'être décommité par autrui.**
+*La discipline du pathspec est unilatérale : elle borne ce que j'écris, pas ce
+qu'on me retire.* **La parade est de vérifier que son propre commit est ancêtre de
+`HEAD`** — `git merge-base --is-ancestor <sha> HEAD` — *et c'est la première fois
+de ce chantier que ce contrôle aurait servi.*
+
+**Réinscrit en avant**, sans `reset` ni `rebase` : l'historique porte donc `E-398`
+deux fois, et c'est préférable à un historique réécrit.
