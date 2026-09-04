@@ -7715,3 +7715,100 @@ ces deux appels, pour un résultat pire.**
 **⛔ PROPRIÉTÉ NON NÉGOCIABLE, et le portage doit être GATÉ dessus** : *la restauration par jeton EXIGE le
 second facteur.* **Portée de travers, cette capacité contourne la 2FA d'un produit de sécurité. Elle ne se
 porte qu'avec un test qui verrouille cette propriété — et le test avant la livraison, pas après.**
+
+### ⛔ MON HEURISTIQUE DE CIBLAGE ÉTAIT FAUSSE — j'ai promu un CORRÉLAT en MÉCANISME
+
+**J'avais inscrit, il y a une heure, et transmis comme consigne de ciblage :**
+
+> *« les touches de la question 3 se groupent sur les capacités RARES par nature »*
+
+**La session 3 l'a cassée avec ses trois touches suivantes :**
+
+    login.php         « se souvenir de moi »        employe a CHAQUE connexion
+    manage_roles.php  changer le role d'un compte   geste d'administration COURANT
+    manage_users.php  jeton de reinit a la creation chaine deja connue
+
+**Deux sur trois ne sont pas rares du tout.**
+
+> **Le mécanisme réel : LE FICHIER PORTEUR A PLUSIEURS GESTES DONT LA MAJORITÉ EST PORTÉE.** *Un verdict de
+> fichier y est nécessairement une MOYENNE — et une moyenne cache la minorité.*
+
+    ✅ l'heuristique juste : pointer la Q3 sur les fichiers MULTI-GESTES
+    ⛔ pas sur les capacites rares — la rarete etait un CORRELAT de
+       l'echantillon, et j'en ai fait une regle de ciblage
+
+**C'est ma propre règle enfreinte : « fonder sur le MÉCANISME et pas sur l'ÉNUMÉRATION ». Trois touches
+partageaient un trait, j'en ai fait une loi.** *Et la rareté explique bien les trois PREMIÈRES — leurs
+fichiers portaient un geste unique — mais comme cause locale, pas comme cause commune.*
+
+### ⚠ NOUVELLE TOUCHE : CHANGER LE RÔLE D'UN COMPTE N'EST PAS PORTÉ
+
+**Vérifié par moi, et ma première sonde était PARTIELLE — je le dis parce que c'est la leçon du jour :**
+
+    ma sonde en trois formes rendait 0 partout — MAIS `insertGetId` rendait
+    0 AUSSI, alors que la creation POSE bien `role_id`.
+    -> l'incoherence INTERNE a tue la sonde : un temoin sur `totp_secret`
+       (2 fichiers) validait la FORME, pas la QUESTION.
+
+    reprise SANS motif de forme : 46 fichiers citent `role_id` sur 399 lus
+      Comptes.php:740            `role_id => $role`   dans un ->insert([…])
+      ComptesController.php:208  `role_id => $role`   dans un ->insert([…])
+      Comptes.php:518 · :521 · ComptesController:251 · :428   LECTURES (gardes)
+    -> AUCUN `UPDATE` de `users.role_id`, nulle part
+
+**✅ DÉCISION : PORTER le changement de rôle, avec la coercition de la création.**
+
+    la regle a reprendre est celle que la session 1 a deja posee (E-385) :
+      un auteur de role < 3 ne peut pas attribuer un role >= le sien
+    et le legacy la porte a `manage_roles.php:154` sous forme de REFUS par
+      exception — pas la coercition muette de l'import.
+    Les gardes de LECTURE existent deja (`Comptes.php:518`,
+      `ComptesController:251`/`:428`) : la regle est ecrite, il manque le geste.
+
+**⛔ Sans ce portage, personne ne pourra plus changer un rôle après l'extinction — et `Comptes.php:521`
+montre que le produit sait déjà qu'un dernier superadministrateur ne doit pas être dégradé. La garde
+survivrait au geste qu'elle garde.**
+
+### ⚠ ET UN DÉFAUT VIVANT QUE CETTE MESURE A RÉVÉLÉ EN PASSANT
+
+**Les DEUX chemins de création de compte du portage divergent, et l'un fabrique un compte inutilisable :**
+
+    ComptesController.php:205-212   (creation manuelle, /comptes)
+        password = hash(random_bytes(32))   <- personne ne connait le clair
+        force_password_change = 1
+        -> et le portage n'envoie AUCUN courriel, et le flux de
+           reinitialisation n'est pas porte
+
+    Comptes.php:731-748             (import CSV)
+        mot de passe GENERE et REMIS a l'importeur
+        PAS de force_password_change
+        -> et son commentaire cite nommement l'arbitrage qui l'a decide
+
+> **La création manuelle produit un compte dont personne ne connaît le mot de passe. Le recours existe —
+> un administrateur peut lui en fixer un (`web.php:622`, porté) — mais rien à l'écran ne le dit.**
+
+**✅ DÉCISION : aligner la création manuelle sur l'arbitrage déjà rendu pour l'import.** *Deux chemins de
+création aux comportements opposés coûtent plus que l'un ou l'autre.* **Soit le mot de passe généré est
+remis une fois, soit l'écran ANNONCE le second geste. Le premier est préférable : il est déjà implémenté
+deux fois dans le portage (clés d'API, import CSV) et son prix est connu.**
+
+### ✅ ET DEUX POINTS FERMÉS SANS TOUCHE
+
+**`manage_users.php:117` insère les permissions TOUT À ZÉRO (`VALUES (?, 0, 0, 0, …)`).** *Donc « pas de
+ligne » et « ligne du legacy » sont équivalents en comportement : l'absence d'initialisation au portage
+n'ôte AUCUN droit.* **Le non-classé de la session 3 est résolu, et mon inquiétude — « si un seul défaut
+est à 1, c'est un écart d'autorisation » — tombe.**
+
+**Second en-tête menteur de la journée, et dans l'autre sens** : *`verify.php` annonce une responsabilité
+n°8 (« initialisation permissions par défaut ») dont le code n'existe pas — le geste est ailleurs, dans
+`manage_users.php`, et il est sans conséquence.* **`MotDePasse.php` annonçait MOINS que ce qu'il fait ;
+celui-ci annonce PLUS.**
+
+### 📌 ET LE BLOQUANT DE RÉINITIALISATION EST PLUS LARGE QUE JE NE L'AI ÉCRIT
+
+**Le legacy émet un jeton de réinitialisation À LA CRÉATION du compte** (`manage_users.php`). *Donc le flux
+« le nouveau compte choisit son mot de passe lui-même » n'existe pas non plus au portage.*
+
+> **Le bloquant ne touche pas seulement « un compte qui a perdu son mot de passe » : il touche TOUT COMPTE
+> NOUVEAU.** *C'est à porter au `DOSSIER-24` — le SMTP n'est pas une commodité, c'est le canal de première
+> délivrance.*
