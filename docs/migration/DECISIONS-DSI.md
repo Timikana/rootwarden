@@ -8005,3 +8005,73 @@ corriger.**
 **`expires_at` existe au schéma. Sa liste de témoins couvrait l'absent, le forgé, le `user_id` d'autrui —
 PAS l'EXPIRÉ.** *Un jeton expiré qui restaure est le même trou avec un délai, et il se vérifie EN BASE, pas
 au cookie.*
+
+## Tour de 16:36 (2026-09-04) — MON COMPTE DE PRODUCTION ÉTAIT AVEUGLE AUX BRANCHES
+
+**Fenêtre : 15:35 → 16:35.**
+
+    premier compte (branche courante seule) :
+      CODE 3  ·  DOC 10 (5 miens, 5 autres)  ·  TEST 2
+      rapport brut 3,33  ·  sans mes docs 1,67
+
+    ⚠ CORRECTION : `git log --since` ne voit QUE la branche courante.
+      `98d8586` — `fix(securite)`, les trois arbitrages semgrep appliques —
+      vit sur `security/semgrep-regles-mortes` et etait INVISIBLE.
+
+    compte corrige : CODE 4  ·  rapport sans mes docs = 1,25   SOUS LE SEUIL
+
+> **Un instrument de mesure de la production qui ignore le travail sur branche sous-compte exactement les
+> sessions dont le mandat impose de travailler sur branche.** *Et c'est la règle de sécurité de ce dépôt
+> qui les y envoie.*
+
+**Correction de méthode : `git log --all --since`, et le relevé des branches locales par
+`for-each-ref`.**
+
+### ✅ 3) `socle_avertissement` — REMESURÉ à 16:36:14 CEST
+
+    occurrences sur 1301 fichiers lus (laravel/ + tests/ + backend/)   0
+    cles fr/auth.php · en/auth.php    40 · 40   (etaient 36 ce matin :
+                                                 la parite tient, le volume a cru)
+    cgu.blade.php                     present
+
+**⚠ ET UNE FAUSSE ALARME QUE J'AI ÉVITÉE DE JUSTESSE, sur mon propre élargissement de la mesure :**
+
+    `git grep socle_avertissement` sur TOUTES les branches locales rend :
+        security/backend-cve:laravel/lang/en/auth.php
+        security/backend-cve:laravel/lang/fr/auth.php
+        security/backend-cve:laravel/resources/views/cgu.blade.php
+    -> j'allais annoncer « la fusion REINTRODUIRAIT la cle »
+
+    le seul critere qui compte :
+    `git diff --stat <base> security/backend-cve -- <les trois fichiers>`
+        VIDE — la branche ne les touche PAS
+    TEMOIN : la meme commande sans filtre rend 6 fichiers, 643 insertions
+
+> **`git grep <ref>` mesure le CONTENU À UN SOMMET, pas un CHANGEMENT SUR UNE BRANCHE.** *Une branche de
+> 860 commits de retard « contient » tout ce qui a été retiré depuis. Aucun risque de réintroduction.*
+
+**C'est le troisième instrument que j'élargis aujourd'hui et qui se trompe du côté qui ALARME.** *Les deux
+autres — `^\s*logger\s*=` qui comptait un argument nommé, et ma sonde `role_id` incohérente avec elle-même
+— se trompaient du côté qui DÉDOUANE. Celui-ci du côté qui alarme, et il aurait bloqué une fusion.*
+
+### 📌 ET LA LISTE DES « 11 PORTABLES » DE LA CONSIGNE EST LARGEMENT PÉRIMÉE
+
+**L'appariement des 5 catalogues (session 6, 2026-09-04 00:15-00:40) a répondu à la plupart :**
+
+    apparier les 5 catalogues        ✅ FAIT
+    creer un releve planifie         ✅ CABLE (portee `all` fermee aux 6 etages)
+    creer un groupe                  ✅ DEJA PORTE (creation ET suppression)
+    test de connexion                ✅ DEJA PORTE (mesure du 2026-09-02)
+    import CSV                       ✅ PORTE (serveurs) + PORTE (comptes, E-386)
+    desactiver une jail · geolocaliser  ✅ dans les 15 cibles portees de fail2ban
+    installer sur UNE machine · redemarrer  ⛔ BLOQUES (installent)
+    le rollback politiques/sftp      ⛔ DECLARE ABSENT (destructeur)
+
+    RESTE REELLEMENT OUVERT, et rien d'autre :
+      afficher `sshd_config` en LECTURE      (ssh_audit)
+      relever un serveur                     (ssh_audit, session SSH reelle)
+      scan de derive de masse `drift_scan`   (groups, aucune session SSH)
+      les 2 capacites PERDUES de `supervision`
+
+**C'est la cinquième déclaration d'état de ce chantier à périmer, et celle-ci vit dans la consigne de
+relance elle-même.** *Je la corrige ici plutôt que de faire porter cinq fois ce qui existe.*
