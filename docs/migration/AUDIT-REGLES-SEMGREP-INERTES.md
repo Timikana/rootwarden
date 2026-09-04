@@ -148,6 +148,18 @@ WARNING alors que c'est de l'exécution de commande.
 
 ## 4. Ce que je NE peux PAS mesurer, et ce qui le règlerait
 
+> **⚠ BORNÉ LE 2026-09-04 — mon pire cas était trop large.** Le DSI a mesuré
+> que `ci.yml` porte **DEUX jobs semgrep distincts** : « SAST cross-langue
+> (semgrep) » et « SAST règles custom RootWarden (advisory) ». Sur le dernier
+> run vert (`33803915986`), **le générique est `SUCCESS` et seul le custom est
+> `FAILURE`**. *La couverture semgrep du dépôt n'est donc pas nulle depuis le
+> 2026-05-19 — seule la couche MAISON est morte.* Mon §5 laissait craindre pire.
+>
+> **La question « la passe entière ou les trois règles seulement » reste
+> entière** : les journaux ne sont plus récupérables (`gh run view --log` rend 0
+> ligne, et le DSI a posé le témoin d'instrument — le listing des jobs, lui,
+> fonctionne). Elle attend la première exécution après le correctif.
+
 **Les trois règles survivantes MORDENT-elles ?** *Je ne peux pas le dire.*
 
 `semgrep` n'est disponible **nulle part** : ni sur l'hôte, ni dans
