@@ -671,3 +671,32 @@ l'un fait que l'autre ne fait pas ; le choix est le vôtre.*
 **⛔ Et une borne que j'ai posée** : *ne rien écrire dans `ci.yml` sans votre mot.* **Un workflow est un
 effet sortant : il tourne sur l'infrastructure de GitHub avec un `GITHUB_TOKEN`, et `auto-tag` porte
 `contents: write`.**
+
+---
+
+## 2026-09-04, 14:55 — TROIS MOUVEMENTS, dont une RÉTRACTATION
+
+    ✅ DOSSIER-16   les trois arbitrages de l'import CSV : RENDUS         `0865de3`
+                    et le 2e CHANGE ma recommandation d'hier — le
+                    DOSSIER-24 l'avait rendue impraticable
+    ⛔ DOSSIER-11   l'exemption RGPD : ANNULEE                            `c253b6c`
+                    ma premisse « CERTAIN » etait une contrainte d'ORDRE
+    📌 DOSSIER-15   `security/backend-cve` : la branche est APTE,          `a249606`
+                    le merge attend VOTRE mot (votre propre regle),
+                    et un couplage avec l'invariant QA-009 se repare AVANT
+
+> **Une décision rendue puis retirée en trois heures n'est pas un accident de rythme.** *Elle a été retirée
+> par la session qui allait l'écrire, qui a refusé d'écrire et a mesuré d'abord. C'est le cinquième cas où
+> cet instrument — un pair qui va AGIR — attrape ce qu'aucune relecture n'attrape.*
+
+**CE QUI RESTE, ET AUCUN DE CES POINTS N'EST UN ARBITRAGE PRODUIT :**
+
+    le SMTP du portage (DOSSIER-24)      un effet SORTANT vers un serveur reel
+    le merge de `security/backend-cve`   votre regle le reserve a votre mot
+    `bashrc` · l'annulation · K4         ils ECRIVENT en root sur des machines
+    les 5 comptes forces sans adresse    poser une adresse sur des comptes REELS
+    supprimer `Migration-Laravel`        trois conditions, toujours non reunies
+
+    ⚠ ET UNE ACTION DE SECURITE QUI VOUS APPARTIENT, TOUJOURS OUVERTE :
+       `MAIL_SMTP_PASSWORD` (opnsense@timikana-heero.fr) a ete expose en clair
+       par ma propre commande non filtree. ROTATION recommandee. DOSSIER-24 §5.
