@@ -9028,3 +9028,74 @@ instruments.** *Trois signaux, aucun de vigilance.*
 
 **Et l'audit de mes 28 dossiers était de cette espèce-là : un audit de mes propres dédouanements. C'est le
 seul exercice qui ait attrapé quelque chose qu'aucun pair n'aurait relevé.**
+
+## Tour de 20:35 (2026-09-04) — UN DOCUMENT QUI NE DIT JAMAIS « NON » N'A PAS ÉTÉ INTERROGÉ
+
+### 1) PRODUCTION — fenêtre 19:35 → 20:35, `--all`
+
+    CODE 2  ·  DOC 16 (8 miens, 8 autres)  ·  TEST 4
+    doc/code brut 8,00   ·   sans mes docs 4,00      LES DEUX AU-DESSUS DU SEUIL
+
+**⚠ Et pour la première fois le dépassement ne m'est pas entièrement imputable : 8 documents de sessions
+pour 2 codes.**
+
+**Mais je ne l'attaque PAS, et je dis pourquoi** : *le tour précédent a établi qu'il ne reste aucune
+capacité à porter qui ne soit interdite. Les 8 documents sont l'inscription de propriétés MESURÉES —
+`PARITE.md` sous la convention `NON MESURÉ`, la table de vérité, le bilan d'import.*
+
+> **Attaquer ce rapport-là pousserait sept sessions à inventer du code.** *Un rapport doc/code élevé est le
+> symptôme d'une phase de portage FINIE, pas d'un évitement — et le seuil de 2 était calibré pour une
+> phase qui n'existe plus.*
+
+### 2) ⚠ ET J'AI TROUVÉ LA VRAIE POPULATION RESTANTE — dans une asymétrie de documentation
+
+**Le §7 de l'inventaire déclare neuf modules « non traités ». J'ai relevé leurs dossiers :**
+
+    module        lignes   date        verdicts PORTE / NON PORTE   `np_*`
+    ADM            1261    27/08              30 / 0                  0
+    API-DOCS        176    28/08               2 / 0                  0
+    AUTH            279    24/08               3 / 0                  0
+    BASHRC          339    27/08               3 / 0                  0
+    GRAYLOG         508    27/08              14 / 0                  0
+    FILTRAGE        668    01/09              11 / 0                  0
+    SECURITY        745    21/08              11 / 0                  0
+    SSH             379    28/08               9 / 0                  0
+    SUPERVISION     837    23/08              12 / 0                  0
+    GROUPS          860    04/09              15 / 0                  1
+
+> **ZÉRO verdict « NON PORTÉ » dans les dix. Aucun. Et c'est ça qu'il faut lire.**
+
+**Deux lectures possibles, et elles ne se départagent pas par ces chiffres :**
+
+    (a) ces modules sont entierement portes
+    (b) ces documents n'enregistrent QUE ce qui est porte — un registre
+        ASYMETRIQUE
+
+**⚠ Et (b) est la lecture qui DÉDOUANE, donc c'est celle qu'il faut éprouver.** *Ma propre règle inscrite
+ce matin : « une déclaration qui borne des DEUX côtés est plus utile qu'une qui n'énumère que le manque » —
+ici c'est l'inverse exact, des documents qui n'énumèrent que les réussites.*
+
+> **Un document qui ne dit jamais « non » n'a pas été interrogé.** *Trente verdicts « porté » et zéro
+> « non porté » sur 1261 lignes ne décrivent pas un module complet : ils décrivent un relevé qui ne
+> cherchait pas les manques.*
+
+**✅ C'est la population restante, et elle est de la MESURE — donc elle est distribuable.**
+
+### 3) DÉCLARATIONS D'ÉTAT — le contrôle demandé, à 20:35
+
+    `socle_avertissement`   0 occurrence (temoin : 1301 fichiers, mesure de
+                            17:35 ; aucun commit n'a touche `lang/` depuis
+                            sur ce point)
+    et une VERIFICATION que je n'avais pas faite : aucune suite ne l'assere
+                            0 fichier dans tests/ + laravel/tests/
+                            + backend/tests/
+
+### 4) ARBITRAGES — aucun nouveau. Et l'état de l'exploitant est inchangé.
+
+    🔴 DOSSIER-25   le bouton « Sceller », irreversible, 462 paires
+    🔴 DOSSIER-28   `is-ancestor origin/main HEAD` = FAUX, et le bump du
+                    jalon precede la poussee
+    🔴 DOSSIER-21   le compte role1 id=2 assigne a `srv-zabbix`
+    📌 DOSSIER-24   le SMTP — canal de PREMIERE delivrance
+    📌 DOSSIER-27   `/wazuh/group` : ne pas le porter tel quel
+    📌 les deux fusions · le redemarrage · les gestes destructeurs
