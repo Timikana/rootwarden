@@ -18,48 +18,78 @@ rules:
       Voir CONTRIBUTING-SECURITY.md section 3.
     languages: [python]
     severity: ERROR
+  # ══════════════════════════════════════════════════════════════════════════
+  # ⛔ REGLE DESACTIVEE — ARBITRAGE DU 2026-09-04, ET LA RAISON EST ICI
+  #
+  # `rw-shell-fstring-execute-as-root` : interpolation dans une commande shell
+  # executee en root.
+  #
+  # Le motif d'origine NE COMPILAIT PAS (`f"...{$VAR}..."` — semgrep ne
+  # substitue pas de metavariable dans un champ de remplacement de f-string).
+  # Il a ete repare, puis SIMULE par AST sur `backend/` : **84 occurrences**,
+  # dont `f'systemctl start {service}'` et `f'touch {path} && chmod 640 {path}'`.
+  #
+  # **Quasi toutes interpolent une valeur DEJA VALIDEE en amont**
+  # (`_validate_service_name`, `_valid_username`, un chemin litteral).
+  # « Y a-t-il une interpolation ? » n'est pas « la valeur est-elle sure ? », et
+  # l'idiome NORMAL de ce depot est l'interpolation validee.
+  #
+  # ⚠ UNE REGLE QUI COMPILE ET TROUVE **TOUT** EST AUSSI INUTILE QU'UNE QUI NE
+  # TROUVE RIEN — et elle redevient du decor PLUS VITE, parce que 84 lignes
+  # rouges se scrollent alors qu'une erreur de compilation se lit.
+  #
+  # La propriete visee est un flux SOURCE -> SINK : elle demande `mode: taint`,
+  # que personne ne peut valider ici (semgrep absent de l'hote et des trois
+  # conteneurs). **Activer sur la foi d'un mode non valide serait pire que
+  # laisser la regle desactivee et DITE.**
+  #
+  # ⚠ POURQUOI COMMENTEE ET NON RETROGRADEE EN `WARNING` : le job filtre par
+  # `--severity=ERROR`, et ce filtre est en cours de RETRAIT. Une desactivation
+  # qui reposerait sur la severite serait donc annulee en silence par ce
+  # retrait. **Une desactivation doit survivre au changement de la commande.**
+  #
+  # Le motif REPARE est conserve ci-dessous, en commentaire, pour qu'une
+  # reactivation ne reparte pas du motif casse.
+  # ══════════════════════════════════════════════════════════════════════════
 
-  # -------------------------------------------------------------------------
-  # A03 Injection commande - shlex.quote obligatoire pour interpolation shell
-  # -------------------------------------------------------------------------
-  - id: rw-shell-fstring-execute-as-root
-    # ⚠ REECRIT — les trois motifs precedents ne compilaient pas.
-    #
-    # `f"...{$VAR}..."` n'est pas du Python valide : mesure par le parseur de
-    # Python lui-meme, « f-string: expecting a valid expression after '{' ».
-    # Semgrep ne substitue pas de metavariable dans le champ de remplacement
-    # d'une f-string ; le motif doit donc y etre valide TEL QUEL, et il ne
-    # l'etait pas. La regle n'a jamais compile, donc jamais rien garde.
-    #
-    # On sort la metavariable de la f-string : elle capture l'ARGUMENT entier,
-    # et le filtrage se fait par expression reguliere sur son texte source.
-    #
-    # ⚠⚠ NE PAS ACTIVER EN L'ETAT — SIMULATION DU 2026-09-04.
-    # La logique de ce motif, simulee par AST sur `backend/`, rend **84
-    # occurrences** : `f'systemctl start {service}'`, `f'touch {path} && chmod
-    # 640 {path}'`, `f'journalctl -u {service} …'`. Quasi toutes interpolent une
-    # valeur DEJA VALIDEE en amont (`_validate_service_name`, `_valid_username`).
-    # « Y a-t-il une interpolation ? » n'est pas « la valeur est-elle sure ? », et
-    # l'idiome NORMAL de ce depot est l'interpolation validee. Le motif rendrait
-    # le job rouge en permanence avec 84 faux positifs : c'est le MIROIR du
-    # defaut qu'on repare, et une regle qui trouve TOUT redevient du decor plus
-    # vite qu'une qui ne trouve rien. La propriete visee est un flux
-    # SOURCE -> SINK : elle demande `mode: taint`, non validable ici (semgrep
-    # absent de l'hote et des trois conteneurs). Reparation syntaxique conservee
-    # pour que le fichier compile ; l'ACTIVATION est un arbitrage.
-    patterns:
-      - pattern: execute_as_root($CLIENT, $CMD, ...)
-      - metavariable-regex:
-          metavariable: $CMD
-          regex: '^f.*\{.*\}'
-      - pattern-not-regex: '(shlex\.quote|base64)'
-    message: |
-      Interpolation de variable dans commande shell sans shlex.quote.
-      Utiliser shlex.quote($VAR) ou pousser via base64 -d.
-      Voir CONTRIBUTING-SECURITY.md section 3.
-    languages: [python]
-    severity: ERROR
-
+  #   - id: rw-shell-fstring-execute-as-root
+  #     # ⚠ REECRIT — les trois motifs precedents ne compilaient pas.
+  #     #
+  #     # `f"...{$VAR}..."` n'est pas du Python valide : mesure par le parseur de
+  #     # Python lui-meme, « f-string: expecting a valid expression after '{' ».
+  #     # Semgrep ne substitue pas de metavariable dans le champ de remplacement
+  #     # d'une f-string ; le motif doit donc y etre valide TEL QUEL, et il ne
+  #     # l'etait pas. La regle n'a jamais compile, donc jamais rien garde.
+  #     #
+  #     # On sort la metavariable de la f-string : elle capture l'ARGUMENT entier,
+  #     # et le filtrage se fait par expression reguliere sur son texte source.
+  #     #
+  #     # ⚠⚠ NE PAS ACTIVER EN L'ETAT — SIMULATION DU 2026-09-04.
+  #     # La logique de ce motif, simulee par AST sur `backend/`, rend **84
+  #     # occurrences** : `f'systemctl start {service}'`, `f'touch {path} && chmod
+  #     # 640 {path}'`, `f'journalctl -u {service} …'`. Quasi toutes interpolent une
+  #     # valeur DEJA VALIDEE en amont (`_validate_service_name`, `_valid_username`).
+  #     # « Y a-t-il une interpolation ? » n'est pas « la valeur est-elle sure ? », et
+  #     # l'idiome NORMAL de ce depot est l'interpolation validee. Le motif rendrait
+  #     # le job rouge en permanence avec 84 faux positifs : c'est le MIROIR du
+  #     # defaut qu'on repare, et une regle qui trouve TOUT redevient du decor plus
+  #     # vite qu'une qui ne trouve rien. La propriete visee est un flux
+  #     # SOURCE -> SINK : elle demande `mode: taint`, non validable ici (semgrep
+  #     # absent de l'hote et des trois conteneurs). Reparation syntaxique conservee
+  #     # pour que le fichier compile ; l'ACTIVATION est un arbitrage.
+  #     patterns:
+  #       - pattern: execute_as_root($CLIENT, $CMD, ...)
+  #       - metavariable-regex:
+  #           metavariable: $CMD
+  #           regex: '^f.*\{.*\}'
+  #       - pattern-not-regex: '(shlex\.quote|base64)'
+  #     message: |
+  #       Interpolation de variable dans commande shell sans shlex.quote.
+  #       Utiliser shlex.quote($VAR) ou pousser via base64 -d.
+  #       Voir CONTRIBUTING-SECURITY.md section 3.
+  #     languages: [python]
+  #     severity: ERROR
+  #
   - id: rw-subprocess-shell-true
     patterns:
       - pattern: subprocess.run(..., shell=True, ...)
@@ -164,55 +194,32 @@ rules:
       leak en prod.
     languages: [php]
     severity: WARNING
+  # ══════════════════════════════════════════════════════════════════════════
+  # ⛔ REGLE RETIREE — CONVERTIE EN INVARIANT AST, ARBITRAGE DU 2026-09-04
+  #
+  # `rw-flask-route-without-api-key` : route Flask sans `@require_api_key`.
+  #
+  # **La propriete est VRAIE et vaut d'etre gardee. C'est l'INSTRUMENT qui
+  # etait faux.** Deux fois :
+  #
+  #   1. le motif ne compilait pas — un `...` SEUL entre deux decorateurs et le
+  #      `def`, position ou Python n'admet que des lignes commencant par `@` ;
+  #   2. repare, la simulation rend **3 occurrences sur 230**, et **les trois
+  #      sont des exceptions LEGITIMES documentees a leur site** :
+  #        updates.py:update_security_exec  jeton HMAC X-Update-Token, borne au
+  #                                         machine_id, signe avec SECRET_KEY
+  #        chatops.py:chatops_command       signature Slack OU jeton partage
+  #        monitoring.py:test               sonde de vie, chaine statique
+  #      -> **3 faux positifs PERMANENTS.**
+  #
+  # Un moteur de motifs ne sait pas porter une liste d'exceptions ARGUMENTEES,
+  # ni n'asserter que l'ECART a un etat connu. Un invariant sur l'arbre
+  # syntaxique le sait, et ce depot en possede deja un qui marche.
+  #
+  # ✅ REMPLACEE PAR : `backend/tests/test_invariant_cle_api.py`
+  #    (gabarit : `test_invariant_machine_id.py`, plancher compris)
+  # ══════════════════════════════════════════════════════════════════════════
 
-  # -------------------------------------------------------------------------
-  # A04 Auth - require_api_key obligatoire sur les blueprints sensibles
-  # -------------------------------------------------------------------------
-  - id: rw-flask-route-without-api-key
-    # ⚠ REECRIT, ET SA SEMANTIQUE RESTE NON VERIFIEE.
-    #
-    # Les deux `pattern-not` precedents portaient un `...` SEUL entre deux
-    # decorateurs et le `def`. Python n'admet a cet endroit que des lignes
-    # commencant par `@` : mesure par `ast.parse`, « invalid syntax » ligne 3.
-    # L'ellipse de semgrep ne franchit pas cette position.
-    #
-    # ⚠ CE QUE CETTE REECRITURE NE PROUVE PAS. Elle rend le motif
-    # syntaxiquement valide ; elle ne prouve PAS que semgrep exprime
-    # correctement « ce decorateur est ABSENT ». Cette famille de propriete est
-    # mal servie par un moteur de motifs, et elle est deja mesuree de facon
-    # FIABLE dans ce depot par un invariant sur l'arbre syntaxique
-    # (`backend/tests/test_invariant_machine_id.py`, qui compte 230 routes et
-    # 116 gardes). RECOMMANDATION : deplacer cette regle vers un invariant du
-    # meme modele, et la retirer d'ici.
-    #
-    # ⚠ ET LA SIMULATION DU 2026-09-04 LE CONFIRME PAR LES CHIFFRES. Sur 230
-    # routes, **3** n'ont pas `@require_api_key` — et **les trois sont des
-    # exceptions LEGITIMES, documentees a leur site** :
-    #   updates.py:update_security_exec  jeton HMAC X-Update-Token, borne au
-    #                                    machine_id, signe avec SECRET_KEY
-    #   chatops.py:chatops_command       signature Slack OU jeton partage
-    #   monitoring.py:test               sonde de vie, chaine statique
-    # Cette regle rendrait donc **3 faux positifs PERMANENTS**. Un invariant AST
-    # porte une liste d'exceptions connues ARGUMENTEES et n'asserte que l'ECART
-    # a cet etat — ce que `--severity=ERROR` ne sait pas faire.
-    patterns:
-      - pattern: |
-          @bp.route(...)
-          def $F(...):
-            ...
-      - pattern-not: |
-          @require_api_key
-          def $F(...):
-            ...
-    message: |
-      Route Flask sans @require_api_key. Toute route doit etre authentifiee
-      sauf cas explicite documente. Voir CONTRIBUTING-SECURITY.md section 1.
-    languages: [python]
-    severity: ERROR
-
-  # -------------------------------------------------------------------------
-  # A02 Crypto - pas d'AES-CBC en ecriture (uniquement lecture legacy autorisee)
-  # -------------------------------------------------------------------------
   - id: rw-aes-cbc-encrypt
     patterns:
       - pattern: openssl_encrypt($DATA, 'AES-256-CBC', ...)
