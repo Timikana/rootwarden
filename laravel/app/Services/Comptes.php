@@ -49,6 +49,31 @@ class Comptes
     /** Les roles, en liste FERMEE. Le legacy fait de meme (`manage_users.php:84`). */
     public const ROLES = [1, 2, 3];
 
+    /**
+     * Les colonnes EXIGEES par l'import de comptes.
+     *
+     * ⚠ `email` est exigee ici alors que le legacy la laisse FACULTATIVE
+     * (`import_csv.php:159`, `trim($data['email'] ?? '')`). C'est une divergence
+     * VOULUE : un compte importe sans adresse et sans mot de passe connu n'a ni
+     * acces ni recuperation — le legacy en fabriquait en serie (E-131). Le
+     * portage exige donc l'adresse ET rend le mot de passe genere une fois.
+     *
+     * `role`, `ssh_key`, `active` et `sudo` restent facultatives, comme dans le
+     * legacy.
+     */
+    public const IMPORT_COLONNES = ['name', 'email'];
+
+    /** Le plafond que le legacy n'a pas. Ce qui depasse est DIT, pas tronque en silence. */
+    public const IMPORT_MAX_LIGNES = 500;
+
+    /**
+     * La table des roles du CSV — LISTE FERMEE, reprise du legacy
+     * (`import_csv.php:150`). Un nom inconnu ne cree pas un compte privilegie :
+     * il retombe sur le role le plus faible. **Pas d'entree libre a valider,
+     * donc pas d'entree libre.**
+     */
+    public const IMPORT_ROLES = ['user' => 1, 'admin' => 2, 'superadmin' => 3];
+
     /** Longueur minimale — celle de la politique, pas celle de l'administrateur. */
     public const LONGUEUR_MINIMALE = 15;
 
@@ -554,6 +579,198 @@ class Comptes
     }
 
     /** @return int le nombre de comptes de role 3 encore ACTIFS */
+    /**
+     * Le role qu'un auteur est REELLEMENT autorise a poser, et s'il a ete abaisse.
+     *
+     * ══ UNE SEULE IMPLEMENTATION, DEUX APPELANTS ══════════════════════════
+     *
+     * La creation unitaire (`ComptesController::creer`) et l'import CSV posent
+     * la meme regle. La recopier en donnerait deux versions qui divergeraient :
+     * le LEGACY en porte TROIS (`manage_users:92`, `manage_roles:154`,
+     * `import_csv:156`) et elles n'ont deja pas la meme forme — deux annoncent
+     * la coercition, la troisieme est muette.
+     *
+     * LA REGLE, reprise de `manage_users.php:92` : un non-superadministrateur ne
+     * pose qu'un role STRICTEMENT INFERIEUR au sien. Le commentaire du legacy dit
+     * l'incident qui l'a fait ecrire — quelqu'un *« creait un superadmin,
+     * recevait le magic-link sur son email et prenait le controle »*.
+     *
+     * ⚠ La liste fermee `ROLES` borne a des valeurs VALIDES ; celle-ci borne a
+     * des valeurs PERMISES. Ce sont deux proprietes, et E-385 vient de ce que
+     * seule la premiere etait verifiee.
+     *
+     * @return array{0: int, 1: bool} le role effectif, et s'il a ete abaisse
+     */
+    public function roleAutorise(int $demande, int $roleAuteur): array
+    {
+        $role = in_array($demande, self::ROLES, true) ? $demande : 1;
+        if ($roleAuteur < 3 && $role >= $roleAuteur) {
+            return [1, true];
+        }
+
+        return [$role, false];
+    }
+
+    /**
+     * Importe des comptes depuis un CSV. Rend le bilan ET les secrets generes.
+     *
+     * ══ POURQUOI LES SECRETS SORTENT A PART ═══════════════════════════════
+     *
+     * Chaque compte cree recoit un mot de passe genere que PERSONNE ne connait
+     * encore. Le legacy le jette (`import_csv.php:148`) : ses comptes importes
+     * sont inutilisables, sans acces ni recuperation (E-131). Ici il est rendu a
+     * l'appelant, qui l'affichera UNE FOIS — et il ne doit transiter par aucun
+     * stockage, donc ni par le bilan qu'on pourrait flasher en session, ni par
+     * le journal d'audit, ni par le compte-rendu par ligne.
+     *
+     * @return array{bilan: array<string, mixed>, secrets: list<array{nom: string, mdp: string}>}
+     */
+    public function importeCsv(string $chemin, int $roleAuteur): array
+    {
+        $bilan = ['lignes' => 0, 'crees' => 0, 'manquantes' => [], 'tronque' => false, 'erreurs' => []];
+        $secrets = [];
+
+        $flux = @fopen($chemin, 'r');
+        if ($flux === false) {
+            $bilan['erreurs'][] = ['ligne' => 0, 'nom' => '', 'texte' => __('comptes.imp_err_illisible')];
+
+            return ['bilan' => $bilan, 'secrets' => $secrets];
+        }
+
+        try {
+            $entete = fgetcsv($flux);
+            if ($entete === false || $entete === [null]) {
+                $bilan['erreurs'][] = ['ligne' => 0, 'nom' => '', 'texte' => __('comptes.imp_err_vide')];
+
+                return ['bilan' => $bilan, 'secrets' => $secrets];
+            }
+            $entete = array_map(static fn ($c) => mb_strtolower(trim((string) $c)), $entete);
+
+            $manquantes = array_values(array_diff(self::IMPORT_COLONNES, $entete));
+            if ($manquantes !== []) {
+                $bilan['manquantes'] = $manquantes;
+
+                return ['bilan' => $bilan, 'secrets' => $secrets];
+            }
+
+            $ligne = 1;
+            while (($brut = fgetcsv($flux)) !== false) {
+                if ($brut === [null]) {      // ligne vide : fgetcsv rend [null]
+                    continue;
+                }
+                $ligne++;
+                if ($bilan['lignes'] >= self::IMPORT_MAX_LIGNES) {
+                    $bilan['tronque'] = true;
+                    break;
+                }
+                $bilan['lignes']++;
+                $this->importeUnCompte($entete, $brut, $ligne, $roleAuteur, $bilan, $secrets);
+            }
+        } finally {
+            fclose($flux);
+        }
+
+        return ['bilan' => $bilan, 'secrets' => $secrets];
+    }
+
+    /**
+     * Une ligne. Tout refus s'inscrit dans `erreurs` AVEC son numero de ligne :
+     * un import qui cree 8 comptes sur 10 sans dire lesquels ont echoue se lit
+     * comme une reussite.
+     *
+     * @param  list<string>  $entete
+     * @param  list<string|null>  $brut
+     */
+    private function importeUnCompte(
+        array $entete, array $brut, int $ligne, int $roleAuteur,
+        array &$bilan, array &$secrets,
+    ): void {
+        $data = [];
+        foreach ($entete as $i => $col) {
+            $data[$col] = trim((string) ($brut[$i] ?? ''));
+        }
+
+        $nom = $data['name'] ?? '';
+        if ($nom === '' || mb_strlen($nom) > 255) {
+            $bilan['erreurs'][] = ['ligne' => $ligne, 'nom' => $nom, 'texte' => __('comptes.err_nom')];
+
+            return;
+        }
+        if (DB::table('users')->where('name', $nom)->exists()) {
+            $bilan['erreurs'][] = ['ligne' => $ligne, 'nom' => $nom, 'texte' => __('comptes.imp_doublon')];
+
+            return;
+        }
+        $courriel = filter_var($data['email'] ?? '', FILTER_VALIDATE_EMAIL);
+        if ($courriel === false) {
+            $bilan['erreurs'][] = ['ligne' => $ligne, 'nom' => $nom, 'texte' => __('comptes.imp_err_courriel')];
+
+            return;
+        }
+
+        [$role, $rangRamene] = $this->roleAutorise(
+            self::IMPORT_ROLES[mb_strtolower($data['role'] ?? 'user')] ?? 1,
+            $roleAuteur,
+        );
+
+        /*
+         * `sudo` EXIGE LE ROLE 3, ET LA COERCITION SE DIT.
+         *
+         * Le legacy ecrit `users.sudo` depuis le CSV sans AUCUN controle de role
+         * (`import_csv.php:162,166`), alors que son geste dedie
+         * (`api/toggle_sudo.php:26`) exige `ROLE_SUPERADMIN` et refuse meme de
+         * modifier son propre sudo. C'est E-130.
+         *
+         * On coerce a 0 et on le DIT par ligne : un importeur qui croit avoir
+         * accorde sudo et ne l'a pas accorde prendra la decision suivante sur une
+         * croyance fausse.
+         */
+        $sudoDemande = ($data['sudo'] ?? '') !== '' && (int) $data['sudo'] === 1;
+        $sudo = ($sudoDemande && $roleAuteur >= 3) ? 1 : 0;
+
+        $mdp = $this->genereMotDePasse();
+        try {
+            DB::table('users')->insert([
+                'name' => $nom,
+                'email' => $courriel,
+                // `cout()` et non un `config()` recopie : ce service porte deja
+                // le cout, « lu la ou le legacy le lit » dit son commentaire.
+                'password' => password_hash($mdp, PASSWORD_BCRYPT, ['cost' => $this->cout()]),
+                'ssh_key' => ($data['ssh_key'] ?? '') !== '' ? $data['ssh_key'] : null,
+                'role_id' => $role,
+                'active' => ($data['active'] ?? '') === '' ? 1 : (int) $data['active'],
+                'sudo' => $sudo,
+                /*
+                 * PAS de `force_password_change`. Le mot de passe genere est
+                 * REMIS a l'importeur, donc il est connu : forcer un changement
+                 * sans canal de delivrance — le portage n'envoie aucun courriel —
+                 * fabriquerait un compte inaccessible, en serie. C'est la
+                 * divergence que l'arbitrage a retenue.
+                 *
+                 * AUCUNE ligne dans `permissions` : `Permissions::pour()` traite
+                 * l'absence comme « aucun droit », et `definit()` en cree une au
+                 * premier reglage. Le legacy insere 15 colonnes NOMMEES a zero —
+                 * une liste qui omettrait silencieusement une permission ajoutee
+                 * apres coup, alors que `Permissions::toutes()` lit le SCHEMA.
+                 */
+            ]);
+        } catch (\Throwable $e) {
+            $bilan['erreurs'][] = ['ligne' => $ligne, 'nom' => $nom, 'texte' => __('comptes.imp_err_ecriture')];
+
+            return;
+        }
+
+        $bilan['crees']++;
+        // LE SECRET NE VA QUE LA. Ni dans `erreurs`, ni dans le journal.
+        $secrets[] = ['nom' => $nom, 'mdp' => $mdp];
+        if ($rangRamene) {
+            $bilan['erreurs'][] = ['ligne' => $ligne, 'nom' => $nom, 'texte' => __('comptes.imp_rang_ramene')];
+        }
+        if ($sudoDemande && $sudo === 0) {
+            $bilan['erreurs'][] = ['ligne' => $ligne, 'nom' => $nom, 'texte' => __('comptes.imp_sudo_refuse')];
+        }
+    }
+
     public function superadminsActifs(): int
     {
         return (int) DB::table('users')->where('role_id', 3)->where('active', 1)->count();
