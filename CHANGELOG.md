@@ -5,6 +5,70 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.39.6] - 2026-09-04
+
+### Securite - E-388 : la portee « tout le parc » des planifications CVE
+
+**Symptome.** Le chemin d'execution CVE du scheduler promouvait QUATRE etats en
+scan recurrent de tout le parc, `srv-zabbix` (production) compris, sans qu'aucun
+d'eux ne soit distinguable des autres ensuite :
+
+| etat de la ligne                | ce qui etait scanne |
+|---------------------------------|---------------------|
+| `target_type = 'all'`           | tout le parc (intention reelle) |
+| `target_type` vide, nul, inconnu| tout le parc (illisible) |
+| `'tag'` avec un champ tag vide  | tout le parc (case laissee blanche) |
+| `'machines'` avec liste vide    | tout le parc (rien de coche) |
+
+Les trois derniers sont des accidents. Le troisieme etait atteignable par le
+chemin normal de l'interface. Et aucune des requetes ne filtrait
+`lifecycle_status` : les machines archivees etaient scannees.
+
+**Cause racine.** La determination des cibles n'avait ni branche `'all'`
+explicite ni echec ferme : son `else` prenait tout le parc. C'est exactement le
+defaut corrige sur le chemin SSH par E-280, dans le meme fichier — la politique
+existait, elle n'avait jamais ete appliquee au second chemin.
+
+**Correctif.**
+
+- `backend/scheduler.py` — miroir de la politique E-280 sur le chemin CVE :
+  branche `'all'` explicite, `else` refusant (`WHERE 1=0` + journal d'erreur),
+  liste `machines` vide ou illisible fermee, filtre `lifecycle_status` sur les
+  quatre requetes, coercition entiere des identifiants.
+- `backend/routes/cve.py` — la portee `'all'` n'est plus offerte a la CREATION
+  (`PORTEES = ('tag', 'machines')`, releve de `PlanificationsCve::CIBLES`). Pas
+  de defaut fabrique : `(data.get(...) or '')` et non `.get(..., 'all')`, une
+  cle presente a `null` rendant `None` sans declencher le defaut. Un champ
+  absent, vide ou nul tombe donc hors liste — le refus est obtenu sans branche
+  supplementaire.
+- `backend/routes/cve.py` — **seconde porte fermee** : la boucle de champs de
+  `update_cve_schedule` (`PUT`) ecrivait `target_type` sans aucun controle. Une
+  planification `'tag'` se repointait sur `'all'` par une simple modification :
+  sans ce second garde, celui de la creation etait decoratif.
+
+**Ce que le correctif ne ferme PAS, deliberement.** Une ligne `'all'` deja en
+base continue d'etre lue, nommee par l'interface et EXECUTEE — la branche
+`'all'` du scheduler est explicite, et une modification qui ne touche pas la
+colonne `target_type` reste acceptee. Cesser d'offrir une portee n'est pas
+cesser de savoir la lire. `cve_scan_schedules` porte zero ligne aujourd'hui,
+donc le cas est theorique — il ne le restera pas.
+
+**Tests.** Selection de branche exercee sur 9 etats de ligne, conditions
+EXTRAITES du fichier et non retapees, avec garde-fou de compilation sur
+l'extrait : une seule entree lit tout le parc, le choix explicite. Coercition
+des identifiants exercee sur 8 valeurs : `[2,3]` scanne, `[]` / `{oops` /
+`null` / `[2.5]` ferment, `[0]` et `[-1]` ne matchent aucun identifiant. Les
+deux portes d'entree exercees sur 12 corps de requete. `ruff` vert sur les deux
+fichiers. Aucune requete HTTP emise et aucune ligne creee : un cas valide aurait
+arme le scheduler.
+
+**Notes d'exploitation.** `backend/**.py` est lu au demarrage du processus : ces
+deux fichiers sont INERTES jusqu'au redemarrage de `rootwarden_python`. La
+garde de creation suppose le portage a v1.39.5 (`7153ca3`), qui a cesse
+d'envoyer `'all'` — l'ordre inverse aurait casse la planification CVE portee.
+
+---
+
 ## [1.39.5] - 2026-09-04
 
 ### Securite
