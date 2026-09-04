@@ -7914,3 +7914,94 @@ sens.** *Mon scénario — « si un seul défaut est à 1 » — est écarté PA
 *Ni un code faux, ni un commentaire faux : **un code JUSTE dont la justesse dépend d'une propriété du
 schéma que personne ne surveille.*** **Le legacy meurt, donc pas de correctif — mais qui portera la
 création de compte devra soit citer les 18, soit dépendre du même défaut, et le dire.**
+
+### ⛔ MON « GATE » ÉTAIT INEXÉCUTABLE — un test avant le code serait VERT PAR VACUITÉ
+
+**J'avais posé : « ne livre pas la capacité sans un test qui verrouille la propriété, et le test AVANT la
+livraison ». La session 6 a refusé, et elle a raison.**
+
+    sans chemin de restauration :
+      GET AVEC cookie forge  ->  redirection vers /connexion
+      GET SANS cookie        ->  redirection vers /connexion
+    SORTIES IDENTIQUES
+
+> **« Le cookie forgé n'authentifie pas » serait vert aujourd'hui sans rien mesurer : le test ne distingue
+> pas *la restauration a refusé* de *aucune restauration n'a été tentée*.**
+
+**Et c'est plus grave qu'un test vide : le portage s'écrirait « conforme » à un test qui n'a jamais exercé
+la branche — le contournement passerait par la porte que le test devait fermer.**
+
+*Mon exception au test de caractérisation restait juste — le legacy ne peut pas servir de référence — mais
+elle dit contre quoi le test ne doit pas être calé, PAS qu'il devient écrivable plus tôt.* **Deuxième
+prérequis inexécutable que je pose aujourd'hui, après « corrige `CLES` sur la branche » où le fichier
+n'était pas sur la branche.**
+
+### ✅ ET LA FORME QU'ELLE PROPOSE VAUT MIEUX QUE MON GATE
+
+> **Que la restauration rende une DÉCISION — `PORTAIL | DEFI | ENROLEMENT | REFUS` — plutôt qu'un effet de
+> bord.**
+
+    alors les deux moities se mesurent separement,
+    `REFUS` se distingue de `PORTAIL` SANS base ni navigateur,
+    et `PORTAIL` devient inatteignable PAR CONSTRUCTION depuis ce chemin
+
+**C'est la propriété la plus forte possible, parce qu'elle ne dépend d'aucun câblage.** *Un intergiciel se
+mesure au réseau et avec une base — donc au banc, et le banc n'est pas libre. Une fonction qui rend une
+décision se mesure dans une suite hermétique.* **✅ Je la retiens comme exigence de conception, et le
+verrou tombe le jour où la forme est nommée.**
+
+### ⚠ ET LE PRÉREQUIS QU'ELLE A TROUVÉ EST RÉEL — vérifié
+
+    MotDePasse.php:237   DB::transaction(…)  { l'ecriture du mot de passe }  :255
+    PUIS, HORS transaction :
+      :288  try { purge `active_sessions` }   catch { Log::warning }
+      :294  try { purge `remember_tokens` }   catch { Log::warning }
+
+**Les deux purges sont en MEILLEUR EFFORT et HORS de la transaction. Si la purge échoue, le changement de
+mot de passe réussit quand même — et un jeton émis sous l'ancien mot de passe continue d'authentifier.**
+
+> **Inoffensif aujourd'hui parce que la table n'est jamais remplie. Le jour où le portage la remplit, ce
+> meilleur effort devient un trou.** *C'est ma propre formule sur `install_all` : un défaut qui protège par
+> accident cesse de protéger au moment exact où on le corrige.*
+
+### ✅ ARBITRAGE — les deux purges n'ont PAS le même enjeu, et je ne tranche pas en bloc
+
+    `remember_tokens`   un jeton est un IDENTIFIANT PORTEUR, valable 30 jours.
+                        Ne pas le purger laisse une credential vivante sous
+                        l'ancien mot de passe.
+                        ✅ DANS la transaction, SANS try/catch.
+                        Mode d'echec : le changement de mot de passe est
+                        REFUSE et rien n'est a moitie fait. C'est fail-safe :
+                        la personne recommence.
+
+    `active_sessions`   une session non purgee expire d'elle-meme, et la
+                        purge exclut deja la session courante.
+                        ✅ peut RESTER en meilleur effort — mais le choix se
+                        DECLARE en commentaire, il ne se subit pas.
+
+**Pourquoi dans la transaction plutôt que « avant l'écriture et bloquant » : la transaction EXISTE DÉJÀ et
+donne l'atomicité gratuitement.** *« Avant et bloquant » laisse le cas « purge réussie, écriture échouée »
+— des jetons révoqués pour rien.*
+
+### ⛔ ET LA MOITIÉ DE SON CONSTAT QUI EST FAUSSE — mesurée
+
+**Elle étendait le défaut à l'anonymisation : « `Comptes.php:572`, six tables dans la même boucle, même
+`try/catch` ». NON.**
+
+    Comptes.php:558   DB::transaction(function () use ($id, $marque) {
+                        UPDATE users … ;
+                        foreach (6 tables) { delete }
+                      });                  <- AUCUN try/catch a l'interieur
+
+**Une défaillance sur l'une des six annule TOUT. L'anonymisation est atomique, et il n'y a rien à y
+corriger.**
+
+> **La FORME se ressemble — un bloc, plusieurs tables — et la transaction change tout.** *C'est la
+> cinquième fois aujourd'hui qu'une propriété vraie d'un objet est étendue à son homonyme, et la deuxième
+> où la ressemblance est syntaxique plutôt que sémantique.*
+
+### 📌 Et un témoin manquant qu'elle a nommé, à porter dans le test
+
+**`expires_at` existe au schéma. Sa liste de témoins couvrait l'absent, le forgé, le `user_id` d'autrui —
+PAS l'EXPIRÉ.** *Un jeton expiré qui restaure est le même trou avec un délai, et il se vérifie EN BASE, pas
+au cookie.*
