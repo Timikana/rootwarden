@@ -466,3 +466,79 @@ aujourd'hui avec 389 lignes de connexion d'août en dehors d'elle.
 *Je ne sais pas ce qui s'est passé du 12 au 15 août et je ne le suppose pas.* Ce que
 la mesure établit : le trou existe, il est contigu, et la chaîne l'a refermé
 par-dessus.
+
+---
+
+## 8. Question 3 sur les blocs C et D — **mesure du 2026-09-04 15:34 CEST**
+
+### 8.1 BLOC C — deux touches, dont une **de sécurité**
+
+| fichier | le geste | équivalent ? | Q3 |
+|---|---|---|---|
+| `auth/migrate_crypto.php` | **rotation de clé** : re-chiffrer TOUS les secrets de `machines` et `users`, de `OLD_SECRET_KEY` vers `SECRET_KEY` | ⚠ **non** | **TOUCHE — seul accès** |
+| `auth/migrate_totp.php` | chiffrer les secrets TOTP restés en clair (un coup, idempotent, CLI) | **non** — 0 occurrence | **touche, faible** |
+
+**⚠ Et la nuance sur `migrate_crypto.php` est tout le sujet.** `OLD_SECRET_KEY`
+existe bien côté backend — **17 occurrences** — mais `backend/encryption.py:24-25`
+dit exactement ce qu'il en fait :
+
+> *« L'ancienne clé (`OLD_SECRET_KEY`) est uniquement utilisée pour le
+> **déchiffrement** (migration transparente) ; le re-chiffrement utilise toujours
+> `SECRET_KEY`. »*
+
+**C'est une migration PARESSEUSE : une ligne ne passe à la clé neuve que si
+quelque chose l'ÉCRIT.** Une ligne jamais réécrite garde indéfiniment le
+chiffré de l'ancienne clé. Et il n'existe côté backend que **2 écritures de secret
+en masse**, toutes deux dans `ssh.py` et pour un autre métier (effacer / ressaisir
+un mot de passe), aucune pour une rotation.
+
+> **Le geste « terminer une rotation, maintenant, sur toutes les lignes » n'existe
+> que dans `migrate_crypto.php`. L'archiver signifie qu'une rotation ne pourra plus
+> jamais être MENÉE À TERME — donc que `OLD_SECRET_KEY` devra rester déployée
+> indéfiniment, et que l'ancienne clé ne pourra jamais être retirée.**
+
+Mon verdict du §BLOC C — *« mort en tant que page, vivant en tant qu'outil : à
+déplacer vers un dossier de scripts, pas à supprimer »* — **tient, et la Q3 lui
+donne une raison bien plus forte que « c'est un outil »**.
+
+### 8.2 BLOC D — le socle passe la Q3, et c'était prévisible
+
+| fichier de socle | requérants | le geste devient-il inatteignable ? |
+|---|---|---|
+| `includes/totp_crypto.php` | 5, tous `auth/*` | non — l'enrôlement 2FA est porté (`views/auth/enrolement.blade.php`) |
+| `adm/includes/crypto.php` | 8, tous legacy | non — tombe avec eux |
+| `includes/feature_flags.php` | `index.php`, `menu.php`, `wazuh/` | non — `Navigation::pour()` prend `$fonctionnalites` |
+| `includes/howto_tip.php` | 15 pages | non — tombe avec elles (les clés `tip.*` relèvent de l'étape 9 du cycle) |
+| `api/openapi.php` + `api/docs.php` | 0 | non — **remplacés**, et le portage le DIT (`web.php:974`, `autorisations.remplace_texte`) |
+| `api_proxy.php` | 0 | non — remplacé par `/api/gateway`, 74 emplois |
+
+**⚠ Un seul cas demande une précision : `includes/mail_helper.php`.**
+
+    requerants : auth/forgot_password.php:19   +   adm/includes/manage_users.php:133
+    envois de courriel REELS cote laravel/ : 0   (seul `config/mail.php` existe)
+
+**Ce n'est pas une touche Q3 indépendante** : `mail_helper.php` est l'expéditeur du
+courriel de la **réinitialisation de mot de passe**, déjà identifiée au §3 comme le
+bloquant que personne n'avait. Il tombe avec elle, dans la même chaîne. *Mais il
+confirme l'ampleur de ce bloquant : le portage n'envoie aucun courriel, du tout.*
+
+### 8.3 Ce que la Q3 attrape, et pourquoi
+
+**Sur l'ensemble des blocs C et D — 93 fichiers — la Q3 ne touche que DEUX
+fichiers, et les deux sont des scripts CLI « un coup ».** Avec l'onboarding déjà
+arbitré, les trois touches de la Q3 sur tout l'inventaire sont :
+
+    l'assistant de premiere configuration      (une fois par installation)
+    la rotation de cle de chiffrement          (une fois par incident)
+    le chiffrement des secrets TOTP en clair   (une fois par version)
+
+> **Les touches de la question 3 se groupent sur les capacités RARES par nature.**
+> Et ce n'est pas un hasard : *c'est leur rareté même qui les rend invisibles aux
+> questions 1 et 2.* Une capacité utilisée tous les jours a quelqu'un pour la
+> réclamer, un test pour la couvrir, une page pour la nommer. Une capacité utilisée
+> une fois par installation n'a rien de tout cela — et **rare ne veut pas dire
+> secondaire** : la rotation de clé est précisément le remède d'un incident de
+> sécurité.
+
+**La Q3 est donc terminée sur les quatre blocs.** Reste à l'appliquer à ce qui n'a
+jamais été inventorié : les **16 fichiers non appariés** du §4.
