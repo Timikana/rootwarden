@@ -19543,3 +19543,98 @@ de ce chantier que ce contrôle aurait servi.*
 
 **Réinscrit en avant**, sans `reset` ni `rebase` : l'historique porte donc `E-398`
 deux fois, et c'est préférable à un historique réécrit.
+
+---
+
+## E-399 — un drapeau qui signifiait DEUX choses n'etait fiable pour aucune
+
+**Mesure de la QA (session 6), arbitrage du DSI, portage ici.** `roleAutorise()` rendait
+`array{int, bool}`, et ce booleen ne rapportait **qu'une** des deux coercitions :
+
+    auteur 3 ou 2, valeur hors liste   ->  role 1, EN SILENCE
+    auteur 1, n'importe quelle valeur  ->  role 1, ANNONCE
+
+*Un superadministrateur qui se trompe de valeur creait un utilisateur en croyant creer un
+administrateur.*
+
+### La coercition RESTE, parce qu'elle echoue du bon cote
+
+Le DSI a signale avoir failli trancher « refuse, ne devine pas » **par coherence** avec ses
+deux decisions du jour sur `target_type`, et avoir mesure la difference :
+
+    `target_type` fabriquait `'all'` = TOUT LE PARC, la portee la plus LARGE
+    `role_id`     fabrique  `1`     = le role le MOINS privilegie
+
+**Refuser serait plus propre ; ce ne serait pas plus sur.** *« Coherent avec ma decision
+precedente » n'est pas un argument.*
+
+### Ce qui est pose
+
+`App\Support\RolePose` — un objet `readonly` a trois proprietes NOMMEES :
+
+| propriete | ce qu'elle dit | nature de la phrase |
+|---|---|---|
+| `role` | le role effectivement ecrit, toujours dans `ROLES` | — |
+| `valeurInvalide` | *« la valeur soumise n'est pas une valeur de role »* | **validite** |
+| `rangRamene` | *« votre autorisation ne permettait pas ce rang »* | **securite** |
+
+**Trois choix de forme, et chacun paie une erreur deja faite sur ce chantier :**
+
+1. **un objet, pas un tuple a trois positions.** *On se trompe sur une position, pas sur un
+   nom* — et ce depot a deja paye un `[$a, $b]` lu a l'envers ;
+2. **`roleDuLibelle(): ?int` — le cas dangereux est INEXPRIMABLE.** L'import ecrivait
+   `IMPORT_ROLES[mb_strtolower($data['role'] ?? 'user')] ?? 1` : **deux defauts dans une
+   seule expression**, la colonne absente et le libelle inconnu, tous deux rendus `1`.
+   « Inconnu » ne s'ecrit plus `1`, il s'ecrit `null`, et l'appelant ne peut plus le
+   confondre avec un role. *Garde par CONSTRUCTION : un type sans le cas dangereux ;*
+3. **les deux drapeaux sont INDEPENDANTS, pas un choix entre deux.** Une valeur invalide
+   devient le plancher, que l'autorisation peut a son tour refuser : **les deux sont alors
+   vraies**. Rendre « laquelle des deux » au singulier aurait force a en taire une.
+
+### Les quatre etages de fabrication du `1`, et les deux que j'ai mesures en plus
+
+Le DSI en a nomme quatre en demandant *« mesure les tiens ; si tu en trouves un cinquieme,
+c'est ma consigne qui etait courte »*. Les quatre sont exacts. Il y en a **deux autres, et
+les deux sont MORTS** — mesure, pas lecture :
+
+    JetonMemorisation:189   (int) ($compte->role_id ?? 1)
+    users.role_id                       DEFAULT 1 en schema
+
+    information_schema : users.role_id  IS_NULLABLE = NO, COLUMN_DEFAULT = 1
+
+**`role_id` est `NOT NULL`, donc le `?? 1` ne peut pas se declencher** ; et les deux seuls
+ecrivains de la colonne la posent toujours, donc le defaut du schema ne se declenche pas non
+plus. *Deux replis qui RESSEMBLENT a une fabrication et n'en sont pas — et c'est la
+nullabilite en base, pas la lecture du code, qui tranche.* Le voisin immediat
+(`ConnexionController:77`) n'a aucun repli et rendrait `0` : **incoherent avec le mien, plus
+sur, et sans effet non plus.**
+
+### Table de verite jouee — 20 cas, 0 FAIL, temoin inverse rendu
+
+    csv 'user'/'admin'/'superadmin'      -> 1 / 2 / 3, aucun signal
+    csv 'ADMIN', '  admin  '             -> 2  (casse et espaces)
+    csv ''  (colonne absente ou vide)    -> 1, AUCUN signal — personne n'a rien demande
+    csv 'admni', 'root', '2'             -> 1, valeurInvalide            <- ETAIT MUET
+    csv 'admin'   auteur 2               -> 1, rangRamene
+    man role_id absent                   -> 1, aucun signal
+    man 99, 0, -1                        -> 1, valeurInvalide            <- ETAIT MUET
+    man 2         auteur 2               -> 1, rangRamene
+
+    invariant  role ∈ ROLES : 0 violation sur 27 combinaisons (null, -5..PHP_INT_MAX × 1,2,3)
+    TEMOIN     attendu 'admni' -> 2 : 1 FAIL rendu, l'instrument mord
+
+*`'2'` en libelle CSV est signale comme invalide, et c'est voulu : la colonne `role` prend
+des libelles, pas des entiers. Accepter les deux ferait deux langages dans une colonne.*
+
+### Ce qui rougira chez la QA, et c'est un rouge JUSTE
+
+`roleAutorise()` **n'existe plus** — une seule implementation, pas un adaptateur qui
+garderait le drapeau ambigu en vie. `laravel/tests/Feature/RoleAutoriseTest.php` porte
+**7 appels reels** (lignes 97, 116, 129, 137, 146, 188, 221) qui leveront
+`Call to undefined method`. La correspondance :
+
+    [$effectif, $abaisse] = $c->roleAutorise($d, $a)
+        ->  $p = $c->rolePose($d, $a)          // $d accepte null
+            $p->role · $p->rangRamene · $p->valeurInvalide   <- le troisieme est NEUF
+
+*Je ne l'ai pas modifie : `laravel/tests/` n'est pas a moi.*

@@ -36,7 +36,7 @@ return [
 
     'creer_titre' => 'Créer un compte',
     'creer' => 'Créer',
-    'cree' => "Compte « :nom » créé (identifiant :id). Il devra fixer son mot de passe à la première connexion.",
+    'cree' => "Compte « :nom » créé (identifiant :id). Il devra changer ce mot de passe à sa première connexion.",
 
     'mdp_placeholder' => ':minimum car. min.',
     'mdp_poser' => 'Enregistrer',
@@ -77,6 +77,7 @@ return [
     'imp_err_vide' => 'Le fichier est vide ou sans ligne d\'en-tête.',
     'imp_err_courriel' => 'Adresse de courriel absente ou invalide : ligne ignorée.',
     'imp_err_ecriture' => 'La création a échoué en base : ligne ignorée.',
+    'imp_err_role' => 'La valeur « :valeur » de la colonne « role » n\'est pas un rôle : le compte a été créé avec le rôle « Utilisateur ». Valeurs acceptées : :roles.',
     'imp_rang_ramene' => 'Compte créé, mais avec le rôle « Utilisateur » : vous ne pouvez créer qu\'un rôle inférieur au vôtre.',
     'imp_sudo_refuse' => 'Compte créé SANS sudo : accorder sudo demande le rôle « Superadministrateur ».',
     'err_nom' => "Le nom est obligatoire et ne peut dépasser 255 caractères.",
@@ -106,6 +107,7 @@ return [
     'supprime' => 'Compte « :nom » supprimé.',
     'anonymise' => "Compte « :nom » anonymisé. :nombre ligne(s) de journal conservée(s).",
     'err_soi_meme' => "Vous ne pouvez pas agir sur votre propre compte.",
+    'cree_valeur_role' => 'La valeur de rôle soumise n\'est pas un rôle : le rôle « Utilisateur » a été posé.',
     'cree_rang_ramene' => 'Compte « :nom » créé (identifiant :id) — mais avec le rôle « Utilisateur » : vous ne pouvez créer qu\'un rôle inférieur au vôtre.',
     'err_rang' => "Impossible d'agir sur un compte de rôle égal ou supérieur au vôtre.",
     'err_dernier_sa' => "C'est le dernier super-administrateur actif : il ne peut pas être retiré.",

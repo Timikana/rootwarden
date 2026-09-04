@@ -35,7 +35,7 @@ return [
 
     'creer_titre' => 'Create an account',
     'creer' => 'Create',
-    'cree' => 'Account ":nom" created (id :id). It will have to set its password on first sign-in.',
+    'cree' => 'Account ":nom" created (id :id). It will have to change this password at first sign-in.',
 
     'mdp_placeholder' => ':minimum chars min.',
     'mdp_poser' => 'Save',
@@ -76,6 +76,7 @@ return [
     'imp_err_vide' => 'The file is empty or has no header row.',
     'imp_err_courriel' => 'Email address missing or invalid: row skipped.',
     'imp_err_ecriture' => 'Creation failed in the database: row skipped.',
+    'imp_err_role' => 'The "role" column value ":valeur" is not a role: the account was created with the "User" role. Accepted values: :roles.',
     'imp_rang_ramene' => 'Account created, but with the "User" role: you may only create a role below your own.',
     'imp_sudo_refuse' => 'Account created WITHOUT sudo: granting sudo requires the "Superadmin" role.',
     'err_nom' => 'The name is required and cannot exceed 255 characters.',
@@ -105,6 +106,7 @@ return [
     'supprime' => 'Account ":nom" deleted.',
     'anonymise' => 'Account ":nom" anonymised. :nombre audit log line(s) kept.',
     'err_soi_meme' => 'You cannot act on your own account.',
+    'cree_valeur_role' => 'The submitted role value is not a role: the "User" role was applied.',
     'cree_rang_ramene' => 'Account ":nom" created (id :id) — but with the "User" role: you may only create a role below your own.',
     'err_rang' => 'You cannot act on an account whose role is equal to or above yours.',
     'err_dernier_sa' => 'This is the last active super administrator: it cannot be removed.',

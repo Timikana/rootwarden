@@ -160,13 +160,29 @@ class ComptesController extends Controller
             return back()->with('erreur', __('comptes.err_nom_pris'));
         }
         $courriel = filter_var(trim((string) $requete->input('email', '')), FILTER_VALIDATE_EMAIL) ?: null;
-        // La liste fermee ET l'anti-escalade, en UN appel : `roleAutorise()` porte
-        // les deux, et l'import CSV appelle la meme. Deux copies divergeraient —
-        // le legacy en a trois, dont une muette.
-        [$role, $rangRamene] = $this->comptes->roleAutorise(
-            (int) $requete->input('role_id', 1),
+        /*
+         * La liste fermee ET l'anti-escalade, en UN appel : `rolePose()` porte les
+         * deux, et l'import CSV appelle la meme. Deux copies divergeraient — le
+         * legacy en a TROIS, dont une muette.
+         *
+         * ⚠ `null` PLUTOT QU'UN REPLI A 1 QUAND LE CHAMP EST ABSENT.
+         * `input('role_id', 1)` fabriquait `1` pour un champ absent **et** pour
+         * `role_id=99`, sans distinguer les deux : le premier est un defaut
+         * legitime, le second une valeur qui n'est pas un role. Ici l'absence
+         * garde le plancher — personne n'a rien demande — et **toute valeur
+         * presente est jugee**, `(int) 'abc'` valant 0 et sortant de `ROLES`.
+         *
+         * *`ConvertEmptyStringsToNull` rend `role_id=""` comme `null` : c'est
+         * donc l'absence, pas une valeur invalide. Le `<select>` de la vue est une
+         * liste FERMEE — atteindre ce chemin demande une requete forgee, et c'est
+         * precisement pour celle-la que le signal existe.*
+         */
+        $roleBrut = $requete->input('role_id');
+        $pose = $this->comptes->rolePose(
+            $roleBrut === null ? Comptes::ROLE_PLANCHER : (int) $roleBrut,
             $roleAuteur,
         );
+        $role = $pose->role;
 
         /*
          * ══ ANTI-ESCALADE — REPRISE DU LEGACY, ELLE MANQUAIT ICI ══════════
@@ -234,8 +250,12 @@ class ComptesController extends Controller
         ]);
         // La coercition entre dans la TRACE : une decision de rang qui n'est pas
         // journalisee ne se retrouve pas, et c'en est une.
+        // La trace distingue les deux coercitions comme l'ecran les distingue : une
+        // trace qui dit « anti-escalade » sur une faute de frappe ferait chercher
+        // une tentative d'escalade la ou il n'y en a pas eu.
         $this->journalise($auteur, "Creation du compte '{$nom}' (role={$role})"
-            . ($rangRamene ? ' [rang ramene a 1 : anti-escalade]' : ''));
+            . ($pose->rangRamene ? ' [rang ramene au plancher : anti-escalade]' : '')
+            . ($pose->valeurInvalide ? ' [valeur de role invalide : plancher pose]' : ''));
 
         /*
          * ⚠ UN SEUL MESSAGE, ET IL PASSE PAR `succes`.
@@ -257,9 +277,21 @@ class ComptesController extends Controller
          * cette reponse, pas a la suivante — et ce message-la n'est pas un
          * secret, seul le mot de passe l'est.
          */
-        $requete->session()->now('succes', $rangRamene
+        /*
+         * DEUX COERCITIONS, DEUX PHRASES, ET ELLES S'AJOUTENT.
+         *
+         * `cree_rang_ramene` est une phrase de SECURITE — *« vous ne pouvez creer
+         * qu'un rang inferieur au votre »*. `cree_valeur_role` est une phrase de
+         * VALIDITE — *« la valeur soumise n'est pas un role »*. Les rendre
+         * exclusives aurait tu l'une des deux quand les deux ont joue.
+         */
+        $annonce = $pose->rangRamene
             ? __('comptes.cree_rang_ramene', ['nom' => $nom, 'id' => $id])
-            : __('comptes.cree', ['nom' => $nom, 'id' => $id]));
+            : __('comptes.cree', ['nom' => $nom, 'id' => $id]);
+        if ($pose->valeurInvalide) {
+            $annonce .= ' ' . __('comptes.cree_valeur_role');
+        }
+        $requete->session()->now('succes', $annonce);
 
         return $this->rendu($requete, secretsImport: [['nom' => $nom, 'mdp' => $mdpGenere]]);
     }
