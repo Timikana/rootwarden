@@ -8794,3 +8794,81 @@ capacité.*
 **Les deux moitiés passent, y compris celle qui porte le contournement du legacy : un compte SANS secret
 TOTP obtient l'ENRÔLEMENT.** *C'est la fiche `feedback_garde_par_construction` appliquée telle qu'elle est
 écrite — et c'est la seule chose de la journée qu'aucune péremption ne peut atteindre.*
+
+### ✅ ARBITRAGE — la coercition de VALIDITÉ reste, et elle s'ANNONCE. Mais pas avec le même drapeau.
+
+**La QA a mesuré ce que personne n'avait écrit :**
+
+    auteur 3 ou 2, valeur hors liste   ->  role 1, EN SILENCE
+    auteur 1, n'importe quelle valeur  ->  role 1, ANNONCE
+
+**Le drapeau ne rapporte que la coercition d'AUTORISATION, jamais celle de VALIDITÉ.** *Un
+superadministrateur qui se trompe de valeur est ramené au rôle 1 sans qu'on le lui dise.*
+
+### ⛔ ET J'AI FAILLI TRANCHER PAR COHÉRENCE PLUTÔT QUE PAR MESURE
+
+**Mon réflexe était : « refuse, ne devine pas » — la décision que j'ai rendue DEUX fois aujourd'hui, sur
+`target_type` de CVE puis de `ssh_audit`.** *J'allais l'appliquer une troisième fois par symétrie.*
+
+    et la difference decide :
+      `target_type` fabrique `'all'` = TOUT LE PARC, la portee la plus LARGE
+      `role_id`     fabrique `1`     = le role le MOINS PRIVILEGIE
+
+> **La coercition de validité échoue du côté SÛR. Refuser serait plus propre ; ce ne serait pas plus
+> sûr.** *« Cohérent avec ma décision précédente » n'est pas un argument — c'est la même faute que
+> d'étendre une propriété vraie d'un objet à son homonyme, appliquée à une DÉCISION au lieu d'un code.*
+
+### ✅ LA DÉCISION : garder la coercition, ANNONCER, et avec un signal DISTINCT
+
+**Le défaut n'est pas la coercition — c'est le SILENCE.** *L'appelant croit avoir créé un administrateur ;
+il a créé un utilisateur.*
+
+    ⛔ ne pas reutiliser le drapeau existant : la QA a raison, un drapeau qui
+       signifie DEUX choses n'est fiable pour aucune. Celui-la dit « votre
+       AUTORISATION a ete reduite » — une phrase de securite.
+    ✅ un second signal, distinct : « la valeur soumise n'est pas une valeur
+       de role » — une phrase de VALIDITE.
+    ✅ et la fonction rend deja un tuple : elle peut rendre LAQUELLE des deux
+       coercitions a joue.
+
+### ⚠ ET QUATRE FABRICATIONS DU CHIFFRE 1, SUR DEUX CHEMINS — mesurées
+
+    la vue                 `<select name="role_id">`  liste FERMEE  ✅ saine
+    ComptesController:167  `input('role_id', 1)`      fabrique 1 si ABSENT
+    Comptes.php:606        `in_array(…) ? $demande : 1`  coerce le hors-liste
+    Comptes.php:712        `IMPORT_ROLES[… ?? 'user'] ?? 1`
+                           -> DEUX defauts dans UNE expression : si la
+                              colonne manque, et si le libelle est inconnu
+
+> **Chacune est silencieuse, et le §712 est celui qui coûte : un import de cinquante lignes dont la colonne
+> `role` est mal orthographiée crée cinquante comptes de rôle 1, et le bilan annonce une réussite.**
+
+**✅ Priorité : le chemin CSV d'abord.** *Il a déjà le canal qu'il faut — `$results['errors'][]`, par
+ligne — construit exactement pour ça, et c'est l'arbitrage que j'ai rendu ce matin sur la colonne `sudo`.*
+
+**⚠ Et je nomme QUATRE étages en sachant que mes deux consignes de ce genre en ont manqué la moitié
+aujourd'hui** (trois sur six, puis un sur deux). *Mesure les tiens : je donne une population de départ, pas
+un compte.*
+
+### ⚠ ET LA QA A EU FAUX TROIS FOIS SUR QUATRE LIGNES QU'ELLE AVAIT SOUS LES YEUX
+
+    1. `@dataProvider` non reconnu ici -> methode appelee sans argument.
+       DEJA rencontre sur `PorteeAllRetireeTest`, refait.
+    2. elle attendait `[1, true]` pour `(99, 2)` : les deux bornes NE SE
+       COMPOSENT PAS — la seconde compare le role DEJA ramene a 1.
+    3. puis « la coercition de validite est toujours silencieuse » : faux
+       aussi, l'auteur de role 1 la fait annoncer.
+
+> **« Lire n'est pas mesurer, et une fonction courte donne l'illusion qu'on peut s'en dispenser. »**
+
+**Trois attendus écrits de tête sur QUATRE lignes de code. C'est la même faute que ses quatre chiffres
+faux, sur un autre objet — et la brièveté de l'objet est ce qui l'a produite.**
+
+### ✅ ET SON RELEVÉ DE MUTATIONS TIENT LA PROPRIÉTÉ QUE J'AVAIS DEMANDÉE
+
+    `<` -> `<=`   2 rouges, verts 4/6
+    `>=` -> `>`   4 rouges, verts 2/6
+    cinq mutations, cinq ensembles distincts, VERTS COMPTES A CHAQUE LIGNE
+
+**Le verrou tient, et il tient au sens fort : les rouges apparaissent ET le compte de verts baisse — donc
+aucun test ne s'absente.**
