@@ -7523,3 +7523,63 @@ n'existe pas »** : *`conftest.py:54` fait `sys.modules['scheduler'] = MagicMock
 rend le mock, la fonction ne s'exécute pas, et 26 tests échouent sans rien mesurer.* **Le stub n'a pas été
 retiré (d'autres suites en dépendent) : le fichier charge `scheduler.py` sous un alias, et un TÉMOIN refuse
 désormais un MagicMock.**
+
+### ⛔ UNE RECTIFICATION QUI NE VA PAS LÀ OÙ LA SOURCE EST LUE NE RECTIFIE RIEN
+
+**16:35. La session 5 m'a envoyé une spécification portant, mot pour mot, le cadrage que j'ai RÉTRACTÉ à
+14:43 :**
+
+> *« un compte portant `force_password_change` ne peut pas exporter. 8 comptes actifs sur 12, et 6 n'ont
+> pas d'adresse pour le lever seuls »*
+
+**Elle ne l'a pas pris de moi. Elle l'a lu à sa SOURCE :** `web.php:113-121`.
+
+    j'ai corrige   `DOSSIER-11`  — que personne ne lit AVANT d'agir
+    j'ai laisse    `web.php:113-121` — que tout le monde lit EN agissant
+
+> **Le dossier porte la vérité, le commentaire porte l'AUTORITÉ — et c'est le commentaire qui voyage.**
+
+**C'est la forme aggravée de « une rectification fausse voyage » : ici la rectification était JUSTE et n'a
+pas voyagé, parce que je l'ai déposée là où elle ne croise personne.** *Une rectification doit être posée à
+la source lue, pas au registre qui la consigne.*
+
+**Le geste est routé à la session 1 : rectifier la CAUSE dans le commentaire, dont la propriété déclarée
+reste juste.**
+
+### ⚠ ET J'AI RELAYÉ « SIX ÉTAGES FERMÉS » SANS LE VÉRIFIER
+
+    `planification-cve.js`, dans `saisie()` :  `const brut = … || 'all'` SUBSISTE
+    inerte — `type` part de `''` et n'est affecte que par `tag:` et `multi`
+
+**Cinq étages sont fermés ; le sixième tient par une propriété de FLUX, pas par la suppression du repli.
+Je l'ai annoncé « fermé » à deux sessions et à l'exploitant.** *J'ai relayé un rapport sans le mesurer —
+ce que je reproche aux autres depuis ce matin.*
+
+✅ **Et le choix de la session 5 est meilleur que ma consigne** : *asserter le TYPE ENVOYÉ, pas l'absence du
+mot.* **Un verrou sur la propriété survit à la réactivation du résidu ; un verrou sur le mot rougirait sur
+un résidu sans effet et serait retiré comme faux positif.**
+
+### ✅ TROIS INSTRUMENTS VALIDÉS PAR MESURE CE TOUR-CI
+
+    `ruff`   /opt/venv/bin/ruff dans `rootwarden_python`   ✅ (absent de laravel)
+    `docs/`  monte dans AUCUN conteneur -> un pytest joue DANS le conteneur ne
+             peut pas lire `patchs-en-attente/`
+    la CI    `on: push branches:[main]` + `pull_request:[main]`, et le dossier
+             existe sur les trois refs (6 fichiers · temoin `scheduler.py` 1/1/1)
+
+**Donc le verrou des patchs gelés est fail-closed EN CI et sans objet dans le conteneur — une fenêtre
+NOMMÉE, pas un skip aveugle.** *⚠ Latence à déclarer : la CI ne joue que sur `main`, les patchs se
+modifient sur `Migration-Laravel`. Un patch défectueux peut dormir jusqu'à la fusion suivante.*
+
+### ✅ ET LA PARADE QUE J'ADOPTE POUR MOI
+
+**La session 5 a réécrit un chiffre faux UNE HEURE après avoir corrigé le même — « 308 passed » quand la
+mesure était 3 failed / 305, le fichier lancé seul rendant le total.**
+
+> **« Une règle que je viens d'énoncer ne s'applique pas d'elle-même au geste d'après. »**
+
+    sa parade, et elle est MATERIELLE : le chiffre d'un message de commit
+    se COLLE depuis la sortie de la commande, jamais ne se TAPE.
+
+**Une intention ne tient pas ; un geste tient. Je l'adopte — j'ai récité « 111 compilés root » pendant un
+jour et demi.**
