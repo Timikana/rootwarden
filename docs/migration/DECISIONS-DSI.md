@@ -6868,3 +6868,87 @@ mesure » : le défaut était dans la façon de mesurer, pas dans le code.**
 **Je ne relance personne.** *La session 3 porte, la session 5 a rendu son rejeu et attend pour relire, les
 autres ont rendu leur assignation.* **Et je n'invente pas de tâche pour remplir un tour — c'est ce que
 j'ai refusé toute la journée.**
+
+## Tour de 14:50 (2026-09-04) — LE RAPPORT DOC/CODE EST DE 3 POUR 1, ET C'EST MOI
+
+**Fenêtre mesurée : du 2026-09-03 23:35 (dernier tick inscrit) au 2026-09-04 14:47 CEST.**
+
+    CODE (feat/fix touchant laravel/ ou backend/)   3
+    DOCUMENTATION (docs:)                           9
+    AUTRE (fix hors des deux cibles)                1
+    -> rapport doc/code = 3,00        SEUIL = 2     DEPASSE
+
+**La consigne dit d'attaquer « l'équipe écrit sur ses propres mesures au lieu de porter ». La mesure ne dit
+pas ça.**
+
+    des 9 commits `docs:`, SEPT sont les miens
+      312b117 · 0865de3 · c253b6c · a249606 · e325ed9 · c8ce49a · 59f8789
+
+> **Le rapport de 3 pour 1 est produit par la session qui le mesure.** *Relancer les autres sur ce chiffre
+> serait leur imputer ma propre production — et l'identité git est PARTAGÉE entre les huit sessions, donc
+> `--author` ne discrimine RIEN. Je le sais parce que je le sais, pas parce que je l'ai mesuré.*
+
+**Ce que je fais donc, plutôt que de relancer sur un chiffre mal attribué** : *un tour où je n'écris que
+CECI et un dossier, et où chaque session reçoit UNE capacité nommée.*
+
+## ✅ 3) LA DÉCLARATION D'ÉTAT VÉRIFIÉE — `socle_avertissement` a bien DISPARU
+
+    laravel/lang/fr/auth.php    0     temoin : 36 cles lues dans le fichier
+    laravel/lang/en/auth.php    0     temoin : 36 cles lues
+    cgu.blade.php               0     le fichier EXISTE (3175 o, 2 sept. 18:36)
+    balayage COMPLET laravel/ + tests/, en Python (glob+io.open, PAS ripgrep)
+        fichiers contenant la cle : 0
+        temoin d'instrument : 90 catalogues lang lus
+
+**Aucune suite ne l'assère. La déclaration est VRAIE au 2026-09-04 14:48.** *Et elle est datée pour cette
+raison : c'est la quatrième déclaration d'état de ce chantier, et trois des précédentes étaient devenues
+fausses sans qu'aucun commit ne les touche.*
+
+## ⚠ 4) L'ARBITRAGE DU TOUR — et j'avais les deux fonctions à L'ENVERS
+
+**En instruisant « créer un relevé planifié », j'ai lu les deux exécuteurs de l'ordonnanceur. Ma
+prédiction était que le chemin SSH serait le dangereux. C'est l'inverse.**
+
+    `_run_scheduled_ssh_audit`  (scheduler.py:257)   DURCI
+        machines + liste illisible -> `WHERE 1=0`     <- echoue FERME
+        filtre `lifecycle_status != 'archived'`  : 4 occurrences
+
+    `_run_scheduled_scan`       (scheduler.py:171)   NON DURCI
+        machines + liste illisible -> TOUT LE PARC
+        tag sans valeur          -> TOUT LE PARC
+        `else`                   -> TOUT LE PARC
+        filtre `archived` : 0 occurrence   (temoin : 4 dans son voisin)
+
+> **Je n'ai pas deviné le nom des fonctions depuis le chemin de leur route — je les ai lues, et c'est la
+> seule raison pour laquelle cette entrée n'est pas fausse.** *`_run_scheduled_scan` est le CVE, pas le
+> SSH ; le durcissement est du côté que je croyais nu.*
+
+**Et le correctif de `_run_scheduled_scan` EXISTE : c'est `a345e65`, un des six de
+`security/backend-cve`.** *Un des six correctifs non fusionnés est précisément la garde qui empêche une
+planification de prendre le parc entier. Ça ajoute un poids réel au `DOSSIER-15`, et je l'y porte.*
+
+### ✅ CE QUE JE TRANCHE — le formulaire porté n'offrira PAS `'all'`
+
+    ssh_audit.py:790   target_type = (data.get('target_type') or 'all')
+    ssh_audit.py:798   `all` est la SEULE portee qui n'exige aucun target_value
+    -> creer une planification SANS portee explicite arme un relevé SSH
+       sur TOUT LE PARC, `srv-zabbix` (PROD, id 1) comprise
+
+**Décision : la vue portée offre une LISTE FERMÉE de trois portées — `tag`, `environment`, `machines` — et
+jamais `'all'`.** *Le backend continue de l'accepter, pour les planifications créées avant le portage ; la
+PAGE ne le propose plus.*
+
+**Pourquoi, et ce n'est pas « le legacy le fait déjà »** : *ce qui décide est le rapport utilité /
+exposition, pas ce que le legacy expose.* **`tag` rend le même service — un tag peut couvrir le parc — en
+exigeant un geste explicite. Et une entrée libre absente ne se contourne pas par une requête forgée,
+tandis qu'une entrée validée se contourne.** *C'est la forme que V10a a déjà imposée aux surcharges de
+supervision, pour la même raison.*
+
+### ⛔ ET CE QUE JE NE FAIS PAS PORTER
+
+    ENREGISTRER une planification VIVANTE sur le banc.
+
+**L'ordonnanceur tourne dans un fil invisible à `ps`.** *Une planification de test enregistrée est un
+relevé SSH réel, et son échéance ne demande la permission de personne.* **La capacité se porte CÂBLÉE :
+la vue, la validation, le refus. L'enregistrement d'une ligne vivante attend le mot de l'exploitant, comme
+A3, F8 et A4.**
