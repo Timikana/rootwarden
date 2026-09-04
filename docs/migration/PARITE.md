@@ -8,6 +8,101 @@ Un ecart non ecrit ici est une regression, pas un choix.
 
 ---
 
+## E-394 — « Se souvenir de moi » : PORTE, et le contournement du legacy N'EST PAS porte
+
+**Porte le 2026-09-04 (`v1.40.0`).** *Le portage VIDAIT une table qu'il ne remplissait jamais
+(`MotDePasse:295`, `Comptes:572`). Il la remplit desormais — et la propriete qu'il porte est
+plus forte que celle du legacy.*
+
+### ⛔ CE QUE LE LEGACY FAIT, ET QU'ON NE PORTE PAS
+
+    verify.php:139   if ($totpSecret) { … 2fa_pending … exit(); }
+                     ^^^^^^^^^^^^^^^^ PAS de `else`
+    verify.php:153   if (!empty($_SESSION['2fa_required']) || !empty($_SESSION['2fa_pending']))
+
+**Compte SANS secret TOTP : la condition ne tire pas, aucun drapeau n'est pose, le garde de
+`:153` ne tire pas non plus — et l'execution continue avec `$_SESSION['user_id']` renseigne.**
+*Le cookie authentifie SEUL, sans second facteur et sans la redirection vers l'enrolement que
+`login.php` impose partout ailleurs.*
+
+**Vérifié par trois lectures indépendantes** (moi, session 5, session 6). *Et l'objection de
+principe de la DSI — « le jeton restitue l'identite, pas l'authentification » — avait ete
+RETRACTEE sur la foi d'un commentaire d'en-tete (`verify.php:13`). **Un commentaire qui affirme
+est une donnee a mesurer, pas un constat.***
+
+### ✅ LA PROPRIETE PORTEE, ET ELLE TIENT PAR LE TYPE
+
+    DecisionRestauration = Defi | Enrolement | Refus        <- PAS de cas « portail »
+
+> **L'acces direct au portail n'est pas « jamais rendu » : il est INEXPRIMABLE.** *La session 6
+> proposait quatre valeurs pour pouvoir asserter l'absence de la quatrieme ; il y en a trois, et
+> il n'y a plus rien a asserter. Une assertion se supprime, un type ne se contourne pas sans
+> qu'on le voie.*
+
+⚠ **ET LE RISQUE SE DEPLACE, la session 6 l'a nomme** : la valeur fautive n'existe plus, mais
+**un appelant qui recoit `Defi` et ne fait rien laisserait passer la requete.** *D'ou un `match`
+sur l'enumeration dans `RestaureMemorisation` : ajouter un cas leve `UnhandledMatchError` au
+lieu de tomber en silence dans un chemin qui passe.* **L'exhaustivite est tenue par le langage.**
+
+### Trois divergences deliberees, toutes declarees
+
+    1. la restauration n'AUTHENTIFIE jamais — voir ci-dessus
+    2. le jeton est emis APRES la reussite du defi, jamais avant
+       (le legacy : `login.php:176`, juste apres `2fa_required = true`)
+    3. une restauration ne RENOUVELLE pas le jeton — pas d'expiration glissante
+
+**La raison de 2 est la cle primaire, pas le principe** : `remember_tokens` porte
+`PRIMARY KEY (user_id)`, donc une connexion ABANDONNEE au stade du defi sur un appareil
+evincerait le jeton qui fonctionnait sur l'autre. *Et la raison de la session 6 est plus forte
+que celle de la DSI : emis avant, le cas « restaure sans avoir jamais franchi le second
+facteur » devient **produisible par le portage** — plus une compatibilite heritee, une
+creation.*
+
+### Ce qui se DECLARE a l'ecran, et pourquoi
+
+    « il vous demandera TOUJOURS votre second facteur »   la propriete elle-meme
+    « un seul appareil a la fois »                        limite du SCHEMA
+    « l'ancien portail effacera cette memorisation »      transition
+
+**La limite d'un seul appareil est heritee, pas choisie — mais elle devient un choix des qu'on
+la porte en silence.** *Et la troisieme vient du chiffrement : `EncryptCookies` s'applique et on
+ne l'en exempte PAS — un porteur d'identite n'a rien a faire dans une liste d'exceptions. Le
+legacy lit le cookie en clair, ne saura pas le lire, et l'effacera (`functions.php:111`).*
+
+### Les attributs du cookie, poses explicitement — et pourquoi c'est ecrit AU SITE
+
+    expires 30 jours · path '/' · secure · httponly · samesite Strict
+
+**Aucun test Feature ne voit un attribut de cookie**, et un test de navigateur exige le banc.
+*La table de correspondance avec `login.php:206-211` vit donc dans le docblock de
+`cookieMemorisation()`, pas dans un compte rendu — la session 5 me l'a fait remarquer en me
+renvoyant ma propre lecon.* **La DUREE est un attribut de securite autant que les trois autres :
+laisser le defaut du cadre aurait fait une divergence SILENCIEUSE.**
+
+### Verifications
+
+    /connexion  ->  200, et le HTML rendu porte `name="memorisation"` et les
+                    TROIS declarations ; « 30 jours » y figure, donc le
+                    parametre `:jours` resout depuis JetonMemorisation::JOURS
+    TEMOIN      ->  ZERO motif `auth.` dans le HTML, alors que la source en
+                    appelle DOUZE : toutes les cles resolvent
+    parite FR/EN 40 = 40 · classes CSS presentes dans rw.css
+    equilibres identiques a HEAD sur les huit fichiers modifies,
+      (0,0,0) sur les cinq neufs — sauf `SecondFacteurController`, dont
+      l'ecart (-1,-1,-1) PREEXISTE (mesure contre HEAD)
+    le verrou de la session 6 : `laravel/tests/Feature/RestaurationParJetonTest.php`
+      (4948bdf), qui SKIP en nommant l'absence et mordra sur cette livraison
+
+### Reserves
+
+- **Le flux n'est pas exerce de bout en bout** : franchir le defi exige un code TOTP valide, et
+  je n'invente pas de secret. *Le verrou de la session 6 mesure la redirection, ce qui est la
+  propriete — pas le franchissement.*
+- **Ses quatre temoins etaient VACUES avant cette livraison** et le fichier le dit. *Ils
+  deviennent porteurs maintenant.*
+- Pas de binaire PHP sur l'hote de cette session.
+
+---
 ## E-393 — un jeton « se souvenir de moi » survivant DEFAIT le changement de mot de passe
 
 **Corrige le 2026-09-04 (`v1.39.10`), AVANT le portage qui rendrait le defaut atteignable.**

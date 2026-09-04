@@ -75,6 +75,16 @@ class ConnexionController extends Controller
             'id'   => (int) $compte->id,
             'nom'  => (string) $compte->name,
             'role' => (int) $compte->role_id,
+            /*
+             * ⚠ SEULE L'INTENTION VOYAGE ICI, JAMAIS UN JETON.
+             *
+             * Le legacy emet le jeton A CET INSTANT (`login.php:176`), juste
+             * apres avoir pose `2fa_required` — donc AVANT que le second facteur
+             * soit presente. On ne porte pas ce choix : voir
+             * `JetonMemorisation`, divergence 2. Ici on ne retient que le
+             * souhait, et l'emission attend la reussite du defi.
+             */
+            'memoriser' => $requete->boolean('memorisation'),
         ]);
 
         // Aucun secret TOTP : le compte doit d'abord en enroler un. Il n'existe
@@ -93,10 +103,21 @@ class ConnexionController extends Controller
         // resterait en base a decrire une session qui n'existe plus.
         app(SessionsActives::class)->ferme($requete->session()->getId());
 
+        /*
+         * Le jeton de memorisation meurt avec la deconnexion, et le cookie avec
+         * lui. Se deconnecter en laissant vivre un jeton qui restitue l'identite
+         * serait un mensonge d'interface : la personne a demande a sortir.
+         */
+        $idSortant = (int) $requete->session()->get('utilisateur_id', 0);
+        if ($idSortant > 0) {
+            app(\App\Services\JetonMemorisation::class)->revoque($idSortant);
+        }
+
         $requete->session()->flush();
         $requete->session()->regenerate();
 
-        return redirect()->route('connexion');
+        return redirect()->route('connexion')
+            ->withoutCookie(\App\Services\JetonMemorisation::COOKIE);
     }
 
     /** Incremente les echecs et verrouille au-dela du seuil. */

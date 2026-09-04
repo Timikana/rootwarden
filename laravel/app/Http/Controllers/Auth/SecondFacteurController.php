@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Services\JetonMemorisation;
 use App\Services\SessionsActives;
 use App\Services\Totp;
 use App\Support\TotpCrypto;
@@ -59,6 +60,7 @@ class SecondFacteurController extends Controller
     public function __construct(
         private readonly Totp $totp,
         private readonly SessionsActives $sessions,
+        private readonly JetonMemorisation $jetons,
     ) {
     }
 
@@ -298,13 +300,75 @@ class SecondFacteurController extends Controller
         $requete->session()->put('utilisateur_nom', (string) $compte->name);
         $requete->session()->put('role_id', (int) $compte->role_id);
 
+        /*
+         * ══ « SE SOUVENIR DE MOI » — L'EMISSION EST ICI, ET NULLE PART AILLEURS
+         *
+         * Ce point est le succes UNIQUE des deux chemins du second facteur, donc
+         * le seul endroit ou « le defi a ete franchi » est vrai. Le legacy emet
+         * le jeton a `login.php:176`, juste apres avoir pose `2fa_required` —
+         * c'est-a-dire AVANT le defi. On ne porte pas ce choix : voir
+         * `JetonMemorisation`, divergence 2.
+         *
+         * ⚠ ET UNE RESTAURATION NE RENOUVELLE PAS LE JETON. `memoriser` n'est
+         * pose que par `ConnexionController`, jamais par
+         * `RestaureMemorisation` : les trente jours courent depuis la derniere
+         * saisie du mot de passe, pas depuis la derniere visite. Une expiration
+         * glissante ferait vivre un porteur d'identite indefiniment sans qu'on
+         * ait jamais reverifie quoi que ce soit.
+         */
+        $memoriser = (bool) ($temporaire['memoriser'] ?? false);
+
         if ((int) ($compte->force_password_change ?? 0) === 1) {
             $requete->session()->put('changement_mot_de_passe_requis', true);
-
-            return redirect()->route('profil', ['force_change' => 1]);
+            $reponse = redirect()->route('profil', ['force_change' => 1]);
+        } else {
+            $reponse = redirect()->route('cgu');
         }
 
-        return redirect()->route('cgu');
+        return $memoriser ? $reponse->withCookie($this->cookieMemorisation((int) $compte->id)) : $reponse;
+    }
+
+    /**
+     * Le cookie du jeton — TOUS ses attributs explicites.
+     *
+     * ⚠ AUCUN TEST FEATURE NE VOIT UN ATTRIBUT DE COOKIE, et un test de
+     * navigateur exige le banc. **La parite avec le legacy se verifie donc par
+     * LECTURE**, et voici la table de correspondance
+     * (`legacy/auth/login.php:206-211`) :
+     *
+     *     expires   time() + 2592000        ->  30 jours (JetonMemorisation::JOURS)
+     *     path      '/'                     ->  '/'
+     *     secure    true                    ->  true
+     *     httponly  true                    ->  true
+     *     samesite  'Strict'                ->  'Strict'
+     *
+     * **La DUREE est un attribut de securite autant que les trois autres** — et
+     * si on laissait le defaut du cadre plutot que de l'ecrire, la divergence
+     * serait SILENCIEUSE : un cookie qui vit plus longtemps que prevu ne se voit
+     * nulle part. Elle est donc posee explicitement.
+     *
+     * ⚠ CONSEQUENCE DE PERIODE DE TRANSITION, DECLAREE. Ce cookie est CHIFFRE :
+     * `EncryptCookies` s'applique et on ne l'en exempte pas — un porteur
+     * d'identite n'a rien a faire dans une liste d'exceptions. Le legacy, lui,
+     * lit `$_COOKIE['remember_token']` en clair : il ne saura pas le lire et
+     * l'effacera (`functions.php:111`). **Donc visiter l'ancien portail annule la
+     * memorisation du nouveau.** *C'est un desagrement de transition, pas un
+     * defaut de securite — et il vaut mieux que d'exempter le jeton du
+     * chiffrement pour un portail qu'on demonte.*
+     */
+    private function cookieMemorisation(int $idCompte): \Symfony\Component\HttpFoundation\Cookie
+    {
+        return cookie()->make(
+            JetonMemorisation::COOKIE,
+            $this->jetons->emet($idCompte),
+            JetonMemorisation::JOURS * 24 * 60,
+            '/',
+            null,
+            true,      // secure
+            true,      // httpOnly
+            false,     // raw
+            'Strict',  // sameSite
+        );
     }
 
     /** Compteur d'echecs par IP sur 10 minutes, partage avec le legacy. */
