@@ -1309,6 +1309,21 @@ fiches ne portent pas de colonne « porté / non porté » : elles nomment les m
 en prose et en titres de section. **Zéro n'y mesurait pas l'absence de négatifs, il
 mesurait l'absence d'un mot.**
 
+**⚠ ET LE COMPTE « 21 » CI-DESSUS S'EST INVALIDÉ LUI-MÊME.** Remesuré à 20:44, le
+même motif rend **31** — parce que **la section que vous lisez a ajouté dix lignes de
+négation au document qu'elle mesure**. Un pair, avec son propre motif, en rendait
+**44** ; un motif volontairement large en rend **226**.
+
+> **Ces quatre nombres ne se départagent pas, et c'est le point : « une négation »
+> n'est pas un prédicat défini.** 226 attrape « aucun appelant », « aucune
+> permission », « zéro sur seize » — des négations sur les GARDES, pas sur l'état de
+> portage. Chaque motif mesure un objet différent.
+
+**Ce qui a réellement tranché n'est aucun de ces comptes : c'est le reste du §8.1,
+qui se referme à 37/37.** Un prédicat dont la POPULATION est définie se vérifie ;
+un comptage de tournures se discute. *Nous avons convergé sur la conclusion malgré
+des bases incommensurables — c'est de la chance, pas de la méthode.*
+
 *C'est la troisième fois aujourd'hui qu'un instrument ne connaît qu'une **forme** de
 la chose qu'il compte* — après le nom de base contre le chemin résolu, et l'ORM
 contre le SQL brut. **Et c'est la première fois que la forme manquante n'est pas
