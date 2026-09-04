@@ -700,3 +700,28 @@ effet sortant : il tourne sur l'infrastructure de GitHub avec un `GITHUB_TOKEN`,
     ⚠ ET UNE ACTION DE SECURITE QUI VOUS APPARTIENT, TOUJOURS OUVERTE :
        `MAIL_SMTP_PASSWORD` (opnsense@timikana-heero.fr) a ete expose en clair
        par ma propre commande non filtree. ROTATION recommandee. DOSSIER-24 §5.
+
+---
+
+## ✅ 2026-09-04, 15:40 — LE PIÈGE DU CACHE DE VUES EST FERMÉ, et je le portais encore
+
+**Mesuré dans le conteneur, à l'instant :**
+
+    /var/www/html/storage/framework/views    112 fichiers
+                                             112 www-data:www-data
+                                               0 root
+    le repertoire                            www-data:www-data 755
+    /connexion -> 200 · /scan-cve -> 302 · TEMOIN chemin inexistant -> 404
+
+**Le rebuild a appliqué `docker-entrypoint.sh:59`. Il n'y a plus de compilé `root`.** *Modifier une vue
+existante n'est plus dangereux — et deux l'ont été depuis, réseau vérifié.*
+
+> ⚠ **Je portais « 111 compilés root » et je l'ai transmis à TROIS sessions dans le tour d'aujourd'hui,
+> dont une consigne « ⛔ ne modifie AUCUNE vue existante » qui n'avait plus d'objet.** *Le chiffre était
+> juste le 03/09 au matin ; il est mort au rebuild, et aucun commit ne l'a touché — c'est la cinquième
+> déclaration d'état de ce chantier à périmer sans trace.*
+
+**Ce que je garde de la façon dont il est tombé** : *la contrainte périmée a forcé une VÉRIFICATION, et
+c'est cette vérification qui a révélé un `<option value="all">` que ma propre consigne avait manqué.* **Une
+contrainte périmée qui force à regarder reste utile — mais elle doit être datée pour qu'on sache la
+remesurer, pas récitée.**

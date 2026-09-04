@@ -7370,3 +7370,32 @@ répartition.*
 *C'est la forme générale du piège de son analyseur de préfixes, et de mon motif `logger\s*=` qui comptait
 un argument nommé pour une définition. Deux instruments justes, deux questions plus fines, deux valeurs
 plausibles.*
+
+### ⚠ MA CONSIGNE SUR `'all'` AVAIT DEUX ÉTAGES DE MOINS QUE LE DÉFAUT — et l'un cassait l'écran
+
+**Je demandais trois changements : `CIBLES` (:52) et les deux défauts (:156, :188). Il y en avait SIX, et
+le quatrième étage était visible à l'écran.**
+
+    etage 4  planification-cve.js:210   `let type = 'all'` en REPLI
+    ET       scan-cve.blade.php:104     <option value="all">  <- `all` n'etait
+                                        pas qu'un repli : c'etait le PREMIER
+                                        CHOIX de la liste
+
+> **Mon geste, exécuté tel quel, aurait laissé un formulaire dont la première option soumet une valeur que
+> le serveur refuse.** *Ni l'ancien comportement, ni le nouveau : un écran qui propose ce qu'il rejette.*
+
+**Posé en entier : `7153ca3`, v1.39.5, E-387.** *Six changements, dont l'exigence DÉCLARÉE sous le
+sélecteur (`planif.portee_exigee`, FR et EN) — et le fail-closed sans branche supplémentaire : une chaîne
+vide, un `null` ou un champ absent tombent hors de la liste fermée.*
+
+**✅ ET UNE CHOSE GARDÉE CONTRE MA CONSIGNE, avec raison** : *`planif.cible_all` est CONSERVÉ dans les deux
+catalogues, parce que `planification-cve.js:60` en a besoin pour NOMMER une ligne existante de type `all`.*
+**Le retirer aurait affiché une portée VIDE sur une planification qui joint tout le parc — le pire des deux
+états. Cesser d'OFFRIR n'est pas cesser de SAVOIR LIRE.**
+
+**⚠ Et la garde existait déjà vingt lignes plus bas** (`:159-171`, une cible `machines` illisible est
+refusée, avec le commentaire « accepter la ligne, c'est armer un scan complet »). *Le raisonnement était
+écrit ; il n'avait pas été appliqué au cas où la retombée est la VALEUR elle-même.* **Troisième fois
+aujourd'hui que le dépôt portait déjà l'argument.**
+
+**✅ La session 4 est débloquée pour la garde d'entrée de `cve.py:490`.**
