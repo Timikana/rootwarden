@@ -7150,3 +7150,78 @@ déclarées `ERROR` — le filtre `--severity=ERROR` ne garde que la catégorie 
 
 **C'est la propriété qui compte, et elle est bien énoncée : un job vert de plus n'est pas une garde de
 plus. Ici c'est un rouge qui BLOQUE de plus.**
+
+### ✅ L'APPARIEMENT DES 5 CATALOGUES EST RENDU — et il a coûté deux fausses conclusions à son auteur
+
+    politiques · sftp   lire, auditer, DEPLOYER, retirer  PORTES
+                        le rollback est DECLARE ABSENT
+    bashrc              comptes, simulation, gabarit (lecture ET ecriture) PORTES
+                        deploiement, prerequis, restauration, sauvegardes ABSENTS
+    fail2ban            15 cibles portees + une route PROPRE au portage
+                        (`/fail2ban/portee`) ; installer sur UNE machine et
+                        redemarrer : ABSENTS
+    serveurs            7 capacites portees, AUCUNE cle de manque, et AUCUNE
+                        ne passe par la passerelle (4 SQL brutes + insert/
+                        update/delete) — c'est la « COUCHE », et c'est
+                        exactement pourquoi le cycle de vie avait ete
+                        compte absent
+
+**Témoins donnés avec leurs valeurs : 45 catalogues FR, 974 fichiers legacy, 410 fichiers portage.**
+
+**⚠ Et deux pièges nouveaux, sous des formes que je n'avais pas prévues :**
+
+    un analyseur qui remonte le PREFIXE LITTERAL d'un helper classe une
+    FAMILLE de routes — il ne peut pas inventorier des GESTES :
+      politiques.js:237  appelle('/policy/sudo/' + geste, envoi)
+      releve rendu       /api/gateway/policy/sudo/   <- LE GESTE A DISPARU
+      -> a fait lire un instant « politiques ne fait que lire et auditer »
+    et l'ambiguite d'une cle presente vaut aussi pour un PANNEAU ENTIER :
+      `bashrc-onglet-deploiement` EXISTE, le geste NON — l'onglet sert a
+      choisir les cibles et a simuler
+
+**Ce sont les LIBELLÉS qui ont rattrapé les deux.** *L'ordre de fiabilité tient : libellés > couche > nom.*
+
+### ✅ LA RÉSERVE SUR `sftp` EST LEVÉE — mesurée, aucune divergence
+
+    legacy   adm/server_user_sftp.php:12   checkAuth([ROLE_SUPERADMIN])
+    portage  web.php:987-988               `/acces-sftp` -> middleware role:3
+    backend  policies.py:173 / :344 / :493  sudo_deploy · sftp_deploy · rollback
+             tous trois : @require_api_key @require_role(3)
+                          @require_machine_access @threaded_route
+    TEMOIN   26 decorateurs `@require_` dans policies.py
+
+**La page ET la requête portent le rôle 3 des deux côtés.** *C'était la bonne question à poser — « la
+garde est sur la PAGE, pas sur la REQUÊTE » a coûté trois trous à ce dépôt — et cette fois la réponse est
+propre.*
+
+### 📌 L'ARBITRAGE QUE `fail2ban` REMONTE — l'ordre du risque est INVERSÉ
+
+    installer fail2ban sur TOUT LE PARC   PORTE
+    installer sur UNE machine             NON PORTE
+
+> **Le geste le plus large est disponible, le plus étroit demande l'ancien portail.** *C'est l'arrangement
+> le plus défavorable possible : il force à choisir le geste le plus exposé pour un besoin étroit.*
+
+✅ **Décision : le portage ne doit pas offrir l'installation sur le parc sans offrir celle sur une
+machine.** *Le rapport utilité/exposition est mauvais dans les deux sens — installer un paquet et un
+service sur les trois machines, `srv-zabbix` (PROD) comprise, pour un besoin qui vise une machine.*
+
+**⛔ MAIS je ne fais RIEN retirer avant une mesure : l'installation parc est-elle ATTEIGNABLE depuis la
+page portée, ou seulement PRÉSENTE dans le code ?** *Le fichier qui liste un chemin n'est pas celui qui
+l'appelle, et j'ai déjà failli retirer trois libellés justes sur cette confusion.*
+
+### ⚠⚠ ET UN COUPLAGE QUE PERSONNE NE POUVAIT VOIR SEUL
+
+**Deux sessions m'ont écrit à quelques minutes, et leurs deux faits se contredisent en pratique :**
+
+    la session 4 va poser le REFUS de `target_type='all'` au backend
+    la session 6 mesure que `go-security.mjs:48` CREE une planification
+      `{ target_type: 'all', target_value: '' }`
+      et `:56` ASSERTE que la creation rend 200
+
+> **Le correctif rendra cette assertion ROUGE. C'est un rouge JUSTE — la suite assère qu'un comportement
+> dangereux réussit — mais si personne ne le sait, quelqu'un « réparera le test » en défaisant la garde.**
+
+**Les deux gestes doivent être dans le MÊME commit, ou l'ordre doit être annoncé.** *`go-security.mjs`
+n'est dans aucun LOT (laravel=0, legacy=0), c'est la deuxième suite dangereuse hors LOT après
+`go-wazuh.mjs`, et elle est inscrite au `REGISTRE-HORS-LOT.md` §5.*
