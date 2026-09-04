@@ -170,4 +170,26 @@
             </p>
         </div>
     </div>
+
+    {{-- L'EXPORT EST UN GET, DONC UN LIEN. C'est une LECTURE : elle ne modifie
+         rien, elle n'a pas a passer par un formulaire POST, et un lien reste
+         copiable et ouvrable dans un onglet. Le telechargement vient de
+         `Content-Disposition: attachment`, pas d'un attribut `download` — que
+         le navigateur pourrait ignorer et que le serveur, lui, impose.
+
+         `a.rw-bouton` ne garde pas son soulignement de lien : un element se lit
+         comme un bouton OU comme un lien, pas comme les deux. --}}
+    <section class="rw-section" data-rw="profil-rgpd">
+        <h2 class="rw-sous-titre">{{ __('profil.rgpd_titre') }}</h2>
+        <p class="rw-prose rw-aide">{{ __('profil.rgpd_aide') }}</p>
+        <p class="rw-prose rw-aide" data-rw="rgpd-contenu">{{ __('profil.rgpd_contenu') }}</p>
+        <p class="rw-prose rw-aide" data-rw="rgpd-protege">{{ __('profil.rgpd_protege') }}</p>
+        <p class="rw-prose rw-aide" data-rw="rgpd-borne">{{ __('profil.rgpd_borne') }}</p>
+        <p class="rw-prose rw-aide" data-rw="rgpd-trace">{{ __('profil.rgpd_trace') }}</p>
+        <div class="rw-actions">
+            <a class="rw-bouton" data-rw="rgpd-telecharger"
+               href="{{ route('profil.donnees-personnelles') }}">{{ __('profil.rgpd_bouton') }}</a>
+        </div>
+    </section>
+
 @endsection

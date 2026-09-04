@@ -40,6 +40,13 @@ return [
     'mdp_erreur_compte' => 'Account not found.',
 
     // E-203: open sessions.
+    'rgpd_titre' => 'Your personal data',
+    'rgpd_aide' => 'Download a copy of every piece of data this portal holds about you (GDPR, articles 15 and 20). The file is JSON — readable and reusable elsewhere.',
+    'rgpd_bouton' => 'Download my data',
+    'rgpd_contenu' => 'The file holds your profile, your rights, your server access, your action and sign-in history, your open sessions, your notification preferences, and the dates your password changed.',
+    'rgpd_protege' => 'Two things are deliberately left out: the hashes of your former passwords, and your full session identifiers — they are cut to eight characters, because a file you archive or forward must not contain enough to replay a session.',
+    'rgpd_borne' => 'The two longest histories are capped. If yours exceeds the cap, the file SAYS SO: it carries the total row count alongside the exported count.',
+    'rgpd_trace' => 'Your request is recorded in the audit log, as keeping the register requires.',
     'sessions_titre' => 'Your open sessions',
     'sessions_aide'  => 'Each login to this portal or the old one opens a session. Closing a session logs it out immediately, on both sides.',
     'sessions_vide'  => 'No session recorded — not even this one, which is not normal.',

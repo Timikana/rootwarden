@@ -5,6 +5,7 @@ use App\Http\Controllers\ChatopsController;
 use App\Http\Controllers\ClesApiController;
 use App\Http\Controllers\ClePlateformeController;
 use App\Http\Controllers\ClesSshController;
+use App\Http\Controllers\ExportRgpdController;
 use App\Http\Controllers\ComparaisonCveController;
 use App\Http\Controllers\ComptesController;
 use App\Http\Controllers\ComptesDistantsController;
@@ -99,6 +100,27 @@ Route::middleware(['session.authentifiee', 'session.revoquee', 'mot.de.passe.a.c
     Route::post('/cgu', [PortailController::class, 'accepterCgu'])->name('cgu.accepter');
     Route::get('/accueil', [PortailController::class, 'accueil'])->name('accueil');
     Route::get('/profil', [PortailController::class, 'profil'])->name('profil');
+    /*
+     * L'export des donnees personnelles — RGPD art. 15 et 20.
+     *
+     * AUCUNE garde de role ni de permission, et c'est volontaire : la
+     * portabilite est un droit de la PERSONNE, pas un privilege
+     * d'administration. Le legacy fait de meme
+     * (`profile/export.php:27`, `checkAuth([ROLE_USER, ROLE_ADMIN, ROLE_SUPERADMIN])`).
+     * L'identifiant du compte vient de la SESSION, jamais de la requete, et
+     * aucun parametre n'est offert.
+     *
+     * ⚠ CONSEQUENCE DU GROUPE, DECLAREE : `mot.de.passe.a.changer` est un
+     * intergiciel de ce groupe. Un compte portant `force_password_change` est
+     * donc renvoye vers son profil et ne peut PAS exporter avant d'avoir change
+     * son mot de passe. C'est la parite avec le legacy, et c'est defendable —
+     * mais la population concernee est reelle : **8 comptes actifs sur 12**
+     * portent ce drapeau (mesure du 2026-09-03), et 6 d'entre eux n'ont pas
+     * d'adresse de courriel pour le lever seuls. Ce sont les memes qui attendent
+     * un geste d'administration.
+     */
+    Route::get('/profil/donnees-personnelles', ExportRgpdController::class)
+        ->name('profil.donnees-personnelles');
     // E-203 : fermer une session ouverte. Vise une EMPREINTE, jamais un
     // identifiant de session — celui-ci ne sort pas du serveur.
     Route::post('/profil/sessions/fermer', [PortailController::class, 'revoquerSession'])
