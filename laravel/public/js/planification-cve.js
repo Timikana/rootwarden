@@ -207,7 +207,10 @@
     /** Ce que le formulaire va envoyer. */
     function saisie() {
         const brut = el('sched-target').value || 'all';
-        let type = 'all';
+        // Le repli ne vaut PLUS « tout le parc ». Une chaine vide est refusee
+        // par le serveur, la ou `'all'` armait un scan du parc entier en
+        // silence — et ce repli etait le quatrieme etage du meme defaut.
+        let type = '';
         let valeur = '';
         if (brut.startsWith('tag:')) { type = 'tag'; valeur = brut.slice(4); }
         else if (brut === 'multi') {
