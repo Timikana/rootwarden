@@ -5,6 +5,53 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.39.2] - 2026-09-04
+
+### Ajoute
+- **L'export RGPD article 20 est PORTE (E-384).** `GET /profil/donnees-personnelles`, ouvert a
+  **tout compte connecte des le role 1** — la portabilite est un droit de la personne, pas un
+  privilege d'administration. L'identifiant vient de la SESSION, jamais de la requete, et
+  aucun parametre n'est offert. Seul l'article 17 (anonymisation) etait porte jusqu'ici.
+- **Les deux protections deliberees du legacy sont conservees** : `session_id` tronque a huit
+  caracteres — un jeton en clair dans un fichier archive ou transfere est une fuite
+  d'identifiant — et `password_history` reduit a `changed_at`. **Elles se lisent comme des
+  details d'implementation et sont des decisions de securite.**
+- **`JournalAudit::ajoute()`**, ecrivain canonique du journal chaine, avec le verrou
+  `FOR UPDATE` du legacy.
+
+### Corrige par rapport au legacy
+- **Les coupes s'annoncent.** `user_logs` (10 000) et `login_history` (1 000) etaient bornees
+  en silence. Mesure en base : deux comptes depassent la borne de `login_history`
+  aujourd'hui, et leur export etait incomplet sans aucun moyen de le savoir. Chaque section
+  bornee porte `_total`, `_exportees`, `_tronque` et `_borne` ; la borne elle-meme est
+  conservee.
+- **Une section illisible ne change plus de TYPE.** Le legacy remplacait la liste par
+  `{"_error": "fetch failed"}` et partait quand meme en 200. La section reste une liste vide,
+  et son nom entre dans `_metadata.sections_en_echec`.
+- **`json_encode` rendant `false` produit un 500**, plus un fichier vide nomme comme un
+  export ; et une session sans identifiant rend 403 au lieu d'un `WHERE user_id = 0`.
+
+### Conserve deliberement
+- **`SELECT *` sur `permissions`.** La regle « jamais de `SELECT *` » s'inverse sur un export
+  de portabilite : une liste fermee omettrait silencieusement une permission ajoutee apres le
+  portage, ce qui est le mode de defaillance que la portabilite vise a empecher.
+
+### ⚠ Un defaut du portage trouve en portant ceci, NON corrige
+- **Les trois copies existantes de l'insert du journal chaine lisent la tete sans verrou et
+  hors transaction** (`ComptesController`, `PermissionsController`, `ServeursController`),
+  la ou le legacy utilise `FOR UPDATE`. Deux ecritures concurrentes produiraient deux lignes
+  portant le meme `prev_hash`, donc une chaine fourchue. `JournalAudit::ajoute()` reprend le
+  verrou ; **les trois copies restent a migrer.**
+
+### ⚠ Reserves
+- **`laravel/tests/` est hors de mon perimetre d'ecriture : la suite des treize assertions du
+  §5 de la specification n'est pas ecrite.** Deux d'entre elles exigent deux comptes peuples.
+- **La vue et le fichier produit ne sont pas exerces** (302 sans session). Verifie au reseau :
+  la route resout — **302 et non 404**. Pas de binaine PHP sur l'hote de cette session ;
+  equilibres identiques a `HEAD`.
+- **Un compte portant `force_password_change` ne peut pas exporter** avant d'avoir change son
+  mot de passe — parite avec le legacy, mais 8 comptes actifs sur 12 portent ce drapeau.
+
 ## [1.39.1] - 2026-09-04
 
 ### Corrige

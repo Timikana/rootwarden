@@ -290,6 +290,58 @@ class JournalAudit
 
     /* ═══ Empreintes — la formule du legacy, au caractere pres ══════════════ */
 
+    /**
+     * Ajoute une ligne au journal, EN CHAINANT — l'ecrivain canonique.
+     *
+     * ══ POURQUOI CETTE METHODE, ET POURQUOI AVEC UN VERROU ────────────────
+     *
+     * Le portage porte DEJA trois copies de cet insert (`ComptesController`,
+     * `PermissionsController`, `ServeursController`) et une quatrieme ecriture
+     * NUE assumee (`MotDePasse`, qui documente son choix). En ecrire une
+     * cinquieme etait la solution la moins couteuse et la plus mauvaise : ce
+     * depot a paye trois copies du garde SSRF et trois compteurs 2FA.
+     *
+     * ⚠ ET LES TROIS COPIES EXISTANTES OMETTENT LE VERROU. Elles lisent la tete
+     * de chaine par un simple `orderByDesc('id')->value('self_hash')`, hors
+     * transaction. Le legacy, lui, le fait dans une transaction avec
+     * `FOR UPDATE` (`adm/includes/audit_log.php:107-116`) — et ce verrou n'est
+     * pas decoratif : **deux ecritures concurrentes qui lisent la meme tete
+     * produisent deux lignes portant le MEME `prev_hash`, donc une chaine
+     * FOURCHUE**, que `verifie()` signalera comme rompue sans pouvoir dire
+     * laquelle des deux branches est la bonne.
+     *
+     * Cette methode reprend donc le verrou du legacy. **Les trois copies
+     * restent a migrer** — ce n'est pas fait ici, et c'est declare.
+     */
+    public function ajoute(int $auteur, string $action): void
+    {
+        $action = mb_substr($action, 0, 255);
+        try {
+            DB::transaction(function () use ($auteur, $action): void {
+                $tete = DB::table('user_logs')->whereNotNull('self_hash')
+                    ->orderByDesc('id')->lockForUpdate()->value('self_hash') ?: self::GENESE;
+                $ts = time();
+                DB::table('user_logs')->insert([
+                    'user_id' => $auteur,
+                    'action' => $action,
+                    'created_at' => date('Y-m-d H:i:s', $ts),
+                    'prev_hash' => $tete,
+                    'self_hash' => $this->empreinte($tete, $auteur, $action, $ts),
+                ]);
+            });
+        } catch (\Throwable $e) {
+            /*
+             * Best-effort, comme le legacy : un echec de journalisation ne doit
+             * pas annuler le geste qu'il trace. Mais il se JOURNALISE, sans quoi
+             * une trace manquante serait indiscernable d'un geste non accompli.
+             */
+            \Illuminate\Support\Facades\Log::error('journal d\'audit : ecriture impossible', [
+                'auteur' => $auteur,
+                'erreur' => $e->getMessage(),
+            ]);
+        }
+    }
+
     public function empreinte(string $precedent, int $utilisateur, string $action, int $ts): string
     {
         return hash_hmac('sha256', implode('|', [$precedent, (string) $utilisateur, $action, (string) $ts]), $this->cle());

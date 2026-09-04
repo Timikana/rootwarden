@@ -8,6 +8,101 @@ Un ecart non ecrit ici est une regression, pas un choix.
 
 ---
 
+## E-384 — l'export RGPD article 20 : PORTE, avec trois divergences assumees
+
+**Porte le 2026-09-04 (`v1.39.2`).** Specification de reference :
+`docs/migration/QA-SPEC-EXPORT-RGPD.md` (session c6, 121 lignes du legacy lues en entier).
+*Seul l'article 17 — l'anonymisation — etait porte ; la portabilite ne l'etait pas.*
+
+### Les DEUX protections deliberees du legacy, conservees
+
+    `session_id` TRONQUE a 8 caracteres + '...'
+       un jeton de session en clair dans un fichier que la personne telecharge,
+       archive et transfere par courriel est une FUITE D'IDENTIFIANT
+    `password_history` : `changed_at` SEULEMENT
+       les empreintes ne sont pas reversibles, mais elles n'ont rien a faire
+       dans une copie de donnees personnelles
+
+**Elles se lisent comme des details d'implementation et sont des DECISIONS DE SECURITE.**
+*Un portage qui recopie les requetes sans les commentaires les perd toutes les deux en
+silence, et aucune suite ne le verrait : le fichier resterait parfaitement valide.*
+
+**Assertion du §4.2 posee comme la specification l'exige** — sur l'ENSEMBLE des colonnes
+(`select('changed_at')`, ensemble = `{changed_at}`), **pas sur l'absence d'un `hash`
+nomme** : *une assertion d'absence nommee ne voit pas la colonne qu'on n'a pas nommee.*
+
+### Trois divergences, arbitrees
+
+**A. Les coupes s'ANNONCENT.** Le legacy borne `user_logs` a 10 000 et `login_history` a
+1 000, et rien dans le fichier ne dit qu'il a ete coupe. *Mesure en base : `login_history`
+atteint 1882 lignes pour un compte — **deux comptes depassent la borne aujourd'hui**, et
+leur export serait incomplet sans aucun moyen de le savoir.* Chaque section bornee porte
+desormais `_total`, `_exportees`, `_tronque` et `_borne`. **La borne est CONSERVEE** : elle
+protege la memoire du serveur, et l'annoncer est sans risque la ou la retirer n'en est pas.
+
+*Le compte total est lu SEPAREMENT de la page exportee — sans lui, « 1000 lignes » et
+« exactement 1000 lignes existantes » sont la meme sortie. C'est le temoin d'une sonde,
+applique a une coupe.*
+
+**B. Une section en echec NE CHANGE PAS DE TYPE.** Le legacy rend
+`['_error' => 'fetch failed']` a la place du tableau : la section devient un OBJET la ou le
+consommateur attend une LISTE, et le telechargement part quand meme en 200. Ici la section
+reste une **liste vide** et son nom entre dans `_metadata.sections_en_echec`.
+*Une reponse de portabilite qui change de type selon qu'une requete a abouti est
+indiscernable d'une section vide pour qui ne lit pas, et un plantage de lecture pour qui lit.*
+
+**C. `SELECT *` sur `permissions` est CONSERVE, et c'est un CHOIX.** *La regle « jamais de
+`SELECT *` » s'INVERSE sur un export de portabilite* : cette table est un pur matricule, et
+une liste fermee omettrait silencieusement une permission ajoutee apres le portage —
+exactement le mode de defaillance que la portabilite vise a empecher.
+
+### Ce que le portage ajoute et que le legacy n'a pas
+
+    json_encode() rendant `false`   -> 500, jamais un fichier VIDE nomme comme un export
+    `$idCompte <= 0`                -> 403, jamais un `WHERE user_id = 0` presente
+                                       comme la copie des donnees de quelqu'un
+    UN ECRIVAIN CANONIQUE du journal -> voir ci-dessous
+
+### ⚠ UN DEFAUT DU PORTAGE TROUVE EN PORTANT CECI, ET IL N'EST PAS CORRIGE
+
+Le legacy journalise par `audit_log_raw`, qui chaine **dans une transaction avec
+`FOR UPDATE`** sur la tete de chaine (`adm/includes/audit_log.php:107-116`).
+
+**Les TROIS copies existantes du portage lisent la tete sans verrou et hors transaction** —
+`ComptesController`, `PermissionsController`, `ServeursController`. *Deux ecritures
+concurrentes lisant la meme tete produisent deux lignes portant le MEME `prev_hash`, donc
+une chaine FOURCHUE que `verifie()` signalera comme rompue sans pouvoir dire laquelle des
+deux branches est la bonne.*
+
+**`JournalAudit::ajoute()` reprend le verrou du legacy et devient l'ecrivain canonique. Les
+trois copies restent a migrer — ce n'est pas fait ici, et c'est declare.**
+
+*Et un quatrieme ecrivain, `MotDePasse`, ecrit NU deliberement, avec sa raison documentee.
+Il y a donc deux conventions contradictoires sur la meme table, et cette contradiction
+preexiste a ce portage.*
+
+### ⚠ Reserves
+
+- **`laravel/tests/` est dans mes interdits d'ecriture : la suite du §5 de la specification
+  n'est PAS ecrite par moi.** Ses treize assertions restent a poser, et deux d'entre elles
+  exigent **deux comptes peuples** pour verifier qu'un export ne contient aucune ligne d'un
+  autre.
+- **La vue et le fichier produit ne sont pas exerces** : `/profil` et
+  `/profil/donnees-personnelles` rendent 302 sans session. *Ce qui EST verifie au reseau :
+  la route resout — **302 et non 404** — donc `web.php` s'analyse et la route est
+  enregistree.*
+- **Pas de binaire PHP sur l'hote de cette session.** Equilibres identiques a `HEAD` sur les
+  cinq fichiers modifies, et `(0,0,0)` sur les deux fichiers neufs.
+- ⚠ **Consequence declaree du groupe de routes** : `mot.de.passe.a.changer` garde ce groupe,
+  donc **un compte portant `force_password_change` ne peut pas exporter avant d'avoir change
+  son mot de passe**. C'est la parite avec le legacy — mais **8 comptes actifs sur 12**
+  portent ce drapeau, et 6 d'entre eux n'ont pas d'adresse de courriel pour le lever seuls.
+- **Le chemin detourne du §6 de la specification n'est pas ferme** : `LiensLegacy` traduit
+  `/profile.php` vers `profil`, et rien ne dira le jour ou `legacy/profile/` sera archive
+  que sa capacite est ailleurs. *Un releve gelant les capacites du legacy non portees reste
+  a poser.*
+
+---
 ## E-383 — une legende qui decrivait un marqueur que plus aucune entree ne porte
 
 **Corrige le 2026-09-04 (`v1.39.1`), socle.**

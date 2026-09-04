@@ -43,6 +43,13 @@ return [
     'mdp_erreur_compte' => 'Compte introuvable.',
 
     // ══ E-203 : LES SESSIONS OUVERTES ════════════════════════════════════
+    'rgpd_titre' => 'Vos données personnelles',
+    'rgpd_aide' => 'Téléchargez la copie de toutes les données que ce portail détient sur vous (RGPD, articles 15 et 20). Le fichier est un JSON, lisible et réutilisable ailleurs.',
+    'rgpd_bouton' => 'Télécharger mes données',
+    'rgpd_contenu' => 'Le fichier contient votre profil, vos droits, vos accès machines, votre historique d\'actions et de connexions, vos sessions ouvertes, vos préférences de notification et les dates de vos changements de mot de passe.',
+    'rgpd_protege' => 'Deux choses n\'y figurent pas, volontairement : les empreintes de vos anciens mots de passe, et vos identifiants de session en entier — ils sont coupés à huit caractères, parce qu\'un fichier que vous archivez ou transférez ne doit pas contenir de quoi rejouer une session.',
+    'rgpd_borne' => 'Les deux historiques les plus longs sont bornés. Si le vôtre dépasse la borne, le fichier le DIT : il porte le nombre total de lignes à côté du nombre exporté.',
+    'rgpd_trace' => 'Votre demande est enregistrée dans le journal d\'audit, comme l\'exige la tenue du registre.',
     'sessions_titre' => 'Vos sessions ouvertes',
     'sessions_aide'  => "Chaque connexion à ce portail ou à l'ancien ouvre une session. Fermer une session la déconnecte immédiatement, des deux côtés.",
     'sessions_vide'  => "Aucune session enregistrée — pas même celle-ci, ce qui n'est pas normal.",
