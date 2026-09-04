@@ -33,7 +33,11 @@ import pytest
 
 
 CRON_VALIDE = '0 3 * * *'          # 3 h du matin, au-dessus du plancher de 10 min
-PORTEES = ('all', 'tag', 'environment', 'machines')
+# ⚠ `'all'` N'EST PLUS DANS LA LISTE — decision du 2026-09-04 (`1d99a23`).
+# Elle etait la seule portee n'exigeant aucune valeur, et le planificateur la
+# traduisait par « tout le parc non archive » : les TROIS machines, `srv-zabbix`
+# comprise. `tag` rend le meme service en exigeant un geste EXPLICITE.
+PORTEES = ('tag', 'environment', 'machines')
 
 
 def _trace(mock_db):
@@ -74,14 +78,14 @@ class TestLaListeFermeeDesPortees:
                "rouvert avant de conclure a une regression.")
 
     @pytest.mark.parametrize('portee', PORTEES)
-    def test_chacune_des_quatre_portees_est_acceptee(self, client, admin_headers,
-                                                     mock_db, portee):
+    def test_chacune_des_TROIS_portees_restantes_est_acceptee(
+            self, client, admin_headers, mock_db, portee):
         """LE CONTRE-CAS, et il vient en premier : sans lui, un serveur qui
         refuserait TOUT passerait chacun des tests de refus qui suivent."""
         vues = _trace(mock_db)
 
         reponse = _cree(client, admin_headers, target_type=portee,
-                        target_value=None if portee == 'all' else 'PROD')
+                        target_value='PROD')
 
         assert reponse.status_code == 200, self.ARBITRE
         assert _insertion(vues) is not None, "la planification n'a pas ete inseree"
@@ -108,18 +112,45 @@ class TestLaListeFermeeDesPortees:
         for portee in PORTEES:
             assert portee in message, f"« {portee} » manque au message de refus"
 
-    def test_un_type_vide_vaut_all_et_non_un_refus(self, client, admin_headers, mock_db):
-        """`(data.get('target_type') or 'all')` : l'ABSENCE de type est un
-        defaut explicite, pas une erreur. C'est le seul repli de cette route, et
-        il va vers la portee la plus large — ce qui se defend ici, parce que
-        `all` est un choix EXPLICITE de l'appelant quand il ne dit rien, et non
-        le resultat d'une valeur non reconnue."""
+    def test_un_type_ABSENT_est_desormais_REFUSE(self, client, admin_headers, mock_db):
+        """⚠ CE TEST DISAIT L'INVERSE, ET IL DEFENDAIT L'ANCIEN ETAT.
+
+        Il s'appelait `un_type_vide_vaut_all_et_non_un_refus` et verrouillait le
+        repli `(data.get('target_type') or 'all')` — que je justifiais alors :
+        « `all` est un choix explicite de l'appelant quand il ne dit rien ». La
+        decision du 2026-09-04 tranche l'inverse, et sa raison est meilleure que
+        la mienne : *un defaut implicite fabriquait une valeur aussitot refusee,
+        et l'appelant recevait un message parlant d'une portee qu'il n'avait
+        jamais demandee.*
+
+        **Une phrase fausse se corrige ; une assertion fausse RESISTE, parce
+        qu'elle rougit quand on repare le code.** Celle-ci a rougi au premier
+        passage suivant le correctif — c'est son office, et c'est pour ca qu'on
+        lit la diff avant de realigner.
+        """
         vues = _trace(mock_db)
 
         reponse = _cree(client, admin_headers)
 
-        assert reponse.status_code == 200
-        assert _insertion(vues)[2] == 'all'
+        assert reponse.status_code == 400
+        assert _insertion(vues) is None
+
+    def test_all_est_refuse_par_un_message_DISTINCT_du_type_inconnu(
+            self, client, admin_headers, mock_db):
+        """`'all'` reste une valeur legale de l'ENUM en base : un appelant qui la
+        lit dans le schema doit apprendre qu'elle est refusee PAR DECISION, et
+        non par faute de frappe. Deux refus, deux messages — sinon le lecteur
+        cherche une coquille qui n'existe pas."""
+        vues = _trace(mock_db)
+
+        message = _cree(client, admin_headers, target_type='all').get_json()['message']
+
+        assert _insertion(vues) is None
+        assert "'all'" in message
+        assert 'plus acceptee' in message or "n'est plus" in message
+        assert 'tag' in message, "le message doit nommer ce qui rend le meme service"
+        assert message != f"target_type doit valoir l'un de : {', '.join(PORTEES)}", (
+            "le refus de `all` ne doit pas se confondre avec celui d'un type inconnu")
 
 
 class TestUnePorteeRestreinteExigeSaValeur:

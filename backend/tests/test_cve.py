@@ -159,8 +159,14 @@ class TestCveSchedules:
         assert resp.status_code == 400
 
     def test_create_schedule_success(self, client, admin_headers, mock_db):
+        # ⚠ UNE PORTEE EXPLICITE EST DESORMAIS EXIGEE (2026-09-04, `1d99a23`).
+        # Ce test postait un corps SANS `target_type` et passait grace au repli
+        # implicite vers `'all'`. Le repli est retire : une planification ne peut
+        # plus viser tout le parc par omission. Le corps porte donc sa portee —
+        # ce que la nouvelle regle demande de tout appelant.
         resp = client.post('/cve_schedules', headers=admin_headers, json={
-            'name': 'Scan nightly', 'cron_expression': '0 3 * * *', 'min_cvss': 7.0
+            'name': 'Scan nightly', 'cron_expression': '0 3 * * *', 'min_cvss': 7.0,
+            'target_type': 'tag', 'target_value': 'production'
         })
         assert resp.status_code == 200
         data = resp.get_json()
