@@ -91,13 +91,36 @@ sont ARCHIVABLES.**
 
 ## 2. Les blocs d'archivage, et l'ordre entre eux
 
-### BLOC A — archivable dès maintenant, 3 fichiers
+### BLOC A — ⚠ **CORRIGÉ le 2026-09-04 : il n'était pas de 3 fichiers, mais de 2**
 
-    adm/includes/audit_log.php · adm/api/audit_seal.php · adm/api/audit_verify.php
+**J'avais publié « archivable dès maintenant » pour les trois. C'était faux pour
+le troisième, et je ne l'ai vu qu'en lisant `profile/export.php` pour une autre
+raison.** J'avais sauté l'**étape 8 du cycle d'archivage — la passe des liens
+ENTRANTS** — sur mon propre bloc.
 
-Contrôle **avant** le `git mv` : `scelle`/`verifie` doivent rendre > 0 côté
-`laravel/`. Ils rendent 2 et 18. *L'ordre compte : une assertion « rend 404 » sur
-un chemin déjà retiré passe en ne mesurant rien.*
+| fichier | liens entrants | verdict |
+|---|---|---|
+| `adm/api/audit_seal.php` | 1 : `adm/audit_log.php:218` | **ARCHIVABLE** avec la page |
+| `adm/api/audit_verify.php` | 1 : `adm/audit_log.php:191` | **ARCHIVABLE** avec la page |
+| `adm/includes/audit_log.php` | ⚠ **17 requérants distincts** | **SOCLE — PAS archivable** |
+
+Ce que `adm/includes/audit_log.php` fait tomber s'il part aujourd'hui :
+
+    auth/login.php:19                     la page de CONNEXION
+    profile.php:81, :100
+    profile/export.php:36                 le fichier que ce chantier doit GARDER
+    adm/api/*                             12 points d'entree
+    adm/includes/manage_users.php:124
+
+**La page `adm/audit_log.php` est portée** (`web.php:989`), donc ses deux
+endpoints tombent avec elle. **Le helper, lui, reste tant qu'il reste un écrivain
+du journal** — et `profile/export.php`, non archivable par ailleurs, en est un.
+
+> **La leçon, et elle vaut pour tout le reste de l'inventaire** : *un fichier peut
+> avoir son équivalent porté ET rester non archivable, parce que quelque chose
+> d'autre en dépend.* « Porté » et « archivable » sont deux questions, et j'ai rendu
+> la seconde en ne mesurant que la première. **Les blocs B, C et D n'ont PAS reçu
+> cette passe.**
 
 ### BLOC B — les 26 pages appariées une à une
 
