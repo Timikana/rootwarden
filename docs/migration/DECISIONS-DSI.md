@@ -8621,3 +8621,84 @@ main sur le clavier — et les deux sont en pause.**
 **Et la liste des « 11 portables » de la consigne reste périmée comme mesuré au tour précédent : il ne
 reste réellement ouvert que `sshd_config` en lecture (DÉJÀ PORTÉ, mesuré depuis), relever un serveur,
 `drift_scan`, et les deux capacités perdues de `supervision`.** *Soit trois, dont deux joignent une machine.*
+
+## ▶ REPRISE — 2026-09-04, 17:40. Et j'ai lu l'inventaire AVANT de distribuer, pour la première fois.
+
+**L'exploitant lève la pause. Sept sessions relancées, UNE tâche chacune.**
+
+### ⛔ QUATRE DUPLICATIONS ÉVITÉES EN UNE SEULE DISTRIBUTION — par la LECTURE, pas par un refus
+
+**J'ai ouvert `MODULE-CAPACITES-RESTANTES.md` (494 lignes, 2026-09-02 23:45) avant d'écrire aux sessions.
+Son §7 nomme lui-même ce qui reste, et son §9 ferme deux choses que j'allais faire refaire :**
+
+    les 2 capacites PERDUES de `superv`   §9 : « FERMEES TOUTES LES DEUX,
+                                          et pas de la meme facon »
+                                          -> je l'avais assignee a la session 2
+                                             au tour precedent. RETIREE.
+    le jeton telegraf en clair (§9.4)     deja le `DOSSIER-13`, avec le
+                                          couplage du badge
+    `drift_scan`                          cable (`groupes.js:521`) — verifie
+    `sshd_config` en lecture               DEJA PORTE — mesure par la session 4
+
+> **Les quatre étaient mesurées et écrites. Aucune session n'a eu à me refuser : j'ai lu le document
+> autoritaire au lieu de distribuer depuis ma liste.** *C'est la neuvième duplication évitée de la journée,
+> et la première qui l'ait été par moi.*
+
+**La leçon de la session 4 a changé mon ORDRE D'OPÉRATIONS, pas seulement mon vocabulaire** : *« un
+sommaire n'est pas une lecture » — et je n'avais même pas ouvert le sommaire de celui-là.*
+
+### ✅ CE QUE LE §7 DÉCLARE LUI-MÊME COMME RESTANT, et c'est la base de la distribution
+
+    « je n'ai pas croise chaque capacite avec ce que le JS APPELLE […]
+      C'est exactement le defaut qui a fait declarer `pare-feu` incapable
+      d'une validation qu'il cable. »   <- « le PREMIER travail a refaire »
+
+    « les huit autres dossiers (adm hors serveurs, api, auth, bashrc,
+      graylog, iptables, profile, security, ssh, wazuh) : NON TRAITES »
+
+### LA RÉPARTITION
+
+    session 6 (QA)   JOUER le verrou « se souvenir de moi » — PRIORITE ABSOLUE,
+                     seul verdict non lu du jour, garde une porte d'auth
+    session 6 (E2E)  la FENETRE a la QA d'abord, puis E-385 puis l'export RGPD
+    session 3        croiser geste par geste ce que le JS APPELLE (le §7)
+    session 1        aligner la creation MANUELLE d'un compte sur l'import
+                     -> mesure : elle fabrique encore un compte inutilisable
+                        (`random_bytes` + `force_password_change`, et aucun
+                         courriel n'est envoye)
+    session 4        apparier `wazuh` — module dont les SIX gestes d'ecriture
+                     sont interdits, donc rien ne peut etre exerce par erreur
+    session 5        trier `rw-decode-errors-ignore` (ssh_utils.py:346) :
+                     constatation VRAIE, ERROR, jamais triee depuis mai
+    session 2        le tableau des verrous joue / non joue / SKIPPE
+
+### ⚠ ET UN RISQUE QUE JE N'AVAIS PAS VU, SIGNALÉ PAR L'E2E À LA QA DIRECTEMENT
+
+> **« Mon garde surveille l'ARBRE, pas la BASE. »**
+
+**Le test de la QA touche l'authentification et l'enrôlement TOTP — donc il est pile dans la classe qui a
+fait tomber ~61 suites en cascade le 2026-09-01.** *Une fixture qui pose `force_password_change` sur un
+compte partagé ne fait bouger AUCUN fichier et passe sous le garde de fenêtre.*
+
+    la parade qu'elle a exigee : un compte NEUF plutot qu'une mutation de
+      `rw-test-admin`/`rw-test-super`, une restauration verifiee en `finally`,
+      et le rappel que le garde anti-rejeu TOTP est par COMPTE, persistant,
+      en cache FICHIER, et qu'il traverse les invocations
+
+**Je n'avais pas fait ce lien. Elle l'a fait sans que personne ne le demande, et c'est le vrai risque de la
+mesure que je venais de prioriser.**
+
+### ✅ ET LA GÉNÉRALISATION SUR LES LISTES BLANCHES — la quatrième est cherchée
+
+**Trois listes blanches trop étroites sur ce chantier, et elles n'ont pas la même forme :**
+
+    `$ALLOWED_PROXY_PREFIXES`        enumere des CHEMINS
+    `CLES` (invariant machine_id)    enumere des CLES
+    `CHEMINS_SERVIS.laravel`         enumerait des REPERTOIRES
+
+> **« Une liste NOIRE trop courte ALARME et se fait corriger le jour même ; une liste BLANCHE trop courte
+> OCCUPE LA PLACE où l'on aurait cherché. C'est pour ça qu'elles arrivent par trois et pas par une. »**
+
+**Et le test qui les trouve, qu'elle applique désormais** : *« qu'est-ce qui existe et n'y est pas ? » —
+question qui se pose en ÉNUMÉRANT L'ENSEMBLE COMPLET, jamais en relisant la liste.* **Sur `lib-arbre.mjs`
+c'est `git ls-files` qui a rendu les 34, pas la relecture.**
