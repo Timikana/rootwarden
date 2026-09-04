@@ -373,3 +373,19 @@ technique avant votre mot. Il n'y en avait pas.*
 
 **`a345e65` — un des six — est précisément la garde qui ferme ça.** *Une planification de scan CVE peut
 aujourd'hui prendre le parc entier, `srv-zabbix` comprise, par une valeur JSON mal formée.*
+
+### ⚠ ET LA BRANCHE N'EST PAS POUSSÉE — la cause du « 0 exécution de CI » n'est pas celle que je corrigeais
+
+    origin/security/backend-cve                        N'EXISTE PAS
+    branches distantes portant « security », sur 36    AUCUNE
+    TEMOIN origin/Migration-Laravel                    EXISTE
+
+**Je proposais d'ajouter `security/**` aux déclencheurs de la CI pour donner enfin une exécution à ces six
+correctifs. Le découpage n'aurait rien changé : la CI ne peut pas tourner sur une référence absente.**
+
+> **Mon « zéro exécution en quinze jours » était exact, et sa cause n'est pas celle que je corrigeais —
+> une universelle négative vraie à vide, sur le geste même que je prescrivais.**
+
+**Conséquence pour l'ordre de ce dossier : faire passer la CI sur ces six correctifs demande de POUSSER la
+branche, ce qui demande votre mot au même titre que le merge.** *Ce n'est pas un cran de plus : c'est le
+même, et je l'avais compté comme technique.*
