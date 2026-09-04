@@ -7473,3 +7473,53 @@ RÉPONSE.** *Le témoin l'a tuée sur place : `audit_log.php` devait rendre beau
 (`index.php` en désigne DIX, `notifications.php` est une sous-chaîne de `manage_notifications.php` → 21
 requérants pour un fichier qui n'en a aucun) ; le chemin relatif au dépôt SOUS-COMPTE, parce que les
 `require` PHP sont relatifs au fichier → 7 là où la vérité est 21.*
+
+### ⚠ CORRECTION DE MA PROPRE FORMULATION — « champ blanc » couvrait DEUX cas qui ne se comportent pas pareil
+
+**J'ai écrit trois fois « `tag` sans valeur / champ blanc → TOUT LE PARC ». C'est vrai d'UN cas et faux de
+l'autre, et la session 5 l'a mesuré en verrouillant :**
+
+    `target_value = ''`      chaine VIDE, donc falsy
+                             -> `and schedule.get('target_value')` est faux
+                             -> repli -> LE PARC              ✅ ma phrase tenait
+
+    `target_value = '   '`   chaine NON VIDE, donc truthy
+                             -> entre dans la branche `tag`
+                             -> INNER JOIN sur un tag « trois espaces »
+                             -> ZERO cible                    ⛔ ma phrase etait fausse
+
+> **« La route rogne (`.strip() or None`), le planificateur non. Les deux couches n'ont pas la même
+> définition de "vide". »**
+
+**Et la nuance qui compte n'est pas la correction : c'est ce qu'elle révèle.** *Une ligne faite de blancs
+ne peut pas ARRIVER par la route, mais elle peut exister en base par une autre porte. Elle ne prend alors
+pas le parc — et cette sûreté vient de la VALEUR, pas d'une garde.*
+
+    elle basculerait si cette recherche devenait un `LIKE`.
+    Transmis, NON corrige : le durcir demanderait de toucher une requete
+    du planificateur sans qu'aucun chemin d'arrivee ne le justifie.
+
+### ✅ LE VERROU ① EST POSÉ — et ses mutations mesurent ce que je n'avais qu'affirmé
+
+    `3a33145` puis `8e9196e`   27 tests
+    pytest a 15:14             667 passed · 1 skipped · 2 xfailed
+    mutations : 5 jouees, 5 ensembles DISJOINTS
+      repli qui reprend le parc     -> 13 rouges
+      casse normalisee              ->  5   <- la classe « casse » entiere
+      refus non journalise          ->  1
+      archivees non exclues         ->  1
+      tag interpole                 ->  5
+
+**Mon « quelqu'un ajoutera un `.lower()` par hygiène » n'était qu'une prédiction. La mutation S2 le FAIT,
+et exactement cinq tests rougissent.** *Une prédiction devenue mesure.*
+
+**⚠ Et son propre commit portait un chiffre faux** — *« 667 passed » alors que la mesure de l'instant était
+4 failed / 663 : le fichier lancé SEUL rendait 27, et le total de la suite a été reporté comme s'il
+tenait.* **Corrigé dans un commit VISIBLE plutôt que par un `--amend` : une mesure fausse déjà écrite se
+corrige au vu de tous.**
+
+**⚠ Et ses 26 premiers rouges ne disaient pas « le correctif ne marche pas » — ils disaient « le module
+n'existe pas »** : *`conftest.py:54` fait `sys.modules['scheduler'] = MagicMock()`, donc `import scheduler`
+rend le mock, la fonction ne s'exécute pas, et 26 tests échouent sans rien mesurer.* **Le stub n'a pas été
+retiré (d'autres suites en dépendent) : le fichier charge `scheduler.py` sous un alias, et un TÉMOIN refuse
+désormais un MagicMock.**
