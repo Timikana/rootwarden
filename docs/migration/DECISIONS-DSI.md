@@ -8964,3 +8964,67 @@ qui annonce une réussite ; l'import remettait le mot de passe SANS le drapeau.*
 terme de chacun.**
 
 *C'est ma décision d'« aligner l'un sur l'autre » qui était courte : aucun des deux n'était le modèle.*
+
+### ✅ LA PARADE QUI N'EST PAS DE LA VIGILANCE — et je l'avais refusée à moi-même
+
+**J'avais écrit : « je n'ai pas de parade à proposer qui ne soit pas de la vigilance, et la vigilance ne
+tient pas ici ». C'était faux, et la parade est de la famille que j'accepte des autres depuis ce matin.**
+
+> **Un dossier qui prescrit un numéro d'étiquette n'a pas à contenir de numéro. Il contient la COMMANDE.**
+> *Un chiffre recopié se périme en silence ; une commande citée se réexécute et rend la vérité du moment.*
+
+**`DOSSIER-28` est réécrit dans cette forme (`552b320`) : il ne porte plus aucun numéro d'étiquette, il
+porte les quatre commandes à exécuter au moment de décider.**
+
+**⚠ Et c'est DÉJÀ la règle du `PLAN-DE-MIGRATION.md`** — *« chaque chiffre porte sa commande de remesure »*
+— **que je cite depuis ce matin sans l'avoir appliquée à mes propres dossiers.** *Sixième fois du jour que
+la règle est au registre et que le geste suivant ne la consulte pas — et la première où la parade
+existait, écrite, dans le document que je suis censée lire en entier.*
+
+    la preuve que le numero ne pouvait pas tenir :
+      mon chiffre corrige (728) valait 730 une heure plus tard
+      et l'un des deux commits qui l'ont perime est LA CORRECTION ELLE-MEME
+
+### ⚠ ET LA PHRASE QUE JE RELAYAIS ÉTAIT INCOMPLÈTE D'UN TERME
+
+    ce que je citais    « une propriete du CHEMIN pris dans l'histoire »
+    ce qu'il faut lire  « du chemin ET DE L'INSTANT »
+
+**Le chemin explique 4 contre 730. L'instant explique 728 contre 730.** *J'avais retenu le premier terme
+parce que c'est celui qu'on m'avait donné — et une formule héritée se relaie sans être éprouvée, exactement
+comme un chiffre.*
+
+### ⚠⚠ ET UNE RÉSERVE QUI CORRIGE MA CONCLUSION DE LA JOURNÉE
+
+**J'avais écrit : « la seule chose qui a marché aujourd'hui est qu'un pair relise ». C'est vrai d'une moitié
+seulement.**
+
+> **« Un pair attrape les fausses alarmes ; il RATIFIE les exculpations, parce qu'elles ne demandent rien à
+> personne. »**
+
+**Le bilan honnête du jour, réparti :**
+
+    attrapees par un PAIR (dix fois)  mes deux prerequis inexecutables, mes
+                                      trois fausses cardinalites, ma
+                                      retractation sur un commentaire lu pour
+                                      une mesure, mon heuristique-correlat,
+                                      mon universelle sur un seul run, mon
+                                      numero sous-specifie, mon faux residu
+                                      de montage
+    attrapees par MOI SEULE (trois)   mon motif `^\s*logger\s*=` qui comptait
+                                      un argument nomme pour une definition
+                                      -> il DEDOUANAIT un vrai NameError
+                                      mon `re.S` qui rendait 12 fichiers la
+                                      ou la ligne en rend 4
+                                      ma sonde `role_id` incoherente avec
+                                      elle-meme (insertGetId a 0)
+
+> **Les dix attrapées par des pairs ALARMAIENT ou se trompaient de forme. Les trois attrapées seule
+> DÉDOUANAIENT — et aucune n'a été relevée par personne d'autre.**
+
+**Ce qui les a attrapées n'est pas ma rigueur : c'est un rapport trop net (42 contre 0), une incohérence
+interne (un `insertGetId` à 0 alors que la création pose la colonne), et une divergence entre deux
+instruments.** *Trois signaux, aucun de vigilance.*
+
+**Et l'audit de mes 28 dossiers était de cette espèce-là : un audit de mes propres dédouanements. C'est le
+seul exercice qui ait attrapé quelque chose qu'aucun pair n'aurait relevé.**
