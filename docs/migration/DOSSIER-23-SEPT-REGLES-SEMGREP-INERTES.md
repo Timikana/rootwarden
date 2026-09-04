@@ -267,3 +267,52 @@ sans incident est maintenant, pendant qu'on est dans le fichier.**
 
 **La fusion reste utile et son urgence baisse.** *Ce qui reste à votre signature est inchangé : la fusion et
 la poussée de `security/semgrep-regles-mortes`.*
+
+---
+
+# ⛔ CORRECTION DU §3 — « défaut à ÉCHÉANCE » est FAUX. Il n'y a pas d'échéance.
+
+**2026-09-04, 17:35. Mesuré par la session 5, avant d'écrire, et je le corrige ici parce que je l'avais
+publié comme un fait dans ce dossier.**
+
+    le job lance `semgrep … .` SANS working-directory
+      -> la racine du scan EST la racine du depot
+    `git ls-files` : le fichier est a `legacy/auth/migrate_crypto.php`
+      -> exactement le chemin qu'epelle le motif
+
+> **La forme ANCRÉE `/legacy/auth/migrate_crypto.php` matcherait donc le même et unique fichier.
+> L'exclusion ne cessera PAS de porter, et la règle ne commencera PAS à mordre.**
+
+**L'urgence tombe dans les DEUX sens : ni « il faut maintenant », ni « il attendra ».** *Et j'avais écrit
+« la seule occasion de le corriger sans incident est maintenant » — une pression fondée sur une échéance
+qui n'existe pas.*
+
+## ✅ Le correctif reste juste, pour une AUTRE raison
+
+    `**/` rend l'exclusion INDEPENDANTE de la racine du scan.
+    Le jour ou le job scannerait un SOUS-REPERTOIRE, la forme ancree
+    cesserait de porter et la non ancree non.
+
+**De l'hygiène à coût nul, pas une course.**
+
+## ⚠ ET LA BORNE, que la session 5 a demandé d'inscrire AVEC le point
+
+**Ce raisonnement applique la sémantique gitignore ; semgrep n'est installé ni sur l'hôte ni dans les
+conteneurs, donc il n'a PAS été exécuté.**
+
+> **Ce qui le réfuterait : que semgrep v2 ancre à autre chose que la racine du scan.**
+
+*Sa demande est juste et je la porte telle quelle : sans cette borne, « défaut à échéance » aurait survécu à
+sa réfutation dans ce dossier — un énoncé faux vit plus longtemps qu'une mesure fausse, parce qu'il n'a plus
+d'instrument pour le contredire.*
+
+## 📌 ET UN POINT À TRIER QUI N'EST DE PERSONNE
+
+    la constatation `rw-decode-errors-ignore` sur `ssh_utils.py:346`
+    -> VRAIE, severite ERROR, au journal depuis mai, JAMAIS triee
+    -> apres le correctif des motifs, le job restera ROUGE SUR ELLE
+
+**Qualification de la session 5, et elle ne se l'attribue pas** : *la raison énoncée par la règle
+(« padding oracle sur un déchiffrement ») ne s'applique pas — c'est une sortie de canal SSH.* **À trier par
+qui connaît ce chemin, et à trier explicitement : une constatation vraie non triée depuis mai est ce qui
+rend un job rouge acceptable, et un job rouge acceptable est un job qu'on ne lit plus.**
