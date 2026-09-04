@@ -33,6 +33,20 @@ rules:
     #
     # On sort la metavariable de la f-string : elle capture l'ARGUMENT entier,
     # et le filtrage se fait par expression reguliere sur son texte source.
+    #
+    # ⚠⚠ NE PAS ACTIVER EN L'ETAT — SIMULATION DU 2026-09-04.
+    # La logique de ce motif, simulee par AST sur `backend/`, rend **84
+    # occurrences** : `f'systemctl start {service}'`, `f'touch {path} && chmod
+    # 640 {path}'`, `f'journalctl -u {service} …'`. Quasi toutes interpolent une
+    # valeur DEJA VALIDEE en amont (`_validate_service_name`, `_valid_username`).
+    # « Y a-t-il une interpolation ? » n'est pas « la valeur est-elle sure ? », et
+    # l'idiome NORMAL de ce depot est l'interpolation validee. Le motif rendrait
+    # le job rouge en permanence avec 84 faux positifs : c'est le MIROIR du
+    # defaut qu'on repare, et une regle qui trouve TOUT redevient du decor plus
+    # vite qu'une qui ne trouve rien. La propriete visee est un flux
+    # SOURCE -> SINK : elle demande `mode: taint`, non validable ici (semgrep
+    # absent de l'hote et des trois conteneurs). Reparation syntaxique conservee
+    # pour que le fichier compile ; l'ACTIVATION est un arbitrage.
     patterns:
       - pattern: execute_as_root($CLIENT, $CMD, ...)
       - metavariable-regex:
@@ -121,6 +135,12 @@ rules:
       # normalise `<?= $x ?>` en instruction `echo`, donc `echo $X;` couvre les
       # deux formes. ⚠ CETTE EQUIVALENCE N'EST PAS VERIFIEE ICI — elle demande
       # une execution de semgrep.
+      #
+      # ✅ SIMULATION DU 2026-09-04 : **0 occurrence** dans `legacy/`, sous les
+      # deux formes. Seule des trois livrable sans arbitrage — aucun bruit, et
+      # son role est de rougir le jour ou une occurrence apparait. ⚠ Corollaire :
+      # zero occurrence signifie qu'aucun temoin POSITIF ne peut etre tire du
+      # depot ; prouver qu'elle MORD demande un fichier d'epreuve dedie.
       - pattern: echo $X;
       - metavariable-regex:
           metavariable: $X
@@ -164,6 +184,17 @@ rules:
     # (`backend/tests/test_invariant_machine_id.py`, qui compte 230 routes et
     # 116 gardes). RECOMMANDATION : deplacer cette regle vers un invariant du
     # meme modele, et la retirer d'ici.
+    #
+    # ⚠ ET LA SIMULATION DU 2026-09-04 LE CONFIRME PAR LES CHIFFRES. Sur 230
+    # routes, **3** n'ont pas `@require_api_key` — et **les trois sont des
+    # exceptions LEGITIMES, documentees a leur site** :
+    #   updates.py:update_security_exec  jeton HMAC X-Update-Token, borne au
+    #                                    machine_id, signe avec SECRET_KEY
+    #   chatops.py:chatops_command       signature Slack OU jeton partage
+    #   monitoring.py:test               sonde de vie, chaine statique
+    # Cette regle rendrait donc **3 faux positifs PERMANENTS**. Un invariant AST
+    # porte une liste d'exceptions connues ARGUMENTEES et n'asserte que l'ECART
+    # a cet etat — ce que `--severity=ERROR` ne sait pas faire.
     patterns:
       - pattern: |
           @bp.route(...)
