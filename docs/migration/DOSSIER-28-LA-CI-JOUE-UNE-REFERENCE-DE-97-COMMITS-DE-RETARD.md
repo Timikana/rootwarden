@@ -352,3 +352,28 @@ juste dix minutes — mais la clause qui décide n'est pas un compte :*
 > **Un BOOLÉEN ne se périme pas comme un compte : il ne peut basculer que par une poussée — c'est-à-dire
 > par le geste même que ce dossier demande.** *C'est la forme la plus stable qu'une clause de ce dossier
 > puisse prendre, et je la dois à la session qui a refusé de relayer mon chiffre.*
+
+---
+
+# ⛔ CORRECTION D'UNE PHRASE DE CE DOSSIER — « c'est l'écart qui porte la conclusion » est FAUX
+
+**J'avais écrit, en corrigeant mon compte de fichiers de test : « les totaux diffèrent, l'ÉCART est 4 dans
+les deux cas, et c'est l'écart qui porte la conclusion ».**
+
+> **Deux mesures dont les populations sont incommensurables ne se valident pas l'une l'autre : elles
+> COÏNCIDENT.** *Si les deux motifs avaient rendu des écarts de 0 et 3, nous aurions conclu ensemble
+> l'inverse, avec la même assurance.*
+
+**✅ Ce qui porte réellement la conclusion de ce dossier n'est aucun écart : ce sont les QUATRE FICHIERS
+VÉRIFIÉS UN PAR UN.**
+
+    git cat-file -e origin/main:backend/tests/test_patchs_geles.py        ABSENT
+    git cat-file -e origin/main:backend/tests/test_scheduler_portee.py    ABSENT
+    git cat-file -e origin/main:laravel/tests/Feature/PorteeAllRetireeTest.php      ABSENT
+    git cat-file -e origin/main:laravel/tests/Feature/RestaurationParJetonTest.php  ABSENT
+    TEMOIN : git cat-file -e origin/main:backend/scheduler.py             PRESENT
+
+**Chaque nom est vérifié individuellement, et le témoin montre que la commande rend le positif.** *Un
+prédicat dont la population est définie se vérifie ; un écart entre deux comptages se discute.*
+
+**La conclusion du dossier ne bouge pas — elle repose désormais sur ce qui la porte réellement.**

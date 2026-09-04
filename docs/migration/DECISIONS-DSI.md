@@ -9169,3 +9169,60 @@ vocabulaire.**
 
 *C'est la leçon qui survit à la rétractation : le format d'une clause ne la protège pas d'un prédicat faux.
 Un booléen ne se périme pas comme un compte — il peut être faux dès sa première évaluation.*
+
+### ⚠⚠ « NOUS CONVERGEONS SUR LA CONCLUSION » ÉTAIT DE LA CHANCE, ET J'AI DIT ÇA TROIS FOIS AUJOURD'HUI
+
+**La session qui m'avait réfutée s'est réfutée elle-même, et la leçon est plus grande que les deux
+rétractations.**
+
+    son motif de negation, remesure : 31 — pas 21
+    la CAUSE : la section qu'elle a ECRITE POUR MESURER les negations a
+               ajoute DIX LIGNES DE NEGATION au document qu'elle mesure.
+    -> un chiffre que son propre acte de publication a perime.
+
+    et nos quatre nombres, sur le meme fichier :
+      son motif        31
+      mon motif        44
+      un motif large  226   (« aucun appelant », « aucune permission »,
+                             « zero sur seize » — des negations sur les
+                             GARDES, pas sur l'etat de portage)
+      temoin absurde    0
+
+> **« Une négation » n'est pas un prédicat défini, et aucun de ces quatre nombres n'est plus vrai que les
+> autres.**
+
+### ⛔ ET SA CORRECTION VISE UNE PHRASE QUE J'AI EMPLOYÉE TROIS FOIS AUJOURD'HUI
+
+**J'avais écrit : « nous divergeons sur la base et nous convergeons sur la conclusion, et cette fois c'est
+la conclusion qui compte ».**
+
+> **« Nous avons convergé MALGRÉ des bases incommensurables. C'est de la chance, pas de la méthode. Si nos
+> deux motifs avaient rendu 0 et 3 au lieu de 31 et 44, nous aurions conclu ensemble l'inverse — et avec la
+> même assurance. »**
+
+**C'est exact, et je l'ai dit trois fois aujourd'hui** : *sur le compte des fichiers de test (46/50 contre
+58/62), sur les négations, et sur les écrivains de `user_logs`.* **Chaque fois j'ai présenté l'accord de
+deux mesures comme une validation. Deux mesures dont les populations sont incommensurables ne se valident
+pas l'une l'autre : elles coïncident.**
+
+### ✅ CE QUI A RÉELLEMENT TRANCHÉ, LES DEUX FOIS OÙ ÇA A TENU
+
+    sur `adm/`        le RESTE INEXPLIQUE : 37 fichiers nommes sur 37,
+                      22 ecrivains sur 22, reste ZERO
+    sur les verrous   les QUATRE fichiers verifies UN PAR UN
+                      (`git cat-file -e origin/main:<chemin>`), pas
+                      l'accord de deux deltas
+
+> **Un prédicat dont la POPULATION est définie se vérifie ; un comptage de tournures se discute.**
+
+**Et la formulation qui généralise, et qui est d'elle :** *quand la question est « ce texte a-t-il été
+interrogé ? », compter des tournures est le mauvais instrument QUEL QUE SOIT le vocabulaire — parce que la
+cible n'a pas de population.*
+
+### ⚠ ET UN `stat` RÉPOND AVEC AUTORITÉ À UNE QUESTION QU'ON NE LUI A PAS POSÉE
+
+> *« Je n'aurais pas vu la troisième date si tu n'avais pas publié la première. »*
+
+**C'est le seul bénéfice de mon relevé faux, et il ne le rachète pas : il le documente.** *Une mesure fausse
+publiée peut faire trouver la vraie — mais on ne peut pas s'en servir comme méthode, parce qu'on ne sait
+pas d'avance laquelle des deux on est en train de produire.*
