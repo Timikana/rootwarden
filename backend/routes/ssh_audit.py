@@ -359,6 +359,34 @@ def ssh_audit_results():
 
 @bp.route('/ssh-audit/config', methods=['POST'])
 @require_api_key
+# ══ E-390 : LE GESTE QUI ECRIT ETAIT GARDE, CELUI QUI LIT NON ══════════════
+#
+# `POST /ssh-audit/config` portait `@require_api_key` + `@require_machine_access`
+# et rien d'autre, tandis que sa jumelle `POST /ssh-audit/save-config` porte
+# `@require_role(2)`. Or les DEUX pages exigent la meme permission :
+#   legacy  : legacy/ssh-audit/index.php:12-13  checkPermission('can_audit_ssh')
+#   portage : laravel/routes/web.php:229        ['role:1', 'perm:can_audit_ssh']
+#
+# Ce que rendait ce trou : `legacy/documentation.php` est un forgeur de requetes
+# graphique (champ d'endpoint libre, corps libre), au MENU, ouvert a tout compte
+# connecte. Un role 1 SANS `can_audit_ssh` pouvait donc lire le `sshd_config`
+# de ses machines assignees — `PermitRootLogin`, `AllowUsers`, les ports, les
+# methodes d'authentification. Ce n'est pas un secret, c'est une carte.
+#
+# Une PERMISSION et pas `@require_role(2)` : les deux pages admettent un role 1
+# qui la porte, et un role 2 backend aurait defait la page qu'il sert (meme
+# raison qu'E-389 sur `updates.py`).
+#
+# ⚠ Court-circuit au role 3 (`helpers.py:338`) : un superadmin passe SANS porter
+# la ligne. Voulu — mais ce garde ne s'applique donc pas a tous.
+#
+# ⚠ TROIS ROUTES DU MEME MODULE RESTENT NUES, et c'est un choix d'ordre, pas un
+# oubli : `/ssh-audit/scan` (l.124, joint la machine), `/ssh-audit/results`
+# (l.319, historique des scores et comptes de findings) et `/ssh-audit/backups`
+# (l.636, joint la machine). Les trois sont des lectures de posture de securite
+# gardees par `can_audit_ssh` aux deux pages : meme correctif attendu, sur
+# arbitrage separe.
+@require_permission('can_audit_ssh')
 @require_machine_access
 @threaded_route
 def ssh_audit_config():
