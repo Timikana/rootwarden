@@ -7812,3 +7812,105 @@ celui-ci annonce PLUS.**
 > **Le bloquant ne touche pas seulement « un compte qui a perdu son mot de passe » : il touche TOUT COMPTE
 > NOUVEAU.** *C'est à porter au `DOSSIER-24` — le SMTP n'est pas une commodité, c'est le canal de première
 > délivrance.*
+
+### ⛔⛔ MA RÉTRACTATION SUR « SE SOUVENIR DE MOI » ÉTAIT FAUSSE — et j'ai lu un COMMENTAIRE pour une mesure
+
+**J'avais une objection de principe : un jeton de 30 jours contourne le second facteur. Je l'ai RETIRÉE
+sur la foi de ceci :**
+
+    legacy/auth/verify.php:13   « 7. Auto-restore remember_token -> mais
+                                  FORCER re-2FA apres restore »
+
+**C'est un COMMENTAIRE D'EN-TÊTE. Je l'ai lu comme une preuve. Voici le CODE :**
+
+    verify.php:139   if ($totpSecret) {                <-- LA CONDITION
+                        $_SESSION['2fa_pending']  = true;
+                        $_SESSION['2fa_required'] = true;
+                        header("Location: /auth/verify_2fa.php"); exit();
+                     }
+    verify.php:153   if (!empty($_SESSION['2fa_required'])
+                         || !empty($_SESSION['2fa_pending'])) { … }
+
+> **Un compte SANS secret TOTP : la condition de `:139` ne tire pas, donc aucun drapeau n'est posé, donc le
+> garde de `:153` ne tire pas non plus — et l'exécution continue avec `$_SESSION['user_id']` renseigné.**
+> *Le cookie authentifie SEUL, sans second facteur et sans la redirection vers l'enrôlement que `login.php`
+> impose partout ailleurs.*
+
+**Mon objection était juste. C'est ma RÉTRACTATION qui était fausse.**
+
+    et la faute est exactement celle que deux sessions m'ont apprise AUJOURD'HUI :
+      « un commentaire qui AFFIRME est une donnee a mesurer ;
+        seul un commentaire qui JUSTIFIE est un argument a lire »
+    la ligne 13 AFFIRME. Je l'ai prise pour un constat.
+
+> **Et la rétractation est plus grave que l'erreur d'origine : elle a VOYAGÉ, sous la forme d'une consigne
+> — « reprends la propriété du legacy » — qui, suivie littéralement, portait le trou dans le produit qui
+> SURVIT à la bascule.**
+
+### ✅ LA PROPRIÉTÉ CORRIGÉE, plus forte que le legacy et DÉCLARÉE comme divergence
+
+    une identite restauree par jeton n'est JAMAIS authentifiee :
+      compte AVEC secret  ->  le second facteur
+      compte SANS secret  ->  l'ENROLEMENT
+      jamais le portail, dans aucun cas
+
+**⚠ ET UNE CONSÉQUENCE DE PROCÉDURE, CRITIQUE** : *la règle du chantier — « test de caractérisation VERT
+sur le legacy d'abord » — NE PEUT PAS s'appliquer ici. Le test sera ROUGE sur le legacy.*
+
+> **Si quelqu'un l'ajuste pour le faire passer là-bas, il FIGE le contournement — et le portage le
+> reproduirait pour être « conforme au test ».**
+
+*Et l'erreur symétrique compte autant : une suite qui n'exercerait que le compte ENRÔLÉ laisserait le seul
+chemin qui contourne non emprunté. Les deux moitiés se mesurent séparément, avec le témoin du cookie
+forgé.*
+
+### ✅ ARBITRAGE : le jeton se crée APRÈS le second facteur, pas avant
+
+    legacy/login.php:176   le jeton est cree juste APRES
+                           `$_SESSION['2fa_required'] = true`
+    -> un jeton existe pour une session qui n'a JAMAIS acheve son
+       authentification
+
+    mysql/init.sql:49-55   remember_tokens : PRIMARY KEY (user_id)
+    -> UN SEUL jeton par compte, d'ou le `REPLACE INTO`
+
+> **C'est la clé primaire qui tranche : une connexion ABANDONNÉE au stade du second facteur, sur un
+> appareil B, ÉVINCE silencieusement le jeton qui fonctionnait sur l'appareil A.** *Un préjudice concret,
+> sans bénéfice compensatoire.*
+
+**✅ Décision : émettre le jeton après la RÉUSSITE du second facteur.** *L'ordre inverse accorde la valeur
+du jeton — sauter l'étape du mot de passe — à quelqu'un qui n'a pas prouvé contrôler le second facteur.*
+
+**📌 Et la limite d'UN SEUL appareil se DÉCLARE à l'écran plutôt que de se découvrir.** *C'est une limite
+héritée du schéma, pas un choix du portage — mais elle devient un choix dès qu'on la porte en silence.*
+
+### ⚠ ET LE DÉPÔT A DEUX ENDROITS OÙ LE SCHÉMA NAÎT
+
+    `remember_tokens`   defini dans `mysql/init.sql:49-55`
+                        ABSENT de `mysql/migrations/`
+    `001_initial_schema.sql` ne la cite que dans un COMMENTAIRE d'en-tete
+
+**C'est le piège que j'avais moi-même signalé sous une autre forme — `backend/migrations/` vide et
+`mysql/migrations/` peuplé. Il y en a une TROISIÈME source, et un balayage des migrations rend zéro pour
+une table qui existe.**
+
+### ✅ « TOUT À ZÉRO » ÉTAIT VRAI, ET REPOSAIT SUR UN COMPTAGE NON FAIT
+
+    colonnes citees par manage_users.php:116   14, toutes a 0 explicitement
+    colonnes de `permissions` au schema        18
+    NON citees   can_manage_bashrc · can_manage_graylog
+                 · can_manage_wazuh · can_manage_api_keys
+    defaut au schema des 18                    0 pour TOUTES, NOT NULL
+
+**La conclusion tient : « pas de ligne » ≡ « ligne du legacy », aucun écart d'autorisation dans aucun
+sens.** *Mon scénario — « si un seul défaut est à 1 » — est écarté PAR LA MESURE, pas par un raisonnement.*
+
+**⚠ Et le détail vaut plus que la réponse, sous une forme que je n'avais pas rencontrée :**
+
+> **Les quatre colonnes non citées sont exactement celles des modules ajoutés APRÈS l'écriture de cet
+> `INSERT`. Le code du legacy a dérivé de son propre schéma, et il n'est inoffensif que PAR
+> COÏNCIDENCE.**
+
+*Ni un code faux, ni un commentaire faux : **un code JUSTE dont la justesse dépend d'une propriété du
+schéma que personne ne surveille.*** **Le legacy meurt, donc pas de correctif — mais qui portera la
+création de compte devra soit citer les 18, soit dépendre du même défaut, et le dire.**
