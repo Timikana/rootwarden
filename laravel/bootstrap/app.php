@@ -71,6 +71,7 @@ return Application::configure(basePath: dirname(__DIR__))
             // `web` : la deconnexion vit hors du groupe, donc elle reste
             // atteignable PAR CONSTRUCTION et non par exemption.
             'mot.de.passe.a.changer' => \App\Http\Middleware\ChangementMotDePasseExige::class,
+            'memorisation' => \App\Http\Middleware\RestaureMemorisation::class,
             // E-203 : rend la revocation de session EFFECTIVE. Sans lui, le
             // bouton « Revoquer » ecrit une suppression que rien ne lit.
             'session.revoquee' => \App\Http\Middleware\SessionRevoquee::class,

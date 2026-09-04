@@ -95,7 +95,16 @@ Route::get('/deconnexion', [ConnexionController::class, 'deconnexion']);
  * role 3, ce drapeau est le SEUL frein : le role 3 court-circuite chaque `perm:`
  * et chaque `role:`.
  */
-Route::middleware(['session.authentifiee', 'session.revoquee', 'mot.de.passe.a.changer'])->group(function () {
+/*
+ * ⚠ `memorisation` VIENT EN PREMIER, et l'ordre est la propriete.
+ *
+ * `session.authentifiee` renvoie vers la connexion des que `utilisateur_id`
+ * manque : place apres lui, l'aiguillage de restauration ne serait jamais
+ * atteint. Place avant, il ne fait que POSER `compte_temporaire` et rediriger
+ * vers le second facteur ou l'enrolement — **il n'ouvre aucune session**, donc
+ * il ne court-circuite pas le garde qu'il precede.
+ */
+Route::middleware(['memorisation', 'session.authentifiee', 'session.revoquee', 'mot.de.passe.a.changer'])->group(function () {
     Route::get('/cgu', [PortailController::class, 'cgu'])->name('cgu');
     Route::post('/cgu', [PortailController::class, 'accepterCgu'])->name('cgu.accepter');
     Route::get('/accueil', [PortailController::class, 'accueil'])->name('accueil');

@@ -5,6 +5,46 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.40.0] - 2026-09-04
+
+### Ajoute
+- **« Se souvenir de moi » est porte (E-394).** Le portage VIDAIT `remember_tokens` sans jamais
+  la remplir ; il la remplit desormais. Case sur l'ecran de connexion, jeton de 32 octets hache
+  en base, cookie de 30 jours a attributs explicites.
+
+### ⛔ Securite — le contournement du legacy n'est PAS porte
+- **Le legacy conditionne sa re-authentification a `if ($totpSecret)` sans `else`** : pour un
+  compte sans second facteur, le cookie authentifie SEUL, sans defi et sans la redirection vers
+  l'enrolement que la connexion impose partout ailleurs. **Verifie par trois lectures
+  independantes.**
+- **Le portage porte une propriete INCONDITIONNELLE, tenue par le TYPE** :
+  `DecisionRestauration` n'a pas de cas « portail » — l'acces direct n'est pas « jamais rendu »,
+  il est **inexprimable**. Et l'exhaustivite de l'appelant est tenue par un `match` sur
+  l'enumeration : ajouter un cas leve une erreur au lieu de laisser passer la requete.
+- **Le jeton est emis APRES la reussite du defi**, jamais avant comme le legacy — sinon le cas
+  « restaure sans avoir jamais franchi le second facteur » devient produisible par le portage.
+- **Une restauration ne renouvelle pas le jeton** : pas d'expiration glissante, les 30 jours
+  courent depuis la derniere saisie du mot de passe.
+- **Le cookie reste CHIFFRE** : on n'exempte pas un porteur d'identite d'`EncryptCookies`.
+  Consequence de transition declaree a l'ecran — l'ancien portail, qui le lit en clair,
+  l'effacera.
+
+### Declare a l'ecran
+- Que la memorisation **demande toujours le second facteur** ; qu'elle ne vaut que pour **un
+  seul appareil** (limite du schema : `PRIMARY KEY (user_id)`) ; et que passer par l'ancien
+  portail l'annule.
+
+### Tests
+- `/connexion` rend **200** et son HTML porte `name="memorisation"` et les trois declarations ;
+  « 30 jours » y figure, donc le parametre resout. **Temoin : zero motif `auth.` dans le HTML
+  alors que la source en appelle douze.** Parite FR/EN 40 = 40, classes CSS verifiees.
+- Le verrou de la session 6 (`RestaurationParJetonTest`, `4948bdf`) skippait en nommant
+  l'absence ; il mord sur cette livraison.
+
+### Reserves
+- **Le flux n'est pas exerce de bout en bout** : franchir le defi exige un code TOTP valide.
+  Pas de binaire PHP sur l'hote de cette session.
+
 ## [1.39.10] - 2026-09-04
 
 ### Securite
