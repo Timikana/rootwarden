@@ -5519,3 +5519,59 @@ dernier `view:clear` : c'est une grandeur qui bouge seule.*
 - **les comptes déjà créés par l'import** avant v1.40.4 gardent un mot de passe non forcé. La
   remédiation existe (`POST /comptes/{id}/mot-de-passe`) et **n'a pas été jouée** : elle
   change des comptes existants.
+
+---
+
+## E-399 — et **deux étiquettes qui affirmaient leur conclusion avant de l'avoir mesurée**
+
+**Commit `b600da7`, v1.40.5.** Le fond est dans `PARITE.md` : `roleAutorise()` rendait un
+booléen qui ne rapportait qu'une des deux coercitions, il rend désormais un objet à deux
+drapeaux **indépendants** — `valeurInvalide` (validité) et `rangRamene` (sécurité). Ce qui
+mérite d'être ici est ce que j'ai raté **en le mesurant**.
+
+### Deux fois dans le même tour, j'ai imprimé la conclusion SOUS la sortie, en dur
+
+    echo "$(grep -n rangRamene …)"
+    echo "  (une seule occurrence = la coercition d'AUTORISATION est MUETTE)"
+        -> la sortie montrait DEUX occurrences. La coercition n'etait pas muette.
+
+    echo "$(grep -rn roleAutorise … laravel/app)"
+    echo "  (vide = aucun)"
+        -> la sortie montrait UNE ligne. Elle etait inoffensive, mais l'etiquette
+           annoncait le vide sous une sortie non vide.
+
+**Les deux étiquettes étaient des `echo` inconditionnels.** Elles ne lisaient pas le
+résultat : elles le *préjugeaient*, et elles se seraient affichées à l'identique si la mesure
+avait dit l'inverse.
+
+> **C'est [[feedback_detail_echec_sur_pass]] déplacé du code vers le shell** : *un détail qui
+> ne vaut que pour un verdict se conditionne à ce verdict.* Ici le « détail » était la
+> conclusion elle-même, et le verdict n'existait pas — **il n'y avait aucune condition du
+> tout.**
+
+**Ce qui m'a sauvée les deux fois est d'avoir lu la sortie et non mon étiquette.** *C'est
+exactement ce qu'un lecteur pressé — ou une session qui relaie — ne fait pas.* Et la première
+des deux allait devenir une accusation publiée : j'étais à un message d'écrire à la DSI que
+la coercition d'autorisation était muette sur l'import, alors qu'elle est signalée par ligne
+depuis D6c.
+
+**Parade, et elle est mécanique** : une étiquette de verdict se calcule.
+
+    n=$(grep -c … ) ; [ "$n" -eq 0 ] && echo "  aucun" || echo "  $n occurrence(s)"
+
+*Jamais une phrase conclusive en `echo` littéral à côté d'une commande de mesure.* Le coût de
+la forme correcte est une substitution ; le coût de l'autre est une accusation fausse, et
+c'est la troisième fois que ce chantier la paie sous une forme ou une autre.
+
+### Le reste du tour, en une ligne chacun
+
+- **le cinquième et le sixième étage de fabrication du `1` sont MORTS**, et c'est
+  `information_schema` qui le tranche (`users.role_id IS_NULLABLE = NO`) — *un repli qui
+  ressemble à une fabrication n'en est pas une tant que son cas d'entrée est impossible ; la
+  lecture du code ne pouvait pas le dire* ;
+- **la garde par construction a servi deux fois** : `roleDuLibelle(): ?int` rend le cas
+  dangereux inexprimable, et `RolePose` remplace deux positions de tuple par deux noms ;
+- **j'ai refusé le singulier demandé par l'arbitrage** — « laquelle des deux coercitions » —
+  parce que les deux peuvent jouer ensemble. *Un singulier dans une consigne est une
+  affirmation sur la cardinalité, et celle-là était fausse.* Même famille que le
+  [[feedback_libelle_decrit_le_defaut]] du possessif au singulier.
