@@ -9099,3 +9099,73 @@ ici c'est l'inverse exact, des documents qui n'énumèrent que les réussites.*
     📌 DOSSIER-24   le SMTP — canal de PREMIERE delivrance
     📌 DOSSIER-27   `/wazuh/group` : ne pas le porter tel quel
     📌 les deux fusions · le redemarrage · les gestes destructeurs
+
+### ⛔⛔ RÉTRACTATION — « un document qui ne dit jamais non » : ma catégorie n'a AUCUN membre, et mon prédicat cherchait un MOT
+
+**Vérifié par moi après la réfutation, et elle tient sur toute la ligne.**
+
+    MODULE-ADM.md, lignes de NEGATION en prose        44
+      (temoin absurde `zzz_motif_inexistant_zzz`  ->  0)
+    et ses TITRES de section les portent :
+      4.1  « un bouton "Deployer" qui NE PEUT PAS marcher »
+      4.5  « Ce qui est MORT, en une table »
+      5.4  « Ce que le portage devra construire, et QUI N'EXISTE PAS encore »
+      7    « ce dont je NE SUIS PAS SUR », six entrees avec ce qui les leverait
+
+    et le RESTE INEXPLIQUE se referme :
+      ecritures en base dans `legacy/adm/`   63, dans 22 fichiers, 19 tables
+      fichiers de `adm/` NOMMES dans le doc  37 / 37
+      dont les 22 ECRIVAINS                  22 / 22
+      reste                                  ZERO
+
+> **Mon « zéro verdict NON PORTÉ » ne mesurait pas l'absence de négatifs : il mesurait l'absence d'un
+> MOT.** *Ces fiches n'ont pas de colonne de verdict — elles nomment les manques en prose et en titres.*
+
+**✅ La formulation elle-même pouvait être vraie ; ce qui est faux, c'est que ces dix documents en soient
+membres. Et c'est mon INSTRUMENT DE SÉLECTION qui les y avait mis.**
+
+    ce que ca aurait coute : dix documents re-interroges pour rien.
+    et la Q3 sur `adm/` n'est PAS « jamais etablie » — elle l'est par ce
+    document, dont le reste se referme a zero.
+
+### ⚠ ET LA FORME MANQUANTE EST NOUVELLE AU CATALOGUE : elle est RÉDACTIONNELLE
+
+    troisieme fois du jour qu'un instrument ne connait qu'UNE FORME de la
+    chose qu'il compte :
+      1. le nom de base contre le chemin resolu       (syntaxique)
+      2. l'ORM contre le SQL brut                     (syntaxique)
+      3. le JETON en majuscules contre la PROSE       <- REDACTIONNELLE
+
+**Les deux premières se cherchent dans une grammaire. La troisième se cherche dans un STYLE — et rien ne
+borne les façons d'écrire « non ».** *La session qui m'a réfutée le dit contre elle-même : son propre motif
+de négation a raté le vocabulaire d'`API-DOCS`.*
+
+### ⚠ ET MA DATE ÉTAIT FAUSSE DE DEUX FAÇONS À LA FOIS
+
+    ce que j'ai publie   « ADM, 27/08 »
+    `stat` maintenant    2026-09-04    <- ma propre lecture etait DEJA perimee
+    le document lui-meme 2026-08-25    <- en ligne 3, sections du 26
+
+> **La date de FICHIER n'est pas la date de MESURE — c'est ma propre règle, et elle mord ici deux fois :
+> j'ai lu un `stat` déjà périmé, et un `stat` ne répondait pas à la question.**
+
+**Trois dates pour un fichier, dans un relevé que j'ai présenté comme une mesure.**
+
+### ✅ ET LE SEUL ZÉRO QUI RESTE EST UN ZÉRO CORRECT SUR UNE POPULATION VIDE
+
+    `MODULE-API-DOCS` rend 0 negation — et les cinq fichiers de `legacy/api/`
+    portent 0 ecriture en base, deux etant du vendor minifie.
+    -> aucun geste a declarer non porte.
+    et il porte quand meme une etape « BLOQUEE », une « NON », une « ZERO »
+    et un §4 « ce que je n'ai PAS fait ».
+
+**Donc même le seul candidat restant n'était pas silencieux : c'était le motif qui ne connaissait pas son
+vocabulaire.**
+
+### ✅ ET LE BOOLÉEN ÉTAIT LE BON FORMAT, POSÉ SUR LE MAUVAIS PRÉDICAT
+
+> **« Ton booléen était le bon format, mais il fallait le poser sur *contient-il des négations* et non sur
+> *contient-il ce mot*. »**
+
+*C'est la leçon qui survit à la rétractation : le format d'une clause ne la protège pas d'un prédicat faux.
+Un booléen ne se périme pas comme un compte — il peut être faux dès sa première évaluation.*
