@@ -5,6 +5,68 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.40.5] - 2026-09-04
+
+### Comptes - E-399 : la coercition de VALIDITE du role etait muette
+
+**Symptome.** Mesure de la QA : `roleAutorise()` rendait `array{int, bool}` et ce booleen ne
+rapportait que la coercition d'AUTORISATION.
+
+    auteur 3 ou 2, valeur hors liste   ->  role 1, EN SILENCE
+    auteur 1, n'importe quelle valeur  ->  role 1, ANNONCE
+
+Un superadministrateur qui se trompe de valeur creait un utilisateur en croyant creer un
+administrateur. Sur l'import CSV, un fichier de cinquante lignes dont la colonne `role` est
+mal orthographiee creait cinquante comptes de role 1 **et le bilan annoncait une reussite**.
+
+**Cause racine.** Un drapeau qui signifiait deux choses, et un repli muet dans une
+expression : `IMPORT_ROLES[mb_strtolower($data['role'] ?? 'user')] ?? 1` fabriquait `1` pour
+la colonne ABSENTE **et** pour le libelle INCONNU, sans les distinguer. Le premier est un
+defaut legitime, le second une valeur qui n'est pas un role.
+
+**Correctif.** La coercition RESTE — elle echoue du cote sur, `1` etant le role le moins
+privilegie, contrairement au `'all'` de `target_type` qui fabriquait la portee la plus large —
+mais elle **se dit**, avec deux signaux distincts.
+
+- `App\Support\RolePose` : objet `readonly`, trois proprietes NOMMEES — `role`,
+  `valeurInvalide` (phrase de validite), `rangRamene` (phrase de securite). Les deux drapeaux
+  sont INDEPENDANTS : une valeur invalide devient le plancher, que l'autorisation peut a son
+  tour refuser, et alors les deux sont vraies.
+- `Comptes::roleDuLibelle(string): ?int` : le cas dangereux est **inexprimable** — « inconnu »
+  ne s'ecrit plus `1` mais `null`. Colonne absente ou cellule vide restent un defaut
+  legitime et ne signalent rien.
+- `Comptes::rolePose(?int, int): RolePose` remplace `roleAutorise()`. **Une seule
+  implementation** : pas d'adaptateur qui garderait le drapeau ambigu en vie.
+- signal par LIGNE sur l'import (`imp_err_role`) citant la valeur soumise, bornee a
+  40 caracteres, et la liste des valeurs acceptees — sans elle, l'importeur d'un fichier de
+  500 lignes ne sait pas quoi corriger.
+- deux phrases qui s'AJOUTENT sur la creation manuelle (`cree_valeur_role` apres
+  `cree` / `cree_rang_ramene`), et la trace d'audit distingue les deux : une trace qui dit
+  « anti-escalade » sur une faute de frappe ferait chercher une tentative d'escalade la ou il
+  n'y en a pas eu.
+- `cree` corrige : *« devra changer ce mot de passe »* et non plus *« devra fixer son mot de
+  passe »* — la phrase datait d'avant E-397, quand personne ne connaissait le mot de passe.
+
+**Mesure des etages de fabrication du `1`.** Les quatre nommes par l'arbitrage sont exacts.
+**Deux autres existent et les deux sont MORTS** : `JetonMemorisation:189`
+(`(int) ($compte->role_id ?? 1)`) et le `DEFAULT 1` du schema — `users.role_id` est
+`IS_NULLABLE = NO` (`information_schema`), et les deux seuls ecrivains de la colonne la posent
+toujours. C'est la nullabilite en base, pas la lecture du code, qui le tranche.
+
+**Tests.** Table de verite jouee dans le conteneur : **20 cas, 0 FAIL**, invariant
+`role ∈ ROLES` sans violation sur 27 combinaisons, et **temoin inverse rendu** (une attente
+mutee fait rougir la table — l'instrument mord). `php -l` sur les cinq fichiers, parite FR/EN
+verifiee **par PHP** et non par expression reguliere : **94 = 94, 0 divergence**.
+
+**⚠ Notes exploitation — un rouge ATTENDU chez la QA.** `roleAutorise()` n'existe plus, et
+`laravel/tests/Feature/RoleAutoriseTest.php` porte 7 appels reels (lignes 97, 116, 129, 137,
+146, 188, 221) qui leveront `Call to undefined method`. Correspondance :
+`[$effectif, $abaisse] = $c->roleAutorise($d, $a)` devient `$p = $c->rolePose($d, $a)` puis
+`$p->role` / `$p->rangRamene`, plus `$p->valeurInvalide` qui est neuf. **Ce fichier n'a pas
+ete modifie ici** : `laravel/tests/` appartient a la QA.
+
+---
+
 ## [1.40.4] - 2026-09-04
 
 ### Comptes - E-397 : les deux chemins de creation etaient faux, en sens opposes
