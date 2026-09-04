@@ -5,6 +5,37 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.39.3] - 2026-09-04
+
+### Securite
+- **Un compte de role 2 pouvait creer un SUPERADMINISTRATEUR (E-385).** `POST /comptes` est
+  garde `role:2` et `ExigeRole` compare avec `<` : un role 2 porteur de `can_admin_portal`
+  franchit la route. Le role demande etait borne par la liste fermee `Comptes::ROLES`
+  — c'est-a-dire a des valeurs VALIDES, pas a des valeurs PERMISES — et le role de l'auteur
+  etait recupere puis jete par la destructuration. La clause anti-escalade du legacy est
+  reprise : un non-superadministrateur ne cree qu'un role strictement inferieur au sien.
+  Le legacy documente l'incident qui l'a fait ecrire — *quelqu'un creait un superadmin,
+  recevait le magic-link sur son courriel et prenait le controle*.
+- **La coercition est ANNONCEE et TRACEE.** Le legacy a deux formes de cette regle : une
+  coercition annoncee a la creation (« feedback utilisateur au lieu d'un clamp silencieux »,
+  dit son propre commentaire) et un refus a la modification. On reprend la premiere, plus une
+  entree au journal d'audit : une decision de rang qui n'est pas journalisee ne se retrouve
+  pas.
+
+### ⚠ Note de methode — le defaut failli livrer EN corrigeant
+- Le premier jet posait un message flash `avertissement`. `comptes.blade.php` ne rend que
+  `succes` et `erreur`, et `avertissement` n'avait qu'une occurrence dans tout le portage :
+  celle-ci. **La coercition aurait donc ete silencieuse derriere une annonce qui n'atteignait
+  aucun ecran.** Un seul message desormais, par la cle que la vue affiche.
+
+### Reserves
+- **Non mesurable ici** : combien de comptes de role 2 portent `can_admin_portal` aujourd'hui
+  (`docker` refuse a cette session). Le garde est le defaut quelle que soit l'atteignabilite,
+  et cette permission s'accorde depuis `/permissions`.
+- Parite FR/EN 72 = 72 ; equilibres identiques a `HEAD` ; application demarree (200 sur
+  `/connexion`, temoin 404). Pas de binaire PHP sur l'hote de cette session, et la route
+  n'est pas exercee.
+
 ## [1.39.2] - 2026-09-04
 
 ### Ajoute

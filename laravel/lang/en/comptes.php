@@ -86,6 +86,7 @@ return [
     'supprime' => 'Account ":nom" deleted.',
     'anonymise' => 'Account ":nom" anonymised. :nombre audit log line(s) kept.',
     'err_soi_meme' => 'You cannot act on your own account.',
+    'cree_rang_ramene' => 'Account ":nom" created (id :id) — but with the "User" role: you may only create a role below your own.',
     'err_rang' => 'You cannot act on an account whose role is equal to or above yours.',
     'err_dernier_sa' => 'This is the last active super administrator: it cannot be removed.',
     'err_journal_present' => 'This account carries :nombre audit log line(s): deleting it would take them along and break the chain. Anonymise it instead.',
