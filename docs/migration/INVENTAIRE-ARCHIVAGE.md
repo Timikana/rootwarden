@@ -683,6 +683,28 @@ sans conséquence.
 
 *C'est le second en-tête de la journée qui annonce plus que ce que son fichier fait.*
 
+**⚠ COMPLÉMENT DU 2026-09-04 15:40 — mon relevé de 15:38 était INCOMPLET, et la
+question posée méritait mieux.** L'`INSERT` du legacy ne cite que **14** des **18**
+colonnes de permission. Les quatre absentes prennent donc leur **défaut de schéma**,
+et je ne l'avais pas mesuré.
+
+    colonnes citees par manage_users.php:116   14, toutes a 0 explicitement
+    colonnes de `permissions` au schema        18 (+ user_id)
+    NON citees   can_manage_bashrc · can_manage_graylog
+                 can_manage_wazuh  · can_manage_api_keys
+    defaut au schema des 18                    0 pour TOUTES (NOT NULL)
+
+**Conclusion inchangée mais désormais fondée : une ligne créée par le legacy est
+tout à zéro, défauts de schéma compris. « Pas de ligne » et « ligne du legacy » sont
+équivalents, et il n'y a d'écart d'autorisation dans AUCUN des deux sens.**
+
+*Et un détail qui vaut d'être noté* : les quatre colonnes non citées sont
+précisément celles des modules ajoutés **après** l'écriture de cet `INSERT`
+(bashrc, graylog, wazuh, clés d'API). **L'`INSERT` du legacy a donc dérivé de son
+schéma, et il n'est inoffensif que par coïncidence** — le jour où une colonne de
+permission naîtrait avec un défaut à `1`, le legacy l'accorderait sans le dire.
+
+
 ### 10.5 Bilan de la Q3 sur les 16 — et la révision de mon heuristique
 
     TOUCHES : 3
