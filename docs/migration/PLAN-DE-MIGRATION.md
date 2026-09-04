@@ -5494,7 +5494,7 @@ autre chose, elle gagne ». Sans cette phrase j'aurais aligné sur un modèle d�
 ### Un piège réarmé par ma propre main, et ce qu'il dit du correctif en attente
 
 `php artisan view:cache`, lancé en root pour contrôler que la vue compile, a recréé
-**151 vues compilées appartenant à `root`** dans un dossier `www-data` : la cause exacte de
+**112 vues compilées appartenant à `root`** dans un dossier `www-data` : la cause exacte de
 `PIEGE-CACHE-BLADE.md`, celle qui rend 500 sur **toutes** les pages. Constaté par `ls -l`,
 désarmé par `chown`, vérifié au réseau (`/` 302, `/connexion` 200, `/comptes` 302).
 
@@ -5503,6 +5503,13 @@ désarmé par `chown`, vérifié au réseau (`/` 302, `/connexion` 200, `/compte
 > entre deux démarrages réarme le piège** — et le seul témoin est `ls -l`, que rien n'oblige à
 > regarder. *À ajouter au dossier : le geste de contrôle le plus banal du portage est aussi
 > celui qui pose la mine.*
+
+**⚠ Et j'ai d'abord écrit « 151 », un chiffre que je n'avais pas compté** — il vient du
+dossier, où il datait d'une autre mesure. Compté ici : **112** (`ls -1 … | wc -l`), soit 39
+d'écart. *La règle de ce document — chaque chiffre porte sa commande de remesure — dispense
+de refaire une mesure DATÉE ET SOURCÉE ; elle n'autorise pas à en recopier une comme si elle
+venait d'être prise. Le nombre de vues compilées dépend de ce qui a été rendu depuis le
+dernier `view:clear` : c'est une grandeur qui bouge seule.*
 
 ### Non fait, et dit
 
