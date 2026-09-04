@@ -210,3 +210,87 @@ simulation).* **Mais sa prémisse était fausse, et elle a fait refaire du trava
 > **`RELECTURE-SECURITY-BACKEND-CVE.md` déplore ce coût exact à sa ligne 9** — *« sept sessions ont
 > re-trouvé, re-mesuré et re-rédigé `a345e65`, écrit douze jours plus tôt »*. **J'en ai causé une
 > huitième.**
+
+---
+
+# 📌 DÉCISION RENDUE — la branche est APTE. Le merge attend VOTRE mot, et c'est votre règle.
+
+**2026-09-04, 14:50.** *L'exploitant a délégué : « continue et prends les décisions ». Je rends celle que
+je peux, et je dis nettement celle que je ne peux pas.*
+
+## ⛔ D'ABORD : POURQUOI JE NE MERGE PAS, MÊME AVEC CETTE DÉLÉGATION
+
+    votre regle permanente : « tout patch securite va sur branche `security/...`,
+    merge UNIQUEMENT sur validation verbale explicite de l'exploitant »
+
+**Cette règle vous appartient et elle nomme exactement ce cas.** *« Prends les décisions » délègue des
+arbitrages produit ; elle ne révoque pas une règle que vous avez posée sur ce geste précis.* **Et le merge
+va dans `main`, que `maj.sh` tire en production : c'est un effet sortant, pas un arbitrage.**
+
+## ✅ CE QUE J'AI MESURÉ AUJOURD'HUI — et le merge est PROPRE
+
+    base commune       279f5fa  (2026-08-20)
+    ecart              main +860  /  branche +6
+    merge-tree         AUCUN conflit
+    fichiers touches par la branche ET par main depuis la base :
+        backend/routes/cve.py        main : 0 ligne   <- intact
+        backend/cve_enrich.py        main : 0 ligne   <- intact
+        backend/routes/helpers.py    main : +146      <- MAIS dans `get_current_user`,
+                                                        pas dans le decorateur
+        backend/scheduler.py         main : +10
+
+**Donc quatre des six correctifs portent sur du code que `main` n'a pas touché en quinze jours : les
+défauts sont encore exactement là.** *Et les deux zones où `main` a écrit ne recoupent pas les hunks de la
+branche — `main` a corrigé les permissions TEMPORAIRES dans `get_current_user`, la branche corrige la
+résolution d'identifiant dans `check_machine_access`. Deux fonctions, deux objets.*
+
+## ⚠ ET LA TROUVAILLE DU JOUR — un COUPLAGE que personne n'avait vu, dans le sens rassurant
+
+**`main` a repris le 2026-08-28 (`59484cb`, QA-009) l'invariant `require_machine_access` « parce que sa
+liste était 2/3 périmée ». Le merge la rendrait périmée à nouveau, par un autre bout.**
+
+    test_invariant_machine_id.py:49
+      CLES = ('machine_id', 'server_id', 'machine_ids', 'server_ids')   -> QUATRE
+
+    la branche fait lire au decorateur, en plus :
+      `mid`  +  les parametres de CHEMIN (`kwargs`)                     -> CINQ sources
+
+    et `_lit_un_identifiant()` cherche une CONSTANTE DE CHAINE dans le corps :
+      une route `def x(mid)` n'en contient AUCUNE -> comptee « ne lit rien »
+
+> **Après le merge, l'invariant mesurerait un contrat plus étroit que le décorateur réel.** *Une route dont
+> l'identifiant arrive par le CHEMIN serait gardée pour de bon, et l'invariant continuerait d'exiger d'elle
+> une autorisation propre.*
+
+**⚠ Le sens de l'erreur est le bon** — *elle ALARME, elle ne dédouane pas ; elle réclame une garde
+redondante, elle n'en dispense aucune.* **Ce n'est donc pas un bloquant. Mais c'est précisément la forme de
+péremption que QA-009 vient de payer, et la laisser revenir en silence serait défaire ce travail.**
+
+## ✅ LA DÉCISION QUE JE PRENDS, ET ELLE NE TOUCHE PAS `main`
+
+**Prérequis au merge, à porter SUR LA BRANCHE** — *dans le commit qui fait le correctif, pas après* :
+
+    ajouter `'mid'` a CLES, et faire reconnaitre a `_lit_un_identifiant()`
+    un parametre de CHEMIN (un argument de la fonction, pas une constante)
+
+**Pourquoi sur la branche et pas sur `main`** : *l'invariant de `main` est juste POUR le décorateur de
+`main`. Le désaccord naît du merge, donc il se répare du côté qui change le décorateur.* **Sinon on écrit
+dans `main` un test qui décrit du code absent — l'inverse exact de ce qu'un invariant doit faire.**
+
+## ⛔ CE QUE JE N'AI PAS MESURÉ, ET JE LE DIS PLUTÔT QUE DE L'INFÉRER
+
+    les 318 pytest de la branche, VERTS ou non aujourd'hui   NON REMESURE
+
+**Je ne relance pas la suite** : *le banc n'est pas déclaré libre — `banc-libre.sh` rend « ⚠ ce n'est pas
+libre », et une relance a déjà tué la sonde d'une autre session.* **Le chiffre `318` est HÉRITÉ. Il ne
+vaut pas verdict, et je ne l'annonce pas comme tel.**
+
+> **Donc l'ordre est : (1) `CLES` corrigée sur la branche · (2) la suite rejouée par qui tient le banc ·
+> (3) votre mot · (4) le merge.** *Les trois premiers ne vous demandent rien.*
+
+## SI RIEN N'EST FAIT
+
+**Six défauts backend qui MORDENT restent hors production, et `main` a maintenant 860 commits d'avance :
+chaque jour rend le merge plus cher sans rendre les défauts moins réels.** *Trois relectures ont été
+payées sur cette branche. C'est le seul travail de ce chantier qui ait été fait trois fois et jamais
+livré.*
