@@ -294,3 +294,82 @@ vaut pas verdict, et je ne l'annonce pas comme tel.**
 chaque jour rend le merge plus cher sans rendre les défauts moins réels.** *Trois relectures ont été
 payées sur cette branche. C'est le seul travail de ce chantier qui ait été fait trois fois et jamais
 livré.*
+
+---
+
+## ⛔ CORRECTION — ma consigne d'il y a une heure était INEXÉCUTABLE, et l'exécuter aurait cassé le merge
+
+**2026-09-04, 15:00.** *La session 5 a mesuré au lieu d'exécuter. Trois de mes points tombent.*
+
+### 1. Le fichier n'est PAS sur la branche
+
+    main / origin/main / Migration-Laravel   test_invariant_machine_id.py  PRESENT
+    security/backend-cve                                                   ABSENT
+    `git merge-base --is-ancestor 59484cb security/backend-cve`  ->  NON
+
+**La branche a divergé le 20/08 ; l'invariant est arrivé le 28/08.** *« Corrige-le sur la branche » n'a
+pas d'objet : il n'y a rien à corriger là.*
+
+> **Et l'y apporter serait NUISIBLE : le fichier existerait des deux côtés avec des contenus différents,
+> donc un conflit add/add — exactement la propriété de merge propre que je venais de mesurer présente.**
+> *Ma consigne, exécutée à la lettre, aurait détruit la mesure qui la motivait.*
+
+**Mon argument pour refuser `main` était juste, et il EXPIRE au merge** : *« on écrirait dans `main` un
+test qui décrit du code absent » — vrai avant la fusion, faux après.* **Donc le correctif n'appartient à
+aucun des deux côtés : il appartient au MERGE, appliqué sur `main` APRÈS.**
+
+### 2. Le couplage n'alarme même pas — aucune assertion ne bouge
+
+    configuration                      routes  gardees  sans_objet  NEUVES
+    4 cles (etat actuel)                 230     116        2         0
+    + 'mid'                              230     116        2         0
+    + 'mid' + parametre de chemin        230     116        2         0
+
+**Les quatre routes dont un argument porte un nom de machine portent TOUTES `require_role` ET
+`require_permission`** — *elles sortent de la classe mesurée par la clause d'autorisation propre, avant
+que `CLES` n'entre en jeu.* **`machine_profile` est la seule à porter le décorateur, et elle est déjà
+exemptée par l'autre bout de la condition.**
+
+**J'avais écrit « l'erreur ALARME, elle ne dédouane pas, donc non bloquante ». Le fait est plus simple :
+elle ne fait ni l'un ni l'autre.** *La modification reste souhaitable — pour que le modèle du test décrive
+le décorateur qu'il teste — mais elle ne défait pas QA-009, et j'ai donné du poids à un couplage inerte.*
+
+### 3. ⚠ Et j'avais désigné le MAUVAIS ENDROIT, d'une façon qui aurait été inerte EN SILENCE
+
+**Je demandais de faire reconnaître le paramètre de chemin à `_lit_un_identifiant()`. C'est
+`_refuse_si_absent()`.**
+
+    `_lit_un_identifiant` est aussi appelee sur des EXPRESSIONS (`n.value`
+    d'un Assign) — un noeud d'expression n'a pas d'`args`, donc la
+    modification y aurait ete INERTE, et sans le dire
+
+    et la propriete mesuree n'est pas « la fonction LIT un identifiant »,
+    c'est « l'identifiant est OBLIGATOIRE » — or un parametre de chemin
+    l'est PAR CONSTRUCTION : `/x/<int:mid>` ne matche pas sans le segment
+
+> **J'ai nommé une fonction pour ce qu'elle semblait faire d'après son nom, et prescrit une modification
+> qui n'aurait rien changé sans lever d'erreur.** *C'est la famille du drapeau inventé et du contrôle qui
+> ne commande pas l'action — deux entrées de mon propre catalogue, dans une consigne que j'ai envoyée
+> comme un prérequis de sécurité.*
+
+### ✅ L'ORDRE CORRIGÉ
+
+    1. la mesure de la session 5              FAITE (`3808619`, §8)
+    2. VOTRE MOT                              <- le seul cran qui vous demande quelque chose
+    3. le merge
+    4. le diff de l'invariant, sur `main`     <- la, il decrit du code PRESENT
+    5. la suite rejouee par qui tient le banc
+
+**Ce qui ne change pas : les six correctifs sont réels, `cve.py` et `cve_enrich.py` n'ont pas bougé sur
+`main` en quinze jours, et le merge est propre.** *Ce qui change, c'est qu'il n'y a plus de prérequis
+technique avant votre mot. Il n'y en avait pas.*
+
+### ⚠ ET UN POIDS QUI S'AJOUTE, MESURÉ CE TOUR-CI
+
+    `_run_scheduled_scan` (scheduler.py:171)  0 filtre `archived`
+        temoin : son voisin `_run_scheduled_ssh_audit` en porte 4
+    trois chemins y menent au PARC ENTIER : `else`, `tag` sans valeur,
+        et une liste de machines ILLISIBLE
+
+**`a345e65` — un des six — est précisément la garde qui ferme ça.** *Une planification de scan CVE peut
+aujourd'hui prendre le parc entier, `srv-zabbix` comprise, par une valeur JSON mal formée.*
