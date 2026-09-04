@@ -615,3 +615,92 @@ ce geste, pas son code. Le portage crée la ligne au **premier réglage**
 que sur un compte n'ayant jamais reçu aucune permission. **Je ne sais pas si les
 valeurs d'initialisation du legacy sont toutes à zéro** — et sans ça je ne peux pas
 dire si « pas de ligne » et « ligne du legacy » sont équivalents. **Non classé.**
+
+---
+
+## 10. Lots 2 et 3 des non appariés — **les 16 sont faits** (2026-09-04 15:38 CEST)
+
+### 10.1 `manage_servers.php` (939 l.), rendu en GESTES — aucune touche Q3
+
+| geste | équivalent `laravel/` |
+|---|---|
+| créer un serveur (`INSERT INTO machines` :136) | `Serveurs.php:294` |
+| modifier un serveur (`UPDATE machines` :186) | `Serveurs.php:536`, `:730` |
+| supprimer un serveur (`DELETE FROM machines` :207) | `Serveurs.php:776` (réel) + `web.php:740` |
+| tester la connexion (`/server_status` :589) | `serveurs.js:114` — porté, mesuré le 2026-09-02 |
+| cycle de vie (`/server_lifecycle` :641) | porté, en écriture directe (pas de route) |
+| 6 appels à `server_actions.php` | voir §10.3 |
+
+### 10.2 ⚠ `manage_roles.php` — **TOUCHE Q3 : changer le rôle d'un compte**
+
+    UPDATE users SET password = ?, force_password_change = TRUE   :88   -> PORTE (web.php:622)
+    UPDATE users SET totp_secret = NULL                           :115  -> PORTE (web.php:643)
+    UPDATE users SET role_id = ?                                  :162  -> ⚠ AUCUN EQUIVALENT
+
+    ECRITURES de users.role_id cote laravel/, hors tests, TOUTES FORMES : 0
+      (blocs `->update([…])` multi-lignes + SQL brut ; temoin : la meme sonde
+       voit 3 ecritures de `users.totp_secret`)
+    routes de changement de role : 0
+
+**La création d'un compte POSE bien un `role_id`** (`ComptesController` `insertGetId`)
+— mais poser un rôle à la création n'est pas le **changer** ensuite. Aucun chemin.
+
+> **`adm/includes/manage_roles.php` est le seul accès au changement de rôle d'un
+> compte.** Et cette touche-là **casse ma propre généralisation du §8.3** : ce n'est
+> pas une capacité rare « une fois par installation », c'est un geste
+> d'administration courant. **Q1 l'a manquée parce que le fichier porte TROIS
+> gestes dont DEUX sont portés** — le motif du §0.2, à l'échelle du geste.
+
+### 10.3 Les trois autres, et une touche qui rejoint un bloquant connu
+
+| fichier | gestes | verdict |
+|---|---|---|
+| `manage_permissions.php` (274 l.) | **aucune écriture** — fragment d'affichage | tombe avec `admin_page.php` |
+| `manage_notifications.php` (142 l.) | **aucune écriture** — fragment d'affichage | tombe avec `admin_page.php` |
+| `server_actions.php` (268 l.) | CRUD serveur (doublon de `manage_servers`), `machine_tags` (`Serveurs.php:630` `insertOrIgnore`, `:638`), `server_notes` (`:659` + `web.php:761`) | **tout porté** |
+| `manage_users.php` (459 l.) | créer un compte → porté ; ligne de `permissions` à la création → **équivalent** (voir 10.4) ; **`INSERT INTO password_reset_tokens` :142** → ⚠ **0 écriture au portage** | **touche, rattachée au bloquant du §3** |
+
+**La touche de `manage_users.php` n'est pas indépendante** : `password_reset_tokens`
+n'a qu'une occurrence côté portage, `config/auth.php:98`, l'échafaudage du cadriciel.
+Elle appartient à la chaîne de réinitialisation de mot de passe déjà identifiée. *Mais
+elle en élargit la portée* : le legacy émet un jeton **à la création du compte**, donc
+le flux « le nouveau compte choisit son mot de passe lui-même » n'existe pas non plus
+au portage.
+
+### 10.4 ✅ Le non-classé du §9.3 est RÉSOLU — et il n'y avait pas de touche
+
+`manage_users.php:116-117` :
+
+    INSERT INTO permissions (user_id, can_deploy_keys, …)
+    VALUES (?, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+
+**Tout à zéro.** Donc « pas de ligne » et « ligne du legacy » sont équivalents en
+comportement, et l'absence d'initialisation au portage n'ôte aucun droit. **Et la
+ligne est créée par `manage_users.php` à la CRÉATION du compte, pas paresseusement
+par `verify.php`** — l'en-tête de `verify.php` annonce cette responsabilité, je n'en
+ai jamais trouvé le code, et je n'en ai plus besoin : le geste est ailleurs et il est
+sans conséquence.
+
+*C'est le second en-tête de la journée qui annonce plus que ce que son fichier fait.*
+
+### 10.5 Bilan de la Q3 sur les 16 — et la révision de mon heuristique
+
+    TOUCHES : 3
+      login.php            « se souvenir de moi »        (page du BLOC B)
+      manage_roles.php     changer le role d'un compte   (geste COURANT)
+      manage_users.php     jeton de reinit a la creation (chaine deja connue)
+
+> **⚠ Ma généralisation du §8.3 était trop étroite.** J'avais écrit que les touches
+> de la Q3 se groupent sur les capacités **rares par nature**. Deux des trois
+> touches ci-dessus ne le sont pas : « se souvenir de moi » est employé à chaque
+> connexion, et changer un rôle est un geste d'administration ordinaire.
+>
+> **Ce qu'elles ont en commun n'est pas la RARETÉ, c'est que le fichier porteur a
+> plusieurs gestes dont la MAJORITÉ est portée.** `login.php` : connexion portée,
+> souvenir non. `manage_roles.php` : deux gestes sur trois portés. C'est le motif du
+> §0.2 — et il explique aussi les trois touches « rares » du §8.3, dont les fichiers
+> portaient un geste unique et invisible.
+>
+> **L'heuristique juste est donc : pointer la Q3 sur les fichiers qui portent
+> PLUSIEURS gestes**, parce qu'un verdict de fichier y est nécessairement une
+> moyenne — et une moyenne cache la minorité.
