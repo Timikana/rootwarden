@@ -12,7 +12,43 @@ import hashlib
 import logging
 from flask import Blueprint, jsonify, request, Response
 from config import Config
-from routes.helpers import require_api_key, require_role, require_machine_access, threaded_route, get_db_connection, server_decrypt_password, logger, get_current_user
+from routes.helpers import require_api_key, require_role, require_permission, require_machine_access, threaded_route, get_db_connection, server_decrypt_password, logger, get_current_user
+
+# ══ E-389 : LE BACKEND ETAIT PLUS PERMISSIF QUE LES DEUX PAGES QU'IL SERT ════
+#
+# Les 13 routes POST de ce module n'avaient NI role NI permission — seules
+# `@require_api_key` et `@require_machine_access`. Or les deux portails
+# exigent une permission a l'etage PAGE :
+#   legacy  : checkPermission('can_update_linux')
+#   portage : web.php:446  ->middleware(['role:1', 'perm:can_update_linux'])
+# et `can_update_linux` n'apparaissait NULLE PART dans `backend/routes/`.
+#
+# Ce que ce trou rendait atteignable : `documentation.php` est un forgeur de
+# requetes graphique (champ libre + corps libre), au MENU, ouvert a tout
+# compte de role 1. Un compte role 1 actif SANS `can_update_linux`, mais
+# assigne a une machine, pouvait donc declencher `apt full-upgrade` et
+# `dpkg_repair` dessus en trois clics — et la machine assignee mesuree est
+# `srv-zabbix`, en PRODUCTION.
+#
+# Pourquoi une PERMISSION et pas `@require_role(2)` : un role 1 porteur de
+# `can_update_linux` a le DROIT de mettre a jour ses machines (web.php:442
+# le dit et reprend le legacy). Un role 2 backend aurait defait la page qu'il
+# protege. Le correctif ne fait que cesser d'etre plus permissif qu'elle.
+#
+# Trois routes NE recoivent PAS la permission, chacune pour une raison mesuree :
+#   /apt_check_lock, /update_zabbix  -> seul appelant `adm/health_check.php`,
+#       qui exige role 2 + `can_admin_portal` : `@require_role(2)` est le
+#       miroir fidele, la permission serait un contresens.
+#   /update_security_exec            -> AUCUN garde ajoute. Point d'entree
+#       machine-a-machine appele par un cron sur la machine distante, avec son
+#       propre HMAC borne au machine_id (`X-Update-Token`). Son docstring dit
+#       qu'il REMPLACE les decorateurs de session « qu'un cron ne peut pas
+#       satisfaire » : un role l'aurait casse. Son absence de
+#       `@require_api_key` n'est pas un trou, c'est un autre schema.
+#
+# ⚠ `require_permission` court-circuite au role 3 (helpers.py:338) : un
+# superadmin passe SANS porter la ligne. C'est voulu — mais ce garde ne
+# s'applique donc pas a tous, et se lit de travers si on l'ignore.
 from ssh_utils import ssh_session, validate_machine_id, execute_as_root, execute_as_root_stream
 
 
@@ -104,6 +140,7 @@ def _dpkg_configure(client, root_password):
 
 @bp.route('/apt_check_lock', methods=['POST'])
 @require_api_key
+@require_role(2)
 @require_machine_access
 @threaded_route
 def apt_check_lock():
@@ -136,6 +173,7 @@ def apt_check_lock():
 
 @bp.route('/dpkg_repair', methods=['POST'])
 @require_api_key
+@require_permission('can_update_linux')
 @require_machine_access
 @threaded_route
 def dpkg_repair():
@@ -185,6 +223,7 @@ def dpkg_repair():
 
 @bp.route('/update_zabbix', methods=['POST'])
 @require_api_key
+@require_role(2)
 @require_machine_access
 @threaded_route
 def update_zabbix():
@@ -199,6 +238,7 @@ def update_zabbix():
 
 @bp.route('/update', methods=['POST'])
 @require_api_key
+@require_permission('can_update_linux')
 @require_machine_access
 @threaded_route
 def update_server():
@@ -267,6 +307,7 @@ def update_server():
 
 @bp.route('/security_updates', methods=['POST'])
 @require_api_key
+@require_permission('can_update_linux')
 @require_machine_access
 @threaded_route
 def apply_security_updates():
@@ -334,6 +375,7 @@ def apply_security_updates():
 
 @bp.route('/schedule_update', methods=['POST'])
 @require_api_key
+@require_permission('can_update_linux')
 @require_machine_access
 @threaded_route
 def schedule_update():
@@ -408,6 +450,7 @@ def _validate_package_list(packages: list) -> list:
 
 @bp.route('/apt_update', methods=['POST'])
 @require_api_key
+@require_permission('can_update_linux')
 @require_machine_access
 @threaded_route
 def apt_update():
@@ -488,6 +531,7 @@ def apt_update():
 
 @bp.route('/custom_update', methods=['POST'])
 @require_api_key
+@require_permission('can_update_linux')
 @require_machine_access
 @threaded_route
 def custom_update():
@@ -569,6 +613,7 @@ def custom_update():
 
 @bp.route('/schedule_advanced_update', methods=['POST'])
 @require_api_key
+@require_permission('can_update_linux')
 @require_machine_access
 @threaded_route
 def schedule_advanced_update():
@@ -633,6 +678,7 @@ def schedule_advanced_update():
 
 @bp.route('/schedule_advanced_security_update', methods=['POST'])
 @require_api_key
+@require_permission('can_update_linux')
 @require_machine_access
 @threaded_route
 def schedule_advanced_security_update():
@@ -823,6 +869,7 @@ def stream_update_logs():
 
 @bp.route('/dry_run_update', methods=['POST'])
 @require_api_key
+@require_permission('can_update_linux')
 @require_machine_access
 @threaded_route
 def dry_run_update():
@@ -872,6 +919,7 @@ def dry_run_update():
 
 @bp.route('/pending_packages', methods=['POST'])
 @require_api_key
+@require_permission('can_update_linux')
 @require_machine_access
 @threaded_route
 def pending_packages():

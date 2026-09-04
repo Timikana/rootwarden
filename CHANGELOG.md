@@ -5,6 +5,68 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.39.7] - 2026-09-04
+
+### Securite - E-389 : le backend etait plus permissif que les deux pages qu'il sert
+
+**Symptome.** Les 13 routes POST de `backend/routes/updates.py` n'avaient NI role
+NI permission — seules `@require_api_key` et `@require_machine_access`. Or les
+deux portails exigent une permission a l'etage PAGE (`can_update_linux`), et
+cette permission n'apparaissait NULLE PART dans `backend/routes/`.
+
+**Ce que le trou rendait atteignable.** `legacy/documentation.php` est un forgeur
+de requetes graphique — champ d'endpoint libre (`:1624`), corps JSON libre
+(`:1636`, pre-rempli `{"machines": [1]}`), concatenation brute dans le `fetch`
+(`:1744`) — garde par `checkAuth([ROLE_USER, ...])` (`:11`) et present AU MENU
+PRINCIPAL (`menu.php:161`). 39 des 63 prefixes de la liste blanche du proxy
+passent pour un role 1. Un compte role 1 actif sans `can_update_linux`, mais
+assigne a une machine, pouvait donc declencher `apt full-upgrade`
+(`/apt_update`, defaut `method='full'`) et `/dpkg_repair` (tue apt/dpkg,
+supprime les verrous) sur cette machine — en trois clics, sans requete forgee.
+
+**Correctif.** 12 gardes posees, chacune miroir de ce que sa page exige :
+
+- **10 routes** appelees par la page de mises a jour ->
+  `@require_permission('can_update_linux')`. **Pas** `@require_role(2)` : un
+  role 1 porteur de la permission a le DROIT de mettre a jour ses machines
+  (`laravel/routes/web.php:442-446`, garde reprise du legacy). Un role 2 au
+  backend aurait defait la page qu'il protege. Les deux etages court-circuitent
+  au meme seuil (role 3), donc la permission ne casse aucun appelant legitime.
+- **2 routes** (`/apt_check_lock`, `/update_zabbix`) -> `@require_role(2)` :
+  leur seul appelant est `adm/health_check.php`, qui exige role 2 +
+  `can_admin_portal`.
+- **1 route NON touchee** : `/update_security_exec`. Elle ne porte meme pas
+  `@require_api_key`, ce qui la faisait paraitre la plus nue des 13. Ce n'est
+  pas un trou : c'est un point d'entree machine-a-machine appele par un cron sur
+  la machine distante, avec son propre HMAC borne au `machine_id`
+  (`X-Update-Token`). Son docstring dit qu'il REMPLACE les decorateurs de
+  session « qu'un cron ne peut pas satisfaire » — un role l'aurait cassee.
+
+**Tests.** `ruff` vert, import reel du module (jamais `py_compile` : un
+decorateur non importe passe la compilation et leve au chargement — E-149 ;
+`require_permission` manquait effectivement a la ligne d'import). Placement
+verifie par AST sur les 12 : apres `require_api_key`, avant
+`require_machine_access`.
+
+**⚠ Suite pytest : 666 passed, 1 FAILED, et l'echec est ATTENDU.**
+`tests/test_invariant_machine_id.py::test_les_connues_sont_TOUJOURS_TROUVEES`
+tient une liste de routes sans autorisation propre et exige qu'elles restent
+trouvees. Son critere de selection (`:319`) exclut par conception toute route
+portant `require_role` ou `require_permission` : `update_zabbix` en sort donc,
+pour la cause n°1 que le test nomme lui-meme (« la route a ete CORRIGEE »), pas
+pour la cause n°2 (« l'instrument ne la voit plus »). Le precedent est inscrit
+dans ce meme fichier (l.71-74) : l'entree E-211 avait ete retiree pour
+exactement cette raison. **Le fichier appartient a la session 6 et n'a pas ete
+modifie ici** — l'entree `('updates.py', 'update_zabbix')` est a retirer par
+elle.
+
+**Notes d'exploitation.** `backend/**.py` est lu au demarrage : INERTE jusqu'au
+redemarrage de `rootwarden_python`. `ADMIN_SEULEMENT` du portage et
+`ADMIN_ONLY_PREFIXES` du legacy s'accordent et ne changent pas : seule
+`/update_security_exec` y figure, et elle n'est pas touchee.
+
+---
+
 ## [1.39.6] - 2026-09-04
 
 ### Securite - E-388 : la portee « tout le parc » des planifications CVE
