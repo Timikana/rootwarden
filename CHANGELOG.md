@@ -5,6 +5,25 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.39.1] - 2026-09-04
+
+### Corrige
+- **Le socle expliquait une fleche que plus aucune entree du menu ne porte (E-383).** La
+  legende « les entrees marquees menent a l'ancien portail » etait rendue aux DEUX endroits
+  du menu — barre laterale et tiroir mobile — alors que `Navigation` compte desormais
+  **32 entrees `route` et ZERO `legacy`**. Elle est conditionnee par
+  `Navigation::porteDuLegacy()` plutot que supprimee : la supprimer serait correct
+  aujourd'hui et faux le jour ou une entree repasse en `legacy`, et ce menu est passe de 24 a
+  32 entrees en deux semaines. Le predicat teste l'ABSENCE de `route` et non la presence de
+  `legacy` — une entree qui n'aurait ni l'une ni l'autre ferait afficher la legende, donc le
+  sens de l'erreur va vers le trop-dire.
+
+### ⚠ Reserve
+- **Ce gabarit n'est pas exerce au reseau** : `/connexion` etend `layouts.socle`, pas
+  `layouts.portail`, et toute page de portail exige une session. Controle d'appariement des
+  directives Blade seulement (`@if` 3/3 apres contre 1/1 avant, avec temoin), et ecarts de
+  depouillement identiques a `HEAD`. **A confirmer par l'ouverture d'une page de portail.**
+
 ## [1.39.0] - 2026-09-04
 
 ### Ajoute
