@@ -19399,6 +19399,29 @@ role et la mention de la coercition anti-escalade quand elle a joue.
 **Le prix, assume et deja celui de l'import** : recharger la page reproposera le formulaire
 et le mot de passe aura disparu. C'est la propriete recherchee.
 
+### ⚠ La remediation que j'avais annoncee visait une population VIDE — et 4 faux positifs
+
+**Mesure du 2026-09-04, en lecture seule, a la demande du Lead** (*« rends-la avec son objet —
+combien de comptes, crees quand »*) :
+
+    journal (user_logs)  'Import CSV: % comptes importes'        0 evenement  <- le PORTAGE
+                         'Import CSV: % utilisateurs importes'   2 evenements <- le LEGACY
+    comptes crees le 2026-08-26 (jour des 2 evenements legacy)   0
+    users.force_password_change = 0                              4 sur 12
+
+**L'import porte n'a jamais cree un compte dans cette base**, et les 4 comptes que mon
+predicat designait sont les **quatre fixtures** — `opsuser`, `rw-test-user`, `rw-test-admin`,
+`rw-test-super` — citees par **188 fichiers de tests**. *Suivre ma note aurait fait tourner
+leurs mots de passe et casse le banc.*
+
+> **Une remediation dont la population est vide n'est pas un no-op : c'est un geste
+> destructeur qui attend quelqu'un d'obeissant.**
+
+J'avais decrit la population par une CATEGORIE et fourni un PREDICAT, sans verifier que le
+predicat selectionne la categorie. **Le seul discriminant fiable est l'evenement de journal**,
+pas le drapeau — et il faut le dire, parce que la population est nulle *aujourd'hui* et non
+par construction.
+
 *Ce que cet ecart corrige de MON PROPRE travail : le commentaire de `importeUnCompte` disait
 « PAS de `force_password_change` » en le justifiant, et cette justification etait un
 raisonnement juste transporte sur un objet dont il ne decrivait plus les premisses. Un
