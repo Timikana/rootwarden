@@ -5,6 +5,28 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.39.8] - 2026-09-04
+
+### Corrige
+- **`groups.portee_texte` affirmait que la suppression passe encore par l'ancien portail
+  (E-391).** Elle est portee, et c'est verifie depuis TROIS couches autres que le JS : la
+  passerelle couvre `/groups/12` (`correspond()` accepte `$entree . '/'`), le backend expose
+  `DELETE /groups/<id>` (`groups.py:213`), et la vue n'a pas de controle en dur parce qu'il est
+  construit par le JS. Le second membre est exact : les quatre mentions de `cve_scan` dans
+  `groupes.js` sont des commentaires, et la seule action envoyee est `drift_scan`. **Neuvieme
+  occurrence de la conjonction dont un membre devient faux.**
+
+### Documente
+- **E-390 — deux de mes propres declarations**, dont le code a ete corrige en `7eabe64` : le
+  repli `|| 'all'` qui subsistait (« inerte n'est pas ferme ») et la cause fausse du commentaire
+  de `web.php:113-121` (« le courriel ne leve pas le drapeau »), qu'une session tierce avait
+  deja reprise mot pour mot en la lisant la plutot que dans le dossier corrige.
+- ⚠ **`7eabe64` cite « Ecart E-388 » et « v1.39.6 » : les deux sont faux.** Mon controle du
+  registre etait enchaine au `git commit` par `;` au lieu de `&&` — l'assertion a mordu, la
+  documentation n'a pas ete ecrite, et le commit est parti quand meme. E-388 appartient a une
+  autre session (la moitie backend d'E-387). **Quatrieme « controle qui ne commande pas
+  l'action » de la journee, et le premier dans le shell.**
+
 ## [1.39.7] - 2026-09-04
 
 ### Securite - E-389 : le backend etait plus permissif que les deux pages qu'il sert

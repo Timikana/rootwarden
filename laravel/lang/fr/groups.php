@@ -142,7 +142,7 @@ return [
     // Elle est devenue fausse au moment ou R2 l'a portee — le meme mecanisme
     // que `pare-feu`, `superv` et l'encart des CGU, et je l'aurais livre.
     // Un libelle se relit avec le code qu'il decrit, dans le MEME commit.
-    'portee_texte' => "La lecture des groupes, de leurs membres, la création et le scan de dérive de masse sont portés. La suppression et le scan CVE de masse passent encore par l'ancien portail — chaque bouton explique ce qu'il engage avant d'y renvoyer.",
+    'portee_texte' => "La lecture des groupes, de leurs membres, la création, la suppression et le scan de dérive de masse sont portés. Seul le scan CVE de masse passe encore par l'ancien portail — son bouton explique ce qu'il engage avant d'y renvoyer.",
     'parc_entier'  => "Un rôle administrateur peut viser l'ensemble du parc : aucune attribution de machine ne borne les actions de masse.",
 
     // ══ R2 — LA CREATION D'UN GROUPE ═════════════════════════════════════
