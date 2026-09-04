@@ -221,3 +221,72 @@ mes fautes du jour : la règle est au registre, et le geste suivant ne la consul
 
 **L'écart préexistait ; il s'élargit de deux correctifs par tour de travail.** *Ce n'est pas une dérive
 qu'on rattrape : c'est un compteur qui court tant que le jalon ne le rejoint pas.*
+
+---
+
+# ✅ FORME DÉFINITIVE — ce dossier ne contient plus de numéro d'étiquette. Il contient la commande.
+
+**Mon chiffre corrigé était faux DEUX HEURES plus tard, et l'un des commits qui l'ont périmé est la
+correction elle-même.**
+
+    mesure de 20:0x : first-parent depuis le jalon
+      origin/main  3   ·   main  3   ·   HEAD (branche)  730
+    et mon dossier venait d'inscrire 728, une heure plus tot.
+    les deux commits qui l'ont bouge : `3f88697` (LA CORRECTION DE CE DOSSIER)
+    et `3fe7255` (le realignement du verrou de la QA).
+
+> **Un dossier qui prescrit un numéro d'étiquette n'a pas à contenir de numéro. Il contient la commande.**
+> *Un chiffre recopié se périme en silence ; une commande citée se réexécute et rend la vérité du moment.*
+
+**C'EST DÉJÀ LA RÈGLE DU `PLAN-DE-MIGRATION.md` — « chaque chiffre porte sa commande de remesure » — et je
+la cite depuis ce matin sans l'appliquer à mes propres dossiers.**
+
+## ✅ LA FORME QUI NE SE PÉRIME PAS
+
+    l'etiquette que `auto-tag` posera :
+
+      v<VERSION-JALON>.<N>   ou N =
+        git rev-list --count --first-parent 602b285..<le ref que la CI joue>
+
+    et `auto-tag` ne tourne que sur `main` (`ci.yml`, `if: github.ref ==
+    'refs/heads/main' && github.event_name == 'push'`).
+
+    donc, selon VOTRE integration :
+      FUSION (le motif etabli, mesure : `main` tip = `304a604`,
+              `rev-list --parents -1 main` rend 3 jetons)
+        -> N = <compte de main> + 1
+      main DEVIENT HEAD
+        -> N = <compte de la branche>, qui croit a chaque commit
+
+**La commande à exécuter au moment de décider, et pas avant :**
+
+    cat VERSION-JALON
+    git rev-list --count --first-parent 602b285..origin/main
+    git rev-list --count --first-parent 602b285..Migration-Laravel
+    cat legacy/version.txt
+
+**La conclusion du dossier, elle, ne dépend d'aucun chiffre : le mineur du jalon (`1.39`) et le mineur
+affiché (`1.40`) ne s'accordent pas, et rien ne les compare. Le bump précède la poussée.**
+
+## ⚠ ET LA PHRASE QUE JE CITAIS ÉTAIT INCOMPLÈTE D'UN TERME
+
+    ce que j'avais inscrit
+      « le nombre n'est pas une propriete du CODE, c'est une propriete
+        du CHEMIN pris dans l'histoire »
+    ce qu'il faut lire
+      « … du chemin ET DE L'INSTANT »
+
+**Le chemin explique 4 contre 730. L'instant explique 728 contre 730.** *Les deux termes sont nécessaires,
+et j'avais retenu le premier parce que c'est celui qu'on m'avait donné.*
+
+## ⚠ ET LA SOURCE DE L'AUTRE CHIFFRE, nommée par son auteur
+
+    `version.sh:92` calcule `$ancre..HEAD` — il mesure LE REF SUR LEQUEL IL
+    TOURNE. Execute dans un arbre de travail, `HEAD` est la branche.
+
+> **« J'ai attribué à la CI le résultat d'une commande locale : une propriété d'un objet appliquée à un
+> autre. »**
+
+**C'est le septième homonyme de la journée, et le premier où l'objet confondu est un REF GIT.** *Et sa
+formulation vaut d'être gardée : ce n'était pas un choix entre deux intégrations — l'auteur n'avait pas vu
+qu'il y en avait deux.*
