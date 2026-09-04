@@ -5,6 +5,73 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.40.3] - 2026-09-04
+
+### CI - E-381 : le job qui pose une etiquette ne dependait pas des tests
+
+**`auto-tag` gagne `test-php` et `test-python` dans ses `needs`** (`ci.yml:464`).
+Une ligne, et la propriete qu'elle change est la seule qui compte :
+
+    avant   un ROUGE de `test-php` ou `test-python` N'EMPECHAIT RIEN : `auto-tag`
+            posait l'etiquette (`contents: write`), et `maj.sh` TIRE une etiquette
+            -> une compilation cassee devenait publiable en production
+    apres   un rouge de l'une des deux suites empeche l'etiquette, donc coupe la
+            seule voie AUTOMATIQUE vers la production
+
+**Mesure qui l'a etabli** : le run `33792110538` (poussee de la bascule, 891
+commits) a conclu **SUCCESS sur `auto-tag`** alors que **« Tests PHPUnit » etait
+ROUGE**. Les huit `needs` d'origine excluaient les quatre jobs de lint et de test.
+
+> **Un job vert de plus n'est pas une garde de plus ; ici c'est un ROUGE qui
+> BLOQUE de plus.** *Le filet et le verdict doivent partager le meme predicat* —
+> dixieme occurrence de cette famille, et la premiere ou le predicat manquant est
+> une **liste de dependances** plutot qu'une condition.
+
+⚠ **CE QUE CE CORRECTIF NE COUVRE PAS, et il se dit avec lui** : il empeche qu'un
+**rouge** devienne publiable, **pas qu'un vert soit dangereux**. E-388, E-389 et le
+DOSSIER-25 — trois defauts destructeurs du meme jour, dont `/apt_update` menant a
+un `apt full-upgrade` sur une machine de production — **auraient tous les trois
+PASSE cette CI.** *L'etiquette reste le seul passage automatique vers la
+production ; ce correctif n'en garde qu'une porte.*
+
+**Verifie avant commit, temoin negatif compris** : `yaml` etant absent de l'hote,
+la validation a tourne dans `rootwarden_python` (PyYAML 6.0.3) — **14 jobs
+charges, `needs` a 10 entrees, aucune vers un job inconnu** — et un YAML
+volontairement casse est bien refuse (`ParserError`), donc l'instrument mesure.
+
+**Non touche, par decision** : les declencheurs restent `branches: [main]`
+(l'exploitant a repondu « rien pour l'instant » ; mesures versees au dossier :
+`origin/security/backend-cve` **n'existe pas**, donc un declencheur `security/**`
+serait **sans objet**, et `on: push` declenche une fois par **poussee** et non par
+commit — 891 commits ont produit **une** execution). Et les `--severity=ERROR` des
+lignes 305/327 restent en place : les trois regles semgrep qui ne compilent pas
+sont chez une autre session, et les doubler aurait empile deux causes de rouge
+dans un job deja tolere.
+
+### ⚠ Et une regression de version, faite puis reparee dans le meme quart d'heure
+
+**Mon commit `a53e13b` a ecrit `1.38.200` dans `legacy/version.txt`, qui portait
+`1.40.2`.** Un fichier **servi** — rendu dans le pied de page du socle sur toute
+page — et **lu par `auto-tag`**, qui aurait pu poser une etiquette `v1.38.200`
+*apres* une `v1.40.2` existante.
+
+**Cause, et elle est exactement celle que j'inscris contre les autres depuis deux
+jours** : j'ai releve `1.38.199` a **14:54** et je l'ai **reconduit sans
+remesurer** a **17:03**. Entre les deux, deux sessions sont passees par `1.40.1`
+puis `1.40.2` (`f92cdcf` 16:46, `d7382a3` 16:51).
+
+> **« Ne reconduis aucune affirmation sans la remesurer » vaut d'abord pour les
+> chiffres qu'on croit connaitre.** *Un numero de version est le cas le plus
+> traitre : il paraissait a moi, il change plusieurs fois par heure sur un chantier
+> a huit sessions, et rien dans son apparence ne dit son age.*
+
+**Et mon propre garde a echoue en silence** : le script qui devait ecrire
+`version.txt` **et** le CHANGELOG a leve une `AssertionError` **apres** avoir ecrit
+le premier. J'ai donc commite un bump **sans entree de journal** — *un controle
+place au milieu d'une sequence d'ecritures ne protege que ce qui le suit.*
+
+---
+
 ## [1.40.2] - 2026-09-04
 
 ### Securite - E-391 : les trois dernieres routes nues de `ssh_audit`
