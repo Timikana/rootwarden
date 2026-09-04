@@ -149,7 +149,7 @@ class ComptesController extends Controller
 
     /* ═══ Creation ═════════════════════════════════════════════════════════ */
 
-    public function creer(Request $requete): RedirectResponse
+    public function creer(Request $requete): View|RedirectResponse
     {
         [$auteur, $roleAuteur] = $this->qui($requete);
         $nom = trim((string) $requete->input('name', ''));
@@ -194,14 +194,36 @@ class ComptesController extends Controller
          * modifier vers un rang interdit n'a aucun sens.*
          */
 
+        // Genere par le SERVICE, qui porte la politique : vingt caracteres par
+        // defaut — jamais moins que `LONGUEUR_MINIMALE`, 15 — et une de chaque
+        // classe GARANTIE plutot que probable. Son alphabet exclut aussi les
+        // caracteres de balisage, pour qu'aucun filtre d'affichage n'ampute la
+        // valeur remise (E-113).
+        $mdpGenere = $this->comptes->genereMotDePasse();
+
         $id = DB::table('users')->insertGetId([
             'name' => $nom,
-            // `password` est NOT NULL sans defaut. On pose un hache de 64 octets
-            // ALEATOIRES, dont personne ne connait le clair : le compte existe
-            // et aucune connexion n'est possible tant qu'un mot de passe n'a pas
-            // ete fixe. Idee reprise du legacy (`manage_users.php:97`), avec le
-            // cout partage plutot que `PASSWORD_DEFAULT`.
-            'password' => password_hash(bin2hex(random_bytes(32)), PASSWORD_BCRYPT,
+            /*
+             * ⚠ UN MOT DE PASSE GENERE ET REMIS, plus un hache dont personne ne
+             * connait le clair.
+             *
+             * Cette ligne posait `bin2hex(random_bytes(32))` hache : le compte
+             * existait et **aucune connexion n'etait possible**, alors que
+             * `force_password_change` etait pose a 1 juste dessous. *Deux
+             * exigences qui s'annulent : « change ton mot de passe » sur un
+             * compte dont le mot de passe est inconnu.*
+             *
+             * Le recours existait — un administrateur peut en fixer un apres
+             * coup (`web.php:622`) — **mais rien a l'ecran ne le disait**, et le
+             * chemin voisin, l'import CSV, faisait l'inverse. **Deux chemins de
+             * creation du meme produit, aux comportements opposes.**
+             *
+             * Le mot de passe est donc genere par le service — donc il satisfait
+             * la politique — remis UNE FOIS, et `force_password_change` reste a
+             * 1 : il a transite par un ecran et sera transmis de la main a la
+             * main, il ne doit pas rester celui du compte.
+             */
+            'password' => password_hash($mdpGenere, PASSWORD_BCRYPT,
                 ['cost' => (int) config('rootwarden.bcrypt_cost', 12)]),
             'email' => $courriel,
             'company' => trim((string) $requete->input('company', '')) ?: null,
@@ -225,9 +247,21 @@ class ComptesController extends Controller
          * derriere une annonce qui n'atteignait aucun ecran — exactement le
          * defaut que cette annonce existe pour eviter.
          */
-        return back()->with('succes', $rangRamene
+        /*
+         * ⚠ RENDU DIRECT, PAS DE REDIRECTION — le meme motif que
+         * `ClesApiController` et que l'import CSV. Le mot de passe en clair
+         * n'existe qu'une fois : le faire transiter par un message de session le
+         * deposerait sur le disque du conteneur (pilote `file`).
+         *
+         * `now()` et non `flash()` pour le message : il doit etre lisible DANS
+         * cette reponse, pas a la suivante — et ce message-la n'est pas un
+         * secret, seul le mot de passe l'est.
+         */
+        $requete->session()->now('succes', $rangRamene
             ? __('comptes.cree_rang_ramene', ['nom' => $nom, 'id' => $id])
             : __('comptes.cree', ['nom' => $nom, 'id' => $id]));
+
+        return $this->rendu($requete, secretsImport: [['nom' => $nom, 'mdp' => $mdpGenere]]);
     }
 
     /* ═══ Mot de passe ═════════════════════════════════════════════════════ */

@@ -741,12 +741,27 @@ class Comptes
                 'active' => ($data['active'] ?? '') === '' ? 1 : (int) $data['active'],
                 'sudo' => $sudo,
                 /*
-                 * PAS de `force_password_change`. Le mot de passe genere est
-                 * REMIS a l'importeur, donc il est connu : forcer un changement
-                 * sans canal de delivrance — le portage n'envoie aucun courriel —
-                 * fabriquerait un compte inaccessible, en serie. C'est la
-                 * divergence que l'arbitrage a retenue.
+                 * ⚠ `force_password_change` A 1 — ET C'EST UNE CORRECTION DE MON
+                 * PROPRE COMMIT D'HIER (E-386).
                  *
+                 * J'avais ecrit ici « PAS de force_password_change », au motif
+                 * que forcer un changement sans canal de delivrance fabriquerait
+                 * un compte inaccessible. **Ce motif etait juste du cas ou
+                 * PERSONNE ne connait le mot de passe. Il est faux ici** : le
+                 * mot de passe genere est REMIS a l'importeur, donc il est
+                 * connu, transmis, et la personne peut se connecter puis le
+                 * changer — `/profil` et `/profil/mot-de-passe` sont les DEUX
+                 * exemptions de `ChangementMotDePasseExige`, et
+                 * `changerMotDePasse` n'exige que le mot de passe ACTUEL.
+                 *
+                 * **Et un mot de passe qui a transite par l'ecran d'un tiers,
+                 * puis par un courriel ou une conversation, ne doit pas rester
+                 * celui du compte.** *Le laisser vivre indefiniment etait le
+                 * defaut symetrique de celui que ce meme arbitrage corrigeait
+                 * sur la creation manuelle.*
+                 */
+                'force_password_change' => 1,
+                /*
                  * AUCUNE ligne dans `permissions` : `Permissions::pour()` traite
                  * l'absence comme « aucun droit », et `definit()` en cree une au
                  * premier reglage. Le legacy insere 15 colonnes NOMMEES a zero —

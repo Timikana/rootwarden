@@ -5,6 +5,65 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.40.4] - 2026-09-04
+
+### Comptes - E-397 : les deux chemins de creation etaient faux, en sens opposes
+
+**Symptome.** La creation unitaire d'un compte fabriquait un compte **inaccessible** : le
+`password` etait le hache de 64 octets aleatoires dont personne ne connait le clair, et
+`force_password_change` etait pose a 1 par-dessus. L'ecran annoncait une reussite. En face,
+l'import CSV **remettait** le mot de passe genere mais ne posait **pas** le drapeau : un
+secret vu par un tiers, transmis a la main, restait celui du compte indefiniment.
+
+**Cause racine.** Un raisonnement juste, transporte sur un objet dont une premisse avait
+cesse d'etre vraie. Le commentaire de `Comptes::importeUnCompte` justifiait l'absence du
+drapeau par *« forcer un changement sans canal de delivrance fabriquerait un compte
+inaccessible »* — vrai **si personne ne connait le mot de passe**, faux des qu'on
+l'AFFICHE. Le canal manquant etait le courriel (`MAIL_MAILER=log`) ; l'ecran en est un.
+`ChangementMotDePasseExige` exempte `profil` et `profil.mot-de-passe` (`:99`) et ne bloque
+rien d'autre (`:144`) ; `changerMotDePasse` n'exige que le mot de passe actuel
+(`PortailController:250`).
+
+**Correctif.** La meme paire sur les deux chemins : mot de passe **genere**, **remis une
+fois**, `force_password_change = 1`.
+
+- `ComptesController::creer` rend desormais `View|RedirectResponse` et **rend la vue
+  DIRECTEMENT** en reponse au POST — motif de `ClesApiController` : `SESSION_DRIVER=file`,
+  donc un secret passe par un message de session atterrirait sur le disque du conteneur. Le
+  message de succes passe par `session()->now()` et ne porte que le nom et l'identifiant.
+- `Comptes::importeUnCompte` pose `'force_password_change' => 1`, et son commentaire dit la
+  correction plutot que de la masquer.
+- `imp_secrets_titre` / `imp_mdp_avert` cessent de parler de l'import — ils servent les deux
+  chemins — et **enoncent** que la personne devra changer ce mot de passe a sa premiere
+  connexion, avec la raison : *il a transite par cet ecran*. FR et EN dans ce commit,
+  jeux de cles compares : **92 = 92**.
+- `data-rw="comptes-import-secrets"` devient `comptes-secrets-remis` : le bloc sert les deux
+  chemins, l'ancien nom serait devenu faux. Aucune suite ne l'ancrait.
+
+**Ce qui NE change pas.** Le journal d'audit ne recoit ni mot de passe ni secret : le nom du
+compte, le role, et la mention de la coercition anti-escalade quand elle a joue. Recharger la
+page fait disparaitre le mot de passe — propriete recherchee, deja celle de l'import.
+
+**Tests.** `php -l` sur les quatre fichiers PHP, compilation Blade reelle
+(`view:clear` + `view:cache`), parite des jeux de cles FR/EN par analyse PHP, controle au
+reseau sur `http://localhost:8444` (`/` 302, `/connexion` 200, `/comptes` 302 — aucun 500).
+
+**Notes exploitation.** Aucune migration, aucun changement de schema : la colonne
+`force_password_change` existe et etait deja ecrite par le chemin manuel. Les comptes
+**deja crees** par l'import avant cette version gardent un mot de passe non force — ils sont
+identifiables par `SELECT id, name FROM users WHERE force_password_change = 0` croise avec
+la date de creation, et le geste de remediation est
+`POST /comptes/{id}/mot-de-passe`. *Il n'est pas fait ici : il change des comptes existants.*
+
+**⚠ Piege re-arme et desarme pendant ce travail.** `php artisan view:cache` lance en root
+recree des vues compilees appartenant a root dans un dossier `www-data` — le defaut de
+`docs/migration/PIEGE-CACHE-BLADE.md`, qui rend 500 sur **toutes** les pages. Constate par
+`ls -l`, corrige par `chown -R www-data:www-data storage/framework/views`, verifie au reseau.
+Le correctif permanent est en place dans `laravel/docker-entrypoint.sh` mais **n'agit qu'au
+demarrage du conteneur**, qui n'a pas encore ete redemarre.
+
+---
+
 ## [1.40.3] - 2026-09-04
 
 ### CI - E-381 : le job qui pose une etiquette ne dependait pas des tests

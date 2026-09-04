@@ -62,7 +62,7 @@ return [
     'imp_valider' => 'Import the accounts',
     'imp_roles_aide' => 'The "role" column accepts: :roles. Any other value yields the lowest role.',
     'imp_courriel_exige' => 'The email address is REQUIRED here, whereas the legacy portal accepted it empty — an account with no address and no known password has neither access nor recovery.',
-    'imp_mdp_avert' => 'Each created account\'s password is shown ONCE below, right after the import. It is stored nowhere and will never be shown again: copy it before leaving this page.',
+    'imp_mdp_avert' => 'Each created account\'s password is shown ONCE below. It is stored nowhere and will never be shown again: copy it before leaving this page. The person must change it at first sign-in — it passed through this screen, it must not stay theirs.',
     'imp_bilan_titre' => 'Import summary',
     'imp_lues' => ':n row(s) read.',
     'imp_crees' => ':n account(s) created.',

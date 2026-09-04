@@ -494,11 +494,25 @@ comptes sans acces ni recuperation — E-131, **en serie**.
 **3. Le mot de passe genere est RENDU, une fois.** Le legacy le jette (`:148`). Ici il est
 affiche a l'issue de l'import et **n'est enregistre nulle part**.
 
-*⚠ L'arbitrage a change entre hier et aujourd'hui, et pour une raison mesuree : hier
+*⚠ ~~L'arbitrage a change entre hier et aujourd'hui, et pour une raison mesuree : hier
 « forcer `force_password_change` », aujourd'hui « afficher une fois ». **Le portage n'envoie
 aucun courriel** (`MAIL_MAILER=log`) et le flux de reinitialisation n'est pas porte — forcer
 un changement sans canal de delivrance aurait fabrique des comptes definitivement
-inaccessibles, en serie.*
+inaccessibles, en serie.~~*
+
+**⚠ RECTIFIE LE 2026-09-04 — E-397. Ce paragraphe posait une alternative qui n'existe
+pas.** « Forcer » et « afficher une fois » ne sont pas deux arbitrages concurrents : le
+premier n'etait dangereux que **si personne ne connaissait le mot de passe**. Des lors
+qu'on l'AFFICHE, la personne peut se connecter et le changer — `ChangementMotDePasseExige`
+exempte `profil` et `profil.mot-de-passe` (`:99`), redirige vers `profil` et ne bloque rien
+d'autre (`:144`), et `changerMotDePasse` n'exige que le mot de passe **actuel**
+(`PortailController:250`). Le canal de delivrance manquant etait le COURRIEL ; l'ecran en
+est un.
+
+*Le raisonnement etait juste, applique a l'objet qu'il decrivait la veille — un compte dont
+le mot de passe est inconnu. Je l'ai reporte tel quel sur un objet ou une de ses premisses
+avait cesse d'etre vraie.* L'import pose desormais **les deux** : afficher une fois ET
+`force_password_change = 1`.
 
 ### ⚠ Une divergence de RENDU, declaree contre la norme de son propre ecran
 
@@ -19330,3 +19344,62 @@ de `test-php` ou `test-python` ne bloque toujours rien.**
 *Non inscrit ailleurs : `DECISIONS-DSI.md:8335` porte la proposition
 `--strict-markers`, `:8673` porte la tâche du tableau — ni l'un ni l'autre ne
 portait l'écart de référence.*
+
+---
+
+## E-397 — deux chemins de creation du meme compte, faux tous les DEUX, et en sens OPPOSES
+
+**Mesure du 2026-09-04.** La consigne recue etait *« aligne la creation manuelle sur
+l'import »*, avec un arbitrage deja tranche en faveur de la remise du mot de passe. La
+mesure confirme la remise **et refute que l'import soit le modele** : les deux chemins
+etaient defectueux, chacun du defaut que l'autre n'avait pas.
+
+    creation MANUELLE   ComptesController:204  password_hash(bin2hex(random_bytes(32)))
+                                        :211  'force_password_change' => 1
+                        -> personne ne connait le clair. Le compte existe, le drapeau
+                           exige un changement, et AUCUNE connexion n'est possible :
+                           deux exigences qui s'annulent.
+
+    IMPORT CSV          Comptes::importeUnCompte, insert
+                        name, email, password, cost, ssh_key, role_id, active, sudo
+                        -> PAS de force_password_change. Le mot de passe que
+                           l'importeur a VU sur son ecran, puis transmis de la main a
+                           la main, reste celui du compte indefiniment.
+
+**La bonne paire est la MEME pour les deux, et elle prend un terme de chacun** : le mot de
+passe est genere, **remis une fois**, et `force_password_change` vaut **1**.
+
+**Pourquoi les deux et non l'un :**
+
+- *remettre sans forcer* laisse vivre un secret qui a transite par un ecran de tiers, un
+  courriel ou une conversation. Ce n'est plus le secret d'une seule personne ;
+- *forcer sans remettre* fabrique un compte inaccessible — et **c'est la moitie manuelle qui
+  le faisait**, en silence. Le recours existait (`POST /comptes/{id}/mot-de-passe`,
+  `web.php:682`) mais **rien a l'ecran ne le disait** : l'ecran annoncait une creation
+  reussie et rendait un compte dont personne ne pouvait entrer.
+
+**Ce qui a change :**
+
+| Piece | Avant | Apres |
+|---|---|---|
+| `ComptesController::creer` | `RedirectResponse` | `View\|RedirectResponse` |
+| le mot de passe | 64 octets aleatoires haches, clair jete | `genereMotDePasse()`, remis une fois |
+| la reponse | `back()->with('succes', …)` | `session()->now(…)` + `rendu(…)` **direct** |
+| `Comptes::importeUnCompte` | pas de drapeau | `'force_password_change' => 1` |
+| `imp_secrets_titre` / `imp_mdp_avert` | *« a l'issue de l'import »* | neutres, et ils DISENT le changement a la premiere connexion |
+| `data-rw` du bloc de secrets | `comptes-import-secrets` | `comptes-secrets-remis` |
+
+**Le rendu est DIRECT, pas une redirection** — le motif de `ClesApiController`, et pour sa
+raison : `SESSION_DRIVER=file`, donc un secret passe par un message de session **atterrit sur
+le disque du conteneur**. Le message de succes, lui, n'est pas un secret : il passe par
+`now()` pour etre lisible dans cette reponse-la, et il ne porte que le NOM du compte et son
+identifiant. Le journal d'audit n'a **ni** le mot de passe **ni** rien d'autre que le nom, le
+role et la mention de la coercition anti-escalade quand elle a joue.
+
+**Le prix, assume et deja celui de l'import** : recharger la page reproposera le formulaire
+et le mot de passe aura disparu. C'est la propriete recherchee.
+
+*Ce que cet ecart corrige de MON PROPRE travail : le commentaire de `importeUnCompte` disait
+« PAS de `force_password_change` » en le justifiant, et cette justification etait un
+raisonnement juste transporte sur un objet dont il ne decrivait plus les premisses. Un
+commentaire qui JUSTIFIE est un argument — et un argument se relit quand son objet bouge.*

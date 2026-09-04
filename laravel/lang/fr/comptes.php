@@ -63,7 +63,7 @@ return [
     'imp_valider' => 'Importer les comptes',
     'imp_roles_aide' => 'La colonne « role » accepte : :roles. Toute autre valeur donne le rôle le plus faible.',
     'imp_courriel_exige' => 'L\'adresse de courriel est OBLIGATOIRE ici, alors que l\'ancien portail l\'acceptait vide — un compte sans adresse et sans mot de passe connu n\'a ni accès ni récupération.',
-    'imp_mdp_avert' => 'Le mot de passe de chaque compte créé est affiché UNE SEULE FOIS ci-dessous, à l\'issue de l\'import. Il n\'est enregistré nulle part et ne sera plus jamais affiché : recopiez-le avant de quitter cette page.',
+    'imp_mdp_avert' => 'Le mot de passe de chaque compte créé est affiché UNE SEULE FOIS ci-dessous. Il n\'est enregistré nulle part et ne sera plus jamais affiché : recopiez-le avant de quitter cette page. La personne devra le changer à sa première connexion — il a transité par cet écran, il ne doit pas rester le sien.',
     'imp_bilan_titre' => 'Bilan de l\'import',
     'imp_lues' => ':n ligne(s) lue(s).',
     'imp_crees' => ':n compte(s) créé(s).',
