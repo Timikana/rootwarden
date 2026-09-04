@@ -7054,3 +7054,54 @@ backend ; c'est faux, ce que je demandais est l'écran, et l'écran n'est pas à
 *Deux jours plus tard, je la lui renvoie avec « tu portes la vue, la validation, les libellés, l'i18n » —
 c'est-à-dire exactement ce que j'avais conclu ne pas être son périmètre.* **Le registre portait la
 correction ; je ne l'ai pas relu avant de répartir.**
+
+### ⛔ QUATRIÈME RÉFUTATION — et celle-ci change mon PROTOCOLE, pas seulement une décision
+
+**`groups` R2 est ANNULÉ. La création est portée. La suppression aussi — alors que la page la déclare non
+portée.**
+
+    groupes.js, TROIS appelants mutants en tout :
+      :341  POST   /groups                      LA CREATION
+      :431  DELETE /groups/{id}                 LA SUPPRESSION
+      :521  POST   /groups/{id}/run drift_scan  le scan de derive
+    parite FR/EN 72/72, et SEPT cles de suppression
+    `np_cve` est HONNETE : les 4 mentions de `cve_scan` sont des COMMENTAIRES
+    -> mon interdit sur le scan CVE de masse reste fonde
+
+**⚠ Et la page MENT, sur un libellé qui est LU** : *`groups.portee_texte`, affiché à
+`groupes.blade.php:23`, dit « la suppression et le scan CVE de masse passent encore par l'ancien
+portail ». Exact sur le scan. FAUX sur la suppression.*
+
+> **J'ai écrit « un onglet complet et menteur coûte plus cher qu'un onglet incomplet et franc ». Ici
+> l'onglet est complet et c'est la PHRASE qui le nie.** *Le geste utile n'est pas un portage : c'est
+> retirer « la suppression » de `portee_texte`, dans les deux langues.*
+
+### ⚠ CE QUI CHANGE DANS MON PROTOCOLE, ET C'EST LA VRAIE LEÇON
+
+**C'est la SIXIÈME fois que ce chantier s'apprête à porter ce qui existe. Et cette fois l'avertissement
+était DANS le message qui portait la demande** — *les trois pièges, les trois artefacts, la règle du
+témoin, tout y était.*
+
+> **Donc le rappel des pièges ne suffit pas : il faut la MESURE, pas la vigilance.** *(formulation de la
+> session 3)*
+
+✅ **DÉCISION DE PROTOCOLE : aucune capacité n'est plus assignée « à porter ». Elle est assignée « à
+APPARIER, et à me renvoyer AVANT toute ligne de code ».** *Le portage n'est autorisé qu'après
+l'appariement rendu. Ça coûte un aller-retour et ça a déjà évité six portages en double — dont deux dans
+ce tour-ci.*
+
+### ⚠ ET UN PIÈGE D'INSTRUMENT NEUF, qui aurait CONFIRMÉ ma demande
+
+    grep -nE "\b(ecris|supprime)\(" groupes.js | grep -v "function "
+    -> « suppression : ZERO appelant »   resultat credible, et FAUX
+
+**La cause n'est ni le `\b` ni l'alternance : c'est LE FILTRE D'EXCLUSION.** *Il visait les lignes de
+définition `function ecris(…)`, mais les lignes d'APPEL s'écrivent `ecris(…).then(function (r) {` — elles
+contiennent `function ` et le filtre les a retirées avec les définitions.*
+
+> **Un filtre d'exclusion porte sur la LIGNE ENTIÈRE, pas sur la partie qu'on visait. En JavaScript,
+> `grep -v "function "` retire la majorité des appels asynchrones.**
+
+**Et ce qui a sauvé la mesure n'est pas la prudence : c'est d'avoir remesuré autrement quand le résultat
+CONTREDISAIT le catalogue.** *La tension entre les deux était le signal — et mon zéro à moi aurait été
+confirmé par ma propre demande.*
