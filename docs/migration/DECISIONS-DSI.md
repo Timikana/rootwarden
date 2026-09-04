@@ -6952,3 +6952,47 @@ supervision, pour la même raison.*
 relevé SSH réel, et son échéance ne demande la permission de personne.* **La capacité se porte CÂBLÉE :
 la vue, la validation, le refus. L'enregistrement d'une ligne vivante attend le mot de l'exploitant, comme
 A3, F8 et A4.**
+
+### La répartition du tour — UNE capacité par session, et deux sessions m'ont réfutée
+
+    5f   apparier les 5 catalogues non verifies      lecture PURE
+    0b   creer un groupe (groups R2)                 ecrit en base
+    94   creer un releve planifie (ssh_audit)        CABLEE, sans portee `all`
+    c1   l'import CSV, moitie COMPTES                deja en cours
+    c6   les 3 regles semgrep MORTES                 apres sa mesure d'invariant
+    4f   le CI/CD — l'exploitant lui a confie         `auto-tag` tranche
+    ec   la fenetre du banc + 3 rejeux                il tient le banc
+
+**⚠ Et je n'ai PAS relancé « les sessions sans code depuis deux tours », parce que je ne peux pas les
+identifier** : *l'identité git est PARTAGÉE entre les huit sessions, donc `--author` ne discrimine rien.*
+**Attribuer par proximité de sujet m'a déjà fait trois erreurs d'attribution en un jour. Je nomme donc une
+capacité à chacune, sans imputer un silence à personne.**
+
+### ✅ E-385 mesuré pour un pair — le trou était DORMANT, à UN octroi près
+
+    role2 actifs portant `can_admin_portal`   0
+    TEMOIN role3 actifs                       3
+    TEMOIN role2 actifs, tous                 2
+    TEMOIN lignes de `permissions`            9
+
+**Les trois témoins rendent non-zéro : le `0` est mesuré, pas absent.** *Un rôle 2 portant
+`can_admin_portal` pouvait créer un SUPERADMINISTRATEUR (`4a76eb8`, corrigé par la session 1). Aucun
+n'existe aujourd'hui — mais deux comptes de rôle 2 sont actifs et la permission s'accorde depuis
+`/permissions`.* **Dormant, pas fermé.**
+
+### ⚠ DEUX RÉFUTATIONS DE MES CONSIGNES EN UNE HEURE, ET LES DEUX AVAIENT RAISON
+
+    la session 1   mon exemption RGPD reposait sur une contrainte d'ORDRE
+                   presentee comme un blocage  -> RETIREE (`c253b6c`)
+    la session 5   ma consigne sur l'invariant etait INEXECUTABLE (fichier
+                   absent de la branche), le couplage etait INERTE, et
+                   j'avais nomme la MAUVAISE fonction  -> CORRIGEE (`e16e08c`)
+
+> **Les deux fois, l'instrument est le même : un pair qui allait AGIR dessus, et qui a refusé d'écrire
+> AVANT de mesurer.** *Aucune relecture n'a jamais attrapé ça sur ce chantier — cinq cas, cinq fois le même
+> instrument.*
+
+**Et la troisième de mes erreurs du tour est la plus instructive : j'ai prescrit une modification dans
+`_lit_un_identifiant()` qui aurait été inerte SANS LEVER D'ERREUR** — *le drapeau inventé et le contrôle
+qui ne commande pas l'action, deux entrées de mon propre catalogue, dans une consigne envoyée comme un
+prérequis de sécurité.*
