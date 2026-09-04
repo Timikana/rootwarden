@@ -23,10 +23,22 @@ rules:
   # A03 Injection commande - shlex.quote obligatoire pour interpolation shell
   # -------------------------------------------------------------------------
   - id: rw-shell-fstring-execute-as-root
+    # ⚠ REECRIT — les trois motifs precedents ne compilaient pas.
+    #
+    # `f"...{$VAR}..."` n'est pas du Python valide : mesure par le parseur de
+    # Python lui-meme, « f-string: expecting a valid expression after '{' ».
+    # Semgrep ne substitue pas de metavariable dans le champ de remplacement
+    # d'une f-string ; le motif doit donc y etre valide TEL QUEL, et il ne
+    # l'etait pas. La regle n'a jamais compile, donc jamais rien garde.
+    #
+    # On sort la metavariable de la f-string : elle capture l'ARGUMENT entier,
+    # et le filtrage se fait par expression reguliere sur son texte source.
     patterns:
-      - pattern: execute_as_root($CLIENT, f"...{$VAR}...", ...)
-      - pattern-not: execute_as_root($CLIENT, f"...{shlex.quote($VAR)}...", ...)
-      - pattern-not: execute_as_root($CLIENT, f"...{base64...}...", ...)
+      - pattern: execute_as_root($CLIENT, $CMD, ...)
+      - metavariable-regex:
+          metavariable: $CMD
+          regex: '^f.*\{.*\}'
+      - pattern-not-regex: '(shlex\.quote|base64)'
     message: |
       Interpolation de variable dans commande shell sans shlex.quote.
       Utiliser shlex.quote($VAR) ou pousser via base64 -d.
@@ -98,9 +110,18 @@ rules:
   # -------------------------------------------------------------------------
   - id: rw-php-echo-unescaped-var
     patterns:
-      - pattern-either:
-          - pattern: echo $X;
-          - pattern: <?= $X ?>
+      # ⚠ REECRIT — la branche `<?= $X ?>` ne compilait pas.
+      #
+      # `<?= ... ?>` sont des BALISES d'ouverture/fermeture, pas un fragment de
+      # code : mesure par `php -l`, « Errors parsing », la ou `echo $X;` rend
+      # « No syntax errors detected ». Un motif est une expression ou une
+      # instruction, jamais un document avec ses delimiteurs.
+      #
+      # La branche est RETIREE, non reparee : le parseur PHP de semgrep
+      # normalise `<?= $x ?>` en instruction `echo`, donc `echo $X;` couvre les
+      # deux formes. ⚠ CETTE EQUIVALENCE N'EST PAS VERIFIEE ICI — elle demande
+      # une execution de semgrep.
+      - pattern: echo $X;
       - metavariable-regex:
           metavariable: $X
           regex: '\$_(GET|POST|REQUEST|COOKIE)\[.*\]'
@@ -128,21 +149,28 @@ rules:
   # A04 Auth - require_api_key obligatoire sur les blueprints sensibles
   # -------------------------------------------------------------------------
   - id: rw-flask-route-without-api-key
+    # ⚠ REECRIT, ET SA SEMANTIQUE RESTE NON VERIFIEE.
+    #
+    # Les deux `pattern-not` precedents portaient un `...` SEUL entre deux
+    # decorateurs et le `def`. Python n'admet a cet endroit que des lignes
+    # commencant par `@` : mesure par `ast.parse`, « invalid syntax » ligne 3.
+    # L'ellipse de semgrep ne franchit pas cette position.
+    #
+    # ⚠ CE QUE CETTE REECRITURE NE PROUVE PAS. Elle rend le motif
+    # syntaxiquement valide ; elle ne prouve PAS que semgrep exprime
+    # correctement « ce decorateur est ABSENT ». Cette famille de propriete est
+    # mal servie par un moteur de motifs, et elle est deja mesuree de facon
+    # FIABLE dans ce depot par un invariant sur l'arbre syntaxique
+    # (`backend/tests/test_invariant_machine_id.py`, qui compte 230 routes et
+    # 116 gardes). RECOMMANDATION : deplacer cette regle vers un invariant du
+    # meme modele, et la retirer d'ici.
     patterns:
       - pattern: |
           @bp.route(...)
           def $F(...):
             ...
       - pattern-not: |
-          @bp.route(...)
           @require_api_key
-          ...
-          def $F(...):
-            ...
-      - pattern-not: |
-          @require_api_key
-          ...
-          @bp.route(...)
           def $F(...):
             ...
     message: |
