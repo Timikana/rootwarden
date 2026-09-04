@@ -8557,3 +8557,67 @@ après `$ALLOWED_PROXY_PREFIXES` et `CLES` de l'invariant `machine_id`.*
 **Et son premier relevé de la même vérification était faux dans l'autre sens** : *« 37 processus chrome
 résiduels » attrapait l'outillage Electron, dont MA session.* **Elle a corrigé les deux avant de me les
 transmettre.**
+
+## Tour de 17:35 (2026-09-04) — TOUR TENU SANS RÉVEILLER PERSONNE
+
+**⛔ L'ÉTAPE 2 DE LA CONSIGNE — relancer les sessions — N'EST PAS EXÉCUTÉE, DÉLIBÉRÉMENT.**
+
+> **L'exploitant a demandé la pause de l'équipe à 17:30, deux fois et explicitement. La consigne de relance
+> est une instruction RÉCURRENTE ; la pause est une instruction RÉCENTE ET SPÉCIFIQUE.** *Réveiller sept
+> sessions sur un déclenchement automatique contre un mot direct de l'exploitant serait exactement ce que
+> je refuse aux pairs quand ils me transmettent une autorisation qu'ils n'ont pas reçue.*
+
+**Les étapes 1, 3 et 4 sont tenues : elles ne réveillent personne.**
+
+### 1) PRODUCTION — fenêtre 16:35 → 17:35, mesurée avec `--all`
+
+    CODE (feat/fix sur laravel|backend|.semgrep)     4
+    DOCUMENTATION                                   14   dont 11 MIENS
+    TEST                                             2
+
+    doc/code brut          3,50      SEUIL 2 — DEPASSE
+    doc/code SANS mes docs 0,75      trois documents pour quatre codes
+
+**Quatrième tour consécutif où le dépassement est entièrement le mien, et cette fois l'écart est le plus
+net : 11 documents sur 14.** *Le tour a été une séquence de corrections de mes propres énoncés — deux
+prérequis, une échéance inexistante, un résidu qui était une cible de montage.*
+
+> **Un DSI qui documente ses erreurs plus vite que l'équipe ne produit du code n'écrit pas trop : il se
+> trompe trop.** *Le rapport ne mesure pas un excès de documentation, il mesure un taux de rectification.*
+
+**Et les quatre commits de code sont les quatre derniers gestes avant l'arrêt** : *E-390, E-391, le retrait
+de « tout le parc » des planifications, et l'exclusion semgrep rendue non ancrée.*
+
+### 3) DÉCLARATIONS D'ÉTAT — REMESURÉES à 17:35:47 CEST
+
+    `socle_avertissement`, arbre courant            0    TEMOIN 1301 fichiers
+    cles fr/auth.php · en/auth.php                 40 · 40   parite OK
+    `cgu.blade.php`                                present
+    assere par une suite ? tests/ + laravel/tests/
+      + backend/tests/                              0 fichier
+
+**La déclaration est VRAIE, et datée. Les clés étaient 36 à 14:48, 40 à 15:36, 40 maintenant — la parité a
+tenu à chaque mesure pendant que le volume croissait.**
+
+### ÉTAT DE L'ARBRE PARTAGÉ AU MOMENT DU TOUR
+
+    HEAD      ee7cc6a   ·   version 1.40.3
+    amont     0 de retard, 93 non pousses
+    `git status`  UNE ligne : `?? laravel/version.txt`
+                  -> CIBLE DE MONTAGE, pas un residu (verifie par
+                     `docker inspect` : RW=false, le conteneur y lit 1.40.3)
+    aucun LOT ne tourne, aucun worktree ouvert
+
+### 4) ARBITRAGES — AUCUN NOUVEAU N'EST EN ATTENTE
+
+**Tous ceux qui m'étaient délégués sont rendus. Ce qui reste demande soit un mot de l'exploitant, soit une
+main sur le clavier — et les deux sont en pause.**
+
+    a la REPRISE, premier geste et il n'est pas un portage :
+      jouer `4948bdf` (le verrou « se souvenir de moi ») contre `c6aaf5b`.
+      C'est le SEUL verdict non lu de la journee, et il garde une porte
+      d'authentification.
+
+**Et la liste des « 11 portables » de la consigne reste périmée comme mesuré au tour précédent : il ne
+reste réellement ouvert que `sshd_config` en lecture (DÉJÀ PORTÉ, mesuré depuis), relever un serveur,
+`drift_scan`, et les deux capacités perdues de `supervision`.** *Soit trois, dont deux joignent une machine.*
