@@ -49,11 +49,50 @@ page fait disparaitre le mot de passe — propriete recherchee, deja celle de l'
 reseau sur `http://localhost:8444` (`/` 302, `/connexion` 200, `/comptes` 302 — aucun 500).
 
 **Notes exploitation.** Aucune migration, aucun changement de schema : la colonne
-`force_password_change` existe et etait deja ecrite par le chemin manuel. Les comptes
+`force_password_change` existe et etait deja ecrite par le chemin manuel.
+
+**⚠ RECTIFIE LE 2026-09-04 19:5x CEST — LA POPULATION EST NULLE, ET MA NOTE ETAIT PIRE
+QU'INUTILE.** Le Lead a demande de rendre cette remediation *« avec son objet — combien de
+comptes, crees quand »*. Mesure faite, en lecture seule :
+
+    journal (user_logs)   'Import CSV: % comptes importes'   0 evenement
+                          <- le message du PORTAGE (ComptesController:144)
+                          'Import CSV: % utilisateurs importes'  2 evenements
+                          <- le message du LEGACY (import_csv.php:182), 26/08
+    comptes crees le 2026-08-26                              0
+    users.force_password_change = 0                          4 sur 12
+
+**L'import PORTE n'a jamais cree un compte dans cette base.** Les deux evenements du 26/08
+viennent du legacy — dont l'import *jette* le mot de passe — et n'ont laisse aucun compte
+dont la date de creation soit ce jour-la.
+
+**Et les 4 comptes que ma requete designait sont les QUATRE FIXTURES :**
+
+    id  2  opsuser         role 1     4 fichiers de tests le citent
+    id 14  rw-test-user    role 1    50
+    id 15  rw-test-admin   role 2    70
+    id 16  rw-test-super   role 3    64
+
+*Suivre ma note aurait fait tourner le mot de passe des quatre comptes dedies aux mesures,
+donc casser le banc — 188 fichiers les citent. Une remediation dont la population est vide
+n'est pas un no-op : c'est un geste destructeur qui attend quelqu'un d'obeissant.*
+
+**Le defaut de forme, et il est le meme que celui d'E-397 :** j'ai decrit la population par
+une CATEGORIE (« les comptes deja crees par l'import ») et fourni un PREDICAT
+(`force_password_change = 0`) sans verifier que le predicat selectionne la categorie. Il
+selectionnait tout autre chose. *Une remediation se rend avec son objet DENOMBRE, jamais avec
+le critere qui servirait a le denombrer.*
+
+~~Les comptes
 **deja crees** par l'import avant cette version gardent un mot de passe non force — ils sont
 identifiables par `SELECT id, name FROM users WHERE force_password_change = 0` croise avec
 la date de creation, et le geste de remediation est
-`POST /comptes/{id}/mot-de-passe`. *Il n'est pas fait ici : il change des comptes existants.*
+`POST /comptes/{id}/mot-de-passe`. *Il n'est pas fait ici : il change des comptes existants.*~~
+
+**Ce qui reste vrai de cette note** : si l'import porte cree des comptes AVANT que la version
+1.40.4 ne soit deployee, ceux-la porteront un mot de passe non force. La population est nulle
+**aujourd'hui**, elle ne l'est pas par construction — et le seul discriminant fiable est
+l'evenement de journal `'Import CSV: N comptes importes'`, pas le drapeau.
 
 **⚠ Piege re-arme et desarme pendant ce travail.** `php artisan view:cache` lance en root
 recree des vues compilees appartenant a root dans un dossier `www-data` — le defaut de
