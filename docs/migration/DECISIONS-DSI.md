@@ -7225,3 +7225,109 @@ l'appelle, et j'ai déjà failli retirer trois libellés justes sur cette confus
 **Les deux gestes doivent être dans le MÊME commit, ou l'ordre doit être annoncé.** *`go-security.mjs`
 n'est dans aucun LOT (laravel=0, legacy=0), c'est la deuxième suite dangereuse hors LOT après
 `go-wazuh.mjs`, et elle est inscrite au `REGISTRE-HORS-LOT.md` §5.*
+
+### ⚠⚠ LE DÉFAUT « TOUT LE PARC » EST À TROIS ÉTAGES — et fermer le backend SEUL CASSE le portage
+
+**Deux sessions ont mesuré le chemin CVE indépendamment et sont arrivées au même point. J'ai vérifié la
+condition que ni l'une ni l'autre n'avait regardée, et elle change l'ordre des gestes.**
+
+    etage 1  PORTAGE   PlanificationsCve.php:52
+                       CIBLES = ['all', 'tag', 'machines']   <- `all` EST dans
+                                                                la liste fermee
+                       :156 et :188  ($d['target_type'] ?? 'all')  <- et c'est
+                                                                le DEFAUT
+    etage 2  BACKEND   cve.py:490  data.get('target_type', 'all')  <- DEFAUT,
+                       aucune validation, INSERT direct
+    etage 3  PLANIF.   `_run_scheduled_scan`  filtre `archived` : 0 occurrence
+                       `all` / champ blanc / liste illisible -> LES 3 MACHINES
+
+> **Créer une planification de scan CVE sans portée explicite, PAR LE PORTAGE, arme un scan sur les trois
+> machines — `srv-zabbix` (PROD) comprise. Le défaut n'est pas au backend : il est aussi dans le portage,
+> et c'est son propre défaut par défaut.**
+
+**⛔ ET LE PIÈGE QUE J'AI ATTRAPÉ JUSTE À TEMPS : poser le refus au backend SEUL casserait la
+planification CVE du portage** — *le portage envoie `'all'` de son propre chef, comme valeur par défaut. Le
+backend le refuserait.* **Un correctif de sécurité qui casse la fonctionnalité qu'il protège se fait
+défaire dans la semaine.**
+
+### ✅ L'ORDRE QUE JE TRANCHE, ET IL N'EST PAS RÉVERSIBLE
+
+    1. LE PORTAGE d'abord   retirer `'all'` de CIBLES (:52) et des DEUX defauts
+                            (:156, :188) — une portee ne se devine plus
+    2. LE BACKEND ensuite   la meme garde d'entree dans `cve.py:490`
+                            ✅ AUTORISEE, conditionnee au (1)
+    3. le planificateur     `04-E-281-apres-fusion` — APRES la fusion seulement
+
+**Justification de l'ordre : à l'étape 1 seule, le portage cesse d'envoyer `'all'` et rien ne casse. À
+l'étape 2 seule, le portage casse.** *`cve_scan_schedules` porte 0 ligne, donc aucune planification
+existante n'est concernée dans les deux sens.*
+
+### ⛔ ET MA PRÉDICTION SUR `go-security.mjs:56` ÉTAIT FAUSSE — sixième réfutation du tour
+
+    go-security.mjs:47   fetch('/api_proxy.php/cve_schedules')  ->  cve.py:480
+    le correctif de la session 4 (`1d99a23`)  ->  ssh_audit.py, POST /ssh-audit/schedules
+
+**Deux routes différentes. L'assertion ne passera pas au rouge, et je l'avais annoncé aux deux sessions
+concernées comme un fait.**
+
+> **La session 4 a vérifié avant de relayer, et elle nomme le coût que j'aurais causé : « pas un test rouge
+> mal réparé — un test JUSTE modifié pour une raison inexistante ».** *C'est pire, parce qu'un test rouge
+> se rouvre et un test modifié se referme.*
+
+**Et la session 6 a refusé de retourner l'assertion en donnant la bonne raison : une assertion retournée
+avant son correctif est fausse à l'endroit, et personne ne la relit une seconde fois.**
+
+**⚠ Sa nuance est meilleure que mon argument** : *`go-security.mjs` n'est dans AUCUN lot, donc elle ne
+rougira pour personne.* **Le sens de cette assertion compte non parce qu'elle rougira, mais parce que
+quiconque enrôlerait la suite lirait son rouge comme une régression.** *Mon argument était juste, et sa
+prémisse fausse.*
+
+### ✅ ET JE RÉVISE MA DÉCISION SUR `fail2ban` — la mesure la retourne
+
+**J'avais posé : « le portage ne doit pas offrir l'installation sur le parc sans celle sur une machine ».
+La chaîne est ATTEIGNABLE — bouton rendu, câblé, qui part — mais elle est le geste le MIEUX gardé de la
+page :**
+
+    vue:498    `@if ($peutParc)` — un compte sans le droit ne voit pas le bouton
+    js:1782    portee INCONNUE -> BLOQUE (une portee inconnue n'est pas vide)
+    js:1788    portee VIDE -> refuse, en disant le compte
+    le panneau NOMME : le nombre, les NOMS des machines, combien sont
+               sensibles, combien n'ont jamais ete installees
+    et la confirmation exige de RECOPIER le nombre de cibles
+
+> **« Le manque n'est pas une exposition à refermer, c'est une capacité à ajouter. »** *(formulation de la
+> session 5, et elle est juste)*
+
+**Retirer l'installation de parc supprimerait le geste le mieux gardé de la page pour compenser l'absence
+d'un geste plus étroit.** *Ma prémisse — l'asymétrie force à choisir le geste large pour un besoin étroit —
+tient. Ma conclusion ne tenait pas : l'exposition n'est pas celle d'un geste nu.*
+
+✅ **Décision révisée : rien à retirer. L'installation sur UNE machine est à porter — et comme elle
+installe un paquet et un service sur une machine réelle, elle se porte CÂBLÉE et son exercice attend le
+mot de l'exploitant.**
+
+### ✅ LES PATCHS GELÉS — un contrôle mécanique, et il ne dénonce qu'un patch en quarantaine
+
+**La session 4 a trouvé un `NameError` dans un patch gelé, sur la branche que le patch existe pour
+protéger : `logger.error` là où `scheduler.py` définit `_log`. `git apply --check`, `ast.parse` et
+l'import du module passaient tous les trois — seul `ruff` (F821) l'a vu.**
+
+> **Les trois contrôles passaient parce qu'AUCUN n'exécute la branche de refus.** *Un correctif qui lève
+> sur son propre chemin de refus ne refuse pas : il plante, et ce qui suit un plant n'est pas écrit.*
+
+**J'ai cherché la même faute dans les quatre autres patchs. `ruff` n'est pas installé sur l'hôte — j'ai
+donc employé un discriminant mécanique qui ne demande aucun outil :**
+
+    le nom de journal appele par le patch a-t-il d'AUTRES usages dans sa cible ?
+
+    01-E-231      -> supervision.py, `logger.`   33 autres usages   ✅ conforme
+    04-E-281      -> scheduler.py,   `_log.`     42 autres usages   ✅ conforme
+    QUARANTAINE   -> scheduler.py,   `logger.`    0 autre usage     ⛔ meme faute
+                     (et ce patch est deja en quarantaine : perime, refait
+                      par `a345e65`. Rien a corriger, mais le discriminant
+                      le retrouve — c'est ce qui le valide comme instrument.)
+
+**⚠ Et ma première sonde était fausse dans le sens qui DÉDOUANE** : *un motif `^\s*logger\s*=` compte
+`logger=_log` — un ARGUMENT NOMMÉ — pour une définition.* **Il m'a rendu « `logger` est défini dans
+`scheduler.py` (2) » alors qu'il ne l'est nulle part.** *Je ne l'ai pas relayé, et la seule raison est
+que 42 contre 0 était un rapport trop net pour un fichier qui utiliserait les deux.*
