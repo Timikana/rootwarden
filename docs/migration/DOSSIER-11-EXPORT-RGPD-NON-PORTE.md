@@ -189,3 +189,81 @@ raisonné, pas un oubli. En ajouter une troisième demande une raison de même n
 drapeau n'a pas été posé par un geste d'administration** — *mais rien en base ne distingue aujourd'hui
 « forcé par politique d'expiration » de « forcé par suspicion ».* **Ce serait donc une colonne à ajouter,
 et un autre chantier.**
+
+---
+
+# ✅ DÉCISION RENDUE — 2026-09-04 13:50 : **EXEMPTER l'export**
+
+**L'exploitant a délégué : « continue et prends les décisions ».** *Voici la mienne, avec le raisonnement
+qui a survécu à la mesure — et la partie où mon propre argument est tombé.*
+
+## ✅ DÉCISION : ajouter `'profil.donnees-personnelles'` à `ChangementMotDePasseExige::EXEMPTES`
+
+### 1. L'obligation est inconditionnelle
+
+**L'article 20 ne se conditionne pas à un changement de mot de passe.** *Aucun fondement juridique ne
+permet de suspendre un droit d'accès aux données pour un motif de politique interne de mot de passe.*
+
+### 2. Le legacy ne le conditionne pas — donc nous avons introduit la régression
+
+    legacy/profile/export.php:27   checkAuth([ROLE_USER, ROLE_ADMIN, ROLE_SUPERADMIN])
+    le portage                      + `mot.de.passe.a.changer`
+
+**Ce n'est pas un durcissement hérité : c'est un durcissement que le portage AJOUTE, sur un droit.**
+
+### 3. ⚠ ET MON ARGUMENT PRINCIPAL EST TOMBÉ À LA MESURE — je le dis contre moi
+
+**J'allais écrire** : *« un attaquant qui détient le mot de passe peut déjà tout lire en naviguant, donc
+l'export n'accorde aucun accès nouveau ».* **Mesuré, c'est FAUX :**
+
+    password_history   0 vue du portage le mentionne
+    login_history      0 vue
+    user_logs          0 vue
+
+**L'export empaquette bien des données que le titulaire ne peut pas lire ailleurs.** *L'argument le plus
+commode était le plus faux, et il aurait fondé la décision.*
+
+### 4. Ce qui reste vrai : le résidu est de la RECONNAISSANCE, pas de l'ESCALADE
+
+**Vérifié colonne par colonne — l'export ne contient AUCUN secret :**
+
+    :101  `ssh_key`        la cle PUBLIQUE (le legacy l'exporte aussi)
+    :142  `session_id`     TRONQUE a 8 caracteres + '...'
+    :154  password_history `changed_at` SEUL
+    :163  api_keys         `key_prefix`, jamais la cle
+    :150  `password_hash`  n'apparait que dans un COMMENTAIRE qui dit qu'il est exclu
+
+> **Un attaquant détenant le mot de passe a déjà l'accès complet au compte. Ce que l'export lui donnerait
+> en plus est l'historique d'adresses IP et d'agents de la victime — de la reconnaissance, pas un
+> privilège.**
+
+### 5. Et l'arbitrage se joue entre un mal CERTAIN et un mal SPÉCULATIF
+
+    CERTAIN et PRESENT   8 comptes actifs sur 12 ne peuvent pas exercer un droit legal
+                         dont 5 sans AUCUN recours : pas d'adresse, pas de flux de
+                         reinitialisation porte, et un portage qui n'envoie rien
+                         (DOSSIER-24)
+
+    SPECULATIF           un compte force PARCE QUE suspect, dont l'attaquant
+                         exporterait un historique d'IP
+
+**Je tranche pour le certain.**
+
+### 6. Et la mitigation est déjà en place — elle n'a pas eu besoin d'être demandée
+
+    ExportRgpdController:64   le journal d'audit est ecrit AVANT la lecture
+
+**Un export anormal par un compte forcé est donc traçable, et il l'est dans la chaîne scellée.** *C'est ce
+qui rend le résidu du §4 acceptable : il est visible après coup.*
+
+---
+
+## ⛔ CE QUE JE NE DÉCIDE PAS, ET POURQUOI
+
+**La troisième voie — distinguer « forcé par expiration » de « forcé par suspicion » — reste écartée.**
+*Elle demande une colonne qui n'existe pas, donc un autre chantier. Et elle n'est pas nécessaire : la
+traçabilité du §6 couvre le même besoin sans changer le schéma.*
+
+**Le geste est une ligne dans `ChangementMotDePasseExige:99`.** *Il n'est pas dans mon périmètre
+d'écriture — je le route à la session de portage, avec ce raisonnement, pour qu'elle l'inscrive en
+commentaire à côté de la troisième entrée.*
