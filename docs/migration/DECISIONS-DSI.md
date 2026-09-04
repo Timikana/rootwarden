@@ -8164,3 +8164,74 @@ quiconque le voie.**
 **Ce qui la sauve est un DÉLAI, pas une précaution** : *`backend/**.py` est lu au démarrage, donc le refus
 est inerte.* **Le redémarrage que l'exploitant attend transformerait un écran fonctionnel en écran qui
 refuse son propre défaut — et c'est une précondition de redémarrage, à porter au `DOSSIER-00`.**
+
+### ✅ LES TROIS AUTRES ROUTES NUES DE `ssh_audit` — GUARDÉES, en UN commit
+
+**Le balayage AST du module a rendu QUATRE routes sans rôle ni permission, pas une :**
+
+    /ssh-audit/config    l.364  POST  <- posee (E-390, `f92cdcf`)
+    /ssh-audit/scan      l.124  POST  JOINT LA MACHINE — audit complet
+    /ssh-audit/backups   l.636  POST  JOINT LA MACHINE — list_backups
+    /ssh-audit/results   l.319  GET   historique des scores et findings
+
+**Les quatre sont gardées par `can_audit_ssh` AUX DEUX PAGES. Même défaut, même correctif.**
+
+**✅ Décision : les trois, en UN SEUL commit, avec `@require_permission('can_audit_ssh')`.**
+
+*Et la raison de ne pas les découper est celle que la session 4 a nommée elle-même* : **« je ne veux pas
+qu'une liste de un se lise comme un module traité ».** *Trois commits successifs sur le même défaut du même
+module produisent exactement cette lecture.*
+
+### ⚠ ET LE PORTAGE DÉCLARAIT DÉJÀ LE DÉFAUT — quatrième fois aujourd'hui
+
+    laravel/public/js/audit-ssh.js:29-33
+      « GET /ssh-audit/results ne porte NI role NI permission : sa seule
+        borne est `require_machine_access`, inerte des le role 2. Ce qui la
+        referme est la ligne `if not machine_id: return 400` de son CORPS —
+        un controle de VALIDITE, pas un controle d'ACCES. On passe donc
+        toujours le parametre, et on ne compte pas sur ce filet. »
+
+> **Le portage savait, l'avait écrit, et disait explicitement qu'il ne comptait pas sur ce filet.** *Le
+> défaut était documenté ; il n'était pas corrigé.* **Quatrième fois aujourd'hui que le dépôt portait déjà
+> l'analyse — et la première où il portait aussi l'aveu que la parade n'en est pas une.**
+
+### ⚠ UNE CONSÉQUENCE À DÉCLARER, pas à découvrir
+
+    `/ssh-audit/backups` est appele par
+      legacy/adm/health_check.php:226   ['SSH Audit Backups', 'POST',
+                                        '/ssh-audit/backups', …]
+
+    et `require_permission` (helpers.py:320-346) lit `get_current_user()`
+    EN BASE — donc un appelant de role 2 SANS `can_audit_ssh` prendra 403
+    (le role 3 court-circuite a :338)
+
+> **Après le correctif, la sonde « SSH Audit Backups » de `health_check.php` échouera pour un compte de
+> rôle 2 qui ne porte pas `can_audit_ssh`.**
+
+**Je l'accepte, et je le dis** : *`health_check.php` est la page que toutes mes consignes interdisent
+d'ouvrir — elle ÉCRIT sur `srv-zabbix` en production AU CHARGEMENT.* **Dégrader une de ses sondes est une
+réduction d'une capacité non désirée, pas une régression. Mais ça doit être écrit, sinon quelqu'un le
+débogue.**
+
+### ✅ ET LE CONTRÔLE QUE LA SESSION 4 A FAIT ET QUE JE N'AVAIS PAS DEMANDÉ
+
+    `require_permission` etait DEJA importe dans `ssh_audit.py` (l.22),
+    contrairement a `updates.py` ou il MANQUAIT — le piege E-149 verifie
+    plutot que suppose.
+
+    suite : 667 passed, 5 skipped, 2 xfailed, 0 FAILED
+    et `test_les_connues_sont_TOUJOURS_TROUVEES` verifie PASSED et non SKIPPED
+    -> « une suite verte obtenue par des skip n'est pas verte »
+
+**C'est exactement la question que j'ai posée à la session 2 sur la CI il y a une heure, et une autre
+session y a répondu sur son propre périmètre avant que la réponse arrive.**
+
+### ✅ ET LA DISTINCTION QUE MON REFUS A PRODUITE EST MEILLEURE DITE PAR ELLE
+
+> **« La branche `'all'` du planificateur EXÉCUTE l'intention. Je l'ai écrite moi-même en la nommant *un
+> CHOIX, plus un repli*. Elle ne ferme donc rien — elle OUVRE proprement. »**
+
+*C'est la formulation juste, et elle est plus précise que la mienne : je disais « rien ne ferme
+l'intention », elle dit « la pièce que j'ai écrite pour la propreté est celle qui l'exécute ».* **Un
+fail-closed et une branche explicite se ressemblent — l'un refuse ce qu'il ne comprend pas, l'autre
+autorise ce qu'il comprend.**
