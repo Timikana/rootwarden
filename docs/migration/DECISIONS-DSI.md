@@ -8513,3 +8513,47 @@ une porte d'authentification.*
 > *Et le corollaire de la QA, qui m'empêche d'en faire un compliment : « un refus qu'on croit sur parole ne
 > vaut rien de plus qu'une consigne qu'on suit sur parole ». Les deux fois, ce qui a tranché est que l'un
 > de nous soit allé LIRE LE CODE.*
+
+### ⛔ CORRECTION IMMÉDIATE — `laravel/version.txt` N'EST PAS UN RÉSIDU À SUPPRIMER
+
+**Je viens de le signaler à l'exploitant comme « une écriture d'un processus de conteneur dans le bind
+mount » et comme quelque chose que lui seul peut retirer. C'est FAUX, et la correction vient de la session
+E2E. Mesuré par moi avant de la relayer :**
+
+    docker inspect rootwarden_laravel :
+      /…/Gestion_SSH_KEY/legacy/version.txt -> /var/www/html/version.txt  RW=false
+    dans le conteneur, ce chemin rend        1.40.3   (7 octets)
+    le conteneur tourne depuis               2026-09-03T18:51:27Z
+
+> **`./laravel` est monté sur `/var/www/html`, et `legacy/version.txt` est SUR-MONTÉ à
+> `/var/www/html/version.txt`. Docker doit donc créer une CIBLE dans la source du montage parent : c'est
+> `laravel/version.txt`, vide et root, parce que son contenu est masqué par le sur-montage.**
+
+    -> le supprimer retirerait une CIBLE DE MONTAGE sous un conteneur qui TOURNE
+    -> sa mtime bouge a chaque demarrage SANS qu'un octet soit ecrit
+
+**✅ Il faut le LAISSER. Et l'ignorer dans `laravel/.gitignore` serait le geste propre, mais c'est un
+fichier qui n'est pas de mon périmètre.**
+
+**⚠ Ce que je retiens contre moi : j'ai mesuré `ls -l`, `git ls-files` et `git check-ignore` — trois
+instruments sur le FICHIER — et pas un seul sur le CONTENEUR.** *Les trois disaient vrai. Aucun ne pouvait
+répondre à la question « pourquoi existe-t-il ? ». C'est l'arbre contre le service, ma propre entrée de
+catalogue, et j'ai conclu depuis l'arbre sur un objet créé par le service.*
+
+### ✅ ET LA SESSION E2E A TROUVÉ UN GARDE QUI DÉDOUANAIT
+
+    `lib-arbre.mjs` : `CHEMINS_SERVIS.laravel` listait HUIT sous-repertoires
+    -> 34 fichiers SUIVIS vivaient HORS de la liste blanche, dont
+       `public/index.php`, `public/.htaccess`, le Dockerfile, `composer.lock`,
+       `phpunit.xml` et les migrations
+
+> **Son garde de fenêtre rendait « le CODE servi n'a pas bougé » alors qu'une écriture sur le CONTRÔLEUR
+> FRONTAL change toutes les pages.**
+
+**« Une liste blanche ne se trompe pas du côté qui alarme : elle DÉDOUANE. »** *C'est la forme la plus
+dangereuse d'un garde, et c'est la troisième liste blanche de ce chantier à être trouvée trop étroite —
+après `$ALLOWED_PROXY_PREFIXES` et `CLES` de l'invariant `machine_id`.*
+
+**Et son premier relevé de la même vérification était faux dans l'autre sens** : *« 37 processus chrome
+résiduels » attrapait l'outillage Electron, dont MA session.* **Elle a corrigé les deux avant de me les
+transmettre.**
