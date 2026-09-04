@@ -290,3 +290,65 @@ et j'avais retenu le premier parce que c'est celui qu'on m'avait donné.*
 **C'est le septième homonyme de la journée, et le premier où l'objet confondu est un REF GIT.** *Et sa
 formulation vaut d'être gardée : ce n'était pas un choix entre deux intégrations — l'auteur n'avait pas vu
 qu'il y en avait deux.*
+
+---
+
+# ✅ SIMPLIFICATION FINALE — mon second scénario est INATTEIGNABLE, et ce qui commande la décision est un BOOLÉEN
+
+**Vérifié par moi, avec témoin, après qu'une session l'ait mesuré plutôt que de relayer mon chiffre.**
+
+    git rev-list --left-right --count origin/main...HEAD
+      -> 3 / 121
+
+    git merge-base --is-ancestor origin/main HEAD   ->   FAUX
+      -> UNE AVANCE RAPIDE EST IMPOSSIBLE
+
+    commits HORS FUSION propres a `origin/main` :   0
+      304a604  parents=7a575af 7ce22a5   Merge Migration-Laravel
+      7a575af  parents=4742438 d77f287   Merge Migration-Laravel
+      4742438  parents=99c3874 3055dec   Merge branch 'Migration-Laravel'
+    TEMOIN : commits hors fusion propres a HEAD :  121
+
+> **`origin/main` ne porte AUCUN travail qui lui soit propre : ses trois commits sont des fusions de cette
+> branche, donc leur contenu vient d'ici.**
+
+## ⛔ CE QUE ÇA RETIRE DU DOSSIER
+
+**Mon second scénario — « si `main` devient HEAD, l'étiquette sera à trois chiffres » — exigerait un
+`push --force`.**
+
+    en CONTENU  rien ne serait perdu : le contenu des trois fusions est ici
+    en HISTOIRE trois ENREGISTREMENTS D'INTEGRATION seraient effaces
+
+**Ce n'est donc pas une option d'intégration, c'est un geste destructeur. Je la retire du dossier comme
+scénario, et je la garde comme AVERTISSEMENT : si quelqu'un vous propose `--force` pour « aligner », c'est
+ce qu'il efface.**
+
+## ✅ CE QUI RESTE, ET C'EST DÉTERMINISTE
+
+    l'integration est une FUSION — le seul chemin non destructeur,
+    et le motif deja etabli trois fois.
+
+    donc l'etiquette sera   v<VERSION-JALON>.<compte(main) + 1>
+      AVANT le bump du jalon  ->  v1.39.4
+      APRES le bump a `1.40`  ->  v1.40.1
+
+**Et le geste que ce dossier demande est exactement celui qui rend la seconde ligne vraie.**
+
+## ✅ ET LA FORME DÉFINITIVE DE LA CLAUSE QUI PORTE LE DOSSIER
+
+**Le titre de ce dossier annonce « 97 commits ». Ce nombre valait 97 à 19:35, et il vaut 121 maintenant :
+sept sessions en produisent.** *Je ne le corrige pas dans le titre — un titre stable vaut mieux qu'un titre
+juste dix minutes — mais la clause qui décide n'est pas un compte :*
+
+    ce qui commande la decision :
+      `git merge-base --is-ancestor origin/main HEAD`  ->  FAUX
+      c'est-a-dire : la reference que la CI joue N'EST PAS un ancetre de
+      ce qui existe. Il y a donc du travail qu'elle ne voit pas.
+
+    et le compte, si vous le voulez :
+      git rev-list --count $(git merge-base origin/main HEAD)..HEAD
+
+> **Un BOOLÉEN ne se périme pas comme un compte : il ne peut basculer que par une poussée — c'est-à-dire
+> par le geste même que ce dossier demande.** *C'est la forme la plus stable qu'une clause de ce dossier
+> puisse prendre, et je la dois à la session qui a refusé de relayer mon chiffre.*
