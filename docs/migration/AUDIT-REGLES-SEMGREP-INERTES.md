@@ -160,7 +160,56 @@ WARNING alors que c'est de l'exécution de commande.
 > ligne, et le DSI a posé le témoin d'instrument — le listing des jobs, lui,
 > fonctionne). Elle attend la première exécution après le correctif.
 
-**Les trois règles survivantes MORDENT-elles ?** *Je ne peux pas le dire.*
+### ✅ QUESTION FERMÉE LE 2026-09-04 — la passe n'abortait PAS, et l'une des trois MORD
+
+Le Lead a lu le journal avant qu'il ne devienne irrécupérable, et y a trouvé,
+**dans la même passe qui rejetait les trois motifs** :
+
+```
+[ERROR] Rule parse error in rule semgrep.rw-shell-fstring-execute-as-root
+… (les trois)
+❯❯❱ semgrep.rw-decode-errors-ignore
+    346┆ output += channel.recv(1024).decode('utf-8', errors='ignore')
+```
+
+**Corroboré par ma propre mesure** — je ne pouvais pas relire le journal, mais je
+peux vérifier que la constatation désigne du code réel :
+
+```
+backend/ssh_utils.py:346   output += channel.recv(1024).decode('utf-8', errors='ignore')
+                           ^ la ligne ET le numero cites, unique occurrence du depot
+motif de la regle          $X.decode('utf-8', errors='ignore')   — valide, il matche
+```
+
+> **`semgrep-core rule validation failed` n'aborte donc PAS la passe entière.** Les
+> règles valides ont tourné et trouvé. **Le jeu custom n'a pas produit zéro
+> analyse depuis le 2026-05-19 : il en a produit une AMPUTÉE de 70 %.** Mon pire
+> cas du §5 est donc borné une seconde fois, et cette question est fermée.
+
+**⚠ ET ÇA EN OUVRE UNE AUTRE, PLUS CONCRÈTE.** Cette constatation est de sévérité
+`ERROR`, elle est **réelle**, et elle est au journal **depuis trois mois et demi
+sans avoir été triée** — parce que le job était rouge pour une autre raison et
+toléré.
+
+**Donc après le correctif des trois motifs, le job restera ROUGE** — non plus sur
+une erreur de compilation, mais sur cette constatation. *Ce n'est pas une cause
+nouvelle : c'est une cause existante qui devient la seule.*
+
+**Ma qualification, à trier par qui décide** : le message de la règle invoque un
+*« padding oracle sur un déchiffrement »*. Ici il n'y a **pas de déchiffrement** —
+c'est la sortie d'un canal SSH, où du bruit binaire est normal et où
+`errors='ignore'` est un choix défendable. **La raison énoncée par la règle ne
+s'applique pas à cette occurrence.** Elle demande donc soit un `# nosemgrep` avec
+sa raison, soit un resserrement du motif — *et le commentaire de `ci.yml:312`
+anticipait exactement ce tri, qui n'a jamais eu lieu.*
+
+> **C'est « un rouge toléré devient une propriété du décor » dans sa forme la plus
+> coûteuse : il n'a pas seulement masqué que trois contrôles n'existaient pas — il
+> a masqué une constatation VRAIE, non triée depuis mai.**
+
+**Les trois règles survivantes MORDENT-elles ?** *Une des trois, oui — mesuré.
+Pour les deux autres (`rw-sql-fstring-execute`, `rw-aes-cbc-encrypt`), je ne peux
+toujours pas le dire.*
 
 `semgrep` n'est disponible **nulle part** : ni sur l'hôte, ni dans
 `rootwarden_python`, `rootwarden_php`, `rootwarden_laravel`, ni comme module
