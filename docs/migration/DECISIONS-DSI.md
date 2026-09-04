@@ -7647,3 +7647,71 @@ contre elle.*
 
 **Il tombe dans la chaîne de la réinitialisation, pas comme une touche indépendante. Mais il en confirme
 l'ampleur : le portage n'envoie AUCUN courriel, du tout.**
+
+## Tour de 15:40 (2026-09-04) — LE RAPPORT DOC/CODE, ATTRIBUÉ PAR PÉRIMÈTRE
+
+**Fenêtre : 14:47 → 15:35. Et cette fois l'attribution est MÉCANIQUE, pas de mémoire.**
+
+    CODE (feat/fix sur laravel|backend)     9
+    DOCUMENTATION                          27      -> rapport 3,00, seuil 2
+    AUTRE (test/e2e)                        7
+
+    discriminant : mon perimetre d'ecriture est EXCLUSIF
+                   (DECISIONS-DSI.md + DOSSIER-*.md)
+
+    docs n'ayant touche QUE mon perimetre        18   <- les miens
+    docs des autres sessions                      9
+    -> rapport doc/code SANS MOI = 1,00           SOUS LE SEUIL
+
+> **Deux tours de suite, le dépassement est entièrement le mien.** *La consigne dit d'attaquer « l'équipe
+> écrit sur ses propres mesures au lieu de porter ». La mesure dit le contraire : 9 commits de code en 48
+> minutes, et 9 documents pour 9 codes.*
+
+**Et le discriminant vaut mieux que l'identité git** : *elle est partagée entre huit sessions, donc
+`--author` ne discrimine rien. Le PÉRIMÈTRE D'ÉCRITURE, lui, discrimine — parce qu'il est exclusif par
+construction.* **C'est la première attribution de ce chantier qui ne soit pas une déduction.**
+
+### ✅ 3) `socle_avertissement` — REMESURÉ à 15:36:18 CEST
+
+    occurrences sur 1295 fichiers lus (laravel/ + tests/ + backend/)   0
+    TEMOIN                                    1295 fichiers (> 600)
+    cles dans fr/auth.php · en/auth.php       36 · 36
+    cgu.blade.php                             existe
+
+**Toujours vrai. Et la mesure est DATÉE, pas reconduite.**
+
+### ✅ ARBITRAGE — « Se souvenir de moi » : PORTER, avec une propriété non négociable
+
+**Troisième page du bloc B à sortir par la question 3, et les trois ont la même forme :**
+
+    Q1 disait « la page est PORTEE » — ce qui etait VRAI
+    et le geste de trop n'etait pas dans la partie portee
+
+> **« La page est portée » n'est pas une unité de mesure.** *`admin_page.php`, `index.php` et maintenant
+> `login.php` sont sortis exactement ainsi.*
+
+    legacy/auth/login.php:183   REPLACE INTO remember_tokens
+                        :190   setcookie('remember_token', …)
+                        :397   <input type="checkbox" id="remember_me">
+    portage : 0 occurrence de remember/souvenir dans la vue de connexion
+              0 ECRITURE de `remember_tokens`, toutes formes
+              MAIS DEUX SUPPRESSIONS — MotDePasse.php:295, Comptes.php:572
+
+**Le portage VIDE une table qu'il ne remplit JAMAIS.**
+
+**✅ Décision : PORTER. Et la raison qui tranche est mesurée :**
+
+    legacy/auth/verify.php:13   « 7. Auto-restore remember_token -> mais
+                                  FORCER re-2FA apres restore »
+
+*Le jeton restitue l'IDENTITÉ, pas l'authentification complète. Ce n'est donc pas un contournement du
+second facteur, et mon objection de principe tombe.*
+
+**Pourquoi porter plutôt qu'abandonner** : *c'est une commodité d'usage QUOTIDIEN — à l'inverse des trois
+touches Q3, dont la rareté fait l'invisibilité. Son absence sera remarquée le premier jour.* **Et les deux
+suppressions du portage supposent déjà la fonctionnalité : l'abandonner coûterait de retirer la table et
+ces deux appels, pour un résultat pire.**
+
+**⛔ PROPRIÉTÉ NON NÉGOCIABLE, et le portage doit être GATÉ dessus** : *la restauration par jeton EXIGE le
+second facteur.* **Portée de travers, cette capacité contourne la 2FA d'un produit de sécurité. Elle ne se
+porte qu'avec un test qui verrouille cette propriété — et le test avant la livraison, pas après.**

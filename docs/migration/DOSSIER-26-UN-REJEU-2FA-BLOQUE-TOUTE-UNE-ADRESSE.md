@@ -96,3 +96,58 @@ quoi faire (attendre la fenêtre suivante plutôt que ressaisir).*
 personnes d'un même bureau s'authentifient dans la même fenêtre de 30 secondes, elles commencent à
 consommer un compteur partagé dont le seuil est 10 — et le blocage qu'elles déclencheront portera sur
 l'étape 2FA, c'est-à-dire sur la porte d'entrée du produit.**
+
+---
+
+# ⛔ CORRECTION — le seuil qui mord le PREMIER est 5, et il est dans le legacy SERVI EN PRODUCTION
+
+**2026-09-04, 15:40. Ma description nommait le mauvais compteur.**
+
+    legacy/auth/login.php:46   $maxAttempts = 5;
+                        :50   SELECT COUNT(*) FROM login_attempts
+                              WHERE ip_address = ? AND success = 0
+                                AND attempted_at >= …
+                              ^^^ AUCUN filtre de `step`
+
+> **Le compteur de CONNEXION du legacy compte toute ligne en échec, quelle que soit son étape. CINQ rejeux
+> fermaient donc déjà l'étape de CONNEXION — à la MOITIÉ du seuil, sur un AUTRE écran, avant que le
+> compteur 2FA atteigne dix.**
+
+**Et changer l'étape ne l'en sort pas** : *une ligne `2fa_rejeu` reste `success = 0`, donc elle continue
+d'alimenter ce compteur-là.*
+
+    ce que j'ecrivais   « dix rejeux bloquent l'etape 2FA »
+    ce qui est vrai     CINQ rejeux bloquent la CONNEXION,
+                        et dix bloquent AUSSI la 2FA
+
+## ✅ Le correctif posé reste SUFFISANT — pour le côté qui survit
+
+    aucun compteur du PORTAGE ne lit `login_attempts` sans filtre d'etape
+    `ConnexionController:119` n'y fait qu'INSERER
+    les quatre lecteurs de `step = '2fa'` :
+        laravel  SecondFacteurController:282   ipBloquee()
+        legacy   verify_2fa:73 · confirm_2fa:72 · enable_2fa:129
+                 -> TROIS copies du meme compteur
+    aucun tableau ne les lit
+
+**Donc après `4b3e656` (v1.39.9), un rejeu ne ferme plus rien du côté qui survit à la bascule.**
+
+## ⚠ MAIS LE RÉSIDU EST EN PRODUCTION, ET IL Y RESTERA JUSQU'À L'EXTINCTION
+
+**`legacy/auth/login.php` est servi. Le seuil de 5, sans filtre d'étape, y est vivant aujourd'hui.**
+
+    ⛔ je ne fais pas corriger le legacy : c'est du code de production que la
+       bascule doit RETIRER, et un correctif y ajouterait un risque a un
+       composant qu'on eteint
+    ✅ ce qui ferme reellement ce residu : l'extinction du legacy
+    📌 dans l'intervalle, si un blocage de connexion inexplique est signale,
+       la cause probable est la : cinq refus de rejeu 2FA depuis la meme
+       adresse en dix minutes
+
+**Et c'est un argument opérationnel de plus pour l'extinction — pas seulement pour la propreté.**
+
+## ✅ Un resserrement du correctif, meilleur que ma prescription
+
+**`journalise()` reçoit désormais le VERDICT et non un booléen : une seule place décide `success` ET
+`step`.** *Passés séparément, les deux finiraient par se contredire — un rejeu inscrit en échec, ou un
+échec inscrit hors du compteur.* **Et `ipBloquee()` passe du littéral à la CONSTANTE.**
