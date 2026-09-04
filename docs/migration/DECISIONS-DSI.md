@@ -7583,3 +7583,67 @@ mesure était 3 failed / 305, le fichier lancé seul rendant le total.**
 
 **Une intention ne tient pas ; un geste tient. Je l'adopte — j'ai récité « 111 compilés root » pendant un
 jour et demi.**
+
+### ⚠ LA ROTATION DE CLÉ DE CHIFFREMENT MOURRAIT AVEC L'ARCHIVAGE — et c'est le pire cas de la classe 3
+
+**Mesure de la session 3, 2026-09-04 15:34, que je n'ai PAS remesurée et dont je le dis :**
+
+    `legacy/.../migrate_crypto.php`  re-chiffre TOUS les secrets de `machines`
+                                     et `users`, de OLD_SECRET_KEY vers SECRET_KEY
+
+    `OLD_SECRET_KEY` EXISTE cote backend : 17 occurrences
+      -> on pourrait clore la, et c'est le piege
+    `encryption.py:24-25` : « l'ancienne cle est UNIQUEMENT utilisee pour le
+      DECHIFFREMENT (migration transparente) ; le re-chiffrement utilise
+      toujours SECRET_KEY »
+      -> migration PARESSEUSE : une ligne ne passe a la cle neuve que si
+         quelque chose l'ECRIT. Une ligne jamais reecrite garde indefiniment
+         le chiffre de l'ancienne cle.
+    et cote backend, DEUX ecritures de secret en masse seulement, toutes deux
+      dans `ssh.py` et pour un autre metier (effacer, ressaisir) — AUCUNE
+      pour une rotation.
+
+> **Le geste « terminer une rotation, maintenant, sur toutes les lignes » n'existe QUE là.** *L'archiver
+> veut dire qu'une rotation ne pourra plus être menée à terme — donc que `OLD_SECRET_KEY` devra rester
+> déployée indéfiniment, et que l'ancienne clé ne pourra JAMAIS être retirée.*
+
+**✅ DÉCISION : `migrate_crypto.php` est PRÉSERVÉ comme OUTIL — déplacé vers un dossier de scripts, jamais
+supprimé.** *Le verdict « mort en tant que page, vivant en tant qu'outil » tenait déjà ; la question 3 lui
+donne une raison bien plus forte que « c'est un outil ».*
+
+**📌 Et ça DÉCLARE un manque du portage que rien ne nommait : le portage n'a aucun chemin de rotation.**
+*C'est un élément de la feuille de route (« reste rotation des secrets ») qui se trouvait dépendre d'un
+fichier qu'on s'apprêtait à archiver.*
+
+### ✅ ET LA GÉNÉRALISATION EST LA MEILLEURE CHOSE SORTIE DE CET EXERCICE
+
+**Sur tout l'inventaire, la question 3 n'a que TROIS touches, et elles ont la même forme :**
+
+    l'assistant de premiere configuration     une fois par INSTALLATION
+    la rotation de cle de chiffrement         une fois par INCIDENT
+    le chiffrement des secrets TOTP en clair  une fois par VERSION
+
+> **Les touches de la question 3 se groupent sur les capacités RARES par nature — et ce n'est pas un
+> hasard : c'est leur rareté même qui les rend invisibles aux questions 1 et 2.**
+>
+> *Une capacité utilisée tous les jours a quelqu'un pour la réclamer, un test pour la couvrir, une page
+> pour la nommer. Une capacité utilisée une fois par installation n'a rien de tout cela.*
+
+**Et RARE ne veut pas dire SECONDAIRE : la rotation de clé est précisément le remède d'un incident de
+sécurité.** *C'est la même structure que l'arbitrage sur l'onboarding — une capacité dont personne ne
+remarque l'absence n'a personne pour la défendre, ce qui est un argument POUR la décision explicite, pas
+contre elle.*
+
+### ✅ Bloc D : le socle passe, et `mail_helper.php` confirme l'ampleur du DOSSIER-24
+
+**Un fichier de socle est une DÉPENDANCE, pas un porteur de geste — il tombe avec ses pages.** *Et
+`api/openapi.php`, `api/docs.php`, `api_proxy.php` sont REMPLACÉS, le portage le dit lui-même
+(`/api/gateway` à 74 emplois).*
+
+    `includes/mail_helper.php`   requerants : auth/forgot_password.php:19
+                                 et adm/includes/manage_users.php:133
+    cote laravel/                ZERO envoi de courriel reel — seul
+                                 `config/mail.php` existe
+
+**Il tombe dans la chaîne de la réinitialisation, pas comme une touche indépendante. Mais il en confirme
+l'ampleur : le portage n'envoie AUCUN courriel, du tout.**

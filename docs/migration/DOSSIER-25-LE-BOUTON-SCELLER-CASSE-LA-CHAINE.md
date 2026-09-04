@@ -125,3 +125,20 @@ est que le trou existe, qu'il est contigu, et que la chaîne l'a enjambé.*
 **Et la direction du `DOSSIER-20` — fermer la fenêtre par un scellement périodique — reste juste, mais elle
 attend le point 2 :** *automatiser le scellement en l'état ferait tourner ce défaut tout seul, sans
 personne pour lire le résultat.*
+
+---
+
+## 9. ⚠ AJOUT — il y a DEUX raisons de chercher avant de sceller, pas une
+
+**La mienne, au point 3** : *après, l'outil ne montrera plus rien.*
+
+**La seconde, que je n'avais pas** : *les 389 lignes portent encore leur `created_at` et leur `action`
+intacts. Sceller n'efface pas le CONTENU — il efface le SIGNAL qui dit « ces trois jours sont
+différents ».*
+
+> **C'est le MARQUEUR qu'on perd, pas la donnée.** *Une fois scellées, ces 389 lignes seront
+> indistinguables des 4563 autres : rien, dans la table, ne dira plus qu'elles ont traversé une fenêtre
+> où la chaîne ne les voyait pas.*
+
+**Ça ne change pas la décision, ça change ce qu'elle coûte** : *l'ordre contraint du point 3 ne protège pas
+une capacité d'enquête — il protège la seule trace qui indique OÙ enquêter.*
