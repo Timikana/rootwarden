@@ -9296,3 +9296,73 @@ inexécutables. La QA mesure, et si c'est faux c'est ma consigne qui l'était.**
 **Les deux fois, la contrainte annoncée portait sur le CHEMIN D'ACCÈS et non sur la PROPRIÉTÉ.** *« Il faut
 un compte pour atteindre la route » est vrai ; « il faut un compte pour mesurer la propriété » ne l'est
 pas — et je n'ai pas fait la distinction la seconde fois.*
+
+### ✅ ARBITRAGE — une branche JUSTE dont le cas ne se produit sur AUCUN chemin : elle reste, et elle DIT où elle est fermée
+
+**La mesure a trouvé ce que ni moi ni la session 1 n'avions vu. Table complète, 15 couples :**
+
+    auteur 1, valeur invalide  ->  valeurInvalide ET rangRamene   LES DEUX
+    auteur 2, valeur invalide  ->  valeurInvalide seul
+    auteur 3, valeur invalide  ->  valeurInvalide seul
+
+**Une valeur invalide tombe TOUJOURS sur le plancher (1), et l'anti-escalade ne mord que si ce plancher est
+`>=` au rang de l'auteur — donc JAMAIS au-dessus du rôle 1. Or les DEUX routes appelantes sont gardées
+`role:2`.**
+
+> **La composition des deux phrases est correcte, commentée, défendue — et son cas ne se produit sur AUCUN
+> chemin de production.**
+
+**Et la contrainte de la session 1 — « inatteignable en superadministrateur » — était JUSTE MAIS TROP
+FAIBLE : c'est inatteignable au-dessus du rôle 1, pas seulement au rôle 3.** *Une borne exacte et une borne
+suffisante ne sont pas la même chose, et la seconde rassure sur un périmètre plus étroit que le vrai.*
+
+**✅ DÉCISION : la branche RESTE, et le commentaire DIT où son cas est fermé.**
+
+    ⛔ la retirer perdrait la propriete si une route s'ouvrait un jour a un
+       role 1, et elle coute un `if`
+    ⛔ la garder MUETTE est le defaut du jour sous sa forme inverse : le
+       catalogue dit qu'un defaut ratifie par son commentaire est le plus
+       couteux ; ici c'est du code JUSTE dont la commentaire defend la
+       composition SANS dire qu'elle ne peut pas se produire
+    ✅ donc : « ce cas exige un auteur de role 1 ; les deux routes appelantes
+       sont gardees `role:2`, donc il est ferme LA — pas ici »
+
+> **Une branche juste dont l'atteignabilité est fermée AILLEURS doit nommer OÙ. Sinon elle se lit comme une
+> couverture vivante — et le jour où la garde s'ouvre, personne ne sait que ce chemin s'est réveillé.**
+
+**Le verrou est au bon endroit : il verrouille le FAIT. S'il rougit, une garde a changé ou le plancher a
+bougé.**
+
+### ⚠ ET TROIS LEÇONS D'INSTRUMENT, DONT UNE SUR LA VÉRIFICATION DE MON PROPRE RELEVÉ
+
+**① Le bon prédicat dans le mauvais RÉGIME.** *La sonde autonome tournait contre MySQL et rendait « OK ».
+Dans le harnais — SQLite, aucune migration Laravel — le gabarit lève `no such table: permissions`, puis
+`temporary_permissions`.*
+
+> **« J'ai vérifié la bonne propriété dans le mauvais régime, en vérifiant la tienne. »**
+
+**Et la parade est meilleure que le correctif** : *DÉRIVER les tables des services que le gabarit appelle,
+plutôt que les découvrir une par une.* **« Un défaut qu'on découvre par itération ne dit jamais quand il
+s'arrête. »**
+
+**② L'annonce se lit dans la RÉPONSE, pas dans la session.** *`session()->now(...)` puis rendu : après la
+réponse, `session('succes')` est vide. Un rouge qui accusait la composition alors qu'il disait où elle
+VIT.*
+
+**③ Et il faut comparer au HTML ÉCHAPPÉ.** *Blade rend « n'est » en `n&#039;est` : comparer le catalogue
+BRUT au HTML échoue sur toute phrase portant une apostrophe et PASSE sur les autres.* **Une erreur
+INTERMITTENTE SELON LA PHRASE — donc une suite qui passe ne prouve rien sur les phrases qu'elle n'a pas
+tirées.**
+
+### ✅ ET SUR MON BILAN, une nuance que j'accepte à moitié
+
+**On me fait remarquer que mes trois prescriptions inexécutables ont toutes été rattrapées AVANT d'avoir
+coûté un geste, parce que j'ai chaque fois écrit « mesure, et si mon relevé est faux, c'est ma consigne qui
+l'était ».**
+
+> **Ce n'est pas de la chance : c'est la seule pratique de ma journée qui ait tenu à chaque tour.** *Envoyer
+> une consigne AVEC son falsificateur la rend bon marché à réfuter — et c'est ce qui a transformé onze
+> réfutations en onze corrections plutôt qu'en onze incidents.*
+
+**Ce que je n'accepte pas de la nuance : trois prescriptions fausses restent trois prescriptions fausses.**
+*Le falsificateur borne le coût ; il ne rachète pas la mesure que je n'ai pas faite.*
