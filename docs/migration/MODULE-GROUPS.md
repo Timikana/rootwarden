@@ -793,3 +793,68 @@ La section la plus utile du rapport, et elle est courte parce que l'essentiel a 
   `SELECT`, `SHOW CREATE TABLE`, `grep`, `wc`, `docker exec … php -r` sur les catalogues, et une
   lecture d'attributs de configuration dans le conteneur Python. La seule sonde réseau émise l'a été
   vers **10.10.10.10:22**, le conteneur du banc.
+
+---
+
+## ⚠ Relevé du 2026-09-04 — **la création ET la suppression sont DÉJÀ portées**
+
+On m'a demandé de porter « créer un groupe » (sous-lot R2) en me rappelant, dans le
+même message, que *« ce chantier a payé cinq fois le portage de ce qui existait
+déjà »*. **C'est la sixième fois, et la capacité demandée existe.**
+
+### Ce qui est câblé, mesuré au script et non déduit
+
+`laravel/public/js/groupes.js` n'a que deux helpers mutants — `ecris()` (POST,
+:153) et `supprime()` (DELETE, :175) — et **trois** appelants au total :
+
+| ligne | requête composée | geste |
+|---|---|---|
+| **341** | `POST /groups` avec `{name, description, group_type, filters, member_ids}` | **CRÉATION — portée** |
+| **431** | `DELETE /groups/{id}` | **SUPPRESSION — portée** |
+| 521 | `POST /groups/{id}/run` `{action:'drift_scan'}` | scan de dérive, porté |
+
+L'heuristique des libellés confirme sans ambiguïté : **7 clés de suppression**
+(`supprimer_titre`, `supprimer_membres`, `supprimer_definitif`,
+`supprimer_valider`, `supprimer_fait`, `supprimer_introuvable`,
+`supprimer_echec`). Parité FR/EN : 72/72, aucun écart.
+
+Le code est soigné : `:420-425` lit `deleted` et **non** `success`, parce que
+`groups.py:225` rend `success: True` même quand rien n'a été supprimé — *le
+marqueur n'est pas le verdict*, déjà appliqué ici par quelqu'un d'autre.
+
+### ⚠ Et la page MENT sur la suppression
+
+`groups.portee_texte`, **affichée à `resources/views/groupes.blade.php:23`** :
+
+> *« La lecture des groupes, de leurs membres, la création et le scan de dérive de
+> masse sont portés. **La suppression et le scan CVE de masse passent encore par
+> l'ancien portail** — chaque bouton explique ce qu'il engage avant d'y renvoyer. »*
+
+**Exacte sur la création. Fausse sur la suppression.** Et contrairement aux deux
+déclarations de `cve` (§10.4 de `MODULE-CAPACITES-RESTANTES.md`), **celle-ci est
+lue** : c'est une variante A, affichée.
+
+`np_cve`, en revanche, est **honnête** : les 4 mentions de `cve_scan` dans le
+script sont **toutes dans des commentaires** (:453, :540, :544, :545), aucune
+requête composée. Le scan CVE de masse n'est effectivement pas porté.
+
+> **Il n'y a donc rien à porter sur ce module ce tour-ci — il y a une phrase à
+> corriger.** Un onglet complet et menteur coûte plus cher qu'un onglet incomplet
+> et franc ; ici l'onglet est complet et la phrase le nie.
+
+### La note d'instrument, parce que j'ai failli rendre l'inverse
+
+Ma première sonde a rendu **« suppression : zéro appelant »** — un résultat
+crédible qui aurait fait porter un geste existant. La commande :
+
+    grep -nE "\b(ecris|supprime)\(" groupes.js | grep -v "function "
+
+**La cause n'est ni `\b` ni l'alternance** (vérifié : sans `\b`, même résultat).
+C'est **le filtre d'exclusion**. Il visait les lignes de DÉFINITION
+(`function ecris(…)`) — mais les deux lignes d'APPEL s'écrivent
+`ecris(…).then(function (r) {` et **contiennent donc `function `**. Le filtre les a
+retirées avec les définitions.
+
+> **Un filtre d'exclusion s'applique à la LIGNE ENTIÈRE, pas à la partie qu'on
+> visait.** En JavaScript, `grep -v "function "` retire tout appel suivi d'une
+> fonction de rappel — soit la majorité des appels asynchrones.
