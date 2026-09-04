@@ -19638,3 +19638,39 @@ garderait le drapeau ambigu en vie. `laravel/tests/Feature/RoleAutoriseTest.php`
             $p->role · $p->rangRamene · $p->valeurInvalide   <- le troisieme est NEUF
 
 *Je ne l'ai pas modifie : `laravel/tests/` n'est pas a moi.*
+
+### ⚠ TROIS PROPRIETES NON MESUREES — RELEVEES PAR LECTURE, ET ECRITES ICI PARCE QU'UNE NON-MESURE PORTEE PAR UNE CONVERSATION SE PERIME
+
+**Elles couvrent E-397 et E-399.** La QA a verrouille le SERVICE
+(`ImportComptesSignalementTest`, 10 tests / 38 assertions, et `RolePoseTest`, 9 / 109) ; ses
+suites instancient `app(Comptes::class)`. **Ce qui suit vit au-dessus, dans le controleur et
+dans la vue, et n'est verifie par AUCUNE assertion.**
+
+| # | propriete | ou elle vit | ce qu'il faudrait |
+|---|---|---|---|
+| 1 | les **deux phrases** paraissent ensemble quand les deux drapeaux jouent | `ComptesController::creer`, `$annonce .= ' ' . __('comptes.cree_valeur_role')` | un auteur de **role 2** atteignant `POST /comptes` — donc un compte reel |
+| 2 | le bilan d'import **rend** chaque signal, avec son nom et sa ligne | `comptes.blade.php:107-118` | un POST de CSV authentifie en role 2 |
+| 3 | le mot de passe genere **paraît a l'ecran**, une fois (E-397) | la section `comptes-secrets-remis`, `comptes.blade.php:48` | idem — et le compte cree persisterait |
+
+**Pourquoi elles ne sont pas mesurees, et ce n'est pas un renoncement :** les trois exigent de
+**creer un compte reel dans une base partagee**. L'arbitrage l'a refuse, avec trois raisons
+dont la troisieme suffit — *un geste sur des comptes appartient a l'exploitant*. Les deux
+autres tiennent aussi : la QA tient le banc, et *un compte jetable cree pour une mesure devient
+un compte reel que personne ne retire* — ce depot en porte deja deux a un nom d'exploitant.
+
+**Le point 1 porte une contrainte qui n'est pas evidente** : `rolePose` ne peut pas declencher
+`rangRamene` pour un auteur de role 3 (`$roleAuteur < 3` le garde), donc **le cas « les deux
+drapeaux » est inatteignable en superadministrateur**. Seul `rw-test-admin` (id 15, role 2)
+franchit `role:2` + `perm:can_admin_portal` et peut le produire. *Une suite qui s'authentifie
+en superadmin mesurerait la composition sans jamais l'exercer.*
+
+> **Et le point 2 porte le piege qui a dicte la forme des tests de la QA** : `imp_err_role` est
+> poussee **apres** `$bilan['crees']++`, donc **la ligne est creee ET signalee**. Les textes
+> voisins disent *« ligne ignoree »* ; une assertion qui chercherait ce mot dans la liste
+> passerait **pour une raison fausse**. *Signaler n'est pas refuser.*
+
+**Ce bloc existe pour une raison de forme, donnee par la QA** : ces trois non-mesures etaient
+portees par un echange entre deux sessions, et *le dire est la seule chose qui empeche qu'un
+vert soit lu comme une couverture*. **Une non-mesure ANNONCEE est un fait ; c'est une
+non-mesure DECOUVERTE APRES COUP qui est un defaut** — et une annonce qui ne vit que dans une
+conversation se perime au premier resume.
