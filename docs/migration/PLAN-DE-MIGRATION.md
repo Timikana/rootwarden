@@ -5452,3 +5452,63 @@ désarmer. *`D-07` sans le correctif n'est pas neutre, il reconstitue la cause.*
 - **la propriété du cache en PRODUCTION n'est pas mesurée** (`DOSSIER-00:333`), et
   c'est la seule mesure qui décide si le piège y est armé. Ni la session 3 ni moi
   n'interrogeons la production.
+
+---
+
+## E-397 — la consigne demandait un alignement, la mesure a trouvé **deux** défauts
+
+**Commit `5e02519`, v1.40.4, 2026-09-04 19:4x CEST.** Consigne reçue : *« aligne la création
+manuelle sur l'import : le mot de passe généré est REMIS UNE FOIS »*, avec l'invitation
+explicite *« si ta mesure dit autre chose, elle gagne »*.
+
+**Elle disait autre chose, et sur l'objet de référence.** L'import n'était pas le modèle à
+copier : les deux chemins de création étaient faux, **chacun du défaut que l'autre n'avait
+pas**.
+
+| Chemin | Mot de passe | `force_password_change` | Conséquence |
+|---|---|---|---|
+| création manuelle | 64 octets aléatoires hachés, clair **jeté** | 1 | compte **inaccessible**, sur un écran qui annonce une réussite |
+| import CSV | généré et **remis** | **absent** | un secret vu par un tiers reste celui du compte **indéfiniment** |
+
+La bonne paire prend **un terme de chacun** — remettre **et** forcer — et elle est désormais
+la même sur les deux.
+
+### Ce que cet écart apprend, et qui vaut au-delà de lui
+
+> **Un raisonnement juste se périme quand son objet bouge, sans que rien ne le signale.**
+
+Mon commentaire d'hier justifiait l'absence du drapeau : *« forcer un changement sans canal
+de délivrance fabriquerait un compte inaccessible »*. C'était vrai **du cas où personne ne
+connaît le mot de passe**. La même phrase, sur un chemin qui l'AFFICHE, est fausse — et je
+l'ai reportée telle quelle.
+
+*C'est le pendant exact de la règle déjà écrite ici : **un commentaire qui AFFIRME est une
+donnée à mesurer, un commentaire qui JUSTIFIE est un argument**. Ce que je n'avais pas tiré :
+**un argument se relit quand son objet change**, sinon il devient une affirmation
+déguisée — et il protège le défaut au lieu de l'expliquer.* [[feedback_libelle_decrit_le_defaut]]
+
+**Et la consigne portait déjà l'ouverture qui a permis de la contredire** : « si ta mesure dit
+autre chose, elle gagne ». Sans cette phrase j'aurais aligné sur un modèle défectueux et
+**la moitié du défaut aurait survécu à sa propre correction**.
+
+### Un piège réarmé par ma propre main, et ce qu'il dit du correctif en attente
+
+`php artisan view:cache`, lancé en root pour contrôler que la vue compile, a recréé
+**151 vues compilées appartenant à `root`** dans un dossier `www-data` : la cause exacte de
+`PIEGE-CACHE-BLADE.md`, celle qui rend 500 sur **toutes** les pages. Constaté par `ls -l`,
+désarmé par `chown`, vérifié au réseau (`/` 302, `/connexion` 200, `/comptes` 302).
+
+> **La ligne ajoutée à `docker-entrypoint.sh` n'aurait rien empêché ici** : elle n'agit qu'au
+> démarrage, et le conteneur tourne depuis 23 h. **Tout contrôle de compilation lancé en root
+> entre deux démarrages réarme le piège** — et le seul témoin est `ls -l`, que rien n'oblige à
+> regarder. *À ajouter au dossier : le geste de contrôle le plus banal du portage est aussi
+> celui qui pose la mine.*
+
+### Non fait, et dit
+
+- **aucune exécution E2E** : elle créerait un compte réel dans une base partagée pendant que
+  d'autres mesures peuvent tourner. La propriété « le mot de passe est bien remis à l'écran »
+  reste donc **vérifiée par lecture, pas au réseau** ;
+- **les comptes déjà créés par l'import** avant v1.40.4 gardent un mot de passe non forcé. La
+  remédiation existe (`POST /comptes/{id}/mot-de-passe`) et **n'a pas été jouée** : elle
+  change des comptes existants.
