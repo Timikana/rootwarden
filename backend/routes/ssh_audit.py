@@ -786,16 +786,61 @@ def create_ssh_schedule():
     # sans lui la base leve et l'appelant recoit un 500 opaque, la ou un 400
     # nomme ce qui ne va pas. *Une garde redondante qui ameliore le message n'est
     # pas une garde inutile.*
-    PORTEES = ('all', 'tag', 'environment', 'machines')
-    target_type = (data.get('target_type') or 'all').strip()
+    # ══ `'all'` N'EST PLUS UNE PORTEE ACCEPTABLE ═══════════════════════════
+    #
+    # `'all'` etait la SEULE portee n'exigeant aucun `target_value`, et le
+    # planificateur la traite en prenant tout le parc non archive. Mesure du
+    # 2026-09-04 : les TROIS machines du parc, `srv-zabbix` (id 1) comprise, dont
+    # aucune n'est archivee. « Tout le parc » n'est donc pas une abstraction —
+    # c'est la production.
+    #
+    # ET LA FERMETURE EST ICI, PAS DANS LE `<select>`. La regle invoquee pour
+    # retirer `'all'` de l'ecran — *une entree libre ABSENTE ne se contourne pas,
+    # une entree validee se contourne* — est vraie du SERVEUR. Un `<select>` se
+    # contourne exactement comme un champ valide : par une requete forgee. Poser
+    # la fermeture a l'ecran seul, c'est la poser la ou elle ne mord pas.
+    #
+    # AUCUNE COMPATIBILITE A PRESERVER : `ssh_audit_schedules` et
+    # `cve_scan_schedules` portent 0 ligne (mesure, temoin `machines_total = 3`).
+    # L'argument « garder `'all'` pour les planifications anterieures » n'avait
+    # pas d'objet.
+    #
+    # `tag` rend le meme service — un tag peut couvrir le parc — en exigeant un
+    # geste EXPLICITE. C'est la forme que V10a a imposee aux surcharges de
+    # supervision, pour la meme raison.
+    #
+    # ⚠ ET LE DEFAUT IMPLICITE DISPARAIT AVEC. Sans ca,
+    # `data.get('target_type') or 'all'` fabriquerait une valeur aussitot
+    # refusee : un corps sans `target_type` recevrait un message parlant de
+    # `'all'` qu'il n'a jamais envoye. **Une portee ne se devine plus.**
+    PORTEES = ('tag', 'environment', 'machines')
+    target_type = (data.get('target_type') or '').strip()
     target_value = (data.get('target_value') or '').strip() or None
 
+    if not target_type:
+        return jsonify({
+            'success': False,
+            'message': ("target_type requis : une planification n'a plus de portee "
+                        f"par defaut. Valeurs acceptees : {', '.join(PORTEES)}.")
+        }), 400
+    if target_type == 'all':
+        # Message DISTINCT du type inconnu : `'all'` reste une valeur legale de
+        # l'ENUM en base, et un appelant qui la lit dans le schema doit savoir
+        # qu'elle est refusee par DECISION, pas par faute de frappe.
+        return jsonify({
+            'success': False,
+            'message': ("La portee 'all' n'est plus acceptee : une planification "
+                        "de relevé SSH ne peut plus viser tout le parc par defaut. "
+                        f"Designez la portee ({', '.join(PORTEES)}) — un tag peut "
+                        "couvrir le parc, mais il faut l'ecrire.")
+        }), 400
     if target_type not in PORTEES:
         return jsonify({
             'success': False,
             'message': f"target_type doit valoir l'un de : {', '.join(PORTEES)}"
         }), 400
-    if target_type != 'all' and not target_value:
+    if not target_value:
+        # Les trois portees restantes l'exigent toutes : plus d'exception.
         return jsonify({
             'success': False,
             'message': (f"Une portee '{target_type}' exige target_value. "

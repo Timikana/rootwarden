@@ -79,3 +79,26 @@ for p in docs/migration/patchs-en-attente/0*.patch; do
 done
 # le 04 DOIT refuser ; les 01 a 03 DOIVENT passer
 ```
+
+
+---
+
+## ⚠ `02-E-280-portee-scheduler` — **APPLIQUÉ** le 2026-09-04
+
+Posé avec le refus de `'all'` à l'entrée, sur autorisation nommée du DSI. **Le fichier est conservé
+comme trace de ce qui a été appliqué**, pas comme candidat.
+
+**Et il portait un défaut que trois contrôles n'ont pas vu** : il appelait `logger.error(…)` alors que
+`scheduler.py` définit `_log` (`:28`). `git apply --check` passait, `ast.parse` passait, l'import du
+module passait — **seul `ruff` l'a vu** (`F821 Undefined name 'logger'`).
+
+> **Le défaut était sur la branche que le patch existe pour protéger** : un `NameError` sur le repli
+> fail-closed, c'est-à-dire au moment exact où la planification doit être refusée. *Un correctif qui
+> lève sur son propre chemin de refus ne refuse pas : il plante, et ce qui suit un plant n'est pas
+> écrit.*
+
+**Corrigé dans le code ET dans ce fichier**, pour que la prochaine session n'hérite pas du défaut.
+
+*C'est la démonstration de la condition posée par le DSI : « `git apply` puis relis le résultat —
+`--check` dit que ça s'applique, pas que c'est juste. » Ici il fallait aller au-delà de la relecture :
+un nom absent ne se voit pas à l'œil dans un diff de 35 lignes.*

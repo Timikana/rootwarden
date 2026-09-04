@@ -273,7 +273,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.196** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.197** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2436,6 +2436,62 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.197 — une planification de relevé SSH ne peut plus viser tout le parc par omission
+
+**Deux gestes, autorisés nommément, et ils ne valent qu'ensemble.**
+
+## `'all'` est refusé À L'ENTRÉE, pas seulement à l'écran
+
+`'all'` etait la **seule** portee n'exigeant aucun `target_value`, et le planificateur la traite en
+prenant tout le parc non archive. **Mesure du 2026-09-04 : les trois machines du parc, `srv-zabbix`
+(id 1) comprise, dont aucune n'est archivee.** « Tout le parc » n'est pas une abstraction — c'est la
+production.
+
+**La fermeture est au serveur, et c'est le point.** La regle invoquee pour retirer `'all'` de l'ecran
+— *une entree libre ABSENTE ne se contourne pas, une entree validee se contourne* — **est vraie du
+serveur**. Un `<select>` se contourne exactement comme un champ valide : par une requete forgee.
+*Poser la fermeture a l'ecran seul, c'est la poser la ou elle ne mord pas.*
+
+**Aucune compatibilite a preserver** : les deux tables de planification portent **0 ligne** (temoin :
+`machines_total = 3`). L'argument « garder `'all'` pour les planifications anterieures » n'avait pas
+d'objet.
+
+**Et le defaut implicite disparait avec.** Sans ca, `data.get('target_type') or 'all'` fabriquerait une
+valeur aussitot refusee, et un corps sans `target_type` recevrait un message parlant d'une portee qu'il
+n'a jamais envoyee. **Une portee ne se devine plus.**
+
+`'all'` recoit un message **distinct** du type inconnu : elle reste une valeur legale de l'ENUM en
+base, et un appelant qui la lit dans le schema doit savoir qu'elle est refusee **par decision**.
+
+## Le repli du planificateur : les cinq branches d'un coup
+
+Branche `'all'` **explicite**, et `else` qui **refuse** (`WHERE 1=0` + journal). *Ce n'est pas une
+enumeration de cas a tenir a jour : c'est un repli inverse.* Les trois branches restreintes portaient
+leur test de vacuite **dans la condition d'entree**, donc un champ blanc n'entrait jamais dans sa
+branche et sortait par le `else` final.
+
+**Le `WHERE 1=0` cite jusqu'ici a decharge est dans le `else` INTERNE de `machines`** : il couvre une
+liste *presente mais illisible*, jamais un champ *blanc*. Trois lecteurs prudents s'y sont trompes.
+
+## ⚠ ET LE PATCH GELE PORTAIT UN DEFAUT QUE TROIS CONTROLES N'ONT PAS VU
+
+Il appelait `logger.error(…)` alors que `scheduler.py` definit `_log` (`:28`). **`git apply --check`
+passait, `ast.parse` passait, l'import du module passait — seul `ruff` l'a vu** (`F821`).
+
+> **Le defaut etait sur la branche que le patch existe pour proteger** : un `NameError` sur le repli
+> fail-closed, au moment exact ou la planification doit etre refusee. *Un correctif qui leve sur son
+> propre chemin de refus ne refuse pas : il plante.*
+
+Corrige dans le code **et dans le fichier de patch**, pour que la prochaine session n'herite pas du
+defaut.
+
+**Mesure** : la garde d'entree exercee sur **neuf** cas — corps vide, `'all'` explicite, `null` JSON,
+espaces seuls, `tag` sans valeur, `tag` en espaces, `tag` renseigne, casse differente, type hors enum.
+`'ALL'` est refuse comme type inconnu : **ne pas normaliser la casse est plus strict** que de le faire,
+et c'est delibere.
+
+**Inerte jusqu'au redemarrage.** Aucune ligne ecrite dans les tables de planification.
 
 ### v1.38.196 — LOT3 : 55 FAIL bruts, **5 reels**, et six erreurs de mesure toutes du meme cote
 
