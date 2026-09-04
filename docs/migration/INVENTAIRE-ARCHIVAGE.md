@@ -542,3 +542,76 @@ arbitré, les trois touches de la Q3 sur tout l'inventaire sont :
 
 **La Q3 est donc terminée sur les quatre blocs.** Reste à l'appliquer à ce qui n'a
 jamais été inventorié : les **16 fichiers non appariés** du §4.
+
+---
+
+## 9. Les 16 non appariés — **lot 1/3 : les sept `auth/`** (2026-09-04 15:35 CEST)
+
+Q3 pointée en premier, comme demandé.
+
+| fichier | geste | équivalent `laravel/` | verdict |
+|---|---|---|---|
+| `auth/verify.php` (371 l.) | le garde central : session, blocage 2FA, expiration de mot de passe, en-têtes de sécurité | middlewares (`ChangementMotDePasseExige`, `ExigePermission`…) | **SOCLE** — 56 requérants (Q2) |
+| `auth/functions.php` (317 l.) | utilitaires de session/CSRF/permissions | idem | **SOCLE** — 24 requérants (Q2) |
+| `auth/enable_2fa.php` | enrôlement TOTP initial (QR + validation du 1er code) | `views/auth/enrolement.blade.php` | **PORTÉ** |
+| `auth/confirm_2fa.php` | confirmation du code après activation | même flux d'enrôlement | **PORTÉ** |
+| `auth/step_up.php` (5 req.) | exiger une re-auth pour un geste destructeur | `web.php:160` `POST /profil/step-up` | **PORTÉ** |
+| `auth/step_up_verify.php` | valider le code TOTP du step-up | `web.php:164` (+ révocation) | **PORTÉ** |
+| `auth/reset_totp.php` | un superadmin remet à zéro le TOTP d'un compte | `web.php:643` `POST /comptes/{id}/second-facteur` | **PORTÉ** |
+
+### 9.1 ⚠ TOUCHE Q3, et elle frappe une page du BLOC B
+
+**`auth/login.php` n'est pas dans ce lot — il était classé PORTÉ au bloc B. Mais
+mesurer le step-up m'a fait ouvrir son formulaire, et il porte un geste de plus.**
+
+    legacy/auth/login.php:10    « L'option "Se souvenir de moi" (token 30 jours) »
+                        :179    if (isset($_POST['remember_me']) …)
+                        :183    REPLACE INTO remember_tokens (user_id, token_hash, expires_at)
+                        :190    setcookie('remember_token', …)
+                        :397    <input type="checkbox" id="remember_me" …>
+
+    laravel/resources/views/auth/connexion.blade.php
+        occurrences de remember / souvenir / rester : 0
+
+    ECRITURES de `remember_tokens` cote laravel/, TOUTES FORMES : 0
+        (ORM · SQL brut · DB::statement — temoin : les 3 formes sont vues
+         sur `user_logs`, dont le SQL brut d'ExigePermission.php:73)
+
+**Le portage ne fait que SUPPRIMER de cette table** — `MotDePasse.php:295` (purge au
+changement de mot de passe) et `Comptes.php:572` (anonymisation).
+
+> **`auth/login.php` est le seul accès à « se souvenir de moi ». L'archiver retire
+> la capacité, et la table `remember_tokens` restera en base avec un portage qui
+> n'y écrit jamais et n'en supprime que le contenu d'autrui.** Troisième page du
+> bloc B à sortir par la Q3, après `admin_page.php` et `index.php`.
+
+### 9.2 Deux corrections à mes propres relevés — **les deux dans le même sens**
+
+**1. La déclaration du step-up a été CORRIGÉE depuis mon relevé de cette nuit.**
+
+    ce que j'avais mesure   « Cette action exige une re-authentification, QUI N'EST
+                              PAS ENCORE DISPONIBLE sur cette interface. Effectuez-la … »
+    ce qu'elle dit a 15h35  « Cette action exige une re-authentification.
+                              Confirmez-la a… »
+
+Le geste a été porté et la phrase rectifiée. **Ma lecture était juste à son heure ;
+elle a une demi-vie de quelques heures sur ce dépôt.** C'est la deuxième fois de la
+journée après le préréglage sudo.
+
+**2. Et j'ai évité de justesse le piège que j'avais déjà payé deux fois.** Ma
+première sonde sur la table `permissions` ne cherchait que la forme ORM
+(`DB::table('permissions')->…`) : elle rendait **3 occurrences, toutes des
+LECTURES**, donc « le portage n'écrit jamais les permissions ». **Faux.**
+`Permissions.php:155` écrit en **SQL brut** via `DB::statement`, avec
+`INSERT … ON DUPLICATE KEY UPDATE`, exactement comme le legacy. La sonde
+multi-formes l'a vu ; la sonde à une forme aurait produit une accusation.
+
+### 9.3 Ce que je NE classe pas
+
+**`verify.php` porte en en-tête une responsabilité n°8, « Initialisation
+permissions par défaut si absentes ».** Je n'ai trouvé que la **documentation** de
+ce geste, pas son code. Le portage crée la ligne au **premier réglage**
+(`ON DUPLICATE KEY UPDATE`) et non à la création du compte : la différence ne porte
+que sur un compte n'ayant jamais reçu aucune permission. **Je ne sais pas si les
+valeurs d'initialisation du legacy sont toutes à zéro** — et sans ça je ne peux pas
+dire si « pas de ligne » et « ligne du legacy » sont équivalents. **Non classé.**
