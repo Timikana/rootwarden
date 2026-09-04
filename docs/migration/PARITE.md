@@ -19251,3 +19251,82 @@ entrée de journal**, violant ma propre liste de contrôle.
 > transactionnelle.* C'est la même forme que « le filet et le verdict doivent
 > partager le même prédicat », appliquée à l'ordre des gestes plutôt qu'à leur
 > contenu.
+
+
+## E-396 — quatre verrous sont HORS DE PORTÉE de la CI, et cinq y sont joués dans une version périmée
+
+**Mesuré le 2026-09-04 19:30.** La question posée était *« la CI joue-t-elle ce
+verrou ? »* avec trois réponses attendues — joué, non joué, joué-mais-skippé.
+**Il en manquait une, et c'est celle qui domine.**
+
+    origin/main <-> HEAD                3 derriere / 96 devant
+    fichiers de test sur origin/main    58        en local    62
+
+    categorie                              compte   ce qu'un ROUGE bloque
+    NON JOUE — absent de `origin/main`          4   rien : le fichier n'y est pas
+    JOUE dans une version PERIMEE               5   ce que l'ANCIENNE version assertait
+    JOUE a jour                                49   voir la reserve ci-dessous
+    JOUE-MAIS-SKIPPE                    2 fichiers  rien, et c'est VOULU
+
+### ⛔ Les quatre hors de portée
+
+    backend/tests/test_patchs_geles.py                  les patchs geles
+    backend/tests/test_scheduler_portee.py              la portee `all`, etage backend
+    laravel/tests/Feature/PorteeAllRetireeTest.php      la portee `all`, etage portage
+    laravel/tests/Feature/RestaurationParJetonTest.php
+
+**Et l'inverse est vide** : rien sur `origin/main` n'est absent en local, donc
+l'écart est purement additif.
+
+> **Le verrou des patchs gelés n'est pas « joué-mais-skippé » : il est hors de
+> portée.** *La question portait sur son skip ; la réponse est en amont.* Et le
+> détail qui le rend visible : **le dossier `docs/migration/patchs-en-attente/`
+> EST sur `origin/main` (6 fichiers), le garde ne l'est pas.** *Le gardé est
+> publié, le garde ne l'est pas.*
+
+**Le travail de la session 6 n'est pas en cause** : `test_patchs_geles.py:76-86`
+**échoue fermé** si `GITHUB_ACTIONS` est défini et que le dossier manque, et son
+skip **nomme sa fenêtre**. C'est la bonne forme, sans effet tant que le fichier
+n'est pas poussé.
+
+### ⚠ Les cinq périmés, et c'est la catégorie la plus traître
+
+    backend/tests/test_invariant_machine_id.py   DIFFERE de origin/main
+    backend/tests/test_cve.py                    DIFFERE
+    + 3 autres
+
+> **Le job est vert, le fichier est là, le nom est le bon — et la propriété
+> assertée n'est pas celle qu'on croit avoir posée.** *Un « joué » n'est pas un
+> « joué à jour », et rien dans le rapport du job ne distingue les deux.*
+
+### Sur la question du skip, qui était la priorité : oui, mais pas là où on la craignait
+
+    --strict-markers dans ci.yml                 0
+    --strict-markers dans pytest.ini/cfg/toml    AUCUN fichier
+    plancher sur le compte de COLLECTES          AUCUN
+    (temoin : ci.yml porte bien des options pytest, ligne 111)
+
+**La faille structurelle est réelle et non couverte** — `pytest tests/ -v
+--tb=short` sort en 0 avec des skips, et rien ne borne les collectés. **Mais aucun
+skip actuellement joué n'est de cette forme** : deux fichiers seulement en portent,
+et les raisons sont des **décisions nommées** (`test_ssh.py` : « refusée par
+`ipaddress` elle-même » ; `test_fail2ban_manager.py` : « remplacé par
+`TestApprobationSelonLeDrapeau`, qui déclare le drapeau »).
+
+*La parade proposée par la session 4 — `--strict-markers` + un plancher sur les
+collectés — protège donc d'un skip FUTUR, pas d'un skip présent.* **Proposée, non
+écrite** : c'est `ci.yml`.
+
+### ⚠ ET LE CORRECTIF D'E-381 EST DANS LA MÊME SITUATION
+
+Le `needs` d'`auto-tag` est **commité et non poussé**. **Donc aujourd'hui, un rouge
+de `test-php` ou `test-python` ne bloque toujours rien.**
+
+> **La troisième colonne du tableau a la même réponse pour tout : « rien, jusqu'à
+> une poussée ».** *Le retard de la référence rend la question du skip secondaire
+> — quatre verrous sont invisibles, cinq sont périmés, et aucune option de `pytest`
+> n'y changerait quoi que ce soit.*
+
+*Non inscrit ailleurs : `DECISIONS-DSI.md:8335` porte la proposition
+`--strict-markers`, `:8673` porte la tâche du tableau — ni l'un ni l'autre ne
+portait l'écart de référence.*
