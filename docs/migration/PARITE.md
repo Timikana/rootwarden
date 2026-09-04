@@ -8,6 +8,85 @@ Un ecart non ecrit ici est une regression, pas un choix.
 
 ---
 
+## E-392 — dix rejeux 2FA fermaient l'etape du second facteur pour TOUTE une adresse
+
+**Corrige le 2026-09-04 (`v1.39.9`).** *Trouve par la session 4, verifie par la DSI, et la
+condition qu'elle posait avant d'ecrire est mesuree ci-dessous — avec une reponse qui
+DEBORDE son correctif.*
+
+### Le defaut
+
+    SecondFacteurController, les DEUX chemins (:128 connexion, :212 step-up)
+        $verdict = $this->totp->verifie(…);
+        $this->journalise(…, $verdict === 'ok');   <- AVANT l'aiguillage
+        if ($verdict === 'rejeu') { return back()->withErrors(…); }
+
+    -> un rejeu s'inscrivait `success = 0`, `step = '2fa'` : un ECHEC
+    ipBloquee() (:280-289)  compte exactement ces lignes, et bloque a DIX en 10 min
+
+**Un bureau derriere un NAT partage une adresse.** *Et un rejeu est le cas legitime le plus
+banal : le meme compte, un second appareil, la meme fenetre de trente secondes.*
+
+> **Ce n'est pas une regression : c'est une garde neuve et bonne dont le choix de
+> journalisation a produit un risque de DISPONIBILITE.** *Le legacy porte le meme compteur par
+> IP ; c'est la DETECTION du rejeu qui est nouvelle.*
+
+### Le correctif, et la distinction qui le porte
+
+> **Un rejeu n'est pas un echec d'identifiant : c'est une soumission EN DOUBLE d'un
+> identifiant VALIDE. Il doit etre inscrit et ne doit pas compter.**
+
+    `journalise()` recoit desormais le VERDICT, pas un booleen
+      -> UNE SEULE place decide `success` ET `step` : passes separement, les
+         deux finiraient par se contredire
+    step = `2fa_rejeu` pour un rejeu, `2fa` sinon    (varchar(16), neuf caracteres)
+    `ipBloquee()` INCHANGE dans sa logique : il filtre deja `step = '2fa'`
+
+*Et il passe du litteral a la constante : si l'etape des rejeux changeait de nom, ce compteur
+doit continuer de ne compter que la sienne.*
+
+**Ce qu'on ne fait PAS** : inscrire `success = 1` (falsifier le journal) ni cesser d'inscrire
+(un rejeu est une PREUVE — quelqu'un resoumet un code cryptographiquement valide).
+
+### ✅ LA CONDITION POSEE AVANT D'ECRIRE : qui LIT `step = '2fa'` ?
+
+**Enumeration des trois arbres :**
+
+    laravel   SecondFacteurController:282   ipBloquee()          <- le compteur corrige
+    legacy    verify_2fa.php:73 · confirm_2fa.php:72 · enable_2fa.php:129
+              trois copies du MEME compteur, meme filtre
+    -> les quatre cessent de voir les rejeux. C'est l'effet voulu.
+
+### ⛔ MAIS LE CORRECTIF NE SUFFIT PAS, ET CE N'EST PAS DANS MON PERIMETRE
+
+    legacy/auth/login.php:46   $maxAttempts = 5;
+                        :50   COUNT(*) … WHERE ip_address = ? AND success = 0
+                              AND attempted_at >= …        <- AUCUN filtre de `step`
+
+> **Le compteur de CONNEXION du legacy compte toute ligne en echec, quelle que soit son
+> etape. CINQ rejeux fermaient donc deja l'etape de connexion — a la MOITIE du seuil, sur un
+> AUTRE ecran, avant que le compteur 2FA atteigne dix.**
+
+**Changer l'etape ne l'en sort pas** : `2fa_rejeu` reste `success = 0`. *Le residu vit dans
+`legacy/auth/login.php`, qui est en production et hors de mon perimetre d'ecriture.*
+
+**Pour le portage, le correctif EST suffisant** : aucun compteur du portage ne lit
+`login_attempts` sans filtre d'etape — `ConnexionController:119` n'y fait qu'INSERER. *Donc
+apres cette correction, un rejeu ne ferme plus rien du cote qui survit a la bascule.*
+
+### Ce qui n'est PAS fusionne, et deliberement
+
+`erreur_code_deja_utilise` reste distinct d'`erreur_code_invalide`. *C'est un oracle faible —
+il faut deja detenir un code valide pour l'atteindre — et c'est la SEULE information qui dise
+a la personne legitime quoi faire : attendre la fenetre suivante plutot que ressaisir.*
+
+### Reserves
+
+- **Le geste n'est pas exerce** : provoquer un rejeu exige une session et un code TOTP valide
+  resoumis dans sa fenetre. *Je n'invente pas de secret TOTP.*
+- Pas de binaire PHP sur l'hote de cette session ; equilibres identiques a `HEAD`.
+
+---
 ## E-390 — deux de MES declarations, l'une inerte et l'autre fausse
 
 **Code corrige en `7eabe64`** (2026-09-04). *⚠ Ce commit cite « Ecart E-388 » et « v1.39.6 » :
