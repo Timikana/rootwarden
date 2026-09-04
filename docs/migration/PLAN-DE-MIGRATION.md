@@ -5621,3 +5621,54 @@ choix de conception, et mesurer des valeurs ne pouvait pas le voir — il fallai
 l'INDÉPENDANCE.* Même remarque pour `ROLE_PLANCHER` : verrouiller qu'il est le **moins
 privilégié** de la liste attrape ce qu'un invariant `role ∈ ROLES` laisse passer sans rien
 dire — *un plancher à 2 rendrait chaque refus promoteur.*
+
+### Une sonde a **l'autorité de sa réparation** — 10 fausses alarmes, 0 défaut
+
+La QA a nommé une classe de défaut qu'aucun contrôle i18n du dépôt ne voit : *un jeton
+`:xxx` présent dans un catalogue mais non lié par son appelant s'affiche en clair, et les
+contrôles cherchent des identifiants `module.cle`, pas des jetons* — le dépôt l'a déjà payé
+avec « 3 :count serveur(s) disponible(s) ». J'ai mesuré le catalogue `comptes` en entier.
+
+    23 cles a jetons · 0 defaut residuel · parite des JETONS par cle fr/en : 0 divergence
+
+**Le catalogue est sain. Ma sonde ne l'était pas** — quatre angles morts, tous du côté qui
+accuse :
+
+    v1 : 8 alarmes, 8 FAUSSES        v2 : 2 alarmes, 2 FAUSSES
+
+    ① la substitution vit cote CLIENT — `garnis(L.cle, { jeton })`, en split/join.
+       J'ai cherche `replace` dans le JS, obtenu 0, et lu ce zero comme
+       « le JS ne substitue pas ».                                  6 alarmes
+    ② `[^\]]*` s'arretait au `]` de `?? []`, cachant le 2e argument.  1
+    ③ `__($err, [...])` — cle par VARIABLE, invisible a un motif litteral. 1
+    ④ apres correction des trois : `garnis(L.cle, { nom })`, forme ABREGEE
+       ES6 — mon motif exigeait « jeton: ».                            2
+
+> **① est la forme la plus dangereuse : un zéro sur UNE implémentation lu comme un zéro sur
+> le MÉCANISME.** *`garnis` substitue par `split/join` ; chercher `replace` ne pouvait pas le
+> trouver, et le silence a rendu « personne ne substitue ».*
+
+**Et ④ est la leçon neuve de ce tour.** J'avais corrigé trois angles morts, relancé, obtenu
+deux alarmes — **et j'ai failli les rapporter comme réelles.**
+
+> **Une sonde qu'on vient de réparer emprunte l'autorité de la réparation.** *Le témoin ne dit
+> pas qu'elle est JUSTE, il dit seulement qu'elle MORD.* Les alarmes **survivantes** à une
+> correction sont les plus suspectes, pas les plus crédibles.
+
+*Corollaire de compte rendu, et il n'est pas cosmétique* : un rapport « 8 alarmes puis 2 »
+décrit une sonde, pas un défaut. **Compter les fausses alarmes de ses propres versions
+successives est ce qui distingue les deux** — sans ce compte, la v2 se lit comme un
+resserrement et non comme un instrument encore cassé.
+
+### ⚠ Et mon témoin, lui, a été posé dans l'ARBRE
+
+Pour vérifier que la v2 mord, j'ai introduit `:jetonTemoin` dans une clé de
+`laravel/lang/fr/comptes.php` — **le conteneur monte l'arbre**, donc la mutation a vécu ~1 s
+dans un fichier que sept sessions lisent. Contenu restauré, `git status` propre, **mtime
+déplacée** (20:06:33) et le fait signalé au pair plutôt que laissé à l'état d'anomalie
+inexplicable.
+
+*Le témoin devait porter sur une copie dans le `/tmp` du conteneur.* Encore la règle du banc
+rendu : **la charge se voit dans `ps`, l'écriture ne se voit nulle part** — et cette fois
+c'est un témoin de qualité qui a ouvert la fenêtre, pas une négligence. *Les deux bonnes
+pratiques se contrariaient, et je n'ai vu le conflit qu'après.*
