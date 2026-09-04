@@ -503,3 +503,129 @@ la même demande qu'en §2.4, maintenant étayée par la population complète.
 **Je ne fusionne rien** — la règle du dépôt exige un accord verbal explicite de
 l'exploitant pour un patch de sécurité, et cet accord porte sur
 `Migration-Laravel`, pas sur cette branche.
+
+---
+
+## 8. L'invariant `require_machine_access` face au merge — 2026-09-04
+
+Le DSI demande d'élargir `CLES` à `'mid'` et de faire reconnaître les paramètres
+de chemin, **sur la branche**, pour que le merge ne rende pas l'invariant périmé.
+
+**Mesuré : l'élargissement ne change RIEN, et le fichier n'est pas sur la
+branche.** Les deux faits changent la réponse.
+
+### 8.1 Avant / après — trois configurations, résultat IDENTIQUE
+
+Mesure en chargeant `test_invariant_machine_id.py` et en réemployant **ses propres
+fonctions** (`pytest` émulé sur l'hôte, rien installé) :
+
+| configuration | routes | gardées | `sans_objet` | neuves |
+|---|---|---|---|---|
+| **AVANT** — 4 clés | 230 | **116** | 2 | **0** |
+| + `'mid'` | 230 | **116** | 2 | **0** |
+| + `'mid'` + paramètre de chemin | 230 | **116** | 2 | **0** |
+
+**Plancher `PLANCHER_ROUTES_GARDEES = 100` : tenu dans les trois (116).** Seuil
+des 150 routes : tenu (230). *L'élargissement ne casse pas le parseur — le
+contrôle que le DSI demandait est vert.*
+
+**`FACULTATIVES_CONNUES` : aucun changement de statut**, dans aucune des trois
+configurations. Les deux entrées (`docker.py:docker_results`,
+`updates.py:update_zabbix`) restent trouvées ; aucune ne devient fantôme, aucune
+ne disparaît.
+
+### 8.2 POURQUOI l'élargissement est inerte — mesuré, pas déduit
+
+Les **quatre** routes du backend dont un argument porte un nom de machine :
+
+```
+supervision.py:get_overrides             args=[machine_id]  macc=False  role+perm
+supervision.py:save_overrides            args=[machine_id]  macc=False  role+perm
+supervision.py:get_machine_agents_route  args=[machine_id]  macc=False  role+perm
+supervision.py:machine_profile           args=[mid]         macc=TRUE   role+perm
+```
+
+**Les quatre portent `require_role` ET `require_permission`.** Elles sont donc
+exclues de `sans_objet` par la clause d'**autorisation propre**, *avant* que
+`CLES` ou la reconnaissance des paramètres de chemin n'entre en jeu. Et trois des
+quatre ne portent même pas le décorateur.
+
+> **Le désaccord que le DSI craignait ne se matérialise pas.** Il notait que
+> l'erreur *alarmerait* sans dédouaner — donc non bloquante. **Mesuré : elle
+> n'alarme pas non plus.** La seule route concernée (`machine_profile`) est déjà
+> exemptée par l'autre bout de la condition.
+
+**La modification reste souhaitable** — pour que le modèle du test décrive le
+décorateur qu'il teste, et ne diverge pas en silence. **Mais ce n'est pas la
+péremption qui défait QA-009 : aucune assertion ne bouge.**
+
+### 8.3 ⚠ ET LE FICHIER N'EST PAS SUR LA BRANCHE
+
+```
+main / origin/main / Migration-Laravel   test_invariant_machine_id.py  PRESENT
+security/backend-cve                                                   ABSENT
+git merge-base --is-ancestor 59484cb security/backend-cve  ->  NON
+```
+
+La branche a divergé à `279f5fa` (2026-08-20) ; l'invariant est arrivé par
+`59484cb` (2026-08-28). **La consigne « corrige-le sur la branche » ne peut pas
+s'exécuter : il n'y a rien à corriger là.**
+
+Et l'y **apporter** serait nuisible : le fichier existerait alors des **deux**
+côtés avec des contenus différents → **conflit add/add**, exactement la propriété
+de merge propre que le DSI vient de mesurer absente.
+
+**Le raisonnement du DSI pour refuser `main` est juste — et il expire au merge** :
+*« on écrirait dans `main` un test qui décrit du code absent »*. Vrai avant le
+merge, faux après.
+
+> **Donc le correctif n'appartient à aucun des deux côtés : il appartient au
+> MERGE.** Préparé, appliqué sur `main` **après** la fusion — moment où il décrit
+> du code présent, ce qu'un invariant doit faire.
+
+### 8.4 Le diff préparé — et une correction à la consigne
+
+Le DSI demande de faire reconnaître le paramètre de chemin **à
+`_lit_un_identifiant()`**. **C'est le mauvais endroit, pour deux raisons.**
+
+1. `_lit_un_identifiant` est aussi appelée sur des **expressions** (`n.value`
+   d'un `Assign`) dans `_refuse_si_absent` ; un nœud d'expression n'a pas
+   d'`args`. La modification y serait inerte.
+2. **Et la propriété n'est pas « la fonction lit un identifiant » — c'est
+   « l'identifiant est OBLIGATOIRE ».** Un paramètre de chemin l'est **par
+   construction** : une route Flask `<int:mid>` ne matche pas sans le segment.
+   C'est donc `_refuse_si_absent` qui doit rendre `True`.
+
+```python
+CLES = ('machine_id', 'server_id', 'machine_ids', 'server_ids', 'mid')
+#                                                               ^^^^^
+# `mid` : le decorateur de la branche `security/backend-cve` lit CINQ sources
+# (corps, query, kwargs) x ('machine_id','server_id','mid'). La liste du test
+# doit decrire le decorateur qu'elle mesure, sinon elle en modelise un autre.
+
+
+def _refuse_si_absent(fn):
+    # UN PARAMETRE DE CHEMIN EST OBLIGATOIRE PAR CONSTRUCTION.
+    #
+    # `@bp.route('/x/<int:mid>')` ne matche pas sans le segment : l'identifiant
+    # ne peut pas etre absent, donc le decorateur a toujours un objet. Ce n'est
+    # pas « la fonction le LIT » — c'est « il ne peut pas manquer ». La nuance
+    # decide de l'endroit : ici, pas dans `_lit_un_identifiant`, qui est aussi
+    # appelee sur des noeuds d'EXPRESSION (sans `args`).
+    if {a.arg for a in fn.args.args} & set(CLES):
+        return True
+    …  # le corps existant, inchange
+```
+
+**Ce que le diff casserait : rien.** Mesuré — les trois configurations rendent
+230 / 116 / 2 / 0. Il rend le modèle du test conforme au décorateur **sans
+déplacer aucune assertion**.
+
+### 8.5 Ce que je n'ai pas fait
+
+- **aucun `git checkout`** : la branche a été montée en `git worktree` dans le
+  scratchpad, puis retirée ;
+- **aucune écriture sur `security/backend-cve` ni sur `main`** — §8.3 ;
+- **la suite n'a pas été rejouée** : le banc n'est pas déclaré libre, et le « 318
+  pytest » est un chiffre hérité que le DSI ne présente pas comme un verdict. **Je
+  ne le relaie pas comme mesuré.**
