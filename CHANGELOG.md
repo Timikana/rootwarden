@@ -5,7 +5,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
-## [1.51.2] - 2026-09-05
+## [1.52.1] - 2026-09-05
 
 ### Profil - une tuile annoncait un manque qui n'existait pas, et renvoyait vers un portail qui ne le comblait pas
 
