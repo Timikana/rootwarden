@@ -60,14 +60,60 @@
 // ── Garde CLI ────────────────────────────────────────────────────────────────
 // Placée AVANT tout require : une requête HTTP ne doit même pas ouvrir la
 // connexion BDD ni charger les clés de chiffrement.
-// Lancement : docker exec rootwarden_php php /var/www/html/auth/migrate_crypto.php
+// Lancement (le script est AUTONOME, il ne depend plus d'aucun fichier du
+// portail) :
+//   docker cp scripts/migrate_crypto.php rootwarden_php:/tmp/ \
+//     && docker exec rootwarden_php php /tmp/migrate_crypto.php
+// Apres l'extinction du legacy, n'importe quelle image `php:cli` ayant acces a
+// la base convient — c'est precisement ce que ce deplacement preserve.
 if (PHP_SAPI !== 'cli') {
     http_response_code(403);
     exit;
 }
 
-// Charge la connexion PDO depuis les variables d'environnement DB_*
-require_once __DIR__ . '/../db.php';
+// ══ CONNEXION PDO AUTONOME ═══════════════════════════════════════════════════
+//
+// Ce bloc REMPLACE `require_once __DIR__ . '/../db.php'`, et le remplacement est
+// la raison d'etre du deplacement, pas un effet de bord :
+//
+//   `db.php` vit dans `legacy/`, c'est-a-dire dans l'arborescence qu'on ETEINT.
+//   Un script deplace qui continuerait de l'inclure serait preserve en tant que
+//   FICHIER et perdu en tant qu'OUTIL le jour de l'extinction — un archivage
+//   avec une etape de plus.
+//
+// La surface reprise est exactement celle qui etait utilisee : `migrate_crypto`
+// ne consommait qu'UN symbole de `db.php`, `$pdo` (5 occurrences ; mesure du
+// 2026-09-05, garde-fou sur la sonde). Les quatre variables d'environnement, les
+// memes valeurs par defaut, les deux attributs PDO et le patch A05 sont repris
+// a l'identique ; seule la gestion d'erreur passe du WEB (`http_response_code`,
+// indice HTML) au CLI (stderr + code de sortie non nul), le garde ci-dessus
+// interdisant de toute facon tout autre contexte.
+$host     = getenv('DB_HOST')     ?: 'db';
+$dbname   = getenv('DB_NAME')     ?: 'rootwarden';
+$username = getenv('DB_USER')     ?: 'rootwarden_user';
+$password = getenv('DB_PASSWORD') ?: 'rootwarden_password';
+
+$debugMode = getenv('DEBUG_MODE') === 'true';
+
+// Patch A05 (repris de `db.php`) : refuser le mot de passe par defaut hors mode
+// debug — valeur triviale, presente dans le depot.
+if (!$debugMode && $password === 'rootwarden_password') {
+    fwrite(STDERR, "[migrate_crypto] DB_PASSWORD non defini (valeur par defaut) "
+                 . "en mode non-debug. Abandon.\n");
+    exit(1);
+}
+
+try {
+    $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4", $username, $password);
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $pdo->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
+} catch (PDOException $e) {
+    fwrite(STDERR, "[migrate_crypto] Connexion a la base impossible.\n");
+    if ($debugMode) {
+        fwrite(STDERR, $e->getMessage() . "\n");
+    }
+    exit(1);
+}
 
 // Taille d'un bloc AES en octets (16 = 128 bits), utilisée pour l'IV
 define('AES_BLOCK_SIZE', 16);
