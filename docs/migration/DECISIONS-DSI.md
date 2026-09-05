@@ -9645,3 +9645,52 @@ par leur NOM.**
 
 **⛔ Je ne réécris pas les 128.** *Mais toute citation d'un dossier que l'exploitant pourrait ACTIONNER est
 à reprendre par nom — et je commence par ceux qui portent un geste.*
+
+### ⚠⚠ UNE ATTENTE FAUSSE NE RENCONTRE JAMAIS RIEN QUI LA CONTREDISE
+
+**La session 4 a porté cinq messages durant — dont un à l'exploitant — la réserve « `cve.py:490` toujours
+non déclenchée ». La garde était posée depuis des heures, PAR ELLE, dans le commit `8a26a9c` (E-388).**
+
+> **« Je n'ai pas récité la mesure d'un autre, j'ai récité une ATTENTE que mon propre travail avait déjà
+> close. »**
+
+**Et sa cause est neuve au catalogue :**
+
+    un CHIFFRE faux finit par contredire une mesure
+    une ATTENTE fausse ne rencontre JAMAIS rien qui la contredise
+      -> elle se contente d'etre repetee, et rien ne la met a l'epreuve
+
+**C'est pour ça qu'elle a survécu à cinq relais alors que nos chiffres faux tombent en une heure.** *Une
+réserve ne coûte rien à porter : elle n'affirme rien, donc rien ne l'attaque.*
+
+    la parade est la meme que pour les chiffres, et elle est de la session 4 :
+    la REMESURER AU MOMENT DE LA TRANSMETTRE, pas au moment de la poser.
+
+**⚠ Et je la porte contre moi aussi** : *j'ai relayé cette réserve dans mes propres comptes-rendus à
+l'exploitant, sans jamais l'éprouver — alors que je remesure les chiffres de tout le monde.*
+
+### ✅ ET LE COROLLAIRE QUI CHANGE LA SUITE DE LA MISSION D'EXTINCTION
+
+> **« 0 appelant » répond à « QUI L'APPELLE », pas à « DE QUOI DÉPEND-IL ».**
+
+**Les DEUX questions décident d'un déplacement, et la seconde ne se lit pas dans un relevé d'appelants.**
+*C'est elle qui a fait de E-404 autre chose qu'un `git mv` : `migrate_crypto.php` n'avait aucun appelant, et
+il dépendait de `legacy/db.php` — c'est-à-dire de l'arborescence qu'on éteint.*
+
+    -> repointer le `require` n'aurait fait que DEPLACER LA DATE DE SA MORT
+    -> la surface reellement consommee etait UN symbole, `$pdo`, incorpore
+
+**⚠ ET L'INVENTAIRE D'ARCHIVAGE PORTE D'AUTRES CANDIDATS JUGÉS SUR LA PREMIÈRE QUESTION SEULE.** *La
+session 4 l'a écrit à l'endroit où le prochain lecteur en aura besoin plutôt que dans un message — c'est la
+bonne place, et ça devient une passe à faire sur les 82 restants.*
+
+### ⚠ ET DEUX DESCRIPTIONS FAUSSES CORRIGÉES EN PASSANT
+
+**`ARCHITECTURE.md` décrivait `migrate_crypto.php` comme « Script CLI/web ».** *Il est CLI SEULEMENT :
+`PHP_SAPI !== 'cli'` rend 403 AVANT tout `require`, pour qu'une requête HTTP « n'ouvre même pas la connexion
+BDD ».* **La description annonçait une surface WEB que le code refuse depuis toujours — l'inverse exact du
+défaut habituel, où le commentaire promet une garde que le code n'a pas.**
+
+**Et la trace de mesure `INVENTAIRE-ARCHIVAGE.md:166` n'a PAS été corrigée, à raison** : *« une trace de
+mesure garde le chemin qu'elle a mesuré ».* **Corriger le chemin d'une mesure passée la rendrait fausse
+sur son propre objet.**
