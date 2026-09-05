@@ -208,91 +208,173 @@ class ReinitialisationMecanismeTest extends TestCase
     }
 
     // ══════════════════════════════════════════════════════════════════════
-    // LE REGIME MESURE — pour que la bascule se voie
+    // LE REGIME MESURE — et il se lit chez le SERVANT, pas chez le BANC
     // ══════════════════════════════════════════════════════════════════════
 
-    public function test_le_transport_courant_est_DISTANT_et_la_garde_TIRE(): void
+    /**
+     * L'environnement du processus qui SERT le portail.
+     *
+     * ⚠ POURQUOI PAS `config('mail.default')`. Depuis E-447, `phpunit.xml` porte
+     * `force="true"` : le banc impose `MAIL_MAILER=array` et est donc, par
+     * construction, hors d'atteinte du SMTP reel. **C'est exactement ce qu'on
+     * voulait — et ca eteindrait ce marqueur.** Une surete visible achetee par
+     * une alerte qui s'eteint, sans que rien ne rougisse pour le dire.
+     *
+     * Le marqueur doit donc lire l'objet dont il parle. PID 1 de ce conteneur EST
+     * `apache2` : `/proc/1/environ` rend l'environnement fige a son exec —
+     * c'est-a-dire celui que `env_file:` a injecte, celui que le SAPI web voit.
+     * `force="true"` ne l'atteint pas.
+     *
+     * Le nom du processus est VERIFIE avant lecture : ailleurs (integration
+     * continue, poste local), PID 1 est autre chose, et lire son environnement
+     * rendrait une valeur plausible et fausse.
+     */
+    private function environnementDuServant(): ?array
+    {
+        $nom = @file_get_contents('/proc/1/comm');
+        if ($nom === false || ! in_array(trim($nom), ['apache2', 'httpd'], true)) {
+            return null;
+        }
+
+        $brut = @file_get_contents('/proc/1/environ');
+        if ($brut === false || $brut === '') {
+            return null;
+        }
+
+        $vars = [];
+        foreach (explode("\0", $brut) as $paire) {
+            if ($paire === '') {
+                continue;
+            }
+            [$cle, $valeur] = array_pad(explode('=', $paire, 2), 2, '');
+            $vars[$cle] = $valeur;
+        }
+
+        // TEMOIN : un environnement de service porte toujours PATH. Un tableau
+        // vide ou minuscule signifierait que le decoupage a echoue, et rendrait
+        // « transport absent » — c'est-a-dire un DEDOUANEMENT.
+        return isset($vars['PATH']) ? $vars : null;
+    }
+
+    public function test_le_transport_DU_SERVICE_est_DISTANT_et_la_garde_TIRE(): void
     {
         /*
-         * Ce test ne juge pas la configuration : il DATE le regime dans lequel
-         * les autres tests de ce fichier sont lus. Il portait « local », il
-         * porte « distant » — c'est le meme instrument, retourne le jour ou sa
-         * premisse a change, et non un instrument qu'on eteint.
+         * Ce test ne juge pas la configuration : il DATE le regime dans lequel les
+         * autres tests de ce fichier sont lus. Il portait « local », il porte
+         * « distant » depuis le 2026-09-05 (`fff1f8d`) — c'est le meme instrument,
+         * retourne le jour ou sa premisse a change, et non un instrument eteint.
          *
-         * S'il rougit MAINTENANT, c'est que quelqu'un est repasse en transport
-         * local : le defaut redevient latent, et il faudra retourner ce
-         * marqueur une seconde fois plutot que de le contourner.
+         * S'il rougit, c'est que le transport du SERVICE est redevenu local : le
+         * defaut de temps redevient latent, et il faut retourner ce marqueur une
+         * seconde fois plutot que le contourner.
          */
-        $transport = (string) config('mail.default');
+        $env = $this->environnementDuServant();
+
+        if ($env === null) {
+            $this->markTestSkipped(
+                "FENETRE D'OBSERVATION ABSENTE : PID 1 n'est pas le serveur web, ou "
+                . "son environnement est illisible. Ce marqueur ne vaut que dans le "
+                . 'conteneur qui sert. Ni PASS ni FAIL — et surtout pas un feu vert.');
+        }
+
+        $transport = $env['MAIL_MAILER'] ?? null;
+
+        if ($transport === null) {
+            $this->markTestSkipped(
+                "FENETRE D'OBSERVATION ABSENTE : le service ne porte aucune variable "
+                . '`MAIL_MAILER`. Sa valeur vient alors de `.env`, et ce marqueur ne '
+                . 'la mesure pas.');
+        }
 
         $this->assertNotContains($transport, ReinitialisationController::TRANSPORTS_LOCAUX,
-            "le transport courant est « $transport », qui EST local. Le regime a "
+            "le transport du SERVICE est « $transport », qui EST local. Le regime a "
             . 'change depuis le 2026-09-05 : retourner ce marqueur, et relire la '
             . 'garde — elle ne se declenchera plus.');
     }
 
-    public function test_la_valeur_SERVIE_ne_vient_PAS_du_fichier_env(): void
+    public function test_le_BANC_lui_est_INSENSIBLE_et_ca_doit_le_rester(): void
     {
         /*
-         * ⚠ LE POINT QUI COUTE. Le premier reflexe, pour desarmer un envoi, est
-         * d'editer `.env`. Ici `.env` porte DEJA `log` et le transport est
-         * pourtant `smtp` : la valeur vient de l'environnement du process, que
-         * `safeLoad()` refuse d'ecraser.
+         * Le pendant du precedent, et il verrouille E-447. Le banc doit rester
+         * LOCAL quoi que porte le service : c'est ce que `force="true"` obtient.
          *
-         * Ce test existe pour qu'une tentative de desarmement par `.env` soit
-         * DEMENTIE par une suite, et pas seulement par un commentaire.
+         * S'il rougit, c'est que `force="true"` a saute de `phpunit.xml` — et
+         * alors toute suite qui atteindrait un envoi enverrait un COURRIEL REEL.
+         * *L'exposition etait latente le 2026-09-06 — un seul envoyeur, quatre
+         * routes, aucune suite ne les appelle — mais la latence n'est pas une
+         * garde : elle tient a ce qu'aucun test n'a encore ete ecrit.*
+         */
+        $duBanc = (string) config('mail.default');
+
+        $this->assertContains($duBanc, ReinitialisationController::TRANSPORTS_LOCAUX,
+            "le banc sert le transport « $duBanc », qui n'est PAS local. Verifier "
+            . '`force="true"` sur `<env name="MAIL_MAILER">` dans `phpunit.xml` : '
+            . 'sans lui, l\'environnement du conteneur gagne et le banc est cable '
+            . 'sur le SMTP reel.');
+    }
+
+    public function test_la_valeur_du_SERVICE_ne_vient_PAS_du_fichier_env(): void
+    {
+        /*
+         * ⚠ LE POINT QUI COUTE, ET IL SURVIT AU `force`. Le premier reflexe pour
+         * desarmer un envoi est d'editer `.env`. Le service porte pourtant un
+         * transport distant alors que `.env` porte une valeur locale : la valeur
+         * vient de l'environnement, que `safeLoad()` refuse d'ecraser.
+         *
+         * > `.env` porte deja la valeur sure. Quelqu'un qui l'ouvre POUR VERIFIER
+         * > y lit `log`, en conclut que l'envoi est desarme, et ne fait rien. Il
+         * > n'a meme pas besoin d'editer pour se tromper.
+         *
+         * Ce test existe pour qu'une telle conclusion soit DEMENTIE par une suite,
+         * et pas seulement par un commentaire. Il compare le SERVICE au FICHIER —
+         * jamais le banc, dont la valeur est desormais imposee.
          *
          * ══ QUATRIEME REGIME DE LECTURE ══════════════════════════════════
-         * Le meme nom peut designer deux objets : l'ARBRE et le SERVICE, MySQL
-         * et SQLite, la BASE et le fichier, et — signale par le DSI le
-         * 2026-09-05 — un montage de FICHIER epingle a un inode que `mv` ou
-         * `git checkout` detache en silence. Ici, le partage est autre : le
-         * fichier est bien le meme des deux cotes (2745 o, montage de
-         * REPERTOIRE), mais il n'est pas la SOURCE. *« Le fichier que je lis
-         * est-il celui que le service lit » et « le service lit-il ce fichier »
-         * sont deux questions distinctes.*
+         * Le meme nom designe des objets differents : l'ARBRE et le SERVICE,
+         * MySQL et SQLite, la BASE et le fichier, et — signale le 2026-09-05 — un
+         * montage de FICHIER epingle a un inode que `mv` detache en silence. Ici
+         * le partage est autre : le fichier est bien le meme des deux cotes
+         * (montage de REPERTOIRE, 2745 o), mais **il n'est pas la SOURCE**.
+         * *« Le fichier que je lis est-il celui que le service lit » et « le
+         * service lit-il ce fichier » sont deux questions distinctes.*
          */
-        $depuisEnvironnement = getenv('MAIL_MAILER');
+        $env = $this->environnementDuServant();
 
-        if ($depuisEnvironnement === false || $depuisEnvironnement === '') {
+        if ($env === null || ! isset($env['MAIL_MAILER'])) {
             $this->markTestSkipped(
-                'FENETRE D\'OBSERVATION ABSENTE : aucune variable `MAIL_MAILER` '
-                . "dans l'environnement du process. Ce test ne vaut que la ou "
-                . '`srv-docker.env` est injecte par `env_file:` — hors conteneur, '
-                . "il n'y a pas d'ecrasement a constater. Ni PASS ni FAIL.");
+                "FENETRE D'OBSERVATION ABSENTE : l'environnement du servant n'est pas "
+                . "lisible ici. Il n'y a pas d'ecrasement a exhiber.");
         }
 
-        $this->assertSame($depuisEnvironnement, (string) config('mail.default'),
-            "le transport servi ne suit plus la variable d'environnement : la "
-            . 'demonstration ci-dessous ne porte plus.');
-
         $chemin = base_path('.env');
+
         if (! is_readable($chemin)) {
             $this->markTestSkipped(
                 "FENETRE D'OBSERVATION ABSENTE : `.env` illisible par ce compte. "
-                . "⚠ Ne PAS conclure « pas de ligne MAIL_ » d'un compte nul : un "
-                . "refus d'acces rend zero exactement comme une absence.");
+                . "⚠ Ne PAS conclure « aucune ligne MAIL_ » d'un compte sans droits : "
+                . "un refus d'acces rend zero exactement comme une absence.");
         }
 
         $lignes = preg_grep('/^\s*MAIL_MAILER\s*=/', file($chemin, FILE_IGNORE_NEW_LINES));
 
         if ($lignes === false || $lignes === []) {
             $this->markTestSkipped(
-                '`.env` ne porte aucune ligne `MAIL_MAILER` : il n\'y a pas de '
-                . 'valeur perdante a exhiber, donc rien a demontrer ici.');
+                '`.env` ne porte aucune ligne `MAIL_MAILER` : il n\'y a pas de valeur '
+                . 'perdante a exhiber, donc rien a demontrer ici.');
         }
 
         $duFichier = trim(explode('=', (string) reset($lignes), 2)[1] ?? '');
+        $duService = $env['MAIL_MAILER'];
 
-        $this->assertNotSame($duFichier, $depuisEnvironnement,
-            "`.env` et l'environnement s'accordent : la demonstration de "
-            . "l'ecrasement n'est plus visible sur cette machine. Ce n'est pas "
-            . 'une regression — mais le piege du faux remede redevient invisible.');
+        $this->assertNotSame($duFichier, $duService,
+            "`.env` et l'environnement du service s'accordent tous deux sur "
+            . "« $duService » : la demonstration de l'ecrasement n'est plus visible "
+            . "ici. Ce n'est pas une regression — mais le piege du faux remede "
+            . 'redevient invisible.');
 
         $this->assertContains($duFichier, ReinitialisationController::TRANSPORTS_LOCAUX,
-            "⚠ `.env` porte « $duFichier », qui n'est PAS local, alors que "
-            . "l'environnement impose « $depuisEnvironnement ». Quel que soit le "
-            . 'gagnant, les deux sont distants : plus aucun des deux leviers ne '
-            . 'desarme.');
+            "⚠ `.env` porte « $duFichier », qui n'est PAS local, alors que le service "
+            . "impose « $duService ». Quel que soit le gagnant, les deux sont "
+            . 'distants : plus aucun des deux leviers ne desarme.');
     }
 }
