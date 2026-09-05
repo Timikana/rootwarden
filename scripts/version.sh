@@ -211,6 +211,13 @@ case "${1:-}" in
             exit 1
         fi
         tmp="$(mktemp "$RACINE/$FICHIER_PRODUIT.XXXXXX")"
+        # ⚠ `mktemp` CREE EN 0600, ET `mv` CONSERVE CE MODE.
+        # Mesure du 2026-09-05 : apres un bump, `version.txt` passait en 0600 et
+        # le serveur web — qui tourne en `www-data` — ne pouvait plus le lire.
+        # `is_file()` rendait vrai, `is_readable()` faux, et LES DEUX portails
+        # affichaient « Version inconnue » sans qu'aucune erreur ne soit levee.
+        # Le correctif d'atomicite avait donc introduit son propre defaut.
+        chmod 0644 "$tmp"
         printf '%s\n' "$v" > "$tmp" && mv -f "$tmp" "$RACINE/$FICHIER_PRODUIT"
         echo "$v -> $FICHIER_PRODUIT"
         ;;
