@@ -201,3 +201,31 @@ travers — aucun n'a produit d'erreur publiée, et les trois ont demandé une s
 
 *C'est un défaut de FORME du fichier, pas des lecteurs : deux listes longues, séparées par une accolade,
 qu'aucun outil ne distingue à l'œil.*
+
+---
+
+# ⚠ AJOUT — DEUX des sondes de `health_check.php` ne mesurent RIEN
+
+**Mesuré le 2026-09-05.**
+
+    legacy/adm/health_check.php:223
+      ['SSH Audit Policies', 'GET', '/ssh_audit/policies', …]
+                                      ^^^^^^^^^ tiret BAS
+
+    routes reelles portant « policies » : 7, toutes en `ssh-audit/` (tiret)
+    routes avec un tiret BAS : ZERO  (TEMOIN)
+
+> **Cette sonde vise un chemin qui n'existe pas. Elle n'a jamais rien mesuré.**
+
+**C'est la SECONDE sonde de ce fichier à ne rien mesurer** — *la première est « SSH Audit Backups », que le
+correctif E-391 dégrade volontairement pour un rôle 2 sans `can_audit_ssh`.*
+
+> **Une page de contrôle de santé dont les sondes mentent est pire qu'une page absente : elle rend un vert
+> que personne ne remet en question.**
+
+**⛔ Je ne fais rien corriger** : *`health_check.php` ÉCRIT sur `srv-zabbix` — la PRODUCTION — AU
+CHARGEMENT. C'est la page que toutes les consignes de ce chantier interdisent d'ouvrir, et le portage ne la
+reprend pas.* **Son extinction ferme le problème ; la corriger demanderait de l'ouvrir.**
+
+**Ce qui vaut d'être su : si quelqu'un s'appuie sur cette page pour dire que le parc va bien, deux de ses
+lignes vertes ne portent aucune mesure.**
