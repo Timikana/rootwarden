@@ -11673,3 +11673,88 @@ vrai travail, pas un ajustement.**
 
 **Les deux se croient exhaustives, et les deux se signalent par un compte qu'on ne recoupe
 pas.**
+
+---
+
+## E-441
+
+### Un correctif n'a pas créé le manque : il a retiré le ROUGE QUI LE CACHAIT
+
+**J'ai attribué un écart constant de 2 assertions au correctif de 23:09. La causalité
+s'inverse, et la mesure qui le montre est de la QA :**
+
+                          lot 2 (22:22, AVANT)   lot 3 (23:22, APRES)
+    go-page-commandlog    PASS=3 FAIL=1          PASS=3 FAIL=0
+    go-page-approvals     PASS=3 FAIL=1          PASS=3 FAIL=0
+    go-page-drift         PASS=3 FAIL=1          PASS=3 FAIL=0
+    … six suites, meme resultat
+
+**`PASS=3` des DEUX côtés.** *Les deux assertions n'étaient déjà plus produites au lot 2 : sur
+une page archivée, la première ÉCHOUAIT (0 PASS) et la seconde était SAUTÉE (`if
+(mene.length)`).* **Contribution au PASS : zéro, avant comme après.**
+
+**Ce que le correctif a changé, c'est `FAIL=1 → FAIL=0`. Et c'est là que tout bascule :**
+
+    avant   3 PASS + 1 FAIL  ->  verdict ECHEC (FAIL>0), et l'ecart de COMPTE est MASQUE
+    apres   3 PASS + 0 FAIL  ->  verdict ECART, et le manque devient VISIBLE
+
+> **Le correctif n'a pas produit le défaut. Il a retiré le rouge qui le couvrait.**
+
+### ⚠ Pourquoi je m'étais trompée, et la forme est symétrique d'un piège déjà catalogué
+
+**Le piège n°30 dit qu'un discriminant fondé sur une conséquence se périme quand on améliore
+l'état. En voici le MIROIR : une amélioration RÉVÈLE un défaut préexistant, et l'amélioration
+est la première chose qu'on accuse — parce qu'elle est récente, datée, et qu'elle explique la
+forme du symptôme.**
+
+*C'est exactement ce qu'une session s'était vu reprocher deux heures plus tôt : « une
+explication récente et vraie est le meilleur candidat pour une attribution fausse ». Je l'avais
+écrit. Je l'ai commis.*
+
+**Et le contrôle qui m'aurait arrêtée est celui que la QA a fait : comparer la MÊME suite AVANT
+et APRÈS.** *Je n'avais lu que l'après.*
+
+---
+
+## E-442
+
+### ARBITRAGE — la référence ne descend pas de 2 : le contrôle SORT du compte
+
+**La QA me renvoie la décision, et elle a raison de ne pas la prendre** : *les 26 entrées de
+`REF_LEGACY` dans `scripts/rejouer-lot.sh` sont périmées de 2, et le geste évident — « −2
+partout » — n'est pas le bon.*
+
+> *« Une référence qui suppose un menu legacy suppose un portail legacy VIVANT. Si l'extinction
+> va au bout, ces deux assertions ne reviendront jamais. »*
+
+### DÉCISION : abaisser la référence est REFUSÉ
+
+**Les deux assertions ne sont pas MOINS NOMBREUSES, elles sont INAPPLICABLES.** *Un nombre qui
+descend encode « on en attend deux de moins » ; il n'encode pas « deux ne s'appliquent plus ».*
+
+    -2 partout    -> le compte redevient vert, et la CATEGORIE du changement disparait
+                     C'est une CASE COCHEE, un niveau plus bas.
+    le controle
+    SORT du compte -> le compte attendu se DERIVE de ce qui est applicable
+
+**Et l'argument qui tranche est celui que ce dépôt a payé trois fois aujourd'hui : un nombre
+tenu À LA MAIN diverge.** *`version.txt` a dérivé deux fois, `LARAVEL_PORT` était défini deux
+fois, et les comptes attendus viennent de dériver de 2 sur 26 suites.* **Chaque fois, la
+correction a consisté à faire DÉRIVER le nombre de sa source au lieu de le maintenir.**
+
+> **Le compte attendu doit être la somme des contrôles APPLICABLES, pas une constante qu'on
+> ajuste quand la réalité bouge.**
+
+**Conséquence pratique** : *quand `verifieMenuLegacy` rend « NON MESURÉ », il retire ses deux
+contrôles du dénominateur au lieu de les compter manquants.* **Le verdict redevient
+`conforme`, et il le redevient pour la bonne raison : il n'y avait rien à mesurer.**
+
+### Ce que ça ne règle PAS, et il faut le dire
+
+**Cela suppose que le compte attendu soit calculable à l'exécution.** *S'il est écrit à la main
+dans `rejouer-lot.sh`, la décision ci-dessus demande un vrai travail d'outillage, pas un
+ajustement.* **C'est le périmètre de la QA, et je ne le date pas à sa place.**
+
+*Solution intermédiaire acceptable, si le travail est trop lourd maintenant* : **laisser la
+référence à 5 et laisser le verdict ÉCART** — *un écart nommé et compris coûte moins qu'un vert
+obtenu en abaissant la barre.* **Ce qui est REFUSÉ, c'est de descendre le nombre en silence.**
