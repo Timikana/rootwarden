@@ -57,6 +57,61 @@ raison ci-dessus, et leur donner un faux chainage couterait la propriete elle-me
 
 ---
 
+## [1.45.0] - 2026-09-05
+
+### Auth - E-414 : le re-hachage bcrypt a la connexion, et « l'equivalent Laravel » n'en etait pas un
+
+**Ce qui est porte.** `legacy/auth/login.php:162-167` devient
+`MotDePasse::rehacheSiNecessaire()`, appele par `ConnexionController` juste apres une
+verification de mot de passe reussie. Avant ce lot : **0 occurrence** de
+`password_needs_rehash` dans le portage. *C'est le seul instant du produit ou le mot de passe
+en clair existe — aucune tache de fond ne peut faire ce geste.*
+
+**⚠ `Hash::needsRehash()` AURAIT ETE FAUX.** Il compare a `hashing.bcrypt.rounds`, qui lit
+`BCRYPT_ROUNDS`, tandis que TOUS les ecrivains de mot de passe du portage lisent `BCRYPT_COST`.
+Mesure en forcant `BCRYPT_COST` a 13 en memoire :
+
+    motif du projet                     ->  $2y$13$
+    Hash::make                          ->  $2y$12$
+    Hash::needsRehash sur un cout 12    ->  NON
+    password_needs_rehash, cout projet  ->  OUI
+
+Et `.env` pose `BCRYPT_ROUNDS=12` **sans poser `BCRYPT_COST`** : la divergence est le chemin par
+defaut, pas une hypothese. **Un equivalent qui lit une autre source de verite n'est pas un
+equivalent** — le geste aurait ete ecrit et n'aurait jamais tire.
+
+**Le geste est DORMANT** : 12 comptes, tous en `$2y$12$`, cout courant 12. *Son absence est
+indetectable tant que le cout ne bouge pas* — et c'est la raison de l'ecrire, la meme qui a fait
+porter l'assistant de premiere configuration.
+
+**⚠ Et le legacy raconte ce piege** : *« Avant, le commentaire l'annoncait mais ce n'etait pas
+fait »* (`login.php:159-161`). **Le portage avait herite du commentaire corrige et pas du
+geste.** Le geste est donc ecrit dans le MEME commit que son commentaire, et l'assertion le mord
+sur un compte FORGE au cout 10 — un test sur les douze comptes deja a jour serait passe A VIDE.
+
+**Trois choix contre le legacy** : l'echec se JOURNALISE (le legacy avale l'exception sans rien
+dire, et une mise a niveau qui echoue en silence ne se distingue pas d'une mise a niveau jamais
+ecrite) ; `password_updated_at` n'est PAS deplacee (le mot de passe n'a pas change, seule sa
+representation) ; et rien n'est ecrit dans `password_history` (elle refuse la REUTILISATION, et
+y ecrire ferait refuser son propre mot de passe au proprietaire).
+
+**Tests.** 14 cas, 0 FAIL, **en transaction annulee sur un compte forge au cout 10** : le
+prefixe change, le mot de passe reste le meme, un autre reste refuse, le second appel ne fait
+rien, `password_updated_at` ne bouge pas, `password_history` ne recoit rien, et l'etat du hache
+est verifie APRES l'annulation. **Temoin inverse : 4 FAIL, et ce sont les quatre bonnes.**
+
+**⚠ Et le premier temoin de ce lot etait VACANT** : il employait `python3`, absent du conteneur.
+La mutation n'a pas ete appliquee et le harnais a rendu « 14 cas · 0 FAIL » — *un resultat qui
+ressemblait a une mesure reussie*. Le harnais porte desormais QUATRE gardes d'entree :
+empreinte changee, `php -l` qui passe, classe renommee, mutation presente dans le fichier. Une
+mutation qui ne s'applique pas est DECLAREE, jamais comptee.
+
+**Notes exploitation.** Aucune migration. **Pour relever le cout bcrypt, poser `BCRYPT_COST`** —
+c'est la variable que lisent les ecrivains du portage. `BCRYPT_ROUNDS`, deja dans le `.env`, ne
+gouverne que `Hash::`, qui n'est employe nulle part. *Les deux ne se suivent pas.*
+
+---
+
 ## [1.44.1] - 2026-09-05
 
 ### Auth - E-406 bis : `terminating()` ne garantit PAS ici ce qu'il garantit ailleurs
