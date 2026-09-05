@@ -306,3 +306,99 @@ protection qu'elle n'exerce pas.**
 EN (`laravel/lang/*/profil.php`). Une clé pour un contrôle éteint est correcte
 **si** le contrôle est porté ; **non vérifié** — c'est à la relecture du portage
 de la politique, pas ici.
+
+---
+
+## 8. `login_attempts` — mesuré le 2026-09-05, et la crainte est fondée pour une raison plus forte
+
+Le DSI demande si le flux de réinitialisation alimente `login_attempts`, avec la
+conséquence qu'*« une demande de réinitialisation qui échoue pourrait fermer la
+CONNEXION de toute une adresse »*.
+
+### 8.1 Le legacy ne l'alimente PAS — zéro occurrence
+
+```
+grep 'login_attempts|recordLoginAttempt' forgot_password.php reset_password.php
+   -> AUCUNE occurrence dans les deux fichiers
+```
+
+Le flux legacy a son **propre** compteur, sur `password_reset_tokens.ip_address`
+(3/IP/heure) — celui dont le §7.1 montre qu'il ne borne pas ce qu'il devrait.
+**Les deux compteurs sont disjoints, et c'est ce qui protège la connexion
+aujourd'hui.**
+
+### 8.2 ⚠ Mais le compteur de connexion N'A AUCUN FILTRE D'ÉTAPE — la colonne existe pourtant
+
+```sql
+-- login.php:50, LE GARDE qui bloque réellement :
+SELECT COUNT(*) FROM login_attempts
+WHERE ip_address = ? AND success = 0 AND attempted_at >= …
+--                      ^^^^^^^^^^^  filtre l'echec, PAS l'etape
+```
+
+Et le schéma porte bien une colonne `step` :
+
+```
+id · ip_address · username · success · step (varchar(16)) · attempted_at
+```
+
+**Le portage l'utilise** (`SecondFacteurController`, `step = '2fa'`) ; **le garde
+du legacy l'ignore.**
+
+> **Conséquence pour qui portera ce flux :** *toute* écriture dans
+> `login_attempts`, depuis *n'importe quel* flux, **avec ou sans `step`**,
+> compte dans le verrou de connexion du legacy. La crainte du DSI n'est donc pas
+> un « pourrait » conditionnel : **le compteur legacy est structurellement
+> incapable de distinguer les étapes.** Écrire les échecs de réinitialisation
+> dans cette table fermerait la connexion de l'adresse.
+>
+> **Contrainte de portage : ne pas écrire les échecs de réinitialisation dans
+> `login_attempts`** — ou n'y écrire qu'avec un `step` dédié **et** ajouter le
+> filtre correspondant au garde du legacy, ce qui est une modification du
+> legacy et sort du portage.
+
+### 8.3 ⚠ ET UN DÉFAUT LIVE, TROUVÉ EN MESURANT : l'écran annonce un verrou qui n'existe pas
+
+```php
+// login.php:337 — dans la VUE, pour AFFICHER « adresse bloquée »
+SELECT MAX(attempted_at) AS last_attempt, COUNT(*) AS cnt
+FROM login_attempts
+WHERE ip_address = ? AND attempted_at >= DATE_SUB(NOW(), INTERVAL 600 SECOND)
+if (($lockInfo['cnt'] ?? 0) >= 5): … « 🔒 votre adresse est bloquée N minutes »
+```
+
+**Cette requête n'a NI `success = 0` NI `step`.** Elle compte **toutes** les
+tentatives, **succès compris** — là où le garde de `:50`, lui, filtre les échecs.
+
+> **L'écran et le garde ne comptent pas la même chose.** Cinq connexions
+> **réussies** depuis la même adresse en dix minutes affichent
+> *« votre adresse est bloquée »* — **alors que rien n'est bloqué** : le
+> formulaire fonctionne, `:50` ne compte aucun échec.
+
+**Et l'occupation n'est pas théorique** : c'est un outil interne, derrière une
+sortie NAT d'entreprise. **Cinq connexions réussies en dix minutes depuis une
+même adresse publique est un mardi matin ordinaire.**
+
+C'est la famille du défaut qu'on démonte, **inversée** : d'habitude l'écran
+annonce une protection que le code n'exerce pas ; ici il annonce une
+**restriction** que le code n'applique pas. *Le coût est le même — on cesse de
+croire l'écran.*
+
+**Non corrigé** : c'est `legacy/auth/login.php`, hors de mon périmètre d'écriture
+et hors du portage de ce flux. **Signalé pour arbitrage.**
+
+### 8.4 Mise à jour de ma liste de contrôle (§4) — point 5
+
+Mon point 5 disait *« révocation des sessions et des cookies `remember` **après le
+commit** »*, en décrivant le legacy. **E-393 a tranché depuis, et dans l'autre
+sens** : `MotDePasse::applique` fait désormais la purge de `remember_tokens`
+**DANS** la transaction — *un jeton survivant défait le geste, qui est tout son
+objet.*
+
+**Le portage de la réinitialisation doit faire pareil**, sinon le défaut revient
+par une autre porte : deux chemins écrivent un mot de passe, et un seul
+révoquerait vraiment.
+
+*Et l'asymétrie avec `active_sessions` reste justifiée : le portage ne lit jamais
+cette table (ses sessions vivent en fichiers), donc une ligne survivante y est
+inerte — mesuré au site de `MotDePasse.php`.*
