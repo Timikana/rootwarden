@@ -11224,3 +11224,92 @@ n'est pas un bon calcul ».*
 
 **Elle ne renvoie pas le travail, elle le DATE — et elle en donne la raison.** *C'est la bonne
 réponse à une demande légitime au mauvais moment, et je ne la surcharge pas.*
+
+---
+
+## E-433
+
+### La PRODUCTION porte le même montage — et le défaut se répare tout seul à chaque redémarrage
+
+**Trouvé par une session à qui je n'avais rien demandé sur ce sujet.**
+
+    docker-compose.prod.yml:124   - ./legacy/version.txt:/var/www/html/version.txt:ro
+
+**Le même montage de FICHIER, donc le même défaut.** *La production est à `v1.37.15` : elle n'a
+pas encore subi de bump par le script, donc elle n'a pas encore dérivé.* **Elle dérivera au
+premier.**
+
+### ⚠ CE QUI REND CE DÉFAUT PRESQUE INTROUVABLE
+
+**Il se répare tout seul à chaque redémarrage, puis revient au bump suivant.**
+
+    22:09:52   `mv` ecrit 2.0.94 -> nouvel inode, montage DETACHE
+    22:18      je recree les conteneurs pour armer le SMTP
+               -> le montage se RATTACHE a l'inode courant (2.0.94)
+    ~23:02     `mv` ecrit 2.0.11 -> detache DE NOUVEAU
+    23:04      j'ecris desormais EN PLACE : l'inode survit
+
+> **Un pair avait écrit « personne ne fera le lien la troisième fois ». La mesure lui donne
+> raison plus fort que son propre relevé** — *parce qu'entre deux détachements il y a un état
+> parfaitement sain, et que cet état est produit par le geste qu'on fait pour diagnostiquer.*
+
+**Sa chronologie était fausse d'un cran** — *elle datait le détachement de 18:53 et en
+concluait que cinq bumps étaient invisibles.* **Le conteneur servait 2.0.94, donc au moins un
+bump avait bien traversé.** *Le mécanisme était juste ; c'est le RATTACHEMENT qui manquait à
+son modèle.*
+
+### Les deux remèdes durables, et le mien n'est pas le meilleur
+
+    monter le REPERTOIRE   le montage suit le CHEMIN, l'atomicite est preservee
+    ecrire EN PLACE        ce que j'ai pose, au prix de l'atomicite
+
+**J'ai choisi le second sans consulter, et la raison tient** : *pour sept octets lus par un
+`file_get_contents`, un fichier momentanément tronqué rend « version inconnue » une
+milliseconde ; un montage détaché ment pendant des jours.* **Mais l'autre ne sacrifie rien, et
+il reste ouvert pour la production, où rien n'a encore dérivé.**
+
+---
+
+## E-434
+
+### Une capacité orpheline dont la garde passe ses tests ne produit AUCUN signal
+
+**Trois routes `/policy/` existent, sont gardées, et ne sont appelées par rien** — *`rollback`
+(POST, ouvre une session SSH), `deployments` (GET), `list` (GET).* **Leur interface vivait dans
+`_deprecated/`.**
+
+    une capacite morte SANS garde        -> quelque chose finit par rougir
+    une capacite morte AVEC une garde
+    dont le test PASSE                   -> le vert CERTIFIE l'absence de probleme
+
+> **Le test ne ment pas.** *Il mesure exactement ce qu'il promet — que la règle de step-up mord
+> sur ce chemin. Il ne promet rien sur l'existence d'un appelant, et personne ne le lui
+> demande.* **Mais un vert sur une garde se LIT « cette capacité est saine ».**
+
+**C'est un dédouanement structurel, et on sait ce qu'il advient des dédouanements : personne ne
+les conteste.**
+
+### Et la distinction qui explique pourquoi ma frontière ne s'appliquait pas
+
+    retenues par ARBITRAGE       produit d'une DECISION      -> elle SELECTIONNE
+    orphelines par DEPRECIATION  produit d'un EFFET DE BORD  -> elle ne trie RIEN
+
+> *« Une dépréciation ne retire pas un GESTE, elle retire une INTERFACE — et une interface sert
+> des lectures autant que des écritures. »*
+
+**Quatre orphelins en LECTURE dans trois modules.** *Ce n'est plus un contre-exemple à la
+formule « ce qui reste est ce qui écrit » : c'est une seconde population, produite par un
+mécanisme différent.*
+
+### ⚠ Et la limite de la méthode que je venais d'ériger en règle
+
+**Le relevé sans délimiteur corrige un faux NÉGATIF et introduit un faux POSITIF** — *toutes
+les occurrences trouvées dans `laravel/app/` étaient des COMMENTAIRES.* **« Cité » n'est pas
+« appelé ».**
+
+> **Un outil qui déplace le biais sans le réduire doit être annoncé comme tel.**
+
+**Et une troisième forme de témoin défaillant** : *après le mauvais AXE et la mauvaise ÉTENDUE,
+la mauvaise FORME* — **un témoin littéral ne qualifie pas une sonde qui cherche des chemins
+composés.** *Il rend zéro, donc il ressemble à « la sonde est aveugle », et il aurait fait
+jeter un relevé juste.*
