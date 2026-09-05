@@ -16,6 +16,7 @@
           href="/img/favicon.png?v={{ @filemtime(public_path('img/favicon.png')) ?: '0' }}">
     <link rel="apple-touch-icon" href="/img/favicon.png">
     <link rel="stylesheet" href="/css/rw.css?v={{ @filemtime(public_path('css/rw.css')) ?: '0' }}">
+    @include('composants.theme-tete')
 </head>
 <body>
 
@@ -96,11 +97,17 @@
                      PETIT ECRAN. La regle visait `.rw-entete__compte span` et
                      attrapait AUSSI la pastille de notification et la langue
                      active — trois elements caches la ou un seul devait l'etre. --}}
-                <span class="rw-entete__nom">{{ __('auth.connecte_en_tant_que') }} <strong>{{ session('utilisateur_nom') }}</strong></span>
-                <form class="rw-inline" method="POST" action="{{ route('deconnexion') }}">
-                    @csrf
-                    <button class="rw-bouton rw-bouton--discret" type="submit">{{ __('nav.logout') }}</button>
-                </form>
+                {{-- LE BASCULE DE THEME. Absent du portage depuis le debut : le
+                     legacy l'avait (`menu.php:200`), et il ne figurait dans AUCUNE
+                     des 16 capacites inventoriees — cet inventaire etait construit
+                     a partir des ENTREES DE MENU, et un bascule n'en est pas une. --}}
+                @include('composants.theme')
+
+                {{-- LE COMPTE EN PASTILLE. Le libelle complet occupait l'en-tete et
+                     devait etre masque sur petit ecran par une regle qui attrapait
+                     aussi la cloche et la langue. Une pastille tient a toutes les
+                     tailles, et le menu porte le nom en entier. --}}
+                @include('composants.profil')
             </div>
         </header>
 

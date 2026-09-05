@@ -71,6 +71,7 @@ return [
     // Etat du portage
     'non_porte'              => 'ancien portail',
     'non_porte_titre'        => "cette page n'est pas encore portée, elle s'ouvre dans l'ancien portail",
+    'theme_basculer'          => 'Changer de theme (clair / sombre)',
     'langue'                 => 'Langue',
     'langue_fr'              => 'francais',
     'langue_en'              => 'anglais',

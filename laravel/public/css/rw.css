@@ -30,7 +30,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-    :root {
+    :root:not([data-theme="light"]) {
         --rw-fond: #0f1722;
         --rw-surface: #17202e;
         --rw-surface-2: #1c2637;
@@ -2868,3 +2868,181 @@ a.rw-alerte:focus-visible { outline: 2px solid var(--rw-accent); outline-offset:
 }
 
 .rw-cgu__liste li { margin-bottom: 4px; }
+
+/* ══ CE QUE L'EXPLOITANT A DEMANDE LE 2026-09-05 ═══════════════════════════
+ *
+ * Trois manques, tous trouves EN SE SERVANT du produit et aucun par une sonde :
+ * la lune du bascule de theme, le profil en pastille, et le texte des CGU.
+ *
+ * ⚠ LE BASCULE DE THEME N'AVAIT JAMAIS ETE PORTE, et il ne figurait dans
+ * AUCUNE des 16 capacites de l'inventaire — parce que cet inventaire a ete
+ * construit a partir des ENTREES DE MENU, et qu'un bascule n'en est pas une.
+ * L'unite de l'inventaire a decide de ce qu'il pouvait voir.
+ * Le legacy l'avait (`menu.php:200`, soleil et lune en SVG).
+ */
+
+/* ── LE THEME EXPLICITE ────────────────────────────────────────────────────
+ *
+ * TROIS etats, et c'est le troisieme qu'on oublie :
+ *   1. « sombre » choisi   -> `data-theme="dark"`   gagne meme si l'OS est clair
+ *   2. « clair » choisi    -> `data-theme="light"`  gagne meme si l'OS est sombre
+ *   3. RIEN choisi         -> aucun attribut, et `prefers-color-scheme` decide
+ *
+ * D'ou la garde `:not([data-theme="light"])` posee sur la media query : sans
+ * elle, un utilisateur d'OS sombre ne pourrait PAS obtenir le clair — la media
+ * query gagnerait, et le bouton mentirait dans un sens sur deux.
+ *
+ * Les declarations sombres ne sont PAS recopiees ici : elles sont derivees du
+ * bloc `@media` par script. Deux listes ecrites a la main divergent.
+ */
+:root[data-theme="dark"] {
+        --rw-fond: #0f1722;
+        --rw-surface: #17202e;
+        --rw-surface-2: #1c2637;
+        --rw-bordure: #2a3746;
+        --rw-bord-defilement: rgba(148, 173, 209, .40);
+        --rw-texte: #e8eef6;
+        --rw-texte-doux: #9fb0c4;
+        --rw-accent: #5b8cff;
+        --rw-accent-texte: #0b1220;
+        --rw-accent-doux: #1b2942;
+        --rw-danger: #fca5a5;
+        --rw-danger-fond: #2a1618;
+        --rw-succes: #6ee7a8;
+        --rw-succes-fond: #16281f;
+        --rw-avertissement: #fcd34d;
+        --rw-avert-fond: #2a2410;
+        --rw-ombre: 0 1px 3px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .35);
+}
+
+/* Le bouton lui-meme. Soleil ET lune sont dans le DOM ; c'est le theme APPLIQUE
+ * qui decide lequel se voit — pas le JS, qui n'a donc rien a synchroniser. */
+.rw-theme {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px; height: 30px;
+    padding: 0;
+    border: 1px solid var(--rw-bordure);
+    border-radius: var(--rw-rayon);
+    background: var(--rw-surface-2);
+    color: var(--rw-texte-doux);
+    cursor: pointer;
+    line-height: 1;
+    font-size: 15px;
+}
+.rw-theme:hover { color: var(--rw-texte); border-color: var(--rw-accent); }
+.rw-theme__soleil, .rw-theme__lune { display: none; }
+/* Theme CLAIR applique -> on propose le sombre -> on montre la LUNE. */
+.rw-theme__lune   { display: inline; }
+.rw-theme__soleil { display: none; }
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .rw-theme__lune   { display: none; }
+    :root:not([data-theme="light"]) .rw-theme__soleil { display: inline; }
+}
+:root[data-theme="dark"]  .rw-theme__lune   { display: none; }
+:root[data-theme="dark"]  .rw-theme__soleil { display: inline; }
+:root[data-theme="light"] .rw-theme__lune   { display: inline; }
+:root[data-theme="light"] .rw-theme__soleil { display: none; }
+
+/* ── LE PROFIL EN PASTILLE ─────────────────────────────────────────────────
+ *
+ * `<details>` et non un menu en JS : il s'ouvre au clavier, se ferme a Echap,
+ * et fonctionne si le script ne charge pas. Un menu de compte qui depend du JS
+ * est un menu de compte qui disparait quand le JS tombe.
+ */
+.rw-profil { position: relative; }
+.rw-profil > summary {
+    list-style: none;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px; height: 30px;
+    border-radius: 999px;
+    background: var(--rw-accent);
+    color: var(--rw-accent-texte);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .3px;
+    user-select: none;
+}
+.rw-profil > summary::-webkit-details-marker { display: none; }
+.rw-profil > summary:hover { filter: brightness(1.08); }
+
+.rw-profil__menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    z-index: 40;
+    min-width: 210px;
+    padding: 10px;
+    border: 1px solid var(--rw-bordure);
+    border-radius: var(--rw-rayon);
+    background: var(--rw-surface);
+    box-shadow: var(--rw-ombre);
+    text-align: left;
+}
+.rw-profil__nom { display: block; font-weight: 600; margin-bottom: 2px; }
+.rw-profil__role { display: block; color: var(--rw-texte-doux); font-size: 12px; margin-bottom: 10px; }
+.rw-profil__menu .rw-bouton { width: 100%; }
+
+/* ── LES CGU ───────────────────────────────────────────────────────────────
+ *
+ * ⚠ LA SECTION 8 S'APPELLE « CONTACT » ET NE NOMMAIT PERSONNE : la phrase
+ * finissait sur un deux-points suivi de RIEN. Le legacy rendait l'adresse juste
+ * apres (`_deprecated/terms.php:109`) ; le portage l'a perdue au passage.
+ *
+ * ⚠ ET LE BLOC DE SOUTIEN N'ETAIT RENDU NULLE PART : `support_title` et
+ * `support_desc` VIVENT dans le catalogue depuis le portage du 05/09 et
+ * n'avaient aucun lecteur. Deux cles mortes sur 36.
+ *
+ * La carte GRANDIT et c'est la PAGE qui defile, comme faisait le legacy. Une
+ * boite a hauteur fixe montrait 29 % du texte (504 px pour 1710 px) et l'ombre
+ * de bord passait SUR un titre. Les boutons apres le texte valent mieux pour un
+ * consentement : on accepte au bout de ce qu'on a lu.
+ */
+.rw-cgu {
+    max-width: 72ch;
+    margin: 18px 0 22px;
+    text-align: left;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--rw-texte);
+    /* ⚠ CES TROIS-LA ANNULENT LA BOITE A HAUTEUR FIXE definie plus haut. Sans
+     * elles, `max-height: 46vh` survit a cette redefinition — une propriete non
+     * mentionnee n'est pas remise a zero, elle est HERITEE du bloc precedent.
+     * Le defaut serait invisible : la page rendrait, avec 29 % du texte. */
+    max-height: none;
+    overflow-y: visible;
+    padding-right: 0;
+}
+.rw-cgu__contact { margin-top: 6px; }
+.rw-cgu__contact a { color: var(--rw-accent); text-decoration: none; }
+.rw-cgu__contact a:hover { text-decoration: underline; }
+
+.rw-cgu__soutien {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--rw-bordure);
+}
+.rw-cgu__soutien-icone { font-size: 26px; line-height: 1.1; }
+.rw-cgu__soutien-titre { font-weight: 600; margin: 0 0 2px; }
+.rw-cgu__soutien-texte { color: var(--rw-texte-doux); font-size: 13px; margin: 0; }
+
+/* La couleur de la marque : elle ne suit PAS le theme, c'est son role. */
+.rw-cgu__cafe {
+    display: inline-block;
+    margin-top: 10px;
+    padding: 7px 16px;
+    border-radius: var(--rw-rayon);
+    background: #ffdd00;
+    color: #3d2c00;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+}
+.rw-cgu__cafe:hover { background: #ffe74d; }

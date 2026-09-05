@@ -114,6 +114,27 @@
         <section class="rw-cgu__section">
             <h2 class="rw-cgu__titre">{{ __('cgu.s8_title') }}</h2>
             <p>{{ __('cgu.s8_p1') }}</p>
+            {{-- ⚠ LA PHRASE FINISSAIT SUR UN DEUX-POINTS SUIVI DE RIEN. La section
+                 s'appelle « Contact » et ne nommait personne. Le legacy rendait
+                 l'adresse juste apres (`_deprecated/terms.php:109`), depuis
+                 `SERVER_ADMIN` ; le portage l'a perdue au passage. --}}
+            <p class="rw-cgu__contact" data-rw="cgu-contact">
+                <a href="mailto:{{ config('app.contact_admin') }}">{{ config('app.contact_admin') }}</a>
+            </p>
+        </section>
+
+        {{-- ⚠ CE BLOC N'ETAIT RENDU NULLE PART. `support_title` et `support_desc`
+             vivent dans le catalogue depuis le portage du 05/09 et n'avaient
+             AUCUN lecteur : deux cles mortes sur 36. Le legacy les rendait ici
+             meme, avec le lien de soutien (`_deprecated/terms.php:114-124`). --}}
+        <section class="rw-cgu__soutien" data-rw="cgu-soutien">
+            <span class="rw-cgu__soutien-icone" aria-hidden="true">&#9749;</span>
+            <div>
+                <p class="rw-cgu__soutien-titre">{{ __('cgu.support_title') }}</p>
+                <p class="rw-cgu__soutien-texte">{{ __('cgu.support_desc') }}</p>
+                <a class="rw-cgu__cafe" href="https://buymeacoffee.com/timikana"
+                   target="_blank" rel="noopener" data-rw="cgu-cafe">Buy me a coffee</a>
+            </div>
         </section>
     </div>
 

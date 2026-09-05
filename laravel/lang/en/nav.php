@@ -71,6 +71,7 @@ return [
     // Etat du portage
     'non_porte'              => 'previous portal',
     'non_porte_titre'        => 'this page has not been ported yet, it opens in the previous portal',
+    'theme_basculer'          => 'Switch theme (light / dark)',
     'langue'                 => 'Language',
     'langue_fr'              => 'French',
     'langue_en'              => 'English',

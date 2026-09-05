@@ -13,6 +13,13 @@ return [
     |
     */
 
+    // L'adresse de contact affichee par les CGU. MEME source que le legacy
+
+    // (`SERVER_ADMIN`), pour que les deux portails ne puissent pas diverger.
+
+    'contact_admin' => env('SERVER_ADMIN', 'admin@localhost'),
+
+
     'name' => env('APP_NAME', 'Laravel'),
 
     /*
