@@ -11,10 +11,7 @@ return [
     'second_facteur_titre'  => 'Second factor',
     'second_facteur_valeur' => 'Active',
     'second_facteur_texte'  => 'A single-use code is required at every sign-in. There is no access without a second factor.',
-
-    'non_porte_titre' => 'Not here yet',
     // E-203: sessions ARE listed now — see fr.
-    'non_porte_texte' => 'Remembered logins are not listed here yet: the legacy portal shows them. The password change and open sessions are now handled on this page.',
     /*
      * ── SUB-LOT A2: PASSWORD CHANGE ──────────────────────────────────────
      *
