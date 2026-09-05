@@ -5,6 +5,41 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.53.1] - 2026-09-05
+
+### Extinction - `import_csv.php` : le dernier blocage MESURABLE tombe
+
+Il etait retenu depuis ce matin sur « 4 tables ecrites, seule la moitie `users` est
+prouvee ». **Instruit ligne a ligne :**
+
+    INSERT machines      porte   route + `serveurs.blade.php`
+    INSERT users         porte   `ComptesController::importer` + `POST /comptes/importer`
+    INSERT user_logs     porte   et CHAINE depuis la v1.45.0
+    INSERT permissions   DELIBEREMENT non reproduit
+
+**Et la raison du quatrieme est meilleure qu'une equivalence.** `Permissions::pour()`
+(`:130-134`) traite l'absence de ligne comme « aucun droit ». Le portage refuse d'inserer
+les **15 colonnes NOMMEES a zero** du legacy, parce que `Permissions::toutes()` lit le
+**SCHEMA** :
+
+> *« une liste qui omettrait silencieusement une permission ajoutee apres coup »*
+
+**C'est une garde par construction : la liste est DERIVEE de sa source, elle ne peut pas
+la contredire.** *Le portage ne reproduit pas ce geste — il le rend inexprimable.*
+
+    Q4, commentaires depouilles : 0 appelant   (temoin : api_proxy -> 10)
+    .php metier servis   32 -> 31     (82 ce matin)
+    archives             69 -> 70     (19 ce matin)
+
+    /adm/includes/import_csv.php  404   ·   /api_proxy.php  302
+    portage /comptes 302  ·  /serveurs 302
+
+**Il ne reste plus AUCUN blocage mesurable.** Les trois derniers — le SMTP, le scan
+sortant, l'application de regles de pare-feu — sont des effets sur des tiers et
+appartiennent a l'exploitant.
+
+---
+
 ## [1.53.0] - 2026-09-05
 
 ### Extinction - vague 4 : trois fichiers liberes par les livraisons de la flotte
