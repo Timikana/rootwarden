@@ -9694,3 +9694,50 @@ défaut habituel, où le commentaire promet une garde que le code n'a pas.**
 **Et la trace de mesure `INVENTAIRE-ARCHIVAGE.md:166` n'a PAS été corrigée, à raison** : *« une trace de
 mesure garde le chemin qu'elle a mesuré ».* **Corriger le chemin d'une mesure passée la rendrait fausse
 sur son propre objet.**
+
+### ⚠ LA VENTILATION CHANGE L'ORDRE DE GRANDEUR — et le vrai garde n'a JAMAIS tiré
+
+**Mon témoin « 23 lignes, 23 succès, 0 échec » était juste et cachait l'essentiel. Remesuré par la
+session 5 :**
+
+    step='2fa'    success=1    19 lignes
+    step='login'  success=1     4 lignes
+    success=0                   0
+    fenetre : 2026-09-03 20:46 -> 2026-09-05 06:03  (~34 h)
+
+**a) Ce ne sont pas des connexions — ce sont des vérifications de SECOND FACTEUR, 19 sur 23.** *La requête
+d'affichage ne filtre pas `step`, donc CINQ PASSAGES DE 2FA en dix minutes suffisent, et ils s'accumulent
+cinq fois plus vite que les lignes de connexion.*
+
+> **Le message faux se déclenche sur l'événement le PLUS FRÉQUENT de la table.** *« Cinq connexions
+> réussies, c'est un mardi matin » était trop faible : derrière un NAT d'équipe, cinq vérifications en dix
+> minutes, c'est UNE HEURE DE TRAVAIL NORMAL. Le message serait quasi permanent.*
+
+**b) ⚠ ET LE VRAI GARDE N'A JAMAIS TIRÉ NON PLUS.** *Zéro ligne `success = 0` signifie que `login.php:50`
+n'a jamais eu quoi que ce soit à compter.*
+
+> **La limite de connexion est entièrement NON ÉPROUVÉE, et le seul « verrouillage » que quiconque ait
+> jamais vu sur cet écran est le FAUX.**
+
+**✅ Mon correctif reste juste et il ne couvre PAS (b).** *Après lui, l'écran cessera de mentir et le garde
+restera sans épreuve. Deux propriétés distinctes — à DIRE, pas à réparer dans le même geste, sinon
+« corrigé » se lira « éprouvé ».*
+
+### ⛔ ET JE REFUSE D'ÉPROUVER CE GARDE PAR LE CHEMIN VIVANT
+
+    l'eprouver demande d'INSERER des `success = 0` pour l'adresse de dev
+    -> les huit sessions partagent cette adresse
+    -> cinq echecs et l'ecran de connexion se ferme POUR TOUT LE MONDE
+
+**Ce serait une panne auto-infligée sur le seul chemin d'entrée du produit, pour prouver une propriété
+qu'un test unitaire du COMPTAGE établit sans insérer une ligne.** *Même forme que `roleAutorise` : la
+propriété est atteignable sans le chemin d'accès.*
+
+### ⚠ ET UN DÉTAIL DE MÉTHODE QUI DÉSAMORCE UNE LECTURE FAUSSE
+
+    la fenetre mesuree est de ~34 h, et `login.php:47` purge a 24 h
+    -> « 23 lignes » n'est PAS une fenetre glissante propre
+
+**L'échantillon est plus large qu'annoncé. Ça ne change aucune conclusion — mais ça évite de le relire
+comme un instantané de 24 h.** *C'est le genre de borne qu'on ne pense à poser qu'après avoir été trompé
+une fois.*
