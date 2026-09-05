@@ -5,6 +5,54 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.54.0] - 2026-09-05
+
+### Extinction - l'archivage etait INACHEVE : le JavaScript restait servi
+
+**⚠ Signale par la session qui tient le banc, et le defaut est dans les vagues 1 a 5 :
+`git mv` a emporte les `.php` et laisse le `js/`.**
+
+    /bashrc/js/bashrc.js       200   26 Kio      <- module dont les pages sont archivees
+    /wazuh/js/wazuh.js         200   17 Kio
+    /ssh-audit/js/main.js      200   36 Kio
+    /bashrc/                   403               <- le REPERTOIRE existe encore
+
+**Et mon compte publie avait un angle mort** : j'annoncais « 26 fichiers servis » en ne
+comptant que les `.php` METIER. **130 fichiers etaient servis** — 26 metier, 76 catalogues
+de langue, 14 JS pour 1,7 Mio.
+
+#### Retire du service
+**10 fichiers JavaScript, 1637 Kio**, orphelins de modules dont les pages sont archivees :
+`bashrc` `fail2ban` `graylog` `groups` `ssh-audit` `ssh` `wazuh`, plus
+`adm/js/server_user_policy.js`, `js/admin.js` et `api/swagger/swagger-ui-bundle.js`
+(1491 Kio a lui seul).
+
+**Et 16 repertoires devenus vides**, ce qui fait passer sept modules de **403 a 404** — la
+condition exacte que `tests/e2e/archive.mjs` exige (`if (statut !== 404) …`). *Un
+repertoire vide rend « interdit » la ou l'outil attend « absent », et 12 suites restaient
+rouges pour cette seule raison.*
+
+#### ⚠ TROIS defauts de sonde dans la meme mesure, tous les miens
+    « chargeur » compte un COMMENTAIRE   `head.php:37` cite bashrc.js dans une phrase
+    appariement par NOM DE BASE          `main.js` existe dans SIX modules : un seul
+                                         charge faisait paraitre les six charges
+    comptage par EXTENSION UNIQUE        `.php` seul, alors que le legacy sert aussi
+                                         du JS, des images, du CSS
+
+**La forme qui tient : apparier le `<script src>` par CHEMIN RESOLU, commentaires
+depouilles.** *Temoin : 14 JS servis, 4 chemins reellement charges, 10 orphelins.*
+
+#### Verifie au reseau
+    /bashrc/js/bashrc.js  404  ·  /wazuh/js/wazuh.js  404  ·  /ssh-audit/js/main.js  404
+    /bashrc/ /wazuh/ /ssh-audit/ /graylog/ /groups/ /ssh/ /fail2ban/   403 -> 404
+    /iptables/ /security/   302   (vivants, bloques sur decision de l'exploitant)
+    /iptables/js/main.js 200 · /js/utils.js 200   (charges par des pages vivantes)
+    temoin inexistant 404  ·  portage /connexion 200
+
+    fichiers servis toutes extensions   130 -> 120
+
+---
+
 ## [1.53.1] - 2026-09-05
 
 ### Extinction - `import_csv.php` : le dernier blocage MESURABLE tombe
