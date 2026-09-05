@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
+use App\Services\HistoriqueConnexions;
 use App\Services\MotDePasse;
 use App\Services\SessionsActives;
 use Illuminate\Http\Request;
@@ -19,8 +20,10 @@ use Illuminate\View\View;
  */
 class ConnexionController extends Controller
 {
-    public function __construct(private readonly MotDePasse $motDePasse)
-    {
+    public function __construct(
+        private readonly MotDePasse $motDePasse,
+        private readonly HistoriqueConnexions $historique,
+    ) {
     }
 
     /** Duree du verrouillage apres trop d'echecs, en secondes. */
@@ -62,6 +65,21 @@ class ConnexionController extends Controller
         if (! $motDePasseValide || ! $compte->active) {
             if ($compte) {
                 $this->compteEchec($compte);
+                /*
+                 * ⚠ L'HISTORIQUE N'EST ECRIT QUE SI LE COMPTE EXISTE, et c'est
+                 * une contrainte du SCHEMA, pas un choix : `login_history`
+                 * porte `user_id NOT NULL` avec une cle etrangere vers `users`.
+                 * *Un echec sur un identifiant inconnu n'a donc aucune ligne ou
+                 * s'attacher* — c'est aussi ce que fait le legacy (`:267`, dans
+                 * la branche ou `$user` existe), et le compteur par IP qui
+                 * borne l'enumeration vit ailleurs, dans `login_attempts`.
+                 */
+                $this->historique->enregistre(
+                    (int) $compte->id,
+                    'failed_password',
+                    $requete->ip(),
+                    $requete->userAgent(),
+                );
             }
             $this->journalise($requete, $donnees['username'], false);
 
@@ -100,6 +118,28 @@ class ConnexionController extends Controller
          * L'echec ne casse pas la connexion : le mot de passe est bon, la
          * personne entre. Il se JOURNALISE — voir le service.
          */
+        /*
+         * ══ L'HISTORIQUE DES CONNEXIONS ══════════════════════════════════
+         *
+         * `login_history` porte 5 067 lignes et **un seul ecrivain : le
+         * legacy**. `ExportRgpd` la LIT — c'est une section d'un livrable
+         * d'exercice du droit d'acces. *Eteindre le legacy sans cette ligne
+         * figerait la donnee au jour de l'extinction, et l'export continuerait
+         * de la presenter comme complete.*
+         *
+         * ⚠ ET C'EST ICI, PAS APRES LE SECOND FACTEUR. Le legacy l'ecrit au
+         * meme endroit (`login.php:206`) : le statut `success` de cette table
+         * dit « le mot de passe etait bon », pas « la session est ouverte ».
+         * *Le deplacer apres la 2FA changerait le sens de 4 957 lignes deja
+         * ecrites, et l'export melangerait deux definitions.*
+         */
+        $this->historique->enregistre(
+            (int) $compte->id,
+            'success',
+            $requete->ip(),
+            $requete->userAgent(),
+        );
+
         $this->motDePasse->rehacheSiNecessaire(
             (int) $compte->id,
             (string) $compte->password,
@@ -161,7 +201,18 @@ class ConnexionController extends Controller
     {
         $echecs = ((int) ($compte->failed_attempts ?? 0)) + 1;
 
-        $maj = ['failed_attempts' => $echecs];
+        /*
+         * `last_failed_login_at` DANS LA MEME ECRITURE. Le legacy la pose aux
+         * deux endroits ou il touche `failed_attempts` (`login.php:249` et
+         * `:260`) ; ici il n'y a qu'un point d'ecriture, donc une seule ligne.
+         *
+         * **Elle est lue par les DEUX exports de donnees personnelles**
+         * (`ExportRgpd:103`) et n'avait AUCUN ecrivain dans le portage : deux
+         * comptes seulement la portent aujourd'hui, tous deux ecrits par le
+         * legacy. *Une colonne exportee que plus personne n'ecrit devient un
+         * champ qui dit « jamais » pour tout le monde.*
+         */
+        $maj = ['failed_attempts' => $echecs, 'last_failed_login_at' => now()];
         if ($echecs >= self::ECHECS_AVANT_VERROU) {
             $maj['locked_until'] = date('Y-m-d H:i:s', time() + self::VERROU_SECONDES);
         }

@@ -32,16 +32,77 @@ use Illuminate\Support\Facades\Log;
  *     Elle est desactivee aujourd'hui (`PASSWORD_EXPIRY_DAYS` non definie), donc
  *     le defaut est LATENT — mais on ne s'appuie pas sur un effet de bord.
  *
- *  2. **`password_expires_at` n'est PAS ecrite.** Le legacy la calcule et
- *     l'enregistre, mais **personne ne la lit** : `verify.php:159` calcule
- *     l'expiration depuis `password_updated_at`. Mesure : **0 ligne** renseignee
- *     dans toute la table. Porter cette ecriture reviendrait a porter une colonne
- *     morte.
+ *  2. **`password_expires_at` EST ecrite — et ce point corrige une affirmation
+ *     qui vivait ici, de moi.**
+ *
+ *     Elle disait : *« Le legacy la calcule et l'enregistre, mais **personne ne
+ *     la lit** : `verify.php` calcule l'expiration depuis `password_updated_at`.
+ *     Porter cette ecriture reviendrait a porter une colonne morte. »*
+ *
+ *     **La moitie citee etait vraie** — `verify.php:196-197` calcule bien depuis
+ *     `password_updated_at`, sans toucher la colonne. **La conclusion ne l'etait
+ *     pas** : `backend/scheduler.py` la LIT deux fois (`:623` et `:820`), et la
+ *     premiere **envoie un courriel** — « Votre mot de passe RootWarden expire
+ *     le … ».
+ *
+ *     > **J'ai infere « personne » de « pas le portail que je comparais ».**
+ *     > *Mesurer l'appelant qu'on a sous les yeux n'est pas mesurer la chaine, et
+ *     > un consommateur qui vit dans un autre depot ne se signale pas.*
+ *
+ *     Consequence de l'affirmation tant qu'elle a tenu : **tout mot de passe
+ *     change par le portage restait sans date d'expiration**, donc le rappel ne
+ *     partait jamais pour cette personne — et rien ne le signalait, la tache
+ *     trouvant simplement zero ligne a traiter.
+ *
+ *     La regle de calcul, a trois branches, est dans `expirationApres()`.
  */
 class MotDePasse
 {
     /** Une CLE i18n, jamais un message : la vue traduit, le service decide. */
     public const OK = 'profil.mdp_ok';
+
+    /**
+     * La date d'expiration a poser, ou `null` si le compte est exempte.
+     *
+     * ══ LA REGLE EST CELLE DU LEGACY, ET ELLE A TROIS BRANCHES ════════════
+     *
+     * `profile.php:190-197` et `adm/api/update_user.php:53-65` :
+     *
+     *     override === 0        ->  EXEMPTE, aucune expiration
+     *     override > 0          ->  cette duree-la, propre au compte
+     *     override absent       ->  la duree globale, ou aucune si elle vaut 0
+     *
+     * ⚠ ZERO ET ABSENT NE SONT PAS LA MEME CHOSE, et c'est tout le sens de la
+     * colonne : `0` est une exemption DEMANDEE, `NULL` est « rien de demande,
+     * suis la regle globale ». *Les confondre exempterait tout le monde le jour
+     * ou la duree globale serait posee.*
+     *
+     * **Le calcul part de MAINTENANT** — comme `profile.php:197`
+     * (`strtotime("+N days")`), et non de `password_updated_at` comme
+     * `update_user.php`. Les deux coincident ici, puisque cette ecriture pose
+     * `password_updated_at = now()` dans la meme requete.
+     *
+     * ⚠ AUJOURD'HUI LE RESULTAT EST `null` POUR TOUS : `PASSWORD_EXPIRY_DAYS`
+     * n'est pas posee et aucun compte ne porte d'override (mesure : 12 comptes,
+     * 0 override, 0 expiration). **Le geste est donc dormant — et c'est la
+     * raison de l'ecrire**, comme le re-hachage bcrypt : le jour ou la duree
+     * sera posee, les mots de passe changes par le portage en tiendront compte
+     * au lieu de rester eternellement sans echeance.
+     */
+    private function expirationApres(int $idCompte): ?string
+    {
+        $override = DB::table('users')->where('id', $idCompte)->value('password_expiry_override');
+
+        if ($override !== null && (int) $override === 0) {
+            return null;
+        }
+
+        $jours = ($override !== null && (int) $override > 0)
+            ? (int) $override
+            : (int) config('rootwarden.mot_de_passe.expiration_jours', 0);
+
+        return $jours > 0 ? now()->addDays($jours)->format('Y-m-d') : null;
+    }
 
     private function cout(): int
     {
@@ -311,12 +372,26 @@ class MotDePasse
             /*
              * `password_updated_at` EXPLICITEMENT, et `force_password_change` dans
              * la MEME ecriture — le legacy fait deux `UPDATE` successifs.
-             * `password_expires_at` n'est pas touchee : personne ne la lit.
+             *
+             * ⚠⚠ ~~`password_expires_at` n'est pas touchee : personne ne la lit.~~
+             * **CETTE PHRASE ETAIT DE MOI, ET ELLE ETAIT FAUSSE.** Mesure du
+             * 2026-09-05 : `backend/scheduler.py` la lit DEUX fois — `:623` et
+             * `:820` — et la premiere **ENVOIE un courriel** (« Votre mot de
+             * passe RootWarden expire le … »).
+             *
+             * *Consequence de mon affirmation : tout mot de passe change par le
+             * portage n'avait AUCUNE date d'expiration, donc le rappel ne
+             * partait jamais pour cette personne — et rien ne le signalait,
+             * puisque la tache trouve simplement zero ligne.*
+             *
+             * **La colonne est donc ecrite, dans la meme ecriture que les deux
+             * autres.** Voir `expirationApres()` pour la regle.
              */
             DB::table('users')->where('id', $idCompte)->update([
                 'password' => password_hash($nouveau, PASSWORD_BCRYPT, ['cost' => $this->cout()]),
                 'password_updated_at' => now(),
                 'force_password_change' => 0,
+                'password_expires_at' => $this->expirationApres($idCompte),
             ]);
 
             /*
