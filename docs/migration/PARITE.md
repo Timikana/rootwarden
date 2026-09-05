@@ -20516,3 +20516,55 @@ annoncée, pas cherchée.
 
 *Sans forçage : 0 compte sur 12 porte un override et `PASSWORD_EXPIRY_DAYS` n'est pas posée —
 le test passerait à vide.* **Le geste est dormant, et c'est la raison de l'écrire.**
+
+
+## E-420 — j'ai publié « 58 = 58 » sur un catalogue qui en porte 63, et ma parité était juste PAR CHANCE
+
+**Mesuré le 2026-09-05 20:40, après qu'une autre session eut signalé la classe** —
+*« un `grep -c` sur un catalogue compte des LIGNES et pas des clés ; je m'y suis
+fait prendre aujourd'hui sur `ssh_audit.php`, 49 contre 48 en lignes, parité
+parfaite en clés extraites »*.
+
+**Trois nombres pour le même objet, dont deux de moi :**
+
+    mon motif publie   `grep -cE "^\s*'[a-z_0-9]+' =>"`   ->  58
+    mon motif affine   memes clés, extraites et dedupliquees ->  56
+    L'AUTORITE         `require` + `count()` dans PHP        ->  63
+
+**Mon motif ratait 7 clés** — `sessions_aide`, `sessions_err`, `sessions_revoquee`,
+`sessions_vide`, `sessions_vue`, `second_facteur_titre`, `second_facteur_texte`.
+Toutes ordinaires : **le motif exigeait UNE SEULE espace avant `=>`**, et ces
+lignes sont **alignées**.
+
+> **Une convention de mise en forme rend un motif aveugle sans rien changer au
+> code.** *Rien ne distingue une clé alignée d'une clé absente, pour un motif qui
+> compte.*
+
+### ⚠ Et ma conclusion de parité était juste PAR CHANCE
+
+J'avais compare les jeux de clés par `diff` sur des listes triées — **une méthode
+de bon aloi, appliquée à une population amputée de 7.** La parité des 7
+invisibles n'était pas vérifiée : elle se trouvait tenir.
+
+**Refait par l'autorité, témoin négatif rendu :**
+
+    fr=63  en=63   absentes de fr : aucune   absentes de en : aucune
+    TEMOIN : une cle inventee est bien rendue ABSENTE
+
+> **Un instrument aveugle sur une partie de sa population rend un verdict qui a
+> la forme d'une preuve.** *Le `diff` était rigoureux ; ce qu'il comparait ne
+> l'était pas.*
+
+### La parade, et elle ne coûte rien
+
+    php -r '$a = require "lang/fr/x.php"; echo count($a);'
+    php -r '... array_diff(array_keys($fr), array_keys($en)) ...'
+
+**Demander au langage ce qu'il charge**, plutôt que d'inférer d'un motif ce qu'il
+devrait charger. *C'est la même règle que « demander à Laravel ce qu'il RAPPORTE »
+qui m'a fait trouver le `scheme` inversé ce matin — un diff se relit contre
+l'intention qu'on avait, un état rapporté se lit contre ce qui est.*
+
+**Ce qui est corrigé** : le « 58 = 58 » figure dans le message de `feaaaa2` et a
+été transmis à deux sessions. **Le vrai chiffre est 63 = 63, et la parité tient** —
+la conclusion survit, la méthode non.
