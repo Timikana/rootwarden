@@ -91,3 +91,58 @@ le portage ne l'appelle pas, et le legacy l'appelle depuis une page qui exige d�
     📌 et RIEN d'autre — sauf de savoir que tant que le legacy est servi,
        l'interrupteur existe. C'est l'extinction qui rend le §3 urgent,
        pas son absence aujourd'hui.
+
+---
+
+# ⛔ CORRECTION DU §4 — mon « miroir exact » ÉLARGISSAIT l'écriture à un rôle 1
+
+**Vérifié après réfutation. Le correctif est posé (`356caea`, E-392) mais PAS sous la forme que j'avais
+prescrite, et la différence est mesurée.**
+
+    ce que j'ecrivais   « @require_permission('can_audit_ssh') +
+                          @require_machine_access, miroir exact du jumeau
+                          en LECTURE »
+    le jumeau en LECTURE ne porte AUCUN role.
+    -> un miroir STRICT retirait `@require_role(2)`
+
+    et la page legacy admet un ROLE 1 porteur de la permission :
+      `legacy/ssh-audit/index.php:12-13`
+        checkAuth([ROLE_USER, ROLE_ADMIN, ROLE_SUPERADMIN])
+        + checkPermission('can_audit_ssh')
+
+> **Mon « miroir » aurait ouvert l'ÉCRITURE d'une politique SSH à un rôle 1. Sur un geste d'écriture, la
+> symétrie avec la lecture n'est pas la bonne cible.**
+
+    can_audit_ssh, comptes ACTIFS :  role 3 -> 1  ·  role 2 -> 1  ·  role 1 -> 0
+    (temoin : 12 comptes actifs)
+
+**⚠ ZÉRO rôle 1 la porte aujourd'hui — donc l'élargissement aurait été INVISIBLE à la mesure et effectif au
+premier octroi.** *C'est la forme la plus désagréable d'un défaut : correct au moment où on l'écrit, faux au
+moment où quelqu'un l'emploie.*
+
+**✅ La forme retenue est ADDITIVE** : `role(2)` **ET** permission **ET** `machine_access` — strictement plus
+serré que les deux états antérieurs, sans aucune ouverture nouvelle.
+
+## ⚠ ET `@require_machine_access` NE PEUT REFUSER PERSONNE ICI — c'est écrit au site
+
+    `helpers.py:364`   `if role_id >= 2: return True`   SANS CONDITION
+    et la ligne au-dessus exige justement `role(2)`.
+    `machine_id` est de plus OPTIONNEL ici (`None` = politique GLOBALE).
+
+**Il ne mordra que si le rôle venait à être relâché.** *Posé sans commentaire, c'était « un contrôle qui ne
+commande pas l'action » à côté d'un contrôle qui commande — l'entrée exacte du catalogue. Il porte
+désormais sa propre borne.*
+
+## ✅ ET MON CRITÈRE, BALAYÉ SUR TOUT LE BACKEND, REND UN NÉGATIF GLOBAL
+
+    27 chemins portent plusieurs methodes
+     3 ont des gardes divergentes entre jumelles :
+       /admin/notification_prefs   GET role(2) · POST role(3)   ecriture PLUS STRICTE ✔
+       /admin/temp_permissions     GET role(2) · POST role(3)   ecriture PLUS STRICTE ✔
+       /ssh-audit/policies         desormais fermee
+
+> **Après ce correctif, AUCUNE route du backend n'a d'écriture moins gardée que sa lecture.**
+
+**Et la nature du critère mérite d'être notée** : *« ni rôle ni permission » est une classe ABSOLUE ; ce
+défaut-ci est RELATIONNEL — il n'existe que par comparaison entre deux routes du même chemin.* **Aucun
+élargissement du critère absolu ne l'aurait rendu.**
