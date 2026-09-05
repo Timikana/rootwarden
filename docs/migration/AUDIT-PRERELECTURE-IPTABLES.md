@@ -526,3 +526,103 @@ Les questions restantes portent toutes sur l'**exécution** : ce que
 `iptables-restore` fait d'un jeu de règles réel, ce qu'un rollback restaure
 vraiment, si la machine reste joignable après. **Aucune ne se mesure par la
 lecture.** Ma marge va donc en pré-relecture, comme le Lead le propose.
+
+---
+
+## 9. Q3 sur `legacy/iptables/index.php` — relevé par BRANCHE
+
+**Relevé du 2026-09-05, 11:37 CEST.** Lecture seule, aucune machine jointe,
+aucune écriture dans `laravel/`.
+
+Le DSI demande, **par branche `case` et non par fichier** : ce geste-là est-il
+porté, et par quel artefact ?
+
+### 9.1 Le verdict, branche par branche
+
+| branche `case` | ce qu'elle fait | verdict | artefact |
+|---|---|---|---|
+| `load_from_db` | lit `iptables_rules` pour un serveur | **PORTÉ** | `PareFeuController::charger()` · `POST /pare-feu/copie` · appelé par `pare-feu.js:395` |
+| `save_to_db` | **DELETE + INSERT** dans `iptables_rules` | **PORTÉ** | `PareFeuController::enregistrer()` · `POST /pare-feu/copie/enregistrer` · appelé par `pare-feu.js:475` |
+| `restore` | lit la copie en base **et l'APPLIQUE sur la machine** via `POST /iptables-restore` | **NON PORTÉ — délibérément** | c'est **I5**, fermé sur l'arbitrage du port SSH |
+
+**La table écrite (`iptables_rules`) l'est par `save_to_db` seul, et ce geste est
+porté.** *Aucune écriture de table n'est perdue.*
+
+### 9.2 Ce que le JS du portage appelle — mesuré, pas remémoré
+
+Le DSI avertit : *« cherche ce que le JS APPELLE, pas les routes »*, *« cherche le
+chemin COMPOSÉ »*, *« la méthode se construit aussi »*. Relevé exhaustif de
+`pare-feu.js` :
+
+```
+:307  appelle('/iptables', {action:'get'})        -> passerelle   I1
+:395  appellePortage('/pare-feu/copie')                          I2
+:475  appellePortage('/pare-feu/copie/enregistrer')              I2
+:548  appellePortage('/pare-feu/historique')                     I3
+:710  appelle('/iptables-validate')               -> passerelle   I4
+```
+
+**Cinq appels, tous à chemin LITTÉRAL. `method: 'POST'` est écrit en dur dans les
+deux fonctions d'appel — aucune méthode calculée, aucun `DELETE`, aucune
+concaténation de chemin.**
+
+> **La « fermeture par l'absence » d'I1 est donc confirmée par MESURE et non par
+> mon souvenir de l'avoir écrite.** *C'est la distinction que je réclame ailleurs,
+> appliquée à mon propre code.*
+
+### 9.3 ⚠ Et le relevé corrige MON PROPRE SEC-012 — il sous-comptait
+
+`SEC-012` (§7.2) affirme que le préfixe `/iptables-` de la liste blanche *« ouvre
+`/iptables-validate`, `/iptables-apply` et `/iptables-rollback` »*. **Mesuré :
+c'est plus que trois.**
+
+```
+/iptables            /iptables-validate    /iptables-apply
+/iptables-restore    /iptables-history     /iptables-rollback    /iptables-logs
+```
+
+**`/iptables-restore` est un QUATRIÈME point d'entrée mutant que je n'avais pas
+inventorié** — et il est couvert par le même préfixe (`autorisee()` rend `OUI`,
+vérifié). *Ma formulation nommait trois exemples ; elle se lisait comme une
+énumération.* **L'erreur est dans le sens rassurant, donc je la signale.**
+
+### 9.4 ✅ ET UNE TROUVAILLE POUR L'ARBITRAGE D'I5 — les deux points d'application ne se valent pas
+
+Les deux appliquent des règles, avec **les mêmes gardes** (`require_api_key` +
+`require_permission('can_manage_iptables')` + `require_machine_access`). Mais :
+
+| | d'où viennent les règles appliquées |
+|---|---|
+| `/iptables-apply` | **du CORPS de la requête** (`data.get('rules_v4')`) |
+| `/iptables-restore` | **de la BASE** — `SELECT rules_v4, rules_v6 FROM iptables_rules WHERE server_id = %s ORDER BY id DESC LIMIT 1` |
+
+> **`/iptables-restore` n'offre AUCUNE entrée libre pour les règles.** L'appelant
+> ne peut pas injecter un jeu arbitraire : il ne peut que déclencher
+> l'application de **la copie déjà en base** — celle qu'I2 écrit et qu'I4 valide,
+> lue par la **même requête déterministe**.
+
+**C'est la fermeture par l'absence, au niveau du backend.** Si I5 est un jour
+ouvert, **c'est ce point d'entrée qu'il doit employer, pas `/iptables-apply`** —
+la chaîne devient alors cohérente de bout en bout : I2 enregistre → I4 valide →
+I5 applique **le même objet**, sans qu'aucune règle ne transite par le client.
+
+*Cela ne lève rien de l'arbitrage : appliquer un jeu de règles, quel qu'il soit,
+peut couper l'accès SSH — c'est la question posée, et elle est inchangée. **Mais
+elle se pose sur un geste plus étroit que ce qu'on croyait.***
+
+### 9.5 Réponse à Q3 : le fichier N'EST PAS archivable, et le bloquant est nommé
+
+**Branches 1 et 2 : le legacy n'est plus le seul accès** — le portage les sert.
+
+**Branche 3 : il l'est.** Aucune interface du portage ne compose d'appel vers
+`/iptables-restore` (§9.2), donc **la page legacy est le seul chemin
+utilisateur** vers l'application d'une copie enregistrée.
+
+> **`legacy/iptables/index.php` ne peut pas partir en vague 1.** Son bloquant
+> n'est pas un portage manquant par négligence : c'est **l'arbitrage du port SSH**,
+> ouvert et non rendu. *Q3 et I5 sont la même question, posée des deux bouts.*
+
+**Non mesuré, et dit** : je n'ai pas ouvert la page au navigateur, ni vérifié
+qu'aucun autre gabarit du portage ne compose ce chemin ailleurs que dans
+`pare-feu.js`. *Ce qui me réfuterait : un appel construit dans un autre fichier
+JS, ou un formulaire HTML qui poste directement vers la passerelle.*
