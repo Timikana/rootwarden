@@ -20203,3 +20203,49 @@ n'écrit rien.
   ci-dessus. C'est la seule mesure qui trancherait, et elle n'est pas faite ;
 - **le chemin complet de bout en bout** — demander, recevoir, cliquer, poser — n'est pas exercé
   au réseau, parce qu'il exigerait d'émettre un jeton réel sur un compte réel.
+
+
+## E-399 — un accent grave dans un `-m` entre guillemets DOUBLES est EXECUTE, et il efface le mot en silence
+
+**Mesuré le 2026-09-05 sur mon propre commit `fff1f8d`.** Le message enregistre
+porte :
+
+    « LE PILOTE RESTE , DELIBEREMENT. »        <- le mot manque
+    occurrences de `smtps` dans le message : 0  <- le mot a disparu entierement
+
+**Bash a substitue les commandes entre accents graves.** La sortie l'a dit —
+`log : commande introuvable`, `scheme : commande introuvable` — *mais sur stderr,
+au milieu d'une sortie de commit reussie, et le commit a ete cree quand meme.*
+
+> **Rien n'echoue : le commit reussit, et le message perd des mots.** *Un lecteur
+> ultérieur voit une phrase amputée sans savoir qu'elle l'a été, et le mot manquant
+> est justement celui qu'on avait juge assez important pour le mettre en evidence.*
+
+**La parade** : `-m` en guillemets **simples**, ou un fichier de message
+(`-F`). *Et lire la sortie du commit meme quand il reussit — les erreurs de
+substitution y sont, noyees dans le succes.*
+
+**Ce qui limite le degat ici** : l'explication vit aussi **dans le fichier**, en
+commentaires, et ceux-la sont intacts — le code a ete verifie par ce que Laravel
+RAPPORTE (`default=log`, `port=465`, `scheme=smtps`, hote du projet). *Une
+explication ecrite a deux endroits survit a la perte d'un des deux.*
+
+**Non amende, delibérément** : j'ai reproché hier à un pair d'avoir amendé sur ce
+dépôt, et le correctif d'un message ne vaut pas de réécrire un historique partagé.
+
+### ⚠ Et la vraie leçon du tour n'est pas celle-là
+
+**Ce même mappage avait déjà été écrit à 09:47, puis effacé à 09:53:40** par une
+restauration d'un pair — `git status` propre, `mtime` postérieur à mon écriture,
+`MAIL_SMTP_HOST` à 0 occurrence. **Je ne l'avais pas commité** : je l'avais
+vérifié à 09:50, puis j'étais parti mesurer une question forensique pendant trois
+minutes.
+
+> **Sur un arbre partagé par huit sessions, l'intervalle entre « vérifié » et
+> « commité » est une fenêtre de perte.** *Hier un `reset --soft` m'a décommité un
+> écart ; aujourd'hui une restauration m'a effacé une édition non commitée. Deux
+> mécanismes différents, le même intervalle.*
+
+**Règle que je m'applique : vérifier puis commiter dans le MÊME geste, et remettre
+la mesure d'après à après le commit.** *Ce qui n'est pas dans l'historique n'existe
+que jusqu'au prochain geste d'un tiers.*
