@@ -9412,3 +9412,54 @@ instants. Je ratifie le raisonnement, pas le chiffre. »*
 **C'est le pendant exact de ce que la journée a montré : un pair ratifie les exculpations parce qu'elles ne
 lui demandent rien.** *Une ratification qui borne ce qu'elle couvre est la seule qui ne se transforme pas en
 caution.*
+
+### ✅ J'AI REFAIT SUR `groups` LA MESURE QUI AVAIT TROUVÉ LES TROIS DE WAZUH — et cette fois il n'y a rien
+
+**Après avoir découvert que « les 9 gestes de wazuh sont interdits » en valait SIX, j'ai appliqué le même
+instrument aux deux autres modules qui portent encore des `np_*`.**
+
+    `groups`, les 4 routes MUTANTES :
+      POST   /groups                SSH -  ·  MASSE -   ecrit   -> PORTE
+      DELETE /groups/<id>           SSH -  ·  MASSE -   ecrit   -> PORTE
+      POST   /groups/<id>/run       SSH -  ·  MASSE OUI         -> `drift_scan`
+                                    PORTE · `cve_scan` INTERDIT
+      PUT    /groups/<id>           SSH -  ·  MASSE -   ecrit   -> ORPHELINE
+
+**⚠ Et ma première sonde sur le `PUT` était fausse d'une façon que je connais** : *elle exigeait `PUT` et
+`/groups/` SUR LA MÊME LIGNE.* **Une méthode construite (`const m = id ? 'PUT' : 'POST'`) y échappe — c'est
+le piège de l'URL construite, appliqué à la MÉTHODE.** *Je l'ai repris avant de conclure.*
+
+### ✅ ET LE RÉSULTAT EST UN NÉGATIF MESURÉ, PAS UNE ABSENCE SUPPOSÉE
+
+    `PUT /groups/<id>` sur 866 fichiers balayes (TEMOIN) :
+      DEUX occurrences — sa propre declaration `groups.py:170`, et un
+      COMMENTAIRE dans `go-page-groupes.mjs:125` qui liste les « routes reelles »
+      -> AUCUN appelant, nulle part
+
+    le legacy declare pourtant un mode edition :
+      `legacy/groups/js/main.js:13`   let editingId = null; // null = creation,
+                                                            // sinon edition
+      `:140`                          editingId = null;
+      -> DEUX occurrences, toutes deux des AFFECTATIONS. Jamais LU.
+
+    et le portage refuse la methode PAR CONSTRUCTION :
+      `ecris()` ne sait faire qu'un POST · `supprime()` qu'un DELETE
+      et son commentaire le dit : « un `envoie(methode, chemin)` generique
+      ouvrirait PUT et PATCH sans qu'aucun code les demande »
+
+> **Modifier un groupe n'est pas une capacité à porter : elle n'existe pas non plus dans le legacy. Son
+> mode édition est déclaré et jamais consommé.**
+
+**`PUT /groups/<id>` est une route ORPHELINE — de la surface morte, pas un trou** : *elle porte
+`@require_role(2)` et `@require_permission('can_admin_portal')`.* **Elle rejoint la famille du
+`DOSSIER-21` par la forme et pas par le risque.**
+
+### ⚠ CE QUE JE RETIENS DE L'ÉCART ENTRE LES DEUX MODULES
+
+    sur `wazuh`  ma restriction couvrait 9 objets pour 6 interdits
+                 -> TROIS capacites recuperees, portees le meme jour
+    sur `groups` ma restriction couvrait le bon perimetre
+                 -> et le seul candidat restant est du code MORT des deux cotes
+
+**Le même instrument, deux résultats opposés. C'est ce qui le rend utilisable** : *s'il avait rendu « il
+reste du travail » les deux fois, il n'aurait mesuré que mon envie d'en trouver.*
