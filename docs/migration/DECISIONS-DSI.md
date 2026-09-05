@@ -10349,3 +10349,66 @@ mesure précède l'assignation.**
 portées.** *Une consigne qui nomme les bons objets et un état périmé se lit comme à jour —
 c'est exactement le défaut que j'ai signalé ce matin sur le prompt d'extinction, et je
 viens de le retrouver dans l'autre consigne, une heure plus tard.*
+
+---
+
+## E-413 — CODE 0 sur douze commits : la mesure est fondée cette fois, et sa cause n'est pas celle que la consigne suppose
+
+**2026-09-05, 12:35 CEST.** Banc libre, branche vérifiée.
+
+    fenetre 11:35 -> 12:35 (~60 min)   12 commits   CODE 0 · DOC 12
+
+**La fenêtre est cette fois assez large pour que le rapport signifie quelque chose** (12 >
+10, seuil posé en E-412). **Le constat tient : zéro code en une heure, avec sept sessions.**
+
+### Mais la consigne se trompe de cause
+
+> **Elle suppose que « l'équipe écrit sur ses propres mesures au lieu de porter ». Le
+> décompte dit autre chose.**
+
+    1  changer son adresse           DOSSIER-30  -> arbitrage exploitant
+    2  poser sa propre cle SSH       DOSSIER-30  -> arbitrage exploitant
+    3  fermer ses autres sessions    DOSSIER-30  -> arbitrage exploitant
+    4  supprimer son compte          DOSSIER-30  -> arbitrage exploitant
+    5  INSERT login_history          DOSSIER-31  -> arbitrage exploitant
+    6  last_failed_login_at          DOSSIER-31  -> arbitrage exploitant
+    7  password_expires_at           DOSSIER-31  -> arbitrage exploitant
+    8  password_expiry_override      DOSSIER-31  -> arbitrage exploitant
+    9  re-hachage bcrypt au login    AUCUN blocage
+    +  l'extinction elle-meme        le `git mv` n'est tenu par personne
+
+**Huit des neuf gestes restants attendent une décision qui n'appartient à aucune session.
+Le neuvième vient d'être routé.** *L'heure a produit la CLÔTURE de la Q3, deux dossiers, et
+la découverte qu'un livrable légal se dégraderait en silence — c'est-à-dire précisément le
+travail qui transforme un chantier bloqué en une liste de décisions posables.*
+
+> **Un rapport doc/code mesure l'ACTIVITÉ, jamais la DISPONIBILITÉ du travail.** *Quand le
+> code restant est bloqué en amont, l'instrument condamne l'équipe pour avoir fait la seule
+> chose qui restait à faire.*
+
+**RÈGLE, à ajouter à celle du seuil de dix commits** : *avant de reprocher un rapport
+doc/code, compter combien d'items de code sont DÉBLOQUÉS. Un ratio infini sur zéro item
+disponible n'accuse personne.*
+
+### Ce que j'ai routé, et pourquoi c'est le seul
+
+**Le re-hachage bcrypt à la connexion** (`login.php:162-167`), vers la session qui tient le
+flux d'authentification.
+
+    les deux portails hachent au MEME cout : legacy `BCRYPT_COST`=12,
+      portage `hashing.bcrypt.rounds`=12
+    en base : 12 comptes, TOUS en `$2y$12$`   ->  le geste est DORMANT
+    `password_needs_rehash` cote portage : 0 fichier (temoin : `Hash::` present)
+
+**Son absence est indétectable tant que le coût ne bouge pas — et c'est la raison de le
+porter**, comme l'onboarding. *Ce qui ne se réclame jamais est ce qui disparaît le plus
+sûrement.*
+
+**⚠ Et son commentaire legacy porte un avertissement qui vise le portage** : *« Avant, le
+commentaire l'annonçait mais ce n'était pas fait. »* **Le portage a hérité de la version
+CORRIGÉE du commentaire et pas du geste — deuxième occurrence de cette forme aujourd'hui.**
+
+### ✅ Étape 3 : la déclaration tient
+
+    fr/auth.php 0 · en/auth.php 0 · cgu.blade.php 0 · suites 0
+    temoin : 40 cles -> instrument sain
