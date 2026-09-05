@@ -12029,3 +12029,76 @@ l'exploitant.*
 (`ReinitialisationController:219`), joignable par quatre routes de réinitialisation, et AUCUNE
 suite PHPUnit ne l'atteint.* **Aucun courriel n'est parti du banc. On ferme une porte qui
 n'avait pas encore servi.**
+
+---
+
+## E-448
+
+### Ma sonde rendait EXACTEMENT LA VALEUR ATTENDUE pendant que le produit servait l'ancienne
+
+**E-447 était fondé sur une mesure qui interrogeait le mauvais canal — la mienne comme celle de
+la session qui me l'avait remonté.**
+
+    <env> de PHPUnit touche   putenv() et $_ENV        (`PhpHandler.php:141`,
+                                                        `BackedUpEnvironmentVariable`)
+    il ne touche JAMAIS       $_SERVER
+    Laravel lit               `Env` -> RepositoryBuilder::createWithDefaultAdapters()
+                              -> ServerConstAdapter consulte $_SERVER
+
+**Donc après avoir posé les quatorze `force="true"` :**
+
+    getenv(MAIL_MAILER)     'array'    <- force a bien agi
+    $_ENV[MAIL_MAILER]      'array'    <- force a bien agi
+    $_SERVER[MAIL_MAILER]   'smtp'     <- INTACT
+    config(mail.default)    'smtp'     <- LE BANC RESTAIT CABLE
+
+> **Un `<env>` sans `force` est un souhait. Un `<env>` SEUL, en Laravel, est un souhait adressé
+> à la mauvaise superglobale.**
+
+**Le correctif complet : 14 `<server name="…" force="true"/>` EN PLUS des 14 `<env>`.** *Vérifié
+après pose, sur les quatre canaux : `getenv` · `$_SERVER` · `Env::get` · `config` rendent tous
+`array`.*
+
+### ⚠ CE QUI REND CETTE ERREUR PARTICULIÈRE, ET C'EST LE FACTEUR AGGRAVANT
+
+**Ma sonde rendait `array`. C'est-à-dire EXACTEMENT la valeur attendue d'un correctif réussi.**
+
+> **La sonde confirmait le succès pendant que le produit servait l'ancienne valeur.** *Ce n'est
+> pas un instrument qui rend zéro, ni un qui alarme à tort : c'est un instrument qui
+> FÉLICITE.*
+
+**Et une correction qui PARAÎT faite ne se signale pas d'elle-même** — *un défaut proteste, une
+fausse réussite se tait.* **Le commit était prêt, intitulé « le banc est hors d'atteinte », avec
+une mesure `getenv()` à l'appui.**
+
+### ✅ CE QUI L'A ATTRAPÉE, ET CE N'ÉTAIT PAS DE LA VIGILANCE
+
+**Le verrou `test_le_BANC_lui_est_INSENSIBLE_et_ca_doit_le_rester` a rougi.** *Écrit dans le
+même mouvement que le `force`, PRÉCISÉMENT parce que j'avais demandé de ne pas éteindre
+l'alerte en gagnant la sûreté.*
+
+> **La garde que j'avais exigée pour une raison — ne pas perdre le signal — a servi à une
+> autre : prouver que le correctif ne corrigeait rien.** *Un contradicteur écrit dans le même
+> commit que le geste qu'il surveille.*
+
+**Et mon raisonnement sur les quatorze en sort RENFORCÉ** : *un seul nom est dans `$_SERVER` —
+`MAIL_MAILER`. Les treize autres y sont absents, donc gagnaient déjà, donc les doubler ne change
+aucune valeur servie.* **La classe est fermée sur les DEUX canaux, au même coût nul.**
+
+### Le marqueur, déplacé et gardé
+
+**Il lit `/proc/1/environ`** — *PID 1 de ce conteneur EST `apache2`, son environnement est celui
+qu'`env_file:` a injecté, et `force` ne l'atteint pas.* **Le nom du processus est vérifié avant
+lecture** (*ailleurs, PID 1 est autre chose et rendrait une valeur plausible et fausse*) **et un
+témoin `PATH` refuse un découpage raté** — *sans lui, un échec de parsing rendrait « transport
+absent », c'est-à-dire un DÉDOUANEMENT.*
+
+    verrou 1   le SERVICE est distant
+    verrou 2   le BANC est local — si `force` saute, ROUGE
+    verrou 3   `.env` PERD contre le service
+
+### ⚠ Et un signalement en cours, non tranché
+
+**`POST /profil/effacement` ne porte que `session.authentifiee`** — *pas de step-up, pas de
+rôle.* **Un geste destructeur en libre-service.** *La session lit le contrôleur avant de
+conclure ; je ne double pas son travail et je le note pour ne pas le perdre.*
