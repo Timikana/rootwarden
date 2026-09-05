@@ -11831,3 +11831,59 @@ seul module, et la même forme que `/policy/rollback` — c'est une population, 
 
 > **Dans les deux cas, ce qui manque n'est pas l'objet mesuré, mais ce qui permettait de
 > l'ATTEINDRE ou de le JUGER.**
+
+---
+
+## E-445
+
+### LA CINQUIÈME CATÉGORIE : *jamais câblée*. Sa trace est de la DOCUMENTATION, et rien d'autre.
+
+    /server_users_inventory      aucun appelant : ni portage, ni legacy vivant,
+    /admin/notification_prefs    ni `_deprecated/`, ni `tests/`
+
+**Elles n'apparaissent que dans leur propre définition, la liste blanche, et de la
+DOCUMENTATION.** *Sept documents parlent de `/server_users_inventory`. Aucun code ne l'appelle.*
+
+> **Ce n'est aucune des quatre.** *Pas orpheline par dépréciation — rien n'a jamais été
+> déprécié, parce que rien n'a jamais été construit dessus. Pas retenue — aucune décision ne
+> les concerne. Pas un trou dans un sous-lot déclaré complet — aucun sous-lot ne les revendique.
+> Pas un témoin disparu — aucune suite n'en dépend.*
+>
+> **Elles ont été écrites, gardées, mises en liste blanche, documentées — et jamais appelées
+> par personne.**
+
+### La taxonomie complète, et chaque ligne demande un travail DIFFÉRENT
+
+    depreciation              -> un `_deprecated/`                    ARBITRER
+    arbitrage                 -> un dossier ouvert                    DECIDER
+    sous-lot declare complet  -> une CASE COCHEE                      FINIR
+    temoin disparu            -> une SUITE ROUGE sur un objet SAIN    REOUTILLER
+    JAMAIS CABLEE             -> de la DOCUMENTATION, et rien d'autre GARDER ou RETIRER
+
+**La trace de la cinquième est la plus trompeuse des cinq : abondante, écrite, exacte — et
+elle décrit une capacité que personne n'a jamais pu employer.**
+
+*`DOSSIER-21-LISTE-BLANCHE-ORPHELINE.md` nommait déjà `/admin/notification_prefs`.* **Le
+dossier existait ; ce qui manquait était le mécanisme qui explique pourquoi il y en a
+d'autres.**
+
+### ⚠ Et la quatrième est la seule dont le rouge ACCUSE le produit
+
+**Les quatre autres se TAISENT.** *Le témoin disparu, lui, produit un échec sur une assertion
+parfaitement écrite à propos d'un objet qui fonctionne.* **Et c'est pour ça qu'il se corrige
+vite et mal : on cherche le défaut là où l'assertion pointe.**
+
+**Le remède durable n'est pas de changer l'étalon** — *c'est d'en choisir un qui ne puisse pas
+être archivé, ou de VÉRIFIER l'étalon avant de s'en servir.*
+
+> **Un témoin qui peut disparaître n'est pas un témoin, c'est une hypothèse.**
+
+### ⚠ Un avertissement rendu à la place d'un résultat, et c'était la bonne réponse
+
+**Une session a refusé de classer `/server_lifecycle` (5 références dans `tests/`) et `/deploy`
+(10) sur ce critère** : *« beaucoup de références de test peut signifier ÉTALON — ou simplement
+capacité bien testée. Le nombre ne distingue pas les deux. »*
+
+**Ce qui trancherait : lire si la suite s'en sert comme SUJET ou comme RÉFÉRENCE.** *Un
+comptage réduit l'espace — 203 → 53 → 22 — il ne tranche pas.* **Rendre un avertissement
+plutôt qu'un classement fondé sur un nombre qui ne discrimine pas est le geste juste.**
