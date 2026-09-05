@@ -20334,3 +20334,100 @@ ressemblait à une mesure réussie.* Le harnais porte désormais **quatre gardes
 l'empreinte doit changer, `php -l` doit passer, la classe doit être renommée, et la mutation
 doit être **présente dans le fichier**. *Une mutation qui ne s'applique pas est déclarée, jamais
 comptée.*
+
+---
+
+## E-418 — les trois dernières écritures du legacy, et **une affirmation de moi qui les bloquait**
+
+**Porté :** `login_history` (succès et échec), `last_failed_login_at`, `password_expires_at`.
+Trois colonnes dont **le seul écrivain était le legacy**, et dont les lecteurs, eux, survivent à
+son extinction.
+
+    login_history          5 067 lignes · derniere ecriture le jour meme · lu par ExportRgpd
+    last_failed_login_at   2 comptes renseignes · lu par les DEUX exports
+    password_expires_at    0 compte renseigne · lu par backend/scheduler.py, DEUX fois
+
+### ⚠ Le dispositif conçu contre ce mensonge y est aveugle
+
+`ExportRgpd` porte `_total`, `_exportees` et `_tronque` sur chaque section bornée — écrits
+précisément parce que le legacy livrait *« un JSON qui se présente comme complet »*.
+
+> **Aucun des trois n'attraperait le gel.** *Rien n'est tronqué : la donnée s'arrête. Le
+> compteur dirait la vérité sur un ensemble mort.*
+
+### ⛔ Et ce qui bloquait `password_expires_at`, c'était moi
+
+`MotDePasse` portait ce commentaire, de ma main :
+
+> *« Le legacy la calcule et l'enregistre, mais **personne ne la lit** : `verify.php` calcule
+> l'expiration depuis `password_updated_at`. Porter cette écriture reviendrait à porter une
+> colonne morte. »*
+
+**La moitié citée était vraie** — `verify.php:196-197` calcule bien depuis
+`password_updated_at`. **La conclusion ne l'était pas** : `backend/scheduler.py` la lit **deux
+fois** (`:623`, `:820`), et la première **envoie un courriel** — *« Votre mot de passe
+RootWarden expire le … »*.
+
+> **J'ai inféré « personne » de « pas le portail que je comparais ».** *Mesurer l'appelant
+> qu'on a sous les yeux n'est pas mesurer la chaîne, et un consommateur qui vit dans un autre
+> dépôt ne se signale pas.*
+
+**Conséquence tant que l'affirmation a tenu** : tout mot de passe changé par le portage restait
+sans date d'expiration, donc le rappel ne partait **jamais** pour cette personne — et rien ne le
+signalait, la tâche trouvant simplement zéro ligne à traiter.
+
+### La règle d'expiration, à trois branches, et le piège des deux zéros
+
+    override === 0     ->  EXEMPTE, aucune expiration
+    override > 0       ->  cette duree, propre au compte
+    override absent    ->  la duree GLOBALE, ou aucune si elle vaut 0
+
+**`0` et `NULL` ne sont pas la même chose** : `0` est une exemption *demandée*, `NULL` est
+« rien de demandé, suis la règle globale ». *Les confondre exempterait tout le monde le jour où
+la durée globale serait posée.*
+
+**Et la durée se lit dans `PASSWORD_EXPIRY_DAYS`, la variable que le legacy lit déjà** — pas
+dans un nom neuf. *Le portage vient de payer exactement cela sur le coût bcrypt, où
+`BCRYPT_COST` et `BCRYPT_ROUNDS` gouvernent deux hachages différents (E-414).*
+
+### Deux statuts sur quatre, et les deux autres n'ont aucun écrivain
+
+`login_history.status` est un `enum('success','failed_password','failed_2fa','locked')`. Le
+legacy n'écrit que les deux premiers, et la base ne porte que ceux-là — 4 957 et 110.
+
+**`failed_2fa` et `locked` n'ont d'écrivain nulle part, dans aucun des deux portails.** Le
+service les **refuse** plutôt que de les offrir : *porter un statut que personne n'écrit
+reviendrait à fabriquer une donnée qui n'a jamais existé, et à rendre un export plus riche que
+l'historique qu'il décrit.* Ils sont déclarés, pas comblés.
+
+### Trois choix de placement, chacun mesuré
+
+- **le succès s'écrit AVANT le second facteur**, comme le legacy (`login.php:206`). *Le statut
+  `success` de cette table dit « le mot de passe était bon », pas « la session est ouverte ».
+  Le déplacer après la 2FA changerait le sens de 4 957 lignes déjà écrites* ;
+- **l'échec ne s'écrit que si le compte existe** — contrainte du schéma, pas choix :
+  `user_id NOT NULL` avec clé étrangère. *Un échec sur un identifiant inconnu n'a aucune ligne
+  où s'attacher*, et le compteur qui borne l'énumération vit ailleurs (`login_attempts`) ;
+- **`last_failed_login_at` dans la même écriture que `failed_attempts`.** Le legacy la pose aux
+  deux endroits où il touche le compteur ; ici il n'y en a qu'un.
+
+### Ce qui est mesuré
+
+    20 cas · 0 FAIL · en TRANSACTION ANNULEE, sur des etats FORCES
+      les deux statuts ecrits · les deux sans ecrivain REFUSES · un statut invente refuse
+      l'agent borne a 500 (largeur de colonne) · aucune ligne posee par un refus
+      les TROIS branches d'expiration, dont « override 0 l'emporte sur une globale de 90 »
+      etat de login_history et de l'override verifie APRES l'annulation
+
+*Sans forçage, ce test passerait à vide : 0 compte porte une expiration, 0 porte un override, et
+`PASSWORD_EXPIRY_DAYS` n'est pas posée.* **Témoin inverse : la liste fermée élargie aux quatre
+statuts sur une copie renommée → 3 FAIL, et ce sont les trois bonnes.** Quatre gardes d'entrée
+sur le harnais de mutation : empreinte changée, `php -l`, classe renommée, mutation présente.
+
+### Le geste d'expiration est DORMANT, et c'est la raison de l'écrire
+
+`PASSWORD_EXPIRY_DAYS` n'est pas posée et aucun compte ne porte d'override : le calcul rend
+`null` pour tout le monde aujourd'hui. **Le jour où la durée sera posée, les mots de passe
+changés par le portage en tiendront compte au lieu de rester éternellement sans échéance.**
+*Même raisonnement que le re-hachage bcrypt et que l'assistant de première configuration : ce
+qui ne se réclame jamais est ce qui disparaît le plus sûrement.*
