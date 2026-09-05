@@ -75,24 +75,27 @@ def _actor_id() -> int:
 
 
 def _audit_log(user_id: int, action: str, details: str):
-    """Journalise une action dans user_logs (audit chain HMAC via trigger BDD).
-    Scrub les contenus sensibles (sudoers custom_rules peut contenir des commandes
-    revelant l'inventaire systeme - on hash le contenu pour ne logger que un fingerprint)."""
+    """Journalise une action CHAINEE dans `user_logs`.
+
+    Scrub : un `details` long peut porter des regles sudoers, donc l'inventaire
+    systeme d'une machine. Au-dela de 200 caracteres on n'en garde qu'un debut
+    et une empreinte.
+
+    ⚠ DEUX DEFAUTS CORRIGES ICI le 2026-09-05, tous deux SILENCIEUX :
+
+    - le docblock annoncait « audit chain HMAC via trigger BDD ». **Il n'y a
+      aucun trigger** : ni sur `user_logs`, ni ailleurs dans le schema. Le
+      chainage n'existait pas, et le commentaire le faisait croire acquis.
+    - `user_id or None` posait NULL sur une colonne `NOT NULL` des que
+      l'identifiant valait 0 — l'insertion levait, et l'exception etait avalee.
+      `user_logs` compte **0 ligne `[policy]`**.
+    """
     import hashlib
-    # Scrub : si details contient un payload long (> 200 chars), on le hash
+    from audit_chain import journalise
     if len(details) > 200:
         sha = hashlib.sha256(details.encode('utf-8')).hexdigest()[:16]
         details = f"{details[:180]}... [scrubbed-sha256:{sha}]"
-    try:
-        with get_db_connection() as conn:
-            cur = conn.cursor()
-            cur.execute(
-                "INSERT INTO user_logs (user_id, action, created_at) VALUES (%s, %s, NOW())",
-                (user_id or None, f"[policy] {action} - {details}")
-            )
-            conn.commit()
-    except Exception as e:
-        logger.warning("Audit log policy echec : %s", e)
+    journalise(int(user_id or 0), f"[policy] {action} - {details}")
 
 
 def _record_deployment(machine_id: int, server_user_id: int, policy_type: str,

@@ -5,6 +5,58 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.45.0] - 2026-09-05
+
+### Audit - le backend Python ecrivait 11 lignes de journal HORS de la chaine de hachage
+
+`user_logs` porte une chaine (`prev_hash`/`self_hash`) dont la propriete est qu'on ne
+peut retirer ni modifier une ligne sans que les suivantes cessent de se verifier.
+
+**Mesure du 2026-09-05 : sur 6271 lignes, 1484 n'ont NI `prev_hash` NI `self_hash`.**
+
+Ces lignes ne sont pas « en attente de scellement » : elles sont hors chaine **par
+construction**, parce que la tete se calcule en sautant les lignes nues, ici comme dans
+le portail PHP :
+
+    SELECT self_hash FROM user_logs WHERE self_hash IS NOT NULL ORDER BY id DESC LIMIT 1
+
+La chaine des 4787 scellees est **intacte** (4787 `prev_hash` distincts, chacun egal au
+`self_hash` de la precedente). Aucun scellement retroactif ne peut y remettre les nues
+sans reecrire le `prev_hash` des 4787 autres, c'est-a-dire sans detruire la seule
+propriete que la chaine apporte. **Une ligne non chainee se chaine a l'ecriture, ou
+jamais.**
+
+#### Ajoute
+- `backend/audit_chain.py` : ecriture chainee unique, empreinte identique a
+  `JournalAudit::empreinte` (epreuve croisee PHP/Python sur 3 cas, dont un `|` dans
+  l'action et des chaines vides). Lecture de tete sous `FOR UPDATE` — sans le verrou,
+  deux ecritures concurrentes obtiennent le meme `prev_hash` et la chaine fourche.
+
+#### Corrige
+- **11 sites d'insertion nue** repris dans `bashrc` `graylog` `policies` `services`
+  `ssh_audit` `wazuh` `monitoring` `ssh` (4 sites). Compte restant : **0**.
+- **`services.py` et `ssh_audit.py` n'avaient JAMAIS rien ecrit** : leur `INSERT` visait
+  une colonne `details` **qui n'existe pas** dans `user_logs`, et l'exception etait
+  avalee par un `logger.debug`. Mesure : 0 ligne `service_%`, 0 ligne `ssh_audit_%`
+  (temoin : 156 lignes `[graylog]` presentes).
+- **`policies.py` non plus** : `user_id or None` posait NULL sur une colonne `NOT NULL`.
+  Mesure : 0 ligne `[policy]`.
+- **Deux commentaires affirmaient une propriete que le code ne posait pas** :
+  `policies.py` annoncait « audit chain HMAC via trigger BDD » (mesure : **0 trigger sur
+  `user_logs`, 0 dans tout le schema**), et `ssh.py` intitulait « Audit log immutable »
+  une insertion sans `prev_hash`.
+- L'echec d'ecriture est desormais journalise en WARNING avec sa cause. Les insertions
+  remplacees etaient toutes enveloppees d'un `except` muet — c'est ce qui a permis a
+  1484 lignes de se poser hors chaine sans que personne ne le voie.
+- `ssh.py` (retrait d'empreinte de cle) : la ligne d'audit partage desormais la
+  transaction du `DELETE` qu'elle trace.
+
+#### Non corrige, et dit comme tel
+Les **1484 lignes existantes restent hors chaine**. Elles sont irrattrapables pour la
+raison ci-dessus, et leur donner un faux chainage couterait la propriete elle-meme.
+
+---
+
 ## [1.44.1] - 2026-09-05
 
 ### Auth - E-406 bis : `terminating()` ne garantit PAS ici ce qu'il garantit ailleurs

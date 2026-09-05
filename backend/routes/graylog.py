@@ -62,16 +62,14 @@ _RW_FORWARD_CONF = '/etc/rsyslog.d/99-rootwarden-graylog-forward.conf'
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
 def _audit(user_id, action, details):
-    try:
-        with get_db_connection() as conn:
-            cur = conn.cursor()
-            cur.execute(
-                "INSERT INTO user_logs (user_id, action, created_at) VALUES (%s, %s, NOW())",
-                (user_id, f"[graylog] {action} - {details}")
-            )
-            conn.commit()
-    except Exception as e:
-        logger.warning("Audit log graylog echec : %s", e)
+    """Journalise une action CHAINEE dans `user_logs`.
+
+    Le chainage passe par `audit_chain.journalise` : avant, cette fonction
+    inserait sans `prev_hash` ni `self_hash`, et ses 156 lignes etaient donc
+    hors chaine (mesure du 2026-09-05).
+    """
+    from audit_chain import journalise
+    journalise(user_id, f"[graylog] {action} - {details}")
 
 
 def _get_config():
