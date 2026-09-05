@@ -20084,11 +20084,48 @@ en ligne de commande. *Le maillon décisif de la démonstration n'est pas celui-
 module chargé par Apache et l'absence de binaire FPM.* Les deux mènent à la même conclusion ;
 un seul la prouve.
 
-### Le défaut est LATENT, et c'est ce qui le rend dangereux
+### ~~Le défaut est LATENT~~ — ⚠ **IL EST VIVANT DEPUIS LE 2026-09-05 À 22:18**
 
-`mail.default` vaut `log` : l'envoi est une écriture de fichier, du même ordre que l'`INSERT`
-qu'il accompagne. **Il devient vivant le jour où un transport réseau est configuré — et ce
+~~`mail.default` vaut `log` : l'envoi est une écriture de fichier, du même ordre que l'`INSERT`
+qu'il accompagne.~~ **Il devient vivant le jour où un transport réseau est configuré — et ce
 jour-là, personne ne relira ce fichier.**
+
+**Ce jour-là est arrivé le soir même.** Sur ordre de l'exploitant, le SMTP a été armé.
+Mesure du 2026-09-05 à 22:24:31 CEST :
+
+    mail.default   smtp                      (etait `log`)
+    host:port      ssl0.ovh.net:465          fournisseur EXTERNE reel
+    scheme         smtps
+    from           un domaine reel
+    ma garde       classe `smtp` DISTANT -> `Log::warning` a chaque demande
+
+> **L'écart de temps entre « cette adresse existe » et « elle n'existe pas » n'est plus
+> latent. Il est vivant, sur une route publique et liée depuis l'écran de connexion.**
+
+**Et la phrase citée ci-dessus s'est vérifiée sur elle-même** : *« ce jour-là, personne ne
+relira ce fichier »*. Personne ne l'a relu. **Ce qui a produit l'événement est la garde
+d'exécution, pas ce paragraphe** — c'est exactement la raison pour laquelle elle a été écrite,
+et la démonstration qu'un commentaire ne suffisait pas.
+
+**L'oracle n'a PAS ÉTÉ EXERCÉ à ce jour**, et trois témoins indépendants le disent :
+
+    password_reset_tokens                  0 ligne  (une demande connue en laisserait une)
+    occurrences de mon Log::warning        0        (il ne tire que dans la branche connue)
+    trace d'envoi dans le journal          0
+    temoin : le journal est VIVANT — derniere ligne 2 minutes avant la mesure
+
+*Trois zéros dont un serait suspect ; trois zéros adossés à un témoin qui montre que
+l'instrument rend le positif, non.*
+
+**Ce qui reste vrai, et qui ne dépend d'aucune décision** : sous `mod_php`, la poignée de main
+TLS — 78 ms rien que pour ouvrir la socket vers `ssl0.ovh.net` — se produit **pendant** la
+requête, et **seulement dans la branche « l'adresse existe »**. `terminating()` s'exécute avant
+la fermeture de connexion, et il n'existe pas de `fastcgi_finish_request` à appeler.
+
+**Les trois issues appartiennent à l'exploitant** — accepter l'oracle en le sachant, poser
+`php-fpm` qui le ferme par construction, ou désarmer le transport. *Fermer le flux n'en est pas
+une : retirer la réinitialisation à qui a perdu son mot de passe pour fermer un oracle, c'est
+payer une propriété avec la capacité qu'elle protège.*
 
 **La prémisse est donc VÉRIFIÉE À L'EXÉCUTION et journalisée**, pas laissée au commentaire :
 `TRANSPORTS_LOCAUX` est une **liste fermée** — un transport inconnu est traité comme distant —
