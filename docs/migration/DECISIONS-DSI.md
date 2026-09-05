@@ -9540,3 +9540,68 @@ la convention, on ne se presse pas.**
 sa propre déclaration », mais « un commit périme la déclaration d'un AUTRE et personne ne relit ».** *Et
 l'en-tête énumère désormais ligne par ligne, avec les numéros — un lecteur peut le réfuter sans quitter le
 fichier.*
+
+### ⛔ TROISIÈME « MIROIR » DE MA PART, ET CELUI-CI AURAIT FAIT MENTIR UN 200
+
+**J'avais tranché : « aligner `delete_ssh_schedule` sur `deleted > 0`, comme `wazuh.delete_rule` ». La suite
+de la QA l'a refusé, et elle avait raison.**
+
+    `legacy/ssh-audit/js/main.js:775`
+      if (r.ok) { toast('Planification supprimee', 'success'); … }
+      ^^^^^^^ il ne lit QUE le statut
+
+> **Un 200 portant `success: false` aurait fait annoncer « supprimée » pour une suppression qui n'a rien
+> supprimé.** *Le portage, lui, lit `corps.success` — UN appelant sur deux était correct.*
+
+**✅ La forme retenue est un 404, CONTRE la convention de `wazuh`, et c'est le bon choix : les deux
+appelants sont corrects ainsi, un seul l'était avec un 200.**
+
+    mes trois « miroirs » du jour :
+      1. `CLES` a corriger sur la branche      -> le fichier n'y etait pas
+      2. « miroir exact du jumeau en LECTURE » -> elargissait a un role 1
+      3. « aligne-toi sur `delete_rule` »      -> faisait mentir un 200
+
+> **La formulation qui generalise, et elle est de la session 4 : « s'aligner sur la convention d'une route
+> VOISINE n'est juste que si ses APPELANTS se comportent comme les miens ».**
+
+**Je prescris une symétrie parce que le mot sonne rigoureux, et je ne compare jamais les deux termes.**
+*Trois fois en un jour, sur trois objets différents — une garde, un code de statut, un fichier de test.*
+
+### ⚠ ET LA GARDE QUE J'AI AUTORISÉE RÉVÈLE UN ÉCART PRÉEXISTANT
+
+    la page `/audit-ssh`            `web.php:228`   role:1 + can_audit_ssh
+    les QUATRE routes de planif     desormais       role(2) + can_audit_ssh
+
+> **Un rôle 1 porteur de la permission voit l'écran de planification et prend 403 sur les quatre gestes.**
+> *« Un écran qui propose ce que le serveur refuse » — encore, et celui-ci est antérieur à ma garde : les
+> quatre routes exigeaient déjà `role(2)`.*
+
+    role1 ACTIFS portant `can_audit_ssh` : 0    (TEMOIN role>=2 : 2)
+    -> LATENT, comme tout ce qu'on trouve aujourd'hui.
+
+### ✅ CE QUE JE TRANCHE, ET ÇA N'ÉLARGIT NI NE RÉTRÉCIT RIEN
+
+    ⛔ PAS descendre les routes a `role:1` — j'ai deja elargi une ecriture
+       a un role 1 aujourd'hui, par un « miroir ». Deux fois suffit.
+    ⛔ PAS monter la PAGE a `role:2` — un role 1 porteur de la permission
+       perdrait la LECTURE (sshd_config, resultats, flotte), qui lui est
+       legitimement ouverte.
+    ✅ CONDITIONNER LA SECTION : la planification n'est rendue qu'a partir
+       du role 2.
+
+**Le motif existe déjà dans le dépôt** — `@if ($estSuperadmin)` dans `comptes`, `cle-plateforme`,
+`sauvegardes`, et `@if ($peutParc)` dans `fail2ban`. *La section est isolable : `audit-ssh.blade.php:147`
+porte son propre `<h2>`, `:154` le bouton, `:168` le bloc de formulaire.*
+
+> **Un bouton qu'on ne rend pas ne se contourne pas ; un bouton qu'on rend et que le serveur refuse
+> apprend seulement à l'utilisateur que le produit se contredit.**
+
+### ⚠ ET UN COMMENTAIRE DU PORTAGE AFFIRME ENCORE LE CONTRAIRE DU CODE
+
+    `audit-ssh.js:14`   « … et rien d'autre. Ni `DELETE /schedules/<id>`, ni … »
+    or `:171`  fetch(… '/ssh-audit/schedules/' + n, {method:'DELETE'})
+       `:185`  fetch(… '/ssh-audit/schedules/' + n + '/toggle', …)
+
+**A5 les a ajoutées et le commentaire n'a pas suivi.** *Les deux sont en URL CONSTRUITE — invisibles à un
+motif littéral, ce qui explique probablement que personne ne l'ait repris.* **Deuxième fois en deux heures
+sur ce même en-tête, et la seconde est causée par le commit qui l'a lu.**
