@@ -11143,3 +11143,84 @@ sur une ancre périmée d'une seconde.* **Et je l'ai diffusée avant de la véri
 **L'atomicité du renommage est perdue, et c'est le bon échange** : *un fichier momentanément
 tronqué rend « version inconnue » une milliseconde ; un montage détaché ment pendant des
 jours.*
+
+---
+
+## E-431
+
+### Un discriminant fondé sur une CONSÉQUENCE de l'état se périme quand on améliore l'état
+
+**Neuf minutes ont séparé un correctif de sa péremption, et c'est le mien qui l'aurait tuée.**
+
+    23:09   la QA fonde l'abstention de `verifieMenuLegacy` sur `liens.length === 0`
+    23:18   je pose un `ErrorDocument` qui NOMME et LIE le portail
+            -> la page archivee porte desormais UNE ancre
+            -> `liens.length` vaut 1, l'abstention ne se declenche plus
+            -> les vingt suites repartent en ECHEC, avec « parmi 1 liens »
+
+> **Et elles seraient reparties sous les traits d'un VRAI défaut de menu.** *« parmi 0 liens »
+> se lit comme une page morte ; « parmi 1 liens » se lit comme un menu qui existe et pointe
+> mal.* **L'amélioration aurait rendu le symptôme plus crédible, pas moins.**
+
+### La correction, et la règle qu'elle porte
+
+    avant   liens.length === 0            <- une CONSEQUENCE de « la page est archivee »
+    apres   await repond(url) === 404     <- l'ETAT lui-meme
+
+**Contre-épreuve dans les deux sens, faite par la QA :**
+
+    /auth/login.php   vivante, 3 ancres, route absente  -> FAIL, l'assertion mord
+    /tasks/           archivee, rend 404                -> NON MESURE, URL nommee
+
+> **Un discriminant fondé sur une conséquence de l'état se périme dès que quelqu'un améliore
+> cet état. Celui fondé sur l'état lui-même survit.**
+
+**Et la variante refusée mérite d'être notée** : *élargir le compte d'ancres en excluant le
+lien de portail aurait marché — mais il aurait fallu le RECONNAÎTRE, donc dépendre à nouveau
+du contenu de ma page.* **Le statut ne demande rien à personne.**
+
+### ⚠ Ce que ça dit de mon avertissement
+
+**J'avais prévenu : « si une de tes suites asserte 0 lien sur une page archivée, elle
+rougira ».** *C'était le bon objet et la mauvaise couche : aucune SUITE ne lit le corps —
+c'est le GARDE PARTAGÉ qui en dépendait, et il venait d'être écrit neuf minutes plus tôt.*
+
+> **Un avertissement juste sur la mauvaise couche a quand même servi** — parce qu'il nommait
+> le changement, pas seulement le risque. *La QA a cherché dans ses suites, n'a rien trouvé,
+> et a regardé son garde.*
+
+**RÈGLE** : *quand on modifie une sortie observable, on annonce CE QU'ON CHANGE — pas
+seulement qui on croit toucher.* **L'inventaire des dépendants est presque toujours faux ;
+la description du changement, non.**
+
+---
+
+## E-432
+
+### Ma forme pour `E2E_CIBLE` ouvrait un désaccord SILENCIEUX, et la QA l'a vu
+
+**Je proposais :**
+
+    const CIBLE = process.env.E2E_CIBLE || (/8444|laravel/i.test(BASE) ? 'laravel' : 'legacy');
+
+**Objection retenue** : *rien n'empêche `E2E_CIBLE=laravel` avec un `BASE` qui pointe le
+legacy.* **La suite jouerait les assertions du portage sur l'ancien portail et rendrait des
+rouges parfaitement crédibles.**
+
+> **Je remplaçais un prédicat implicite par un prédicat explicite, et j'ai laissé les deux
+> coexister sans les confronter.** *Deux sources pour une même vérité, dont l'une gagne en
+> silence — c'est exactement le défaut de `LARAVEL_PORT` défini deux fois, à trois heures
+> d'intervalle et de ma main.*
+
+**La forme retenue est la sienne** : *si l'environnement et l'URL se contredisent, **échouer
+bruyamment** plutôt que faire confiance à l'un des deux.* **Une garde par construction, et
+pas un ordre de priorité.**
+
+### Et le calendrier est le sien aussi, pour une bonne raison
+
+**Elle refuse de poser les 87 substitutions ce soir** : *« une substitution mécanique sur 87
+suites juste après une soirée où j'ai déjà cassé mon propre garde deux fois en trois heures
+n'est pas un bon calcul ».*
+
+**Elle ne renvoie pas le travail, elle le DATE — et elle en donne la raison.** *C'est la bonne
+réponse à une demande légitime au mauvais moment, et je ne la surcharge pas.*
