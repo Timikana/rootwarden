@@ -5672,3 +5672,50 @@ inexplicable.
 rendu : **la charge se voit dans `ps`, l'écriture ne se voit nulle part** — et cette fois
 c'est un témoin de qualité qui a ouvert la fenêtre, pas une négligence. *Les deux bonnes
 pratiques se contrariaient, et je n'ai vu le conflit qu'après.*
+
+---
+
+## E-400 — le périmètre était juste, **l'ORDRE ne l'était pas**
+
+Wazuh R2 est porté (`bc77045`, v1.41.0) : le fond est dans `PARITE.md`. Ce qui vit ici est ce
+que l'arbitrage a corrigé de ma méthode, et il a raison.
+
+### `rw.css` est partagé : la règle est d'ANNONCER AVANT, pas de CONSTATER APRÈS
+
+J'ai mesuré qu'aucun des trois fichiers que je ne possède pas — `rw.css`,
+`bashrc.blade.php`, `graylog.blade.php` — n'était modifié dans l'arbre, ni depuis 10 jours
+pour les deux vues. **Puis j'ai écrit, puis je l'ai annoncé en proposant de scinder.**
+
+> **Ce que j'ai mesuré est exactement ce qui rendait le geste sûr — et c'est donc exactement ce
+> qu'il fallait annoncer, pas constater.** *Une mesure qui justifie un geste après coup ne
+> protège personne : elle explique pourquoi on a eu de la chance.*
+
+La scission, elle, était une mauvaise idée et l'arbitrage l'a refusée pour la bonne raison :
+**un renommage de classe et ses sites d'usage ne se séparent pas** — un commit laisserait soit
+une classe que rien n'emploie, soit des vues qui référencent une classe absente. *Et les quatre
+zones partagent UN rôle visuel : en corriger deux et signaler les deux autres aurait reproduit
+le défaut même que je décrivais.*
+
+### Deux formules que cette journée a produites, et qu'il faut garder
+
+> **Une valeur absente ne se signale pas : elle prend l'apparence d'une valeur fausse
+> PLAUSIBLE.**
+
+Quatre champs lus sous un nom que le backend ne rend pas rendaient « — » sans aucune erreur.
+*L'objet est un ÉCRAN, donc personne n'a d'instrument pour s'en apercevoir : mes 26 assertions
+étaient vertes, et seule l'image l'a montré.* Même famille que le `?? 1` mort d'E-399 et que le
+zéro d'une sonde — mais sans instrument possible.
+
+> **Une phrase vraie que le geste rend fausse, dans le commit qui la laisse.**
+
+`portee_texte` disait « n'écrit rien » : vrai en R1, faux dès la première ligne de R2.
+L'arbitrage m'avait nommé `np_liste` — sa quatrième cardinalité au singulier de la journée — et
+c'est la carte JUSTE AU-DESSUS qui devenait fausse. *La forme la plus vicieuse de cette famille
+n'est pas la déclaration qui a vieilli, c'est celle que MON PROPRE travail périme.*
+
+### Une réserve d'honnêteté que l'arbitrage a posée, et que je reprends
+
+Leur relevé mesure l'arbre **après** mon portage : il ne confirme ni n'infirme ma mesure des
+lecteurs backend. *Ce sont deux questions et deux instants.* Ils ratifient le raisonnement,
+pas le chiffre — qu'ils n'ont pas refait. **C'est la bonne façon de ratifier**, et elle laisse
+la mesure réfutable au lieu de la clore.
