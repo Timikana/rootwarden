@@ -20054,9 +20054,59 @@ dit que le défaut était de l'avoir mis dedans. **Le temps, lui, ne l'était pa
 s'exécute **en ligne**. *Une prescription de mise en file aurait été inopérante ici, et elle
 aurait eu l'apparence d'un correctif.*
 
-**Le mécanisme employé est `app()->terminating()`** : la fermeture s'exécute **après** que la
+~~**Le mécanisme employé est `app()->terminating()`** : la fermeture s'exécute **après** que la
 réponse a été transmise. L'envoi sort du temps mesurable par le demandeur, sans dépendre d'un
-ouvrier de file qui n'existe pas.
+ouvrier de file qui n'existe pas.~~
+
+### ⚠ RECTIFIÉ — `terminating()` ne garantit PAS ici ce qu'il garantit ailleurs
+
+**Je m'étais signalée non sûre de ce point ; la relecture a répondu, et la réponse est non.**
+
+    Response::send() choisit dans cet ordre :
+      fastcgi_finish_request()      -> TERMINE la requete    (php-fpm)
+      litespeed_finish_request()    -> idem                  (litespeed)
+      closeOutputBuffers(); flush() -> VIDE LES TAMPONS SEULEMENT
+
+**Ce conteneur tourne sous `mod_php`** — Apache charge `/usr/lib/apache2/modules/libphp.so`,
+aucun binaire `php-fpm`, aucune socket `/run/php/*.sock`. Seule la troisième branche s'exécute.
+
+> **`terminating()` déplace le travail après l'ÉCRITURE de la réponse, pas après sa FIN.**
+> *Sous php-fpm ce sont la même chose ; sous mod_php, non.*
+
+**Ce que cela change, et ce que cela ne change pas.** Un demandeur qui chronomètre **le dernier
+octet du corps** ne voit pas l'envoi. Un demandeur qui chronomètre **la fermeture de connexion**
+le voit. *La propriété n'est donc pas acquise par construction : elle dépend d'un comportement
+de tampon que personne n'a mesuré.*
+
+**⚠ Et une précision de méthode sur la mesure elle-même** : `function_exists('fastcgi_finish_request')`
+lancé **en CLI** rend toujours faux — cette fonction appartient au SAPI FPM et n'existe jamais
+en ligne de commande. *Le maillon décisif de la démonstration n'est pas celui-là, c'est le
+module chargé par Apache et l'absence de binaire FPM.* Les deux mènent à la même conclusion ;
+un seul la prouve.
+
+### Le défaut est LATENT, et c'est ce qui le rend dangereux
+
+`mail.default` vaut `log` : l'envoi est une écriture de fichier, du même ordre que l'`INSERT`
+qu'il accompagne. **Il devient vivant le jour où un transport réseau est configuré — et ce
+jour-là, personne ne relira ce fichier.**
+
+**La prémisse est donc VÉRIFIÉE À L'EXÉCUTION et journalisée**, pas laissée au commentaire :
+`TRANSPORTS_LOCAUX` est une **liste fermée** — un transport inconnu est traité comme distant —
+et tout transport hors liste produit un `Log::warning` nommant la conséquence et le remède
+(php-fpm, ou un ouvrier de file).
+
+> *Un commentaire ne produit aucun événement le jour où sa prémisse cesse d'être vraie.*
+
+**Éprouvé : 18 cas, 0 FAIL** — `smtp`, `ses`, `mailgun`, `postmark`, `resend`, `sendmail` et un
+transport inventé sont tous traités comme distants ; `log`, `array`, `null` comme locaux ; la
+garde précède `terminating(` ; un seul `Mail::`, après lui. **Témoin inverse** : `smtp` déclaré
+local sur une **copie renommée** → 1 FAIL.
+
+**Ce qui trancherait vraiment** est une mesure au réseau, chronométrée **jusqu'à la fermeture de
+connexion** et non jusqu'au premier octet, sur les deux branches. Elle n'est pas faite : elle
+consomme la limite de débit, et la branche connue exige un jeton réel sur un compte réel.
+*Non mesurée, et annoncée.*
+
 
 **Mesuré, et le résidu est énoncé plutôt que tu :**
 
@@ -20149,5 +20199,7 @@ n'écrit rien.
 
 - **la délivrance** : avec `MAIL_MAILER = log`, l'envoi écrit dans le journal du conteneur. Que
   le courriel *parte* ne peut pas être mesuré avant la décision SMTP ;
+- **le temps jusqu'à la FERMETURE DE CONNEXION**, sur les deux branches — voir la rectification
+  ci-dessus. C'est la seule mesure qui trancherait, et elle n'est pas faite ;
 - **le chemin complet de bout en bout** — demander, recevoir, cliquer, poser — n'est pas exercé
   au réseau, parce qu'il exigerait d'émettre un jeton réel sur un compte réel.
