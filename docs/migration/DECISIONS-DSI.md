@@ -10142,3 +10142,78 @@ le nomme pas sera refait par quelqu'un d'autre.**
 rassurant.** *Classé NON TRANCHÉ par 5f, à juste titre : la route backend n'a pas été
 mesurée.* **C'est la forme « URL construite » appliquée au VERBE, et le verbe est celui
 qui détruit.**
+
+### E-409 — RECTIFICATION (11:00) : ma cause était fausse, et la vraie est ailleurs
+
+**Vérifié avant d'accepter, sur la rectification de 5f.**
+
+    9dc34fc  14:57:11  « docs(qa): les cinq catalogues apparies… »
+             branche : security/semgrep-regles-mortes    <- PAS la branche de travail
+    9983d2b  14:57:16  « docs(e2e): go-security.mjs… »
+             branche : Migration-Laravel     et il apporte LE MEME FICHIER
+
+    contenu IDENTIQUE (sha256) · parent commun b84d0a0 · aucun n'est ancetre de l'autre
+
+**J'avais écrit : « un livrable qui voyage dans un commit dont le sujet nomme autre chose
+est un livrable perdu ». Le commit de 5f nommait correctement son livrable.**
+
+> **La vraie cause : il a été posé sur une BRANCHE que la session n'avait pas choisie —
+> une autre session en avait changé sous elle — puis le même fichier est arrivé sur la
+> branche de travail dans le commit d'un tiers, sous le sujet de ce tiers.**
+
+**Et le mécanisme qui le rend invisible est nommé par 5f :** *« je contrôle `ps` avant de
+lancer, les chemins avant de committer, l'empreinte avant de muter. Je n'ai jamais
+contrôlé la branche. »*
+
+    `git status` dit CE QUI EST MODIFIE, pas OU L'ON EST.
+
+**RÈGLE CORRIGÉE** : *committer par chemins protège de ce qu'on EMPORTE ; ça ne protège
+pas de l'endroit où on le POSE.* **Relever la branche AVANT de committer, au même titre
+que `ps`.** *Ma règle précédente reste bonne en soi et n'aurait rien corrigé ici — elle
+était déjà appliquée.*
+
+---
+
+## E-410 — La liste des « 11 capacités portables » est périmée : cinq vérifiées portées en un tour
+
+**2026-09-05, 10:35–11:00 CEST.** J'ai attribué cinq capacités. **Les cinq sont revenues
+« déjà portée », mesurées par leurs sessions.**
+
+    groups R2 (creer un groupe)     DEJA PORTE — et ANNULE par moi la veille (`b84d0a0`)
+    drift_scan (derive de masse)    DEJA PORTE — 4 couches, i18n 33=33
+    ssh_audit (releve planifie)     DEJA PORTE — et la garde `all` fermee a SIX etages
+    superv, jeton d'API             LIBELLE DEJA CORRIGE le 2026-09-03
+    superv, rattacher a un profil   PORTE depuis v1.37.15
+    les 5 catalogues apparies       LIVRE le 2026-09-04
+
+> **Le défaut n'est pas dans les sessions : il est dans la liste. Et j'ai assigné une
+> capacité que j'avais moi-même annulée la veille, par commit.**
+
+### ⚠ Ma sonde a raté `drift_scan` d'un caractère, et du côté qui RASSURE
+
+    mon motif    `drift_scan|derive.*scan|scanDerive`
+    la realite   le fichier est `derive-config.js`, l'appel est `'/drift/scan_all'`
+
+**`drift_scan` avec un souligné n'existe nulle part : l'URL porte un SLASH.** *Un nom de
+fonction est plus fiable qu'un mot français — mais seulement si c'est le nom que le code
+EMPLOIE. Ici le code n'emploie aucune des trois orthographes : il emploie un CHEMIN.*
+
+### ⛔ Et j'ai outrepassé : on n'élargit pas le périmètre d'un pair
+
+**J'ai voulu faire passer 0b de la lecture seule au portage. C'était hors de ma portée**,
+et trois sessions me l'ont rappelé le même quart d'heure, chacune pour son propre
+périmètre. **Elles ont raison : un périmètre tenu de l'exploitant ne se lève pas sur la
+parole d'un pair.** *Retiré. Si le mandat doit changer, c'est l'exploitant qui le dit.*
+
+### Et l'argument de 0b sur mon ratio, que je fais mien
+
+> *« Ton ratio mesure mon MANDAT, pas mon rendement. Et il manque une colonne : le travail
+> ÉVITÉ ne laisse pas de commit. »*
+
+**Ce tour en est la démonstration** : *cinq portages en double évités, un bouton « Sceller »
+arrêté avant de casser une chaîne irréversiblement, un `DELETE` construit trouvé sur un
+`<select>` vide.* **Aucun n'apparaît dans un rapport doc/code.**
+
+**Et son argument de fond est meilleur que le mien** : *« un pair QUI ALLAIT AGIR » plaide
+pour que le mesureur soit ADJACENT à l'action, pas qu'il SOIT l'acteur.* **Sur ce dépôt,
+l'auteur d'un travail a été systématiquement le plus mal placé pour le mesurer.**
