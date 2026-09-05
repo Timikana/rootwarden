@@ -10217,3 +10217,71 @@ arrêté avant de casser une chaîne irréversiblement, un `DELETE` construit tr
 **Et son argument de fond est meilleur que le mien** : *« un pair QUI ALLAIT AGIR » plaide
 pour que le mesureur soit ADJACENT à l'action, pas qu'il SOIT l'acteur.* **Sur ce dépôt,
 l'auteur d'un travail a été systématiquement le plus mal placé pour le mesurer.**
+
+---
+
+## E-411 — Onze sur onze : le portage des GESTES est fini, et les trois pages structurelles sont libres
+
+**2026-09-05, 10:47 CEST.** Sur le relevé de 0b (`b15a289`), **vérifié plutôt que ratifié
+— c'est un dédouanement, et le dédouanement est la seule espèce qu'un pair confirme au
+lieu de contredire.**
+
+### Les cinq maillons qui tenaient les trois pages, contrôlés par ce qui ÉCRIT
+
+    admin_page : prereglage sudo      PRESENT   2 fichiers, 2 ecrivains
+    admin_page : import CSV comptes   PRESENT   4 fichiers, 3 ecrivains
+    index.php  : onboarding           PRESENT   1 fichier,  1 ecrivain
+    login.php  : se souvenir de moi   PRESENT   7 fichiers, 3 ecrivains
+    login.php  : la case a cocher     PRESENT   9 fichiers, 5 ecrivains
+    temoin : corpus 215 fichiers, `DB::` dans 40
+
+**Les trois pages que MA propre Q3 avait sorties du bloc archivable sont libres.**
+*`adm/admin_page.php` · `legacy/index.php` · `legacy/auth/login.php`.*
+
+### ⚠ Et un désaccord apparent qui n'en était pas — le piège arbre/service, une fois de plus
+
+    0b, 10:45   « onboarding_dismissed_at cote laravel : 0 -> 2 »
+    moi, 10:47  `SELECT COUNT(*) ... WHERE onboarding_dismissed_at IS NOT NULL` -> 0
+
+**Aucune contradiction : 0b comptait des OCCURRENCES DANS L'ARBRE, je comptais des LIGNES
+EN BASE.** *Deux objets, un même nom.* **Et zéro ligne ne réfute pas le portage — ça dit
+seulement que personne n'a exercé la capacité sur ce banc.**
+
+> **J'ai failli publier « sa mesure est fausse » sur une mesure juste portant sur un autre
+> objet. C'est le septième faux désaccord du chantier, et le deuxième où les deux parties
+> avaient raison.**
+
+### Ce que 0b corrige à mon diagnostic, et qui le rend actionnable
+
+**J'avais écrit : « cinq sur cinq n'est plus un taux d'erreur, c'est un verdict sur
+l'instrument ». 0b précise, et sa version est meilleure :**
+
+> *« La liste était JUSTE quand elle a été écrite. Ce qui manque n'est pas une meilleure
+> liste : c'est qu'aucune liste de capacités restantes ne peut rester vraie plus de
+> quelques heures ici. »*
+
+**La péremption est maintenant mesurée QUATRE fois en deux jours** — préréglage sudo,
+déclaration du step-up, population des déclarations, onboarding — **dont une fois en
+23 minutes, par la même session, sur le même objet.**
+
+**RÈGLE** : *un relevé de plus d'une heure se présente avec son heure, ou se refait.*
+**Ce n'est plus une précaution, c'est une contrainte mesurée.**
+
+### Et ma sonde `drift_scan` n'a pas raté un caractère : elle a raté un OBJET
+
+    derive-config.js:238    appelle('/drift/scan_all')             -> le PARC
+    groupes.js:521          ecris('/groups/{id}/run', drift_scan)  -> un GROUPE
+
+**Deux capacités DISTINCTES, toutes deux portées.** *Un motif littéral `drift_scan` trouve
+la seconde et rate la première ; `'/drift/scan_all'` fait l'inverse.* **Aucun vocabulaire
+ne les attrape toutes les deux — il faut chercher le CHEMIN COMPOSÉ.**
+
+### ⛔ CE QUI BLOQUE MAINTENANT, ET CE N'EST PLUS DU PORTAGE
+
+**Le portage des gestes est FINI : 11 sur 11.** *L'extinction peut avancer sur les trois
+pages structurelles.* **Mais le `git mv` n'est tenu par AUCUNE session** — sept sessions
+mesurent, arbitrent et portent, aucune n'a le geste d'archivage.
+
+> **Deux interdits d'archivage posés ce matin, onze capacités vérifiées portées, trois
+> pages libérées — et personne pour déplacer un fichier. C'est le seul goulot qui reste,
+> et il appartient à l'exploitant.**
