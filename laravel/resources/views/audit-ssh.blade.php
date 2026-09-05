@@ -82,8 +82,10 @@
                  panneau precedent agit sur autre chose que ce qu'on a lu. --}}
             <button type="button" class="rw-bouton rw-bouton--avertissement"
                     data-rw="audit-ssh-panneau-confirmer" hidden>{{ __('ssh_audit.planif_valider') }}</button>
-            <a class="rw-bouton" data-rw="audit-ssh-panneau-legacy"
-               href="{{ $lienLegacy }}" target="_blank" rel="noopener">{{ __('ssh_audit.np_ouvrir') }} ↗</a>
+            @if ($lienLegacy)
+                <a class="rw-bouton" data-rw="audit-ssh-panneau-legacy"
+                   href="{{ $lienLegacy }}" target="_blank" rel="noopener">{{ __('ssh_audit.np_ouvrir') }} ↗</a>
+            @endif
         </div>
     </div>
 

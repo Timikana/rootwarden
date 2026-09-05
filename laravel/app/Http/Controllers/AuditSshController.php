@@ -174,7 +174,13 @@ class AuditSshController extends Controller
                 ),
             ] : ['environment' => [], 'tag' => [], 'machines' => []],
             'libelles' => __('ssh_audit'),
-            'lienLegacy' => rtrim((string) config('app.url_legacy'), '/') . '/ssh-audit/',
+            /*
+             * ⛔ NUL DEPUIS LE 2026-09-05 : la cible est ARCHIVEE et rend 404.
+             * Offrir un lien vers une page retiree est le defaut que ce chantier
+             * a corrige deux fois ailleurs (supervision le 03/09, /profil le 05/09).
+             * La vue garde le nul et n'affiche plus le renvoi.
+             */
+            'lienLegacy' => null,
         ]);
     }
 }
