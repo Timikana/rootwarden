@@ -82,7 +82,100 @@ legacy/lang/{fr,en}/policies.php   EXISTENT
 
 ---
 
-## 4. ⚠ DEUX RÉSIDUS RÉELS, ET ILS SONT L'INVERSE DU LEAD
+## 4. ⚠ CORRECTION DU 2026-09-05 — j'avais TORT sur `sftp`, et mon témoin ne couvrait pas ce que j'affirmais
+
+**`/policy/sftp/*` EST porté.** Signalé par le Lead, **vérifié par ma mesure** :
+
+```
+laravel/public/js/acces-sftp.js:216   appelle('/policy/sftp/' + geste, envoi)
+                             :244   appelle('/policy/sftp/audit', {…})
+laravel/routes/web.php:1096          Route::get('/acces-sftp')->middleware(['role:3'])
+```
+
+**Interface complète** — contrôleur, service, JS de 11 Ko, vue de 13 Ko, i18n FR+EN.
+Le legacy correspondant est dans `_deprecated/adm/server_user_sftp.php`.
+
+### 4.1 ⚠ LE MÉCANISME DE MON ERREUR — un témoin JUSTE sur une étendue FAUSSE
+
+**J'avais posé un témoin, et il était bon :** `'deploy'` rend **7** dans
+`politiques.js`, donc ma sonde n'était pas aveugle **à ce fichier**.
+
+**Puis j'ai écrit : « `sftp` : zéro occurrence dans le module porté ».** *La
+mesure portait sur UN fichier ; l'affirmation portait sur LE PORTAGE.*
+
+> **Un témoin prouve que la sonde LIT. Il ne prouve pas que le PÉRIMÈTRE de
+> recherche est le bon.** *J'ai vérifié le bon axe — « la sonde voit-elle ? » —
+> sur la mauvaise ÉTENDUE.* **La capacité vivait dans un module voisin
+> (`acces-sftp`), et aucun témoin posé DANS `politiques.js` ne pouvait le dire.**
+
+**Et l'erreur va du côté qui ALARME** — j'annonçais une capacité perdue qui ne
+l'était pas. *C'est le sens le moins coûteux, et c'est aussi celui que le Lead a
+rouvert : personne n'aurait rouvert un « c'est porté ».*
+
+### 4.2 Le remède du Lead, et il est par CONSTRUCTION
+
+```
+grep -ohE "/policy/[a-z0-9_/-]*" laravel/public/js/*.js laravel/resources/views/*.blade.php | sort -u
+  -> /policy/sftp/  ·  /policy/sftp/audit
+     /policy/sudo/  ·  /policy/sudo/audit  ·  /policy/sudo/deploy
+```
+
+**Relever les fragments SANS présumer du délimiteur, puis dédupliquer.** *Le
+segment tronqué (`/policy/sftp/`) apparaît de lui-même et signale la
+composition* — **là où un motif littéral rend zéro et se lit « absent ».**
+
+*Le Lead range ma variante comme la cinquième du même piège : le segment variable
+n'est ni un identifiant ni une chaîne de requête — **c'est le nom du geste
+lui-même**. Et les cinq ratent du même côté : vers « c'est absent ». Le piège du
+préfixe ne se trompe pas au hasard : **il alarme**.*
+
+---
+
+## 5. ⚠ `/policy/rollback` — MA TROUVAILLE TIENT, et elle est d'une TROISIÈME nature
+
+**Vérifié après le signalement, par ma propre mesure :**
+
+```
+backend/routes/policies.py:496   POST · role:3 · require_machine_access · threaded_route
+                        :548     'Erreur SSH'  ->  la route OUVRE une session
+
+appelants reels :
+  legacy/_deprecated/adm/js/server_user_policy.js:99   <- DEPRECIE
+  laravel/tests/Feature/PasserelleTest.php:273,323     <- un TEST
+  RoutesBackend.php:321 · legacy/api_proxy.php:58      <- deux regles de step-up
+
+interface utilisateur : AUCUNE, sur AUCUN des deux portails
+```
+
+**Le relevé sans délimiteur le confirme** : `/policy/rollback` **n'apparaît nulle
+part** dans les JS ni les vues du portage.
+
+> **Ce n'est ni une règle morte ni une capacité « non portée » au sens
+> ordinaire : c'est une capacité du BACKEND dont l'INTERFACE est morte avec la
+> page qui la servait.** *Sa garde est vivante, elle reste appelable par clé
+> d'API — mais aucun humain ne peut l'atteindre.*
+
+**Le Lead la nomme `orpheline par dépréciation`, et le nom est juste** : une
+capacité sort du périmètre non parce qu'on a décidé de ne pas la porter, **mais
+parce que la page qui la servait a été dépréciée et que personne n'a regardé ce
+qu'elle emportait.**
+
+**Et ce qu'elle emporte ici** : la restauration d'un déploiement de politique
+sudo **par SSH**. *Un geste qui écrit sur une machine.*
+
+**⚠ À porter à l'exploitant sous cette forme** — non pas « une règle de step-up
+sans interface », mais **« une capacité de restauration par SSH que la
+dépréciation a rendue inatteignable sans que ce soit décidé »**. *Elle n'est
+nommée par aucune liste ni aucun dossier.*
+
+**Un détail qui la distingue d'une règle morte** : le portage porte un **test**
+qui exerce le step-up sur ce chemin. *La règle n'est donc pas du code mort du
+point de vue de la suite — elle est éprouvée, pour un chemin que personne ne peut
+emprunter.*
+
+---
+
+## 6. ~~Deux résidus~~ — UN seul, et le troisième reste ouvert
 
 Mon lead disait : *une règle de step-up désigne un chemin qu'on appelle.* **Vrai
 pour `sudo/deploy|remove`. Faux pour les deux autres :**
