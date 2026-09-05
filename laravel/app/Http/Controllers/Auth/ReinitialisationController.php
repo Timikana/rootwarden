@@ -40,17 +40,60 @@ use Illuminate\View\View;
  * prescription de mise en file aurait ete inoperante ici, et elle aurait donne
  * l'apparence d'un correctif.
  *
- * **Le mecanisme employe est `terminating()`** : la fermeture s'execute APRES
- * que la reponse a ete transmise. L'envoi sort donc du temps mesurable par le
- * demandeur, sans dependre d'un ouvrier de file qui n'existe pas.
+ * **Le mecanisme employe est `terminating()`**, et ⚠ **IL NE GARANTIT PAS ICI CE
+ * QU'IL GARANTIT AILLEURS** — corrige apres relecture, la formulation qui vivait
+ * ici etait trop forte.
  *
- * ⚠ CE QUI SUBSISTE, ET QUI EST DIT PLUTOT QUE TU : un `UPDATE` et un `INSERT`
- * ne se produisent que dans la branche connue. Ils se comptent en fractions de
- * milliseconde la ou le bcrypt — egalise, lui — se compte en centaines. *Le
- * residu n'est pas nul ; il est borne, et il est enonce.*
+ * `Response::send()` (symfony/http-foundation) choisit dans cet ordre :
+ *
+ *     fastcgi_finish_request()      -> termine la requete   (php-fpm)
+ *     litespeed_finish_request()    -> idem                 (litespeed)
+ *     closeOutputBuffers(); flush() -> VIDE LES TAMPONS SEULEMENT
+ *
+ * **Ce conteneur tourne sous `mod_php`** — mesure : Apache charge
+ * `/usr/lib/apache2/modules/libphp.so`, aucun binaire `php-fpm`, aucune socket
+ * `/run/php/*.sock`. Seule la troisieme branche s'execute : *le corps est ecrit
+ * et vide, mais la CONNEXION reste ouverte jusqu'a la fin du script — donc
+ * apres les rappels `terminating()`.*
+ *
+ * > **`terminating()` deplace le travail apres l'ECRITURE de la reponse, pas
+ * > apres sa FIN. Sous php-fpm ce sont la meme chose ; sous mod_php, non.**
+ *
+ * ══ CE QUE CELA CHANGE, ET CE QUE CELA NE CHANGE PAS ══════════════════════
+ *
+ * Un demandeur qui chronometre **le dernier octet du corps** ne voit pas
+ * l'envoi. Un demandeur qui chronometre **la fermeture de connexion** le voit.
+ * *La propriete n'est donc pas acquise par construction : elle depend d'un
+ * comportement de tampon que personne n'a mesure.*
+ *
+ * ⚠ ET AUJOURD'HUI LE DEFAUT EST LATENT, PAS VIVANT. `mail.default` vaut `log` :
+ * l'envoi est une ecriture de fichier, du meme ordre que l'`INSERT` qu'il
+ * accompagne. **Il devient vivant le jour ou un transport RESEAU est configure**
+ * — et ce jour-la, personne ne pensera a relire ce fichier.
+ *
+ * **C'est pourquoi la condition est VERIFIEE A L'EXECUTION et journalisee**
+ * plutot que laissee a ce commentaire : voir `envoyer()`. *Un commentaire ne
+ * produit aucun evenement le jour ou sa premisse cesse d'etre vraie.*
+ *
+ * ⚠ ET CE QUI SUBSISTE EN TOUT ETAT DE CAUSE : un `UPDATE` et un `INSERT` ne se
+ * produisent que dans la branche connue. Ils se comptent en fractions de
+ * milliseconde la ou le bcrypt — egalise, lui — se compte en centaines : **2,4 ms
+ * d'ecart mesure, 1 % du cout de base.** *Le residu n'est pas nul ; il est
+ * borne, et il est enonce.*
  */
 class ReinitialisationController extends Controller
 {
+    /**
+     * Les transports dont l'envoi ne sort pas de la machine. Avec eux, le cout
+     * de l'envoi est du meme ordre que celui de l'`INSERT` qui le precede, et
+     * l'ecart de temps reste dans le residu mesure.
+     *
+     * ⚠ LISTE FERMEE, ET C'EST VOULU : un transport inconnu est traite comme
+     * DISTANT. *Se tromper du cote qui journalise coute un message ; se tromper
+     * de l'autre rouvre un oracle en silence.*
+     */
+    public const TRANSPORTS_LOCAUX = ['log', 'array', 'null', 'failover-log'];
+
     public function __construct(
         private readonly ReinitialisationMotDePasse $jetons,
         private readonly MotDePasse $motDePasse,
@@ -92,6 +135,26 @@ class ReinitialisationController extends Controller
              * demandeur : le jeton est deja emis, la reponse deja partie. On la
              * journalise et on s'arrete la.
              */
+            /*
+             * ⚠ LA PREMISSE DE `terminating()` EST VERIFIEE, PAS SUPPOSEE.
+             *
+             * Elle ne tient que si le transport est LOCAL — sinon l'envoi est un
+             * aller-retour reseau execute avant la fermeture de connexion, et
+             * l'oracle de temps rouvre. Le jour ou l'exploitant posera le SMTP,
+             * ce fichier ne sera pas relu : **le controle doit donc produire un
+             * evenement, pas dormir dans un commentaire.**
+             */
+            $transport = (string) config('mail.default');
+            if (! in_array($transport, self::TRANSPORTS_LOCAUX, true)) {
+                Log::warning(
+                    '[reinitialisation] transport « ' . $transport . ' » non local sous '
+                    . 'mod_php : l envoi se produit AVANT la fermeture de connexion, '
+                    . 'et l ecart de temps entre adresse connue et inconnue redevient '
+                    . 'mesurable. Il faut php-fpm (fastcgi_finish_request) ou un '
+                    . 'ouvrier de file.'
+                );
+            }
+
             app()->terminating(function () use ($compte, $lien): void {
                 try {
                     Mail::raw(

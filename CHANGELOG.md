@@ -5,6 +5,56 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.44.1] - 2026-09-05
+
+### Auth - E-406 bis : `terminating()` ne garantit PAS ici ce qu'il garantit ailleurs
+
+**Je m'etais signalee non sure de ce point en livrant 1.44.0. La relecture a repondu, et la
+reponse est non.**
+
+    Response::send() choisit dans cet ordre :
+      fastcgi_finish_request()      -> TERMINE la requete   (php-fpm)
+      litespeed_finish_request()    -> idem
+      closeOutputBuffers(); flush() -> VIDE LES TAMPONS SEULEMENT
+
+**Ce conteneur tourne sous mod_php** : Apache charge `libphp.so`, aucun binaire `php-fpm`,
+aucune socket. Seule la troisieme branche s'execute. **`terminating()` deplace donc le travail
+apres l'ECRITURE de la reponse, pas apres sa FIN** — sous php-fpm ce sont la meme chose, sous
+mod_php non.
+
+*Un demandeur qui chronometre le dernier octet du corps ne voit pas l'envoi ; un demandeur qui
+chronometre la fermeture de connexion le voit.* **La propriete n'est pas acquise par
+construction.**
+
+**⚠ Une precision de methode** : `function_exists('fastcgi_finish_request')` lance EN CLI rend
+toujours faux — la fonction appartient au SAPI FPM et n'existe jamais en ligne de commande. Le
+maillon decisif est le module charge par Apache et l'absence de binaire FPM. *Les deux menent a
+la meme conclusion ; un seul la prouve.*
+
+**Le defaut est LATENT** : `mail.default` vaut `log`, donc l'envoi est une ecriture de fichier
+du meme ordre que l'`INSERT` qu'il accompagne. Il devient vivant le jour ou un transport reseau
+est configure — **et ce jour-la personne ne relira ce fichier**.
+
+**Correctif : la premisse est VERIFIEE A L'EXECUTION et journalisee.** `TRANSPORTS_LOCAUX` est
+une liste FERMEE — un transport inconnu est traite comme distant — et tout transport hors liste
+produit un `Log::warning` nommant la consequence ET le remede (php-fpm, ou un ouvrier de file).
+*Un commentaire ne produit aucun evenement le jour ou sa premisse cesse d'etre vraie.*
+
+**Tests.** 18 cas, 0 FAIL : `smtp`, `ses`, `mailgun`, `postmark`, `resend`, `sendmail` et un
+transport invente traites comme distants ; `log`, `array`, `null` comme locaux ; la garde
+precede `terminating(` ; un seul `Mail::`, apres lui ; aucune ecriture dans `login_attempts`.
+**Temoin inverse** : `smtp` declare local sur une COPIE RENOMMEE -> 1 FAIL.
+
+**⚠ Non mesure, et annonce** : le temps jusqu'a la FERMETURE DE CONNEXION sur les deux branches.
+C'est la seule mesure qui trancherait ; elle consomme la limite de debit et la branche connue
+exige un jeton reel sur un compte reel.
+
+**Note pour l'exploitant.** Poser un SMTP sur ce portail demande **aussi** php-fpm ou un ouvrier
+de file. Sans l'un des deux, l'ecart de temps entre adresse connue et inconnue redevient
+mesurable — et le journal le dira, mais apres coup.
+
+---
+
 ## [1.44.0] - 2026-09-05
 
 ### Auth - E-406 : la reinitialisation de mot de passe est portee
