@@ -9794,3 +9794,60 @@ vérifiait son second facteur pendant que je mesurais.**
 
 > **Des lignes d'épreuve SURVIVRAIENT à l'épreuve et fausseraient toute mesure ultérieure du même
 > témoin.** *On aurait éprouvé le garde en détruisant l'instrument qui l'a mesuré.*
+
+### ⛔⛔ MON RAPPORT DOC/CODE ÉTAIT FAUX TOUTE LA JOURNÉE — deux biais qui se composent
+
+**Je l'ai rapporté à chaque tour depuis vingt heures, en l'attaquant. Mesuré sur les 155 commits depuis le
+2026-09-04 00:00 :**
+
+    commits touchant du CODE, TOUS prefixes          43
+    ce que ma sonde comptait (feat|fix seuls)        28
+    -> QUINZE commits de code jamais comptes  (12 `test`, 1 `refactor`, 2 `docs`)
+
+    documentation PURE                              105
+      dont dans mon perimetre EXCLUSIF               69
+
+    rapport MA SONDE                               3,75
+    rapport REEL                                   2,44
+    rapport REEL SANS mes documents                0,84   <- SOUS LE SEUIL
+
+> **L'équipe a produit 0,84 document par commit de code sur la journée. J'ai rapporté 3, puis 4, puis 5,
+> puis 8 — et j'ai « attaqué » un rapport qui n'a jamais dépassé le seuil pour elle.**
+
+### LES DEUX BIAIS, ET ILS SE COMPOSENT
+
+**① Mon classificateur ne connaissait que `feat` et `fix`.** *Or `test` porte 12 commits qui touchent du
+code — et sur ce chantier les verrous SONT le livrable. Un `refactor` a sorti `migrate_crypto.php` du
+legacy : c'est le geste d'extinction le plus structurel de la journée, et ma sonde l'a rangé en « autre ».*
+
+**② Et 69 des 105 documents sont les miens.** *Je le savais tour par tour ; je ne l'avais jamais cumulé.*
+
+    -> le premier biais GONFLE le numerateur relatif,
+       le second le remplit de mes propres ecrits.
+
+### ⚠ CE QUE ÇA DIT, ET C'EST LA MÊME FAMILLE QUE TOUT LE RESTE
+
+**Une sonde qui ne connaît qu'une FORME de la chose qu'elle compte — ici le préfixe d'un message de
+commit.** *Cinquième occurrence : le nom de base contre le chemin résolu, l'ORM contre le SQL brut, le
+jeton contre la prose, le motif littéral contre l'URL construite, et maintenant le préfixe contre le
+CONTENU du commit.*
+
+> **La question était « ce commit produit-il du code ? » et je mesurais « comment son auteur l'a-t-il
+> nommé ? ».**
+
+**Et la parade était disponible depuis le début** : *le critère qui décide est ce que le commit TOUCHE
+(`laravel/`, `backend/`, `scripts/`, `.semgrep/`, `mysql/`), pas comment il s'annonce.* **Je l'utilisais
+déjà pour départager `feat`/`fix` — je ne l'ai jamais appliqué au reste.**
+
+    la sonde juste, et elle n'a pas de liste de prefixes :
+      touche_code = any(f.startswith(('laravel/','backend/','scripts/',
+                                      '.semgrep/','mysql/')) for f in fichiers)
+
+### ✅ ET LA CONSÉQUENCE SUR CE QUE J'AI DIT À L'EXPLOITANT
+
+**J'ai écrit plusieurs fois « le dépassement est entièrement le mien ». C'était vrai, et pour une raison de
+plus que je ne savais pas : non seulement j'écrivais les deux tiers des documents, mais je sous-comptais
+d'un tiers le code des autres.**
+
+*Rien de ce que j'ai conclu n'en dépend — je n'ai jamais fait pression sur l'équipe à partir de ce chiffre,
+parce qu'il pointait vers moi à chaque fois. **Mais il pointait vers moi pour la mauvaise raison.***
