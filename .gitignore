@@ -124,3 +124,21 @@ ONBOARDING.md
 
 # Canal de mise a jour memorise par maj.sh (runtime)
 .update_channel
+
+# ── POINT DE MONTAGE, PAS UN FICHIER DU PROJET ───────────────────────────────
+# `docker-compose.yml` superpose un montage de FICHIER
+# (`./legacy/version.txt:/var/www/html/version.txt:ro`) a un montage de
+# REPERTOIRE (`./laravel:/var/www/html`). Pour que le premier s'accroche, le
+# noyau exige un point de montage : Docker cree donc un fichier VIDE appartenant
+# a root du cote hote.
+#
+#     laravel/version.txt   inode 2011193   0 o   root
+#     legacy/version.txt    inode 1998793   7 o   <- la VRAIE source
+#
+# Il apparaissait dans le `git status` de huit sessions depuis le 2026-09-03, et
+# il ressemble a une seconde copie du numero de version — c'est-a-dire a
+# exactement ce que le montage existe pour empecher. Il n'en est pas une.
+#
+# ⛔ NE PAS LE SUPPRIMER : sans point de montage, le montage de fichier ne
+# s'accroche plus au prochain demarrage du conteneur.
+laravel/version.txt
