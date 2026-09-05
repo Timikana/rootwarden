@@ -11505,3 +11505,71 @@ messages de résultat pour un geste que sa page n'accomplit pas ».* **La famill
 
 *Zéro dans un sens comme dans l'autre : une famille sans résultat ne dit ni « porté » ni
 « absent ».* **Une heuristique qui ne rend rien doit être déclarée muette, pas interprétée.**
+
+---
+
+## E-438
+
+### Une CINQUIÈME forme d'échec de mesure — et une question sur la PROVENANCE réfute dix mesures
+
+### ⚠ La quatrième : une sortie TRONQUÉE lue comme exhaustive
+
+**Le compte de « trois appels » que j'ai corrigé en quatre avait une cause exacte, nommée par
+la session qui l'avait produit :**
+
+    son releve : `grep -n … | head -8`   sur NEUF occurrences
+    la troncature a coupe exactement la neuvieme — l'appel manquant
+
+> **`head -N` est ce qu'on emploie SANS Y PENSER pour garder une sortie lisible.** *On ne le lit
+> pas comme une décision de mesure, et il ne produit AUCUN signal de troncature — la sortie a
+> l'air complète.*
+
+**La règle est meilleure que l'interdiction** : *compter AVANT d'afficher (`wc -l` puis `head`)
+et ANNONCER LE TOTAL.* **« 9 occurrences, voici les 8 premières » se relit ; « voici 8 » ne se
+relit pas.** *Et si le compte fonde un verdict : pas de `head` du tout.*
+
+    mauvais AXE       une reserve juste sur un axe sain
+    mauvaise ETENDUE  un temoin juste sur un perimetre faux
+    mauvaise FORME    un temoin litteral pour une sonde de chemins composes
+    TRONCATURE        une sortie coupee, lue comme exhaustive
+
+### ⚠ Et la cinquième, commise deux minutes après avoir inscrit la quatrième
+
+**J'ai voulu inventorier les sous-lots déclarés portés. Ma sonde a rendu ceci :**
+
+    « ...qui porte A1, sous-lot PORTE A2 porte A2... ce comporte D5, ne porte D9a...
+      si le portage doit reproduire ce comporte... un importe K4... »
+
+**`porte` a attrapé `comporte`, `apporte`, `importe`, et « la porte ».** *C'est le piège n°4 de
+mon propre catalogue — chercher un MOT n'est pas chercher un OBJET — commis dans la commande
+que j'écrivais pour distribuer du travail sur ce même catalogue.*
+
+**Le compte n'a pas été publié.** *Il n'existe pas : ce n'est pas un chiffre faux, c'est une
+soupe de sous-chaînes qui a la forme d'un relevé.*
+
+### ⛔ LE FAIT LE PLUS IMPORTANT : LA PROVENANCE RÉFUTE CE QUE DIX MESURES ONT COÛTÉ
+
+> *« Dix mesures ont réfuté dix items ; une seule question sur la provenance de la liste les
+> réfute tous. »*
+
+**La liste des onze a été bâtie en inventoriant les ENTRÉES DE MENU, puis lue comme un
+inventaire de GESTES.** *Cette erreur de catégorie n'était PAS trouvable en mesurant les items
+un par un — seulement en regardant COMMENT la liste avait été faite.*
+
+    dix releves, dont trois d'une meme session
+    aucun n'etait inutile — ils ont produit les trois mecanismes de perte
+      et les quatre formes d'echec de mesure
+    aucun n'etait le travail demande
+
+> **RÈGLE : avant de vérifier le contenu d'un artefact de planification, demander comment il a
+> été fabriqué.** *Une liste porte l'unité de son instrument, et se lit avec l'unité de son
+> lecteur.*
+
+### Le relevé qui remplace la liste des onze
+
+**Chasser les CASES COCHÉES** — *les sous-lots déclarés portés dont un geste du périmètre n'a
+aucun appelant sans être retenu par arbitrage.*
+
+**Témoin positif fourni d'avance** : *`/ssh-audit/backups` dans A2 et `/ssh-audit/trends` dans
+A1.* **Une méthode qui ne les retrouve pas doit être corrigée avant de conclure sur les
+autres.**
