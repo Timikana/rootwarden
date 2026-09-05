@@ -208,6 +208,29 @@ Route::middleware(['memorisation', 'session.authentifiee', 'session.revoquee', '
         ->name('profil.mot-de-passe');
 
     /*
+     * LES TROIS GESTES DE LIBRE-SERVICE — meme forme que le mot de passe
+     * ci-dessus : aucune garde de role ni de permission, l'identifiant du compte
+     * venant de la SESSION et jamais de la requete. Leur cote administratif
+     * etait deja porte ; c'est l'ACTEUR qui manquait.
+     */
+    Route::post('/profil/courriel', [PortailController::class, 'changerCourriel'])
+        ->name('profil.courriel');
+    /*
+     * L'ecriture administrative de la cle (`/comptes/{id}/cle-ssh`) est gardee
+     * `role:3`. Ici la cible EST le demandeur, donc la garde de role n'a pas
+     * d'objet : un role 1 doit pouvoir poser la cle qui sert son propre acces.
+     */
+    Route::post('/profil/cle-ssh', [PortailController::class, 'definirCleSsh'])
+        ->name('profil.cle-ssh');
+    /*
+     * ⚠ IRREVERSIBLE. Le geste execute est l'ANONYMISATION, pas une suppression :
+     * `user_logs` est une chaine de hachage et retirer une ligne casserait la
+     * verification de toutes les suivantes. La demande est tracee AVANT.
+     */
+    Route::post('/profil/effacement', [PortailController::class, 'demanderEffacement'])
+        ->name('profil.effacement');
+
+    /*
      * La re-authentification ponctuelle. AUCUNE garde de role : l'exigence porte
      * sur l'action visee, pas sur qui la demande, et l'identifiant du compte
      * vient de la session. Valider un step-up n'accorde par soi-meme aucun
@@ -732,6 +755,18 @@ Route::middleware(['memorisation', 'session.authentifiee', 'session.revoquee', '
         ->whereNumber('id')->middleware(['role:3', 'perm:can_admin_portal'])->name('comptes.cle-ssh');
     Route::post('/comptes/{id}/deverrouiller', [ComptesController::class, 'deverrouiller'])
         ->whereNumber('id')->middleware(['role:3', 'perm:can_admin_portal'])->name('comptes.deverrouiller');
+
+    /*
+     * L'exemption d'expiration de mot de passe — `role:3`.
+     *
+     * `legacy/adm/api/update_user.php:31` pose `checkAuth([ROLE_SUPERADMIN])` et
+     * la garde vit ICI, pas dans le controleur. **La colonne
+     * `password_expiry_override` n'avait aucun ecrivain porte** alors que le
+     * portage la LIT en deux endroits — `MotDePasse::expirationApres()` et
+     * l'export RGPD. *Son seul ecrivain vivant etait le fichier qu'on eteint.*
+     */
+    Route::post('/comptes/{id}/expiration', [ComptesController::class, 'expiration'])
+        ->middleware(['role:3', 'perm:can_admin_portal'])->name('comptes.expiration');
     /*
      * Suppression et anonymisation — sous-lot D4. Role 3 sur la ROUTE : le
      * legacy exige le meme role, mais dans le corps du fichier.
