@@ -33,13 +33,23 @@ tournait a chaque visite**, pour les dix-neuf deja deplaces.
 Le controle posait Q1 (le geste est-il porte), Q2 (le fichier est-il requis PAR LE
 LEGACY) et Q3 (est-il le seul acces a un geste non porte). **Il ne posait pas :**
 
-> **Q4 - le PORTAGE depend-il de ce fichier ?**
+> **Q4 - quelque chose l'appelle-t-il encore PAR HTTP ?**
 
-`api_proxy.php` est une feuille, en lecture pure, et **cinq fichiers du portage
-l'appellent a l'execution**. *Archive puis REMIS dans le meme quart d'heure, verifie au
-reseau : 404 -> 302.* **Un fichier peut n'etre requis par aucun fichier legacy et rester
-indispensable au portage : le graphe du legacy ne voit pas ce lien, il traverse la
-frontiere des deux applications.**
+`api_proxy.php` est une FEUILLE par `require` et un CARREFOUR par `fetch`. Archive puis
+REMIS dans le meme quart d'heure. Mesure, code separe du commentaire :
+
+    PORTAGE   CODE  0  ·  commentaire 6      <- il ne l'appelle PAS
+    LEGACY    CODE 14                        <- ses pages survivantes, si
+    HARNAIS   CODE 94
+
+⚠ **La premiere version de cette entree disait « cinq fichiers du portage l'appellent a
+l'execution ». C'ETAIT FAUX** : les six mentions sont des docblocks, et la sonde qui m'en
+avait convaincue interrogeait le portage en `https://` sur un port qui sert du `http://`.
+**Le revert etait bon, sa raison ne l'etait pas.**
+
+**Le graphe Q2 ne suit que `require`/`include`. Une extinction par vagues cree des
+dependances qu'il ne voit pas : tant qu'une page legacy vit, ce qu'elle appelle en HTTP
+doit vivre aussi.**
 
 #### Verifie au reseau apres le geste
     /_deprecated/adm/api_keys.php   404      (retire)

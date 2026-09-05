@@ -10511,3 +10511,59 @@ arbitrages produit :**
 
 **`forgot_password.php`, `reset_password.php`, `security/index.php` et `iptables/index.php`
 restent donc interdits d'archivage — et ce sont les quatre derniers.**
+
+---
+
+## E-416 — RECTIFICATION : mon « j'ai cassé la passerelle » était un FAUX AVEU
+
+**2026-09-05, 13:30 CEST.** *Et 0b m'avait décrit cette faute, nommément, trois heures plus
+tôt.*
+
+### Ce que j'ai publié à l'exploitant, et qui est faux
+
+> *« `api_proxy.php` est une feuille, en lecture pure, et CINQ fichiers du portage
+> l'appellent à l'exécution. »*
+
+**Mesuré, en séparant le code du commentaire :**
+
+    PORTAGE (php + js + vues)   CODE  0   ·  commentaire  6
+    LEGACY  (php + js)          CODE 14   ·  commentaire 10
+    HARNAIS (tests + scripts)   CODE 94   ·  commentaire  9
+
+**Les six mentions du portage sont des DOCBLOCKS** qui documentent ce que le legacy
+faisait. *Zéro occurrence dans le JS du portage.* **Le portage n'a jamais appelé ce
+fichier.**
+
+### Comment je m'en suis convaincue, et c'est le pire de l'affaire
+
+**Ma sonde `https://localhost:8444` a rendu une erreur de connexion, et j'ai lu « le
+portage est cassé ».** *Ce port sert du HTTP : la même sonde en `http://` rend 302.*
+**J'avais identifié cet artefact MOI-MÊME dix minutes plus tard — et j'avais déjà bâti la
+conclusion, le revert, une règle méthodologique et une entrée de CHANGELOG dessus.**
+
+> **Un faux aveu coûte comme une fausse alarme, et il est plus difficile à contredire
+> parce que personne ne défend l'auteur contre lui-même.** *(0b, ce matin, à propos de ma
+> troncature `[:14]`. Trois heures plus tard, je l'ai fait en grand.)*
+
+### ⚠ Le revert était bon. Sa RAISON était fausse — et la vraie est plus utile
+
+**`api_proxy.php` doit rester, parce que LE LEGACY l'appelle : 14 sites de code.** *Le
+legacy n'est pas encore éteint ; ses pages survivantes passent par lui.*
+
+**Et ça corrige la « Q4 » que j'avais énoncée.** *Elle disait « le PORTAGE dépend-il de ce
+fichier ». C'était la mauvaise question, tirée d'une fausse observation.* **La bonne est :**
+
+> **Q4 — quelque chose l'appelle-t-il encore PAR HTTP ?**
+
+    le graphe Q2 ne suit que `require`/`include`
+    `api_proxy.php` est une FEUILLE par `require`  et  un CARREFOUR par `fetch`
+
+**Une extinction par vagues crée des dépendances que le graphe d'inclusion ne voit pas :
+tant qu'une page legacy vit, ce qu'elle appelle en HTTP doit vivre aussi.** *C'est un fait
+mesuré, contrairement au précédent.*
+
+### Ce que je corrige dans les artefacts déjà écrits
+
+**Le `CHANGELOG` 1.47.0 porte la version fausse.** *Il est corrigé dans le même commit que
+cette entrée — un document qui affirme une dépendance inexistante ferait refuser un
+archivage légitime, indéfiniment.*
