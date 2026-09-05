@@ -5,6 +5,73 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.41.0] - 2026-09-05
+
+### Wazuh - E-400 : les trois gestes qui n'ouvrent pas de session SSH sont portes
+
+**Ce qui est porte.** `POST /wazuh/config`, `POST /wazuh/options`, `POST /wazuh/rules` et
+`DELETE /wazuh/rules/<name>`. **La ligne n'est pas « ecrire ou lire », c'est « ouvrir une
+session SSH ou non »** : les six gestes restants du module en ouvrent une, les quatre
+ci-dessus n'ecrivent qu'en base. Un classement par ECRITURE aurait mis les dix du meme cote.
+
+**⚠ Et « enregistrer » ne veut pas dire la meme chose sur les trois.** Mesure sur tout le
+depot — qui LIT ce que chaque geste ECRIT :
+
+    wazuh_config           lu par install() et install_all()      -> effet DIFFERE, reel
+    wazuh_machine_options  son propre SELECT et son propre INSERT -> AUCUN effet aujourd'hui
+    wazuh_rules            list_rules et get_rule seulement       -> AUCUN effet aujourd'hui
+
+L'ecran porte donc TROIS phrases d'effet distinctes, attachees chacune a son geste. Un
+« Enregistre. » identique ferait croire trois fois la meme chose, et deux fois ce serait faux.
+
+**La garde de R1 a change de nature, elle n'a pas disparu.** R1 fermait par l'absence (`lis()`
+ne savait faire qu'un GET). R2 pose une LISTE FERMEE de couples (methode, chemin) : `ecris()`
+refuse toute cible absente d'`ECRITURES_PERMISES`, et la cible est nommee par une CLE — c'est
+le helper qui construit l'URL, parce qu'une URL construite par l'appelant echapperait a la
+liste. Les six gestes SSH sont INEXPRIMABLES par ce helper.
+
+**Corrections trouvees en portant :**
+
+- **quatre champs lus sous un nom que le backend ne rend pas** : `active_response`, `sca`,
+  `rootcheck` (le backend rend `*_enabled`) et `kind` (il rend `rule_type`). Les quatre
+  rendaient « — » ou du vide SANS ERREUR — trois interrupteurs de surveillance affiches comme
+  inactifs quelle que soit leur valeur ;
+- **`portee_texte` disait « n'ecrit rien »** — vrai en R1, faux des la premiere ligne de R2 ;
+- **la page affichait DEUX FOIS la configuration** (liste de R1 + formulaire de R2). La liste
+  ne rend plus que les deux etats de mot de passe, qu'un champ de saisie ne peut pas dire ;
+- **une classe CSS, deux intentions, dix sites** : `.rw-saisie--code` etait defini DEUX fois —
+  le champ du code TOTP (centre, `letter-spacing .35em`) et une zone d'edition de fichier. Le
+  second ne redefinissait ni `letter-spacing` ni `text-align` : les quatre zones d'edition du
+  portage heritaient de la mise en forme du champ TOTP. **Le nom est SEPARE** —
+  `.rw-saisie--edition` pour les 4 zones, `.rw-saisie--code` pour les 6 champs TOTP ;
+- **quatre cases a cocher tombaient au-dessus de leur libelle** : `.rw-champ__etiquette` est en
+  `display: block`. Motif de `acces-sftp` repris — toute la ligne devient cliquable.
+
+**Suppression d'une regle.** Le legacy prend le nom DANS LE CHAMP DE SAISIE puis demande un
+`confirm()` : on peut ouvrir une regle, changer le nom, et supprimer UNE AUTRE regle. Ici le
+bouton nait DESACTIVE, il ne s'active qu'apres l'ouverture d'une regle, il vise cette regle-la,
+et il OUVRE un panneau qui la NOMME. `confirm()` est proscrit — et surtout il ne nomme rien.
+`delete_rule` rendant 200 avec `success: false` quand rien n'a ete supprime, ce cas a son
+propre message : « aucune regle de ce nom » n'est pas « la suppression a echoue ».
+
+**Tests.** 26 assertions au navigateur, 0 FAIL, aux trois largeurs (1920/1400/390), captures
+REGARDEES — trois des defauts ci-dessus ne relevaient d'AUCUNE assertion. Liste fermee eprouvee
+sur 13 cibles dans un DOM simule, 0 FAIL, **temoin inverse rendu** (`install` ajoute a la liste
+sur une copie -> 1 FAIL et 1 requete partie). `node --check`, execution reelle du script dans un
+DOM minimal (3 GET au chargement, 0 ecriture, 0 geste SSH), `php -l`, parite FR/EN verifiee par
+PHP : **122 = 122, 0 divergence**, et 73 cles employees par la vue et le JS, 0 absente.
+
+**⚠ Ce qui n'est PAS mesure, et c'est annonce.** Aucune ecriture n'a ete executee : les trois
+gestes ecrivent dans une base partagee et la configuration decide de ce que fera la prochaine
+installation. Le chemin d'ecriture est verifie par LECTURE et par la liste fermee, pas au
+reseau. Meme raison que les trois non-mesures d'E-397/E-399 : le geste appartient a l'exploitant.
+
+**Notes exploitation.** Aucune migration. `rw.css`, `bashrc.blade.php` et `graylog.blade.php`
+sont touches : aucun n'etait modifie dans l'arbre au moment de l'ecriture, et la correction CSS
+repare les quatre zones d'edition du portage, pas seulement les deux nouvelles.
+
+---
+
 ## [1.40.5] - 2026-09-04
 
 ### Comptes - E-399 : la coercition de VALIDITE du role etait muette

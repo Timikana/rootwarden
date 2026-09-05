@@ -2182,13 +2182,40 @@ a.rw-onglet { text-decoration: none; display: inline-block; }
  * `tab-size: 4` pour que les tabulations du fichier ne s'affichent pas comme
  * huit colonnes, ce qui deplacerait tout ce qui suit.
  */
-.rw-saisie--code {
+/*
+ * ⚠ CE BLOC S'APPELAIT `.rw-saisie--code`, ET IL PORTAIT LE MEME NOM QU'UNE
+ * AUTRE DEFINITION — DEUX INTENTIONS IRRECONCILIABLES SOUS UN SEUL NOM.
+ *
+ * Vu A L'IMAGE le 2026-09-05, en portant Wazuh R2 : le contenu d'une regle
+ * s'affichait CENTRE et LETTRE PAR LETTRE dans sa zone d'edition.
+ *
+ *     :173  .rw-saisie--code  22px · letter-spacing .35em · text-align center
+ *           -> le champ du CODE TOTP, ou l'espacement aide a lire six chiffres
+ *     ici   .rw-saisie--code  12px · white-space pre · tab-size 4
+ *           -> une zone d'EDITION de fichier
+ *
+ * Le second ne redefinissait ni `letter-spacing` ni `text-align` : **les quatre
+ * zones d'edition heritaient donc de la mise en forme du champ TOTP.** La
+ * cascade ne fusionne pas des intentions, elle empile des proprietes — et une
+ * propriete qu'on n'a pas pensé a remplacer survit sans rien signaler.
+ *
+ * Le nom est donc SEPARE plutot que le conflit arbitre : deux roles visuels,
+ * deux classes, et il redevient impossible de les melanger par inadvertance.
+ * *Six champs TOTP gardent `--code`, quatre editeurs prennent `--edition`.*
+ *
+ * `tab-size: 4` pour que les tabulations du fichier ne s'affichent pas comme
+ * huit colonnes, ce qui deplacerait tout ce qui suit.
+ */
+.rw-saisie--edition {
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     font-size: 12px;
     line-height: 1.5;
     tab-size: 4;
     white-space: pre;
     overflow-wrap: normal;
+    /* Explicites, et non implicites : c'est leur absence qui a fait le defaut. */
+    letter-spacing: normal;
+    text-align: left;
 }
 
 /*
