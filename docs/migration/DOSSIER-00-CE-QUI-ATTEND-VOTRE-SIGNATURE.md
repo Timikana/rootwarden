@@ -813,3 +813,54 @@ ce jour-là le schéma décidera à sa place.**
 
 **C'est le même gain que « la restauration rend une DÉCISION » : la propriété tient par la CONSTRUCTION,
 pas par la vigilance.** *Et c'est la seule espèce de garde que ce chantier n'ait jamais vue se périmer.*
+
+---
+
+# ⛔ 2026-09-05, 08:40 — SEPT POINTEURS DE MES DOSSIERS SONT PÉRIMÉS. Les voici relocalisés PAR NOM.
+
+**Audit mécanique de mes 29 dossiers : 127 citations `fichier:ligne` vérifiées une par une.**
+
+    pointant une LIGNE VIDE   6
+    HORS du fichier           1
+    fichier introuvable       0
+    -> 7 perimees sur 127
+
+> **Un numéro de ligne est un fait que toute édition du fichier rend faux — EN SILENCE, puisque ni le
+> document ni le code cité n'ont bougé.**
+
+## LA TABLE DE RELOCALISATION, par NOM
+
+| dossier | ce qui était cité | l'objet, aujourd'hui | dérive |
+|---|---|---|---|
+| **00**, **10** | `ssh_audit.py:237` | `@bp.route('/ssh-audit/scan')` → **:120**, `def ssh_audit_scan` → **:125** | **−112** |
+| **00** | `ssh_audit.py:816` | `PORTEES = ('tag','environment','machines')` → **:897** | +81 |
+| **13** | `Supervision.php:273` | le badge `telegraf_output_token … as jeton_pose` → **:298** | +25 |
+| **15** | `test_invariant_machine_id.py:49` | `CLES = ('machine_id', …)` → **:53** | +4 |
+| **22** | `helpers.py:19` | `if role_id >= 3:` → **:338** *(docstring :323)* | **+319** |
+| **25** | `web.php:1031` | `Route::post('/journal-audit/sceller', …)` → **:1058** | +27 |
+
+**⚠ ET LA DÉRIVE N'EST PAS TOUJOURS VERS LE BAS.** *`ssh_audit.py:237` désignait le scan ; il est
+maintenant à `:120`.* **Une réorganisation déplace dans les deux sens — « les éditions au-dessus » ne
+décrit qu'une moitié du mécanisme.**
+
+## ✅ CE QUI NE CHANGE DANS AUCUN DES SIX DOSSIERS
+
+**Aucun fait, aucune mesure, aucune décision.** *Les objets existent tous, à leur nouveau numéro, et je les
+ai retrouvés par leur NOM en une commande chacun.*
+
+    ce qui change : le POINTEUR
+    ce qui ne change pas : le defaut, l'ampleur, l'arbitrage, le geste
+
+## ✅ ET LA RÈGLE QUE J'APPLIQUE DÉSORMAIS
+
+> **Repérer par le NOM — une route, une fonction, une constante, une clé. Un nom se déplace avec ce qu'il
+> désigne ; un numéro reste où on l'a écrit.**
+
+    `JournalAuditController::sceller`   et non `web.php:1031`
+    `PORTEES = (…)`                     et non `ssh_audit.py:816`
+    `if role_id >= 3:`                  et non `helpers.py:19`
+
+**⛔ Je ne réécris pas les 120 citations saines** : *elles sont justes aujourd'hui, et les réécrire toutes
+coûterait plus que de les revérifier quand un dossier redevient actionnable.* **Mais tout dossier que vous
+pourriez ACTIONNER est repris par nom avant de vous être présenté — `DOSSIER-25` l'a été hier, ceux-ci le
+sont maintenant.**
