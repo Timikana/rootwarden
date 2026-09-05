@@ -218,3 +218,85 @@ est une garde, pas un inventaire : personne ne la lit pour savoir ce qui existe.
   backend — mon relevé porte sur ce que le PORTAGE appelle. *S'ils n'existaient
   pas, les motifs de step-up seraient orphelins des deux côtés, ce qui serait un
   quatrième résidu et non un manque.* **Question ouverte, non tranchée.**
+
+---
+
+## 7. QUESTION FERMÉE — 2026-09-05, 23:24 CEST
+
+**Ma question non tranchée était : `/policy/rollback` et `/policy/sftp/*`
+existent-ils côté backend ? C'est elle qui décide entre « capacités perdues » et
+« règles mortes ».** *Mesurée. Et elle rend trois orphelines, pas deux — dont
+DEUX EN LECTURE.*
+
+### 7.1 Les neuf routes du backend contre ce que le portage compose
+
+```
+backend/routes/policies.py
+  /policy/sudo/deploy   /policy/sudo/audit   /policy/sudo/remove
+  /policy/sftp/deploy   /policy/sftp/audit   /policy/sftp/remove
+  /policy/rollback      /policy/deployments (GET)   /policy/list (GET)
+
+le portage compose (releve sans delimiteur, JS + vues + app/) :
+  /policy/sudo/{deploy,remove}   compose      politiques.js:237
+  /policy/sudo/audit             litteral     politiques.js:265
+  /policy/sftp/{deploy,remove}   compose      acces-sftp.js:216
+  /policy/sftp/audit             litteral     acces-sftp.js:244
+```
+
+**⚠ Et toutes les occurrences trouvées dans `laravel/app/` sont des
+COMMENTAIRES**, pas des appels — vérifié ligne à ligne. *« Cité » n'est pas
+« appelé », et un relevé sans délimiteur ne fait pas la différence : c'est la
+lecture qui la fait.*
+
+### 7.2 ⛔ Trois orphelines, pas deux — et ce ne sont PAS des règles mortes
+
+| route | méthode | interface historique | catégorie |
+|---|---|---|---|
+| `/policy/rollback` | POST — **ouvre une session SSH** | `_deprecated/adm/js/server_user_policy.js` | orpheline par dépréciation |
+| `/policy/deployments` | **GET — lecture** | `_deprecated/…` (2 fichiers) | orpheline par dépréciation |
+| `/policy/list` | **GET — lecture** | `_deprecated/adm/health_check.php` | orpheline par dépréciation |
+
+> **Réponse à ma question : les routes EXISTENT et sont gardées. Ce ne sont donc
+> pas des règles mortes à supprimer — ce sont des CAPACITÉS dont l'interface est
+> morte.** *Le travail que ça demande est un arbitrage, pas une suppression.*
+
+### 7.3 ⚠ ET ÇA RÉFUTE LA FRONTIÈRE — dans le module même où je la mesurais
+
+Le Lead avance que *« ce qui reste non porté est exactement ce qui écrit sur une
+machine »*, et j'avais posé la borne : **ce qui la réfuterait est un orphelin en
+LECTURE seule.**
+
+**Il y en a deux ici.** *Et le contre-exemple est STRUCTUREL, pas anecdotique :*
+
+> **Une dépréciation ne retire pas un GESTE, elle retire une INTERFACE — et une
+> interface sert des lectures autant que des écritures.** *`server_user_policy.js`
+> emportait à la fois le retour arrière (qui écrit) et l'historique des
+> déploiements (qui lit). La dépréciation n'a pas trié.*
+
+**La frontière décrit donc une population, pas l'ensemble :**
+
+| population | ce qu'elle contient | la frontière |
+|---|---|---|
+| **retenues par ARBITRAGE** | I5, S7b, `scan-all` — des gestes qu'on a **choisi** de ne pas ouvrir | **tient** : on ne retient que ce qui écrit |
+| **orphelines par DÉPRÉCIATION** | ce que la page servait, sans tri | **ne s'applique pas** |
+
+*La première est le produit d'une décision — donc elle sélectionne. La seconde est
+le produit d'un effet de bord — donc elle ne sélectionne rien.* **Confondre les
+deux fait chercher les orphelines là où elles ne sont pas.**
+
+### 7.4 Mon témoin était MAL CHOISI, et je le dis
+
+J'ai voulu qualifier ma sonde sur `_deprecated/` avec un témoin :
+`/policy/sudo/deploy`. **Il a rendu ZÉRO** — et un témoin à zéro ne qualifie rien.
+
+**Mais la cause n'est pas que la sonde est aveugle** : j'ai pris un chemin
+**LITTÉRAL** comme témoin, dans un dépôt où **les chemins sont composés**. *Le
+`_deprecated` compose probablement le sien aussi.* **J'ai commis, sur mon propre
+témoin, l'erreur que je venais de documenter deux fois.**
+
+**Le vrai témoin était déjà là** : la sonde rend **1, 2 et 1** fichiers pour les
+trois routes cherchées. *Elle lit donc `_deprecated/` — les résultats positifs
+sont leur propre témoin, et le mien était redondant en plus d'être faux.*
+
+> **Un témoin doit être choisi dans la même FORME que ce qu'on cherche.** Un
+> témoin littéral ne qualifie pas une sonde qui cherche des chemins composés.
