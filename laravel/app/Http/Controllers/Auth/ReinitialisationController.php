@@ -100,6 +100,35 @@ class ReinitialisationController extends Controller
     ) {
     }
 
+    /**
+     * La valeur de `MAIL_MAILER` telle qu'elle est ECRITE dans `.env`, ou `null`.
+     *
+     * ⚠ ON NE PASSE PAS PAR `env()` : elle rend la valeur EFFECTIVE, celle qui a
+     * gagne. Le but est precisement de comparer le FICHIER a ce qui opere, donc
+     * il faut lire le fichier — et rien d'autre.
+     *
+     * Toute erreur de lecture rend `null` : l'avertissement principal ne doit
+     * jamais dependre de ce complement.
+     */
+    private function mailerDuFichierEnv(): ?string
+    {
+        try {
+            $chemin = base_path('.env');
+            if (! is_readable($chemin)) {
+                return null;
+            }
+            foreach (file($chemin, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [] as $ligne) {
+                if (preg_match('/^\s*MAIL_MAILER\s*=\s*"?([A-Za-z0-9_-]*)"?\s*$/', $ligne, $m) === 1) {
+                    return $m[1];
+                }
+            }
+        } catch (\Throwable $e) {
+            return null;
+        }
+
+        return null;
+    }
+
     /** L'ecran de demande. Aucune session requise — c'est tout son objet. */
     public function demander(): View
     {
@@ -146,12 +175,42 @@ class ReinitialisationController extends Controller
              */
             $transport = (string) config('mail.default');
             if (! in_array($transport, self::TRANSPORTS_LOCAUX, true)) {
+                /*
+                 * ⚠ L'AVERTISSEMENT DIT AUSSI QUE `.env` MENT, PARCE QUE C'EST LA
+                 * PREMIERE CHOSE QU'ON IRA LIRE.
+                 *
+                 * Mesure du 2026-09-06 :
+                 *
+                 *     environnement du processus   MAIL_MAILER=smtp   <- gagne
+                 *     .env (fichier)               MAIL_MAILER=log    <- perdu
+                 *     config('mail.default')       smtp
+                 *
+                 * `Dotenv::safeLoad()` ne REMPLACE pas une variable deja presente
+                 * dans l'environnement. **Qui ouvre `.env` pour verifier y lit la
+                 * valeur sure et conclut qu'il n'y a rien a faire** — et le seul
+                 * levier reel est `srv-docker.env` PUIS la recreation du
+                 * conteneur.
+                 *
+                 * *C'est la meme forme que tout ce que cette journee a corrige :
+                 * une declaration qui decrit un etat qui n'est plus l'etat
+                 * operant. Sauf qu'ici elle ne vit pas dans un commentaire mais
+                 * dans un fichier de configuration, donc elle a l'air de faire
+                 * autorite.* **Le dire DANS l'avertissement est ce qui evite le
+                 * mauvais diagnostic au moment ou on le pose.**
+                 */
+                $dansFichier = $this->mailerDuFichierEnv();
+                $desaccord = ($dansFichier !== null && $dansFichier !== $transport)
+                    ? ' ⚠ `.env` porte MAIL_MAILER=' . $dansFichier . ', et il PERD contre '
+                      . 'l environnement du processus : le modifier ne changerait rien. '
+                      . 'Le levier est `srv-docker.env` PUIS la recreation du conteneur.'
+                    : '';
+
                 Log::warning(
                     '[reinitialisation] transport « ' . $transport . ' » non local sous '
                     . 'mod_php : l envoi se produit AVANT la fermeture de connexion, '
                     . 'et l ecart de temps entre adresse connue et inconnue redevient '
                     . 'mesurable. Il faut php-fpm (fastcgi_finish_request) ou un '
-                    . 'ouvrier de file.'
+                    . 'ouvrier de file.' . $desaccord
                 );
             }
 
