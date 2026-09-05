@@ -159,6 +159,26 @@ class InventaireDesGardesTest extends TestCase
          * Les autres n'ont pas d'objet a proteger au-dela de l'authentification :
          *   accueil, cgu (GET+POST), profil        l'ecran de tout compte
          *   profil/mot-de-passe, profil/step-up*   ses propres identifiants
+ *   profil/courriel, profil/cle-ssh        SES propres coordonnees et SA
+ *       propre cle — `feaaaa2`, DOSSIER-30. La cible EST le demandeur,
+ *       l'identifiant vient de la SESSION. Le pendant administratif
+ *       (`POST comptes/{id}/cle-ssh`) reste `role:3` : deux arites, deux
+ *       gardes. Exiger un role ici interdirait a un role 1 de poser la cle
+ *       qui sert son propre acces.
+ *   profil/effacement                      SON propre compte — et c'est la
+ *       seule entree IRREVERSIBLE de cette liste, donc celle a relire.
+ *       Le geste est une ANONYMISATION : `user_logs` est une chaine de
+ *       hachage, retirer une ligne romprait la verification des suivantes.
+ *       Trois protections REELLES dans le controleur — identifiant de
+ *       session, RESSAISIE du nom du compte, refus au dernier
+ *       superadministrateur.
+ *       ⚠ Aucune RE-AUTHENTIFICATION : le nom a retaper est AFFICHE sur la
+ *       page de profil, donc la friction protege du geste accidentel et non
+ *       d'une session compromise. `POST profil/step-up` existe et n'est pas
+ *       exige. *Portee du controle ecrite plutot que supposee plus large.*
+ *       CAPACITE NEUVE, non portee : `legacy/profile.php` n'offre que
+ *       l'export, alors que `legacy/lang/fr/terms.php:78` promet le droit
+ *       a l'effacement. Le legacy annoncait ce droit sans l'implementer.
          *   profil/sessions/fermer                 ses propres sessions
      *   accueil/assistant/masquer              SA propre preference
      *   profil/donnees-personnelles            SES propres donnees — export
@@ -192,6 +212,9 @@ class InventaireDesGardesTest extends TestCase
             'GET profil/donnees-personnelles',
             'POST accueil/assistant/masquer',
             'POST cgu',
+            'POST profil/cle-ssh',
+            'POST profil/courriel',
+            'POST profil/effacement',
             'POST profil/mot-de-passe',
             'POST profil/sessions/fermer',
             'POST profil/step-up',

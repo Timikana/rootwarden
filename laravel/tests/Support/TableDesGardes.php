@@ -56,6 +56,12 @@ class TableDesGardes
             ['POST', 'comptes-distants/{machine}/classer-en-attente', ['role:2', 'perm:can_manage_remote_users']],
             ['GET', 'comptes-distants/{machine}/cles/{username}', ['role:2', 'perm:can_manage_remote_users']],
             ['DELETE', 'comptes/{id}', ['role:3', 'perm:can_admin_portal']],
+            /*
+             * `feaaaa2`. La colonne `password_expires_at` existait deja et le
+             * portage la LIT en deux endroits ; son seul ecrivain vivant etait le
+             * fichier qu'on eteint. Garde sur la ROUTE, pas dans le controleur.
+             */
+            ['POST', 'comptes/{id}/expiration', ['role:3', 'perm:can_admin_portal']],
             ['POST', 'comptes/{id}/anonymiser', ['role:3', 'perm:can_admin_portal']],
             ['POST', 'comptes/{id}/cle-ssh', ['role:3', 'perm:can_admin_portal']],
             ['POST', 'comptes/{id}/deverrouiller', ['role:3', 'perm:can_admin_portal']],
@@ -118,6 +124,45 @@ class TableDesGardes
             ['GET', 'politiques', ['role:3']],
             ['GET', 'profil', []],
             ['POST', 'profil/mot-de-passe', []],
+            /*
+             * LES TROIS GESTES DE LIBRE-SERVICE — `feaaaa2`, DOSSIER-30.
+             *
+             * Aucune garde de role ni de permission, et ce n'est PAS un oubli :
+             * la cible EST le demandeur, l'identifiant venant de la SESSION et
+             * jamais de la requete. Exiger un role ici interdirait a un role 1 de
+             * poser la cle qui sert son propre acces. Le pendant administratif
+             * (`POST comptes/{id}/cle-ssh`) reste `role:3` — deux routes, deux
+             * arites, et c'est la difference d'arite qui fonde la difference de
+             * garde.
+             */
+            ['POST', 'profil/courriel', []],
+            ['POST', 'profil/cle-ssh', []],
+            /*
+             * ⚠ IRREVERSIBLE, ET SANS RE-AUTHENTIFICATION — a lire ensemble.
+             *
+             * Le geste est une ANONYMISATION (`user_logs` est une chaine de
+             * hachage ; retirer une ligne romprait la verification de toutes les
+             * suivantes). Le controleur porte trois protections reelles :
+             * l'identifiant vient de la session, la confirmation exige la
+             * RESSAISIE du nom du compte, et le dernier superadministrateur ne
+             * peut pas se retirer.
+             *
+             * **Ce que la ressaisie couvre, et ce qu'elle ne couvre pas.** Le nom
+             * a retaper est AFFICHE sur la page de profil elle-meme : la friction
+             * protege contre le geste accidentel, pas contre une session
+             * compromise. `POST profil/step-up` existe et n'est PAS exige ici.
+             * *Ce n'est pas un defaut — c'est la portee du controle, et elle
+             * merite d'etre ecrite plutot que supposee plus large.*
+             *
+             * NON PORTE DEPUIS LE LEGACY — c'est une capacite NEUVE. Mesure :
+             * `legacy/profile.php` n'offre que l'EXPORT (16 formulaires, aucun
+             * d'effacement ; ses `DELETE` visent `active_sessions` et
+             * `remember_tokens`). Et pourtant `legacy/lang/fr/terms.php:78`
+             * promet « Droit a l'effacement : demander la suppression de votre
+             * compte et de vos donnees ». **Le legacy annoncait ce droit dans ses
+             * CGU sans l'implementer ; le portage comble l'ecart.**
+             */
+            ['POST', 'profil/effacement', []],
             ['POST', 'profil/step-up', []],
             ['POST', 'profil/step-up/revoquer', []],
             ['GET', 'rapport-conformite', ['role:2', 'perm:can_view_compliance']],
