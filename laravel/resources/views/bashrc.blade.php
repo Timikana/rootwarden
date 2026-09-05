@@ -226,7 +226,7 @@
 
     <label class="rw-champ">
         <span class="rw-visuellement-cache">{{ __('bashrc.gabarit_titre') }}</span>
-        <textarea class="rw-saisie rw-saisie--code" rows="24" spellcheck="false"
+        <textarea class="rw-saisie rw-saisie--edition" rows="24" spellcheck="false"
                   data-rw="bashrc-gabarit-editeur"
                   placeholder="{{ __('bashrc.gabarit_chargement') }}"></textarea>
     </label>

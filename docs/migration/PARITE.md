@@ -19674,3 +19674,127 @@ portees par un echange entre deux sessions, et *le dire est la seule chose qui e
 vert soit lu comme une couverture*. **Une non-mesure ANNONCEE est un fait ; c'est une
 non-mesure DECOUVERTE APRES COUP qui est un defaut** — et une annonce qui ne vit que dans une
 conversation se perime au premier resume.
+
+---
+
+## E-400 — Wazuh R2 : trois gestes portés, et **« enregistrer » ne veut pas dire la même chose sur les trois**
+
+**Consigne reçue :** porter les trois gestes de `wazuh/` qui **n'ouvrent pas de session SSH** —
+`POST /wazuh/config`, `POST /wazuh/options`, `POST /wazuh/rules` + `DELETE /wazuh/rules/<name>` —
+et **aucun** des six autres, pas même leur bouton grisé.
+
+*L'arbitrage corrigeait sa propre déclaration : il avait écrit « les 9 gestes de wazuh sont
+interdits », ils sont **six**. Le catalogue du portage séparait déjà les deux familles dans sa
+propre phrase (`np_liste`), et la déclaration l'avait lue comme un tout.*
+
+### La mesure qui a décidé la forme de l'écran
+
+La question posée n'était pas *« que fait ce geste »* mais **« qui LIT ce que ce geste
+ÉCRIT »**, sur tout le dépôt :
+
+    wazuh_config           lu par install() (:339) et install_all() (:531)
+                           -> effet DIFFERE, reel
+    wazuh_machine_options  DEUX occurrences dans TOUT le depot : son propre
+                           SELECT (:992) et son propre INSERT (:1048)
+                           -> AUCUN effet aujourd'hui
+    wazuh_rules            lu par list_rules (:1080) et get_rule (:1098)
+                           -> AUCUN effet aujourd'hui
+
+    temoin : `git grep -l` sur les trois tables hors tests -> `backend/routes/wazuh.py` seul
+
+> **Un « Enregistré. » identique sur les trois ferait croire trois fois la même chose, et deux
+> fois ce serait faux.** *C'est la différence entre régler une surveillance et croire l'avoir
+> réglée.* L'écran porte donc **trois phrases d'effet distinctes**, attachées chacune à son
+> geste, et le test vérifie qu'elles sont distinctes.
+
+### La garde de R1 a changé de NATURE, elle n'a pas disparu
+
+R1 fermait par l'ABSENCE : `lis()` ne savait faire qu'un `GET`. Cette garantie tombe dès qu'un
+helper d'écriture existe, **et la remplacer par un commentaire aurait été un recul**.
+
+Elle est remplacée par une **liste fermée de COUPLES (méthode, chemin)** : `ecris()` refuse
+toute cible absente de `ECRITURES_PERMISES`. Les six gestes SSH ne sont pas seulement absents
+du code, ils sont **inexprimables** par ce helper — ajouter `/wazuh/install` demanderait
+d'ajouter une ligne à la liste, un geste visible en relecture là où un `fetch` de plus se
+serait fondu dans le fichier.
+
+*La cible est nommée par une CLÉ et c'est `ecris()` qui construit l'URL : une URL construite
+par l'appelant échapperait à la liste — et c'est exactement le piège que ce module portait
+déjà, `'/wazuh/rules/' + encodeURIComponent(name)` étant invisible à tout motif littéral.*
+
+**Éprouvée, avec témoin :** 13 cibles jouées dans un DOM simulé — les 4 permises émettent, les
+9 autres sont refusées **sans requête réseau**, `toString` et `constructor` compris (le piège
+du prototype, écarté par `hasOwnProperty`). **Témoin inverse** : `install` ajouté à la liste
+sur une COPIE → 1 FAIL et 1 requête partie. L'instrument mord.
+
+### ⚠ Quatre champs étaient lus sous un nom que le backend ne rend pas
+
+Relevé en portant, corrigé ici :
+
+    lu par R1            rendu par le backend
+    o.active_response    active_response_enabled   (wazuh.py:995)
+    o.sca                sca_enabled
+    o.rootcheck          rootcheck_enabled
+    x.kind               rule_type                 (wazuh.py:1078)
+
+Les quatre rendaient « — » ou du vide, **sans erreur**. *Trois interrupteurs de surveillance
+s'affichaient donc comme inactifs quelle que soit leur valeur réelle, et le type d'une règle
+ne s'affichait jamais.* Une valeur absente ne se signale pas : elle prend l'apparence d'une
+valeur fausse plausible.
+
+### Trois défauts que SEULE L'IMAGE a montrés
+
+Les 26 assertions étaient vertes avant les captures. Les trois qui suivent ne relèvent d'aucune
+d'elles :
+
+1. **`portee_texte` disait « Elle ne joint aucune machine et n'écrit rien ».** Vrai en R1,
+   **faux dès la première ligne de R2** — et c'est la classe de défaut la plus répétée de ce
+   chantier : *une déclaration vraie quand elle a été écrite, fausse quand la capacité a été
+   portée, sans que rien ne la touche.* J'avais corrigé `np_liste`, que l'arbitrage nommait, et
+   **manqué la carte juste au-dessus**, qu'il ne nommait pas ;
+2. **la page affichait DEUX FOIS la configuration** — la liste en lecture de R1, puis le
+   formulaire préremp li de R2. *Un lecteur ne peut pas savoir laquelle fait foi.* La liste ne
+   rend plus que les deux états de mot de passe, **qu'un champ de saisie ne peut pas dire** :
+   le backend blanchit les secrets et ne rend que deux booléens, donc un champ vide dirait
+   « aucune valeur » là où il y en a une ;
+3. **le contenu d'une règle s'affichait CENTRÉ et lettre par lettre.** Voir ci-dessous — c'est
+   le plus intéressant des trois.
+
+### ⚠ Une classe, deux intentions irréconciliables, dix sites
+
+    :173   .rw-saisie--code   22px · letter-spacing .35em · text-align center
+           -> le champ du CODE TOTP, ou l'espacement aide a lire six chiffres
+    :2185  .rw-saisie--code   12px · white-space pre · tab-size 4
+           -> une zone d'EDITION de fichier
+
+**Le second ne redéfinissait ni `letter-spacing` ni `text-align`** : les quatre zones d'édition
+du portage — `bashrc`, `graylog` et mes deux — héritaient donc de la mise en forme du champ
+TOTP. *La cascade ne fusionne pas des intentions, elle empile des propriétés — et une propriété
+qu'on n'a pas pensé à remplacer survit sans rien signaler.*
+
+Le nom est **séparé** plutôt que le conflit arbitré : `.rw-saisie--edition` pour les 4 zones,
+`.rw-saisie--code` pour les 6 champs TOTP. **Deux rôles visuels, deux classes, et il redevient
+impossible de les mélanger par inadvertance.** *Arbitrer aurait cassé l'un des deux usages ;
+seule la séparation les sert tous les deux.*
+
+`rw.css`, `bashrc.blade.php` et `graylog.blade.php` sont des fichiers que je ne possède pas :
+aucun n'était modifié dans l'arbre et les deux vues datent du 26/08. **Le défaut y était et la
+correction les répare aussi — le signaler sans le corriger aurait laissé trois comportements
+pour un seul rôle visuel.**
+
+### Ce qui n'est PAS porté, et pourquoi
+
+Les **six** gestes SSH — `install`, `install_all`, `detect`, `uninstall`, `restart`, `group` —
+n'ont **aucun bouton, pas même grisé** : *un bouton inerte est une promesse.* `np_liste` les
+énumère sans les compter, et `np_reserve` nomme **le seul des six** dont l'effet ne correspond
+pas à son nom (`group` ne transmet jamais le groupe ; la seule commande distante est un
+redémarrage, donc le verdict porte sur le redémarrage).
+
+### Ce qui n'est PAS mesuré, et c'est annoncé
+
+**Aucune écriture n'a été exécutée.** Les captures cliquent « Ouvrir » (un `GET`) et ouvrent le
+panneau de suppression (du DOM pur) ; ni « Sauvegarder » ni « Supprimer cette règle » ne sont
+cliqués. Les trois gestes écrivent dans une base partagée, et la configuration décide de ce que
+fera la prochaine installation. **Le chemin d'écriture est donc vérifié par lecture et par la
+liste fermée, pas au réseau** — comme les trois non-mesures d'E-397/E-399, et pour la même
+raison : le geste appartient à l'exploitant.

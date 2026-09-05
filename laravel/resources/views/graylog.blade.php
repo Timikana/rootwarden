@@ -148,7 +148,7 @@
                 </label>
                 <div class="rw-champ">
                     <label class="rw-champ__etiquette" for="gl-tpl-contenu">{{ __('graylog.gabarit_contenu') }}</label>
-                    <textarea class="rw-saisie rw-saisie--code" id="gl-tpl-contenu" rows="18"
+                    <textarea class="rw-saisie rw-saisie--edition" id="gl-tpl-contenu" rows="18"
                               spellcheck="false" data-rw="graylog-gabarit-contenu"></textarea>
                 </div>
                 <div class="rw-actions">
