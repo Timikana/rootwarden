@@ -937,3 +937,95 @@ garde manque, et les deux tâches qui l'annonceraient n'ont pas de donnée à li
 > **Troisième occurrence de la forme** — après `user_logs.self_hash` (le seul
 > écrivain scellant du legacy) et les trois accès exclusifs de `adm/api/`.
 > **Ici le lecteur survit, écrit à des humains, et échoue en silence.**
+
+---
+
+## 13. Q3 par GESTE sur les trois fichiers les plus multi-gestes — **2026-09-05 11:36 CEST**
+
+Dix-neuf gestes d'écriture. **Une seule touche.**
+
+### 13.1 `adm/includes/server_actions.php` — 6 gestes, **6 PORTÉS**
+
+| geste legacy | artefact `laravel/` |
+|---|---|
+| `DELETE machine_tags` `:125` | `Services/Serveurs.php:638` |
+| `INSERT server_notes` `:136` | `Serveurs.php:659` |
+| `DELETE server_notes` `:143` | `Serveurs.php:680` (+ `web.php:761`) |
+| `INSERT machines` `:184` | `Serveurs.php:294` |
+| `UPDATE machines` `:234` | `Serveurs.php:536` |
+| `DELETE machines` `:256` | `Serveurs.php:776` |
+
+*Les 9 branches `case` ne sont pas des actions : ce sont des noms de CHAMP passés à
+une validation. Compter les `case` surestime les gestes.*
+
+### 13.2 `adm/api/anonymize_user.php` — 7 gestes, **7 PORTÉS**, table pour table
+
+    legacy :85   UPDATE users SET …
+    legacy :102-115  DELETE  active_sessions · remember_tokens · password_history
+                             notification_preferences · permissions · user_machine_access
+
+    portage  Comptes::anonymise()  :572  UPDATE users (name, email, company, ssh_key,
+                                         ssh_key_updated_at, totp_secret, active, password)
+                                   :585-587  foreach LES SIX MEMES TABLES -> delete()
+
+**Correspondance exacte, y compris ce qui n'est PAS touché** : le portage note
+`:589-590` que `user_logs` et `login_history` sont épargnés — *« c'est tout l'objet de
+ce geste »*.
+
+⚠ **Ces deux tables avaient été déclarées « non écrites par le portage » par un
+instrument tiers.** Elles le sont : `Permissions.php:156` (SQL brut) et
+`Notifications.php:210`. **Une sonde qui cherche `DB::table('x')->update()` dans une
+seule expression ne les voit pas.**
+
+### 13.3 `privacy.php` — 6 gestes : **5 sont du CODE MORT**, 1 est une TOUCHE
+
+**Les cinq purges explicites ne sont pas des gestes à porter.** Schéma mesuré :
+
+    cles etrangeres vers `users` en ON DELETE CASCADE :
+      active_sessions · notification_preferences · password_history · permissions
+      remember_tokens · temporary_permissions · user_machine_access
+      login_history · user_logs · password_reset_tokens · chatops_users
+
+`DELETE FROM users` les emporte toutes. **Et le portage l'écrit noir sur blanc**
+(`Comptes.php:542-545`) : *« la cascade manuelle du legacy est du CODE MORT, les
+tables qu'il supprime explicitement étant déjà parties avec la première ligne »*.
+
+*J'ai suspecté une fuite sur `temporary_permissions` — son seul accès au portage est
+`Permissions::revoqueTemporaire()`, qui révoque UN octroi par son `id`. La cascade
+répond. **Cinquième fois en deux jours que j'allais accuser du code qui avait écrit sa
+raison.***
+
+> ### ⛔ LA TOUCHE : **l'auto-suppression de compte**
+>
+>     legacy   privacy.php:35  `if (isset($_POST['delete_data']))`
+>              -> l'utilisateur supprime SON PROPRE compte, depuis SA page
+>     portage  routes /profil/* : sessions, mot de passe, step-up — AUCUNE suppression
+>              `supprimer mon compte` / `delete_data` cote laravel : 0 occurrence
+>              la seule suppression est ADMINISTRATIVE : `web.php:745`,
+>              `role:3` + `can_admin_portal`
+>
+> **`privacy.php` est le seul accès à la suppression de compte par la personne
+> concernée** — l'article 17 exercé par le sujet, et non par un administrateur en son
+> nom. **Ce n'est pas la même capacité que `DELETE /comptes/{id}` : l'acteur change.**
+
+### 13.4 NON TRANCHÉ — les deux gardes ne sont pas comparables
+
+    legacy   privacy.php:37-43   refuse si le compte est le DERNIER superadmin ACTIF
+    portage  Comptes::supprimableSansPerte:509-512   refuse si le compte a des
+                                                     ENTREES DE JOURNAL
+
+**Je ne tranche pas.** Sur une instance vivante, « avoir des entrées de journal » vise
+presque tous les comptes : la suppression administrative du portage est donc bien plus
+restrictive que celle du legacy. **Est-ce voulu ou hérité ? Je ne le sais pas, et
+aucune mesure de mon périmètre ne le dit.**
+
+### 13.5 Mon angle mort sur ce relevé
+
+Ma sonde couvre **quatre** formes : chaîne ORM multi-lignes, SQL brut, `DB::*`, et —
+ajoutée aujourd'hui — **la table citée dans une LISTE parcourue** (`foreach ['a','b']
+as $table`). C'est cette quatrième qui a trouvé la boucle de purge de `anonymise()` ;
+les trois autres la rataient.
+
+**Ce qu'elle ne verrait toujours pas** : une purge par relation Eloquent
+(`$user->sessions()->delete()`) ou par observateur de modèle. *Je n'ai pas vérifié si
+ce dépôt en emploie* — c'est une borne, pas un constat.
