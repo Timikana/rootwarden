@@ -160,6 +160,7 @@ class InventaireDesGardesTest extends TestCase
          *   accueil, cgu (GET+POST), profil        l'ecran de tout compte
          *   profil/mot-de-passe, profil/step-up*   ses propres identifiants
          *   profil/sessions/fermer                 ses propres sessions
+     *   accueil/assistant/masquer              SA propre preference
      *   profil/donnees-personnelles            SES propres donnees — export
      *       RGPD art. 20, FIDELE au legacy qui l'ouvre a tout compte connecte
      *       des le role 1. L'identifiant vient de la SESSION, aucun parametre
@@ -189,6 +190,7 @@ class InventaireDesGardesTest extends TestCase
             'GET documentation',
             'GET profil',
             'GET profil/donnees-personnelles',
+            'POST accueil/assistant/masquer',
             'POST cgu',
             'POST profil/mot-de-passe',
             'POST profil/sessions/fermer',
