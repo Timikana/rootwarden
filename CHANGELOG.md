@@ -5,7 +5,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
-## [1.50.0] - 2026-09-05
+## [1.51.0] - 2026-09-05
 
 ### Auth - E-418 : les trois dernieres ecritures du legacy, et une affirmation de moi qui les bloquait
 
