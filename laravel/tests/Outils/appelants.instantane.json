@@ -3,10 +3,10 @@
   "dossier": "laravel/public/js",
   "totaux": {
     "fichiers": 35,
-    "appels": 68,
+    "appels": 71,
     "verifie": 30,
     "flux": 7,
-    "delegue": 27,
+    "delegue": 30,
     "delegue_sans_lecteur": 2,
     "ignore": 2,
     "illisible": 0
@@ -14,7 +14,7 @@
   "empreintes": {
     "acces-sftp.js": "22fd143b2372c73a",
     "approbations.js": "874aa42ba41121f0",
-    "audit-ssh.js": "67c887a1f42e4600",
+    "audit-ssh.js": "9ce35fcc6b40922d",
     "bashrc.js": "ad6d75455290bf31",
     "chatops.js": "607141666c99b287",
     "cle-plateforme.js": "847da8fc8e2f3f9c",
@@ -46,7 +46,7 @@
     "supervision.js": "e1ee09190066011e",
     "taches.js": "e2f38dc14fa64973",
     "tickets.js": "1b9803433b017d1e",
-    "wazuh.js": "c87a0aad1e41596f"
+    "wazuh.js": "150c5e47c0f94c5f"
   },
   "a_examiner": [
     {

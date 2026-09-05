@@ -102,6 +102,10 @@ class TableDesGardes
             // parametre n'est offert : il n'y a pas d'objet a garder au-dela de
             // l'authentification.
             ['GET', 'profil/donnees-personnelles', []],
+            // Masquer l'assistant d'accueil : le geste ne touche que la
+            // preference d'affichage DU COMPTE LUI-MEME, resolue depuis la
+            // session. Aucun objet a garder au-dela de l'authentification.
+            ['POST', 'accueil/assistant/masquer', []],
             ['GET', 'notifications/preferences', ['role:3', 'perm:can_admin_portal']],
             ['POST', 'notifications/preferences', ['role:3', 'perm:can_admin_portal']],
             ['POST', 'notifications/tout-lire', ['role:1']],
@@ -184,6 +188,19 @@ class TableDesGardes
             'GET groups'              => 'redirection depuis le legacy',
             'GET ssh-audit'           => 'redirection depuis le legacy',
             'GET documentation.php'   => 'redirection depuis le legacy',
+
+            // ── LA REINITIALISATION DE MOT DE PASSE ─────────────────────
+            // Publiques PAR NECESSITE : on ne peut pas exiger une session de
+            // quelqu'un qui a perdu le moyen d'en ouvrir une. Ce qui les borne
+            // n'est donc pas une garde de session mais une LIMITE DE DEBIT qui
+            // echoue FERME et compte les demandes RECUES — un compteur qui ne
+            // compte que les demandes REUSSIES ne limite pas l'enumeration, il
+            // la finance — plus un jeton de 32 octets, hache, a usage unique et
+            // valable une heure.
+            'GET mot-de-passe-oublie'  => 'demander un lien : aucune session a exiger',
+            'POST mot-de-passe-oublie' => 'soumettre l adresse : borne par la limite de debit',
+            'GET reinitialiser'        => 'le lien recu par courriel porte le jeton',
+            'POST reinitialiser'       => 'poser le nouveau mot de passe, jeton a usage unique',
             'GET terms.php'           => 'redirection depuis le legacy',
             'GET adm/admin_page.php'  => 'redirection depuis le legacy',
             'GET commandlog'          => 'redirection d\'une partie archivee',
