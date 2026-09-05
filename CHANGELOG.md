@@ -82,7 +82,7 @@ commitee par `feaaaa2` (fichier partage, elle etait dans l'arbre) : elle est int
 
 ---
 
-## [1.51.2] - 2026-09-05
+## [1.52.1] - 2026-09-05
 
 ### Correctif - changer son adresse ou sa cle repoussait l'echeance de son mot de passe
 
@@ -113,6 +113,12 @@ chemins en beneficient — la route d'administration `role:3` comme le libre-ser
 *Non touche : `anonymise()` ecrit aussi sur `users`, et n'est pas corrige — le
 compte est desactive et son mot de passe rendu inutilisable dans la meme
 transaction, donc l'echeance n'a plus d'objet.*
+
+⚠ **Et j'ai numerote ce correctif `1.51.2` alors que `version.txt` portait deja
+`1.52.0`** — la SECONDE regression de version en deux jours. Pire que la premiere :
+la commande AVAIT mesure et AFFICHE `1.52.0`, et l'increment etait fige dans le
+script. *Un controle dont le resultat ne commande pas l'action n'est pas un
+controle, c'est un commentaire.* Corrige en `1.52.1`, **derive** de la mesure.
 
 **Origine** : la propriete m'a ete donnee par une autre session, qui l'avait payee
 sur son propre lot par une date fausse de huit mois. *Elle ne l'a pas affirmee de
