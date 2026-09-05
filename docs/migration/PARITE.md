@@ -21008,3 +21008,56 @@ plus faible.
 
 **Ici l'écart de charge était DÉCLARÉ, donc trouvable en lisant. Rien ne garantit
 que le prochain le soit.**
+
+
+## E-427 — `ssh_audit` : SIX capacités orphelines par dépréciation, dont UNE lecture portable
+
+**Mesuré le 2026-09-06 00:45.** La page legacy est `_deprecated/ssh-audit/`, et le
+portage a une interface complète (contrôleur, JS 50 Ko, vue, i18n).
+
+    /ssh-audit/backups      POST · can_audit_ssh · 7 SSH   « Liste les fichiers de
+                                                             backup sshd_config »  -> LECTURE
+    /ssh-audit/fix          POST · role:2 · 13 SSH         ECRITURE
+    /ssh-audit/reload       POST · role:2 · 11 SSH         ECRITURE
+    /ssh-audit/restore      POST · role:2 ·  7 SSH         ECRITURE
+    /ssh-audit/save-config  POST · role:2 ·  8 SSH         ECRITURE
+    /ssh-audit/toggle       POST · role:2 ·  8 SSH         ECRITURE
+
+**Appelant vivant pour chacune, des DEUX côtés : AUCUN.** *Vérifié une par une hors
+`_deprecated` ; témoin : `/ssh-audit/scan` est bien rendu par `audit-ssh.js`.*
+
+> **Six capacités orphelines par dépréciation, en un seul module.** *La page qui
+> les servait a été archivée, et personne n'a regardé ce qu'elle emportait — c'est
+> la même forme que `/policy/rollback`, à six exemplaires.*
+
+### ⚠ `/ssh-audit/backups` est une LECTURE, donc portable sans arbitrage
+
+**C'est la première capacité portable trouvée en quatre modules.** *Et c'est une
+troisième lecture orpheline, après `/ssh-audit/trends` et `/cve_trends` — la
+formule réfutée en E-425 l'est une fois de plus.*
+
+**MAIS je ne la porte pas sans le dire, parce qu'elle pose une question de
+conception :**
+
+> **`backups` liste les sauvegardes pour qu'on en RESTAURE une. Or `restore` est
+> une écriture, donc sous arbitrage.** *La porter seule livre une liste dont la
+> suite naturelle est inatteignable.*
+
+Ce n'est pas un blocage — *savoir qu'une sauvegarde existe avant d'agir a une
+valeur propre* — mais c'est un choix, et il appartient à qui décide du périmètre.
+**Non porté, en attente de ce mot.**
+
+### `/ssh-audit/trends` : E-279 tient
+
+Côté portage, ce chemin n'apparaît **que dans `RoutesBackend.php:303`** — *une table
+de routes, pas un appelant.* **Toujours promise par le contrat, appelée par
+personne.**
+
+### Note de méthode : le périmètre du relevé, encore
+
+Mon premier relevé donnait les six comme « manquant au portage », ce qui suggérait
+un travail de portage. **Elles ne manquent pas au portage : elles manquent aux
+DEUX.** *La différence tient au périmètre interrogé — comparer portage contre
+legacy suppose que le legacy, lui, les serve encore.* **Quand la page legacy est
+dépréciée, la comparaison à deux termes rend un verdict qui a la forme d'un
+manque de portage et qui n'en est pas un.**
