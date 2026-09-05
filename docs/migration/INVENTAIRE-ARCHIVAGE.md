@@ -1120,3 +1120,75 @@ lui-même.**
 *Deux de ces quatre touchent le RGPD par le sujet lui-même — corriger son adresse
 (art. 16, rectification) et supprimer son compte (art. 17).* **Je le signale, je ne le
 qualifie pas : la conformité est un jugement juridique.**
+
+---
+
+## 15. Q3 par geste — lot 2/3 (**2026-09-05 12:26 CEST**)
+
+### 15.1 `adm/api/change_password.php` — 3 gestes, **3 PORTÉS**
+
+| geste | artefact |
+|---|---|
+| `UPDATE users password` + `force_password_change` `:85` | `MotDePasse.php:251-254` |
+| `DELETE remember_tokens` `:96` | `MotDePasse.php:286` |
+| `DELETE active_sessions` `:100` | `MotDePasse.php:186` et `SessionsActives.php:120` |
+
+⚠ **Ma sonde par colonne a rendu `force_password_change` → 0. C'était un ARTEFACT** :
+mon motif `->update\(\s*\[(.*?)\]` est non gourmand et s'arrêtait au **premier `]`
+interne** du tableau. La colonne est écrite (`ComptesController:249` à 1,
+`MotDePasse` à 0) et lue (`ChangementMotDePasseExige:120`). *Je ne l'ai vu que parce
+que le zéro contredisait ce que j'avais lu le matin même.*
+
+### 15.2 `adm/api/delete_user.php` — 1 geste réel, **PORTÉ**
+
+`DELETE users :105` → `Comptes::supprime:555`. **Les deux autres `DELETE`
+(`user_machine_access :109`, `permissions :113`) sont du code mort** — cascade, §13.3.
+
+### 15.3 ⛔ `auth/login.php` — 8 gestes, **5 portés, 3 NON**
+
+| geste | état |
+|---|---|
+| `INSERT login_attempts` `:77` | **PORTÉ** — `ConnexionController:140` |
+| `UPDATE failed_attempts=0, locked_until=NULL` `:155` | **PORTÉ** — `ConnexionController:71` |
+| `UPDATE failed_attempts, locked_until` (verrouillage) `:248` | **PORTÉ** |
+| `DELETE login_attempts` (purge) `:47` | **PORTÉ** — `Comptes.php:326` |
+| **`INSERT login_history` `:206` et `:267`** | ⚠ **NON PORTÉ** (voir 15.4) |
+| **`last_failed_login_at`** `:249` `:260` | ⚠ **NON PORTÉ** |
+| **re-hachage du mot de passe à la connexion** `:165` | ⚠ **NON PORTÉ** — `password_needs_rehash` : **0 occurrence** côté portage |
+
+*Le re-hachage relève le coût bcrypt d'un vieux compte de façon transparente. Sans
+lui, un compte créé sous un coût ancien le garde indéfiniment. Le commentaire du
+legacy note que le geste avait été **annoncé sans être fait** avant d'être corrigé.*
+
+### 15.4 ⚠ **`login_history` — quatrième « dernier écrivain qui meurt », et le lecteur est l'EXPORT RGPD**
+
+    ECRIVAINS   legacy/auth/login.php:206 (succes) et :267 (echec)   -> DEUX, tous legacy
+                laravel/ : ZERO   ·   backend/ : ZERO
+    LECTEURS    legacy/profile.php:426        l'historique affiche a l'utilisateur
+                legacy/profile/export.php:81
+                laravel/app/Services/ExportRgpd.php:131-135   ← L'EXPORT PORTE
+                backend/scheduler.py:453     un job de purge
+    DONNEE      5067 lignes, derniere ecriture 2026-09-05 08:42:44 — VIVANTE
+
+**`login_attempts` n'est pas la même table** : colonnes `username`/`success`/`step`
+contre `user_id`/`user_agent`/`status`, et 25 lignes contre 5067. **Et l'export RGPD
+porté ne lit QUE `login_history`.**
+
+> **La section « historique de connexion » de l'export article 20 dépend
+> entièrement d'une table que le portage n'écrit jamais.** Éteindre le legacy la
+> **fige** — l'export continuera de rendre un historique qui s'arrête au jour de
+> l'extinction, sans rien qui le dise.
+
+⚠ **CE QUE J'ALLAIS ÉCRIRE ET QUI EST FAUX** : que la purge la **draine**
+activement. `_purge_old_logs` (`scheduler.py:440-453`) supprime bien dans
+`login_history` — mais `LOG_RETENTION_DAYS` **n'est pas défini dans le conteneur**,
+et la fonction sort si la valeur est `≤ 0` (défaut `'0'`). **La purge est INERTE.**
+*Conditionnel clairement marqué : si cette variable était posée un jour, la section
+se viderait sur la fenêtre de rétention.*
+
+**Et `last_failed_login_at` a exactement la même forme** : écrit uniquement par
+`login.php`, lu par les DEUX exports RGPD (`export.php:62`,
+**`ExportRgpd.php:103`**).
+
+> **Deux colonnes du même fichier alimentent un livrable légal porté, et aucune n'a
+> d'écrivain côté portage.**
