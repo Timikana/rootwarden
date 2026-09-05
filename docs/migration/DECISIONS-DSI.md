@@ -10412,3 +10412,102 @@ CORRIGÉE du commentaire et pas du geste — deuxième occurrence de cette forme
 
     fr/auth.php 0 · en/auth.php 0 · cgu.blade.php 0 · suites 0
     temoin : 40 cles -> instrument sain
+
+---
+
+## E-415 — LES TROIS ARBITRAGES RENDUS, sur délégation explicite de l'exploitant
+
+**2026-09-05, 12:50 CEST.** *« arbitre pour moi, aucune limite, t'es le DSI ».*
+
+---
+
+### ① `DOSSIER-25` — la chaîne d'audit : **NE JAMAIS SCELLER**
+
+**Décision : le bouton « Sceller » ne doit rien sceller. Il est retiré, et son libellé
+dit ce qui est vrai.**
+
+    user_logs   4787 scellees, chaine INTACTE (4787 `prev_hash` distincts)
+                1484 nues, `prev_hash` NUL aussi -> hors chaine PAR CONSTRUCTION
+
+**La tête se calcule en SAUTANT les lignes nues, dans les deux portails.** *Les remettre
+dans la chaîne exige de réécrire le `prev_hash` des 4787 autres — c'est-à-dire de
+détruire la seule propriété que la chaîne apporte.*
+
+    le LEGACY scelle   -> avance sa tete, casse a la 1re scellee qui suit, et STOPPE
+    le PORTAGE scelle  -> 1484 `prev_hash` identiques, et `whereNull('self_hash')`
+                          interdit la reprise : CASSE ET BLOQUE, irreversible
+
+> **Aucun des deux ne peut aboutir. Ce n'était pas une course : c'était deux impasses.**
+
+**Ce qui est fait, et qui était le vrai remède** : `backend/audit_chain.py` (v1.45.0) —
+11 sites d'insertion nue repris, compte restant **0**. *On a cessé d'en fabriquer ; les
+1484 restent, et le dire est plus honnête que de leur donner un faux chaînage.*
+
+**À porter** : retirer l'action de `JournalAudit::scelle`, remplacer le libellé du bouton
+par un état — *« 1484 événements non chaînés, hors chaîne depuis leur écriture »* — et
+`legacy/adm/api/audit_seal.php` devient archivable le jour même.
+
+---
+
+### ② `DOSSIER-30` — le libre-service : **PORTER LES TROIS**
+
+**Décision : `/profil` devient complet. Les trois gestes sont portés.**
+
+    changer son adresse       -> route sur /profil. ⚠ Elle manque AUSSI cote
+                                 administrateur : la poser une fois sert les deux.
+    poser sa propre cle SSH   -> `definitCleSsh` existe ; il lui faut une route
+                                 /profil dont la cible est le demandeur.
+    supprimer son compte      -> forme (b) : une DEMANDE tracee, dont le geste
+                                 execute est l'ANONYMISATION deja portee.
+
+**Pourquoi (b) et non la suppression pure** : *`Comptes::supprimableSansPerte` refuse la
+suppression quand le compte a des entrées de journal, et son docblock écrit pourquoi —
+« l'anonymisation est le geste juste : elle efface les données personnelles et PRÉSERVE
+le journal ».* **La conception existe ; il lui manque l'initiative du sujet, et c'est
+exactement ce que le droit exige.**
+
+**`privacy.php` et `profile.php` deviennent archivables à la livraison.**
+
+---
+
+### ③ `DOSSIER-31` — le dernier écrivain : **OUI, la donnée survit**
+
+**Décision : les trois écritures sont portées dans le flux de connexion, qui l'est déjà.**
+
+    INSERT login_history       alimente la section « historique » de l'export art. 20
+    last_failed_login_at       lue par les DEUX exports RGPD
+    password_expires_at        lue par deux taches du planificateur, dont une qui ENVOIE
+
+**Le coût est trois écritures dans `ConnexionController`. L'alternative — retirer la
+section de l'export et la tâche — coûte plus cher et retire une capacité.**
+
+> **Et la troisième issue, celle que l'inaction produit, est la seule inacceptable :
+> garder les lecteurs, perdre les écrivains, et ne rien dire.** *Elle fabrique un
+> livrable légal qui se présente comme complet et se fige au jour de l'extinction — sans
+> qu'aucun des marqueurs `_total` / `_exportees` / `_tronque` ne l'attrape, parce que rien
+> n'est tronqué.*
+
+**`legacy/auth/login.php` devient archivable à la livraison.**
+
+---
+
+### ⛔ LES DEUX QUE JE MAINTIENS, MALGRÉ LA LEVÉE — et je dis pourquoi
+
+**L'exploitant a levé toute limite. Je garde deux réserves, parce que ce ne sont pas des
+arbitrages produit :**
+
+    ARMER LE SMTP        un courriel part vers une personne REELLE, depuis une page
+                         PUBLIQUE, sans etape de test — et sous `mod_php` ca rouvre
+                         l'oracle d'enumeration que E-406 venait de fermer.
+                         C'est un geste d'EXPLOITATION, pas un choix de produit.
+
+    APPLIQUER DES REGLES un jeu de regles iptables peut couper l'acces SSH d'une
+    DE PARE-FEU          machine reelle. `/iptables-restore` n'offre aucune entree
+                         libre — mais la question n'est pas l'entree, c'est l'EFFET.
+
+> **Déléguer un arbitrage produit n'est pas déléguer un effet irréversible sur des tiers.
+> Je peux décider ce que le produit DOIT faire ; je ne peux pas décider à la place de
+> quelqu'un qu'un courriel parte ou qu'une machine devienne injoignable.**
+
+**`forgot_password.php`, `reset_password.php`, `security/index.php` et `iptables/index.php`
+restent donc interdits d'archivage — et ce sont les quatre derniers.**
