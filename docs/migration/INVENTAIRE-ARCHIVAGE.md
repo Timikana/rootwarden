@@ -168,6 +168,23 @@ tirent un `adm/api/*` ou un `adm/includes/*`. Voir le bloc D.
 *`migrate_crypto.php` n'est pas mort en tant qu'outil* — il est mort **en tant que
 page servie**. À déplacer vers un dossier de scripts, pas à supprimer.
 
+**✅ FAIT — E-404, `959367e` (2026-09-05) : `legacy/auth/migrate_crypto.php` →
+`scripts/migrate_crypto.php`.** Le renommage est suivi par `git log --follow`.
+
+**⚠ Et le déplacement seul n'aurait pas suffi, ce que ce relevé ne pouvait pas
+voir depuis les appelants :** le script incluait `__DIR__ . '/../db.php'`, **et
+`db.php` vit dans `legacy/`, c'est-à-dire dans l'arborescence qu'on éteint.**
+Repointer le `require` n'aurait fait que déplacer la date de sa mort — le fichier
+aurait survécu à l'archivage et serait devenu inexécutable le jour de
+l'extinction. La surface réellement consommée était **un seul symbole**, `$pdo`
+(5 occurrences), désormais construit dans le script : mêmes variables
+d'environnement, mêmes défauts, mêmes attributs PDO, **patch A05 repris**.
+**Zéro `require`/`include` exécutable subsiste.**
+
+*Corollaire pour les autres candidats de ce document : « 0 appelant » répond à
+« qui l'appelle », pas à « de quoi dépend-il ». Les deux questions décident d'un
+déplacement, et la seconde ne se lit pas dans un relevé d'appelants.*
+
 ### BLOC D — LE SOCLE : ni sous-lot, ni relecture, ni captures
 
 Ces fichiers **tombent quand la dernière page tombe**, et pas avant. Le
@@ -475,7 +492,7 @@ par-dessus.
 
 | fichier | le geste | équivalent ? | Q3 |
 |---|---|---|---|
-| `auth/migrate_crypto.php` | **rotation de clé** : re-chiffrer TOUS les secrets de `machines` et `users`, de `OLD_SECRET_KEY` vers `SECRET_KEY` | ⚠ **non** | **TOUCHE — seul accès** |
+| `scripts/migrate_crypto.php` *(était `auth/`, E-404)* | **rotation de clé** : re-chiffrer TOUS les secrets de `machines` et `users`, de `OLD_SECRET_KEY` vers `SECRET_KEY` | ⚠ **non** | **TOUCHE — seul accès** |
 | `auth/migrate_totp.php` | chiffrer les secrets TOTP restés en clair (un coup, idempotent, CLI) | **non** — 0 occurrence | **touche, faible** |
 
 **⚠ Et la nuance sur `migrate_crypto.php` est tout le sujet.** `OLD_SECRET_KEY`
@@ -496,6 +513,23 @@ un mot de passe), aucune pour une rotation.
 > que dans `migrate_crypto.php`. L'archiver signifie qu'une rotation ne pourra plus
 > jamais être MENÉE À TERME — donc que `OLD_SECRET_KEY` devra rester déployée
 > indéfiniment, et que l'ancienne clé ne pourra jamais être retirée.**
+
+**✅ Cette menace est levée (E-404).** Le fichier est sorti du portail et rendu
+**autonome** : après l'extinction du legacy, toute image `php:cli` ayant accès à
+la base peut le lancer.
+
+    docker cp scripts/migrate_crypto.php rootwarden_php:/tmp/ \
+      && docker exec rootwarden_php php /tmp/migrate_crypto.php
+
+**⚠ Le lancement a dû changer, et pas pour une raison de chemin** : le conteneur
+`rootwarden_php` ne monte que `./legacy`, et **aucun conteneur ne monte
+`scripts/`**. La commande `docker exec` historique était donc devenue inopérante
+quel que soit le chemin — préserver le fichier sans préserver son lancement
+aurait été *un archivage avec une étape de plus*.
+
+**⛔ Le script n'a PAS été exécuté** : une rotation re-chiffre tous les secrets de
+`machines` et `users` — geste sur des données de production, il appartient à
+l'exploitant.
 
 Mon verdict du §BLOC C — *« mort en tant que page, vivant en tant qu'outil : à
 déplacer vers un dossier de scripts, pas à supprimer »* — **tient, et la Q3 lui
