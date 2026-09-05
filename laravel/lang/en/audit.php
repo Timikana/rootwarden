@@ -52,6 +52,8 @@ return [
     'btn_seal_tip' => 'Attaches to the chain the rows inserted without a seal. IRREVERSIBLE: a sealed row cannot be unsealed.',
 
     'verif_en_cours' => 'Verifying the chain…',
+    'scellement_impossible' => "1484 events outside the chain",
+    'scellement_impossible_tip' => "These rows were written without chaining. They cannot be attached afterwards: doing so would require rewriting every other row's hash, and the chain would lose the very property it carries. The chain of sealed rows is intact.",
     'chaine_intacte' => 'Chain intact: :scellees sealed rows, :orphelines unsealed, head = :tete',
     'chaine_rompue' => 'Inconsistency at row #:ligne (:type): expected :attendu, found :trouve. Nothing was written.',
 

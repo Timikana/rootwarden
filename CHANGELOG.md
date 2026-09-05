@@ -5,6 +5,111 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.50.0] - 2026-09-05
+
+### Auth - E-418 : les trois dernieres ecritures du legacy, et une affirmation de moi qui les bloquait
+
+**Ce qui est porte.** `login_history` (succes ET echec), `last_failed_login_at` et
+`password_expires_at` — trois colonnes dont **le seul ecrivain etait le legacy**, et dont les
+lecteurs survivent a son extinction.
+
+    login_history          5 067 lignes · derniere ecriture le jour meme · lu par ExportRgpd
+    last_failed_login_at   2 comptes renseignes · lu par les DEUX exports
+    password_expires_at    0 compte renseigne · lu par backend/scheduler.py, DEUX fois
+
+**⚠ Le dispositif concu contre ce mensonge y est aveugle.** `ExportRgpd` porte `_total`,
+`_exportees` et `_tronque` sur chaque section bornee, ecrits parce que le legacy livrait « un
+JSON qui se presente comme complet ». **Aucun des trois n'attraperait le gel** : rien n'est
+tronque, la donnee s'arrete. *Le compteur dirait la verite sur un ensemble mort.*
+
+**⛔ Et ce qui bloquait `password_expires_at`, c'etait un commentaire de moi** :
+« Le legacy la calcule et l'enregistre, mais **personne ne la lit** ». La moitie citee etait
+vraie — `verify.php:196-197` calcule depuis `password_updated_at`. **La conclusion, non** :
+`backend/scheduler.py` la lit deux fois, et la premiere ENVOIE un courriel. *J'avais infere
+« personne » de « pas le portail que je comparais » — mesurer l'appelant qu'on a sous les yeux
+n'est pas mesurer la chaine.* Consequence tant que l'affirmation a tenu : tout mot de passe
+change par le portage restait sans date d'expiration, donc le rappel ne partait JAMAIS pour
+cette personne, et rien ne le signalait.
+
+**La regle d'expiration a trois branches** : override 0 = exempte ; override > 0 = cette duree ;
+absent = la duree globale, ou aucune si elle vaut 0. **`0` et `NULL` ne se confondent pas** —
+`0` est une exemption demandee, `NULL` un « suis la regle globale ». La duree se lit dans
+**`PASSWORD_EXPIRY_DAYS`**, la variable que le legacy lit deja, et pas dans un nom neuf : le
+portage vient de payer cela sur le cout bcrypt (E-414).
+
+**Deux statuts sur quatre.** `login_history.status` est un enum a quatre valeurs ; le legacy
+n'ecrit que `success` et `failed_password`, et la base ne porte que celles-la. **`failed_2fa` et
+`locked` n'ont d'ecrivain nulle part** : le service les REFUSE plutot que de les offrir —
+porter un statut que personne n'ecrit fabriquerait une donnee qui n'a jamais existe.
+
+**Trois choix de placement** : le succes s'ecrit AVANT le second facteur, comme le legacy (ce
+statut dit « le mot de passe etait bon », pas « la session est ouverte » — le deplacer
+changerait le sens de 4 957 lignes deja ecrites) ; l'echec ne s'ecrit que si le compte existe
+(contrainte de cle etrangere, pas choix) ; `last_failed_login_at` va dans la meme ecriture que
+`failed_attempts`.
+
+**Tests.** 20 cas, 0 FAIL, **en transaction annulee sur des etats FORCES** — sans forcage le
+test passerait a vide : 0 expiration, 0 override, `PASSWORD_EXPIRY_DAYS` absente. **Temoin
+inverse** : la liste fermee elargie aux quatre statuts sur une copie renommee -> 3 FAIL, et ce
+sont les trois bonnes. Quatre gardes d'entree sur le harnais de mutation.
+
+**Notes exploitation.** Aucune migration. Le calcul d'expiration rend `null` pour tous
+aujourd'hui — **le geste est dormant, et c'est la raison de l'ecrire** : le jour ou
+`PASSWORD_EXPIRY_DAYS` sera posee, les mots de passe changes par le portage en tiendront compte.
+`legacy/auth/login.php` et `adm/api/update_user.php` deviennent archivables de ce fait.
+
+---
+
+## [1.50.0] - 2026-09-05
+
+### Audit - le bouton « Sceller » ne scelle plus, et c'est la seule reponse juste
+
+**Mesure du 2026-09-05 14:39** : 6272 lignes, 4788 scellees, 1484 nues, et **4788
+`prev_hash` DISTINCTS** parmi les scellees — la chaine est INTACTE.
+
+    id 1  prev=GENESIS    self=d36ccba57
+    id 2  prev=(null)     self=(NULL)      <- nue, `prev_hash` NUL aussi
+    id 3  prev=d36ccba57  self=5a070372c   <- reprend id=1, SAUTE id=2
+
+Les 1484 nues sont hors chaine **par construction** : la tete se calcule en les sautant,
+ici comme dans le legacy. Les y remettre exigerait de reecrire le `prev_hash` des 4788
+autres — donc de detruire la seule propriete que la chaine apporte.
+
+**Les deux sceleurs du depot etaient deux impasses** : le legacy avance sa tete, casse a la
+premiere scellee qui suit et STOPPE ; ce portage posait 1484 `prev_hash` IDENTIQUES, et le
+`whereNull` qui l'accompagnait interdisait la reprise — **casse ET bloque, irreversible**.
+
+#### Modifie
+- `JournalAudit::scelle` **n'ecrit plus**. L'ecriture n'est pas mise derriere un drapeau :
+  elle est **retiree**. *Une garde par construction ne depend pas de la justesse de
+  l'instrument qui la verifierait.* La methode rend l'etat et le motif du refus.
+- `parcourt()` est **inchange** : il sert la VERIFICATION, qui reste juste et qui porte
+  toute la valeur du journal.
+- La vue : le bouton devient un **etat** (`1484 evenements hors chaine`), le panneau de
+  decision est retire. `journal-audit.js` garde ses deux acces (`if (btnSceller)`,
+  `if (panneau)`) — la page se degrade **sans erreur**.
+- i18n FR/EN : 2 cles ajoutees de chaque cote, **jeux COMPARES** — 43 = 43, aucun ecart.
+
+#### La conjonction, verifiee avant le geste
+`->scelle(` n'a **qu'un seul appelant** (`JournalAuditController:130`, la route du bouton).
+**Aucune tache planifiee ne scelle** (mesure : 0). *Desarmer l'ecriture ne casse rien
+d'autre — ce qui n'etait pas acquis.*
+
+#### Verifie
+    blade compile          7499 octets, aucune erreur de syntaxe
+    php -l x3              propre, temoin negatif : « Errors parsing » OK
+    compiles appartenant
+      a root               0 / 115   -> le piege du cache root est desarme
+    /journal-audit         302 (garde)  ·  /connexion 200  ·  inexistant 404
+
+#### Non corrige, et dit
+Les **1484 lignes restent hors chaine**. Le vrai remede est en amont et il est pose depuis
+la 1.45.0 : `backend/audit_chain.py`, 11 sites d'insertion nue repris, compte restant 0.
+**On a cesse d'en fabriquer ; celles-la sont irrattrapables, et le DIRE est plus honnete
+que de leur donner un faux chainage.**
+
+---
+
 ## [1.49.0] - 2026-09-05
 
 ### Extinction - vague 3 : les POINTS D'ENTREE, liberes par le depart de leurs pages

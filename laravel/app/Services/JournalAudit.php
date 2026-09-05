@@ -242,50 +242,63 @@ class JournalAudit
     }
 
     /**
-     * Scelle les lignes orphelines.
+     * ⛔ NE SCELLE PLUS RIEN — arbitrage E-415 du 2026-09-05.
      *
-     * `$simulation` a `true` : rien n'est ecrit, et le compte annonce est celui
-     * que l'ecriture reelle produirait. C'est ce que le legacy offre sur sa
-     * branche non-POST — sauf qu'AUCUN element de son interface ne l'emet.
+     * ══ POURQUOI CETTE METHODE N'ECRIT PLUS ────────────────────────────────
      *
-     * FAIL-CLOSED CONSERVE : si la chaine porte une incoherence, on n'ecrit rien.
-     * Mais contrairement au legacy, l'incoherence est jugee sur la MEME lecture
-     * que la verification, donc une chaine saine n'en produit plus.
+     * Mesure du 2026-09-05 14:39 : 6272 lignes, 4788 scellees, 1484 nues, et
+     * **4788 `prev_hash` DISTINCTS** parmi les scellees — la chaine est INTACTE.
+     *
+     * Les 1484 nues portent un `prev_hash` NUL, toutes. Elles sont hors chaine
+     * PAR CONSTRUCTION : la tete se calcule en les sautant, ici comme dans le
+     * legacy (`SELECT self_hash … WHERE self_hash IS NOT NULL ORDER BY id DESC`).
+     *
+     *     id 1  prev=GENESIS    self=d36ccba57
+     *     id 2  prev=(null)     self=(NULL)      <- nue
+     *     id 3  prev=d36ccba57  self=5a070372c   <- reprend id=1, SAUTE id=2
+     *
+     * **Les y remettre exige de reecrire le `prev_hash` des 4788 autres**, donc
+     * de detruire la seule propriete que la chaine apporte. Les deux sceleurs du
+     * depot etaient deux impasses :
+     *
+     *     le LEGACY   avance sa tete, casse a la 1re scellee qui suit, et STOPPE
+     *     ce PORTAGE  posait 1484 `prev_hash` IDENTIQUES, et le `whereNull` qui
+     *                 l'accompagnait interdisait la reprise — CASSE **ET** BLOQUE
+     *
+     * ⚠ Le commentaire qui justifiait le non-avancement de la tete citait un
+     * comportement REEL (`audit_log_raw`) a l'appui du MAUVAIS objet : son
+     * homologue est `audit_seal.php`, qui scelle en lot, pas l'inserteur qui
+     * ecrit une ligne a la fois.
+     *
+     * ══ LE VRAI REMEDE EST AILLEURS, ET IL EST POSE ───────────────────────
+     *
+     * `backend/audit_chain.py` (v1.45.0) : 11 sites d'insertion nue repris,
+     * compte restant **0**. On a cesse d'en fabriquer. Les 1484 restent, et le
+     * DIRE est plus honnete que de leur donner un faux chainage.
+     *
+     * ══ FORME ─────────────────────────────────────────────────────────────
+     *
+     * L'ecriture n'est pas mise derriere un drapeau : elle est RETIREE. Une
+     * garde par construction ne depend pas de la justesse de l'instrument qui
+     * la verifierait, ni de la vigilance de qui relira ce fichier.
+     *
+     * @return array l'etat de la chaine, et le motif du refus
      */
     public function scelle(bool $simulation): array
     {
         $p = $this->parcourt();
 
-        $sortie = [
+        return [
             'simulation' => $simulation,
             'total' => $p['total'],
             'orphelines' => $p['orphelines'],
             'scellees' => 0,
+            'scellement_possible' => false,
+            'motif' => 'audit.scellement_impossible',
             'arret_sur_incoherence' => $p['erreur'] !== null,
             'erreur' => $p['erreur'],
             'tete' => $p['tete'],
         ];
-
-        if ($simulation || $p['erreur'] !== null || $p['aSceller'] === []) {
-            return $sortie;
-        }
-
-        $posees = 0;
-        DB::transaction(function () use ($p, &$posees): void {
-            foreach ($p['aSceller'] as [$id, $precedent, $propre]) {
-                // Garde-fou repris du legacy : n'ecrire QUE si la ligne est
-                // toujours orpheline. Entre le parcours et l'ecriture, une
-                // insertion concurrente a pu la sceller.
-                $posees += DB::table('user_logs')
-                    ->where('id', $id)->whereNull('self_hash')
-                    ->update(['prev_hash' => $precedent, 'self_hash' => $propre]);
-            }
-        });
-
-        $sortie['scellees'] = $posees;
-        $sortie['tete'] = $this->verifie()['tete'];
-
-        return $sortie;
     }
 
     /* ═══ Empreintes — la formule du legacy, au caractere pres ══════════════ */

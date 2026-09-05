@@ -57,6 +57,8 @@ return [
     'btn_seal_tip' => "Rattache à la chaîne les lignes insérées sans scellement. IRRÉVERSIBLE : une ligne scellée ne se descelle pas.",
 
     'verif_en_cours' => "Vérification de la chaîne en cours…",
+    'scellement_impossible' => "1484 événements hors chaîne",
+    'scellement_impossible_tip' => "Ces lignes ont été écrites sans chaînage. Elles ne peuvent pas y être rattachées après coup : il faudrait réécrire l'empreinte de toutes les autres, et la chaîne perdrait la propriété qu'elle porte. La chaîne des lignes scellées, elle, est intacte.",
     'chaine_intacte' => "Chaîne intacte : :scellees lignes scellées, :orphelines non scellées, tête = :tete",
     'chaine_rompue' => "Incohérence à la ligne #:ligne (:type) : attendu :attendu, trouvé :trouve. Aucune écriture n'a eu lieu.",
 
