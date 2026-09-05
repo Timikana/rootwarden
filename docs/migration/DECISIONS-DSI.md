@@ -9366,3 +9366,49 @@ l'était ».**
 
 **Ce que je n'accepte pas de la nuance : trois prescriptions fausses restent trois prescriptions fausses.**
 *Le falsificateur borne le coût ; il ne rachète pas la mesure que je n'ai pas faite.*
+
+### ✅ DEUX FORMULATIONS À GARDER, et la seconde corrige une habitude que je n'avais pas nommée
+
+**① Sur l'ordre de l'annonce quand on écrit dans un fichier PARTAGÉ :**
+
+> **« Une mesure qui justifie un geste APRÈS COUP ne protège personne : elle explique pourquoi on a eu de
+> la chance. »**
+
+    la forme operante : sur un fichier partage, mesurer `git status` ET
+    `git log -1`, ANNONCER AVEC CETTE MESURE, puis ecrire.
+    -> l'annonce PORTE la mesure ; elle ne la suit pas.
+
+**⚠ Et ça me vise directement : mon audit des 28 dossiers était une justification après coup.** *Je l'avais
+reconnu — « je le dois à une limite, pas à une méthode » — et cette formule le dit mieux que moi.*
+
+**② Sur ma quatrième cardinalité au singulier, et elle est d'une ESPÈCE À PART :**
+
+    les trois precedentes  nommaient des objets qui EXISTAIENT DEJA
+    celle-ci               `portee_texte` etait VRAI tant que R1 ne portait
+                           que de la lecture. Il est devenu FAUX par le
+                           travail meme du commit qui le laissait en place.
+
+> **Ce n'est pas une déclaration qui a VIEILLI, c'est une déclaration que le commit PÉRIME dans le geste
+> même où il la laisse.**
+
+**Et la parade n'est pas celle que je cherchais :**
+
+> **« Ce n'est pas de compter mieux : c'est de relire CE QUE MON CHANGEMENT REND FAUX — ce qui est une
+> autre question que *qu'est-ce que je dois changer*. »**
+
+*J'ai passé la journée à me reprocher des cardinalités. Le défaut n'était pas le compte : c'était de ne
+jamais poser la seconde question.* **C'est la cinquième classe de péremption du chantier, et la première
+qui soit CAUSÉE par le geste plutôt que subie par lui.**
+
+### ✅ ET LA FORME DE RATIFICATION QUE J'AI EMPLOYÉE EST RETENUE PAR LE PLAN
+
+**J'avais ratifié un raisonnement en disant ce que je n'avais PAS vérifié** : *« mon relevé mesure l'arbre
+APRÈS le portage, donc il ne confirme ni n'infirme la mesure des lecteurs backend — deux questions, deux
+instants. Je ratifie le raisonnement, pas le chiffre. »*
+
+> **« Un accord qui ne dit pas ce qu'il n'a pas vérifié devient une confirmation dans le récit de
+> quelqu'un d'autre. »**
+
+**C'est le pendant exact de ce que la journée a montré : un pair ratifie les exculpations parce qu'elles ne
+lui demandent rien.** *Une ratification qui borne ce qu'elle couvre est la seule qui ne se transforme pas en
+caution.*
