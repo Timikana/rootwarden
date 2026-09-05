@@ -161,7 +161,12 @@ rules:
       # migrate_crypto.php est par design un re-encrypt CBC->AEAD pour les
       # vieilles donnees. Toleré le temps de la migration complete.
       exclude:
-        - 'legacy/auth/migrate_crypto.php'
+        # E-404 : le fichier a ete DEPLACE hors du legacy (`scripts/`) pour
+        # survivre a l'extinction du portail. Ce chemin est EN DUR : sans
+        # cette mise a jour, la regle se remettait a mordre sur un fichier
+        # legitime des le deplacement — la regle a toujours un objet, le
+        # `openssl_encrypt(..., 'AES-256-CBC', ...)` est encore la (l.187).
+        - 'scripts/migrate_crypto.php'
     message: |
       AES-CBC sans MAC = malleable (bit-flipping). Utiliser AES-GCM (AEAD) :
       openssl_encrypt($data, 'aes-256-gcm', $key, OPENSSL_RAW_DATA, $iv, $tag)

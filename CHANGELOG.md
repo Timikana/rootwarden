@@ -5,6 +5,94 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.42.2] - 2026-09-05
+
+### Extinction du legacy - E-404 : `migrate_crypto.php` sort du portail SANS perdre sa capacite
+
+**Pourquoi ce fichier ne s'archive pas.** `encryption.py` traite `OLD_SECRET_KEY`
+en **dechiffrement seul** : la migration de cle est PARESSEUSE, une ligne jamais
+reecrite garde indefiniment le chiffre de l'ancienne cle, et **aucune ecriture de
+masse n'existe ailleurs**. Sans ce script, une rotation de la cle de CHIFFREMENT
+ne peut plus etre menee a terme — donc `OLD_SECRET_KEY` resterait deployee
+indefiniment et l'ancienne cle ne pourrait JAMAIS etre retiree.
+
+**⚠ Deux gestes portent le nom « rotation » dans ce depot.** Celui-ci est la
+rotation de la **cle de CHIFFREMENT** (`migrate_crypto.php`, re-chiffre les
+secrets EN BASE) — a ne pas confondre avec la rotation de la **cle PLATEFORME
+SSH** (`regenerate_platform_key`), qui ne revoque rien.
+
+**Deplacement.** `legacy/auth/migrate_crypto.php` -> `scripts/migrate_crypto.php`
+(`git mv`, l'historique suit).
+
+**⚠ Un `git mv` seul aurait preserve le FICHIER et perdu l'OUTIL.** Trois mesures
+l'ont montre, et chacune a change le geste :
+
+1. **Appelants** — **zero appelant de code**, les trois formes cherchees (direct,
+   par helper, chemin CONSTRUIT). Les seules mentions sont documentaires ou
+   destinees a un humain.
+2. **Dependance** — le script incluait `__DIR__ . '/../db.php'`, **et `db.php`
+   vit dans `legacy/`, c'est-a-dire dans l'arborescence qu'on eteint**. Le
+   deplacer en gardant ce `require` n'aurait fait que deplacer la date de sa
+   mort. La surface reellement consommee etait **UN seul symbole** : `$pdo`
+   (5 occurrences ; garde-fou sur la sonde, dont une premiere version ratait
+   `$pdo` parce qu'il est indente dans un `try`). Elle est desormais construite
+   **dans le script** : memes 4 variables d'environnement, memes valeurs par
+   defaut, memes deux attributs PDO, **patch A05 repris** (refus du mot de passe
+   par defaut hors debug). Seule la gestion d'erreur passe du WEB au CLI — le
+   garde `PHP_SAPI !== 'cli'` interdisant de toute facon tout autre contexte.
+   **Verifie : zero `require`/`include` EXECUTABLE dans le fichier deplace**
+   (mesure hors commentaires ; les 2 occurrences restantes sont de la prose).
+3. **Exclusion semgrep** — `.semgrep/rules-rootwarden.yml` excluait
+   `'legacy/auth/migrate_crypto.php'` de `rw-aes-cbc-encrypt`, **chemin en dur**.
+   Sans mise a jour, la regle se remettait a mordre sur un fichier legitime des
+   le deplacement. Redirigee vers `scripts/migrate_crypto.php` — et la regle a
+   **toujours un objet** : `openssl_encrypt(..., 'AES-256-CBC', ...)` est encore
+   la (`:187`). Relu depuis la STRUCTURE PARSEE, pas depuis le texte :
+   `exclude == ['scripts/migrate_crypto.php']`, 10 regles, YAML valide.
+
+**Lancement, mis a jour dans l'en-tete du script.** Le conteneur `rootwarden_php`
+ne monte que `./legacy` : la commande documentee ne pouvait plus atteindre le
+fichier. Remplacee par une forme qui ne depend d'aucun montage :
+
+    docker cp scripts/migrate_crypto.php rootwarden_php:/tmp/ \
+      && docker exec rootwarden_php php /tmp/migrate_crypto.php
+
+**Apres l'extinction du legacy, n'importe quelle image `php:cli` ayant acces a la
+base convient** — c'est precisement ce que ce deplacement preserve.
+
+**⚠ Ce qui devient FAUX ailleurs, signale et NON corrige** (hors perimetre) :
+
+| fichier | ce qu'il dit encore |
+|---|---|
+| `legacy/documentation.php:1390` | « lancez `/auth/migrate_crypto.php` » |
+| `legacy/documentation.php:1675` | `docker exec rootwarden_php php /var/www/html/auth/migrate_crypto.php` |
+| `ARCHITECTURE.md:594, 788` | situe le fichier dans l'arborescence `auth/` |
+| `docs/migration/INVENTAIRE-ARCHIVAGE.md:166, 478` | le decrit a son ancien emplacement |
+
+**Une instruction qui nomme un fichier absent ne se signale pas d'elle-meme : elle
+fait conclure que la capacite a disparu.** Le legacy n'est pas touche par decision
+du chantier — mais ces quatre references doivent etre reprises par leurs
+proprietaires.
+
+**⛔ Le script n'a PAS ete execute.** Une rotation re-chiffre TOUS les secrets de
+`machines` et `users` : c'est un geste sur des donnees de production, il
+appartient a l'exploitant.
+
+**Comptes du legacy apres ce geste** (chaque chiffre porte sa commande, cf.
+`docs/migration/`) : **82** fichiers metier servis (etait 83), dont **14** dans
+`legacy/auth/` (etait 15), **19** deja archives (inchange — ceci est un
+DEPLACEMENT, pas un archivage).
+
+**Reserve.** `semgrep` n'est installe ni sur l'hote ni dans le conteneur : la
+regle n'a **pas** pu etre exercee. Ce qui est verifie est la structure du
+fichier de regles, pas son comportement.
+
+**Tests.** `php -l` vert (via le conteneur). Suite backend : **667 passed,
+5 skipped, 2 xfailed, 0 FAILED** — aucun code Python touche, controle de
+non-regression.
+
+---
+
 ## [1.42.1] - 2026-09-05
 
 ### Securite - E-403 : les quatre routes de planification d'audit SSH
