@@ -268,7 +268,7 @@ try {
         });
         if (archivee) {
             const { ctx, page } = await connecte('rw-test-admin');
-            await verifieMenuLegacy(page, '/mises-a-jour', verifie);
+            await verifieMenuLegacy(page, '/mises-a-jour', verifie, constate);
             await ctx.close();
             /*
              * ⚠ REPRENDRE LA FIXTURE ICI, PARCE QUE `process.exit()` NE JOUE PAS

@@ -295,7 +295,7 @@ try {
         });
         if (archivee) {
             const { ctx, page } = await connecte('rw-test-super');
-            await verifieMenuLegacy(page, '/recherche', verifie);
+            await verifieMenuLegacy(page, '/recherche', verifie, constate);
             await ctx.close();
             console.log(lignes.join('\n'));
             console.log(`\ncible=${CIBLE} : ${lignes.filter(l => l.startsWith('PASS')).length} PASS / ${echecs} FAIL — partie archivee`);

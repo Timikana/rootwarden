@@ -108,9 +108,47 @@ async function repond(url) {
     });
 }
 
-export async function verifieMenuLegacy(page, routeportee, verifie) {
+/*
+ * ══ TROIS ISSUES, PAS DEUX — ET LA TROISIEME A COUTE VINGT ROUGES ═════════
+ *
+ * Mesure du 2026-09-05, moitie legacy du LOT : sur 22 suites rouges, **VINGT**
+ * echouaient sur cette seule assertion, avec le meme detail :
+ *
+ *     FAIL  l'entree de menu du legacy mene au portage
+ *           — aucun lien vers « /supervision » parmi 0 liens
+ *
+ * Zero liens. Pas « un menu qui pointe ailleurs » : **pas de page du tout**.
+ * `legacy/index.php` a ete archive dans la journee, donc la page qui PORTE le
+ * menu n'existe plus. Le controle lisait un 404, y trouvait zero ancre, et
+ * concluait que le menu ne menait nulle part.
+ *
+ * **Ce n'est pas vingt regressions, c'est un controle qui ECHOUE la ou il
+ * devrait S'ABSTENIR.** Et la dissymetrie compte : un controle qui echoue a
+ * tort fabrique de l'alarme — coûteuse mais visible ; un controle qui
+ * s'abstient a tort fabrique du DEDOUANEMENT, que personne ne rouvre. Celui-ci
+ * se trompait du cote le moins coûteux, ce qui n'en fait pas un bon controle.
+ *
+ * LE DISCRIMINANT EST L'ABSENCE TOTALE D'ANCRES. Une page legacy servie en
+ * porte toujours — menu, pied, fil. Zero ancre ne veut pas dire « le menu est
+ * faux », ca veut dire « il n'y a pas de page ». Les deux se distinguent, et
+ * « je n'ai pas pu regarder » n'est pas « rien a signaler ».
+ *
+ * ⚠ FAIL-CLOSED : si l'appelant ne fournit pas `constate`, on ECHOUE comme
+ * avant. Un appelant qui oublie l'argument ne doit pas heriter d'un silence.
+ */
+export async function verifieMenuLegacy(page, routeportee, verifie, constate) {
     const liens = await page.evaluate(() =>
         [...document.querySelectorAll('a[href]')].map(a => a.getAttribute('href')));
+
+    if (liens.length === 0 && typeof constate === 'function') {
+        constate("entree de menu vers « " + routeportee + " »",
+            'NON MESURE — la page ne porte AUCUNE ancre : ce n\'est pas un menu qui '
+            + 'echoue, c\'est la page qui le portait qui a ete archivee. Il n\'y a rien '
+            + 'a juger, et l\'exigence n°3 du contrat d\'archivage devient sans objet '
+            + 'tant qu\'aucune page legacy ne subsiste pour porter un menu.');
+
+        return;
+    }
     /*
      * LE LIEN DOIT ETRE ABSOLU, ET SON CHEMIN DOIT ETRE LA ROUTE — pas la
      * contenir.

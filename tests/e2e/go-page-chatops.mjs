@@ -287,7 +287,7 @@ if (CIBLE === 'legacy') {
     if (archivee) {
         litEnBase('DELETE FROM rootwarden.login_attempts');
         const s = await connecte(COMPTE, SECRET);
-        await verifieMenuLegacy(s.page, '/chatops', verifie);
+        await verifieMenuLegacy(s.page, '/chatops', verifie, constate);
         for (const ctx of contextes) { try { await ctx.close(); } catch {} }
         try { await navigateur.close(); } catch {}
         litEnBase('DELETE FROM rootwarden.login_attempts');

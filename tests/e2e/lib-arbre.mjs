@@ -218,7 +218,32 @@ function parcourt(dossier, sortie) {
         if (e.isDirectory()) { parcourt(p, sortie); continue; }
         try {
             const s = statSync(p);
-            sortie.set(p.replace(RACINE, ''), `${Math.round(s.mtimeMs)}:${s.size}`);
+            /*
+             * ══ LE MODE FAIT PARTIE DE L'EMPREINTE ═══════════════════════
+             *
+             * Premiere redaction : `${mtime}:${size}`. Elle est AVEUGLE aux
+             * changements de droits, et un changement de droits CASSE
+             * l'application sans qu'un octet ni une mtime ne bouge.
+             *
+             * Mesure du 2026-09-05, 22:33 : `scripts/version.sh` ecrivait par
+             * `mktemp` (mode 0600) puis `mv -f`, qui CONSERVE le mode. Le
+             * serveur tourne en `www-data` :
+             *
+             *     is_file(version.txt)      true
+             *     is_readable(version.txt)  FALSE
+             *     mtime inchangee, ctime seule deplacee
+             *
+             * Les DEUX portails ont affiche « Version inconnue » pendant une
+             * heure, et mon garde a rendu `modifies=0` sur toute la periode.
+             * **Une fenetre peut donc etre declaree propre alors que
+             * l'application vient de perdre l'acces a un fichier qu'elle sert.**
+             *
+             * `mode` est pris sur les 12 bits de permission ; un changement de
+             * proprietaire sans changement de mode reste hors de portee, et
+             * c'est ecrit ici plutot que corrige.
+             */
+            sortie.set(p.replace(RACINE, ''),
+                `${Math.round(s.mtimeMs)}:${s.size}:${(s.mode & 0o7777).toString(8)}`);
         } catch { /* disparu entre readdir et stat : c'est un ECART, pas une erreur */ }
     }
 }
