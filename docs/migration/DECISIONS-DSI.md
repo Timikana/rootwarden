@@ -11887,3 +11887,69 @@ capacité bien testée. Le nombre ne distingue pas les deux. »*
 **Ce qui trancherait : lire si la suite s'en sert comme SUJET ou comme RÉFÉRENCE.** *Un
 comptage réduit l'espace — 203 → 53 → 22 — il ne tranche pas.* **Rendre un avertissement
 plutôt qu'un classement fondé sur un nombre qui ne discrimine pas est le geste juste.**
+
+---
+
+## E-446
+
+### VINGT-HUIT suites vivent hors de tout lot — et une suite hors lot ne rougit JAMAIS
+
+**Une session a trouvé, en lisant un fichier pour autre chose, que
+`go-ssh-audit-schedules` n'est dans AUCUNE liste du runner.** *Elle n'a tourné dans aucun des
+trois lots. Elle portait deux gestes armés — une planification sur TOUT LE PARC, puis un audit
+SSH quotidien sur la PRODUCTION — et aucun lot ne pouvait la révéler.*
+
+    SUITES_LARAVEL   85 suites distinctes
+    SUITES_LEGACY    82
+    enrolees (union) 88
+    sur le disque    116 fichiers `go-*.mjs`
+    ⛔ HORS DE TOUTE LISTE : 28
+
+    TEMOIN POSITIF   `go-socle-navigation` trouvee dans SUITES_LARAVEL : OUI
+    TEMOIN INVERSE   enrolees sans fichier : 0 — l'instrument apparie bien
+
+> **Ce que le runner exerce est la définition DE FAIT de « ce qui est testé ». Ce qui vit dans
+> `tests/` est autre chose, et l'écart n'était mesuré par personne.**
+
+**Une suite hors lot ne rougit jamais ET garde ses effets de bord intacts.** *C'est la
+combinaison qui coûte : elle n'alerte pas, et elle agit quand on la lance à la main.*
+
+### ⚠ Ma première mesure de cet écart n'a pas eu lieu
+
+    ma sonde rendait   0 suites enrolees
+    mon temoin rendait 0 aussi
+
+**Zéro sur la sonde ET zéro sur le témoin : la mesure n'avait pas eu lieu** — mon motif exigeait
+une parenthèse fermante seule sur sa ligne, et les tableaux ne s'écrivent pas ainsi. *Piège n°7
+de mon propre catalogue, et le témoin inverse était DÉGÉNÉRÉ : `enrolées − fichiers` sur un
+ensemble vide rend vide, donc il ne témoignait de rien.*
+
+**La seconde mesure porte un témoin POSITIF nommé d'avance** — *une suite dont je savais
+qu'elle était enrôlée.* **C'est la seule forme qui distingue « rien trouvé » de « rien lu ».**
+
+### Toutes les 28 ne sont pas un défaut, et il faut le dire
+
+    `go-ssh-audit-scanall`   EXCLUE DELIBEREMENT, et son en-tete le DIT :
+                             « une connexion sortante vers des machines reelles,
+                               et un LOT la rejouerait »
+    `go-quick`, `go-admin-full`   des agregats, pas des suites unitaires
+    `go-page-profil-rgpd`         tenue hors lot par la QA, avec sa raison
+                                  (elle rougirait sur le montage detache)
+
+**L'exclusion délibérée AVEC sa raison écrite est le bon régime.** *Ce qui manque n'est pas une
+liste plus longue : c'est que l'écart soit MESURÉ, et que chaque absence porte sa raison ou son
+enrôlement.*
+
+⚠ **Et je n'ai PAS pu compter fiablement les gestes mutants des 28** : *mon motif rendait 0 sur
+une suite enrôlée de 381 lignes, donc il ne voit pas la forme employée ici.* **Je ne publie pas
+ce compte.** *`go-cve-schedules` en montre 5 et vaut d'être lue en premier ; c'est un candidat,
+pas un verdict.*
+
+### DÉCISION — l'écart doit être un CONTRÔLE, pas une découverte
+
+**Un fichier `go-*.mjs` qui n'est dans aucune liste doit soit être enrôlé, soit porter dans son
+en-tête la raison de son exclusion.** *Et le runner doit REFUSER de démarrer si un fichier ne
+satisfait ni l'un ni l'autre.*
+
+> **Sans quoi la seule façon de trouver une suite armée hors lot est de lire ses 116 voisines en
+> cherchant autre chose — ce qui vient d'arriver, et par chance.**
