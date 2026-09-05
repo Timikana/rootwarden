@@ -5,6 +5,46 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.49.0] - 2026-09-05
+
+### Extinction - vague 3 : les POINTS D'ENTREE, liberes par le depart de leurs pages
+
+    .php metier servis   43 -> 35     (82 ce matin)
+    archives             58 -> 66     (19 ce matin)
+
+Huit points d'entree `adm/api/*` etaient PARFAITEMENT PORTES et retenus par leurs seuls
+appelants. Ces appelants partis en 1.48.0, ils se liberent : `dismiss_onboarding`
+`toggle_sudo` `toggle_user` `update_notification_prefs` `update_server_access`
+`unlock_user` `api_keys` `server_actions`.
+
+#### Le controle, par TABLE **et** par COLONNE
+Une table couverte ne dit rien de la colonne. Chaque cible a ete verifiee sur les deux.
+
+    dismiss_onboarding    users . onboarding_dismissed_at
+    toggle_sudo           users . sudo
+    toggle_user           users . active
+    update_notif_prefs    notification_preferences
+    update_server_access  user_machine_access
+    api_keys              api_keys . revoked_at
+
+⚠ **`users.sudo` a demande une sonde a part** : le mot `sudo` est trop courant pour qu'un
+motif large soit fiable. Mesure precise (`UPDATE users SET … sudo =` et
+`->update([… 'sudo'`) : **legacy 1 ecrivain, portage 2** (`Comptes.php`,
+`ComptesController.php`), backend 0.
+
+#### ⛔ Un fichier RETENU
+`adm/api/update_user.php` : la campagne Q3 le mesure **1 sur 3**. `ssh_key` est porte ;
+`password_expires_at` et `password_expiry_override` relevent du `DOSSIER-31`, dont
+l'arbitrage est rendu (« la donnee survit ») mais **pas encore livre**.
+
+#### Verifie au reseau
+    /adm/api/toggle_sudo.php    404   (retire)
+    /adm/api/update_user.php    302   (retenu)
+    /api_proxy.php              302   (vivant, temoin Q4 : 10 appelants)
+    portage /connexion          200
+
+---
+
 ## [1.48.0] - 2026-09-05
 
 ### Extinction - vague 2 : la CASCADE, 11 fichiers de plus
