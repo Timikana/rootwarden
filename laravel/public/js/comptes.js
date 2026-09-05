@@ -259,6 +259,32 @@
         });
     }
 
+    /*
+     * ⚠ L'EXEMPTION D'EXPIRATION PART SUR `change`, ET LE CHAMP EST REMIS A SA
+     * VALEUR PRECEDENTE SI LE SERVEUR REFUSE.
+     *
+     * Un selecteur qui garde le choix qu'on vient de faire alors que rien n'a
+     * ete enregistre affiche un etat que la base ne porte pas — et la personne
+     * repart en croyant avoir regle quelque chose.
+     */
+    document.addEventListener('change', async (ev) => {
+        const el = ev.target.closest('[data-rw^="compte-expiration-"]');
+        if (! el) { return; }
+        const precedent = el.dataset.precedent !== undefined ? el.dataset.precedent : '';
+        el.disabled = true;
+        const r = await appelle(`/comptes/${el.dataset.id}/expiration`, { override: el.value });
+        el.disabled = false;
+        if (r.corps && r.corps.success) {
+            el.dataset.precedent = el.value;
+            dis(r.corps.message, 'ok');
+        } else {
+            el.value = precedent;
+            // `L` et `garnis`, comme partout dans ce fichier — `t()` n'existe
+            // pas ici, et `node --check` ne l'aurait pas vu.
+            dis((r.corps && r.corps.message) || garnis(L.err_reseau, { statut: r.statut }), 'echec');
+        }
+    });
+
     document.addEventListener('click', (ev) => {
         const el = ev.target;
         if (! (el instanceof HTMLElement)) return;
@@ -290,6 +316,8 @@
         if (rw.startsWith('compte-mdp-poser-')) return poseMotDePasse(el, false);
         if (rw.startsWith('compte-mdp-generer-')) return poseMotDePasse(el, true);
         if (rw.startsWith('compte-deverrouiller-')) return deverrouille(el);
+        // L'expiration est un `change` sur un `<select>`, pas un clic : le
+        // repartiteur de clics ne la voit pas. Voir l'ecouteur dedie plus bas.
         if (rw.startsWith('compte-totp-')) {
             cibleTotp = el.dataset.id;
             // Le texte est pose par `textContent` : une apostrophe y est un

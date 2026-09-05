@@ -109,7 +109,11 @@ class Comptes
         return DB::table('users')
             ->select('id', 'name', 'email', 'company', 'role_id', 'active', 'sudo',
                 'ssh_key', 'ssh_key_updated_at', 'failed_attempts', 'locked_until',
-                'totp_secret', 'force_password_change', 'password_updated_at')
+                'totp_secret', 'force_password_change', 'password_updated_at',
+                // L'exemption d'expiration : la vue la RESTITUE dans son
+                // selecteur, sinon rouvrir la page reproposerait « suivre la
+                // regle globale » a un compte qu'on vient d'exempter.
+                'password_expiry_override')
             ->orderBy('name')
             ->get()->map(static fn ($u) => (array) $u)->all();
     }

@@ -89,6 +89,93 @@ class MotDePasse
      * sera posee, les mots de passe changes par le portage en tiendront compte
      * au lieu de rester eternellement sans echeance.
      */
+    /**
+     * Pose — ou retire — l'exemption d'expiration d'un compte, ET recalcule sa
+     * date d'echeance dans la meme transaction.
+     *
+     * ══ LE QUATRIEME ECRIVAIN QUE LE LEGACY DETENAIT SEUL ═════════════════
+     *
+     * `password_expiry_override` n'avait AUCUN ecrivain porte, et son unique
+     * ecrivain vivant est `legacy/adm/api/update_user.php:49`. **Or ce fichier-ci
+     * la LIT, deux lignes plus bas** (`expirationApres()`), et `ExportRgpd` la
+     * publie dans l'export RGPD.
+     *
+     * *Je viens de corriger « personne ne la lit » sur `password_expires_at` en
+     * decouvrant un lecteur dans un autre depot. Ici le lecteur etait dans mon
+     * propre fichier.*
+     *
+     * ══ ⚠ TROIS VALEURS, ET « VIDE » N'EST PAS « ZERO » ═══════════════════
+     *
+     *     null  ->  aucune exemption demandee : la duree GLOBALE s'applique
+     *     0     ->  EXEMPTE, aucune expiration
+     *     N > 0 ->  cette duree-la, propre au compte
+     *
+     * Le legacy traite `'null'` et `''` comme `null` (`:47`). Ici l'entree est
+     * une LISTE FERMEE cote formulaire, et le service reçoit un `?int` : le cas
+     * « chaine vide » n'existe pas, il est inexprimable dans le type.
+     *
+     * ⚠ ET UNE VALEUR NEGATIVE EST REFUSEE. Le legacy fait `(int)$val` sans
+     * borne : `-1` s'ecrirait, et `DATE_ADD(..., INTERVAL -1 DAY)` poserait une
+     * echeance DANS LE PASSE — donc un compte expire a l'instant meme, par une
+     * valeur qui ressemble a un reglage.
+     *
+     * @return bool l'ecriture a-t-elle eu lieu
+     */
+    public function poseOverride(int $idCompte, ?int $override): bool
+    {
+        if ($override !== null && $override < 0) {
+            return false;
+        }
+
+        /*
+         * ⚠⚠ LA LECTURE VIENT AVANT, ET `password_updated_at` EST REECRITE A SA
+         * PROPRE VALEUR. Ce n'est pas du zele : la colonne porte
+         * `ON UPDATE CURRENT_TIMESTAMP` (mesure sur `information_schema`), donc
+         * **toute modification de la ligne la deplace a maintenant**.
+         *
+         * Consequence si on ne le fait pas — et mon premier jet l'a eue, le test
+         * l'a mordue : *poser un override RAJEUNIT le mot de passe*, et
+         * l'echeance recalculee repart de zero. **Une expiration se repousserait
+         * indefiniment en basculant un reglage qui n'a rien a voir.**
+         *
+         * *Le legacy a le meme defaut, en pire : il fait DEUX `UPDATE` a la
+         * suite (`update_user.php:49` puis `:57`), donc il deplace la date au
+         * premier et recalcule depuis la date deplacee au second.*
+         *
+         * Poser explicitement la valeur ancienne empeche `ON UPDATE` de tirer —
+         * une valeur fournie l'emporte toujours sur la clause.
+         */
+        $ligne = DB::table('users')->where('id', $idCompte)
+            ->first(['password_updated_at']);
+        if ($ligne === null) {
+            return false;
+        }
+        $base = $ligne->password_updated_at;
+
+        $jours = ($override !== null && $override === 0)
+            ? 0
+            : (($override !== null && $override > 0)
+                ? $override
+                : (int) config('rootwarden.mot_de_passe.expiration_jours', 0));
+
+        $echeance = ($jours > 0 && $base !== null)
+            ? \Illuminate\Support\Carbon::parse((string) $base)->addDays($jours)->format('Y-m-d')
+            : null;
+
+        /*
+         * UNE SEULE ECRITURE. Le legacy en fait deux : entre les deux, la ligne
+         * porte un override neuf et une echeance ancienne — *un etat que
+         * personne n'a voulu, et qu'une lecture concurrente verrait.*
+         */
+        DB::table('users')->where('id', $idCompte)->update([
+            'password_expiry_override' => $override,
+            'password_expires_at' => $echeance,
+            'password_updated_at' => $base,
+        ]);
+
+        return true;
+    }
+
     private function expirationApres(int $idCompte): ?string
     {
         $override = DB::table('users')->where('id', $idCompte)->value('password_expiry_override');

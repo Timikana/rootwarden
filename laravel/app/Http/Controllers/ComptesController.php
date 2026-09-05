@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\Comptes;
+use App\Services\MotDePasse;
 use App\Services\JournalAudit;
 use App\Services\StepUp;
 use Illuminate\Http\JsonResponse;
@@ -51,6 +52,7 @@ class ComptesController extends Controller
         private readonly Comptes $comptes,
         private readonly JournalAudit $journal,
         private readonly StepUp $stepUp,
+        private readonly MotDePasse $motDePasse,
     ) {
     }
 
@@ -63,22 +65,32 @@ class ComptesController extends Controller
     }
 
     /**
-     * Journalise dans `user_logs` en reprenant la chaine de hachage — le meme
-     * scellement que le sous-lot D1 verifie. Une ecriture non scellee creuserait
-     * le trou que D1 vient de mesurer.
+     * Journalise dans `user_logs` en reprenant la chaine de hachage.
+     *
+     * ══ ⚠ CETTE COPIE LISAIT LA TETE SANS VERROU, ET ELLE EST RETIREE ═════
+     *
+     * Elle faisait `orderByDesc('id')->value('self_hash')` **hors transaction et
+     * sans `lockForUpdate()`**, la ou `JournalAudit::ajoute()` fait les deux. Le
+     * docblock de cette derniere dit exactement ce que ma copie risquait :
+     *
+     * > *deux ecritures concurrentes qui lisent la meme tete produisent deux
+     * > lignes portant le MEME `prev_hash`, donc une chaine FOURCHUE, que
+     * > `verifie()` signalera comme rompue sans pouvoir dire laquelle des deux
+     * > branches est la bonne.*
+     *
+     * **Et c'est moi qui ai ecrit ce docblock**, en annoncant que « trois copies
+     * restent a migrer ». *Celle-ci en etait une, dans un fichier que je touche
+     * depuis deux jours sans la voir.* Un portail servi par huit sessions est
+     * precisement le contexte ou deux ecritures concurrentes arrivent — releve
+     * par une autre session, pas par moi.
+     *
+     * La methode reste, parce qu'elle borne l'action a 255 caracteres et donne
+     * un seul point d'appel aux quinze gestes de ce controleur ; **mais elle
+     * DELEGUE.** *Une copie qui delegue ne peut plus diverger.*
      */
     private function journalise(int $auteur, string $action): void
     {
-        $tete = DB::table('user_logs')->whereNotNull('self_hash')
-            ->orderByDesc('id')->value('self_hash') ?: JournalAudit::GENESE;
-        $ts = time();
-        DB::table('user_logs')->insert([
-            'user_id' => $auteur,
-            'action' => mb_substr($action, 0, 255),
-            'created_at' => date('Y-m-d H:i:s', $ts),
-            'prev_hash' => $tete,
-            'self_hash' => $this->journal->empreinte($tete, $auteur, mb_substr($action, 0, 255), $ts),
-        ]);
+        $this->journal->ajoute($auteur, $action);
     }
 
     public function __invoke(Request $requete): View
@@ -371,6 +383,63 @@ class ComptesController extends Controller
         $this->journalise($auteur, "Compte #{$id} deverrouille");
 
         return response()->json(['success' => true, 'message' => __('comptes.deverrouille')]);
+    }
+
+    /**
+     * L'exemption d'expiration de mot de passe d'un compte.
+     *
+     * ══ SUPERADMINISTRATEUR SEULEMENT, ET LA GARDE EST DANS LA ROUTE ══════
+     *
+     * `legacy/adm/api/update_user.php:31` pose `checkAuth([ROLE_SUPERADMIN])`.
+     * La route porte donc `role:3`, et rien n'est recopie ici.
+     *
+     * ══ ⚠ ET L'ANTI-AUTO-EDITION EST ECRITE, PAS SEULEMENT ANNONCEE ═══════
+     *
+     * Le legacy porte ce commentaire a `:42` :
+     *
+     *     // Anti-escalation : pas de self-edit sur role/password_expiry
+     *
+     * **Mesure : ZERO comparaison avec `$_SESSION['user_id']` dans tout le
+     * fichier.** *Le commentaire annonce une protection que le code ne fait
+     * pas* — et c'est la troisieme fois aujourd'hui que cette forme se
+     * presente, la premiere sur un controle de SECURITE.
+     *
+     * Ce qu'elle empeche est reel quoique borne : un superadministrateur peut
+     * s'exempter LUI-MEME de l'expiration, en silence. *Il peut deja presque
+     * tout ; ce que le commentaire promet, c'est precisement que ce geste-la ne
+     * se fasse pas sans temoin.* Ici il est refuse, et le refus se dit.
+     */
+    public function expiration(Request $requete, int $id): JsonResponse
+    {
+        [$auteur] = $this->qui($requete);
+        if (! $this->comptes->trouve($id)) {
+            return response()->json(['success' => false, 'message' => __('comptes.err_inconnu')], 404);
+        }
+        if ($id === $auteur) {
+            return response()->json(['success' => false, 'message' => __('comptes.exp_pas_soi')], 403);
+        }
+
+        /*
+         * ⚠ `has()` ET NON `input() === null`. `ConvertEmptyStringsToNull` rend
+         * un champ VIDE comme `null`, donc indiscernable d'un champ ABSENT — et
+         * ici les deux ont un sens OPPOSE : absent = « ne change rien »,
+         * vide = « retire l'exemption ». Le portage a deja paye ce piege (V10a).
+         */
+        if (! $requete->has('override')) {
+            return response()->json(['success' => false, 'message' => __('comptes.exp_valeur')], 422);
+        }
+
+        $brut = $requete->input('override');
+        $override = ($brut === null || $brut === '') ? null : (int) $brut;
+
+        if (! $this->motDePasse->poseOverride($id, $override)) {
+            return response()->json(['success' => false, 'message' => __('comptes.exp_valeur')], 422);
+        }
+
+        $libelle = $override === null ? 'globale' : ($override === 0 ? 'exempte' : $override . ' jours');
+        $this->journalise($auteur, "Expiration de mot de passe du compte #{$id} : {$libelle}");
+
+        return response()->json(['success' => true, 'message' => __('comptes.exp_pose')]);
     }
 
     /* ═══ Suppression et anonymisation — sous-lot D4 ═══════════════════════ */
