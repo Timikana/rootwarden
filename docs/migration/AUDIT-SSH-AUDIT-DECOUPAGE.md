@@ -434,16 +434,36 @@ voit en lisant la planification.
 **Demandée en préparation d'un portage. Mesuré : la capacité EST DÉJÀ PORTÉE.**
 *Lecture seule, fenêtre 3 du LOT, `docs/` seul.*
 
-### 10.1 Le geste est porté — trois appels réels, commentaires exclus
+### 10.1 Le geste est porté — QUATRE appels réels, commentaires exclus
+
+> **⚠ CORRIGÉ : j'avais publié TROIS.** Le DSI en a mesuré quatre, et sa mesure
+> tient — j'avais manqué `:910 lis('/ssh-audit/schedules')`, la LISTE.
+>
+> **La cause est identifiable à la commande** : mon relevé passait
+> `grep -n … | head -8` sur **9** occurrences. **La troncature a coupé exactement
+> la neuvième**, qui était l'appel manquant.
+>
+> **C'est une QUATRIÈME forme d'échec de mesure**, distincte des trois déjà
+> cataloguées (mauvais axe, mauvaise étendue, mauvaise forme) : **une sortie
+> TRONQUÉE lue comme exhaustive.** *Et elle est d'autant plus insidieuse que
+> `head -N` est ce qu'on emploie sans y penser pour garder une sortie lisible.*
+>
+> **Ma conclusion n'était pas en jeu** — mon second relevé, par AST et sans
+> troncature, comptait bien `/ssh-audit/schedules` parmi les six chemins appelés.
+> **Mais le CHIFFRE que j'ai publié était faux, et il fondait le verdict.**
+> *Le DSI a raison : un compte qui fonde un verdict se vérifie même quand il va
+> dans le bon sens — **et surtout quand il y va**, parce que c'est là qu'on ne le
+> recompte pas.*
 
 ```
 laravel/public/js/audit-ssh.js
   :705   ecris('/ssh-audit/schedules', corps)                     POST   — ARME
+  :910   lis('/ssh-audit/schedules')                             GET    — LISTE
   :180   fetch(PASSERELLE + '/ssh-audit/schedules/' + n, …)       DELETE
   :194   fetch(PASSERELLE + '/ssh-audit/schedules/' + n + '/toggle')
 ```
 
-**Cinq autres occurrences du même chemin dans ce fichier sont des COMMENTAIRES**
+**Cinq des neuf occurrences de ce chemin sont des COMMENTAIRES**
 (`:14`, `:43-45`, `:172`). *Un relevé sans lecture en aurait compté huit — « cité »
 n'est pas « appelé », et c'est la deuxième fois ce soir que ma propre règle me
 rattrape.*
