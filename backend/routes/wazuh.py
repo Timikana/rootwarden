@@ -64,16 +64,9 @@ _VALID_RULE_TYPES = {'rules', 'decoders', 'cdb'}
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
 def _audit(user_id, action, details):
-    try:
-        with get_db_connection() as conn:
-            cur = conn.cursor()
-            cur.execute(
-                "INSERT INTO user_logs (user_id, action, created_at) VALUES (%s, %s, NOW())",
-                (user_id, f"[wazuh] {action} - {details}")
-            )
-            conn.commit()
-    except Exception as e:
-        logger.warning("Audit log wazuh echec : %s", e)
+    """Journalise une action CHAINEE dans `user_logs`."""
+    from audit_chain import journalise
+    journalise(user_id, f"[wazuh] {action} - {details}")
 
 
 def _get_config():

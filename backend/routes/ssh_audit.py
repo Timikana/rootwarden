@@ -44,14 +44,14 @@ def _log_audit_action(machine_id, action, details, user_id='0'):
         return
     try:
         uid = int(user_id) if user_id and user_id.isdigit() else 0
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute(
-            "INSERT INTO user_logs (user_id, action, details, created_at) "
-            "VALUES (%s, %s, %s, NOW())",
-            (uid, f'ssh_audit_{action}', f'{details} sur machine #{int(machine_id)}'))
-        conn.commit()
-        conn.close()
+        # ⚠ Cette insertion visait une colonne `details` qui N'EXISTE PAS dans
+        # `user_logs` : elle levait a chaque appel, et l'exception etait avalee
+        # plus bas par un `logger.debug`. Mesure du 2026-09-05 : **0 ligne**
+        # `ssh_audit_%` en base, alors que d'autres ecrivains y figurent (temoin :
+        # 156 lignes `[graylog]`). Le detail rejoint donc `action`, seule colonne
+        # qui existe, et l'ecriture est CHAINEE.
+        from audit_chain import journalise
+        journalise(uid, f'ssh_audit_{action} - ' + f'{details} sur machine #{int(machine_id)}')
     except Exception as e:
         logger.debug("ssh_audit action log insert failed: %s", e)
 

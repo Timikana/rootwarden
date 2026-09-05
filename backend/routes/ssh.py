@@ -1269,19 +1269,14 @@ def revoke_service_account():
             logger.exception("revoke_service_account %s : %s", m['name'], e)
             r['message'] = str(e)[:200]
 
-        # Audit log immutable (HMAC chain cote PHP, ici juste user_logs INSERT)
-        try:
-            with get_db_connection() as conn3:
-                cur3 = conn3.cursor()
-                cur3.execute(
-                    "INSERT INTO user_logs (user_id, action, created_at) VALUES (%s, %s, NOW())",
-                    (user_id, f"[panic] revoke_service_account machine={_shlex.quote(m['name'])} "
-                              f"reason={_shlex.quote(reason)} ok={r['success']}"
-                              f"{' SUDOERS_ORPHELIN' if r['sudoers_orphelin'] else ''}")
-                )
-                conn3.commit()
-        except Exception:
-            pass
+        # ⚠ Le commentaire precedent disait « Audit log immutable (HMAC chain cote
+        # PHP, ici juste user_logs INSERT) » : il nommait la propriete ET disait
+        # dans la meme phrase qu'il ne la posait pas. Une ligne sans `prev_hash`
+        # n'est pas immuable, elle est hors chaine. Chainee depuis le 2026-09-05.
+        from audit_chain import journalise
+        journalise(user_id, f"[panic] revoke_service_account machine={_shlex.quote(m['name'])} "
+                            f"reason={_shlex.quote(reason)} ok={r['success']}"
+                            f"{' SUDOERS_ORPHELIN' if r['sudoers_orphelin'] else ''}")
 
         results.append(r)
 
@@ -2224,16 +2219,8 @@ def sshd_allow_user():
                          service_account=m.get('service_account_deployed', False)) as client:
             modified, atteste, msg = _ensure_sshd_allows_user(client, root_pass, username, logger)
 
-        try:
-            conn_a = get_db_connection()
-            cur_a = conn_a.cursor()
-            cur_a.execute(
-                "INSERT INTO user_logs (user_id, action) VALUES (%s, %s)",
-                (user_id, f"[ssh] sshd_allow_user '{username}' sur {m['name']} : {msg[:200]}"))
-            conn_a.commit()
-            conn_a.close()
-        except Exception:
-            pass
+        from audit_chain import journalise
+        journalise(user_id, f"[ssh] sshd_allow_user '{username}' sur {m['name']} : {msg[:200]}")
 
         # E-214 : le verdict suit l'EFFET, pas le geste. L'ancienne version
         # rendait `success: True` quoi qu'ait dit le helper — y compris apres un
@@ -2522,12 +2509,15 @@ def server_user_remove_key():
                 "DELETE FROM server_user_ssh_keys WHERE machine_id = %s "
                 "AND username = %s AND fingerprint_sha256 = %s",
                 (int(machine_id), username, fingerprint))
-            # Audit log RGPD-friendly (action utilisateur trace)
-            cur.execute(
-                "INSERT INTO user_logs (user_id, action) VALUES (%s, %s)",
-                (user_id,
-                 f"[ssh-keys] retire fingerprint {fingerprint[:16]}... "
-                 f"de {username}@{m['name']} (type={key_row['key_type']})"))
+            # Audit log RGPD-friendly (action utilisateur tracee), CHAINE.
+            # La connexion est PASSEE : la ligne d'audit et le DELETE ci-dessus
+            # valident ensemble. Sans ca, une panne entre les deux laisserait une
+            # cle retiree sans trace, ou une trace sans retrait.
+            from audit_chain import journalise
+            journalise(user_id,
+                       f"[ssh-keys] retire fingerprint {fingerprint[:16]}... "
+                       f"de {username}@{m['name']} (type={key_row['key_type']})",
+                       conn=conn)
             conn.commit()
         finally:
             conn.close()
@@ -2674,16 +2664,9 @@ def remove_user_keys():
             except ValueError:
                 pass
 
-    try:
-        with get_db_connection() as conn2:
-            cur2 = conn2.cursor()
-            cur2.execute(
-                "INSERT INTO user_logs (user_id, action) VALUES (%s, %s)",
-                (user_id, f"[ssh-keys] remove_user_keys mode={mode} force={force} "
-                          f"sur {username}@{m['name']} : {retirees} cle(s) retiree(s)"))
-            conn2.commit()
-    except Exception:
-        pass
+    from audit_chain import journalise
+    journalise(user_id, f"[ssh-keys] remove_user_keys mode={mode} force={force} "
+                        f"sur {username}@{m['name']} : {retirees} cle(s) retiree(s)")
 
     return jsonify({
         'success': True,
