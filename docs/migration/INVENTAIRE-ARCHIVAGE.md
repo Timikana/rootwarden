@@ -1192,3 +1192,62 @@ se viderait sur la fenêtre de rétention.*
 
 > **Deux colonnes du même fichier alimentent un livrable légal porté, et aucune n'a
 > d'écrivain côté portage.**
+
+---
+
+## 16. Q3 par geste — lot 3/3 et CLÔTURE (**2026-09-05 12:29 CEST**)
+
+### 16.1 Les quatre derniers
+
+| fichier | gestes | verdict |
+|---|---|---|
+| `adm/api/unlock_user.php` | `failed_attempts=0, locked_until=NULL` `:58` · `DELETE login_attempts` `:65` | **2/2 PORTÉS** — `Comptes.php:322` et `:326` |
+| `auth/enable_2fa.php` | `INSERT login_attempts` `:134` · `UPDATE totp_secret` `:170` | **2/2 PORTÉS** — `SecondFacteurController:402` et `:175` |
+| `auth/logout.php` | `DELETE remember_tokens` `:25` · `DELETE active_sessions` `:44` | **2/2 PORTÉS** — `ConnexionController::deconnexion:104` et `:113` |
+| `adm/api/update_user.php` | `ssh_key` `:84` · `password_expiry_override` `:49` · `password_expires_at` `:55-64` | **1/3** — les deux derniers NON, voir §12 |
+
+*`deconnexion()` porte même le raisonnement : « se déconnecter en laissant vivre un
+jeton qui restitue l'identité serait un mensonge d'interface ».*
+
+### 16.2 CLÔTURE — les 13 fichiers multi-gestes, **9 gestes non portés**
+
+| # | geste non porté | famille | conséquence mesurée |
+|---|---|---|---|
+| 1 | changer son adresse de courriel | libre-service | ⚠ absent des **deux** côtés — aucune route ne change l'adresse d'un compte existant |
+| 2 | poser sa propre clé SSH | libre-service | l'unique écriture est gardée `role:3` |
+| 3 | fermer toutes ses autres sessions | libre-service | **dégradé** : atteignable en répétant |
+| 4 | supprimer son propre compte | libre-service | seule la suppression administrative existe |
+| 5 | `INSERT login_history` | dernier écrivain | **alimente l'export RGPD porté** (`ExportRgpd:131`) |
+| 6 | `last_failed_login_at` | dernier écrivain | **alimente l'export RGPD porté** (`ExportRgpd:103`) |
+| 7 | re-hachage du mot de passe à la connexion | — | un coût bcrypt ancien le reste indéfiniment |
+| 8 | `password_expiry_override` | — | jamais écrite ; le garde d'expiration n'est pas porté non plus |
+| 9 | `password_expires_at` | dernier écrivain | lue par **deux tâches** du planificateur (§12) |
+
+**Deux familles, et aucune ne se voit d'une passe par table ou par route :**
+
+> **① Le LIBRE-SERVICE (1-4)** — le côté administratif des mêmes gestes est porté
+> avec soin. **C'est l'ACTEUR qui distingue, et il n'apparaît que dans la GARDE.**
+>
+> **② Le DERNIER ÉCRIVAIN (5, 6, 9)** — la colonne est écrite par le legacy seul, et
+> un consommateur vivant continue de la lire. **Rien ne casse ; une donnée se fige.**
+> *Trois des quatre alimentent un livrable légal ou un envoi de courriel.*
+
+### 16.3 Ce que ce relevé ne couvre PAS
+
+- **les 3 fichiers écartés du critère multi-geste** (`update_notification_prefs`,
+  `update_server_access`, `health_check`) : Q1 seule y a été faite ;
+- **le corps de `Notifications::supprime()`** (§14.1) : le `$roleId` voyage, je n'ai
+  pas lu ce qu'il en fait ;
+- **une purge par relation Eloquent ou par observateur** — ma sonde ne la verrait pas,
+  et je n'ai pas vérifié si ce dépôt en emploie ;
+- **la production** : tous les comptes de lignes viennent du banc.
+
+### 16.4 Trois artefacts de MES sondes, trouvés pendant la campagne
+
+    motif `UPDATE (\w+)`              lit « la table Zabbix » dans un LIBELLE   §14.3
+    motif `->update\(\s*\[(.*?)\]`    non gourmand : s'arrete au 1er `]` interne §15.1
+    sonde par colonne                 ne voit pas une suppression par ENTITE     §11.5
+
+**Aucun des trois ne s'est signalé.** Le premier a été trouvé en lisant, le deuxième
+parce que son zéro **contredisait une lecture du matin même**, le troisième par la
+table des routes. *Une sonde muette et une sonde juste rendent le même silence.*
