@@ -42,6 +42,7 @@
 import puppeteer from 'puppeteer';
 import { createHmac } from 'crypto';
 import { litEnBase, compteEnBase } from './lib-base.mjs';
+import { constateArchivage } from './archive.mjs';
 
 const BASE = process.env.E2E_BASE || 'https://localhost:8443';
 const MDP = process.env.E2E_TEST_PASS || 'RootWarden@2026-Test!';
@@ -202,6 +203,26 @@ function appelle(page, corps) {
 }
 
 try {
+    /*
+     * ══ LE SUJET DE CETTE SUITE N'EXISTE PLUS COTE LEGACY ═════════════════
+     *
+     * Une suite de parite dont la moitie legacy a ete archivee ne doit pas
+     * ECHOUER : un rouge permanent finit par ne plus etre lu. Elle CONSTATE, et
+     * sa moitie portage continue de s'exercer.
+     *
+     * LE CONSTAT VIENT AVANT LA CONNEXION : la sonde de `archive.mjs` n'ouvre
+     * pas de navigateur (Apache rend 404 pour un chemin absent AVANT toute
+     * redirection de connexion). Se connecter d'abord consommerait un code TOTP
+     * — garde anti-rejeu par COMPTE et persistant — pour mesurer une page qui
+     * n'existe plus.
+     */
+    if (CIBLE === 'legacy') {
+        const archivee = await constateArchivage({
+            base: BASE, chemin: PAGE, fichiers: [], verifie, constate,
+        });
+        if (archivee) throw new Error('__archivee__');
+    }
+
     constate('cible', `${CIBLE} — ${PAGE} · route ${ROUTE}`);
     constate('etat du parc',
         `machine ${MACHINE_JAMAIS_SCANNEE} scannee le « ${SCAN_M2 || 'JAMAIS'} », `
@@ -424,8 +445,12 @@ try {
         erreursJs.slice(0, 3).join(' · ') || 'aucune');
     await ctx.close();
 } catch (e) {
-    lignes.push('EXCEPTION ' + String(e).split('\n')[0]);
-    echecs++;
+    // `__archivee__` n'est pas une panne : c'est la sortie NORMALE quand le
+    // sujet legacy a ete archive. Le constat a deja tout dit.
+    if (! String(e && e.message || e).includes('__archivee__')) {
+        lignes.push('EXCEPTION ' + String(e).split('\n')[0]);
+        echecs++;
+    }
 }
 
 console.log(lignes.join('\n'));

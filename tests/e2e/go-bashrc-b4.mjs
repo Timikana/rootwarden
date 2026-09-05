@@ -47,6 +47,7 @@
 import puppeteer from 'puppeteer';
 import { createHmac } from 'crypto';
 import { litEnBase, compteEnBase } from './lib-base.mjs';
+import { constateArchivage } from './archive.mjs';
 import { mkdirSync } from 'node:fs';
 
 const BASE = process.env.E2E_BASE || 'https://localhost:8443';
@@ -244,6 +245,29 @@ try {
     const { page, erreursJs } = s;
     verifie('la session a tenu', ! s.surConnexion, page.url());
 
+    /*
+     * ══ LE SUJET DE CETTE SUITE N'EXISTE PLUS COTE LEGACY ═════════════════
+     *
+     * `bashrc/` a ete archive. Une suite de parite dont la moitie legacy a
+     * disparu ne doit pas ECHOUER : un rouge permanent finit par ne plus etre
+     * lu, et il occupe la place ou l'on aurait cherche une vraie regression.
+     * Elle CONSTATE, et la moitie portage continue de s'exercer.
+     *
+     * ⚠ ET LE CONSTAT EXIGE UN 404, PAS UNE ABSENCE DE PAGE. Le 2026-09-05,
+     * ces sept repertoires rendaient 403 : le `git mv` avait emporte les `.php`
+     * et laisse le JavaScript, si bien que le dossier existait encore et que
+     * `/bashrc/js/bashrc.js` repondait 200 avec 27 Kio. `constateArchivage`
+     * traite tout statut != 404 comme « encore servie » et rend `false` — le
+     * constat aurait donc ete FAUX et la suite rouge quand meme. L'archivage a
+     * ete acheve (`7588e71`) avant que cette ligne soit ecrite.
+     */
+    if (CIBLE === 'legacy') {
+        const archivee = await constateArchivage({
+            base: BASE, chemin: C.page, fichiers: [], verifie, constate,
+        });
+        if (archivee) throw new Error('__archivee__');
+    }
+
     // ══ 1. UN DEPLOIEMENT SUR UNE MACHINE ═════════════════════════════════
     await etape('deployer : ce qui partirait, et ce qui est demande avant', async () => {
         await page.goto(`${BASE}${C.page}`, { waitUntil: 'networkidle2' });
@@ -379,7 +403,11 @@ try {
         erreursJs.filter((e) => ! /Failed to fetch|blocked/i.test(e)).slice(0, 2).join(' | '));
 
 } catch (e) {
-    verifie('deroulement de la suite', false, String(e.message || e).split('\n')[0]);
+    // `__archivee__` n'est pas une panne : c'est la sortie NORMALE quand le
+    // sujet legacy a ete archive. Le constat a deja tout dit.
+    if (! String(e.message || e).includes('__archivee__')) {
+        verifie('deroulement de la suite', false, String(e.message || e).split('\n')[0]);
+    }
 } finally {
     try {
         constate('total des ecritures avortees', String(avortees.length));
