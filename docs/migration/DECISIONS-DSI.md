@@ -10647,3 +10647,58 @@ visite, et les cinquante et un suivants n'auraient fait que changer d'URL.**
 
 > **Un chantier peut avancer pendant des jours sur un geste qui ne fait rien, parce que le
 > geste a un nom qui décrit son intention et non son effet.**
+
+---
+
+## E-422 — L'extinction est bloquée, et le pendant oublié était mesurable
+
+**2026-09-05, 17:40 CEST.** Banc libre.
+
+### Aucune décision n'est tombée
+
+    MAIL_MAILER dans le conteneur   (absente)
+    mail.default rapporte           log
+
+**Les 26 fichiers restants sont exactement la fermeture transitive des quatre bloqués.
+Aucun `git mv` de plus n'est possible.** *C'est un constat, pas un échec — et le dire vaut
+mieux que fabriquer du travail.*
+
+### Le pendant que personne n'avait fait : les suites devenues sans objet
+
+**Cinquante et un fichiers ont quitté le service aujourd'hui. Les suites qui les exercent
+vont rougir, et une suite legacy rouge n'est pas une régression — c'est un objet disparu.**
+
+### ⚠ Et le critère évident était le mauvais
+
+    premiere mesure   « suites entierement sans objet » -> 0, « mixtes » -> 62
+                      VRAI et INUTILISABLE
+
+    pourquoi          quels chemins VIVANTS les 82 suites touchent-elles ?
+                        81 suites  /auth/login.php      <- elles s'y CONNECTENT
+                        12 suites  /api_proxy.php
+                         3 suites  /profile.php
+
+> **81 sur 82 touchent un chemin vivant PARCE QU'ELLES SE CONNECTENT. C'est leur
+> ÉCHAFAUDAGE, pas leur SUJET.**
+
+    bon critere : le SUJET de la suite est-il encore servi ?
+    -> 61 suites sur 82 ont un sujet ARCHIVE
+
+**C'est la leçon du « verdict de FICHIER est une MOYENNE », transposée aux suites** : *la
+moyenne « elle touche du vivant » cache que le vivant est la porte d'entrée et que le mort
+est tout le reste.*
+
+### Ce que j'ai routé, et ce que je n'ai pas tranché
+
+**Mesure remise à la session qui tient le banc, décision laissée chez elle.** *Une suite de
+parité dont la moitié legacy a disparu n'est pas forcément à jeter : elle peut devenir une
+suite du portage seul, et sa valeur change — elle ne compare plus, elle exerce.*
+
+    (a) retirer de SUITES_LEGACY et jeter
+    (b) retirer de SUITES_LEGACY, garder dans SUITES_LARAVEL si la moitie
+        portage est autonome
+    (c) ne rien faire  <- la seule qui produise un LOT rouge et menteur
+
+**Je donne la mesure, pas la décision : c'est elle qui sait lesquelles ont une moitié
+portage autonome.** *Et j'ai refusé de lui coller la liste des 61 — pour qu'elle la
+remesure au lieu de me croire.*
