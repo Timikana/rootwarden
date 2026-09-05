@@ -20672,3 +20672,63 @@ Elle m'attribue trois commits `docs/` pendant sa fenêtre. **Un seul est de moi*
 (`4745ff9`, E-420) ; `d4e14d9` est de la QA, `c5a4861` de la DSI. *Sa conclusion ne
 bouge pas — zéro fichier hors `docs/` commité pendant la fenêtre, vérifié — mais
 « le Lead a commité trois fois pendant le gel » deviendrait faux au relais.*
+
+
+## E-422 — `fail2ban` n'a AUCUNE capacité portable restante, et les deux « à porter plus tard » sont portées
+
+**Mesuré le 2026-09-05 22:40, par différence d'ensembles sur ce que les DEUX JS
+APPELLENT** — pas sur les routes Laravel, comme demandé.
+
+    portage  laravel/public/js/fail2ban.js   `PASSERELLE + chemin`, PASSERELLE = '/api/gateway'
+    legacy   legacy/fail2ban/js/main.js      `${API}${endpoint}`,  API = '/api_proxy.php'
+
+    chemins `/fail2ban/*` appeles :  legacy 16 · portage 15
+
+    MANQUE au portage   /fail2ban/install     /fail2ban/restart
+    EN PLUS au portage  /fail2ban/portee
+
+**Les deux manquants sont EXACTEMENT les deux que l'arbitrage interdit de porter**
+— installer le service et redémarrer le service, tous deux sans le mot de
+l'exploitant.
+
+### ⚠ Et les deux annoncées « restent portables plus tard » sont DÉJÀ portées
+
+    disable_jail   portage=1  legacy=1   appel vivant `:1411`, ancre `f2b-jail-desactiver`
+    enable_jail    portage=1  legacy=1   appel vivant `:1369`
+    geoip          portage=1  legacy=1   appel vivant `:1089`, declencheur `:900`
+    TEMOIN NEGATIF /fail2ban/zzz          portage=0  legacy=0
+
+**`geoip` n'est pas seulement présent : il porte une confirmation dédiée**
+(`geo_conf_titre`/`geo_conf_texte`) et un commentaire qui **réfute une réserve du
+backend** — *« l'IP est déjà publique donc fuite négligeable » est faux : ce qui
+n'est pas public, c'est le fait que notre infrastructure l'a bannie ; un
+observateur du trafic sortant ne lit pas une adresse, il lit la carte de ce que
+nous bloquons. »* **Ce n'est pas du portage minimal, c'est du portage qui a
+raisonné.**
+
+> **Huitième fois sur ce chantier qu'une capacité déclarée manquante est déjà
+> présente.** *Et cette fois elle était en tête de la liste des portables.*
+
+### Deux pièges de mesure, dont un où je suis tombé
+
+**① Le préfixe, évité sur les chemins.** Les deux JS construisent leurs URL
+(`PASSERELLE + chemin`, `${API}${endpoint}`) : un `grep` sur le chemin complet rend
+zéro pour une capacité entièrement présente. Relevé par le **littéral du fragment**,
+pas par l'URL assemblée.
+
+**② Le préfixe, où je SUIS tombé — sur les ANCRES.** Mon relevé a rendu « aucune
+ancre » pour `geoip` dans la vue. **L'ancre est construite en JS** (`'f2b-geoip-'`
++ un suffixe par adresse), donc absente du Blade par construction. *J'avais la
+règle en main et je l'ai appliquée à un seul des deux objets.*
+
+**③ La sous-chaîne.** `grep -c "/fail2ban/install"` rend **2** — il attrape
+`install_all`. Délimité par les guillemets, il rend **0**. *Le même caractère de
+plus dans le motif inverse le verdict, et la forme sans délimiteur est celle qui
+DÉDOUANE.*
+
+### Ce qui reste vraiment
+
+**Rien de portable.** `install` et `restart` sont les deux gestes d'arbitrage, et
+`portee` est un ajout du portage sans équivalent legacy. *La colonne « ce qu'elle
+touche : rien — lecture pure » de la liste des portables ne décrit donc plus une
+capacité à porter : elle décrit une capacité portée.*
