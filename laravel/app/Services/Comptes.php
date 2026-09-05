@@ -314,6 +314,48 @@ class Comptes
         return null;
     }
 
+    /**
+     * Change l'adresse de courriel d'un compte.
+     *
+     * ⚠ AUCUNE ECRITURE DE CETTE COLONNE N'EXISTAIT hors de la creation
+     * (`ComptesController:244`, `importeCsv:788`) et de l'anonymisation
+     * (`anonymise:574`, qui la met a NULL). Une adresse saisie de travers etait
+     * donc definitive : le seul recours etait de recreer le compte.
+     *
+     * UNE ADRESSE VIDE EST REFUSEE, et c'est deliberе. Le courriel est le canal
+     * de recuperation (`Auth/ReinitialisationController`) : l'effacer retirerait
+     * au sujet son propre chemin de retour, sans que rien a l'ecran ne le dise.
+     * L'effacement de l'adresse appartient a l'anonymisation, qui l'annonce.
+     */
+    public function changeCourriel(int $id, string $courriel): ?string
+    {
+        $courriel = trim($courriel);
+        if ($courriel === '') {
+            return 'profil.err_courriel_vide';
+        }
+        if (mb_strlen($courriel) > 255) {
+            return 'profil.err_courriel_long';
+        }
+        if (filter_var($courriel, FILTER_VALIDATE_EMAIL) === false) {
+            return 'profil.err_courriel_forme';
+        }
+        /*
+         * UNE ADRESSE NE SERT QU'UN COMPTE. `compteParCourriel()` cherche par
+         * adresse pour la reinitialisation : deux comptes la partageant rendraient
+         * le resultat dependant de l'ordre des lignes, donc un lien de
+         * reinitialisation pourrait viser l'autre compte.
+         */
+        $pris = DB::table('users')->where('email', $courriel)
+            ->where('id', '!=', $id)->exists();
+        if ($pris) {
+            return 'profil.err_courriel_pris';
+        }
+
+        DB::table('users')->where('id', $id)->update(['email' => $courriel]);
+
+        return null;
+    }
+
     /* ═══ Etats du compte ══════════════════════════════════════════════════ */
 
     /** Un compte verrouille se deverrouille : compteur a zero, verrou leve. */

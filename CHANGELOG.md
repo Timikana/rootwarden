@@ -5,6 +5,73 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.51.1] - 2026-09-05
+
+### Portage - DOSSIER-30 : les trois gestes de libre-service de `/profil`
+
+**Changer son adresse, poser sa propre cle SSH, demander l'effacement de son
+compte.** Les trois etaient absents du portage, et le cote ADMINISTRATIF de
+chacun etait porte -- avec soin.
+
+> **C'est l'ACTEUR qui distingue, et l'acteur n'apparait QUE dans la garde de la
+> route.** Une passe par TABLE voyait `users.ssh_key` ecrite ; une passe par
+> ROUTE voyait des routes existantes ; une passe par NOM trouvait les libelles
+> des deux cotes. *Les trois instruments rendaient COUVERT.*
+
+**Leur incompletude n'a jamais ete decidee : c'est le residu de quatre portages
+faits chacun du cote administrateur.** Deux des trois relevent du RGPD exerce par
+le sujet lui-meme -- rectification (art. 16) et effacement (art. 17).
+
+#### Ce qui a ete mesure avant d'ecrire
+
+    definitCleSsh              existe, appele UNIQUEMENT par la route `role:3`
+    ecritures de `email`       creation + import CSV + anonymisation (-> NULL)
+                               -> AUCUN chemin de mise a jour
+    superadminsActifs()        existe deja : la garde du dernier SA est une primitive
+    anonymise()                existe deja
+    classes CSS employees      11 sur 11 presentes dans `rw.css` (temoin negatif rendu)
+                               -> aucune retouche du fichier PARTAGE
+
+#### L'effacement n'est PAS une suppression, et c'est la partie qui compte
+
+`user_logs` est une chaine de hachage : **retirer une ligne casse la verification
+de TOUTES les suivantes.** Le code le disait deja --
+`supprimableSansPerte():504-507` : *l'anonymisation efface les donnees
+personnelles et PRESERVE le journal*.
+
+> « Effacez-moi » contre « la chaine ne doit pas rompre » est un vrai conflit, et
+> l'anonymisation est la reponse que le droit admet. **La conception existait ; il
+> lui manquait l'initiative du sujet.**
+
+Trois gardes sur ce geste : **refus si le compte est le dernier
+superadministrateur actif** (protection presente en legacy, absente du portage --
+un compte ne doit pas pouvoir retirer le dernier acces privilegie) ; **confirmation
+par SAISIE du nom du compte**, pas par une case ; et **la demande est journalisee
+AVANT l'anonymisation**, la session etant morte apres.
+
+#### Deux defauts evites par la verification, pas par la relecture
+
+- **`$compte` n'etait pas passe a la vue.** Les trois champs l'emploient ; sans
+  lui, `$compte['name'] ?? ''` aurait rendu une chaine VIDE **et non une erreur**,
+  donc une etiquette demandant de saisir un nom qu'elle n'affichait pas. *Un `??`
+  sur une variable absente ne se signale nulle part* ;
+- **le journal passe par `JournalAudit::ajoute()`**, qui prend un `lockForUpdate()`.
+  Le `journalise()` prive de `ComptesController` ne le fait PAS : c'est l'une des
+  « trois copies restent a migrer » que le docblock d'`ajoute()` annonce, et deux
+  ecritures concurrentes y produiraient une chaine FOURCHUE.
+
+**Verifie par ce que Laravel RAPPORTE** : `route:list --path=profil` rend les trois
+routes ; `php -l` sur les cinq fichiers PHP ; jeux de cles FR/EN **compares** et
+identiques, 58 de chaque cote.
+
+**Non fait, et dit** : aucune execution du geste d'effacement -- il anonymiserait
+un compte reel. Aucune capture d'ecran : le rendu n'a pas ete exerce.
+
+⚠ **Ce commit emporte une ligne qui n'est pas de moi** : `routes/web.php` portait
+`POST /comptes/{id}/expiration` d'une autre session, non commitee. Le commit par
+chemins protege du contenu d'AUTRES fichiers, pas d'un fichier PARTAGE -- il prend
+l'etat de l'arbre. Declare plutot que tu.
+
 ## [1.51.0] - 2026-09-05
 
 ### Auth - E-418 : les trois dernieres ecritures du legacy, et une affirmation de moi qui les bloquait
