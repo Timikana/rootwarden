@@ -566,3 +566,67 @@ l'installation sur UNE machine.** Le geste le plus large est porté, le plus ét
 ne l'est pas. Je ne le classe pas comme un défaut — c'est un ordre de portage — mais
 c'est l'inverse de l'ordre de risque, et ça mérite d'être su de qui décidera la
 suite.
+
+---
+
+## 12. Les ONZE, remesurées par le CHEMIN D'APPEL — **2026-09-05 10:39-10:45 CEST**
+
+Liste d'origine : `PROMPT-FINIR-LES-CAPACITES.md:46-58`. Repérage **par le nom**,
+jamais par la ligne — les lignes d'`audit-ssh.js` ont bougé **pendant cette mesure**
+(246→368, 335→457, 583→705).
+
+| # | capacité | chemin d'appel mesuré | verdict |
+|---|---|---|---|
+| 1 | apparier les 5 catalogues | — | **livré** le 2026-09-02 (§8) |
+| 2 | créer un relevé planifié | `audit-ssh.js:705` `ecris('/ssh-audit/schedules')` | **PORTÉE** |
+| 3 | créer un groupe | `groupes.js:341` `ecris('/groups', corps)` | **PORTÉE** |
+| ~~4~~ | test de connexion | `serveurs.js` `POST /server_status` | déjà rayée |
+| 5 | import CSV serveurs | `web.php:792` + `serveurs.blade.php:133` | **PORTÉE** |
+| 6 | afficher `sshd_config` | `audit-ssh.js:457` `ecris('/ssh-audit/config')` | **PORTÉE** |
+| 7 | désactiver une jail | `fail2ban.js:1411` `litDistant('/fail2ban/disable_jail')` | **PORTÉE** |
+| 8 | géolocaliser une adresse | `fail2ban.js:1089` `litDistant('/fail2ban/geoip')` | **PORTÉE** |
+| 9 | relever un serveur | `audit-ssh.js:368` `ecris('/ssh-audit/scan')` | **PORTÉE** |
+| 10 | scan de dérive de masse | `groupes.js:521` `ecris('/groups/{id}/run', {action:'drift_scan'})` | **PORTÉE** |
+| 11 | rouvrir les 2 perdues de `superv` | rattachement : `supervision.blade.php:419` + `:460` + `SupervisionController:760` ; jeton : libellé amendé | **RÉPARÉES** |
+
+> **Onze sur onze : rien à porter dans cette liste.** La n°11 est réparée au sens
+> demandé — le rattachement est porté, et la phrase du jeton ne prétend plus qu'il
+> « reste sur l'ancien portail ». *La modification du jeton reste non portée, avec
+> une déclaration désormais exacte.*
+
+### 12.1 Deux capacités de DÉRIVE distinctes, pas une
+
+    derive-config.js:238   appelle('/drift/scan_all')                  le PARC
+    groupes.js:521         ecris('/groups/{id}/run', drift_scan)       un GROUPE
+    backend/routes/drift.py:142  @bp.route('/drift/scan_all')
+    backend/routes/groups.py:257 if action == 'drift_scan'
+
+**Les deux sont portées.** Une sonde qui cherche `drift_scan` littéral trouve la
+seconde et rate la première ; une qui cherche `/drift/scan_all` fait l'inverse.
+
+### 12.2 ⚠ Trois pages SORTENT de la liste tenue — les trois chaînes sont libres
+
+Mon §5.4 de `INVENTAIRE-ARCHIVAGE.md` avait retiré trois pages du bloc archivable par
+la Q3. **Les trois motifs sont tombés :**
+
+| page | ce qui la tenait | état au 2026-09-05 10:45 |
+|---|---|---|
+| `adm/admin_page.php` | préréglage sudo · import CSV de comptes | **portés** — `Permissions.php:322` ; `ComptesController::importer:131`, et les 3 clés `comptes.reste_*` sont **RETIRÉES**, l'i18n passant de 1 à **6 clés d'import** |
+| `legacy/index.php` | l'onboarding | **porté** — `Onboarding.php:228` (lecture) et **`:234` (écriture de `onboarding_dismissed_at`)** |
+| `legacy/auth/login.php` | « se souvenir de moi » | **porté** — `DepotJetonsMemorisationBase.php:39` écrit la table, case à cocher en `connexion.blade.php:34` |
+
+⚠ **Et le troisième maillon d'`admin_page.php` n'était pas un manque** :
+`manage_users.php` émet un jeton de réinitialisation **à la création**. Le portage ne
+le fait pas — il **génère et remet un mot de passe** (`ComptesController:218`,
+`genereMotDePasse()`), avec `force_password_change`. *Deux conceptions, pas une
+absence.* Son commentaire `:222-235` documente d'ailleurs le défaut qu'il a corrigé :
+un compte dont le haché était inconnu et à qui on demandait de changer un mot de
+passe que personne ne connaissait.
+
+### 12.3 La péremption, mesurée une quatrième fois — **en 23 minutes**
+
+    10:22  onboarding_dismissed_at cote laravel : 0
+    10:45  onboarding_dismissed_at cote laravel : 2  (Onboarding.php:228 et :234)
+
+*Et les lignes d'`audit-ssh.js` ont bougé entre 09:12 et 10:39.* **Sur ce dépôt, un
+relevé de plus d'une heure doit être présenté avec son heure ou refait.**
