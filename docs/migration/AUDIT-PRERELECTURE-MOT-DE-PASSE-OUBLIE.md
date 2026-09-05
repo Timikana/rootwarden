@@ -402,3 +402,43 @@ révoquerait vraiment.
 *Et l'asymétrie avec `active_sessions` reste justifiée : le portage ne lit jamais
 cette table (ses sessions vivent en fichiers), donc une ligne survivante y est
 inerte — mesuré au site de `MotDePasse.php`.*
+
+### 8.5 Le témoin remesuré — et la ventilation par étape aggrave d'un ordre de grandeur
+
+Le DSI mesure *« 23 lignes, 23 succès, zéro échec »*. **Remesuré par moi, confirmé,
+et la ventilation dit plus :**
+
+| étape | `success` | lignes |
+|---|---|---|
+| `2fa` | 1 | **19** |
+| `login` | 1 | 4 |
+| — | 0 | **0** |
+
+*Fenêtre : 2026-09-03 20:46 → 2026-09-05 06:03, soit ~34 h — donc la purge des
+24 h (`login.php:47`) n'a pas tourné sur toute la période, et l'échantillon n'est
+pas une fenêtre glissante propre.*
+
+**Trois conséquences, dont deux que la formulation « cinq connexions réussies »
+ne portait pas :**
+
+**a) Ce ne sont pas des connexions — ce sont des vérifications de SECOND
+FACTEUR.** 19 lignes sur 23. La requête d'affichage ne filtre pas `step`, donc
+**cinq passages de 2FA en dix minutes suffisent**, et ils s'accumulent environ
+cinq fois plus vite que les lignes de connexion. *Le message faux se déclenche
+sur l'événement le plus fréquent de la table.*
+
+**b) Une seule adresse distincte ici** — environnement de développement. **En
+production derrière un NAT d'entreprise, toutes les personnes partagent une
+adresse** : les lignes `2fa` de tout le monde se cumulent. Sur une équipe d'une
+dizaine, cinq vérifications en dix minutes est **une heure de travail normal**,
+pas un mardi matin. **Le message serait quasi permanent.**
+
+**c) Et le VRAI garde n'a jamais tiré non plus.** Zéro ligne `success = 0`
+signifie que `login.php:50` **n'a jamais eu quoi que ce soit à compter**. La
+limite de connexion est donc **entièrement non éprouvée**, et *le seul
+« verrouillage » que quiconque ait jamais vu sur cet écran est le faux.*
+
+> **Le correctif arbitré (`AND success = 0` à `:337`) est juste et suffit pour le
+> message.** Mais il ne change rien à (c) : après lui, l'écran cessera de mentir
+> **et le garde restera sans épreuve**. *Deux propriétés distinctes, et une seule
+> est corrigée — c'est à dire, pas à réparer dans le même geste.*
