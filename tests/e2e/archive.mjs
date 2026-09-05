@@ -140,12 +140,30 @@ export async function verifieMenuLegacy(page, routeportee, verifie, constate) {
     const liens = await page.evaluate(() =>
         [...document.querySelectorAll('a[href]')].map(a => a.getAttribute('href')));
 
-    if (liens.length === 0 && typeof constate === 'function') {
+    /*
+     * ⚠ LE DISCRIMINANT EST LE STATUT, PAS LE NOMBRE D'ANCRES.
+     *
+     * Premiere redaction : `liens.length === 0`. Elle marchait le 2026-09-05 a
+     * 23:09 parce qu'une URL archivee rendait le 404 NU d'Apache — 236 octets,
+     * zero ancre. **Elle aurait cesse de marcher a 23:18**, quand E-425 a pose
+     * un `ErrorDocument 404` qui NOMME et LIE le portail : la page archivee
+     * porte desormais UNE ancre, `liens.length` vaut 1, et les vingt suites
+     * seraient reparties en echec — avec « parmi 1 liens » au lieu de « parmi
+     * 0 », c'est-a-dire sous les traits d'un vrai defaut de menu.
+     *
+     * **Un discriminant fonde sur une consequence de l'etat (le corps est vide)
+     * se perime des que quelqu'un ameliore cet etat.** Celui fonde sur l'etat
+     * lui-meme (la page repond 404) survit : le CODE est conserve par E-425,
+     * et il est ce que le contrat d'archivage asserte partout ailleurs.
+     */
+    const statutPage = await repond(page.url());
+    if (statutPage === 404 && typeof constate === 'function') {
         constate("entree de menu vers « " + routeportee + " »",
-            'NON MESURE — la page ne porte AUCUNE ancre : ce n\'est pas un menu qui '
-            + 'echoue, c\'est la page qui le portait qui a ete archivee. Il n\'y a rien '
-            + 'a juger, et l\'exigence n°3 du contrat d\'archivage devient sans objet '
-            + 'tant qu\'aucune page legacy ne subsiste pour porter un menu.');
+            'NON MESURE — la page ou l\'on se trouve rend 404 (' + page.url() + ') : '
+            + 'ce n\'est pas un menu qui echoue, c\'est la page qui le portait qui a '
+            + 'ete archivee. Il n\'y a rien a juger, et l\'exigence n°3 du contrat '
+            + 'devient sans objet tant qu\'aucune page legacy ne subsiste pour porter '
+            + 'un menu.');
 
         return;
     }
