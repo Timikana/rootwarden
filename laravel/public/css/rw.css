@@ -2379,6 +2379,92 @@ a.rw-onglet { text-decoration: none; display: inline-block; }
  * utilitaire : la distinction tient a un purge pres, et elle ne dit rien a un
  * lecteur d'ecran.
  */
+
+/*
+ * ══ L'ASSISTANT DE PREMIERE CONFIGURATION ═══════════════════════════════════
+ *
+ * Une liste d'ETAPES, pas une liste d'etats : chaque ligne porte un rang, un
+ * intitule, une explication, et parfois une action. Elle ne se borne donc PAS a
+ * `78ch` comme `.rw-liste-etats__ligne` — cette borne sert a garder deux
+ * colonnes lisibles cote a cote, alors qu'ici la prose de l'etape a besoin de
+ * sa largeur et l'action reste a droite.
+ */
+.rw-entete-avec-action {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.rw-liste-etapes {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 14px 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.rw-liste-etapes__ligne {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 12px 14px;
+    border: 1px solid var(--rw-bordure);
+    border-radius: var(--rw-rayon);
+    background: var(--rw-surface);
+}
+
+/*
+ * Une etape franchie s'efface SANS disparaitre — meme regle que
+ * `.rw-liste-etats__ligne--absent` : seule la surface recule, le contraste du
+ * texte reste au-dessus du seuil. **Pas d'`opacity` globale** : le legacy pose
+ * `opacity-60` sur toute la ligne, ce qui fait passer son texte gris SOUS le
+ * seuil de contraste.
+ */
+.rw-liste-etapes__ligne--faite {
+    background: var(--rw-surface-2);
+    border-style: dashed;
+}
+
+.rw-liste-etapes__rang {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--rw-surface-2);
+    border: 1px solid var(--rw-bordure);
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--rw-texte-doux);
+}
+
+.rw-liste-etapes__ligne--faite .rw-liste-etapes__rang {
+    color: var(--rw-succes, var(--rw-texte));
+    border-color: currentColor;
+}
+
+.rw-liste-etapes__corps { flex: 1 1 320px; min-width: 0; }
+
+.rw-liste-etapes__titre {
+    margin: 0 0 2px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--rw-texte);
+}
+
+/*
+ * L'action reste a DROITE sur une ligne large et passe DESSOUS quand la place
+ * manque — `margin-left: auto` avec `flex-wrap` sur le parent. Elle ne se
+ * retrecit jamais : c'est la seule chose actionnable de la ligne.
+ */
+.rw-liste-etapes__action { flex: 0 0 auto; margin-left: auto; align-self: center; }
+
 .rw-liste-etats {
     display: flex;
     flex-direction: column;

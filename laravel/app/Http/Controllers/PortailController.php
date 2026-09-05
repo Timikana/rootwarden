@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\Onboarding;
 use App\Services\AlertesAccueil;
 use App\Services\SessionsActives;
 use App\Services\Droits;
@@ -30,8 +31,8 @@ class PortailController extends Controller
         private readonly Comptes $comptes,
         private readonly AlertesAccueil $alertes,
         private readonly SessionsActives $sessions,
-    )
-    {
+        private readonly Onboarding $onboarding,
+    ) {
     }
 
     public function cgu(Request $requete): View
@@ -136,7 +137,55 @@ class PortailController extends Controller
             return $a;
         }, $alertes['alertes']);
 
+        /*
+         * ══ L'ASSISTANT DE PREMIERE CONFIGURATION ════════════════════════
+         *
+         * `null` = rien a rendre, et le gabarit n'a AUCUN predicat a recopier.
+         * Trois raisons de ne rien rendre, et une seule est un choix :
+         *
+         *   - le role est inferieur au minimum (le legacy l'inclut a partir du
+         *     role 2, `index.php:162`) ;
+         *   - la personne l'a masque ;
+         *   - il n'y a pas de session (aucun identifiant a mesurer).
+         *
+         * ⚠ ET LA MESURE NE SE FAIT QUE SI ON REND. Huit `COUNT(*)` sur chaque
+         * chargement de l'accueil pour un bloc masque seraient huit requetes
+         * pour rien — et l'accueil est la page la plus servie du portail.
+         */
+        $assistant = null;
+        if ($idCompte > 0
+            && $role >= Onboarding::ROLE_MINIMAL
+            && ! $this->onboarding->masque($idCompte)) {
+            $etapes = Onboarding::etapes($this->onboarding->mesures($idCompte));
+
+            /*
+             * LE LIEN D'UNE ETAPE SE RESOUT PAR LE MENU, exactement comme celui
+             * d'une alerte quinze lignes plus haut — meme `$parCle`, meme regle.
+             * Une etape dont la page est fermee au compte n'affiche AUCUN lien
+             * plutot qu'un lien vers un 403, et une page NON PORTEE renvoie vers
+             * l'ancien portail avec son marqueur.
+             */
+            $etapes = array_map(function (array $e) use ($parCle) {
+                $entree = $e['nav'] !== null ? $parCle->get($e['nav']) : null;
+                $e['lien'] = null;
+                $e['externe'] = false;
+                if ($entree !== null) {
+                    if (isset($entree['route'])) {
+                        $e['lien'] = route($entree['route']);
+                    } else {
+                        $e['lien'] = rtrim((string) config('app.url_legacy'), '/') . $entree['legacy'];
+                        $e['externe'] = true;
+                    }
+                }
+
+                return $e;
+            }, $etapes);
+
+            $assistant = Onboarding::progression($etapes) + ['etapes' => $etapes];
+        }
+
         return view('accueil', [
+            'onboarding' => $assistant,
             'modulesAccessibles' => $entrees->count(),
             'modulesPortes'      => $entrees->filter(fn ($e) => isset($e['route']))->count(),
             'libelleRole'        => $this->libelleRole((int) $requete->session()->get('role_id', 0)),

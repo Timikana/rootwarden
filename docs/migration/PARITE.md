@@ -19912,3 +19912,114 @@ toggle.** Cette moitié-là reste non mesurée, et elle appartient à l'exploita
 héritent du même trou**. Il est moins grave dans le sens du désarmement — qui peut armer peut
 désarmer — mais `toggle` permet aussi de **ré-armer**. *Relevé, non corrigé : la garde vit dans
 le backend.*
+
+---
+
+## E-405 — l'assistant de première configuration : **une capacité qu'aucun d'entre nous ne verra jamais**
+
+**Porté :** `legacy/includes/onboarding.php` (221 lignes, seul accès `index.php:162`) →
+`App\Services\Onboarding`, `OnboardingController`, `composants/onboarding.blade.php`,
+`lang/{fr,en}/onboarding.php`. Côté portage avant ce lot : **0 fichier**.
+
+**L'argument qui gouverne sa forme, et qui vient de l'arbitrage :**
+
+> **Son absence est INDÉTECTABLE par quiconque travaille sur une installation déjà
+> configurée — c'est-à-dire par toute l'équipe.**
+
+*On ne peut donc pas la valider par ce qu'on voit.* D'où la séparation qui structure le
+service :
+
+    mesures()   touche la base, et ne DECIDE rien
+    etapes()    decide, et ne touche RIEN — pure et statique
+
+**Chaque détection devient éprouvable en forçant son état, sans écrire une ligne.**
+Table de vérité : **23 cas, 0 FAIL**, les huit détections forcées une par une, plus
+l'état vierge, l'état complet et les mesures vides. **Témoin inverse** : le seuil des
+administrateurs passé de `> 1` à `> 0` sur une copie → **9 FAIL**.
+
+### ⚠ Le brief annonçait CINQ étapes. Le fichier en porte HUIT.
+
+    :37  servers   ·  :48  users   ·  :63  2fa   ·  :73  ssh_key
+    :87  keypair   ·  :100 remove_passwords      ·  :117 api_key   ·  :132 first_scan
+
+`servers`, `users` et `api_key` manquaient à l'énumération reçue. *Porter cinq sur huit
+aurait retiré trois détections en silence — et personne ici ne s'en serait aperçu, par la
+raison même qui fait porter cette page.*
+
+### ⛔ Une étape ne pouvait PAS être franchie, par construction
+
+    SELECT COUNT(*) FROM platform_keypair   ->  ERROR 1146, la table n'existe pas
+    aucun fichier de mysql/ ne la CREE      ->  0 CREATE TABLE
+    `012_platform_keypair.sql`              ->  n'ajoute que des COLONNES a `machines`
+    seul lecteur de ce nom dans le depot    ->  `onboarding.php` lui-meme
+
+Le `try/catch` avalait l'erreur et posait zéro. **Deux conséquences mesurées :**
+
+1. **l'étape 4 ne pouvait jamais être « faite »** — l'assistant n'atteignait jamais 8/8 et
+   n'affichait donc **jamais** son panneau final ;
+2. **l'étape 5 porte `'warn' => $nbKeypair === 0`** : l'avertissement était affiché **en
+   permanence**, quel que soit l'état réel.
+
+*Ce n'est pas une capacité à reproduire, c'est une détection morte.* Le portage lit la source
+qui existe — `machines.platform_key_deployed`, que la page `cle-plateforme` gère déjà — et
+**le dit à l'écran** (`cle_plateforme_source`), pas seulement en commentaire.
+
+### ⚠ Et « plus de mot de passe » ne se lit pas sur une seule colonne
+
+Le legacy teste `password IS NOT NULL AND password != ''`. **Deux défauts :**
+
+- il **ignore `root_password`**, la seconde colonne de secret ;
+- `!= ''` compare des **octets**. PHP chiffre la chaîne vide en `sodium:…` — non vide — là où
+  Python rend `''`. Une machine saisie sans mot de passe par le formulaire du legacy compte
+  donc comme « en portant un » (E-P3).
+
+Le portage reprend le prédicat de `ClePlateforme::machines()` : **les deux colonnes**. *Il
+garde l'angle mort du chiffrement de la chaîne vide — il vit du côté qui détient la clé, donc
+dans le backend — mais il cesse d'ignorer la moitié du sujet.*
+
+### Trois choix de forme, chacun contre le legacy
+
+- **le lien d'une étape se résout par le MENU**, jamais par une URL en dur. Le legacy écrit
+  `/adm/admin_page.php#servers` et `/profile.php`. Ici la clé passe par `Navigation`, comme
+  les tuiles et les alertes de l'accueil : **une étape dont la page est fermée au compte
+  n'affiche aucun lien**, au lieu d'en proposer un qui mènerait à un 403 ;
+- **un formulaire, pas un script.** Le legacy pose un `fetch` et retire le bloc du DOM. Le
+  geste est idempotent et sans conséquence : *un script qui n'apporte rien qu'un formulaire
+  ne fasse est une pièce de plus à maintenir* ;
+- **une étape franchie s'efface sans disparaître.** Le legacy pose `opacity-60` sur toute la
+  ligne, ce qui fait passer son texte gris **sous le seuil de contraste**. Ici seule la
+  surface recule, et le marqueur porte un **texte** (`.rw-visuellement-cache`) et pas
+  seulement une couleur et un signe.
+
+### L'avertissement dit la CONSÉQUENCE, pas l'ordre des gestes
+
+Le legacy écrit *« Déploie la keypair avant »* — il dit quoi faire et tait pourquoi. *Or la
+raison est la seule chose qui permette de décider* : sans clé déployée, effacer les mots de
+passe retire le dernier accès. C'est le `sans_retour` que `ClePlateforme` compte déjà.
+
+### Ce qui est mesuré, et comment
+
+    table de verite (pure, sans base)     23 cas · 0 FAIL · temoin inverse 9 FAIL
+    masquage (transaction ANNULEE)         7 cas · 0 FAIL
+    au navigateur, trois largeurs         15 cas · 0 FAIL · captures REGARDEES
+    parite FR/EN par PHP                  35 = 35 · 0 divergence
+    8 etapes x 3 libelles                 24 cles construites · 0 absente
+
+**Le masquage écrit `users.onboarding_dismissed_at`** : il est éprouvé **dans une transaction
+annulée**. *Sur une base partagée, un drapeau posé sur un compte de test resterait et
+masquerait l'assistant pour toute mesure ultérieure, sans que personne sache pourquoi.* Le
+test vérifie l'état avant, après le geste, **et après l'annulation**.
+
+*Le témoin de ce dernier harnais est interne : `masque()` rend `false` avant et `true` après,
+dans la même exécution. Un prédicat qui rend les deux valeurs ne peut pas être vacant.*
+
+### Ce que ce commit périme
+
+**La question 3 de l'inventaire sur `index.php`** : la page sort du bloc bloqué et rejoint
+l'archivable — l'onboarding était son seul contenu non porté. *Il reste deux bloquants à
+l'extinction, et aucun des deux n'est ici :* `migrate_crypto.php` (à préserver comme outil) et
+la **réinitialisation** (bloquée par le SMTP, non portée sur arbitrage — porter un flux qui ne
+délivre rien serait pire que son absence).
+
+*`index.php` désigne **23** fichiers dans ce dépôt, pas dix : 12 hors `_deprecated`, 11 dedans.
+Toute mesure par nom de base surcompte, et le compte annoncé était court.*

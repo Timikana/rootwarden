@@ -5,6 +5,23 @@
     <p class="rw-sous-titre rw-prose">{{ __('accueil.orientation') }}</p>
 
     {{--
+        ═══ L'ASSISTANT DE PREMIERE CONFIGURATION ═══════════════════════════
+
+        AVANT les alertes, et c'est le seul endroit ou il a un sens : il ne
+        s'affiche que sur une installation qui n'est pas encore configuree, et
+        dans ce cas il EST la premiere chose a faire. Une fois masque ou
+        termine, il disparait et la page reprend sa forme habituelle.
+
+        Le predicat vit dans le controleur (`$onboarding === null`), pas ici :
+        role minimal, drapeau de masquage et absence de session y sont decides
+        une fois. **Un gabarit qui recopierait la garde en donnerait une seconde
+        version, et c'est ce que ce portage refuse partout.**
+    --}}
+    @if (($onboarding ?? null) !== null)
+        @include('composants.onboarding')
+    @endif
+
+    {{--
         ═══ E-264 — CE QUI DEMANDE L'ATTENTION ══════════════════════════════
 
         En TETE de page, avant les tuiles : une alerte placee sous douze tuiles

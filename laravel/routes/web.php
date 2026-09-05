@@ -11,6 +11,7 @@ use App\Http\Controllers\ComptesController;
 use App\Http\Controllers\ComptesDistantsController;
 use App\Http\Controllers\AutorisationsPasserelleController;
 use App\Http\Controllers\Fail2banController;
+use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\ServicesController;
 use App\Http\Controllers\BashrcController;
 use App\Http\Controllers\AccesSftpController;
@@ -108,6 +109,22 @@ Route::middleware(['memorisation', 'session.authentifiee', 'session.revoquee', '
     Route::get('/cgu', [PortailController::class, 'cgu'])->name('cgu');
     Route::post('/cgu', [PortailController::class, 'accepterCgu'])->name('cgu.accepter');
     Route::get('/accueil', [PortailController::class, 'accueil'])->name('accueil');
+
+    /*
+     * L'ASSISTANT DE PREMIERE CONFIGURATION — son seul geste d'ecriture.
+     *
+     * ⚠ AUCUNE GARDE DE ROLE ICI, ET C'EST DELIBERE. L'assistant ne s'affiche
+     * qu'a partir du role 2 (`Onboarding::ROLE_MINIMAL`), mais ce geste-ci ne
+     * fait que poser un drapeau d'affichage sur SON PROPRE compte : il ne lit
+     * rien, n'expose rien, et son identifiant vient de la session. Une garde de
+     * role ne protegerait donc rien — elle donnerait seulement l'apparence
+     * d'une protection.
+     *
+     * *Et si un role 1 l'appelait, il masquerait un assistant qu'il ne voit
+     * deja pas. Le pire cas est un `UPDATE` sans effet visible.*
+     */
+    Route::post('/accueil/assistant/masquer', [OnboardingController::class, 'masquer'])
+        ->name('onboarding.masquer');
     Route::get('/profil', [PortailController::class, 'profil'])->name('profil');
     /*
      * L'export des donnees personnelles — RGPD art. 15 et 20.

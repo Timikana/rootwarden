@@ -5,6 +5,70 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.43.0] - 2026-09-05
+
+### Accueil - E-405 : l'assistant de premiere configuration est porte
+
+**Ce qui est porte.** `legacy/includes/onboarding.php` (221 lignes, seul acces
+`index.php:162`) devient `App\Services\Onboarding` + `OnboardingController` + un partiel
+d'accueil + un catalogue FR/EN. Cote portage avant ce lot : **0 fichier**.
+
+**⚠ La forme est gouvernee par un fait, pas par un gout.** *Son absence est INDETECTABLE par
+quiconque travaille sur une installation deja configuree — c'est-a-dire par toute l'equipe.*
+On ne peut donc pas la valider par ce qu'on voit a l'ecran. Le service separe donc la MESURE
+de la DERIVATION : `mesures()` touche la base et ne decide rien, `etapes()` decide et ne
+touche rien. **Chaque detection est ainsi eprouvable en forcant son etat, sans ecrire.**
+
+**HUIT etapes, et non cinq.** `servers`, `users` et `api_key` manquaient a l'enumeration
+recue. Porter cinq sur huit aurait retire trois detections en silence — et personne ne s'en
+serait apercu, par la raison meme qui fait porter cette page.
+
+**⛔ Une etape ne pouvait PAS etre franchie, par construction.** L'etape `keypair` compte
+`platform_keypair`, une table qui **n'existe pas** : `ERROR 1146`, aucun fichier de `mysql/`
+ne la cree, et `012_platform_keypair.sql` n'ajoute que des colonnes a `machines`. Le
+`try/catch` avalait l'erreur et posait zero. Consequences : **l'assistant n'atteignait jamais
+8/8** donc n'affichait jamais son panneau final, **et l'avertissement de l'etape suivante,
+conditionne a ce zero, etait affiche en permanence**. Le portage lit la source qui existe —
+`machines.platform_key_deployed` — et le DIT a l'ecran.
+
+**⚠ « Plus de mot de passe » ne se lit pas sur une seule colonne.** Le legacy teste
+`password IS NOT NULL AND password != ''` : il ignore `root_password`, et `!= ''` compare des
+OCTETS — PHP chiffre la chaine vide en `sodium:…`, non vide, la ou Python rend `''`. Le
+portage reprend le predicat de `ClePlateforme::machines()`, sur les DEUX colonnes.
+
+**Trois choix contre le legacy** : le lien d'une etape se resout par le MENU (une page fermee
+au compte n'affiche aucun lien, plutot qu'un lien vers un 403) ; un FORMULAIRE et pas un
+script pour le masquage ; et une etape franchie s'efface **sans** `opacity` globale — celle du
+legacy fait passer son texte gris sous le seuil de contraste, et son marqueur porte ici un
+TEXTE et pas seulement une couleur.
+
+**L'avertissement dit la CONSEQUENCE.** Le legacy ecrit « Deploie la keypair avant » : il dit
+quoi faire et tait pourquoi. Sans cle deployee, effacer les mots de passe retire le DERNIER
+ACCES — c'est cela qui permet de decider.
+
+**Tests.** Table de verite pure : **23 cas, 0 FAIL**, huit detections forcees une par une,
+etat vierge, etat complet et mesures vides ; **temoin inverse** — seuil des administrateurs
+`> 1` mue en `> 0` sur une copie, **9 FAIL**. Masquage : **7 cas, 0 FAIL, dans une TRANSACTION
+ANNULEE** — il ecrit `users.onboarding_dismissed_at`, et sur une base partagee un drapeau
+laisse masquerait l'assistant pour toute mesure ulterieure. Au navigateur : **15 cas, 0 FAIL**,
+trois largeurs, captures REGARDEES. Parite FR/EN par PHP : **35 = 35**, et les 24 cles
+construites (8 etapes x 3) verifiees separement.
+
+**⚠ Ce que ce commit perime.** `index.php` sort du bloc bloque de l'inventaire et rejoint
+l'archivable : l'onboarding etait son seul contenu non porte. Il reste DEUX bloquants a
+l'extinction, aucun n'est ici — `migrate_crypto.php` (a preserver comme outil) et la
+REINITIALISATION (bloquee par le SMTP, non portee sur arbitrage : porter un flux qui ne
+delivre rien serait pire que son absence).
+
+**Notes exploitation.** Aucune migration : `users.onboarding_dismissed_at` existe deja
+(migration 042, verifie sur `information_schema`). Le legacy tolere son absence par un
+`try/catch` ; le portage ne pose pas de filet contre une absence qu'il a mesuree. Les huit
+`COUNT(*)` ne sont executes QUE si l'assistant doit etre rendu — l'accueil est la page la plus
+servie du portail. `rw.css`, `routes/web.php`, `accueil.blade.php` et `PortailController.php`
+sont touches : **annonces AVANT ecriture** avec leur mesure (`modifie:0` sur les quatre).
+
+---
+
 ## [1.42.2] - 2026-09-05
 
 ### Extinction du legacy - E-404 : `migrate_crypto.php` sort du portail SANS perdre sa capacite
