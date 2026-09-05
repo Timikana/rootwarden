@@ -12181,3 +12181,88 @@ suppression de votre compte et de vos données. »**
 > **Le legacy annonçait ce droit dans ses CGU sans l'implémenter.** *Ce n'est pas un écart de
 > parité : c'est une amélioration intentionnelle qui ferme une promesse non tenue, et elle doit
 > être dite ainsi.*
+
+---
+
+## E-450
+
+### E-449 tient. Son COÛT était faux, et je l'avais affirmé sans le mesurer.
+
+**J'ai écrit : *« `POST /profil/step-up` existe déjà — c'est un intergiciel à POSER, pas une
+capacité à écrire »*. C'est faux sur les quatre points, et une session l'a mesuré avant de
+refuser la tâche.**
+
+    intergiciels declares dans `bootstrap/app.php`   7, AUCUN de step-up
+    consommateurs du step-up                          3, TOUS cote CONTROLEUR
+      ComptesController:539  $this->exigeStepUp($auteur, 'compte_anonymiser')
+    `StepUp::ACTIONS_PORTAGE`                         liste FERMEE de 3
+    `/profil/effacement` cote client                  <form method="POST">
+                                                      (`profil.blade.php:254`)
+    `step-up.js`                                      modale branchee sur `fetch` + JSON
+
+> **Les trois consommateurs rendent `step_up_required: true` en JSON à une modale qui écoute un
+> `fetch`. L'effacement est soumis par un FORMULAIRE HTML — il ne peut pas emprunter ce
+> chemin.**
+
+**Poser le step-up ici demande une vue, un chemin de réponse, une entrée dans une liste fermée
+et une branche de contrôleur.** *Ce n'est pas une ligne.*
+
+**Et `ACTIONS_PORTAGE` est fermée AVEC son motif écrit sur place** : *le legacy accepte
+n'importe quel nom d'action et pose `_step_up_<ce que le client envoie>`, donc on peut y
+déposer une marque qui n'ouvre rien aujourd'hui et quelque chose demain.* **Une quatrième
+entrée est une décision documentée, pas un ajout.**
+
+### ⚠ L'ASYMÉTRIE — et elle rend la décision PLUS forte, pas moins
+
+    ComptesController:539   `compte_anonymiser` par un AUTRE   -> step-up EXIGE
+    PortailController       `/profil/effacement`, son PROPRE   -> aucun
+
+> **Un administrateur qui anonymise le compte d'autrui se ré-authentifie. Le sujet qui anonymise
+> le sien, non.**
+
+**C'est l'inverse de l'intuition, et c'est un meilleur argument que le mien** : *il n'y a pas
+une capacité à porter — il y a un motif ÉTABLI dans le dépôt qu'une route a sauté.*
+
+### DÉCISION CORRIGÉE
+
+**E-449 tient : le step-up doit être exigé.** *Mais ce n'est pas un geste à glisser en fin de
+nuit — c'est une vue, une branche, et une entrée de liste fermée qui porte sa justification.*
+
+**Il rejoint `DOSSIER-34` comme travail à programmer, avec son coût mesuré.** *Le prétendre
+trivial était le vrai défaut de ma consigne : une tâche mal dimensionnée est exécutée mal ou
+refusée — et elle a été refusée, ce qui est la bonne issue.*
+
+### ✅ ET LE REFUS EST FONDÉ SUR UN PRINCIPE QUE J'ADOPTE
+
+> *« Celui qui écrit un correctif ne devrait pas être celui qui certifie qu'il est là. »*
+
+**Et la démonstration est la mienne, d'il y a deux heures** : *E-447 arbitré sur une sonde
+`getenv()` qui FÉLICITAIT un correctif inopérant, et c'est un verrou écrit à côté — pas la
+sonde — qui l'a dit.* **Si la même session pose la garde ET le verrou qui l'atteste, il n'y a
+plus qu'une source.**
+
+### Ce qui a été fait à la place, et c'était un trou réel
+
+**`POST /profil/effacement` avait TROIS protections sérieuses et ZÉRO verrou.** *Le geste le
+plus coûteux du portail à se tromper était le moins tenu ; rien ne rougissait si l'une
+disparaissait.* **`2c78c3c` : 9 tests, 51 assertions.**
+
+*Gelé : l'identifiant vient de la session ET le chemin par la requête est asserté ABSENT —
+un `id` lu dans la requête ferait de ce geste une anonymisation D'AUTRUI sans garde de rôle.*
+
+**Plus deux marqueurs DATÉS qui rougiront le jour où le manque sera comblé**, portant dans leur
+message ce qu'il faudra faire alors. *Le manque est désormais TRACÉ, plus silencieux — et c'est
+ce qui rend acceptable de le programmer au lieu de le bâcler.*
+
+### ⚠ Et un harnais de mutation qui a menti du côté qui RASSURE
+
+**Au premier passage, une mutation rendait ZÉRO rouge — résultat plausible et favorable.**
+
+*Cause : les compteurs `Tests: N, Assertions: N` étaient AVEUGLÉS par les codes ANSI de PHPUnit.
+Le motif ne matchait pas, donc ligne vide pour les QUATRE mutations — et l'anomalie est passée
+inaperçue parce que les ROUGE, eux, s'affichaient.*
+
+**Rejoué avec `--colors=never` et un témoin de la copie intacte : M1 1 · M2 1 · M3 1 · M4 2.**
+
+> **Zéro vert ET zéro rouge veut dire que la mesure n'a pas eu lieu — et ici le zéro rouge était
+> accompagné d'un compteur VIDE qu'il fallait lire en premier.**
