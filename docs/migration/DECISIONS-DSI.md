@@ -9463,3 +9463,80 @@ le piège de l'URL construite, appliqué à la MÉTHODE.** *Je l'ai repris avant
 
 **Le même instrument, deux résultats opposés. C'est ce qui le rend utilisable** : *s'il avait rendu « il
 reste du travail » les deux fois, il n'aurait mesuré que mon envie d'en trouver.*
+
+### ✅ TROIS ARBITRAGES — le numéro en double, la garde des planifications, et deux conventions de « supprimé »
+
+#### ① E-392 porte DEUX objets. Le second prend **E-402**.
+
+    `PARITE.md:227`   E-392 — « dix rejeux 2FA fermaient l'etape du second
+                      facteur pour TOUTE une adresse »   (4b3e656, v1.39.9)
+    `356caea`         E-392 — « l'ecriture d'une politique etait moins gardee
+                      que sa lecture »   (v1.41.1)
+                      -> ce second n'existe QUE dans un message de commit
+
+    numeros : E-401 pris (registre + commit) · E-402 LIBRE · E-403 libre
+
+**✅ La garde des politiques devient `E-402` au registre.** *Je ne fais pas renuméroter le message de
+commit : il est enseveli sous d'autres, et réécrire l'historique pour un numéro coûte plus que la fiche.*
+
+**⚠ L'entrée `E-402` doit porter la mention que `356caea` dit `E-392` par erreur** — *sinon une recherche
+par numéro ne trouvera jamais le commit qui l'a posée.* **C'est la forme qu'on a déjà retenue deux fois
+aujourd'hui : une erreur écrite se corrige au vu de tous, pas en silence.**
+
+#### ② Les QUATRE routes de planification portent `@require_role(2)` SEUL
+
+    775  GET    /ssh-audit/schedules              role(2) seul
+    797  POST   /ssh-audit/schedules              role(2) seul
+    923  DELETE /ssh-audit/schedules/<id>         role(2) seul
+    941  POST   /ssh-audit/schedules/<id>/toggle  role(2) seul
+
+    et les deux pages du module exigent `can_audit_ssh`.
+
+**✅ AUTORISÉ : `@require_permission('can_audit_ssh')` sur les quatre.**
+
+**⛔ ET PAS `@require_machine_access` — mesuré, il n'aurait AUCUN OBJET :**
+
+    colonnes de `ssh_audit_schedules` :
+      created_at, created_by, cron_expression, enabled, id, last_run,
+      name, next_run, target_type, target_value
+    -> AUCUN `machine_id`.
+
+> **Un décorateur d'accès machine qui ne trouve pas d'identifiant laisse TOUT passer.** *Le poser ici
+> ajouterait une garde sans objet à côté d'une garde qui commande — l'entrée exacte du catalogue, et le
+> défaut que la session 4 vient d'éviter en le commentant sur `policies`.*
+
+**⚠ Et la forme est ADDITIVE, pas un miroir. J'ai prescrit « miroir » il y a une heure et ça élargissait
+l'écriture à un rôle 1.** *Deux fois la même leçon suffit.*
+
+**Ce qui rend `toggle` plus important que sa taille** : *il ne fait pas que désarmer — il RÉ-ARME. Une
+bascule aveugle (`SET enabled = NOT enabled`) accessible à un rôle 2 sans `can_audit_ssh` peut remettre en
+marche un relevé SSH récurrent que quelqu'un avait suspendu.*
+
+#### ③ Deux routes du même dépôt, deux conventions opposées sur « supprimé »
+
+    `delete_ssh_schedule`  rend `success: True` SANS regarder `rowcount` (:903)
+    `delete_rule` (wazuh)  rend `deleted > 0`
+
+> **« Le marqueur n'est pas le verdict » — et ici le dépôt porte les deux réponses à la même question.**
+
+**✅ Décision : aligner sur `deleted > 0`, et ce n'est PAS urgent.** *Le portage a déjà pris la parade
+robuste — les deux gestes RELISENT et les libellés disent que la relecture fait foi.* **Une divergence de
+convention entre deux routes finira par tromper quelqu'un ; une relecture ne trompe personne. On corrige
+la convention, on ne se presse pas.**
+
+### ⚠ ET UNE PÉREMPTION QUI N'ÉTAIT PAS CAUSÉE PAR LE COMMIT QUI LA TROUVE
+
+**Je prévenais que le portage des deux gestes périmerait `audit-ssh.js:11-12`. Il l'était DÉJÀ :**
+
+    l'en-tete disait « POST /ssh-audit/schedules, et rien d'autre. Ni DELETE,
+      ni toggle, NI AUCUNE DES ROUTES QUI JOIGNENT UNE MACHINE »
+    il y avait TROIS appels d'ecriture, dont
+      :246  ecris('/ssh-audit/scan', …)  -> `ssh_audit.py:133` ssh_session(…)
+
+> **La clause la plus fausse était celle qui promettait le plus.** *Un commit antérieur avait ajouté ces
+> appels sans revenir sur l'en-tête qui les interdisait.*
+
+**C'est la cinquième classe de péremption sous une variante que je n'avais pas : non pas « le commit périme
+sa propre déclaration », mais « un commit périme la déclaration d'un AUTRE et personne ne relit ».** *Et
+l'en-tête énumère désormais ligne par ligne, avec les numéros — un lecteur peut le réfuter sans quitter le
+fichier.*
