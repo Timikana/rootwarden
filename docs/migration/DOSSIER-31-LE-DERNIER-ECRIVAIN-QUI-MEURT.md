@@ -130,3 +130,49 @@ produit un livrable légal faux, et c'est celle vers laquelle l'inaction nous m�
 
 **C'est l'argument le plus solide pour le protocole « apparier avant d'assigner » : il ne
 rend pas les sondes meilleures, il MULTIPLIE LES OCCASIONS DE CONTRADICTION.**
+
+---
+
+# ⚠ UN QUATRIÈME MEMBRE (14:45) — et son lecteur est dans le fichier qui l'a déclaré morte
+
+**`password_expiry_override`.** *Mesuré après la livraison de E-418.*
+
+    ECRIVAINS PORTES        0
+    lu par le PORTAGE       `MotDePasse.php:94`   pour CALCULER l'expiration
+                            `ExportRgpd.php:102`  il figure dans l'export RGPD
+    lu par le LEGACY        `verify.php:172,:187` · `profile.php:186` · `functions.php:228`
+    ecrit par               `legacy/adm/api/update_user.php:49` — ET PAR LUI SEUL
+    donnees                 0 compte sur 12 porte un override -> DORMANT
+
+> **Le dossier recensait trois membres. Il y en a quatre, et le quatrième a été trouvé en
+> cherchant si un fichier pouvait être archivé — pas en cherchant des membres.**
+
+## Ce que la découverte apprend, et c'est une méthode
+
+**La session qui a livré les trois premières écritures avait elle-même déclaré cette
+colonne morte, dans son propre code :**
+
+> *« Le legacy la calcule et l'enregistre, mais personne ne la lit. »*
+
+**Elle a corrigé cette affirmation en découvrant un lecteur dans un AUTRE dépôt
+(`backend/scheduler.py`, qui envoie un courriel). Le lecteur de la colonne VOISINE est
+dans SON PROPRE FICHIER, deux lignes au-dessus du geste qu'elle venait de porter.**
+
+    « personne ne la lit »  etait infere de  « pas le portail que je comparais »
+
+> **Un « personne » se mesure sur les TROIS arbres, ou il ne se mesure pas.** *Et sa forme
+> honnête n'est jamais « personne » : c'est « aucun lecteur dans legacy, portage et
+> backend, à telle heure ».*
+
+## ⛔ Conséquence sur l'extinction
+
+**`legacy/adm/api/update_user.php` reste RETENU** — Q4 le déclare libre (0 appelant), Q3 le
+retient. **Levée : porter l'écriture de `password_expiry_override`.**
+
+**Et `legacy/auth/login.php` reste retenu pour une AUTRE raison** : Q3 est levée par
+E-418, mais **Q4 lui trouve 7 appelants vivants** (`enable_2fa`, `forgot_password`,
+`logout`…). *Il partira avec sa grappe d'authentification, pas avant.*
+
+> **Deux fichiers annoncés archivables, deux verdicts contraires, et deux raisons
+> différentes. Un fichier n'est archivable que si les QUATRE questions passent — et une
+> seule session ne les voit jamais toutes.**
