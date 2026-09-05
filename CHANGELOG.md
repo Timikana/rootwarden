@@ -5,6 +5,79 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.42.1] - 2026-09-05
+
+### Securite - E-403 : les quatre routes de planification d'audit SSH
+
+**Symptome.** Les quatre routes portaient `@require_role(2)` **seul**, quand les
+deux pages du module exigent `can_audit_ssh` (`legacy/ssh-audit/index.php:12-13`,
+`laravel/routes/web.php:229`) :
+
+    GET    /ssh-audit/schedules
+    POST   /ssh-audit/schedules
+    DELETE /ssh-audit/schedules/<id>
+    POST   /ssh-audit/schedules/<id>/toggle
+
+**`toggle` est la plus consequente malgre sa taille : elle ne DESARME pas, elle
+BASCULE.** Un role 2 sans la permission pouvait donc **re-armer** un releve SSH
+recurrent que quelqu'un avait suspendu.
+
+**Correctif.** `@require_permission('can_audit_ssh')` sur les quatre, **en
+additif** — le role est conserve, comme pour E-402 et pour la meme raison.
+
+**⚠ PAS de `@require_machine_access`, et c'est mesure.** La table
+`ssh_audit_schedules` n'a **aucune colonne `machine_id`** (temoin :
+`user_machine_access.machine_id` = 1, donc la sonde fonctionne). Un decorateur
+d'acces machine qui ne trouve pas d'identifiant laisse TOUT passer : ce serait une
+garde sans objet collee a une garde qui commande, et le lecteur suivant en
+compterait deux la ou il y en a une.
+
+### Correction de registre - la garde des politiques est `E-402`, pas `E-392`
+
+**`E-392` etait deja pris** (`PARITE.md:227` : « dix rejeux 2FA fermaient l'etape
+du second facteur pour TOUTE une adresse », `4b3e656`). Le commit `356caea`
+annonce donc sa garde sous un numero occupe.
+
+**L'historique n'est PAS reecrit pour un numero** — le commit est enseveli sous
+d'autres et le cout depasserait le benefice. **Mais la correspondance est ecrite
+en deux endroits** (le commentaire de la garde dans `ssh_audit.py`, et cette
+entree), sans quoi une recherche par numero ne trouverait jamais le commit qui l'a
+posee. *Une erreur ecrite se corrige au vu de tous, jamais en silence.*
+
+### Correction - `delete_ssh_schedule` : `success` suit desormais l'EFFET
+
+La route rendait `success: True` **sans regarder `rowcount`** : « supprime » pour
+un identifiant qui n'existait pas. `wazuh.delete_rule` (`:1167`) rend deja
+`success: deleted > 0` — **deux routes du meme depot repondaient de facon opposee
+a « qu'est-ce que supprime veut dire ».**
+
+**⚠ Le cas zero rend 404, et NON 200 comme son homologue `wazuh`.**
+`tests/test_verdicts_deux_cents.py::test_aucune_route_NEUVE_ne_rejoint_la_famille_du_200_menteur`
+a refuse la premiere version, et le motif se verifie sur l'appelant :
+
+    legacy/ssh-audit/js/main.js:775
+      if (r.ok) { toast('Planification supprimee', 'success'); loadSshSchedules(); }
+
+**Il ne lit QUE le statut.** Un 200 porteur d'un refus lui aurait fait annoncer une
+reussite — exactement ce que l'invariant protege. Le portage, lui, lit
+`corps.success` (`audit-ssh.js:1023`) et affiche `corps.message` : **les deux
+appelants sont corrects avec un 404, un seul l'etait avec un 200.** Le message du
+cas zero est explicite a dessein, les deux portails retombant sinon sur un libelle
+d'erreur generique.
+
+**Defaut collateral signale, non corrige** (`laravel/`, hors perimetre) :
+`laravel/public/js/audit-ssh.js:14` affirme que le portage ne compose « ni
+`DELETE /schedules/<id>`, ni... ». **Il les compose** — `:171` et `:185`, en URL
+CONSTRUITE. Le sous-lot A5 les a ajoutees et le commentaire n'a pas suivi.
+
+**Tests.** `ruff` vert, import REEL, placement verifie par AST. Suite complete :
+**667 passed, 5 skipped, 2 xfailed, 0 FAILED**.
+
+**Notes d'exploitation.** `backend/**.py` est lu au demarrage : INERTE jusqu'au
+redemarrage de `rootwarden_python`.
+
+---
+
 ## [1.42.0] - 2026-09-05
 
 ### Audit SSH - E-401 : on armait un releve SSH recurrent et on ne pouvait pas le desarmer

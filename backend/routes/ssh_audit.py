@@ -549,7 +549,12 @@ def ssh_audit_policies_get():
 @bp.route('/ssh-audit/policies', methods=['POST'])
 @require_api_key
 @require_role(2)
-# ══ E-392 : L'ECRITURE ETAIT MOINS GARDEE QUE LA LECTURE ═══════════════════
+# ══ E-402 : L'ECRITURE ETAIT MOINS GARDEE QUE LA LECTURE ═══════════════════
+#
+# ⚠ Le commit qui a pose cette garde (`356caea`) l'annonce sous « E-392 ».
+# Ce numero etait DEJA PRIS (`PARITE.md:227`, le blocage 2FA par adresse IP).
+# Le registre porte E-402 ; l'historique n'est pas reecrit pour un numero,
+# donc c'est ici et au CHANGELOG que la correspondance se lit.
 #
 # Sa jumelle `GET /ssh-audit/policies` (l.476) porte
 # `@require_permission('can_audit_ssh')`. Celle-ci portait `@require_role(2)`
@@ -774,7 +779,24 @@ def ssh_audit_reload():
 
 @bp.route('/ssh-audit/schedules', methods=['GET'])
 @require_api_key
+# ══ E-403 : LES QUATRE ROUTES DE PLANIFICATION D'AUDIT ═════════════════════
+#
+# Elles portaient `@require_role(2)` SEUL, alors que les deux pages du module
+# exigent `can_audit_ssh` (`legacy/ssh-audit/index.php:12-13`,
+# `laravel/routes/web.php:229`). Meme ecart qu'E-402 sur les politiques.
+#
+# `toggle` est la plus consequente malgre sa taille : elle ne DESARME pas, elle
+# BASCULE. Un role 2 sans la permission pouvait donc RE-ARMER un releve SSH
+# recurrent que quelqu'un avait suspendu.
+#
+# ⚠ ADDITIF, pas miroir — et PAS de `@require_machine_access` : la table
+# `ssh_audit_schedules` n'a AUCUNE colonne `machine_id` (mesure du 2026-09-05,
+# temoin `user_machine_access.machine_id` = 1). Un decorateur d'acces machine
+# qui ne trouve pas d'identifiant laisse TOUT passer : ce serait une garde sans
+# objet collee a une garde qui commande, et le lecteur suivant en compterait
+# deux la ou il y en a une.
 @require_role(2)
+@require_permission('can_audit_ssh')
 @threaded_route
 def list_ssh_schedules():
     """Liste les planifications de scans SSH Audit."""
@@ -797,6 +819,7 @@ def list_ssh_schedules():
 @bp.route('/ssh-audit/schedules', methods=['POST'])
 @require_api_key
 @require_role(2)
+@require_permission('can_audit_ssh')
 @threaded_route
 def create_ssh_schedule():
     """Cree une planification de scan SSH Audit."""
@@ -923,6 +946,7 @@ def create_ssh_schedule():
 @bp.route('/ssh-audit/schedules/<int:schedule_id>', methods=['DELETE'])
 @require_api_key
 @require_role(2)
+@require_permission('can_audit_ssh')
 @threaded_route
 def delete_ssh_schedule(schedule_id):
     """Supprime une planification de scan SSH Audit."""
@@ -930,9 +954,37 @@ def delete_ssh_schedule(schedule_id):
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute("DELETE FROM ssh_audit_schedules WHERE id = %s", (schedule_id,))
+        deleted = cur.rowcount
         conn.commit()
         conn.close()
-        return jsonify({'success': True, 'message': 'Planification supprimee'})
+        # E-403 bis : `success` suit l'EFFET, pas l'absence d'exception. Cette
+        # route rendait `True` sans regarder `rowcount` — donc « supprime » pour
+        # un identifiant qui n'existait pas. `wazuh.delete_rule` (`:1167`) rend
+        # deja `success: deleted > 0` : deux routes du meme depot repondaient de
+        # facon opposee a « qu'est-ce que supprime veut dire ».
+        #
+        # Le message du cas zero est explicite A DESSEIN : les deux portails
+        # affichent `corps.message` quand il existe et retombent sinon sur un
+        # libelle d'erreur generique (`audit-ssh.js:1023`). Sans lui, une
+        # suppression concurrente afficherait « erreur » pour une planification
+        # qui a bel et bien disparu.
+        if not deleted:
+            # ⚠ 404 ET NON 200, contre la forme de `wazuh.delete_rule` (`:1167`)
+            # qui rend `success: False` avec un 200. La difference n'est pas un
+            # gout : `tests/test_verdicts_deux_cents.py` a REFUSE le 200 ici, et
+            # le motif se verifie sur l'appelant —
+            #   legacy/ssh-audit/js/main.js:775
+            #     if (r.ok) { toast('Planification supprimee', 'success'); ... }
+            # il ne lit QUE le statut. Un 200 porteur d'un refus lui aurait fait
+            # annoncer une reussite. Le portage, lui, lit `corps.success`
+            # (`audit-ssh.js:1023`) et affiche `corps.message` : les deux sont
+            # donc corrects avec un 404, un seul l'etait avec un 200.
+            return jsonify({
+                'success': False, 'deleted': 0,
+                'message': "Aucune planification supprimee : l'identifiant "
+                           "n'existe plus (deja supprimee ?)"}), 404
+        return jsonify({'success': True, 'deleted': deleted,
+                        'message': 'Planification supprimee'})
     except Exception as e:
         logger.error("[ssh-audit/schedules DELETE] %s", e)
         return jsonify({'success': False, 'message': 'Erreur interne'}), 500
@@ -941,6 +993,7 @@ def delete_ssh_schedule(schedule_id):
 @bp.route('/ssh-audit/schedules/<int:schedule_id>/toggle', methods=['POST'])
 @require_api_key
 @require_role(2)
+@require_permission('can_audit_ssh')
 @threaded_route
 def toggle_ssh_schedule(schedule_id):
     """Active/desactive une planification."""
