@@ -5,6 +5,73 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.42.0] - 2026-09-05
+
+### Audit SSH - E-401 : on armait un releve SSH recurrent et on ne pouvait pas le desarmer
+
+**Symptome.** Le portage cree une planification (`POST /ssh-audit/schedules`) et ne pouvait ni
+la supprimer ni la suspendre : **on armait depuis le portail neuf et l'on ne desarmait que
+depuis celui qu'on eteint.** L'ordonnanceur tourne dans un fil invisible a `ps`, une
+planification est RECURRENTE, son echeance ne demande la permission de personne, et son objet
+est une session SSH sur les machines de sa portee. Ce n'est pas une capacite manquante : c'est
+un geste ACTIF sans son interrupteur. Latent aujourd'hui — `ssh_audit_schedules` porte 0 ligne.
+
+**Correctif.** `DELETE /ssh-audit/schedules/<id>` et `POST /ssh-audit/schedules/<id>/toggle`,
+par DEUX helpers NOMMES — pas de `envoie(methode, chemin)`, qui aurait ouvert DELETE et POST
+sur tout chemin. **L'URL est construite DANS le helper** et l'identifiant force par
+`Number(id) | 0` : une URL concatenee par l'appelant est invisible a tout releve par motif,
+la forme exacte que le module wazuh vient de payer.
+
+**L'asymetrie est voulue** : suspendre part directement, reactiver passe par le panneau.
+Suspendre DESARME — y mettre une friction rendrait l'arret plus penible que l'armement.
+Reactiver ARME. La suppression vise l'objet AFFICHE, jamais un identifiant repris d'un champ
+de saisie, et le panneau nomme l'intitule, la portee et la prochaine echeance.
+
+**⚠ Ce que l'ecran ne peut PAS promettre.** `toggle` fait `SET enabled = NOT enabled` — une
+bascule AVEUGLE — et `DELETE` rend `success: True` sans regarder `rowcount`. Un ecran qui
+predirait l'etat obtenu mentirait une fois sur deux des que deux personnes agissent. Les deux
+gestes RELISENT la liste, et les libelles disent que c'est la relecture qui fait foi.
+*`delete_rule` de wazuh, lui, rend `deleted > 0` : deux routes du meme depot, deux conventions
+opposees sur ce que « supprime » veut dire.*
+
+**⚠ DEUX DECLARATIONS ETAIENT DEJA FAUSSES, ET AUCUNE DES DEUX N'EST DE CE LOT.**
+
+- **l'en-tete du fichier** disait *« `POST /ssh-audit/schedules`, et rien d'autre. Ni DELETE, ni
+  toggle, NI AUCUNE DES ROUTES QUI JOIGNENT UNE MACHINE »*. Mesure : **trois** routes
+  (`:246`, `:335`, `:583`), et **`/ssh-audit/scan` OUVRE une session SSH** (`ssh_audit.py:133`).
+  La clause la plus fausse etait celle qui promettait le plus. L'en-tete ENUMERE desormais,
+  avec le numero de ligne de chaque appel ;
+- **le paragraphe SEC-013** affirmait que `POST /ssh-audit/policies` etait moins gardee que sa
+  lecture. **`356caea`, aujourd'hui, y a ajoute `@require_permission('can_audit_ssh')` et
+  `@require_machine_access`.** Une declaration qui cite l'etat d'un AUTRE depot doit citer sa
+  mesure et sa date, sinon elle devient une croyance datee de rien ;
+- **`portee_texte` disait « n'ecrit rien »** — meme defaut que celui de wazuh la veille, vu a
+  l'image. Il distingue desormais les gestes qui ouvrent une session SSH de ceux qui n'ecrivent
+  qu'en base, *dont l'echeance, elle, en ouvrira*.
+
+**Tests.** 20 assertions au navigateur, 0 FAIL, trois largeurs, captures REGARDEES.
+Helpers eprouves en executant le script dans un DOM minimal : 6 appels, 0 FAIL, methode figee,
+aucune traversee de chemin. **Temoin inverse** : la coercition retiree sur une COPIE,
+`supprimePlanif('../../ssh-audit/scan')` fabrique une traversee vers la route qui ouvre une
+session SSH. `node --check`, `php -l`, parite FR/EN par PHP : **121 = 121**, et 74 cles
+employees par le JS, 0 absente.
+
+**⚠ AUCUNE ECRITURE N'A ETE EXECUTEE.** Pour rendre les deux boutons a l'image, la LECTURE a
+ete interceptee dans le navigateur et deux planifications fictives rendues — le DOM et le code
+sont les vrais, **rien n'est ecrit nulle part**. Creer une vraie planification armerait un
+releve SSH recurrent, le geste meme que ce lot sert a desarmer. **Ce que cela ne prouve pas :
+que le backend accepte le DELETE et le toggle.**
+
+**Notes exploitation.** Aucune migration ; `RoutesBackend` n'est PAS touche — l'entree
+`/ssh-audit/schedules` couvre deja `<id>` et `<id>/toggle` par comparaison de segment
+(`:238`). **Garde heritee, relevee et non corrigee** : les deux routes portent
+`@require_role(2)` seul, donc un compte role 2 depourvu de `can_audit_ssh` les atteint par la
+passerelle — le meme trou que `POST /ssh-audit/schedules` documente a `RoutesBackend:277`. Il
+est moins grave dans le sens du desarmement, mais `toggle` permet aussi de RE-ARMER. La garde
+vit dans le backend.
+
+---
+
 ## [1.41.1] - 2026-09-05
 
 ### Securite - E-392 : l'ECRITURE d'une politique SSH etait moins gardee que sa LECTURE

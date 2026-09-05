@@ -19798,3 +19798,104 @@ cliqués. Les trois gestes écrivent dans une base partagée, et la configuratio
 fera la prochaine installation. **Le chemin d'écriture est donc vérifié par lecture et par la
 liste fermée, pas au réseau** — comme les trois non-mesures d'E-397/E-399, et pour la même
 raison : le geste appartient à l'exploitant.
+
+---
+
+## E-401 — A5 : on armait un relevé SSH récurrent depuis le portail neuf, on ne le désarmait que depuis celui qu'on éteint
+
+**Porté :** `DELETE /ssh-audit/schedules/<id>` et `POST /ssh-audit/schedules/<id>/toggle`.
+Les deux n'ouvrent **aucune** session SSH et n'écrivent qu'en base.
+
+**Ce n'est pas une capacité manquante.** L'ordonnanceur tourne dans un fil invisible à `ps`,
+une planification est **récurrente**, son échéance ne demande la permission de personne, et son
+objet est *une session SSH sur les machines de sa portée*. **Le portage laissait donc un geste
+ACTIF sans son interrupteur** — et le jour où le legacy s'éteint, l'interrupteur part avec lui
+pendant que la planification reste en base.
+
+*Le défaut est LATENT : `ssh_audit_schedules` porte 0 ligne (témoin `machines = 3`). C'est
+l'extinction qui le rendrait urgent, pas l'usage.*
+
+### ⚠ L'en-tête du fichier était DÉJÀ faux, sur trois points, avant ce lot
+
+L'arbitrage m'avait prévenue que mon commit périmerait la déclaration de périmètre. **Elle
+l'était avant lui.** Mesure — `grep 'ecris('` :
+
+    :246  ecris('/ssh-audit/scan',      …)   backend:120 -> ssh_session(…)
+    :335  ecris('/ssh-audit/config',    …)   backend:362
+    :583  ecris('/ssh-audit/schedules', …)
+
+L'en-tête disait *« `POST /ssh-audit/schedules`, et rien d'autre. Ni `DELETE`…, ni `toggle`,
+**ni aucune des routes qui joignent une machine** »*. Il y en avait **trois**, et
+**`/ssh-audit/scan` OUVRE une session SSH** (`ssh_session(ip, port, user, …)`,
+`ssh_audit.py:133`). *La clause la plus fausse était celle qui promettait le plus.*
+
+> **Une déclaration de périmètre ne vieillit pas toute seule : elle est périmée par un geste,
+> et le geste ne la relit pas.** L'en-tête ÉNUMÈRE désormais, ligne par ligne, avec le numéro
+> de ligne de chaque appel — *un lecteur peut le réfuter sans quitter le fichier.*
+
+**Et une seconde déclaration a été périmée par une AUTRE session, pendant ce lot** : le
+paragraphe SEC-013 affirmait que `POST /ssh-audit/policies` était moins gardée que sa lecture.
+`356caea` (2026-09-05) y a ajouté `@require_permission('can_audit_ssh')` et
+`@require_machine_access`. *Ce que le portage n'offre pas, il ne l'offre plus faute de
+PORTAGE, pas faute de garde.* **Une déclaration qui cite l'état d'un AUTRE dépôt doit citer sa
+mesure et sa date, sinon elle devient une croyance datée de rien.**
+
+### Deux helpers NOMMÉS, et l'identifiant forcé en entier
+
+Pas de `envoie(methode, chemin)` : il aurait ouvert DELETE et POST sur tout chemin. C'est la
+décision déjà prise dans `groupes.js`. **Et l'URL est construite DANS le helper** —
+`'/ssh-audit/schedules/' + id` avec un `id` venu d'ailleurs est une URL construite, invisible à
+tout relevé par motif, la forme exacte que `wazuh` vient de payer.
+
+`Number(id) | 0` rend un entier ou zéro, et le backend route sur `<int:schedule_id>` : zéro ne
+vise aucune ligne existante.
+
+**Éprouvé en exécutant, 6 appels, 0 FAIL** — méthode figée, aucune traversée de chemin.
+**Témoin inverse** : la coercition retirée sur une COPIE, `supprimePlanif('../../ssh-audit/scan')`
+part en `DELETE …/schedules/../../ssh-audit/scan`. *La mutation fabrique une traversée vers la
+route qui ouvre une session SSH — l'instrument mord, et il mord sur le bon danger.*
+
+### L'asymétrie est voulue : suspendre part direct, réactiver passe par le panneau
+
+**Suspendre est le geste qui DÉSARME.** Y mettre une friction rendrait l'arrêt d'un relevé SSH
+récurrent plus pénible que son armement — l'inverse de ce qu'on veut. **Réactiver ARME** : son
+échéance ouvrira des sessions SSH, il s'annonce donc avant.
+
+Et la suppression vise `p`, l'objet **affiché** — jamais un identifiant repris d'un champ de
+saisie. *C'est le défaut du legacy que le portage vient de corriger sur les règles wazuh, et il
+est ici aussi.* Le panneau nomme l'intitulé, la portée et la prochaine échéance.
+
+### ⚠ Ce que l'écran ne peut PAS promettre, et deux mesures l'imposent
+
+    toggle  `SET enabled = NOT enabled`  (ssh_audit.py:921)   bascule AVEUGLE
+    DELETE  rend success: True SANS regarder rowcount (:903)
+
+**Un écran qui prédirait l'état obtenu après une bascule aveugle mentirait une fois sur deux
+dès que deux personnes agissent.** Les deux gestes RELISENT donc la liste, et les libellés
+disent que *c'est la liste relue qui fait foi, pas le bouton*.
+
+*Et `delete_rule` de wazuh rend `deleted > 0` : **deux routes du même dépôt, deux conventions
+opposées** sur ce que « supprimé » veut dire.*
+
+### `portee_texte` disait « n'écrit rien » — vu à l'image, encore
+
+Même défaut que le `portee_texte` de wazuh, et même famille : la carte était vraie quand la
+page ne lisait que. Elle dit désormais ce que la page écrit, **et distingue** les gestes qui
+ouvrent une session SSH de ceux qui n'écrivent qu'en base — *dont l'échéance, elle, en ouvrira.*
+
+### Ce qui n'est PAS mesuré, et c'est annoncé
+
+**Aucune écriture n'a été exécutée.** Pour photographier les deux boutons, la **lecture** a été
+interceptée dans le navigateur et deux planifications fictives rendues : le DOM est le vrai, le
+code rendu est le vrai, **et rien n'est écrit nulle part**. *Créer une vraie planification
+armerait un relevé SSH récurrent — le geste même que ce lot sert à désarmer.*
+
+**Ce que cela ne prouve pas, et il faut le dire : que le backend accepte le DELETE et le
+toggle.** Cette moitié-là reste non mesurée, et elle appartient à l'exploitant.
+
+**Et une garde héritée, qui n'est pas corrigée ici** : les deux routes portent
+`@require_role(2)` SEUL. `RoutesBackend:277` documente déjà qu'un compte role 2 **dépourvu** de
+`can_audit_ssh` atteint `POST /ssh-audit/schedules` par la passerelle ; **mes deux routes
+héritent du même trou**. Il est moins grave dans le sens du désarmement — qui peut armer peut
+désarmer — mais `toggle` permet aussi de **ré-armer**. *Relevé, non corrigé : la garde vit dans
+le backend.*

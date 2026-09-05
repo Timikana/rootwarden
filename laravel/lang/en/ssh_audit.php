@@ -70,7 +70,7 @@ return [
     'planif_cible_ambigue' => "'The whole fleet' is both a legitimate choice and what an incomplete target produces — a tag whose field was left blank. Both go through the same path, and nothing afterwards tells which one was used.",
 
     'portee_titre' => 'What this page can do today',
-    'portee_texte' => 'It reads: the readings already taken, the policy applied, the fleet state and the scheduled readings. It joins no machine and writes nothing.',
+    'portee_texte' => "It reads: the readings already taken, the policy applied, the fleet state and the scheduled readings. It also WRITES: it audits a server — which OPENS an SSH session on it — it reads its sshd_config, and it arms, suspends or deletes a scheduled reading. The three schedule actions write only to the database and join no machine; it is their DUE TIME that will open the SSH sessions, asking no one for permission.",
 
     // A button label says what it DOES; the explanation lives in the panel.
     'btn_relever' => 'Read this server',
@@ -80,6 +80,27 @@ return [
     'historique_choisir' => 'Choose a server to see its previous readings.',
     'np_titre'  => 'Not ported yet',
     'np_ouvrir' => 'Open in the old portal',
+    /* A5 — disarming a schedule. Two measurements shape these labels:
+     * `toggle` does `SET enabled = NOT enabled` — a BLIND flip, not a set, so
+     * the screen must RE-READ the state instead of announcing it; and `DELETE`
+     * returns success: True without checking rowcount. See fr. */
+    'planif_suppr_titre'   => 'Delete this schedule',
+    'planif_suppr_texte'   => 'The schedule is removed from the database. No machine is joined by this action, and nothing is restored: there is no undo.',
+    'planif_suppr_court'   => 'Delete',
+    'planif_suppr_valider' => 'Delete the schedule',
+    'planif_suppr_faite'   => 'Schedule deleted. The list is re-read below.',
+    'planif_suppr_echec'   => 'Deletion failed: :message',
+
+    'planif_suspendre'     => 'Suspend',
+    'planif_reactiver'     => 'Resume',
+    'planif_bascule_faite' => 'State changed. The list is re-read below — it is the list that states the result, not this button.',
+    'planif_bascule_echec' => 'The state change failed: :message',
+    'planif_bascule_aveugle' => 'This button INVERTS the stored state; it does not set it. If someone changed it meanwhile, the result is the opposite of what this screen displayed — the re-read list is what counts.',
+
+    'planif_ce_qui_est_arme' => 'What this schedule triggers when it comes due: an SSH audit on the machines in its scope. Its due time asks no one for permission.',
+    'planif_prochaine_le'    => 'Next run:',
+    'planif_aucune_echeance' => 'no run time recorded',
+
     'np_fermer' => 'Close',
     'np_sur_serveur' => 'Target server: :nom',
     // A4: the reading of a server IS ported. `np_relever_detail` does NOT move
