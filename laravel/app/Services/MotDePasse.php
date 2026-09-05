@@ -49,6 +49,71 @@ class MotDePasse
     }
 
     /**
+     * Met le hache d'un compte au cout courant, a la connexion.
+     *
+     * ══ POURQUOI ICI, ET NULLE PART AILLEURS ══════════════════════════════
+     *
+     * Re-hacher demande le mot de passe EN CLAIR, et il n'existe qu'a un seul
+     * instant du produit : celui ou quelqu'un vient de le saisir et ou il vient
+     * d'etre verifie. *Aucune tache de fond ne peut faire ce geste, parce
+     * qu'aucune tache de fond ne detient le clair.*
+     *
+     * ⚠ ET LE COUT SE LIT A LA MEME SOURCE QUE CELUI DES ECRIVAINS.
+     *
+     * `Hash::needsRehash()` de Laravel serait l'equivalent APPARENT. Il ne l'est
+     * pas : il compare a `hashing.bcrypt.rounds`, qui lit `BCRYPT_ROUNDS`, tandis
+     * que **tous** les ecrivains de mot de passe du portage lisent `BCRYPT_COST`.
+     * Mesure du 2026-09-05, en forcant `BCRYPT_COST` a 13 en memoire :
+     *
+     *     motif du projet                       -> $2y$13$
+     *     Hash::make                            -> $2y$12$
+     *     Hash::needsRehash sur un cout 12      -> NON
+     *     password_needs_rehash, cout projet    -> OUI
+     *
+     * *Ecrire ce geste avec `Hash::` aurait produit une remise a niveau qui ne se
+     * declenche jamais, dans le seul cas de figure ou elle existe.* Et le `.env`
+     * pose `BCRYPT_ROUNDS=12` sans poser `BCRYPT_COST` : la divergence n'est pas
+     * une hypothese, c'est le chemin par defaut.
+     *
+     * ⚠ UN ECHEC NE CASSE PAS LA CONNEXION — MAIS IL SE JOURNALISE.
+     * Le legacy avale l'exception sans rien dire (`login.php:166`,
+     * `catch (\Exception $e) {}`). *Une mise a niveau qui echoue en silence ne se
+     * distingue pas d'une mise a niveau qui n'a jamais ete ecrite* — et c'est
+     * exactement le defaut que le commentaire du legacy raconte avoir corrige.
+     *
+     * @return bool le hache a-t-il ete remplace
+     */
+    public function rehacheSiNecessaire(int $idCompte, string $hacheActuel, string $clair): bool
+    {
+        if (! password_needs_rehash($hacheActuel, PASSWORD_BCRYPT, ['cost' => $this->cout()])) {
+            return false;
+        }
+
+        try {
+            DB::table('users')->where('id', $idCompte)->update([
+                'password' => password_hash($clair, PASSWORD_BCRYPT, ['cost' => $this->cout()]),
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('[mot de passe] remise a niveau du cout impossible pour le compte '
+                . $idCompte . ' : ' . $e->getMessage());
+
+            return false;
+        }
+
+        /*
+         * `password_updated_at` N'EST PAS TOUCHEE, ET C'EST VOULU. Le mot de
+         * passe n'a pas change : seule sa representation a ete renforcee.
+         * Deplacer la date ferait croire a un changement qui n'a pas eu lieu, et
+         * repousserait une expiration que personne n'a demande a repousser.
+         *
+         * `password_history` non plus : elle sert a refuser la REUTILISATION, et
+         * le mot de passe reste le meme. Y ecrire le ferait refuser a son
+         * proprietaire au prochain changement.
+         */
+        return true;
+    }
+
+    /**
      * La complexite locale. Rend `null` si le mot de passe passe, sinon la cle du
      * message. Le legacy rend UNE seule cle pour les cinq regles : on garde ce
      * choix, parce que detailler quelle regle a echoue renseigne autant l'attaquant

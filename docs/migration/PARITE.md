@@ -20249,3 +20249,88 @@ minutes.
 **Règle que je m'applique : vérifier puis commiter dans le MÊME geste, et remettre
 la mesure d'après à après le commit.** *Ce qui n'est pas dans l'historique n'existe
 que jusqu'au prochain geste d'un tiers.*
+
+---
+
+## E-414 — le re-hachage bcrypt à la connexion, et **l'équivalent Laravel n'en était pas un**
+
+**Porté :** `legacy/auth/login.php:162-167` → `MotDePasse::rehacheSiNecessaire()`, appelé par
+`ConnexionController` juste après une vérification de mot de passe réussie. Côté portage avant
+ce lot : **0 occurrence** de `password_needs_rehash` / `rehash` (témoin : `Hash::` n'est employé
+nulle part non plus — le portage hache par `password_hash` explicite).
+
+**C'est le seul instant du produit où le mot de passe en clair existe.** *Aucune tâche de fond
+ne peut faire ce geste : aucune ne détient le clair.*
+
+### ⚠ « Laravel a l'équivalent exact » — il ne l'a pas
+
+L'arbitrage proposait `Hash::needsRehash()` + `Hash::make()`. **Ils comparent à une AUTRE
+source de coût.** Mesuré le 2026-09-05 en forçant `BCRYPT_COST` à 13 **en mémoire, dans un seul
+processus** :
+
+    motif du projet                    ->  $2y$13$
+    Hash::make                         ->  $2y$12$
+    Hash::needsRehash sur un cout 12   ->  NON
+    password_needs_rehash, cout projet ->  OUI
+
+    rootwarden.bcrypt_cost        <- env BCRYPT_COST      employe par TOUS les ecrivains
+    rootwarden.mot_de_passe.cout  <- env BCRYPT_COST      (deux cles, UN env)
+    hashing.bcrypt.rounds         <- env BCRYPT_ROUNDS    lu par `Hash::` SEUL
+
+**Et `.env` pose `BCRYPT_ROUNDS=12` sans poser `BCRYPT_COST`.** *La divergence n'est pas une
+hypothèse : c'est le chemin par défaut.* Relever le coût du projet ne toucherait pas
+`BCRYPT_ROUNDS`, donc `Hash::needsRehash` répondrait « non » **exactement dans le seul cas de
+figure où ce geste existe**.
+
+> **Un équivalent qui lit une autre source de vérité n'est pas un équivalent.** *Écrit avec
+> `Hash::`, ce lot aurait produit une remise à niveau qui ne se déclenche jamais — et son
+> absence aurait été aussi indétectable qu'aujourd'hui.*
+
+### Le geste est DORMANT, et c'est la raison de l'écrire
+
+    12 comptes en base, TOUS en `$2y$12$`   ·   cout courant : 12
+    -> la condition ne se declenche jamais aujourd'hui
+
+*Son absence est indétectable tant que le coût ne bouge pas. Le jour où quelqu'un le relève,
+les comptes existants gardent l'ancien — indéfiniment, sans que rien ne le signale.* **C'est le
+raisonnement qui a fait porter l'onboarding : ce qui ne se réclame jamais est ce qui disparaît
+le plus sûrement.**
+
+### ⚠ Et le legacy raconte lui-même ce piège
+
+> *« Patch A02 : re-hash si le coût bcrypt stocké est inférieur au coût courant. **Avant, le
+> commentaire l'annonçait mais ce n'était pas fait.** »* (`login.php:159-161`)
+
+**Le portage avait hérité de la version corrigée du commentaire et pas du geste.** Le geste est
+donc écrit **dans le même commit** que son commentaire, et **une assertion le mord sur un
+compte forgé au coût 10** — un test sur les douze comptes déjà au coût courant serait passé à
+vide.
+
+### Trois choix, contre le legacy
+
+- **l'échec se JOURNALISE.** Le legacy avale l'exception sans rien dire (`catch (\Exception $e) {}`).
+  *Une mise à niveau qui échoue en silence ne se distingue pas d'une mise à niveau jamais
+  écrite* — c'est-à-dire du défaut que son propre commentaire raconte avoir corrigé. L'échec ne
+  casse pas la connexion : le mot de passe est bon, la personne entre ;
+- **`password_updated_at` n'est PAS déplacée.** Le mot de passe n'a pas changé, seule sa
+  représentation a été renforcée. *Déplacer la date ferait croire à un changement qui n'a pas eu
+  lieu, et repousserait une expiration que personne n'a demandé à repousser* ;
+- **rien n'est écrit dans `password_history`.** Elle sert à refuser la RÉUTILISATION, et le mot
+  de passe reste le même : y écrire le ferait refuser à son propriétaire au prochain changement.
+
+### Ce qui est mesuré, et comment
+
+    14 cas · 0 FAIL · en TRANSACTION ANNULEE, sur un compte FORGE au cout 10
+    idempotence · le mot de passe reste le meme · un autre reste refuse
+    password_updated_at inchangee · 0 ligne dans password_history
+    etat du hache verifie APRES l'annulation
+
+**Témoin inverse : 4 FAIL, et ce sont les quatre bonnes.** La condition remplacée par `if (true)`
+sur une **copie renommée** — jamais en place.
+
+**⚠ Et le premier témoin de ce lot était VACANT.** Il employait `python3`, absent du conteneur :
+la mutation n'a pas été appliquée, et le harnais a rendu « 14 cas · 0 FAIL » — *un résultat qui
+ressemblait à une mesure réussie.* Le harnais porte désormais **quatre gardes d'entrée** :
+l'empreinte doit changer, `php -l` doit passer, la classe doit être renommée, et la mutation
+doit être **présente dans le fichier**. *Une mutation qui ne s'applique pas est déclarée, jamais
+comptée.*

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
+use App\Services\MotDePasse;
 use App\Services\SessionsActives;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -18,6 +19,10 @@ use Illuminate\View\View;
  */
 class ConnexionController extends Controller
 {
+    public function __construct(private readonly MotDePasse $motDePasse)
+    {
+    }
+
     /** Duree du verrouillage apres trop d'echecs, en secondes. */
     private const VERROU_SECONDES = 900;
 
@@ -69,6 +74,37 @@ class ConnexionController extends Controller
         // session (anti-fixation) et on passe la main au second facteur.
         DB::table('users')->where('id', $compte->id)
             ->update(['failed_attempts' => 0, 'locked_until' => null]);
+
+        /*
+         * ══ LA REMISE A NIVEAU DU COUT BCRYPT ════════════════════════════
+         *
+         * **C'est le seul instant du produit ou le mot de passe en clair
+         * existe** — quelqu'un vient de le saisir, et il vient d'etre verifie.
+         * Aucune tache de fond ne peut faire ce geste : aucune ne detient le
+         * clair. C'est pour cela qu'il vit ici et nulle part ailleurs.
+         *
+         * ⚠ IL EST DORMANT AUJOURD'HUI, ET C'EST LA RAISON DE L'ECRIRE. Les
+         * douze comptes de cette base portent tous `$2y$12$`, et le cout courant
+         * vaut 12 : la condition ne se declenche jamais. *Son absence serait donc
+         * indetectable jusqu'au jour ou quelqu'un releve le cout — et ce jour-la
+         * les comptes existants garderaient l'ancien, indefiniment, sans que rien
+         * ne le signale.*
+         *
+         * ⚠⚠ ET LE COMMENTAIRE DU LEGACY RACONTE PRECISEMENT CE PIEGE :
+         * *« Avant, le commentaire l'annoncait mais ce n'etait pas fait »*
+         * (`login.php:159-161`). Le portage avait herite de la version corrigee
+         * du commentaire et pas du geste. **Le geste est ici, et une assertion le
+         * mord sur un compte FORGE au cout 10** — un test sur les douze comptes
+         * deja au cout courant passerait a vide.
+         *
+         * L'echec ne casse pas la connexion : le mot de passe est bon, la
+         * personne entre. Il se JOURNALISE — voir le service.
+         */
+        $this->motDePasse->rehacheSiNecessaire(
+            (int) $compte->id,
+            (string) $compte->password,
+            (string) $donnees['password'],
+        );
 
         $requete->session()->regenerate();
         $requete->session()->put('compte_temporaire', [
