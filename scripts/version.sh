@@ -190,7 +190,28 @@ case "${1:-}" in
     --epreuve) epreuve ;;
     --ecrire)
         v="$(derive)"
-        printf '%s\n' "$v" > "$RACINE/$FICHIER_PRODUIT"
+        # ══ ECRITURE ATOMIQUE, ET ELLE N'EST PAS DECORATIVE ═══════════════════
+        #
+        # La forme precedente etait `printf … > "$FICHIER"`. Le shell TRONQUE le
+        # fichier a l'ouverture de la redirection, AVANT que `printf` n'ecrive :
+        # il existe une fenetre ou `version.txt` fait ZERO octet.
+        #
+        # `Version::numero()` y lit alors '', sa regex `^\d+\.\d+\.\d+$`
+        # echoue, il rend `null`, et le pied de page affiche « Version inconnue ».
+        # Ce n'est pas une hypothese : une capture du 2026-09-05 le porte, alors
+        # que le fichier est parfaitement lisible avant et apres.
+        #
+        # Un defaut TRANSITOIRE laisse un etat final correct — c'est le mecanisme
+        # d'ECRITURE qu'il faut regarder, jamais le lecteur.
+        #
+        # `mv` sur le meme systeme de fichiers est un `rename(2)` : le fichier
+        # passe d'une version complete a l'autre, sans etat intermediaire.
+        if [ -z "$v" ]; then
+            echo "version.sh: la derivation n'a rien rendu — RIEN N'EST ECRIT" >&2
+            exit 1
+        fi
+        tmp="$(mktemp "$RACINE/$FICHIER_PRODUIT.XXXXXX")"
+        printf '%s\n' "$v" > "$tmp" && mv -f "$tmp" "$RACINE/$FICHIER_PRODUIT"
         echo "$v -> $FICHIER_PRODUIT"
         ;;
     "") derive ;;
