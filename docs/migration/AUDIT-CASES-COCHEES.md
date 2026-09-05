@@ -126,3 +126,95 @@ travail, pas un ajustement.**
   catégories des modules que je n'ai pas audités — `admin`, `updates`, `ssh`,
   `monitoring` — sont **non tranchées**, et ce sont 23 des 53.*
 - **aucune écriture hors `docs/`, aucun geste exercé.**
+
+---
+
+## 6. LES 23 NON TRANCHÉES — reprises le 2026-09-06, 00:44 CEST
+
+**Résultat partiel et dit comme tel : 4 classées sur 22 distinctes, dont une
+CINQUIÈME catégorie que la taxonomie ne portait pas.**
+
+### 6.1 ⚠ Ma première sonde sur-matchait à l'échelle — corrigée par ancrage
+
+Mon relevé initial cherchait les chemins **sans délimiteur** :
+
+```
+/test                    101 « occurrences »   <- « test » est partout
+/deploy                   27
+/list_machines            17
+```
+
+**Le piège de la sous-chaîne, à l'échelle.** *Chercher `/test` attrape `latest`,
+`tests`, `test-server`…*
+
+**Ancré** — le chemin doit être délimité par un guillemet, une parenthèse, une
+espace ou une fin :
+
+```
+motif = ['"`( ] + chemin + (['"`)? ,]|$)
+```
+
+**Témoins de l'ancrage, posés avant de relire les chiffres :**
+
+| témoin | attendu | obtenu |
+|---|---|---|
+| `/test` | doit **chuter** | **101 → 6** |
+| `/server_users_inventory` | doit **rester à 0** | **0** |
+
+*Les deux se comportent comme prévu — un témoin qui ne bouge pas et un qui
+s'effondre qualifient l'ancrage mieux qu'un seul.*
+
+### 6.2 Ce qui est classé
+
+| route | verdict | fondement |
+|---|---|---|
+| `/admin/temp_permissions` ×2 | **FAUX POSITIF — forme 4** | `Services/Permissions.php` fait `DB::table('temporary_permissions')` ×3. *Le portage réimplémente en Laravel.* |
+| `/cve_trends` | **trou connu**, promis par `openapi.yaml` | déjà relevé |
+| `/server_users_inventory` | **⚠ JAMAIS CÂBLÉE** | n'apparaît que dans sa propre définition, la liste blanche, et **7 documents** |
+| `/admin/notification_prefs` | **⚠ JAMAIS CÂBLÉE** | n'apparaît que dans sa définition et **5 documents** — dont `DOSSIER-21-LISTE-BLANCHE-ORPHELINE.md`, qui la nommait déjà |
+
+### 6.3 ⚠ UNE CINQUIÈME CATÉGORIE : *jamais câblée*
+
+**Ces deux routes n'ont d'appelant NULLE PART** — ni portage, ni legacy vivant,
+ni `_deprecated/`, ni `tests/`. **Elles n'apparaissent que dans leur propre
+définition et dans de la documentation.**
+
+> **Ce n'est aucune des quatre.** Pas *orpheline par dépréciation* — **rien n'a
+> jamais été déprécié, parce que rien n'a jamais été construit dessus.** Pas
+> *retenue par arbitrage* — aucune décision ne la concerne. Pas un *trou dans un
+> sous-lot déclaré complet* — aucun sous-lot ne l'a revendiquée. Pas un *témoin
+> disparu* — aucune suite n'en dépend.
+>
+> **Elles ont été écrites, gardées, mises en liste blanche, documentées — et
+> jamais appelées par personne.**
+
+| mécanisme | trace laissée | remède |
+|---|---|---|
+| dépréciation | un `_deprecated/` | arbitrer ce qu'on garde |
+| arbitrage | un dossier ouvert | décider |
+| sous-lot déclaré complet | **une case cochée** | finir, et corriger la déclaration |
+| témoin disparu | **une suite rouge sur un objet sain** | réoutiller |
+| **jamais câblée** | **de la DOCUMENTATION, et rien d'autre** | **décider si on la garde ou on la retire** |
+
+**La trace de la cinquième est la plus trompeuse des cinq** : *elle est
+abondante, elle est écrite, elle est exacte* — **et elle décrit une capacité que
+personne n'a jamais pu employer.** *Sept documents parlent de
+`/server_users_inventory`. Aucun code ne l'appelle.*
+
+### 6.4 Ce qui reste NON TRANCHÉ — 17 sur 22, et je ne le devine pas
+
+`/apt_check_lock` · `/apt_update` · `/custom_update` · `/deploy` ·
+`/exclude_user` · `/list_machines` · `/logs` · `/preflight_check` ·
+`/schedule_update` · `/server_lifecycle` · `/server_user_keys` ·
+`/server_user_remove_key` · `/test` · `/update-logs` ·
+`/update_security_exec` · `/update_zabbix` · `/admin/user_inventory/classify{,_bulk}`
+
+**Chacune exige une lecture** : le portage réimplémente-t-il la capacité
+ailleurs ? une suite en dépend-elle comme étalon ? *Le comptage réduit l'espace ;
+il ne tranche pas.*
+
+**⚠ Et deux d'entre elles portent un indice à ne pas confondre avec un verdict** :
+`/server_lifecycle` a **5** références dans `tests/`, `/deploy` en a **10**.
+*Beaucoup de références de test peut signifier « étalon de mesure » — la
+quatrième catégorie — ou simplement « capacité bien testée ».* **Le nombre ne
+distingue pas les deux.**
