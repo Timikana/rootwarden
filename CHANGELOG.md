@@ -5,6 +5,38 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.53.0] - 2026-09-05
+
+### Extinction - vague 4 : trois fichiers liberes par les livraisons de la flotte
+
+    .php metier servis   35 -> 32     (82 ce matin)
+    archives             66 -> 69     (19 ce matin)
+    feuilles             20 . temoin Q4 : api_proxy -> 10 appelants (sain)
+
+Deux des trois ne sont pas partis par un progres de l'extinction, mais parce qu'un
+PORTAGE a leve leur Q3 :
+
+    adm/api/audit_seal.php        le bouton « Sceller » est desarme (v1.50.0)
+    adm/api/update_user.php       `password_expiry_override` est porte (E-419)
+    adm/includes/manage_permissions.php   LECTURE PURE, aucune ecriture
+
+> **Un arbitrage rendu ne libere rien ; c'est sa LIVRAISON qui libere.** *Les trois
+> etaient annonces bloques dans la consigne de mission au tour precedent, et les trois
+> etaient deja debloques quand je l'ai remesuree.*
+
+#### ⚠ Une correction de la sonde Q4
+Elle comptait un fichier comme APPELE quand un COMMENTAIRE le nommait. *Mon propre
+commentaire de retrait dans `profil.blade.php` faisait ressortir `profile.php` comme
+appele par le portage.* **Les commentaires sont desormais depouilles avant le comptage,
+blocs `/* */` et `{{-- --}}` compris.**
+
+#### Verifie au reseau
+    /adm/api/audit_seal.php    404   ·   /adm/api/update_user.php   404
+    /api_proxy.php             302   ·   /auth/login.php            200
+    portage /journal-audit     302   ·   /profil                    302
+
+---
+
 ## [1.52.1] - 2026-09-05
 
 ### Profil - une tuile annoncait un manque qui n'existait pas, et renvoyait vers un portail qui ne le comblait pas
