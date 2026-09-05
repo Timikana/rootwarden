@@ -10830,3 +10830,316 @@ activé. **Mais `ExigePermission` et `MotDePasse` côté portage, et deux fichie
 refusée.
 
 *Je ne les corrige pas maintenant : le banc mesure, et `laravel/` est gelé.*
+
+---
+
+## E-425
+
+### Une URL legacy archivée est un cul-de-sac SANS SORTIE — mesuré, pas supposé
+
+**La session du banc me renvoie une question que son outillage ne peut plus poser** :
+`verifieMenuLegacy` échoue là où il devrait s'abstenir, parce que `/index.php` — la page qui
+PORTAIT le menu — est archivée. L'exigence n°3 du contrat d'archivage disait *« l'entrée de
+menu du legacy mène désormais au portage, et non au 404 qu'on vient de créer soi-même »*.
+**Elle est devenue non mesurable.** *La question qui reste n'est pas de son ressort.*
+
+### La mesure, au réseau, sur le bon port
+
+⚠ **Ma première sonde a rendu `301` sur TOUT, témoin compris** — je mesurais la redirection
+HTTP→HTTPS, pas le contenu. *Et la redirection pointe vers `https://localhost:8080` alors que
+le TLS écoute sur `8443` : elle est cassée sur ce port.* **Le port et le schéma font partie de
+la sonde.**
+
+    https://localhost:8443/...        code   taille   liens   mentions du portage
+    /_deprecated/terms.php            404     236 o     0            0
+    /index.php                        404     236 o     0            0
+    /tasks/                           404     236 o     0            0
+    /adm/manage_users.php             404     236 o     0            0
+    /terms.php                        404     236 o     0            0
+
+    TEMOIN  /auth/login.php           200    4864 o     6            —
+
+**236 octets, zéro lien : c'est la page 404 nue d'Apache.** *Le témoin rend 200 avec six
+liens, donc l'instrument voit — les zéros sont des absences, pas des angles morts.*
+
+> **Un utilisateur qui suit un signet vers n'importe quelle page archivée reçoit une page
+> vide qui ne nomme pas le portail, ne le lie pas, et ne dit pas que quelque chose a
+> déménagé.** *Nous avons éteint le legacy sans laisser d'adresse.*
+
+### DÉCISION — garder le CODE, corriger le CORPS
+
+**`ErrorDocument 404` vers une page statique qui nomme le portail et le lie.**
+
+*Le statut 404 est CONSERVÉ, et c'est le point qui décide* : les 72 suites qui appellent
+`constateArchivage` asserteront toujours le même code, et le contrat d'archivage tient. **Une
+redirection vers le portail casserait ce contrat ET masquerait les vrais 404.**
+
+    ⛔ NON :  Redirect / vers le portail   -> casse le constat d'archivage,
+                                             masque les 404 legitimes
+    ✅ OUI :  ErrorDocument 404 <page>     -> le code ne bouge pas, le corps parle
+
+**Geste exact, à poser à la fermeture de la fenêtre** — `legacy/.htaccess` porte déjà
+`RedirectMatch 404 ^/_deprecated/` (ligne 31), la directive se pose à côté.
+
+**Si rien n'est fait** : chaque signet vers une page archivée reste une impasse muette, et
+c'est le même défaut que le bouton `bashrc` qui pointait vers un 404 que nous avions créé.
+
+---
+
+## E-426
+
+### Le bascule de thème n'a JAMAIS été porté — trouvé par l'exploitant, absent de l'inventaire
+
+    legacy/menu.php:200   <button id="theme-toggle">  + soleil et lune en SVG
+                          localStorage['theme'], et `prefersDark` quand rien n'est pose
+    portage               `prefers-color-scheme` dans rw.css, et RIEN d'autre
+                          bascule : 0 · fichier JS de theme : 0
+
+⚠ **Ma première sonde a rendu zéro des deux côtés** — parce qu'elle lisait `legacy/header.php`,
+**qui est archivé**, et que `grep` saute un fichier absent en silence. *Zéro sur la sonde ET
+zéro sur le témoin : la mesure n'avait pas eu lieu.*
+
+> **Le portage SUIT le thème du système et n'offre aucun choix.** *Un utilisateur dont le
+> système est en clair ne peut pas obtenir le sombre — le legacy le lui permettait.*
+
+**C'est une capacité NON PORTÉE qui ne figure dans aucune des 16 de l'inventaire.** *Elle n'y
+figure pas parce que l'inventaire a été construit à partir des ENTRÉES DE MENU, et un bascule
+de thème n'est pas une entrée de menu.* **L'unité de l'inventaire a décidé de ce qu'il pouvait
+voir.**
+
+**DÉCISION : portable, et sans arbitrage** — aucune machine, aucune écriture en base, un
+`localStorage` et un attribut sur la racine. *Le socle de `rw.css` est déjà prêt : il définit
+la palette claire sur `:root` nu et la sombre sous media query.*
+
+---
+
+## E-427
+
+### Le port 8444 n'est pas une adresse : c'est devenu l'IDENTITÉ DE PLATEFORME des suites
+
+**L'exploitant pose la bonne question** : *« si on a remplacé le legacy, Laravel devrait être
+sur 8080/8443 ».* **Le raisonnement est juste, et l'échange n'est pas une ligne de
+`docker-compose`.**
+
+    fichiers citant 8444 : 119   dont 95 dans tests/e2e
+    fichiers citant 8443 : 125
+    fichiers citant 8080 :   7
+
+**Les suites savent surcharger l'adresse** — `const BASE = process.env.E2E_BASE ||
+'http://localhost:8444'`. *Ce n'est donc pas là qu'est le coût.*
+
+### ⛔ LE COUPLAGE QUI DÉCIDE, ET IL EST INVISIBLE
+
+    const CIBLE = /8444|laravel/i.test(BASE) ? 'laravel' : 'legacy';
+
+> **Le numéro de port sert d'IDENTITÉ DE PLATEFORME.** *Déplacer Laravel sur 8443 ferait
+> basculer `CIBLE` sur `'legacy'` dans chacune des 95 suites : elles appliqueraient les
+> attentes de l'ancienne plateforme au portage, silencieusement, et rendraient du VERT en
+> mesurant la mauvaise chose.*
+
+**Un chiffre mesure un objet et se lit comme s'il en mesurait un autre** — c'est le motif que
+ce chantier a payé cinq fois, ici sous sa forme la plus coûteuse : *le port est une adresse,
+il est lu comme un nom.*
+
+### ⚠ Et une mine à désamorcer d'abord
+
+    srv-docker.env:62    LARAVEL_PORT=8444
+    srv-docker.env:338   LARAVEL_PORT=8444      <- la MEME cle, deux fois
+
+**Les deux valeurs concordent aujourd'hui, donc rien n'est cassé.** *Mais éditer la première
+ne changerait rien : la dernière gagne.* **C'est exactement la mine qui m'a fait redémarrer
+les conteneurs pour rien ce soir sur `MAIL_ENABLED`.**
+
+### DÉCISION — l'échange est JUSTE, et il vient APRÈS trois gestes, dans cet ordre
+
+    1. dedoublonner LARAVEL_PORT dans srv-docker.env
+    2. remplacer le predicat de plateforme : `CIBLE` doit se decider sur une
+       variable EXPLICITE (E2E_CIBLE), jamais sur le numero de port
+    3. alors seulement, echanger les publications dans docker-compose.yml
+
+**Tant que 2 n'est pas fait, l'échange rend 95 suites menteuses au lieu de rouges** — *et une
+suite qui ment coûte plus cher qu'une suite qui tombe.* **C'est pourquoi je ne recommande pas
+de commencer par la ligne qui a l'air d'être la réponse.**
+
+---
+
+## E-428
+
+### Ma propre consigne fabriquait le faux manque qu'elle servait à éviter
+
+**J'ai envoyé à deux sessions, à 22:36, la capacité n°1 de la liste des portables, avec sa
+méthode** : *« apparie le catalogue contre ce que son JS APPELLE, jamais contre les routes
+Laravel »*. **Les deux ont livré en huit minutes, et les deux ont trouvé que l'énoncé ne
+portait pas.**
+
+### La réfutation, mesurée
+
+    laravel/public/js/serveurs.js   138 lignes, UN SEUL appel :
+      :114   fetch(PASSERELLE + '/server_status', …)
+    la couche reelle                DIX formulaires HTML
+
+> **Appliquée à la lettre, ma consigne aurait trouvé 1 capacité sur 11 et déclaré les dix
+> autres absentes.** *Un faux manque de la famille exacte que la consigne prétendait
+> prévenir, et produit par elle.*
+
+**Et une cinquième forme, à l'intérieur de la quatrième** :
+
+    serveurs.js:65   formulaire.setAttribute('action', gabarit.replace('__ID__', String(id)))
+
+*Ni un `fetch` composé, ni une route citée dans la vue : un attribut `action` construit par
+remplacement de chaîne depuis un `data-action` posé par le serveur.* **Aucun relevé de `fetch`
+ni de `route()` ne relie ce geste à sa route — et le geste est la SUPPRESSION d'un serveur.**
+
+### Pourquoi je l'avais énoncée ainsi, et c'est le vrai enseignement
+
+**Sur `security/` et `iptables`, les gestes passent EFFECTIVEMENT par le JS.** *La consigne y
+était exacte, deux fois. Je l'ai généralisée depuis deux cas qui la vérifiaient.*
+
+> **C'est l'énumération contre le mécanisme — mais dans une CONSIGNE et non dans un relevé.**
+> *Un relevé faux dort. Une consigne fausse s'exécute, autant de fois qu'on la transmet.*
+
+**Ma règle générale portait** — *« cherche la COUCHE, pas seulement le nom »*. **Mon énoncé
+opérationnel ne portait pas.** *La règle survit au module ; l'instruction, non — et c'est
+l'instruction qu'on exécute.*
+
+### CORRECTION DE LA MISSION — ne plus demander « ce que le JS appelle »
+
+**Demander : CE QUI PRODUIT UNE REQUÊTE.** *Cinq formes, qui se relèvent séparément, et
+qu'aucun vocabulaire unique n'attrape :*
+
+    1. `fetch` / XHR                       (y compris a prefixe compose)
+    2. `<form action=…>`                   <- la couche oubliee
+    3. une action COMPOSEE par le JS       <- invisible aux deux premieres
+    4. `DB::table()` direct, sans route    <- le cycle de vie des machines
+    5. un lien `<a href=…>`
+
+### Et le compte que ça corrige
+
+**`fail2ban` est CLOS** : 16 chemins côté legacy, 15 côté portage, et les deux manquants sont
+`install` et `restart` — *exactement les deux que j'interdis de porter.* **Les deux capacités
+que j'annonçais « portables plus tard » — désactiver une jail, géolocaliser une adresse —
+étaient DÉJÀ PORTÉES**, avec pour `geoip` un commentaire qui réfute une réserve du backend.
+
+> **Huitième fois sur ce chantier qu'une capacité déclarée manquante est déjà présente. Et sur
+> les huit, aucune n'a été trouvée en la portant : toutes l'ont été en la MESURANT.**
+
+**Conséquence pour la liste des onze** : *elle est un catalogue de soupçons, pas de manques.*
+**Apparier avant de porter, toujours — c'est moins cher, et c'est plus souvent la réponse.**
+
+---
+
+## E-429
+
+### La chaîne d'audit EST refermée côté portage — le §1 de ma propre mission est périmé
+
+**Ma consigne de 21:35 dit** : *« 15 lignes nues depuis le redémarrage, écrites par
+`ExigePermission.php:73` en `DB::insert` SQL BRUT ».* **C'était vrai à 21:35. Le correctif est
+commité à 22:16:26 (`fe797fc`), et l'énoncé a survécu à son objet.**
+
+### La mesure, en BASE, sur la fenêtre postérieure au correctif
+
+    lignes NUES depuis 20:16:26 UTC :  3
+      id=6353  user=14  20:30:56  « Permission refusee : can_scan_cve »
+      id=6356  user=14  20:32:56  « Permission refusee : can_scan_cve »
+      id=6363  user=14  20:39:27  « Permission refusee : can_deploy_keys »
+    TEMOIN  chainees sur la MEME fenetre : 34   <- la sonde discrimine
+
+**Trois nues, et leur libellé est EXACTEMENT celui d'`ExigePermission`.** *De quoi conclure
+que le correctif ne tient pas — et c'est faux.*
+
+### Ce qui les produit, et la discrimination qui le prouve
+
+    legacy/auth/verify.php:348   $logStmt->execute([$userId, "Permission refusee : $permission"])
+
+**Les deux portails écrivent le MÊME libellé, au caractère près.** *Le libellé ne discrimine
+donc rien.* **Ce qui discrimine, c'est que la voie du portage ne PEUT PLUS écrire nu** :
+
+    JournalAudit::ajoute()   corps depouille de ses commentaires : 24 lignes
+                             UN seul `insert`, et il porte `self_hash` et `prev_hash`
+                             aucun chemin de repli qui ecrirait sans
+
+> **Une ligne nue portant ce libellé ne peut donc venir que du legacy.** *Et le lot en cours
+> joue précisément la moitié LEGACY, sur `rw-test-user` (id 14) — qui est l'auteur des trois.*
+
+### ⚠ Et ma seconde hypothèse a été mesurée avec le MAUVAIS instrument
+
+**J'ai voulu vérifier qu'un opcache périmé ne servait pas l'ancienne classe.** *`php -r
+opcache_get_status()` dans le conteneur a rendu « pas en cache » — et cette mesure ne vaut
+rien : elle est prise dans un processus CLI, qui a son propre cache, pas dans le processus
+Apache qui SERT.*
+
+**Je ne l'ai pas mesurée. Je le dis plutôt que de la compter.** *La conclusion tient sans
+elle, par la voie de l'élimination — mais une inférence dans un relevé mesuré se lit comme une
+mesure, et celle-ci portait le nom d'une vérification.*
+
+### Ce qui reste, et ce qui tombe tout seul
+
+    portage   ExigePermission · MotDePasse   -> CHAINENT depuis 22:16:26
+    backend   les onze ecrivains             -> CHAINENT depuis le redemarrage de 20:31:23
+    legacy    auth/verify.php et ses voisins -> ecrivent NU, et MEURENT avec le legacy
+
+**Aucun geste à faire sur le legacy.** *Le corriger serait porter une propriété sur un
+condamné.* **La chaîne sera close le jour où le legacy cessera d'être servi, et pas avant —
+mais plus aucun écrivain VIVANT ne la perce.**
+
+---
+
+## E-430
+
+### UN QUATRIÈME RÉGIME DE LECTURE : le MONTAGE. Le fichier n'est pas le même objet des deux côtés
+
+**Le chantier tenait trois régimes** — l'ARBRE (le fichier sur le disque), le SERVICE (le
+processus qui l'a lu au démarrage), la BASE. **En voici un quatrième, et il ne se réduit à
+aucun des trois.**
+
+    inode sur l'HOTE         1998793   contenu 2.0.11
+    inode DANS le conteneur  2013478   contenu 2.0.94   <- ORPHELIN
+
+**`docker-compose.yml:76` monte `version.txt` FICHIER PAR FICHIER.** *Un montage de fichier
+est épinglé à l'inode présent au démarrage du conteneur.* **Tout `mv`, tout `git checkout`,
+toute réécriture par renommage le DÉTACHE** — et le conteneur continue de servir l'ancien
+contenu depuis un inode que plus rien ne référence.
+
+> **Ce n'est ni un cache, ni un processus périmé, ni une transaction non validée. C'est le
+> même chemin qui désigne deux fichiers différents.** *Aucune erreur n'est levée, et les deux
+> côtés sont individuellement cohérents.*
+
+### Le témoin qui a rendu la mesure concluante
+
+**Écrire EN PLACE sur le fichier de l'hôte n'a pas davantage atteint le conteneur** — *parce
+que l'hôte pointait DÉJÀ sur un autre inode que celui monté.* **Sans ce témoin, j'aurais
+conclu « il faut écrire en place » et cru le problème résolu**, alors que la réécriture en
+place ne suffit qu'à partir d'un montage SAIN.
+
+### Ce que ça explique rétroactivement
+
+**« `version.txt` a dérivé deux fois le 2026-08-27 »** — resté à `1.38.17` pendant deux bumps,
+puis trois commits sur le même numéro. *On cherchait un défaut de calcul dans `version.sh`.*
+**C'était un montage détaché, et le calcul était juste depuis le début.**
+
+> **Une explication juste sur le mauvais objet est plus tenace qu'une explication fausse :
+> elle se vérifie à chaque occurrence.** *Celle-ci a tenu neuf jours.*
+
+### ⚠ Et le numéro lui-même était faux
+
+    affiche toute la soiree, et relaye a CINQ sessions   2.0.94
+    valeur correcte                                      2.0.11
+
+**Le correctif est le nombre de commits depuis la dernière modification de `VERSION-JALON`.**
+*Le `2.0.94` a été calculé AVANT que le passage à `2.0` soit commité : l'ancre était encore
+celle de 06:04.* **Le commit a ensuite déplacé l'ancre sur lui-même.**
+
+*Ce n'est pas une régression du numéro : c'est la correction d'une valeur surévaluée, calculée
+sur une ancre périmée d'une seconde.* **Et je l'ai diffusée avant de la vérifier.**
+
+### DÉCISION — et une part revient à l'exploitant
+
+    ✅ `version.sh` ecrit desormais EN PLACE (`cat "$tmp" > cible`), inode conserve
+    ✅ `LARAVEL_PORT` dedoublonne dans `srv-docker.env` (la derniere gagnait)
+    ⛔ LE MONTAGE EST DETACHE MAINTENANT. Aucun script ne peut le rattacher :
+       il faut RECREER les conteneurs. Tant que ce n'est pas fait, les portails
+       afficheront 2.0.94.
+
+**L'atomicité du renommage est perdue, et c'est le bon échange** : *un fichier momentanément
+tronqué rend « version inconnue » une milliseconde ; un montage détaché ment pendant des
+jours.*
