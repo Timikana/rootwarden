@@ -9851,3 +9851,159 @@ d'un tiers le code des autres.**
 
 *Rien de ce que j'ai conclu n'en dépend — je n'ai jamais fait pression sur l'équipe à partir de ce chiffre,
 parce qu'il pointait vers moi à chaque fois. **Mais il pointait vers moi pour la mauvaise raison.***
+
+---
+
+## E-407 — Le transport SMTP a été vivant trois minutes ; rien n'est parti, et le zéro qui le dit a failli être faux
+
+**2026-09-05, 09:47–09:59 CEST.** Deux gestes justes, chacun mesuré, dont la
+**conjonction** n'a été mesurée par personne.
+
+    09:41  c1 livre `ReinitialisationController` — un expediteur `Mail::raw` existe
+    09:44  4f mesure « 0 expediteur, la bascule serait silencieuse »   VRAI a son instant
+    09:47  4f ecrit `env('MAIL_ENABLED') ? 'smtp' : 'log'`  -> transport DISTANT vivant
+    09:50  4f neutralise : `env('MAIL_MAILER', 'log')`, variable ABSENTE du conteneur
+
+**Ni l'un ni l'autre n'a tort. L'intervalle entre la prémisse et son écriture est de
+trois minutes.**
+
+### La décision, et elle a dissous un dilemme plutôt que de le trancher
+
+**c1 me posait deux branches** : fermer l'oracle d'énumération → *plus de
+réinitialisation possible* ; laisser envoyer → *écart mesurable et courriel réel non
+autorisé*.
+
+> **Ni l'une ni l'autre : on désarme le TRANSPORT, pas le FLUX.**
+
+Le flux reste entier et opérationnel — il écrit au journal. Le transport n'est armé que
+par `MAIL_MAILER`, **que Laravel lit déjà et qui est absente**. *Retirer la
+réinitialisation à qui a perdu son mot de passe, pour fermer un oracle, aurait été payer
+une propriété avec la capacité qu'elle protège.*
+
+**Garde par construction : la capacité ne peut pas s'armer par inadvertance.**
+
+### ⚠ Le verdict a failli être faux, et ce n'est pas le témoin qui l'a rattrapé
+
+**J'allais écrire « 0 ligne dans `password_reset_tokens` donc jamais demandé ».**
+
+    `ReinitialisationMotDePasse.php:121`  le flux INSERE avant que le controleur envoie
+    ...:189 `consomme()`                  marque `used_at`, NE SUPPRIME PAS
+    -> une ligne devrait donc survivre a son usage
+
+**Et c'était faux : `backend/scheduler.py:485` PURGE la table** (`expires_at < NOW()`).
+**Un zéro peut être un zéro de purge.**
+
+> **Ce qui sauve la conclusion n'est pas le zéro : c'est que la fenêtre tombe DANS
+> l'horizon de rétention.** `DUREE_SECONDES = 3600` ; un jeton né à 09:47 expire à
+> 10:47 ; il était 09:59. **Il serait encore là. Il n'y est pas.**
+
+**✅ Aucune demande pendant la fenêtre. Rien n'a été envoyé.** *Second verrou
+indépendant : 1 seul expéditeur dans `laravel/` (témoin : 40 fichiers utilisent `DB::`)
+et **0 fichier portant une planification ou une mise en file** — aucun chemin ne pouvait
+envoyer sans un geste humain sur une page publique.*
+
+### Ce que l'incident établit, et qui n'était pas au catalogue
+
+**Toutes nos fautes de la semaine étaient des mesures fausses ou des instruments
+partiels. Celle-ci est faite de DEUX MESURES JUSTES dont le produit est faux.**
+
+Ce qui l'a attrapée n'est aucune règle : **4f a annoncé avant d'écrire, et j'ai mesuré
+l'état réel plutôt que de le croire.** *Deux comportements, aucun exigé par une consigne
+— et l'annonce n'a pas suffi : 4f avait écrit avant que ma réponse arrive.*
+
+> **Ce qui doit être gardé n'est pas l'annonce, c'est l'ÉCRITURE — et elle se garde par
+> une remesure de la prémisse juste avant, jamais par une réponse reçue.**
+
+**Et la règle de transmission que c1 en tire, qui vaut pour tout le chantier** : *tout
+relevé transmis porte la commande littérale, l'objet et l'heure — non pour la
+traçabilité, mais pour que l'autre puisse TRANCHER au lieu de choisir à qui se fier.*
+**c1 a relayé « la bascule est vivante » sans son heure, et a failli faire désarmer à la
+session 5 le seul verrou qui signalera la vraie bascule.**
+
+### ⛔ Ce qui reste, et c'est à l'exploitant
+
+**Le mot de passe SMTP est en clair dans l'environnement de `rootwarden_laravel`** —
+compte de messagerie réelle chez un fournisseur externe. Lisible par tout `docker exec`
+et tout `/proc/<pid>/environ`, **donc par chacune des huit sessions, sans trace**, et il
+est entré dans au moins deux journaux de session dont le mien.
+
+    ni dans l'arbre ni dans l'historique  (c1 : 0 fichier suivi porte la VALEUR,
+                                           0 commit l'introduit ou la retire)
+    -> a faire TOURNER, pas a extirper d'un depot
+
+**Aucune réécriture d'historique n'est nécessaire.** *C'est la différence entre un secret
+à faire tourner et un secret à extraire — et la seconde opération n'a pas lieu d'être.*
+
+---
+
+## E-408 — Deux archivages qui paraissent verts détruiraient chacun la seule capacité qui marche
+
+**2026-09-05, 10:00–10:20 CEST.** Tour d'extinction. **Banc libre** (le `3` du premier
+relevé était ma propre ligne de commande — piège inscrit, témoin positif : 4 processus
+`php` vus).
+
+### ⛔ Q3 n°1 — la paire de réinitialisation : NE PAS ARCHIVER
+
+**Le §2 de la mission dit « ne PORTE pas ce flux avant que l'exploitant ait posé le
+SMTP ». Le flux EST porté depuis 09:41. Le danger a changé de côté, et il est plus grave
+dans le nouveau sens.**
+
+    legacy   mail_helper.php:23  MAIL_ENABLED=true ET MAIL_SMTP_HOST pose
+                                 -> mailEnabled() rend VRAI, PHPMailer present
+                                 -> LE LEGACY ENVOIE
+    portage  mail.default = log  -> LE PORTAGE N'ENVOIE PAS
+
+> **Archiver `forgot_password.php` + `reset_password.php` aujourd'hui retirerait le SEUL
+> chemin de récupération de compte qui délivre.** *Et cette perte ne se découvrirait pas
+> par un incident : elle se découvrirait par une demande à laquelle on ne peut plus
+> répondre — quelqu'un qui a perdu son mot de passe.*
+
+**Condition de levée, et elle est unique** : `MAIL_MAILER=smtp` posé par l'exploitant, et
+un envoi réel vérifié côté portage. **Pas avant.**
+
+### ⛔ Q3 n°2 — `audit_seal.php` : NE PAS ARCHIVER tant que le DOSSIER-25 est ouvert
+
+**L'inventaire le classe bloc A, archivable, parce que `JournalAudit` porte `verifie()`
+ET `scelle()`. C'est vrai au niveau du FICHIER et faux au niveau du GESTE.**
+
+    user_logs   non scellees  1484
+                scellees      4787
+
+    legacy   `audit_seal.php:78-81`   `if ($prevSelf === null)` -> la tete AVANCE
+    portage  `JournalAudit::sceller`  `if ($l->self_hash === null) { … continue; }`
+                                      la tete N'AVANCE PAS — son propre commentaire
+                                      (:180-182) RATIFIE le choix
+
+**Les deux implémentations produisent des hachages DIFFÉRENTS pour les mêmes 1484
+lignes.** *Celle qui scelle la première fixe la chaîne, et l'autre déclarera ensuite la
+chaîne rompue.* **Archiver le legacy retire la possibilité de comparer, sur un arbitrage
+encore ouvert.**
+
+### ⚠ ET LE FAIT MÉTHODOLOGIQUE DU TOUR : trois instruments, deux faux, en sens OPPOSÉS
+
+    passe 1  appariement par MOT francais       5 faux DEDOUANEMENTS
+             (`toggle_user` apparie dans `ScanCveController`,
+              `update_server_access` dans `ExportCveController`)
+    passe 2  appariement par TABLE ecrite       3 fausses ALARMES
+             (`permissions`, `notification_preferences`, `notifications`
+              declares non ecrits — ils le sont, par des SERVICES)
+             + bruit : `direct`, `pour`, `si`, `manuel` pris pour des tables
+             (des mots francais apres `UPDATE` DANS DES COMMENTAIRES)
+    passe 3  TROIS formes d'ecriture            les 4 tables sont couvertes
+             (DB::table · Eloquent/relation · SQL brut)   temoin `users` : 13 fichiers
+
+> **La passe 1 se trompe du côté qui RASSURE, la passe 2 du côté qui ALARME.** *Et c'est
+> la première qui aurait coûté : une fausse alarme se fait contredire par le premier qui
+> regarde, un faux dédouanement autorise un `git mv` que personne ne rouvre.*
+
+**Résultat utilisable du bloc `adm/api` (16 fichiers, 14 écrivains)** : *aucun n'écrit
+dans une table que le portage ne sait pas écrire.* **Ce n'est PAS une autorisation
+d'archiver** — la couverture d'une TABLE n'est pas la couverture d'un GESTE : le portage
+peut écrire `users` sans savoir *déverrouiller* un compte.
+
+### Ce que ce tour rend faux, et qu'il faut corriger dans le prompt de mission
+
+**Le §2 « la RÉINITIALISATION est BLOQUÉE PAR LE SMTP, ne porte pas ce flux » est
+périmé** : le flux est porté. **La consigne doit devenir : « ne l'ARCHIVE pas ».**
+*Une consigne qui nomme le bon objet et le mauvais verbe est plus dangereuse qu'une
+consigne absente, parce qu'elle se lit comme à jour.*
