@@ -19867,8 +19867,8 @@ est ici aussi.* Le panneau nomme l'intitulé, la portée et la prochaine échéa
 
 ### ⚠ Ce que l'écran ne peut PAS promettre, et deux mesures l'imposent
 
-    toggle  `SET enabled = NOT enabled`  (ssh_audit.py:921)   bascule AVEUGLE
-    DELETE  rend success: True SANS regarder rowcount (:903)
+    toggle  `SET enabled = NOT enabled`                      bascule AVEUGLE
+    DELETE  rendait success: True SANS regarder rowcount     ⚠ CORRIGE DEPUIS
 
 **Un écran qui prédirait l'état obtenu après une bascule aveugle mentirait une fois sur deux
 dès que deux personnes agissent.** Les deux gestes RELISENT donc la liste, et les libellés
@@ -19876,6 +19876,19 @@ disent que *c'est la liste relue qui fait foi, pas le bouton*.
 
 *Et `delete_rule` de wazuh rend `deleted > 0` : **deux routes du même dépôt, deux conventions
 opposées** sur ce que « supprimé » veut dire.*
+
+> **⚠ RECTIFIÉ LE 2026-09-05 — la moitié `DELETE` de ce constat a été réparée UNE HEURE après
+> ce commit**, par `583ca86` (session 4) : la route rend désormais **404** avec
+> `success: false`, `deleted: 0` et un message. *Mon code n'a pas eu à changer — il teste
+> `r.ok` **et** `corps.success` et affiche `corps.message`, donc il était déjà juste pour les
+> deux formes.* La moitié `toggle` tient : la bascule est toujours aveugle.
+>
+> **Et le 404 a été préféré au 200 de `wazuh` pour une raison qui déplace ma propre
+> conclusion.** J'avais écrit « deux conventions opposées », en sous-entendant qu'une des deux
+> avait tort. **Les deux ont raison, parce que leurs APPELANTS diffèrent** :
+> `legacy/ssh-audit/js/main.js:775` ne lit QUE `r.ok`, donc un 200 porteur d'un refus lui
+> aurait fait annoncer une réussite. *S'aligner sur la convention d'une route voisine n'est
+> juste que si ses appelants se comportent comme les miens.*
 
 ### `portee_texte` disait « n'écrit rien » — vu à l'image, encore
 
