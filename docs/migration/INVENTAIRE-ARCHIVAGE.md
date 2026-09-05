@@ -1053,3 +1053,70 @@ les trois autres la rataient.
 **Ce qu'elle ne verrait toujours pas** : une purge par relation Eloquent
 (`$user->sessions()->delete()`) ou par observateur de modèle. *Je n'ai pas vérifié si
 ce dépôt en emploie* — c'est une borne, pas un constat.
+
+---
+
+## 14. Q3 par geste — lot 1/3 des dix restants (**2026-09-05 11:44 CEST**)
+
+### 14.1 `adm/api/notifications.php` — 6 actions, 4 écrivantes, **4 PORTÉES**
+
+| action legacy | artefact |
+|---|---|
+| `read` — marquer une notification lue | `Services/Notifications.php:163` |
+| `read_all` — tout marquer lu | `Notifications.php:168` |
+| `delete` (`:126` et `:129`) | `web.php:672` → `NotificationsController::supprimer:112` |
+| `count` · `list` · `list_all` | lectures, non concernées |
+
+⚠ **Les DEUX `DELETE` du legacy sont UN SEUL geste à deux gardes** : un rôle ≥ 2
+peut supprimer une notification de diffusion (`user_id = 0`), un rôle 1 seulement les
+siennes. Le portage passe bien `$roleId` au service (`supprimer:115`). **NON VÉRIFIÉ
+par moi : le corps de `Notifications::supprime()`.** *Le paramètre voyage ; je n'ai
+pas lu ce qu'il en fait.*
+
+### 14.2 ⛔ `profile.php` — 5 gestes de LIBRE-SERVICE, **3 NON PORTÉS**
+
+| geste du compte sur LUI-MÊME | portage |
+|---|---|
+| `revoke_session` `:75` | **PORTÉ** — `web.php:200` → `PortailController::revoquerSession:435` |
+| changement de mot de passe `:154` | **PORTÉ** — `web.php:207` |
+| **`revoke_all_others` `:93`** | ⚠ **NON PORTÉ** — `revoquerSession` révoque **UNE** session par son empreinte (`revoqueParEmpreinte`). *Nuance : atteignable en répétant, donc dégradé et non impossible — mais le geste « je suis compromis, ferme tout le reste MAINTENANT » devient N clics sur un N inconnu.* |
+| **`new_email` `:112`** | ⚠ **NON PORTÉ** — les deux seules écritures de `email` sont l'anonymisation (`Comptes.php:572`, met à `null`) et la **création** par import CSV (`:786`). Aucune route ne change l'adresse d'un compte existant, **ni pour lui-même ni pour un administrateur**. |
+| **`new_ssh_key` `:127`** | ⚠ **NON PORTÉ pour le compte lui-même** — l'unique écriture est `Comptes::definitCleSsh:309`, atteignable par la seule route `web.php:731`, gardée **`role:3` + `can_admin_portal`**. |
+
+### 14.3 `adm/health_check.php` — **zéro écriture en base**
+
+Les deux « tables » attribuées à ce fichier sont des **libellés dans un tableau de
+définitions de routes** :
+
+    :126  ['Update Zabbix (redirect)', 'POST', '/update_zabbix', …]
+    :128  ['Update Logs SSE', 'GET', '/update-logs', …]
+
+Un motif `UPDATE\s+(\w+)` y lit « la table `Zabbix` ». **Troisième surestimation de la
+même famille**, après les `case` de `server_actions.php` et les `enabled`/`sudo` déjà
+retirés. *Le fichier n'écrit dans AUCUNE table.* **Aucune touche Q3 sur la donnée** —
+c'est une page de diagnostic qui SONDE des routes, et son danger (elle écrit sur la
+production) passe par HTTP, pas par SQL.
+
+### 14.4 ⚠ LE MOTIF — **le LIBRE-SERVICE est la moitié qui manque**
+
+En ajoutant la touche du §13.3, **quatre gestes non portés, tous de la même famille :
+le compte agissant sur SON PROPRE compte.**
+
+    changer son adresse de courriel      profile.php:112
+    changer sa cle SSH                   profile.php:127
+    fermer toutes ses autres sessions    profile.php:93
+    supprimer son propre compte          privacy.php:35
+
+**Et le côté administratif des mêmes gestes est porté, lui, avec soin** : clé SSH
+(`web.php:731`), suppression (`web.php:745`), anonymisation, déverrouillage,
+réinitialisation du second facteur. **Le portage a porté à fond ce qu'un
+administrateur fait à un compte, et partiellement ce qu'un compte se fait à
+lui-même.**
+
+> **Ce n'est pas visible d'une passe par TABLE ni par ROUTE** : `users.ssh_key` est
+> écrite, `users` est supprimée, tout paraît couvert. **C'est l'ACTEUR qui distingue,
+> et il n'apparaît que dans la garde de la route.**
+
+*Deux de ces quatre touchent le RGPD par le sujet lui-même — corriger son adresse
+(art. 16, rectification) et supprimer son compte (art. 17).* **Je le signale, je ne le
+qualifie pas : la conformité est un jugement juridique.**
