@@ -66,8 +66,17 @@
             </div>
 
             {{-- Action principale a droite : c'est la que l'oeil arrive apres
-                 avoir parcouru le formulaire. --}}
+                 avoir parcouru le formulaire. Le recours, lui, va A GAUCHE : il
+                 n'est pas ce qu'on vient faire ici, et une porte de secours qui
+                 se presente comme l'action principale invite a l'emprunter.
+
+                 ⚠ SANS CE LIEN LE FLUX N'EXISTERAIT PAS. Quatre routes, deux
+                 vues, un service — et aucun moyen d'y arriver autrement qu'en
+                 tapant l'adresse. `scripts/pages-sans-lien.py` existe pour cette
+                 classe de defaut ; ici la mesure etait « 0 lien entrant ». --}}
             <div class="rw-actions">
+                <a class="rw-lien rw-actions__gauche" href="{{ route('reinit.demander') }}"
+                   data-rw="connexion-mot-de-passe-oublie">{{ __('reinit.titre') }}</a>
                 <button class="rw-bouton" type="submit">{{ __('auth.connexion_valider') }}</button>
             </div>
         </form>
