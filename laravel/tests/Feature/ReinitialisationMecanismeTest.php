@@ -43,10 +43,33 @@ use Tests\TestCase;
  *
  * ══ D'OU LA GARDE, ET POURQUOI ELLE DOIT ETRE UN EVENEMENT ═══════════════
  *
- * `mail.default` vaut `log` : le defaut est LATENT. Il devient vivant le jour ou
- * un transport reseau est configure — et ce jour-la, personne ne relira ce
+ * `mail.default` valait `log` : le defaut etait LATENT. Il devient vivant le jour
+ * ou un transport reseau est configure — et ce jour-la, personne ne relira ce
  * fichier. **Un commentaire, meme juste, ne produit aucun evenement le jour ou
  * sa premisse cesse d'etre vraie.**
+ *
+ * ══ CE JOUR EST ARRIVE — 2026-09-05, commit `fff1f8d` ════════════════════
+ *
+ *     config('mail.default')       smtp
+ *     MAIL_SMTP_HOST               ssl0.ovh.net:465     fournisseur EXTERNE
+ *
+ * **Le defaut n'est plus latent : il est VIVANT.** La garde tire, et la mesure
+ * au reseau — differee plus bas — est desormais la seule chose qui manque.
+ * *Ce fichier n'a pas ete silencie : son marqueur de regime a ete RETOURNE.*
+ *
+ * ══ ET LA VALEUR NE VIENT PAS D'OU ON IRA LA CHERCHER ════════════════════
+ *
+ *     laravel/.env  (= /var/www/html/.env)   MAIL_MAILER=log
+ *     environnement du process               MAIL_MAILER=smtp   <- CELUI-CI
+ *
+ * `LoadEnvironmentVariables` appelle `safeLoad()`, qui **n'ecrase pas** une
+ * variable deja presente dans l'environnement. `srv-docker.env` est injecte par
+ * `env_file:` au DEMARRAGE du conteneur ; le fichier `.env` perd.
+ *
+ * > ⚠ **Desarmer le SMTP en editant `.env` ne desarme RIEN** : `.env` porte
+ * > deja `log`, et il est deja perdant. C'est un faux remede qui se lit comme
+ * > une precaution — la meme forme que `Mail::queue` sous `queue.default=sync`.
+ * > Le seul levier est `srv-docker.env` **plus une recreation du conteneur**.
  */
 class ReinitialisationMecanismeTest extends TestCase
 {
@@ -188,23 +211,88 @@ class ReinitialisationMecanismeTest extends TestCase
     // LE REGIME MESURE — pour que la bascule se voie
     // ══════════════════════════════════════════════════════════════════════
 
-    public function test_le_transport_courant_est_LOCAL_et_la_garde_dort(): void
+    public function test_le_transport_courant_est_DISTANT_et_la_garde_TIRE(): void
     {
         /*
          * Ce test ne juge pas la configuration : il DATE le regime dans lequel
-         * les autres tests de ce fichier ont ete ecrits. Tant qu'il passe, le
-         * defaut de temps est LATENT et la garde ne s'est jamais declenchee.
+         * les autres tests de ce fichier sont lus. Il portait « local », il
+         * porte « distant » — c'est le meme instrument, retourne le jour ou sa
+         * premisse a change, et non un instrument qu'on eteint.
          *
-         * S'il rougit, ce n'est PAS une regression : c'est que l'exploitant a
-         * pose un transport reseau — et alors la mesure au reseau, aujourd'hui
-         * differee, devient la seule chose qui manque.
+         * S'il rougit MAINTENANT, c'est que quelqu'un est repasse en transport
+         * local : le defaut redevient latent, et il faudra retourner ce
+         * marqueur une seconde fois plutot que de le contourner.
          */
         $transport = (string) config('mail.default');
 
-        $this->assertContains($transport, ReinitialisationController::TRANSPORTS_LOCAUX,
-            "le transport courant est « $transport », qui n'est PAS local. Le "
-            . "defaut de temps n'est plus latent : sous mod_php, l'envoi precede "
-            . 'la fermeture de connexion. Mesurer au reseau avant de conclure, '
-            . 'et ne pas contourner ce test.');
+        $this->assertNotContains($transport, ReinitialisationController::TRANSPORTS_LOCAUX,
+            "le transport courant est « $transport », qui EST local. Le regime a "
+            . 'change depuis le 2026-09-05 : retourner ce marqueur, et relire la '
+            . 'garde — elle ne se declenchera plus.');
+    }
+
+    public function test_la_valeur_SERVIE_ne_vient_PAS_du_fichier_env(): void
+    {
+        /*
+         * ⚠ LE POINT QUI COUTE. Le premier reflexe, pour desarmer un envoi, est
+         * d'editer `.env`. Ici `.env` porte DEJA `log` et le transport est
+         * pourtant `smtp` : la valeur vient de l'environnement du process, que
+         * `safeLoad()` refuse d'ecraser.
+         *
+         * Ce test existe pour qu'une tentative de desarmement par `.env` soit
+         * DEMENTIE par une suite, et pas seulement par un commentaire.
+         *
+         * ══ QUATRIEME REGIME DE LECTURE ══════════════════════════════════
+         * Le meme nom peut designer deux objets : l'ARBRE et le SERVICE, MySQL
+         * et SQLite, la BASE et le fichier, et — signale par le DSI le
+         * 2026-09-05 — un montage de FICHIER epingle a un inode que `mv` ou
+         * `git checkout` detache en silence. Ici, le partage est autre : le
+         * fichier est bien le meme des deux cotes (2745 o, montage de
+         * REPERTOIRE), mais il n'est pas la SOURCE. *« Le fichier que je lis
+         * est-il celui que le service lit » et « le service lit-il ce fichier »
+         * sont deux questions distinctes.*
+         */
+        $depuisEnvironnement = getenv('MAIL_MAILER');
+
+        if ($depuisEnvironnement === false || $depuisEnvironnement === '') {
+            $this->markTestSkipped(
+                'FENETRE D\'OBSERVATION ABSENTE : aucune variable `MAIL_MAILER` '
+                . "dans l'environnement du process. Ce test ne vaut que la ou "
+                . '`srv-docker.env` est injecte par `env_file:` — hors conteneur, '
+                . "il n'y a pas d'ecrasement a constater. Ni PASS ni FAIL.");
+        }
+
+        $this->assertSame($depuisEnvironnement, (string) config('mail.default'),
+            "le transport servi ne suit plus la variable d'environnement : la "
+            . 'demonstration ci-dessous ne porte plus.');
+
+        $chemin = base_path('.env');
+        if (! is_readable($chemin)) {
+            $this->markTestSkipped(
+                "FENETRE D'OBSERVATION ABSENTE : `.env` illisible par ce compte. "
+                . "⚠ Ne PAS conclure « pas de ligne MAIL_ » d'un compte nul : un "
+                . "refus d'acces rend zero exactement comme une absence.");
+        }
+
+        $lignes = preg_grep('/^\s*MAIL_MAILER\s*=/', file($chemin, FILE_IGNORE_NEW_LINES));
+
+        if ($lignes === false || $lignes === []) {
+            $this->markTestSkipped(
+                '`.env` ne porte aucune ligne `MAIL_MAILER` : il n\'y a pas de '
+                . 'valeur perdante a exhiber, donc rien a demontrer ici.');
+        }
+
+        $duFichier = trim(explode('=', (string) reset($lignes), 2)[1] ?? '');
+
+        $this->assertNotSame($duFichier, $depuisEnvironnement,
+            "`.env` et l'environnement s'accordent : la demonstration de "
+            . "l'ecrasement n'est plus visible sur cette machine. Ce n'est pas "
+            . 'une regression — mais le piege du faux remede redevient invisible.');
+
+        $this->assertContains($duFichier, ReinitialisationController::TRANSPORTS_LOCAUX,
+            "⚠ `.env` porte « $duFichier », qui n'est PAS local, alors que "
+            . "l'environnement impose « $depuisEnvironnement ». Quel que soit le "
+            . 'gagnant, les deux sont distants : plus aucun des deux leviers ne '
+            . 'desarme.');
     }
 }
