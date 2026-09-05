@@ -154,6 +154,72 @@ absent** — on cherchait un chemin backend là où il n'y en a jamais eu.
 
 ---
 
+## La dimension VERBE — ajoutée le 2026-09-05
+
+Le relevé ci-dessus apparie des **cibles**. Il ne disait rien des **verbes**, et un geste
+destructeur peut n'exister que dans le verbe.
+
+    TEMOIN POSITIF   71 sites de `fetch` analyses par arbre syntaxique, 0 fichier illisible
+
+    methode LITTERALE   40
+    methode CONSTRUITE   4      <- echappe a tout motif litteral
+    methode ABSENTE     27      (GET implicite)
+
+### Les quatre méthodes construites, et ce qu'elles valent
+
+| site | forme | verbes réellement passés |
+|---|---|---|
+| `comptes.js:46` | `methode \|\| 'POST'` | `GET`, **`DELETE`**, absent → `POST` — 9 appels |
+| `notifications.js:44` | `methode \|\| 'GET'` | `POST`, absent → `GET` — 3 appels |
+| `planification-cve.js:180` | `methode` (entièrement variable) | `GET`, `POST`, **`PUT`**, **`DELETE`** — 5 appels |
+| `supervision.js:159` | `valeur === '' ? 'DELETE' : 'POST'` | **`DELETE`** quand un `<select>` est vide |
+
+> **`DELETE` apparaît sur trois helpers, et sur aucun site de `fetch`.** Un appariement qui
+> lit les appels de `fetch` voit `method: methode` et n'apprend rien : **les verbes vivent
+> un niveau au-dessus**, chez les appelants. C'est la même remontée que pour les chemins,
+> appliquée au verbe.
+
+### Le cas de `supervision.js:159` — TRANCHÉ, et il était le seul non tranché
+
+    method: valeur === '' ? 'DELETE' : 'POST'
+    body:   valeur === '' ? undefined : JSON.stringify({ profile_id: … })
+
+**Le geste n'existe sous aucune forme littérale** : ni verbe cherchable, ni chemin distinct,
+ni corps de requête. Il n'est que la conséquence d'un `<select>` laissé vide.
+
+**Mesuré côté backend** — `backend/routes/supervision.py:2539` :
+
+    @bp.route('/supervision/machines/<int:mid>/profile', methods=['GET', 'POST', 'DELETE'])
+    @require_api_key
+    @require_role(2)
+    @require_permission('can_manage_supervision')
+    @require_machine_access
+
+    DELETE -> DELETE FROM machine_supervision_profile WHERE machine_id=%s AND platform=%s
+
+**PORTÉ.** Le geste est destructeur mais **borné** : il retire une ligne de LIAISON —
+l'assignation d'un profil à une machine — jamais la machine ni le profil.
+
+⚠ **Et une réserve que le code déclare lui-même**, à conserver dans ce relevé :
+
+    # Patch A01 : require_machine_access est un no-op sur le mid d'URL
+    #             -> require_role indispensable
+
+**`require_machine_access` est INERTE sur cette route**, parce que l'identifiant voyage dans
+l'URL et non dans le corps. Un compte de rôle 2 porteur de `can_manage_supervision` peut donc
+désassigner le profil de **n'importe quelle** machine, pas seulement des siennes. C'est
+**connu et écrit** — ce n'est pas une découverte —, et c'est exactement le genre de fait
+qu'un appariement par cible ne fait jamais apparaître.
+
+### Ce que cette dimension change au relevé du 04/09
+
+**Rien de ses conclusions** : aucune capacité ne change de classement. Ce qu'elle ajoute est
+qu'un appariement par cible **comptait le désassignement comme un `POST` de plus**,
+c'est-à-dire **du côté rassurant** — et que c'était le seul geste destructeur du parc
+invisible à tout motif littéral.
+
+---
+
 ## Ce que je ne classe pas
 
 **La parité du CONTENU de chaque geste.** Ce relevé apparie des **capacités**, pas des
