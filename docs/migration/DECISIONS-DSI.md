@@ -10702,3 +10702,57 @@ suite du portage seul, et sa valeur change — elle ne compare plus, elle exerce
 **Je donne la mesure, pas la décision : c'est elle qui sait lesquelles ont une moitié
 portage autonome.** *Et j'ai refusé de lui coller la liste des 61 — pour qu'elle la
 remesure au lieu de me croire.*
+
+---
+
+## E-423 — J'écrivais à la main un fichier DÉRIVÉ, et les « trois collisions » n'en étaient pas
+
+**2026-09-05, 18:55 CEST.** *Découvert en corrigeant l'écriture non atomique de
+`version.sh`, signalée par la session qui tient le banc.*
+
+### Le défaut signalé, et il était exact
+
+    version.sh:193   printf '%s\n' "$v" > "$RACINE/$FICHIER_PRODUIT"
+
+**Le shell TRONQUE à l'ouverture de la redirection, AVANT que `printf` n'écrive.** *Il
+existe une fenêtre où `version.txt` fait zéro octet ; `Version::numero()` y lit `''`, sa
+regex échoue, il rend `null`, et le pied de page affiche « Version inconnue ».*
+
+**Ce n'est pas une hypothèse : une capture de 18:15 le porte, alors que le fichier est
+lisible avant et après.** *Un défaut TRANSITOIRE laisse un état final correct — c'est le
+mécanisme d'ÉCRITURE qu'il faut regarder, jamais le lecteur.*
+
+**CORRIGÉ** : écriture dans un temporaire puis `mv` (un `rename(2)`, atomique), et **refus
+d'écrire si la dérivation rend une chaîne vide** — une garde par construction plutôt qu'un
+contrôle.
+
+### ⚠ ET CE QUE LA CORRECTION A RÉVÉLÉ, QUI EST PLUS GRAVE
+
+**En exécutant `version.sh --ecrire` pour vérifier, il a écrit `1.40.88` par-dessus le
+`1.54.1` que j'y avais mis.**
+
+    VERSION-JALON        1.40
+    version.sh derive    1.40.<compte de commits>   ->  1.40.88
+    lu par               `Version::numero()` -> pied de page du portail
+                         et `legacy/menu.php`
+
+    le CHANGELOG         une suite tenue A LA MAIN : 1.44.1 hier, 1.54.1 ce soir
+
+> **Ce sont DEUX systèmes de numérotation distincts, et je les ai confondus toute la
+> journée.** *J'ai écrit `legacy/version.txt` à la main cinq fois, en y mettant des numéros
+> de CHANGELOG — c'est-à-dire que le pied de page du portail a affiché, plusieurs fois, une
+> version qui n'existe pas dans le schéma du produit.*
+
+### Et les « trois collisions de version » se relisent autrement
+
+**J'ai inscrit trois fois qu'une collision était « structurelle : le numéro se dérive de
+l'état du fichier partagé ».** *C'était vrai du CHANGELOG — et pendant ce temps le VRAI
+numéro se dérivait de git, sans collision possible, et je le piétinais.*
+
+> **Une explication juste sur le mauvais objet est plus tenace qu'une explication fausse :
+> elle se vérifie à chaque occurrence.** *Trois fois j'ai expliqué le symptôme, et trois
+> fois j'ai raté que je regardais le mauvais fichier.*
+
+**Ce qui reste à trancher, et ce n'est pas à moi** : le CHANGELOG doit-il suivre le schéma
+dérivé, ou rester une suite sémantique tenue à la main ? *Les deux se défendent ; les avoir
+sans le dire ne se défend pas.*
