@@ -20811,3 +20811,62 @@ premier relevé rendait donc **2 chemins au lieu de 3** — et un manque de plus
 > délibérément.* **La liste des portables nomme donc des modules dont le reliquat
 > est l'ensemble des arbitrages** — ce qui rejoint E-422 : un catalogue de
 > soupçons, pas de manques.
+
+
+## E-424 — `sftp` est porté et atteignable ; `/policy/rollback` est une capacité sans interface vivante
+
+**Mesuré le 2026-09-05 22:50, en croisant la trouvaille de la session 5** — *elle
+avait relevé que `/policy/rollback` et `/policy/sftp/*` portent une règle de
+step-up et ne sont atteignables depuis AUCUNE interface, sans trancher entre deux
+capacités perdues et deux règles mortes.* **Les deux moitiés n'ont pas le même
+sort.**
+
+### `/policy/sftp/*` — PORTÉ, et sa trouvaille est fausse ici
+
+    laravel/public/js/acces-sftp.js:216   appelle('/policy/sftp/' + geste, envoi)
+                                  :244   appelle('/policy/sftp/audit', {…})
+    laravel/routes/web.php:1096           Route::get('/acces-sftp')->middleware(['role:3'])
+    interface complete : controleur · service · JS 11 Ko · vue 13 Ko · i18n FR+EN
+    cote legacy : `legacy/_deprecated/adm/server_user_sftp.php` — DEPRECIE
+
+> **La ligne `:216` compose le chemin : `'/policy/sftp/' + geste`.** *Un `grep` sur
+> le littéral complet — `/policy/sftp/deploy` — ne le trouve donc PAS dans le JS,
+> et le rend « atteignable depuis aucune interface ».*
+
+**C'est le piège du préfixe, cinquième variante** : *le segment variable n'est pas
+un identifiant ni une requête, c'est **le nom du geste lui-même**.* **Et il rate
+du côté qui alarme**, comme les quatre précédentes.
+
+### `/policy/rollback` — capacité réelle, zéro appelant vivant
+
+    backend/routes/policies.py:496   POST · @require_role(3) · @require_machine_access
+                                     · @threaded_route
+                            :502     « Restaure le contenu d'un deployment passé »
+                            :548     'Erreur SSH' -> il OUVRE une session
+
+    seul appelant   legacy/_deprecated/adm/js/server_user_policy.js:99
+    pages incluant ce JS   3, TOUTES dans `_deprecated/`   (TEMOIN : la sonde les rend)
+    portage   aucun JS ne compose de chemin `/policy/` — le piege a ete CHERCHE ici
+
+**Ce n'est donc ni une règle morte ni une capacité perdue au sens ordinaire :
+c'est une capacité du backend dont l'interface est morte avec la page qui la
+servait.** *Elle reste appelable par clé d'API — sa garde `role:3` +
+`require_machine_access` est vivante — mais aucun humain ne peut l'atteindre.*
+
+### ⚠ Et elle CONFIRME la conclusion qu'elle devait réfuter
+
+L'ordre donné était de commencer par ce dont le reliquat pourrait **ne pas** être
+une écriture, *« parce qu'une conclusion qu'on ne cherche pas à réfuter est une
+croyance »*.
+
+    /policy/rollback   restaure un deploiement passe, par SSH   -> ECRITURE
+
+> **Le seul chemin réellement orphelin des deux est une écriture sur machine.**
+> *La frontière lecture/écriture tient sur le cas choisi pour la mettre en défaut.*
+
+**Ce que ça ajoute quand même** : `rollback` n'est pas dans la liste des onze, et
+il n'est nommé par aucun dossier. *Une capacité peut donc sortir du périmètre non
+pas parce qu'on a décidé de ne pas la porter, mais parce que la page qui la
+servait a été dépréciée et que personne n'a regardé ce qu'elle emportait.*
+**C'est une troisième catégorie, à côté de « portée » et « en arbitrage » :
+**orpheline par dépréciation**.
