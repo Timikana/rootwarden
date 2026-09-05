@@ -11313,3 +11313,53 @@ les occurrences trouvées dans `laravel/app/` étaient des COMMENTAIRES.* **« C
 la mauvaise FORME* — **un témoin littéral ne qualifie pas une sonde qui cherche des chemins
 composés.** *Il rend zéro, donc il ressemble à « la sonde est aveugle », et il aurait fait
 jeter un relevé juste.*
+
+---
+
+## E-435
+
+### ⛔ LE GESTE ÉVIDENT POUR DÉSARMER LE SMTP NE LE DÉSARME PAS
+
+**`DOSSIER-24` offrait trois issues à l'exploitant, dont « désarmer ». Cette issue a un faux
+remède, et le faux remède est celui que tout le monde tentera en premier.**
+
+    fichier /var/www/html/.env   MAIL_MAILER=log      <- la valeur SURE, et elle PERD
+    env du processus             MAIL_MAILER=smtp     <- injecte par `env_file:`
+    ce que Laravel SERT          smtp                 <- mesure dans le conteneur qui sert
+
+**`LoadEnvironmentVariables.php:29` appelle `safeLoad()`, qui n'écrase PAS une variable déjà
+présente dans l'environnement.** *`srv-docker.env` est injecté par `env_file:`
+(`docker-compose.yml:28` et `:78`) au DÉMARRAGE du conteneur. Le fichier `.env` perd toujours.*
+
+> **Quiconque « désarme » en éditant `.env` verra la bonne valeur dans le fichier et enverra
+> quand même de vrais courriels.** *C'est un faux remède qui se LIT comme une précaution — et
+> `.env` porte déjà `log`, donc il donne l'apparence d'une protection déjà en place.*
+
+### Le seul levier réel, et il exige deux gestes
+
+    1. editer `srv-docker.env`
+    2. RECREER le conteneur — un simple redemarrage ne relit pas `env_file:`
+
+**Et la valeur servie ne se lit PAS dans un fichier** : `docker exec … sh -c 'echo $MAIL_MAILER'`,
+ou `config('mail.default')` dans le conteneur.
+
+### ⚠ Ce que ça fait à l'arbitrage
+
+**Ça ne change pas l'alerte, ça la DURCIT.** *L'oracle d'énumération sur `/mot-de-passe-oublie`
+est vivant sur une page publique, et le geste évident pour l'éteindre ne l'éteint pas.*
+
+**Les trois issues restent** — accepter en le sachant · poser `php-fpm` (ferme par
+construction) · désarmer — **mais la troisième coûte une recréation de conteneur, pas une
+ligne dans un fichier.** *Une issue dont on croyait qu'elle était gratuite ne l'est pas.*
+
+### Et un instrument qui a menti en chemin, signalé par la session qui l'a subi
+
+    grep -c '^MAIL' laravel/.env 2>/dev/null || echo 0   ->  « 0 ligne MAIL_ »
+
+**Le fichier est `-rw-r----- www-data` : le compte qui mesurait ne pouvait pas le lire.**
+*Un refus d'accès rend zéro exactement comme une absence* — **et la conclusion qui s'annonçait
+était « l'hôte et le conteneur portent des `.env` différents », c'est-à-dire le quatrième
+régime de lecture invoqué là où il n'était pas.**
+
+> **Une explication récente et vraie est le meilleur candidat pour une attribution fausse.**
+> *Elle est disponible, elle a servi le jour même, et elle explique la forme du symptôme.*
