@@ -549,6 +549,35 @@ def ssh_audit_policies_get():
 @bp.route('/ssh-audit/policies', methods=['POST'])
 @require_api_key
 @require_role(2)
+# ══ E-392 : L'ECRITURE ETAIT MOINS GARDEE QUE LA LECTURE ═══════════════════
+#
+# Sa jumelle `GET /ssh-audit/policies` (l.476) porte
+# `@require_permission('can_audit_ssh')`. Celle-ci portait `@require_role(2)`
+# SEUL : un compte de role 2 sans la permission pouvait ECRIRE une politique
+# SSH qu'il n'avait pas le droit de LIRE. C'est E-390 a l'envers — la, la
+# lecture etait nue et l'ecriture gardee.
+#
+# Le balayage qui a ferme E-390/E-391 cherchait « ni role ni permission » : il
+# ne POUVAIT pas voir cette route, qui porte un role. La classe qui la rend est
+# « garde PLUS FAIBLE que celle de son jumeau » — meme chemin, autre methode.
+#
+# ⚠ LE ROLE EST CONSERVE, ET C'EST DELIBERE. Un miroir exact du jumeau
+# retirerait `require_role(2)` : la lecture ne l'a pas. Mais la page legacy
+# admet un role 1 porteur de la permission (`ssh-audit/index.php:12-13`), donc
+# ce « miroir » OUVRIRAIT l'ecriture de politique a un role 1. Mesure du
+# 2026-09-05 : `can_audit_ssh` est portee par 1 role 3 et 1 role 2, zero role 1
+# (temoin : 12 comptes actifs) — l'elargissement serait donc invisible
+# aujourd'hui et effectif au premier octroi. La garde est ADDITIVE : role 2 ET
+# permission.
+#
+# ⚠ `@require_machine_access` NE PEUT REFUSER PERSONNE ICI, et il faut le dire
+# plutot que de le laisser lire comme une protection : `machine_id` est
+# OPTIONNEL sur cette route (`None` = politique globale), et
+# `check_machine_access` rend `True` sans condition des `role_id >= 2`
+# (`helpers.py:364`) — ce que la ligne au-dessus exige deja. Il est pose en
+# miroir du jumeau, et il ne mordra que si le role venait a etre relache.
+@require_permission('can_audit_ssh')
+@require_machine_access
 @threaded_route
 def ssh_audit_policies_set():
     """Definit une policy (audit/ignore) pour une directive."""

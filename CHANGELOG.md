@@ -5,6 +5,82 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.41.1] - 2026-09-05
+
+### Securite - E-392 : l'ECRITURE d'une politique SSH etait moins gardee que sa LECTURE
+
+**Symptome.** Les deux jumelles du meme chemin :
+
+    GET  /ssh-audit/policies   @require_permission('can_audit_ssh') + @require_machine_access
+    POST /ssh-audit/policies   @require_role(2)  SEUL
+
+**Un compte de role 2 sans `can_audit_ssh` pouvait donc ECRIRE une politique SSH
+qu'il n'avait pas le droit de LIRE**, et l'atteindre en trois clics par le
+forgeur de requetes de `legacy/documentation.php` (cf. E-389 a E-391). C'est
+E-390 **a l'envers** : la, la lecture etait nue et l'ecriture gardee.
+
+**Pourquoi le balayage d'E-390/E-391 ne l'avait pas rendue.** Son critere etait
+« ni role ni permission ». Cette route porte un role : elle sortait de la classe
+mesuree. **La mesure etait juste sur la question posee — c'est la question qui
+etait courte.** La classe qui la rend est *« garde PLUS FAIBLE que celle de son
+jumeau »*, meme chemin, autre methode.
+
+**Correctif.** `@require_permission('can_audit_ssh')` + `@require_machine_access`
+**en plus** de `@require_role(2)`.
+
+**⚠ Le role est CONSERVE, contre la prescription de « miroir exact ».** Un miroir
+strict du jumeau retirerait `require_role(2)`, que la lecture ne porte pas. Mais
+la page legacy admet un **role 1** porteur de la permission
+(`legacy/ssh-audit/index.php:12-13`) : ce « miroir » OUVRIRAIT l'ecriture de
+politique a un role 1. Mesure du 2026-09-05 : `can_audit_ssh` est portee par
+**1 role 3 et 1 role 2, zero role 1** (temoin : 12 comptes actifs) —
+l'elargissement serait donc invisible aujourd'hui et effectif au premier octroi.
+La garde est **additive**, pas symetrique.
+
+**⚠ Et `@require_machine_access` ne peut refuser personne ici** — ecrit en
+commentaire plutot que laisse lire comme une protection. `machine_id` est
+OPTIONNEL sur cette route (`None` = politique globale) et `check_machine_access`
+rend `True` sans condition des `role_id >= 2` (`helpers.py:364`), ce que la ligne
+au-dessus exige deja. Il est pose en miroir du jumeau et ne mordra que si le role
+venait a etre relache.
+
+**Aucun appelant casse, balaye sur les cinq arborescences.** Un seul appelant en
+POST : `legacy/ssh-audit/js/main.js:369`, sur une page qui exige deja
+`can_audit_ssh`. Le portage **ne compose pas** cette route — declare a quatre
+endroits independants (`AuditSshController.php:22`, `audit-ssh.js:18`,
+`web.php:224`, `lang/fr/ssh_audit.php:61`, SEC-013), et
+`audit-ssh.blade.php:122` documentait meme le defaut verbatim. Aucun script,
+aucune suite E2E : `tests/e2e/go-policies.mjs` porte le mot « policies » pour les
+politiques **sudo/sftp** (`/adm/server_user_sudo.php`), sans rapport.
+
+**Le critere « jumelle » balaye sur TOUT le backend.** 27 chemins portent
+plusieurs methodes ; **3** ont des gardes divergentes :
+
+| chemin | GET | POST |
+|---|---|---|
+| `/admin/notification_prefs` | `role(2)` | `role(3)` — **ecriture plus stricte** |
+| `/admin/temp_permissions` | `role(2)` | `role(3)` — **ecriture plus stricte** |
+| `/ssh-audit/policies` | permission + machine_access | + `role(2)` — **ecriture plus stricte** |
+
+**Apres ce correctif, aucune route du backend n'a d'ecriture moins gardee que sa
+lecture.**
+
+**Defaut collateral signale, non corrige.** `legacy/adm/health_check.php:223`
+sonde `'/ssh_audit/policies'` — avec un **tiret bas**, quand la route est
+`/ssh-audit/policies`. Cette sonde vise donc un chemin inexistant et n'a jamais
+rien mesure. `legacy/` n'est pas dans ce perimetre, et cette page est celle que
+les consignes du chantier interdisent d'ouvrir.
+
+**Tests.** `ruff` vert, import REEL du module, placement verifie par AST. Suite
+complete : **667 passed, 5 skipped, 2 xfailed, 0 FAILED** — compte de `skipped`
+inchange, et la route ne figurait pas dans la liste connue de
+`test_invariant_machine_id.py`.
+
+**Notes d'exploitation.** `backend/**.py` est lu au demarrage : INERTE jusqu'au
+redemarrage de `rootwarden_python`.
+
+---
+
 ## [1.41.0] - 2026-09-05
 
 ### Wazuh - E-400 : les trois gestes qui n'ouvrent pas de session SSH sont portes
