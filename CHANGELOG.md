@@ -5,7 +5,63 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
-## [1.45.0] - 2026-09-05
+## [1.47.0] - 2026-09-05
+
+### Extinction - vague 1 : 28 fichiers retires du service, et l'archivage ne desservait rien
+
+#### ⛔ Le defaut de fond, corrige d'abord
+La racine servie par Apache **EST** l'arbre `legacy/`. `_deprecated/` s'y trouvait, et
+`.htaccess` ne le mentionnait pas.
+
+    /_deprecated/drift/index.php   500     <- Apache l'atteint, PHP l'EXECUTE
+    /chemin-inexistant.php         404     <- le serveur discrimine bien
+
+Un fichier « archive » repondait 500 la ou un inexistant repond 404 : il etait atteint,
+execute, et n'echouait qu'a son premier `require`. **Le code de sa portee globale
+tournait a chaque visite**, pour les dix-neuf deja deplaces.
+
+- `legacy/.htaccess` : `RedirectMatch 404 ^/_deprecated/`. **404 plutot que 403** : un
+  fichier retire ne doit pas signaler qu'il a existe.
+
+#### Retire du service
+**28 fichiers**, tous FEUILLES et tous en LECTURE PURE, re-controles a l'instant du geste.
+
+    .php metier servis   82 -> 53
+    archives             19 -> 47
+
+#### ⚠ Une QUATRIEME question, que la methode n'avait pas
+Le controle posait Q1 (le geste est-il porte), Q2 (le fichier est-il requis PAR LE
+LEGACY) et Q3 (est-il le seul acces a un geste non porte). **Il ne posait pas :**
+
+> **Q4 - le PORTAGE depend-il de ce fichier ?**
+
+`api_proxy.php` est une feuille, en lecture pure, et **cinq fichiers du portage
+l'appellent a l'execution**. *Archive puis REMIS dans le meme quart d'heure, verifie au
+reseau : 404 -> 302.* **Un fichier peut n'etre requis par aucun fichier legacy et rester
+indispensable au portage : le graphe du legacy ne voit pas ce lien, il traverse la
+frontiere des deux applications.**
+
+#### Verifie au reseau apres le geste
+    /_deprecated/adm/api_keys.php   404      (retire)
+    /adm/api/toggle_user.php        302      (vivant)
+    /api_proxy.php                  302      (remis)
+    portage 8444 : 14 pages 302 . /connexion 200 . inexistant 404 . AUCUN 500
+
+⚠ **Reserve** : un `302` prouve que la route et la garde repondent, **pas que le corps de
+la page se rende**. La preuve complete demande une passe AUTHENTIFIEE.
+
+#### ⚠ Ce que ce changement rend faux
+**28 des 29 URL retirees sont referencees par les suites e2e.** Les suites de PARITE
+exercent le legacy par construction : elles vont echouer, et c'est attendu. **Une suite
+legacy rouge apres cette version n'est pas une regression, c'est un objet disparu.**
+
+#### Corrige aussi
+Le CHANGELOG portait **deux sections `1.45.0`** — deux sessions ont pris le meme numero
+sur un fichier partage, le meme jour. Le re-hachage bcrypt passe en `1.46.0`.
+
+---
+
+## [1.46.0] - 2026-09-05
 
 ### Audit - le backend Python ecrivait 11 lignes de journal HORS de la chaine de hachage
 
