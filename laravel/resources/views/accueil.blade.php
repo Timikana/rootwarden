@@ -109,14 +109,11 @@
             <p class="rw-tuile__texte">{{ __('accueil.securite_texte') }}</p>
         </div>
 
-        <div class="rw-tuile">
-            <span class="rw-tuile__titre">{{ __('accueil.ancien_titre') }}</span>
-            <p class="rw-tuile__texte">{{ __('accueil.ancien_texte') }}</p>
-            <p class="rw-tuile__lien">
-                <a class="rw-lien" href="{{ rtrim(config('app.url_legacy'), '/') }}/index.php"
-                   target="_blank" rel="noopener">{{ __('auth.ouvrir_ancien_portail') }} ↗</a>
-            </p>
-        </div>
+        {{-- LA TUILE « Ancien portail » A ETE RETIREE le 2026-09-05.
+             Son texte disait « Toujours en service, avec les memes identifiants ».
+             MESURE : `/index.php` du legacy rend 404 depuis l'archivage du jour.
+             Un ecran qui annonce un portail en service et pointe vers un 404 est
+             le defaut corrige deux fois ailleurs (supervision 03/09, /profil 05/09). --}}
 
 
     {{--
