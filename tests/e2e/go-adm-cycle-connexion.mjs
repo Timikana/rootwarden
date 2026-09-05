@@ -61,6 +61,7 @@ import puppeteer from 'puppeteer';
 import { createHmac } from 'crypto';
 import { litEnBase, compteEnBase } from './lib-base.mjs';
 import { mkdirSync } from 'node:fs';
+import { constateArchivage } from './archive.mjs';
 
 const BASE = process.env.E2E_BASE || 'https://localhost:8443';
 const CIBLE = /8444|laravel/i.test(BASE) ? 'laravel' : 'legacy';
@@ -291,6 +292,34 @@ async function etape(titre, fn) {
 
 const session = {};
 try {
+    /*
+     * ══ LE SUJET DE CETTE SUITE N'EXISTE PLUS COTE LEGACY ═════════════════
+     *
+     * Une suite de parite dont la moitie legacy a ete archivee ne doit pas
+     * ECHOUER : un rouge permanent finit par ne plus etre lu, et il occupe la
+     * place ou l'on aurait cherche une vraie regression. Elle CONSTATE, et sa
+     * moitie portage continue de s'exercer.
+     *
+     * LE CONSTAT VIENT AVANT LA CONNEXION, et ce n'est pas un detail : la sonde
+     * de `archive.mjs` n'ouvre pas de navigateur (Apache rend 404 pour un chemin
+     * absent AVANT toute redirection de connexion). Se connecter d'abord ferait
+     * consommer un code TOTP — dont le garde anti-rejeu est par COMPTE et
+     * PERSISTANT — pour aller mesurer une page qui n'existe plus.
+     *
+     * ⚠ ET LE CONSTAT EXIGE UN 404, PAS UNE ABSENCE DE PAGE. Le 2026-09-05 ces
+     * repertoires rendaient 403 : le `git mv` avait emporte les `.php` et laisse
+     * le JavaScript, si bien que le dossier existait encore. `constateArchivage`
+     * traite tout statut != 404 comme « encore servie » et rend `false` : le
+     * constat aurait ete FAUX et la suite rouge quand meme. L'archivage a ete
+     * acheve (`7588e71`) avant que cette ligne soit ecrite.
+     */
+    if (CIBLE === 'legacy') {
+        const archivee = await constateArchivage({
+            base: BASE, chemin: C.page, fichiers: [], verifie, constate,
+        });
+        if (archivee) throw new Error('__archivee__');
+    }
+
     etatInitial = releveEtat();
     constate('etat releve a l\'entree (en ligne|cycle|date)', etatInitial || '(machine absente)');
 
@@ -493,13 +522,35 @@ try {
         erreursJs.slice(0, 2).join(' | '));
 
 } catch (e) {
+    // `__archivee__` n'est pas une panne : c'est la sortie NORMALE quand le
+    // sujet legacy a ete archive. Le constat a deja tout dit.
+    if (String(e && e.message || e).includes('__archivee__')) { /* rien a ajouter */ } else {
     verifie('deroulement de la suite', false, String(e.message || e).split('\n')[0]);
+    }
 } finally {
     try {
         restaureEtat();
-        const remis = releveEtat();
-        verifie('l\'etat de la machine d\'essai est restaure', remis === etatInitial,
-            `${remis} attendu ${etatInitial}`);
+        /*
+         * ⚠ CE CONTROLE SUPPOSAIT QUE LE CORPS AVAIT TOURNE, et c'etait vrai
+         * tant que rien ne sortait tot. Depuis que le sujet legacy est archive,
+         * la suite jette `__archivee__` AVANT la ligne qui releve `etatInitial` :
+         * la reference reste `null`, la machine porte son etat courant, et
+         * l'assertion rougissait en comparant un etat REEL a `null`.
+         *
+         * `restaureEtat()` se gardait deja de ce cas (`if (etatInitial === null)
+         * return`). C'est l'ASSERTION qui ne se gardait pas — un controle et son
+         * geste qui ne partagent pas le meme predicat. On n'a rien touche, il n'y
+         * a donc rien a verifier, et on le DIT plutot que de rendre un vert.
+         */
+        if (etatInitial === null) {
+            constate('restauration de la machine d\'essai',
+                'SANS OBJET — la suite est sortie avant de relever un etat de reference, '
+                + 'donc elle n\'a rien modifie.');
+        } else {
+            const remis = releveEtat();
+            verifie('l\'etat de la machine d\'essai est restaure', remis === etatInitial,
+                `${remis} attendu ${etatInitial}`);
+        }
     } catch (e) { note(`FAIL  restauration : ${e.message}`); echecs += 1; }
     try {
         const zabbix = litEnBase(

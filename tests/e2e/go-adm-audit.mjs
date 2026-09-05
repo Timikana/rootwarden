@@ -60,6 +60,7 @@ import puppeteer from 'puppeteer';
 import { createHmac } from 'crypto';
 import { litEnBase, compteEnBase } from './lib-base.mjs';
 import { mkdirSync } from 'node:fs';
+import { constateArchivage } from './archive.mjs';
 
 const BASE = process.env.E2E_BASE || 'https://localhost:8443';
 const CIBLE = /8444|laravel/i.test(BASE) ? 'laravel' : 'legacy';
@@ -285,6 +286,34 @@ async function soumetFiltre(page, selecteurChamp) {
 
 const session = {};
 try {
+    /*
+     * ══ LE SUJET DE CETTE SUITE N'EXISTE PLUS COTE LEGACY ═════════════════
+     *
+     * Une suite de parite dont la moitie legacy a ete archivee ne doit pas
+     * ECHOUER : un rouge permanent finit par ne plus etre lu, et il occupe la
+     * place ou l'on aurait cherche une vraie regression. Elle CONSTATE, et sa
+     * moitie portage continue de s'exercer.
+     *
+     * LE CONSTAT VIENT AVANT LA CONNEXION, et ce n'est pas un detail : la sonde
+     * de `archive.mjs` n'ouvre pas de navigateur (Apache rend 404 pour un chemin
+     * absent AVANT toute redirection de connexion). Se connecter d'abord ferait
+     * consommer un code TOTP — dont le garde anti-rejeu est par COMPTE et
+     * PERSISTANT — pour aller mesurer une page qui n'existe plus.
+     *
+     * ⚠ ET LE CONSTAT EXIGE UN 404, PAS UNE ABSENCE DE PAGE. Le 2026-09-05 ces
+     * repertoires rendaient 403 : le `git mv` avait emporte les `.php` et laisse
+     * le JavaScript, si bien que le dossier existait encore. `constateArchivage`
+     * traite tout statut != 404 comme « encore servie » et rend `false` : le
+     * constat aurait ete FAUX et la suite rouge quand meme. L'archivage a ete
+     * acheve (`7588e71`) avant que cette ligne soit ecrite.
+     */
+    if (CIBLE === 'legacy') {
+        const archivee = await constateArchivage({
+            base: BASE, chemin: C.page, fichiers: [], verifie, constate,
+        });
+        if (archivee) throw new Error('__archivee__');
+    }
+
     // ══ 1. La garde, aux trois roles ════════════════════════════════════════
     // Mesurer le STATUT, pas le texte : un 404 dirait « cette page n'existe
     // pas », pas « vous n'y avez pas droit ».
@@ -656,7 +685,11 @@ try {
         erreursJs.slice(0, 3).join(' | '));
 
 } catch (e) {
+    // `__archivee__` n'est pas une panne : c'est la sortie NORMALE quand le
+    // sujet legacy a ete archive. Le constat a deja tout dit.
+    if (String(e && e.message || e).includes('__archivee__')) { /* rien a ajouter */ } else {
     verifie('deroulement de la suite', false, String(e.message || e).split('\n')[0]);
+    }
 } finally {
     // Chaque etape du nettoyage dans son propre `try` : une exception ici
     // emporterait le journal entier.

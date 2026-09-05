@@ -55,6 +55,7 @@
 import puppeteer from 'puppeteer';
 import { createHmac } from 'crypto';
 import { litEnBase } from './lib-base.mjs';
+import { constateArchivage } from './archive.mjs';
 
 const BASE = process.env.E2E_BASE || 'https://localhost:8443';
 const CIBLE = /8444|laravel/i.test(BASE) ? 'laravel' : 'legacy';
@@ -181,6 +182,23 @@ const secretOrigine = secretEnBase();
 let fixturePosee = false;
 
 try {
+    /*
+     * ══ LE SUJET DE CETTE SUITE N'EXISTE PLUS COTE LEGACY ═════════════════
+     *
+     * Une suite de parite dont la moitie legacy a ete archivee ne doit pas
+     * ECHOUER : un rouge permanent finit par ne plus etre lu. Elle CONSTATE.
+     *
+     * LE CONSTAT VIENT AVANT LA CONNEXION : la sonde n'ouvre pas de navigateur,
+     * et se connecter d'abord consommerait un code TOTP — garde anti-rejeu par
+     * COMPTE et persistant — pour mesurer une page qui n'existe plus.
+     */
+    if (CIBLE === 'legacy') {
+        const archivee = await constateArchivage({
+            base: BASE, chemin: C.enrolement, fichiers: [], verifie, constate,
+        });
+        if (archivee) throw new Error('__archivee__');
+    }
+
     constate('cible', CIBLE);
 
     verifie('la fixture part d\'un compte REELLEMENT enrole',
@@ -278,7 +296,10 @@ try {
         await ctx.close();
     }
 } catch (e) {
+    // `__archivee__` est la sortie NORMALE d'un sujet archive, pas une panne.
+    if (String(e && e.message || e).includes('__archivee__')) { /* le constat a tout dit */ } else {
     verifie('la suite s\'est deroulee sans exception', false, String(e).split('\n')[0]);
+    }
 } finally {
     /*
      * RESTAURATION, ET ETAT RELU POUR ETRE PROUVE. Treize suites dependent de ce
