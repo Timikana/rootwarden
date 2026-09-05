@@ -59,6 +59,18 @@ return [
     'imp_aide' => 'The file must carry a header row. Columns :colonnes are required; :facultatives are optional.',
     'imp_champ' => 'CSV file',
     'imp_fichier' => 'CSV file (:ko KiB at most)',
+    /* Password expiry exemption — three values, and "empty" is not "zero".
+     * See fr for why the self-edit refusal is a ported gesture and not a copy. */
+    'exp_titre'   => 'Password expiry',
+    'exp_aide'    => 'Superadministrator only, and never on their own account.',
+    'exp_globale' => 'Follow the global rule',
+    'exp_exempte' => 'Exempt this account',
+    'exp_jours'   => 'Account-specific duration (in days)',
+    'exp_valider' => 'Save',
+    'exp_pose'    => 'Expiry saved. The due date is recomputed from the last password change.',
+    'exp_valeur'  => 'Invalid expiry value: expected a positive duration, zero to exempt, or nothing to follow the global rule.',
+    'exp_pas_soi' => 'You cannot change the expiry of your own password: exempting yourself from a security rule must go through someone else.',
+
     'imp_valider' => 'Import the accounts',
     'imp_roles_aide' => 'The "role" column accepts: :roles. Any other value yields the lowest role.',
     'imp_courriel_exige' => 'The email address is REQUIRED here, whereas the legacy portal accepted it empty — an account with no address and no known password has neither access nor recovery.',

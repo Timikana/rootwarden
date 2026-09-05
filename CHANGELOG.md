@@ -5,6 +5,48 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.52.0] - 2026-09-05
+
+### Comptes - E-419 : le quatrieme ecrivain que le legacy detenait seul
+
+**Ce qui est porte.** `password_expiry_override` : `MotDePasse::poseOverride()`,
+`ComptesController::expiration()`, une route `role:3`, un selecteur par ligne de compte.
+**0 ecrivain porte, un seul ecrivain vivant** (`legacy/adm/api/update_user.php`) — et le
+portage la LIT en deux endroits, dont `MotDePasse::expirationApres()` que je venais d'ecrire.
+
+**⛔ Le test a mordu sur un defaut reel.** `users.password_updated_at` porte
+`on update CURRENT_TIMESTAMP` : **toute modification de la ligne deplace la date**. Ecrire
+l'override rajeunissait donc le mot de passe, et l'echeance repartait de zero — *une expiration
+se serait repoussee indefiniment en basculant un reglage qui n'a rien a voir*. Correctif : lire
+la date AVANT, la reecrire explicitement a sa valeur ancienne, et faire UNE SEULE ecriture. *Le
+legacy a le meme defaut en pire : deux `UPDATE` a la suite, le second recalculant depuis la
+date que le premier a deplacee.*
+
+**⚠ Et le legacy annonce une anti-escalade qu'il ne fait pas** : « pas de self-edit sur
+role/password_expiry » (`:42`), et **zero comparaison avec l'identifiant de session dans tout le
+fichier**. Un superadministrateur pouvait s'exempter LUI-MEME de l'expiration, en silence. Le
+refus est ECRIT ici, et le selecteur n'est pas rendu sur sa propre ligne.
+
+**Deux bornes que le legacy n'a pas** : une valeur negative est REFUSEE (le legacy l'ecrirait,
+et `INTERVAL -1 DAY` poserait une echeance dans le PASSE), et le formulaire est une liste
+fermee.
+
+**⚠ Les trois copies du journal d'audit deleguent enfin.** Releve par une autre session :
+`journalise()` lisait la tete de chaine SANS `lockForUpdate()` et hors transaction, dans trois
+controleurs. Deux ecritures concurrentes auraient produit une chaine FOURCHUE. *J'avais ecrit
+moi-meme le docblock qui annonce « trois copies restent a migrer ».* Mesure apres : **0 lecture
+de tete en code**, 3 delegations, 1 seul verrou.
+
+**Tests.** 16 cas, 0 FAIL, en transaction annulee sur des etats FORCES — sans forcage le test
+passerait a vide (0 override sur 12 comptes, `PASSWORD_EXPIRY_DAYS` absente). Le geste est
+dormant, et c'est la raison de l'ecrire.
+
+**Notes exploitation.** Aucune migration. La route `POST /comptes/{id}/expiration` a ete
+commitee par `feaaaa2` (fichier partage, elle etait dans l'arbre) : elle est intacte et
+`route:list` la rend.
+
+---
+
 ## [1.51.1] - 2026-09-05
 
 ### Portage - DOSSIER-30 : les trois gestes de libre-service de `/profil`

@@ -48,19 +48,26 @@ class PermissionsController extends Controller
         ];
     }
 
-    /** Meme scellement que D1 : une ecriture nue creuserait le trou qu'il mesure. */
+    /**
+     * Journalise dans `user_logs` en DELEGUANT au seul ecrivain qui verrouille.
+     *
+     * ⚠ CETTE METHODE LISAIT LA TETE DE CHAINE SANS VERROU — corrige le
+     * 2026-09-05. Elle faisait `orderByDesc('id')->value('self_hash')` hors
+     * transaction, la ou `JournalAudit::ajoute()` prend `lockForUpdate()` sur la
+     * tete DANS une transaction.
+     *
+     * > *Deux ecritures concurrentes qui lisent la meme tete produisent deux
+     * > lignes portant le MEME `prev_hash`, donc une chaine FOURCHUE, que
+     * > `verifie()` signalera comme rompue sans pouvoir dire laquelle des deux
+     * > branches est la bonne.*
+     *
+     * C'etait l'une des « trois copies restant a migrer » que le docblock
+     * d'`ajoute()` annonce lui-meme. *Une copie qui delegue ne peut plus
+     * diverger.*
+     */
     private function journalise(int $auteur, string $action): void
     {
-        $tete = DB::table('user_logs')->whereNotNull('self_hash')
-            ->orderByDesc('id')->value('self_hash') ?: JournalAudit::GENESE;
-        $ts = time();
-        DB::table('user_logs')->insert([
-            'user_id' => $auteur,
-            'action' => mb_substr($action, 0, 255),
-            'created_at' => date('Y-m-d H:i:s', $ts),
-            'prev_hash' => $tete,
-            'self_hash' => $this->journal->empreinte($tete, $auteur, mb_substr($action, 0, 255), $ts),
-        ]);
+        $this->journal->ajoute($auteur, $action);
     }
 
     public function __invoke(Request $requete, Machines $machines): View

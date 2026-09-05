@@ -230,6 +230,34 @@
                                     data-id="{{ $c['id'] }}">{{ __('comptes.mdp_generer') }}</button>
                         </td>
                         <td class="rw-tableau__actions">
+                            {{--
+                                L'EXEMPTION D'EXPIRATION — superadministrateur
+                                seulement, et JAMAIS sur son propre compte.
+
+                                ⚠ LE CONTROLE N'EST PAS RENDU SUR SA PROPRE LIGNE.
+                                Le serveur refuse deja ce cas (`exp_pas_soi`), mais
+                                offrir un selecteur qui rendra 403 apprend seulement
+                                que le produit se contredit. **Un geste qu'on ne
+                                rend pas ne se contourne pas ; un geste qu'on rend
+                                et que le serveur refuse est une promesse rompue.**
+
+                                Liste FERMEE : trois choix, pas une saisie libre.
+                                Le legacy accepte n'importe quel entier, negatif
+                                compris — et `-1` poserait une echeance dans le
+                                PASSE, donc un compte expire a l'instant meme.
+                            --}}
+                            @if ($estSuperadmin && (int) $c['id'] !== (int) session('utilisateur_id'))
+                                <label class="rw-visuellement-cache"
+                                       for="exp-{{ $c['id'] }}">{{ __('comptes.exp_titre') }}</label>
+                                <select id="exp-{{ $c['id'] }}" class="rw-saisie rw-saisie--compacte"
+                                        data-rw="compte-expiration-{{ $c['id'] }}" data-id="{{ $c['id'] }}">
+                                    <option value=""@selected($c['password_expiry_override'] === null)>{{ __('comptes.exp_globale') }}</option>
+                                    <option value="0"@selected((int) $c['password_expiry_override'] === 0 && $c['password_expiry_override'] !== null)>{{ __('comptes.exp_exempte') }}</option>
+                                    @foreach ([30, 60, 90, 180, 365] as $j)
+                                        <option value="{{ $j }}"@selected((int) $c['password_expiry_override'] === $j)>{{ $j }} j</option>
+                                    @endforeach
+                                </select>
+                            @endif
                             @if (! empty($c['locked_until']))
                                 <button type="button" class="rw-bouton rw-bouton--minuscule"
                                         data-rw="compte-deverrouiller-{{ $c['id'] }}"

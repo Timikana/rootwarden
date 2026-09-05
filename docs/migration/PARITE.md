@@ -20431,3 +20431,88 @@ sur le harnais de mutation : empreinte changée, `php -l`, classe renommée, mut
 changés par le portage en tiendront compte au lieu de rester éternellement sans échéance.**
 *Même raisonnement que le re-hachage bcrypt et que l'assistant de première configuration : ce
 qui ne se réclame jamais est ce qui disparaît le plus sûrement.*
+
+---
+
+## E-419 — le QUATRIÈME écrivain, et **le lecteur était dans mon propre fichier**
+
+**Porté :** `password_expiry_override` — `legacy/adm/api/update_user.php:45-49` →
+`MotDePasse::poseOverride()`, `ComptesController::expiration()`, une route `role:3`, un
+sélecteur par ligne de compte.
+
+    ecrivains portes    0
+    lu par le PORTAGE   MotDePasse::expirationApres()  ·  ExportRgpd (export RGPD)
+    ecrit par           legacy/adm/api/update_user.php, et lui SEUL
+
+*Je venais de corriger « personne ne la lit » sur `password_expires_at` en découvrant un
+lecteur dans un autre dépôt. **Ici le lecteur était dans mon propre fichier, deux lignes
+au-dessus du geste que je portais.***
+
+### ⛔ Le test a mordu sur un défaut réel, et c'est le meilleur résultat du lot
+
+Mon premier jet recalculait l'échéance depuis `password_updated_at` — la bonne source. Le test
+a rendu **une date fausse de huit mois**. Cause :
+
+    users.password_updated_at   EXTRA : on update CURRENT_TIMESTAMP
+
+**Toute modification de la ligne déplace la date.** Donc écrire l'override *rajeunissait le mot
+de passe*, et l'échéance recalculée repartait de zéro.
+
+> **Une expiration se serait repoussée indéfiniment en basculant un réglage qui n'a rien à voir
+> avec elle.**
+
+*Et mon propre docblock, dans ce même fichier, décrivait déjà ce piège — « cette clause se
+déclenche à toute modification réelle de la ligne `users` ». Je l'ai écrit, puis je suis
+tombée dedans.* Le correctif : lire la date **avant**, la réécrire **explicitement** à sa
+valeur ancienne — une valeur fournie l'emporte sur la clause — et faire **une seule** écriture.
+
+**Le legacy a le même défaut, en pire** : il fait deux `UPDATE` à la suite (`:49` puis `:57`),
+donc il déplace la date au premier et recalcule depuis la date déplacée au second.
+
+### ⚠ Et il annonce une anti-escalade qu'il ne fait pas
+
+    // Anti-escalation : pas de self-edit sur role/password_expiry   (`:42`)
+
+**Mesure : ZÉRO comparaison avec `$_SESSION['user_id']` dans tout le fichier.** *Le commentaire
+annonce une protection que le code ne fait pas* — troisième occurrence de cette forme
+aujourd'hui, la première sur un contrôle de sécurité.
+
+Ce qu'elle empêche est réel quoique borné : **un superadministrateur peut s'exempter lui-même
+de l'expiration, en silence.** Il peut déjà presque tout ; *ce que le commentaire promet, c'est
+précisément que ce geste-là ne se fasse pas sans témoin.* **Le refus est écrit ici**, et le
+sélecteur n'est pas rendu sur sa propre ligne — *un geste qu'on ne rend pas ne se contourne
+pas ; un geste qu'on rend et que le serveur refuse est une promesse rompue.*
+
+### Deux autres bornes que le legacy n'a pas
+
+- **une valeur négative est refusée.** Le legacy fait `(int)$val` sans borne : `-1` s'écrirait,
+  et `DATE_ADD(…, INTERVAL -1 DAY)` poserait une échéance **dans le passé** — un compte expiré
+  à l'instant même, par une valeur qui ressemble à un réglage ;
+- **le formulaire est une liste fermée**, pas une saisie libre.
+
+### ⚠ Les trois copies du journal d'audit délèguent enfin
+
+Relevé par une autre session, dans un fichier que je touchais depuis deux jours : mon
+`journalise()` privé lisait la tête de chaîne **sans `lockForUpdate()` et hors transaction**.
+
+> *Deux écritures concurrentes qui lisent la même tête produisent deux lignes portant le même
+> `prev_hash`, donc une chaîne FOURCHUE, que `verifie()` signalera comme rompue sans pouvoir
+> dire laquelle des deux branches est la bonne.*
+
+**J'ai écrit ce docblock moi-même, en annonçant que « trois copies restent à migrer ».** Les
+trois — `ComptesController`, `PermissionsController`, `ServeursController` — **délèguent
+désormais** à `JournalAudit::ajoute()`. Mesure après : **0 lecture de tête en code**, 3
+délégations, 1 seul `lockForUpdate()`.
+
+*Une copie qui délègue ne peut plus diverger.* **Et ce n'est pas moi qui l'ai vue** — je l'avais
+annoncée, pas cherchée.
+
+### Ce qui est mesuré
+
+    16 cas · 0 FAIL · en TRANSACTION ANNULEE, sur des etats FORCES
+      les trois valeurs · zero l'emporte sur la globale · negatif REFUSE sans ecrire
+      l'echeance part de password_updated_at et NON de maintenant
+      override et echeance verifies APRES l'annulation
+
+*Sans forçage : 0 compte sur 12 porte un override et `PASSWORD_EXPIRY_DAYS` n'est pas posée —
+le test passerait à vide.* **Le geste est dormant, et c'est la raison de l'écrire.**
