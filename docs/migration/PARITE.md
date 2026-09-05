@@ -20023,3 +20023,131 @@ délivre rien serait pire que son absence).
 
 *`index.php` désigne **23** fichiers dans ce dépôt, pas dix : 12 hors `_deprecated`, 11 dedans.
 Toute mesure par nom de base surcompte, et le compte annoncé était court.*
+
+---
+
+## E-406 — la réinitialisation de mot de passe : **l'oracle de temps était fermé sur le mauvais terme**
+
+**Porté :** `legacy/auth/forgot_password.php` (206 l.) et `reset_password.php` (412 l.) →
+`ReinitialisationMotDePasse`, `Auth\ReinitialisationController`, deux vues, `lang/{fr,en}/reinit.php`,
+quatre routes publiques. **Le changement de mot de passe lui-même n'est PAS ici** : il vit dans
+`MotDePasse::reinitialise()`, qui porte déjà l'historique, la politique, la purge des jetons
+« se souvenir de moi » **dans** la transaction (E-393) et celle des sessions actives.
+
+*Deux chemins écrivent un mot de passe. Si un seul révoquait les accès, le défaut reviendrait
+par l'autre porte.*
+
+### ⚠ Le défaut central : le correctif d'anti-énumération portait sur le mauvais terme
+
+Le legacy avait déjà égalisé le **message** — il est hors du `if ($user)`, et son commentaire
+dit que le défaut était de l'avoir mis dedans. **Le temps, lui, ne l'était pas :**
+
+    adresse INCONNUE       adresse CONNUE
+    1 x password_hash      1 x UPDATE · 1 x password_hash · 1 x INSERT
+                           1 x envoi SMTP **SYNCHRONE**
+
+> **Un envoi SMTP dure des ordres de grandeur de plus qu'un bcrypt.** Le correctif a égalisé
+> le terme le moins coûteux et laissé le plus coûteux d'un seul côté : la branche « l'adresse
+> existe » était nettement **plus lente**. *L'oracle subsistait, simplement inversé.*
+
+**Et une file d'attente n'y aurait rien changé** : `queue.default = sync` (mesuré) — `Mail::queue`
+s'exécute **en ligne**. *Une prescription de mise en file aurait été inopérante ici, et elle
+aurait eu l'apparence d'un correctif.*
+
+**Le mécanisme employé est `app()->terminating()`** : la fermeture s'exécute **après** que la
+réponse a été transmise. L'envoi sort du temps mesurable par le demandeur, sans dépendre d'un
+ouvrier de file qui n'existe pas.
+
+**Mesuré, et le résidu est énoncé plutôt que tu :**
+
+    branche INCONNUE (brule)  185,7 ms      un bcrypt au cout 12
+    branche CONNUE   (emet)   188,1 ms      UPDATE + bcrypt + INSERT
+    ecart                       2,4 ms      1 % du cout de base
+
+*Le résidu n'est pas nul : un `UPDATE` et un `INSERT` ne se produisent que dans la branche
+connue. Ils se comptent en fractions de milliseconde là où le bcrypt — égalisé — se compte en
+centaines.*
+
+### ⚠ Le second défaut : la limite de débit **finançait** l'énumération
+
+Le legacy compte les lignes de `password_reset_tokens` pour une adresse IP. **Or une demande
+portant une adresse inconnue n'insère aucune ligne** : elle n'est donc jamais comptée.
+
+> **Un compteur qui ne compte que les demandes réussies ne limite pas l'énumération — il la
+> finance.** *Sonder dix mille adresses ne consomme aucun crédit tant qu'aucune n'existe, et
+> la première qui existe est justement celle qu'on cherchait.*
+
+Le compteur vit donc dans le **cache**, hors de toute table liée au compte, et il est
+incrémenté **avant** de savoir si l'adresse existe. Mesuré : trois demandes passent, la
+quatrième est refusée, une autre IP n'est pas affectée, **et le compteur monte pour une adresse
+inexistante**.
+
+**⛔ Et pas dans `login_attempts`** : le garde de `login.php:50` **ignore** la colonne `step`.
+Toute écriture y compte dans le verrou de **connexion** par adresse — une réinitialisation
+demandée fermerait la connexion de tout un NAT.
+
+**Et la limite échoue FERMÉ.** Le legacy rend `true` — « autorisé » — sur toute `PDOException`,
+au motif « si la table n'existe pas encore ». *Le repli couvre un cas et s'applique à tous.*
+Ici l'inverse : une demande refusée se réessaie, **une limite désarmée ne se remarque
+qu'après**.
+
+### Ce que l'écran dit, et ce qu'il refuse de dire
+
+`MAIL_MAILER = log` (mesuré) : **rien ne part vers une boîte**. Le message dit donc *« un lien
+lui a été **préparé** »*. *Une phrase qui affirmerait un envoi ferait attendre un courriel qui
+n'arrivera pas — et il faudrait la rectifier le jour où le SMTP sera posé. Celle-ci reste vraie
+dans les deux régimes.*
+
+**Le flux est agnostique au transport** : il ne dépend pas de la décision SMTP en cours.
+
+### Le jeton, mesuré
+
+    64 hexadecimaux · haché en BCRYPT, jamais en clair en base
+    une heure de validite · usage unique
+    une nouvelle emission INVALIDE les precedentes
+    la consommation ferme TOUS les jetons du compte
+    la FORME est verifiee avant le contenu — un jeton malforme ne merite pas
+      cinq `password_verify`
+    revalidation AVANT l'ecriture, contre la double soumission
+
+**Aucune session n'est ouverte.** *Réinitialiser un mot de passe ne contourne pas le second
+facteur* : le compte se reconnecte par l'écran de connexion, qui l'exige. Corollaire à
+connaître : un compte qui a perdu son mot de passe **et** son second facteur n'a toujours aucun
+chemin — c'est un geste d'administration.
+
+### Deux choix de rendu
+
+- **un lien mort ne rend AUCUN formulaire.** Afficher une saisie qui sera refusée ferait
+  choisir un mot de passe, le confirmer, et découvrir seulement ensuite que le lien était mort.
+  Le geste offert est celui qui marche : redemander un lien ;
+- **la conséquence est dite avant le geste.** Enregistrer un nouveau mot de passe ferme les
+  sessions ouvertes et révoque les connexions mémorisées. *Quelqu'un qui réinitialise parce
+  qu'il soupçonne un accès doit savoir que ce geste le ferme — c'est justement ce qu'il
+  cherche, et le taire le laisserait douter.*
+
+**Et sans le lien depuis l'écran de connexion, le flux n'existerait pas** : quatre routes, deux
+vues, un service, et aucun moyen d'y arriver autrement qu'en tapant l'adresse. Mesure avant
+pose : **0 lien entrant**.
+
+### Ce qui est mesuré, et comment
+
+    cycle de vie du jeton   26 cas · 0 FAIL · en TRANSACTION ANNULEE
+    au navigateur           19 cas · 0 FAIL · trois largeurs · captures REGARDEES
+    parite FR/EN par PHP    17 = 17 · 0 divergence · 3 jetons lies des deux cotes
+    le MECANISME            1 seul `Mail::` dans le code, APRES `terminating(`
+                            `Mail::queue` : absent · `login_attempts` : aucune ecriture
+
+**Témoin inverse** : `password_verify` remplacé par `true` sur une copie → **2 FAIL**.
+
+**⚠ `password_reset_tokens` porte 0 ligne, et elle en porte toujours 0.** Tout ce qui écrit est
+éprouvé dans une transaction annulée, et l'état de la table est vérifié **après** l'annulation.
+*Y laisser un jeton de test donnerait à un compte réel un mot de passe à usage unique valable
+une heure.* Au navigateur, **seule la branche inconnue est exercée** : elle brûle un bcrypt et
+n'écrit rien.
+
+### Ce qui n'est PAS mesuré, et c'est annoncé
+
+- **la délivrance** : avec `MAIL_MAILER = log`, l'envoi écrit dans le journal du conteneur. Que
+  le courriel *parte* ne peut pas être mesuré avant la décision SMTP ;
+- **le chemin complet de bout en bout** — demander, recevoir, cliquer, poser — n'est pas exercé
+  au réseau, parce qu'il exigerait d'émettre un jeton réel sur un compte réel.

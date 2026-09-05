@@ -5,6 +5,83 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.44.0] - 2026-09-05
+
+### Auth - E-406 : la reinitialisation de mot de passe est portee
+
+**Ce qui est porte.** `forgot_password.php` (206 l.) et `reset_password.php` (412 l.) →
+`ReinitialisationMotDePasse` + `Auth\ReinitialisationController` + deux vues + un catalogue
+FR/EN + quatre routes PUBLIQUES. Le CHANGEMENT du mot de passe n'est pas ici : il vit dans
+`MotDePasse::reinitialise()`, qui porte deja l'historique, la politique, la purge des jetons
+« se souvenir de moi » DANS la transaction (E-393) et celle des sessions actives. *Deux chemins
+ecrivent un mot de passe ; si un seul revoquait, le defaut reviendrait par l'autre porte.*
+
+**⚠ LE DEFAUT CENTRAL : l'anti-enumeration etait fermee sur le mauvais terme.** Le legacy avait
+egalise le MESSAGE. Le TEMPS, non :
+
+    adresse INCONNUE    1 x password_hash
+    adresse CONNUE      1 x UPDATE · 1 x password_hash · 1 x INSERT
+                        1 x envoi SMTP SYNCHRONE
+
+Un envoi SMTP dure des ordres de grandeur de plus qu'un bcrypt : la branche « l'adresse
+existe » etait nettement PLUS LENTE. L'oracle subsistait, simplement inverse.
+
+**Et une file d'attente n'y aurait rien change** : `queue.default = sync` (mesure) —
+`Mail::queue` s'execute EN LIGNE. Le mecanisme employe est `app()->terminating()` : l'envoi
+part APRES la reponse, sans dependre d'un ouvrier de file qui n'existe pas.
+
+    branche INCONNUE  185,7 ms   ·   branche CONNUE  188,1 ms   ·   ecart 2,4 ms (1 %)
+
+Le residu est ENONCE : un `UPDATE` et un `INSERT` ne se produisent que dans la branche connue.
+
+**⚠ LE SECOND DEFAUT : la limite de debit FINANCAIT l'enumeration.** Le legacy compte les
+lignes de `password_reset_tokens` par adresse IP — or une demande portant une adresse inconnue
+n'insere AUCUNE ligne, donc n'est jamais comptee. *Un compteur qui ne compte que les demandes
+reussies ne limite pas l'enumeration.* Le compteur vit desormais dans le CACHE et monte AVANT
+de savoir si l'adresse existe. **Pas dans `login_attempts`** : son garde ignore la colonne
+`step`, donc toute ecriture compte dans le verrou de CONNEXION par adresse.
+
+**Et elle echoue FERME.** Le legacy rend « autorise » sur toute `PDOException`. Une demande
+refusee se reessaie ; une limite desarmee ne se remarque qu'apres.
+
+**L'ecran dit « prepare », pas « envoye ».** `MAIL_MAILER = log` : rien ne part vers une boite.
+Une phrase qui affirmerait un envoi serait a rectifier le jour du SMTP ; celle-ci reste vraie
+dans les deux regimes. Le flux est agnostique au transport.
+
+**Le jeton** : 64 hexadecimaux, hache en bcrypt, une heure, usage unique, une nouvelle emission
+invalide les precedentes, la consommation ferme TOUS les jetons du compte, la FORME est
+verifiee avant le contenu, et le jeton est REVALIDE avant l'ecriture. **Aucune session n'est
+ouverte** : reinitialiser ne contourne pas le second facteur.
+
+**Deux choix de rendu** : un lien mort ne rend AUCUN formulaire — il offre de redemander un
+lien ; et la consequence (fermeture des sessions, revocation des connexions memorisees) est
+dite AVANT le geste.
+
+**Tests.** Cycle de vie du jeton : **26 cas, 0 FAIL, en TRANSACTION ANNULEE**. Au navigateur :
+**19 cas, 0 FAIL**, trois largeurs, captures REGARDEES. Parite FR/EN par PHP : **17 = 17**,
+trois jetons lies des deux cotes. Le MECANISME verifie et pas l'intention : un seul `Mail::`
+dans le code, APRES `terminating(` ; `Mail::queue` absent ; aucune ecriture dans
+`login_attempts`. **Temoin inverse** : `password_verify` remplace par `true` sur une copie →
+2 FAIL.
+
+**⚠ `password_reset_tokens` porte 0 ligne, et elle en porte toujours 0.** L'etat de la table est
+verifie APRES l'annulation. Au navigateur, seule la branche INCONNUE est exercee : elle brule
+un bcrypt et n'ecrit rien. *Y laisser un jeton de test donnerait a un compte reel un mot de
+passe a usage unique valable une heure.*
+
+**⚠ Ce qui n'est PAS mesure, et c'est annonce** : la DELIVRANCE (avec `MAIL_MAILER = log`,
+l'envoi ecrit dans le journal ; que le courriel PARTE ne peut pas etre mesure avant la decision
+SMTP), et le chemin complet de bout en bout, qui exigerait d'emettre un jeton reel sur un
+compte reel.
+
+**Notes exploitation.** Aucune migration : `password_reset_tokens` existe (016, verifiee sur
+`information_schema`, contrainte de cle etrangere vers `users`). Les quatre routes sont
+PUBLIQUES par necessite — qui a perdu son mot de passe ne peut pas s'authentifier pour le
+redemander. `routes/web.php` et `auth/connexion.blade.php` sont touches : **annonces AVANT
+ecriture** (`modifie:0` sur les deux).
+
+---
+
 ## [1.43.0] - 2026-09-05
 
 ### Accueil - E-405 : l'assistant de premiere configuration est porte

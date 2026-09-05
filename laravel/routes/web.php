@@ -46,6 +46,7 @@ use App\Http\Controllers\SupervisionController;
 use App\Http\Controllers\TachesController;
 use App\Http\Controllers\TicketsController;
 use App\Http\Controllers\Auth\ConnexionController;
+use App\Http\Controllers\Auth\ReinitialisationController;
 use App\Http\Controllers\Auth\SecondFacteurController;
 use Illuminate\Support\Facades\Route;
 
@@ -62,6 +63,35 @@ Route::redirect('/', '/accueil')->name('racine');
 // ── Public ───────────────────────────────────────────────────────────────────
 Route::get('/connexion', [ConnexionController::class, 'formulaire'])->name('connexion');
 Route::post('/connexion', [ConnexionController::class, 'soumettre'])->name('connexion.soumettre');
+
+/*
+ * ══ LA REINITIALISATION DE MOT DE PASSE — QUATRE ROUTES PUBLIQUES ═════════
+ *
+ * ⚠ PUBLIQUES PAR NECESSITE, ET C'EST TOUT LEUR OBJET : qui a perdu son mot de
+ * passe ne peut pas s'authentifier pour le redemander. Elles vivent donc HORS du
+ * groupe authentifie, comme `/connexion`.
+ *
+ * Ce qui les borne n'est donc pas une garde de session mais :
+ *
+ *   - une LIMITE DE DEBIT qui echoue FERME et compte les demandes RECUES
+ *     (`ReinitialisationMotDePasse::autorise`) ;
+ *   - un JETON de 32 octets, hache en bcrypt, a usage unique, valable une heure ;
+ *   - un message IDENTIQUE que l'adresse existe ou non ;
+ *   - et AUCUNE ouverture de session : le compte se reconnecte, second facteur
+ *     compris. **Reinitialiser un mot de passe ne contourne pas la 2FA.**
+ *
+ * `/reinitialiser` porte `uid` et `jeton` en QUERY parce que c'est le lien du
+ * courriel. La SOUMISSION, elle, les repasse en champs caches : les remettre
+ * dans l'URL du POST deposerait le jeton dans le journal du serveur.
+ */
+Route::get('/mot-de-passe-oublie', [ReinitialisationController::class, 'demander'])
+    ->name('reinit.demander');
+Route::post('/mot-de-passe-oublie', [ReinitialisationController::class, 'envoyer'])
+    ->name('reinit.envoyer');
+Route::get('/reinitialiser', [ReinitialisationController::class, 'formulaire'])
+    ->name('reinit.formulaire');
+Route::post('/reinitialiser', [ReinitialisationController::class, 'appliquer'])
+    ->name('reinit.appliquer');
 
 // Etape intermediaire : le compte temporaire suffit, la session n'est PAS
 // encore authentifiee. Ces routes ne sont donc pas derriere le garde.
