@@ -9605,3 +9605,43 @@ porte son propre `<h2>`, `:154` le bouton, `:168` le bloc de formulaire.*
 **A5 les a ajoutées et le commentaire n'a pas suivi.** *Les deux sont en URL CONSTRUITE — invisibles à un
 motif littéral, ce qui explique probablement que personne ne l'ait repris.* **Deuxième fois en deux heures
 sur ce même en-tête, et la seconde est causée par le commit qui l'a lu.**
+
+### ⛔ MON ARBITRAGE SUR LA SECTION DE PLANIFICATION VISAIT UN DÉFAUT QUI N'EXISTE PAS
+
+    `AuditSshController:139`   'administration' => $role >= 2
+    `audit-ssh.blade.php:136`  @if ($administration)   …   `:232` @else
+    la section de planification (`:147`) est DEDANS
+    et la branche `@else` porte DEUX phrases qui disent pourquoi
+
+**Le commentaire du contrôleur portait déjà mon raisonnement, mot pour mot** : *« Les afficher au rôle 1
+produirait deux 403 à l'écran plutôt qu'une absence expliquée. »*
+
+> **Ma mesure était juste sur les deux gardes ; c'est l'INFÉRENCE qui a sauté la troisième.** *« La page est
+> en `role:1` » et « les routes sont en `role(2)` » n'impliquent « l'écran propose ce que le serveur
+> refuse » QUE SI LA VUE NE CONDITIONNE RIEN.*
+
+**J'ai mesuré une GARDE et j'en ai inféré un ÉCRAN.** *C'est la famille que deux sessions ont payée
+aujourd'hui — décrire un chemin comme une propriété de fonction — et c'est mon quatrième « miroir » sous
+une autre forme : je compare deux termes et je conclus sur un troisième que je n'ai pas lu.*
+
+### ⚠ ET LA SIXIÈME CLASSE DE PÉREMPTION : le numéro de ligne, périmé PAR LE HAUT
+
+    la table de commentaires d'`audit-ssh.js` annoncait  :246  :335  :583
+    la mesure rend                                        :359  :448  :696
+    -> A5 a insere 218 lignes AU-DESSUS. Les trois ont glisse sans que
+       personne ne touche ni au commentaire ni au code cite.
+
+> **Un numéro de ligne est un fait que toute édition située AU-DESSUS rend faux, EN SILENCE.**
+
+**Et ça me vise : mes 29 dossiers portent 128 citations `fichier:ligne`.** *Vérifié sur le plus urgent —
+`DOSSIER-25` citait `web.php:1031` pour la route de scellement, qui est à `:1058`. **27 lignes de
+glissement, et le pointeur visait une ligne vide.*** **Corrigé, et le dossier repère désormais ses objets
+par leur NOM.**
+
+    la parade, et elle est de la session 1 :
+      reperer par l'APPELANT ou par le NOM — `JournalAuditController::sceller`,
+      `lanceReleve`, `supprimePlanif`.
+      « Un nom se deplace avec ce qu'il designe. »
+
+**⛔ Je ne réécris pas les 128.** *Mais toute citation d'un dossier que l'exploitant pourrait ACTIONNER est
+à reprendre par nom — et je commence par ceux qui portent un geste.*

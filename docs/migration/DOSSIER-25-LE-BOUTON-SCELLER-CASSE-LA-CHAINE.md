@@ -142,3 +142,48 @@ différents ».*
 
 **Ça ne change pas la décision, ça change ce qu'elle coûte** : *l'ordre contraint du point 3 ne protège pas
 une capacité d'enquête — il protège la seule trace qui indique OÙ enquêter.*
+
+---
+
+# ⛔ CORRECTION D'UNE CITATION DE CE DOSSIER — elle pointait une ligne VIDE
+
+**Mesuré le 2026-09-05. Ce dossier citait `web.php:1031` pour la route de scellement.**
+
+    ligne 1031 aujourd'hui   « »   (VIDE)
+    la route reelle          `laravel/routes/web.php:1058`
+      Route::post('/journal-audit/sceller', [JournalAuditController::class, 'sceller'])
+
+**27 lignes de glissement. Le pointeur du dossier le plus urgent visait le vide.**
+
+> **Un numéro de ligne dans un document est un fait que TOUTE ÉDITION SITUÉE AU-DESSUS rend faux — et il le
+> devient EN SILENCE, puisque ni le document ni le code cité n'ont bougé.**
+
+## ✅ LA FORME QUI NE GLISSE PAS
+
+**Ce dossier repère désormais ses objets par leur NOM, jamais par leur ligne :**
+
+    la route      `POST /journal-audit/sceller`  ->  `JournalAuditController::sceller`
+    le scelleur   `JournalAudit::scelle()`, la branche `if ($l->self_hash === null)`
+    le legacy     `audit_seal.php`, la branche `if ($prevSelf === null)`
+                  et son `$lastHash = $computed;`
+    l'ecrivain    `legacy/auth/login.php`, l'appel `audit_log_raw(…, 'Connexion reussie')`
+
+**Un nom se déplace avec ce qu'il désigne ; un numéro reste où on l'a écrit.**
+
+## ⚠ LES DEUX AUTRES CITATIONS DE CE DOSSIER TIENNENT — vérifiées une par une
+
+    `legacy/adm/api/audit_seal.php:78`  ->  `if ($prevSelf === null) {`     ✔
+    `legacy/auth/login.php:201`         ->  `audit_log_raw(…)`              ✔
+
+*Elles tiennent parce que personne n'a édité au-dessus d'elles dans le legacy — c'est-à-dire par
+l'immobilité d'un composant qu'on éteint, pas par une propriété de la citation.*
+
+## ⚠ ET L'AMPLEUR SUR MES PROPRES ARTEFACTS
+
+    citations `fichier:ligne` dans mes 29 dossiers : 128
+
+**Chacune est un fait qui se périme par le haut. Je ne les réécris pas en masse — mais celle-ci était dans
+le dossier que je vous présente comme le plus urgent, et son unique pointeur actionnable visait le vide.**
+
+**Rien d'autre du dossier ne change : le défaut, l'ampleur (462 paires), l'irréversibilité et l'ordre
+contraint des 389 lignes du 12-15 août sont inchangés.**
