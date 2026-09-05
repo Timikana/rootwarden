@@ -5,6 +5,43 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.48.0] - 2026-09-05
+
+### Extinction - vague 2 : la CASCADE, 11 fichiers de plus
+
+**Archiver une page LIBERE ce qu'elle incluait.** Apres les 30 deplacements de la 1.47.0,
+le graphe a ete remesure : **59 feuilles -> 37**, et dix fichiers jusque-la tenus sont
+devenus libres — dont `manage_users.php` et `manage_servers.php`, les appelants memes qui
+retenaient trois points d'entree.
+
+    .php metier servis   52 -> 43     (82 ce matin)
+    archives             49 -> 58     (19 ce matin)
+
+#### Retire du service
+Deux ecrivains blanchis geste par geste (`anonymize_user`, `change_password`), puis neuf
+fichiers liberes par la cascade : `manage_access` `manage_notifications` `manage_roles`
+`manage_servers` `manage_users` `confirm_2fa` `migrate_totp` `reset_totp` `onboarding`.
+
+#### Deux alertes de l'inventaire qui TOMBENT, mesurees
+- **`manage_access.php` « seule facon vivante d'accorder un sudo »** : `sudo_preset` est
+  present cote portage (`Permissions.php`, 4 occurrences). L'alerte etait perimee.
+- **`onboarding.php`** : porte (`Onboarding.php`), et il n'ecrit rien.
+
+#### ⛔ Un fichier RETENU, et la raison
+`adm/includes/import_csv.php` : le legacy y ecrit **quatre** tables — `machines`,
+`permissions`, `user_logs`, `users`. `ComptesController::importer` existe et la route
+`POST /comptes/importer` est gardee, mais **seule la moitie `users` est prouvee**. *Moins
+plutot que faux.*
+
+#### Verifie au reseau
+    /adm/includes/manage_users.php   404   (retire)
+    /adm/includes/import_csv.php     200   (retenu, et directement rendu)
+    /api_proxy.php                   302   (vivant)
+    /menu.php                        403   (bloque par une regle preexistante)
+    portage /connexion               200
+
+---
+
 ## [1.47.0] - 2026-09-05
 
 ### Extinction - vague 1 : 28 fichiers retires du service, et l'archivage ne desservait rien
