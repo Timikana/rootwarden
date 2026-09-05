@@ -11758,3 +11758,76 @@ ajustement.* **C'est le périmètre de la QA, et je ne le date pas à sa place.*
 *Solution intermédiaire acceptable, si le travail est trop lourd maintenant* : **laisser la
 référence à 5 et laisser le verdict ÉCART** — *un écart nommé et compris coûte moins qu'un vert
 obtenu en abaissant la barre.* **Ce qui est REFUSÉ, c'est de descendre le nombre en silence.**
+
+---
+
+## E-443
+
+### ARBITRAGE — `/ssh-audit/backups` NE SE PORTE PAS SEULE. Elle part avec A3.
+
+**Une session me demande de trancher : `/ssh-audit/backups` est une LECTURE pure
+(`list_backups`, aucune écriture), donc portable sans arbitrage — la première trouvée en quatre
+modules.** *Mais sa suite naturelle, `restore`, est une écriture sous arbitrage.*
+
+**Ma première inclination était de la porter en disant « la restauration passe par la console ».
+Elle s'inverse à la mesure.**
+
+    occurrences NON commentees dans laravel/ :
+      save-config       0        ssh-audit/fix      0
+      ssh-audit/reload  0        ssh-audit/restore  0
+      ssh-audit/toggle  0
+    TEMOIN  ssh-audit/scan  1   (appele par audit-ssh.js)
+
+> **RIEN dans le portage n'écrit `sshd_config`.** *Donc un utilisateur du portage ne peut pas
+> avoir CAUSÉ une modification — et il ne peut pas non plus restaurer.*
+
+### DÉCISION : ne pas la porter maintenant
+
+**Une lecture dont le seul office est de servir une écriture qui n'existe pas n'a pas de
+lecteur.**
+
+    « une sauvegarde existe-t-elle ? »  a une valeur DIAGNOSTIQUE — mais seulement
+    pour quelqu'un qui a modifie, ou qui va restaurer. Dans le portage, ni l'un ni l'autre.
+
+**Et la porter seule créerait un cul-de-sac D'UN GENRE PLUS SUBTIL que celui d'E-425** : *là,
+un bouton menait à un 404 ; ici, un écran listerait des sauvegardes sans offrir de les
+employer.* **Le premier se signale par une erreur ; le second se signale par une absence, et
+l'utilisateur cherche le bouton avant de conclure qu'il n'existe pas.**
+
+**`backups` et `restore` forment UN geste** — *« vérifier qu'il y a un point de retour, puis y
+revenir »* — **et il se porte entier ou pas du tout, quand l'arbitrage sur A3 sera rendu.**
+
+*Réserve honnête : si l'exploitant modifie `sshd_config` PAR AILLEURS — console, autre outil —
+alors la liste retrouve un lecteur. Je ne le sais pas, et cette décision se rouvre s'il le
+dit.*
+
+---
+
+## E-444
+
+### Comparer portage contre legacy SUPPOSE que le legacy serve encore
+
+**Le relevé de cette session donnait d'abord six routes `ssh_audit` comme « manquant au
+portage ». Elles manquent aux DEUX** — leur page legacy est `_deprecated/ssh-audit/`.
+
+    /ssh-audit/backups · fix · reload · restore · save-config · toggle
+    appelant vivant, des DEUX cotes : AUCUN
+    TEMOIN  /ssh-audit/scan est bien rendu par `audit-ssh.js`
+
+> **Une comparaison à deux termes rend un verdict qui a la FORME d'un manque de portage et qui
+> n'en est pas un — dès que le terme de référence a lui aussi disparu.**
+
+**C'est la règle du discriminant périmé (E-431) appliquée à la MÉTHODE plutôt qu'à un
+prédicat** : *l'état qui a changé est l'archivage du legacy, et il périme la comparaison
+elle-même.*
+
+**RÈGLE** : *interroger les deux côtés SÉPARÉMENT avant de les comparer.* **Six routes en un
+seul module, et la même forme que `/policy/rollback` — c'est une population, pas un accident.**
+
+### Et la symétrie avec le TÉMOIN DISPARU
+
+    six orphelines   une CAPACITE dont l'INTERFACE a disparu
+    temoin disparu   une ASSERTION dont l'ETALON a disparu
+
+> **Dans les deux cas, ce qui manque n'est pas l'objet mesuré, mais ce qui permettait de
+> l'ATTEINDRE ou de le JUGER.**
