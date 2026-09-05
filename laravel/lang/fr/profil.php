@@ -11,12 +11,9 @@ return [
     'second_facteur_titre'  => 'Second facteur',
     'second_facteur_valeur' => 'Actif',
     'second_facteur_texte'  => "Un code à usage unique est exigé à chaque connexion. Il n'existe aucun accès sans second facteur.",
-
-    'non_porte_titre' => 'Pas encore ici',
     // E-203 : les sessions SONT listees desormais. La chaine decrivait un
     // manque qui vient d'etre comble — un libelle qui survit au defaut
     // qu'il decrit devient faux sans que rien ne le signale.
-    'non_porte_texte' => 'Les connexions mémorisées ne sont pas encore listées ici : l\'ancien portail les affiche. Le changement de mot de passe et les sessions ouvertes, eux, se gèrent désormais sur cette page.',
     /*
      * ── SOUS-LOT A2 : LE CHANGEMENT DE MOT DE PASSE ──────────────────────
      *

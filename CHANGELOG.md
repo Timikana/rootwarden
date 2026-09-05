@@ -5,6 +5,41 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.51.2] - 2026-09-05
+
+### Profil - une tuile annoncait un manque qui n'existait pas, et renvoyait vers un portail qui ne le comblait pas
+
+La page `/profil` portait une tuile « Pas encore ici » :
+
+> *« Les connexions memorisees ne sont pas encore listees ici : l'ancien portail les
+> affiche. »*
+
+**MESURE : `legacy/profile.php` ne les liste JAMAIS.** Ses deux seules occurrences de
+`remember_tokens` sont un `DELETE` (`:209`), pose apres un changement de mot de passe.
+
+> **Le libelle inventait un manque ET renvoyait vers un portail qui ne le comblait pas.**
+> *C'est la meme forme que la phrase de supervision corrigee le 2026-09-03 : une page qui
+> indique une sortie muree.*
+
+Et les trois gestes qui manquaient VRAIMENT — changer son adresse, poser sa cle SSH,
+demander l'effacement — sont portes depuis la v1.51.1. **Il ne reste rien a aller chercher
+ailleurs.**
+
+#### Retire
+- la tuile et son lien `target="_blank"` vers `{legacy}/profile.php` ;
+- les cles `profil.non_porte_titre` et `profil.non_porte_texte`, des DEUX catalogues.
+  **Parite verifiee par comparaison des JEUX : 63 = 63, aucun ecart.**
+- `auth.ouvrir_ancien_portail` est CONSERVEE : `accueil.blade.php` l'emploie encore.
+
+#### Verifie
+    php -l x2              propre
+    blade compile          11694 octets, aucune erreur
+    suites qui asserent
+      `non_porte_`         0
+    /profil 302 (garde)  ·  /connexion 200  ·  inexistant 404
+
+---
+
 ## [1.52.0] - 2026-09-05
 
 ### Comptes - E-419 : le quatrieme ecrivain que le legacy detenait seul

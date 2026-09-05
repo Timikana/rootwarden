@@ -157,18 +157,15 @@
             @endif
         </div>
 
-        {{-- Ce qui reste non porte sur cette page, et QUOI exactement : le
-             changement de mot de passe, lui, l'est desormais (A2). Un intitule
-             qui reste vague apres un portage partiel laisse croire que rien n'a
-             bouge. --}}
-        <div class="rw-tuile">
-            <span class="rw-tuile__titre">{{ __('profil.non_porte_titre') }}</span>
-            <p class="rw-tuile__texte">{{ __('profil.non_porte_texte') }}</p>
-            <p class="rw-tuile__lien">
-                <a class="rw-lien" href="{{ rtrim(config('app.url_legacy'), '/') }}/profile.php"
-                   target="_blank" rel="noopener">{{ __('auth.ouvrir_ancien_portail') }} ↗</a>
-            </p>
-        </div>
+        {{-- LA TUILE « Pas encore ici » A ETE RETIREE le 2026-09-05.
+             Son texte disait : « Les connexions memorisees ne sont pas encore
+             listees ici : l'ancien portail les affiche. » MESURE : `legacy/profile.php`
+             ne les liste JAMAIS — ses deux seules occurrences de `remember_tokens`
+             sont un `DELETE` (:209), pose apres un changement de mot de passe.
+             Le libelle inventait un manque ET renvoyait vers un portail qui ne le
+             comblait pas. Les trois gestes qui manquaient vraiment — changer son
+             adresse, poser sa cle SSH, demander l'effacement — sont portes depuis
+             la v1.51.1. Il ne reste rien a aller chercher ailleurs. --}}
     </div>
 
     {{-- L'EXPORT EST UN GET, DONC UN LIEN. C'est une LECTURE : elle ne modifie
