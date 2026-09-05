@@ -388,19 +388,58 @@ try {
                 if (! p) return { ouvert: false, texte: '' };
                 const b = p.getBoundingClientRect();
 
+                const listeEffets = p.querySelector('[data-rw="cle-panneau-effets"]');
+
                 return {
                     // `offsetParent` vaut `null` pour un element en `position: fixed` :
                     // on mesure la place REELLEMENT occupee.
                     ouvert: ! p.hidden && b.height > 0 && getComputedStyle(p).display !== 'none',
                     texte: (p.innerText || '').replace(/\s+/g, ' ').trim(),
+                    // Le panneau ENUMERE ce que le geste fait. C'est cette liste
+                    // qui rend la perte lisible, et elle a son ancre propre.
+                    effets: listeEffets
+                        ? [...listeEffets.querySelectorAll('li')].map((e) => (e.textContent || '').trim())
+                        : null,
                 };
             }, C);
             constate('panneau de decision', vu.ouvert ? `« ${vu.texte.slice(0, 120)} »` : '(ferme)');
             verifie('le clic OUVRE un panneau de decision', vu.ouvert,
                 'le panneau ne s\'affiche pas — un geste de flotte partirait sans etre annonce');
-            verifie('le panneau annonce que le geste est SANS RETOUR',
-                vu.ouvert && /sans retour|irr[ée]versible|no return/i.test(vu.texte),
-                `le panneau ne nomme pas l'irreversibilite : « ${vu.texte.slice(0, 90)} »`);
+            /*
+             * ══ ASSERTER LA PROPRIETE, PAS LE VOCABULAIRE ═════════════════
+             *
+             * Premiere redaction : `/sans retour|irr[ée]versible|no return/`.
+             * Elle a rougi le 2026-09-05 sur un panneau qui dit
+             *
+             *     « il agit sur la flotte entiere, en une fois, et DETRUIT LA
+             *       CLE PRIVEE EN COURS »
+             *     « les machines gardent l'ANCIENNE cle publique : apres ce
+             *       geste RootWarden ne peut plus s'y connecter par cle »
+             *
+             * — c'est-a-dire un avertissement PLUS FORT que le mot qu'elle
+             * exigeait. **Une assertion qui nomme les MOTS attendus plutot que
+             * la PROPRIETE attendue echoue sur une amelioration**, et elle
+             * envoie corriger l'ecran qui vient de s'ameliorer.
+             *
+             * La propriete reelle tient en deux morceaux, et le premier est
+             * STRUCTUREL — donc insensible a une reformulation :
+             *
+             *   1. le panneau ENUMERE les effets du geste (`cle-panneau-effets`),
+             *      et l'enumeration n'est pas vide ;
+             *   2. le texte nomme une CONSEQUENCE qu'on ne peut pas defaire,
+             *      quelle que soit la tournure choisie pour le dire.
+             */
+            const effets = vu.effets || [];
+            verifie('le panneau ENUMERE les effets du geste',
+                vu.ouvert && effets.length > 0,
+                vu.effets === null
+                    ? 'l\'ancre cle-panneau-effets est absente du panneau'
+                    : `${effets.length} effet(s) enumere(s)`);
+
+            const PERTE = /d[ée]truit|destruction|supprime|perdue?|definitiv|irr[ée]versible|sans retour|no return|ne peut plus/i;
+            verifie('le panneau annonce une PERTE DEFINITIVE, quelle qu\'en soit la tournure',
+                vu.ouvert && (PERTE.test(vu.texte) || effets.some((e) => PERTE.test(e))),
+                `le panneau ne nomme aucune consequence irrattrapable : « ${vu.texte.slice(0, 90)} »`);
             verifie('AUCUNE requete n\'est partie avant consentement',
                 passees.length === avantPassees && avortees.length === avantAvortees,
                 `${passees.length - avantPassees} passee(s), ${avortees.length - avantAvortees} avortee(s)`,
