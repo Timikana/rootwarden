@@ -5719,3 +5719,96 @@ Leur relevé mesure l'arbre **après** mon portage : il ne confirme ni n'infirme
 lecteurs backend. *Ce sont deux questions et deux instants.* Ils ratifient le raisonnement,
 pas le chiffre — qu'ils n'ont pas refait. **C'est la bonne façon de ratifier**, et elle laisse
 la mesure réfutable au lieu de la clore.
+
+---
+
+## E-401 à E-419 — la journée du 2026-09-05, et **une seule classe de défaut sous huit visages**
+
+*Le détail de chaque écart vit dans `PARITE.md`. Ce qui suit est ce que la journée a appris et
+qui ne s'y trouve pas — parce que ça ne concerne aucun écart en particulier.*
+
+### ⚠ HUIT DÉCLARATIONS PÉRIMÉES, DONT CINQ DE MOI
+
+    `portee_texte` (wazuh)     « n'ecrit rien »        -> perimee par MON commit
+    `portee_texte` (ssh-audit) idem                    -> perimee par MON commit
+    en-tete `audit-ssh.js`     « une seule ecriture »  -> perimee AVANT moi
+    paragraphe SEC-013         « moins gardee »        -> perimee par une AUTRE session
+    `MotDePasse` :314          « personne ne la lit »  -> fausse des l'ecriture
+    mes numeros de ligne       :246 :335 :583          -> perimes PAR LE HAUT
+    `PARITE.md` E-406          « le defaut est LATENT » -> perimee 14 h plus tard
+    « 0 route de mot de passe » (un pair)              -> perimee par MON E-406
+
+**La forme est unique et je la tiens enfin :**
+
+> **Toutes décrivaient un EFFET observable — « personne ne la lit », « n'écrit rien », « aucune
+> route », « une seule écriture ». Un effet a des causes multiples ; il suffit qu'une seule
+> bouge, et ce n'est jamais celle qu'on avait en tête en écrivant.**
+
+*Une déclaration qui lit un ÉTAT — un code 404, une nullabilité en base, un inode — survit.
+Une déclaration qui lit une conséquence de cet état meurt sans bruit.* La distinction vient du
+DSI, le mécanisme est le mien, et aucun des deux ne suffit seul.
+
+**Le remède n'est pas d'écrire moins :** c'est de **vérifier à l'exécution** ce qu'on serait
+tenté de commenter. `TRANSPORTS_LOCAUX` produit un `Log::warning` là où un paragraphe n'aurait
+produit aucun événement — et le jour où sa prémisse est tombée, **le paragraphe n'a pas été
+relu, l'avertissement a tiré**.
+
+### Un état qui se répare par INTERMITTENCE
+
+Le portail servait `2.0.94` pour une source à `2.0.11`. Deux inodes : un bind mount de
+**fichier** suit l'inode, et l'écriture atomique (`mv` = `rename(2)`) le remplace.
+
+**Ce que je n'avais pas modélisé, et qui a produit un faux désaccord entier :**
+
+> **Une recréation de conteneur RATTACHE le montage.** *Le défaut se répare tout seul à chaque
+> redémarrage et revient au bump suivant.*
+
+**Nous cherchons toujours ce qui casse ; nous modélisons rarement ce qui RÉPARE.** Or un état
+qui se répare par intermittence fait que *chacun mesure à un moment différent du cycle et
+chacun a raison* — septième faux désaccord de la semaine, second où les deux parties avaient
+raison sur des objets différents.
+
+### ⚠ Une valeur fausse qui FLATTE n'est contredite par personne
+
+`2.0.94` contre `2.0.11` : **le numéro faux est plus ÉLEVÉ que le vrai**. *Un numéro faible
+aurait fait chercher ; celui-là se lit « la livraison est en service, et même largement ».*
+
+C'est la famille du dédouanement appliquée à un chiffre — et son symétrique vaut aussi :
+**une erreur qui ALARME se propage comme une précaution et ne se rouvre pas**, parce que
+contester une prudence coûte et l'accepter ne coûte rien. *J'ai commis les deux le même jour.*
+
+### L'économie de la rectification : erreur DITE contre erreur ÉCRITE
+
+Une erreur qui n'a atteint aucun fichier a **une** copie ; une erreur écrite en a autant que de
+lecteurs futurs. **Je ne rectifie le dépôt que pour la seconde**, et je le vérifie avant de
+décider — deux fois aujourd'hui la réponse était « nulle part », et deux fois elle était
+« dans `PARITE.md`, où on la lit ».
+
+### Le harnais de mutation : quatre gardes d'entrée, et un témoin vacant
+
+Un témoin employait `python3`, **absent du conteneur** : la mutation ne s'est pas appliquée et
+le harnais a rendu **« 14 cas · 0 FAIL »** — *un résultat qui ressemblait à une mesure réussie.*
+Et la QA a trouvé pire : deux mutations qui cassaient la **syntaxe** rendaient 5 et 3 rouges
+venus du `Parse error`, **du côté qui rassure**.
+
+    garde 1  l'empreinte du fichier DOIT changer
+    garde 2  `php -l` / `node --check` DOIT passer
+    garde 3  la classe DOIT etre renommee — une copie renommee ne peut pas etre SERVIE
+    garde 4  la mutation DOIT etre presente dans le fichier
+    et la regle : lire LESQUELS des rouges, jamais COMBIEN
+
+*La garde 3 a refusé une mesure ce soir, et c'était son travail : refuser de mesurer plutôt que
+rendre un chiffre.*
+
+### Ce qui a le mieux tenu de toute la journée
+
+> **Un relevé qui porte de quoi le RÉFUTER transforme un désaccord en mesure.**
+
+Deux faux désaccords ont été dissous parce que le relevé portait **la commande littérale,
+l'objet et l'heure**. *Sans ces trois lignes, il reste deux affirmations opposées et le seul
+départage possible est « à qui se fier » — qui donne raison au plus proche du sujet, pas au
+plus juste.*
+
+**Et son corollaire, que le DSI a nommé** : *le marquage sauve ce que la mesure n'a pas
+couvert.* Une déduction transmise **étiquetée « déduction »** reste évaluable ; sans ce mot,
+elle devient une règle.
