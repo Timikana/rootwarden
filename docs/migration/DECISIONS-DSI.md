@@ -11953,3 +11953,79 @@ satisfait ni l'un ni l'autre.*
 
 > **Sans quoi la seule façon de trouver une suite armée hors lot est de lire ses 116 voisines en
 > cherchant autre chose — ce qui vient d'arriver, et par chance.**
+
+---
+
+## E-447
+
+### ARBITRAGE — `force="true"` sur les QUATORZE `<env>` de `phpunit.xml`, pas sur `MAIL_MAILER` seul
+
+**Le banc de test croit capturer les courriels dans un tableau. Il est câblé sur un SMTP externe
+réel.**
+
+    phpunit.xml:29   <env name="MAIL_MAILER" value="array"/>   sans force="true"
+    occurrences de `force=` dans tout le fichier : 0
+
+    resolu sous le bootstrap phpunit :
+      phpunit.xml dit      array
+      getenv()             smtp
+      config mail.default  smtp
+      hote SMTP effectif   ssl0.ovh.net
+
+**L'attribut `force` de PHPUnit vaut `false` par défaut : `<env>` n'écrase PAS une variable déjà
+présente.** *C'est exactement la sémantique de `safeLoad()`, un étage plus haut — troisième
+étage du même mécanisme en une soirée.*
+
+### La mesure qui NARROW le défaut, et qui pourtant élargit la décision
+
+    APP_ENV           absente     <- phpunit gagne
+    DB_CONNECTION     absente     <- phpunit gagne
+    DB_DATABASE       absente     <- phpunit gagne
+    DB_URL            absente     <- phpunit gagne
+    MAIL_MAILER       PRESENTE    <- phpunit PERD          ⛔ le SEUL
+    QUEUE_CONNECTION  absente · CACHE_STORE absente · SESSION_DRIVER absente
+
+**Un seul `<env>` est effectivement perdu aujourd'hui.** *La session qui l'a trouvé
+recommandait donc `force="true"` sur `MAIL_MAILER` seul, et c'est le geste minimal correct.*
+
+**Je tranche pour les QUATORZE, et voici pourquoi la mesure ne suffit pas à décider :**
+
+> **Les treize autres ne gagnent pas par CONSTRUCTION. Elles gagnent par une ABSENCE — et
+> l'absence n'est protégée par rien.**
+
+    srv-docker.env porte   DB_HOST · DB_NAME · DB_USER · DB_PASSWORD
+    Laravel attend         DB_DATABASE · DB_USERNAME
+    -> c'est cette NON-CORRESPONDANCE DE NOMS qui tient la base a distance
+
+**Le jour où quelqu'un range `srv-docker.env` aux noms Laravel et ajoute `DB_CONNECTION=mysql`,
+toute suite PHPUnit tape sur la base réelle au lieu de `:memory:` — EN SILENCE, et sans
+qu'aucun test ne change.** *Le rangement serait un geste de propreté, et il armerait tout.*
+
+**Et le coût de la décision large est NUL aujourd'hui** : *treize `<env>` gagnent déjà ; les
+forcer ne change rien.* **Zéro effet immédiat, une classe entière fermée.**
+
+> **Un `<env>` sans `force` n'est pas une déclaration, c'est un souhait.** *Le bloc existe pour
+> DÉFINIR le régime de test ; un régime qui cède à l'environnement ambiant n'en est pas un.*
+
+### ⚠ Et la collision que la session a vue avant moi
+
+**Son marqueur de régime asserte « le transport est distant » en lisant `config()` SOUS LE
+BANC.** *Avec `force="true"`, le transport du banc devient `array`, donc local, et son test
+tombe.*
+
+> **Un marqueur censé dater le régime du SERVICE ne peut pas lire le `config()` du BANC.**
+
+**Elle réécrit le marqueur pour qu'il lise l'environnement du processus SERVANT, dans le même
+mouvement.** *Sans quoi on gagne la sûreté du banc et on perd l'alerte — et c'est exactement le
+genre d'échange qu'on fait sans s'en apercevoir.*
+
+### Ce que ça ne change PAS
+
+**L'oracle d'énumération sur la page publique reste entier, et `srv-docker.env` ne bouge pas.**
+*Ceci met le BANC hors d'atteinte du SMTP réel. Le PORTAIL y reste câblé, par décision de
+l'exploitant.*
+
+**Exposition mesurée avant décision : LATENTE.** *Un seul envoyeur
+(`ReinitialisationController:219`), joignable par quatre routes de réinitialisation, et AUCUNE
+suite PHPUnit ne l'atteint.* **Aucun courriel n'est parti du banc. On ferme une porte qui
+n'avait pas encore servi.**
