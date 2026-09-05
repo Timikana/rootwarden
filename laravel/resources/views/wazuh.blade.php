@@ -46,8 +46,10 @@
         <p class="rw-prose" data-rw="wazuh-np-liste">{{ __('wazuh.np_liste') }}</p>
         <p class="rw-aide rw-prose" data-rw="wazuh-np-reserve">{{ __('wazuh.np_reserve') }}</p>
         <p class="rw-tuile__lien">
-            <a class="rw-lien" href="{{ $lienLegacy }}" target="_blank" rel="noopener"
-               data-rw="wazuh-np-lien">{{ __('wazuh.np_ouvrir') }} ↗</a>
+            @if ($lienLegacy)
+                <a class="rw-lien" href="{{ $lienLegacy }}" target="_blank" rel="noopener"
+                   data-rw="wazuh-np-lien">{{ __('wazuh.np_ouvrir') }} ↗</a>
+            @endif
         </p>
     </div>
 
