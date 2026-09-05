@@ -211,6 +211,81 @@ désassigner le profil de **n'importe quelle** machine, pas seulement des sienne
 **connu et écrit** — ce n'est pas une découverte —, et c'est exactement le genre de fait
 qu'un appariement par cible ne fait jamais apparaître.
 
+### Les TROIS autres méthodes construites — tranchées le 2026-09-05 au soir
+
+Le titre précédent disait que `supervision.js:159` « était le seul non tranché ». **C'était
+vrai de la seule question qui s'y posait — un verbe qui dépend de l'état de l'écran.** Les
+trois autres restaient non *confrontées aux routes*, ce qui est une autre question.
+
+    TEMOIN POSITIF   3 fonctions localisees /3, 14 paires (verbe, chemin) resolues /14
+                     0 verbe non litteral survivant
+
+| fichier | ligne | verbe | source | chemin | route déclarée |
+|---|---|---|---|---|---|
+| `comptes.js` | 82 | `POST` | omis → défaut | `/comptes/{id}/mot-de-passe` | `web.php:752` `post` |
+| `comptes.js` | 112 | `POST` | omis → défaut | `/comptes/{id}/second-facteur` | `web.php:785` `post` |
+| `comptes.js` | 130 | `POST` | omis → défaut | `/comptes/{id}/deverrouiller` | `web.php:756` `post` |
+| `comptes.js` | 172 | `POST` | omis → défaut | `/profil/step-up` | `web.php:239` `post` |
+| `comptes.js` | 195 | `GET` | explicite | `/comptes/{id}/etat-suppression` | `web.php:778` `get` |
+| `comptes.js` | 232 | **`DELETE`** | explicite | `/comptes/{id}` | `web.php:780` `delete` |
+| `comptes.js` | 243 | `POST` | omis → défaut | `/comptes/{id}/anonymiser` | `web.php:782` `post` |
+| `comptes.js` | 275 | `POST` | omis → défaut | `/comptes/{id}/expiration` | `web.php:768` `post` |
+| `notifications.js` | 89 | `POST` | explicite | `/notifications/{id}/lire` | `web.php:693` `post` |
+| `notifications.js` | 116 | `POST` | explicite | `/notifications/tout-lire` | `web.php:691` `post` |
+| `planification-cve.js` | 78 | `GET` | `fetch` direct | `scan-cve.planifs` | `web.php:626` `get` |
+| `planification-cve.js` | 194 | **`DELETE`** | explicite | `scan-cve.planifs/{id}` | `web.php:632` `delete` |
+| `planification-cve.js` | 201 | **`PUT`** | explicite | `scan-cve.planifs/{id}` | `web.php:630` `put` |
+| `planification-cve.js` | 238 | `POST` | explicite | `scan-cve.planifs` | `web.php:628` `post` |
+| `planification-cve.js` | 264 | `GET` | explicite | `scan-cve.apercu-cron` | `web.php:635` `get` |
+
+`L.url_planifs` / `L.url_apercu` viennent d'un bloc JSON `planif-libelles`, rempli par
+`ScanCveController.php:239-240` avec `route('scan-cve.planifs')` et
+`route('scan-cve.apercu-cron')` — les deux se résolvent.
+
+> **Aucun verbe n'est réellement dynamique.** *La forme est variable, les valeurs ne le sont
+> pas :* les 14 sites passent un littéral ou omettent l'argument sur un défaut écrit, et
+> chaque paire trouve une route déclarée **du même verbe**.
+
+#### ⚠ Réconciliation d'un compte : 9/3/5 contre 8/2/4
+
+Le tableau du 04/09 annonçait « 9 appels », « 3 appels », « 5 appels ». J'en mesure 8, 2 et 4.
+**L'écart est constant et il s'explique : le relevé comptait le `fetch` de la DÉFINITION du
+helper comme un site.** Pour `planification-cve` les deux chiffres coïncident par un autre
+chemin — il y a réellement un `fetch` direct de plus, ligne 78.
+
+*Aucune conclusion ne bouge.* Mais **« 5 » y désignait deux ensembles différents selon la
+ligne du tableau**, et un compte qui change de définition d'une ligne à l'autre est
+exactement ce qu'un relevé gelé existe pour empêcher.
+
+#### Deux pièges LATENTS — transmis, non corrigés (hors de mon périmètre)
+
+**1. `envoie(methode, url, corps)` n'a AUCUN défaut écrit** (`planification-cve.js:181`,
+`method: methode`). Les quatre appelants actuels en passent un ; le jour où l'un l'omet,
+`fetch` retombe sur `GET` **en silence**.
+
+    envoie(undefined, L.url_planifs, saisie())   ->  GET /scan-cve/planifications
+    la route existe en GET (web.php:626, index)  ->  200 + la LISTE
+
+> **Ce n'est pas un 405 : c'est un 200.** *La création ne se produit pas, et la réponse a la
+> forme d'une réussite.* C'est la même famille que « le marqueur n'est pas le verdict » — un
+> code de succès qui ne dit rien du geste. Les deux autres helpers portent un défaut écrit
+> (`|| 'POST'`, `|| 'GET'`) et n'ont pas cette propriété.
+
+**2. Le défaut de `notifications.js:45` est MORT.** Ses deux appelants passent `'POST'`
+explicitement : `|| 'GET'` n'est jamais exercé. *Un défaut qui se lit comme un repli sûr et
+que rien ne parcourt ne prouve pas qu'il est sûr — il n'est pas mesuré.*
+
+**3. En marge :** `const L = lisJson('planif-libelles') || {}` (ligne 26). Bloc absent →
+`L.url_planifs` vaut `undefined` → `fetch(undefined)` demande l'URL **relative `"undefined"`**.
+Combiné au piège 1, un bloc manquant donne `GET /undefined`. *Non observé ; la forme est là.*
+
+#### Ce que ceci n'établit PAS
+
+Que la route **accepte** le verbe ne dit ni que la **garde** est la même que dans le legacy,
+ni que le **corps** envoyé correspond à ce que le contrôleur lit. Les gardes de ces 15 routes
+n'ont pas été confrontées au legacy ici, et la parité de charge utile encore moins. *C'est
+mesurable, ça ne l'a pas été, et je préfère le dire que le supposer.*
+
 ### Ce que cette dimension change au relevé du 04/09
 
 **Rien de ses conclusions** : aucune capacité ne change de classement. Ce qu'elle ajoute est
