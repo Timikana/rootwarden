@@ -11573,3 +11573,103 @@ aucun appelant sans être retenu par arbitrage.*
 **Témoin positif fourni d'avance** : *`/ssh-audit/backups` dans A2 et `/ssh-audit/trends` dans
 A1.* **Une méthode qui ne les retrouve pas doit être corrigée avant de conclure sur les
 autres.**
+
+---
+
+## E-439
+
+### La CAUSE des cases cochées : une livraison cite un COMMIT, jamais un PÉRIMÈTRE
+
+**Toutes les déclarations de portage ont la même forme, vérifié :**
+
+    I1 PORTÉ `3c3fe98`   I2 PORTÉ `f183f07`   I3 PORTÉ `ef32870`   I4 PORTÉ `c42fe48`
+    F1 PORTÉ `v1.38.0`   F3 PORTÉ `v1.38.4`   F4 PORTÉ `v1.38.6`
+
+**Chacune cite un COMMIT ou une VERSION. Aucune ne cite un périmètre.**
+
+> **Elle enregistre qu'un commit a atterri — pas qu'un périmètre est complet.**
+
+**Et le périmètre vit AILLEURS** : *dans le découpage du module, écrit souvent des jours plus
+tôt, par une autre session.* **Rien ne confronte les deux à la livraison.**
+
+### La preuve de première main, et elle vient de celle qui l'a produite
+
+**La session qui a mesuré ce mécanisme a écrit elle-même le découpage A1–A4 de `ssh_audit`, et
+son §5 range `/trends` dans le périmètre d'A1.** *A1 a été déclaré porté en citant un commit.
+`/trends` n'a jamais été câblé.*
+
+> *« Personne n'a repris ma liste item par item au moment de livrer — non par négligence, mais
+> parce qu'AUCUN GESTE DU PROCESSUS NE LE DEMANDE. »*
+
+**C'est un défaut de PROCESSUS, pas de personne** — et c'est pourquoi il produit des trous
+répartis non pas au hasard mais **là où un découpage a énoncé un périmètre ET où un commit
+ultérieur a déclaré le lot porté.** *Les modules sans découpage écrit n'ont pas ce mécanisme ;
+ils en ont d'autres.*
+
+### DÉCISION — une livraison doit citer son périmètre
+
+**À partir de maintenant, une déclaration « PORTÉ » qui ne cite pas le découpage qu'elle
+prétend clore n'est pas une déclaration, c'est un accusé de réception.**
+
+    forme actuelle    « A1 PORTE `3c3fe98` »
+    forme exigee      « A1 PORTE `3c3fe98` — perimetre <doc>§<n>, N gestes, N cables »
+
+*C'est faible comme garde et honnête comme dispositif : ça ne rend pas l'oubli impossible, ça
+le rend VISIBLE dans le commit qui le commet.*
+
+---
+
+## E-440
+
+### 53 routes sans appelant : un CANDIDAT n'est pas un trou, et la session l'a refusé elle-même
+
+    203 routes backend · 262 fragments d'appel relevés · -> 53 sans appelant
+    TEMOINS fournis d'avance : /ssh-audit/backups TROUVE · /ssh-audit/trends TROUVE
+
+**Elle n'a pas publié « 53 trous », et elle a raison.** *Sa sonde ne détecte qu'UNE des cinq
+formes — « le portage appelle la route backend » — et elle est aveugle à la forme n°4, la
+réimplémentation en Laravel.*
+
+    laravel/app/Services/PlanificationsCve.php   DB::table = 7
+    laravel/app/Services/ScansCve.php            DB::table = 6
+    laravel/app/Services/SuiviCve.php            DB::table = 5
+    TEMOIN  31 fichiers de laravel/app citent DB::table(
+
+**Les 14 routes `/cve_*` sans appelant ne sont donc PAS des trous** : *la capacité est portée
+par une autre couche.* **Publier « 53 » aurait été l'erreur du côté qui ALARME.**
+
+**Les 53 se répartissent en quatre catégories que la sonde ne distingue pas** :
+
+    reimplemente en Laravel      les 14 /cve_*                    -> RIEN, faux positif
+    retenu par arbitrage         I5 · A3 · scan-all · cve_scan    -> DECIDER
+    orphelin par depreciation    /policy/rollback|deployments|list -> ARBITRER
+    TROU dans un sous-lot        /ssh-audit/backups · /trends     -> FINIR + corriger
+    declare complet                                                  la declaration
+
+**Seule la quatrième est une case cochée, et DEUX sont confirmées — les deux fournies comme
+témoins.** *Vingt-trois des 53 appartiennent à des modules jamais audités : catégorie NON
+TRANCHÉE, et non devinée.*
+
+**Ce qui rendrait la méthode complète** : *croiser les TABLES écrites et lues, pas les chemins
+— une capacité réimplémentée touche la même table que la route qu'elle remplace.* **C'est un
+vrai travail, pas un ajustement.**
+
+### ⚠ Et j'ai failli accuser cette session de chiffres non reproductibles
+
+**Ma vérification rendait `DB::table = 0` là où elle annonçait 7.** *J'avais résolu
+`PlanificationsCve` vers le CONTRÔLEUR au lieu du SERVICE — deux fichiers, un nom.*
+
+    laravel/app/Http/Controllers/PlanificationsCveController.php   DB::table = 0
+    laravel/app/Services/PlanificationsCve.php                     DB::table = 7
+
+> **C'est le piège n°16 — apparier par nom de base est faux dès qu'un nom se répète — et il
+> s'est trompé du côté qui ACCUSE.** *Troisième fois cette nuit qu'un de mes instruments erre
+> dans ce sens ; aucune dans l'autre.*
+
+### Et une SIXIÈME forme d'échec, exactement inverse de la cinquième
+
+    la mienne   `porte` attrape `comporte`, `apporte`, `importe`   -> trop LARGE
+    la sienne   `PORTE` sans accent rend ZERO sur 13 `PORTÉ`       -> trop EXACTE
+
+**Les deux se croient exhaustives, et les deux se signalent par un compte qu'on ne recoupe
+pas.**
