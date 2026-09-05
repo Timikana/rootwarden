@@ -10069,3 +10069,76 @@ n'arrive jamais.* **C'est faux** : `ReinitialisationController:176-185` porte un
 commentaire « PRÉPARÉ ET NON ENVOYÉ », et le libellé rendu dit *« un lien de
 réinitialisation lui a été PRÉPARÉ »* — **vrai dans les deux régimes, choisi pour
 l'être.** *Elle l'a mesuré avant de me l'envoyer : l'aggravation n'a jamais voyagé.*
+
+---
+
+## E-409 — Un livrable arrivé sous un sujet qui parle d'autre chose est un livrable perdu
+
+**2026-09-05, 10:35–10:50 CEST.** Tour de supervision. **Banc libre.**
+
+### La mesure qui ouvre le tour
+
+    depuis 10:00   commits de CODE (feat|fix|refactor|perf|test
+                   touchant laravel/ ou backend/)      2
+                   commits de DOCUMENTATION            5
+                   rapport doc/code                    2.50   -> AU-DESSUS du seuil
+
+> **Et il faut le lire plus durement : un des deux commits de code est le mien. La flotte
+> est à 5 pour 0.**
+
+**Décision : le mandat de 0b passe de la lecture seule au portage.** *Ses trois dossiers
+du matin sont justes, et ce sont trois documents pour zéro capacité portée — c'est la
+seule session dont le mandat rendait ce résultat inévitable.* **Capacité attribuée :
+créer un groupe (`groups` R2), écrit en base, ne touche aucune machine.**
+
+### ✅ Vérification de déclaration : `socle_avertissement`
+
+    laravel/lang/fr/auth.php                0
+    laravel/lang/en/auth.php                0
+    laravel/resources/views/cgu.blade.php   0
+    suites (tests/ + laravel/tests/)        0
+    temoin : auth.php/fr porte 40 cles      -> instrument sain
+
+**Disparu partout. La déclaration tient.**
+
+### ⛔ LA TROUVAILLE DU TOUR : pourquoi j'ai assigné du livré, pour la 2e fois
+
+**J'ai confié à 5f l'appariement des cinq catalogues. Il était fait depuis la veille** —
+`9983d2b`, 2026-09-04 14:57, `QA-APPARIEMENT-CINQ-CATALOGUES.md`, 167 lignes, présent
+dans l'arbre. *Vérifié, pas cru.*
+
+**La cause n'est pas un oubli de registre. Elle est dans le commit :**
+
+    9983d2b  « docs(e2e): go-security.mjs cree une planification de scan CVE
+               sur TOUT LE PARC, et n'est dans aucun lot »
+             -> et il apporte le document d'appariement, 167 lignes
+
+> **Le livrable a voyagé sous un sujet qui nomme autre chose. Aucun registre fondé sur le
+> journal ne peut le voir : il est là, il est complet, et il est invisible.**
+
+**Ce n'est pas « le registre ne porte pas ce qui est clos » — c'est que la CLÔTURE n'a
+pas été énoncée là où on la cherche.** *Les six portages en double de ce chantier
+s'expliquent par ce seul mécanisme, et il ne demande aucune mémoire pour être corrigé.*
+
+**RÈGLE, applicable immédiatement** : *un fichier neuf de plus de cent lignes prend son
+propre commit, ou au minimum sa mention dans le sujet.* **Un livrable dont le sujet ne
+le nomme pas sera refait par quelqu'un d'autre.**
+
+### La dimension que ma consigne a ouverte, et qui manquait
+
+**Mon seul ajout — « la MÉTHODE se construit aussi » — a produit une mesure neuve :**
+
+    71 sites de `fetch`   litterale 40 · CONSTRUITE 4 · absente 27 (GET implicite)
+    temoin : 71 analyses, 0 fichier illisible
+
+    supervision.js:159   method: valeur === '' ? 'DELETE' : 'POST'
+                         body:   valeur === '' ? undefined : JSON.stringify(...)
+
+> **Un geste DESTRUCTEUR qui n'existe sous aucune forme littérale : ni `'DELETE'`
+> cherchable seul, ni chemin distinct, ni corps de requête. Il n'est que la conséquence
+> d'un `<select>` vide.**
+
+**Un appariement par CIBLE le compte comme un `POST` de plus — c'est-à-dire du côté
+rassurant.** *Classé NON TRANCHÉ par 5f, à juste titre : la route backend n'a pas été
+mesurée.* **C'est la forme « URL construite » appliquée au VERBE, et le verbe est celui
+qui détruit.**
