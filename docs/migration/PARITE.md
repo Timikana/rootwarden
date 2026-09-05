@@ -20940,3 +20940,71 @@ piège, et celui-là DÉDOUANE** — sens inverse des cinq variantes.
 > **Je ne publie pas les « 84 orphelines » que la sonde rendait.** *Un compte dont
 > les témoins échouent n'est pas un compte, c'est une liste de candidats* — et
 > `/list_machines` y figurait alors qu'il est appelé par `mises-a-jour.js`.
+
+
+## E-426 — `groups` : une abstention DÉCLARÉE, une capacité JAMAIS SERVIE, et un angle mort de ma méthode
+
+**Mesuré le 2026-09-05 23:30, par énumération POSITIVE** — *ce que chaque côté
+ÉMET, puis test d'appartenance*, selon la règle reçue : *« ce fichier ne contient
+pas X » est une conséquence ; « ce module ne produit aucune requête vers X » est
+un état.*
+
+    portage   controleur · JS 35 Ko · vue · i18n FR+EN
+    legacy    `_deprecated/groups/index.php` — DEJA DEPRECIE
+
+    routes backend   /groups GET · /groups POST · /groups/<id> DELETE
+                     /groups/<id> PUT · /groups/<id>/members GET · /groups/<id>/run POST
+
+### ① `cve_scan` sur un groupe : ABSTENTION DÉCLARÉE, pas capacité perdue
+
+Le backend accepte **deux** actions — `_BULK_ACTIONS = {'drift_scan', 'cve_scan'}`.
+Le legacy offrait les deux (`act_drift`, `act_cve`). **Le portage code
+`{ action: 'drift_scan' }` en dur.**
+
+**Et ses quatre mentions de `cve_scan` sont toutes des COMMENTAIRES qui disent
+pourquoi** — une note adressée *« À LIRE PAR QUI REMPLACERA CE PANNEAU PAR LE VRAI
+BOUTON »*, avec la chaîne tracée :
+
+    groups.py:269  from routes.cve import _stream_cve_scan
+    groups.py:278  for _line in _stream_cve_scan([mid], min_cvss)
+    cve.py:77      send_cve_report(...)
+    srv-docker.env:206  MAIL_ENABLED=true   <- EN SERVICE
+
+*Et la raison pour laquelle la note vit dans le CODE et pas seulement à l'écran :
+« ce texte disparaîtra avec le panneau — c'est-à-dire au moment exact où quelqu'un
+le remplacera par le bouton réel, donc au moment où le fait compte le plus ».*
+
+> **Une abstention déclarée n'est pas un manque.** *Elle appartient à la catégorie
+> des arbitrages, et elle porte sa preuve avec elle.*
+
+### ② `PUT /groups/<id>` — JAMAIS SERVIE
+
+    methodes emises   portage  GET · POST · DELETE
+                      legacy   GET · POST · DELETE
+    auxiliaires du portage : `lis` · `ecris` (POST) · `supprime` (DELETE)
+                             AUCUN auxiliaire PUT n'existe
+    TEMOIN : DELETE apparait bien dans les deux relevés
+
+**Modifier un groupe est une route du backend (`role:2` + `can_admin_portal`,
+`@threaded_route`) que NI l'un NI l'autre portail n'a jamais atteinte.** *Deuxième
+instance de « jamais servie » après `/ssh-audit/trends` — et celle-ci est une
+ÉCRITURE en base, pas une lecture.*
+
+### ⚠ ③ ET L'ANGLE MORT DE MA MÉTHODE, qui vaut pour les sept modules restants
+
+**Les deux côtés émettent le même chemin `/groups/<id>/run`.** *Une comparaison par
+CHEMINS les déclare donc identiques — et elle a raison sur les chemins.* **La
+différence est dans la CHARGE UTILE** : un `action` variable d'un côté, une
+constante de l'autre.
+
+> **Une capacité peut être rétrécie sans qu'aucun chemin ne bouge.** *Tout ce que
+> j'ai apparié ce soir — `fail2ban`, `bashrc`, `sftp` — l'a été par les chemins :
+> **une narrowing de charge utile y serait passée inaperçue.***
+
+**Ce n'est pas une raison de refaire les trois** : leurs manquants sont des chemins
+absents, donc visibles à ce niveau. *C'est une raison de ne pas conclure « identique »
+d'une égalité de chemins* — la conclusion juste est « les mêmes chemins », qui est
+plus faible.
+
+**Ici l'écart de charge était DÉCLARÉ, donc trouvable en lisant. Rien ne garantit
+que le prochain le soit.**
