@@ -217,8 +217,23 @@ case "${1:-}" in
         # `is_file()` rendait vrai, `is_readable()` faux, et LES DEUX portails
         # affichaient « Version inconnue » sans qu'aucune erreur ne soit levee.
         # Le correctif d'atomicite avait donc introduit son propre defaut.
-        chmod 0644 "$tmp"
-        printf '%s\n' "$v" > "$tmp" && mv -f "$tmp" "$RACINE/$FICHIER_PRODUIT"
+        printf '%s\n' "$v" > "$tmp" || { echo "version.sh : ecriture du tampon impossible" >&2; rm -f "$tmp"; exit 1; }
+        # ⚠ ON N'UTILISE PAS `mv`. IL CHANGE L'INODE, ET LE MONTAGE LE SUIT PAS.
+        #
+        # `docker-compose.yml` monte ce fichier UN PAR UN
+        # (`./legacy/version.txt:/var/www/html/version.txt:ro`). Un montage de
+        # FICHIER est epingle a l'inode present au demarrage du conteneur : tout
+        # `mv`, `git checkout` ou reecriture par renommage le DETACHE, et le
+        # conteneur continue de servir l'ancien contenu depuis un inode que plus
+        # rien ne reference. Mesure du 2026-09-05 :
+        #
+        #     inode hote       1998793
+        #     inode conteneur  2013478      <- orphelin, fige a 2.0.94
+        #
+        # Le seul remede a un montage detache est de RECREER le conteneur, ce
+        # qui n'appartient pas a ce script. On ecrit donc EN PLACE : la
+        # redirection tronque et remplit l'inode existant, le montage tient.
+        cat "$tmp" > "$RACINE/$FICHIER_PRODUIT" && rm -f "$tmp"
         echo "$v -> $FICHIER_PRODUIT"
         ;;
     "") derive ;;
