@@ -10603,3 +10603,47 @@ appartiennent à l'exploitant.*
 ### ✅ Étape 3 : la déclaration tient
 
     3 cibles 0 · suites 0 · temoin 40 cles -> instrument sain
+
+---
+
+## E-421 — Il ne reste plus aucun blocage MESURABLE
+
+**2026-09-05, 16:40 CEST.** Banc libre, branche vérifiée.
+
+    .php METIER servis   82 -> 31    en une journee
+    archives             19 -> 70
+
+### Le dernier a tomber, et sa raison vaut d'être gardée
+
+**`import_csv.php` était retenu sur « quatre tables écrites, seule la moitié `users` est
+prouvée ». Instruit ligne à ligne, les quatre sont réglées — et la quatrième par un choix
+MEILLEUR que l'équivalence.**
+
+> **Le legacy insère 15 colonnes NOMMÉES à zéro. Le portage n'insère rien, et
+> `Permissions::toutes()` lit le SCHÉMA.**
+
+*Une liste écrite à la main omettrait silencieusement toute permission ajoutée après
+coup ; une liste dérivée de sa source ne peut pas la contredire.* **Le portage ne
+reproduit pas ce geste : il le rend inexprimable.**
+
+### ⛔ Les trois qui restent ne sont pas des mesures
+
+    armer le SMTP           un courriel part vers une personne REELLE, depuis une
+                            page PUBLIQUE, sans etape de test
+    le scan sortant         idem, un courriel reel par machine a resultats
+    appliquer des regles    une machine peut devenir injoignable
+
+**J'ai mesuré tout ce qui se mesure. Ces trois-là ne se mesurent pas : ils se décident, et
+la décision appartient à qui subira l'effet.** *Déléguer un arbitrage produit n'est pas
+déléguer un effet irréversible sur des tiers — c'est la seule limite que j'ai maintenue
+après « aucune limite », et je la maintiens.*
+
+### Ce que la journée a produit, et ce qui l'a permis
+
+**Cinquante et un fichiers retirés du service.** *Mais le geste qui a le plus compté n'est
+aucun `git mv` : c'est d'avoir mesuré que `_deprecated/` était TOUJOURS SERVI.* **Sans la
+ligne d'`.htaccess`, les dix-neuf fichiers déjà « archivés » s'exécutaient encore à chaque
+visite, et les cinquante et un suivants n'auraient fait que changer d'URL.**
+
+> **Un chantier peut avancer pendant des jours sur un geste qui ne fait rien, parce que le
+> geste a un nom qui décrit son intention et non son effet.**
