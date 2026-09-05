@@ -5,6 +5,38 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.54.1] - 2026-09-05
+
+### Extinction - la queue : cinq fichiers d'actifs, et une sonde fausse d'un ordre de grandeur
+
+**Suite de la 1.54.0** : le meme defaut d'archivage incomplet laissait des ACTIFS derriere
+les pages parties. **Retires : `api/swagger/swagger-ui.css` et quatre logos** — orphelins,
+cites ni par une page vivante ni par le portage.
+
+    fichiers servis toutes extensions   120 -> 115
+    dont .php METIER                    26   (inchange)
+
+#### ⚠ Et ma sonde annoncait SOIXANTE-TREIZE orphelins pour 651 Kio
+**Elle en trouvait 73 ; le reseau en a rendu CINQ.** *Les 68 autres — catalogues de langue,
+`composer.json`, `openapi.yaml` — sont deja bloques par **six fichiers `.htaccess`** que ma
+sonde ne connaissait pas :
+
+    legacy/.htaccess · logs/ · auth/ · includes/ · vendor/ · lang/
+
+> **Un fichier PRESENT dans l'arbre n'est pas un fichier SERVI.** *Toute ma mesure de
+> l'extinction lisait le disque ; la seule qui tranche est la requete.*
+
+**C'est le pendant exact du defaut inverse trouve ce matin** : `_deprecated/` etait ABSENT
+de l'arbre servi selon mon compte, et SERVI selon le reseau. *Les deux fois, l'ecart est
+entre « ce que le depot contient » et « ce qu'Apache repond ».*
+
+#### Verifie au reseau
+    /api/swagger/swagger-ui.css  404  ·  /img/logos/sodium-logo.png  404
+    /js/utils.js  200  ·  /iptables/js/main.js  200   (charges par des pages vivantes)
+    temoin /zzz.png  404   ·   portage /connexion  200
+
+---
+
 ## [1.54.0] - 2026-09-05
 
 ### Extinction - l'archivage etait INACHEVE : le JavaScript restait servi
