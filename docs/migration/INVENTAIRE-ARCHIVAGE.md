@@ -466,6 +466,30 @@ d'un SCELEUR, qui en traite un lot.** L'auteur a comparé son code à
 > « en-tête qui ment » : c'est un en-tête juste sur le mauvais objet — et c'est plus
 > difficile à voir, parce que le vérifier confirme la citation.
 
+### 7.3bis ⚠ La course n'est PAS symétrique — mesuré le 2026-09-05 10:18
+
+On m'a présenté le risque ainsi : *« les deux implémentations calculent des hachages
+différents ; celle qui scelle la première fixe la chaîne, l'autre la déclarera
+rompue »*. **C'est vrai à moitié, et la moitié qui manque décide de l'ordre des
+opérations.**
+
+`JournalAudit::parcourt()` **avance sa tête sur une ligne DÉJÀ SCELLÉE** (`:216`,
+`$tete = $l->self_hash`) ; il ne l'avance que sur les **orphelines** (`:187`,
+`continue`). Donc :
+
+| qui scelle en premier | résultat |
+|---|---|
+| **le legacy** (`audit_seal.php:82`, tête qui avance) | les 1484 deviennent des lignes correctement chaînées → le parcours du portage les traverse comme scellées, `prev_hash === $tete` tient → **chaîne valide, et le portage sait la vérifier** |
+| **le portage** | les 1484 reçoivent le MÊME `prev_hash` → rupture dès la deuxième, et `whereNull('self_hash')` interdit toute reprise → **chaîne cassée et outil bloqué** |
+
+> **Ce n'est pas une course entre deux gagnants possibles : c'est un seul chemin qui
+> marche.** Le sceleur du legacy est aujourd'hui **le seul qui puisse fermer les 1484
+> correctement** — et le portage saura vérifier son travail. L'inverse est faux.
+
+**Conséquence** : garder `audit_seal.php` n'est pas seulement « préserver la
+possibilité de comparer ». C'est préserver **le seul outil capable de refermer le
+trou**, tant que `JournalAudit::scelle` n'est pas corrigé.
+
 ### 7.4 Et le trou d'août : la chaîne l'a ENJAMBÉ
 
     Connexion reussie, SCELLEES   4563   2026-05-26 -> 2026-09-03
