@@ -875,3 +875,65 @@ n'apparaissait pas dans ma sonde par colonne — la suppression est portée, mai
 appel de service (`NotificationsController::supprimer:112`), pas par un bloc
 `->delete()` que mon motif reconnaissait. **Une sonde par COLONNE ne voit pas une
 suppression par ENTITÉ.** Rattrapé par la route, pas par la sonde.
+
+---
+
+## 12. `users.password_expires_at` — le troisième « dernier écrivain » (**2026-09-05 10:22 CEST**)
+
+### 12.1 Les écrivains — **six, TOUS dans le legacy**
+
+    legacy/profile.php:198              UPDATE users SET password = ?, password_expires_at = ?
+    legacy/auth/reset_password.php:132  UPDATE users SET password_expires_at = ?
+    legacy/adm/api/update_user.php      :55 :57 :62 :64   (NULL, DATE_ADD, DATE_ADD, NULL)
+
+**Côté portage : ZÉRO.** `MotDePasse.php:251-255` pose `password`,
+`password_updated_at` et `force_password_change` — pas celle-là. Et son
+commentaire `:249` justifie l'omission par *« personne ne la lit »*.
+
+### 12.2 Les lecteurs — **deux tâches vivantes**, et le commentaire est faux
+
+    backend/scheduler.py:613  _check_password_expiry_notifications()
+        :623-629  SELECT … WHERE password_expires_at IS NOT NULL
+                  AND password_expires_at BETWEEN CURDATE() AND +7 JOURS
+        :640-650  send_email « Votre mot de passe expire dans N jour(s) »
+
+    backend/scheduler.py:814  _check_password_expiry_in_app()
+        :820-824  meme predicat
+        :845      notification EN APPLICATION, type='password_expiry'
+
+Les deux sont appelées depuis `_scheduler_loop_with_purge()` (`:776`, `:782`) —
+**la boucle principale du planificateur**. Ce ne sont pas des chemins morts.
+
+⚠ **Et les deux sont enveloppées d'un `except` qui avale** : `_log.debug` pour la
+première, un `pass` nu pour la seconde (`:783-784`). *Si elles échouaient, personne
+ne le saurait.*
+
+### 12.3 ⚠ LA GRAVITÉ, ET ELLE N'EST PAS CELLE QUE J'ANNONÇAIS
+
+    users actifs sur le BANC : 12
+    password_expires_at a NULL : 12        renseignes : 0
+
+**Aucun compte de ce banc ne porte de valeur.** Les deux tâches y sélectionnent donc
+**zéro ligne** : la fonctionnalité est **déjà dormante ici**, et pas à cause du
+portage — rien ne l'a jamais peuplée sur ce banc.
+
+> **L'énoncé juste n'est donc pas « éteindre le legacy arrête des courriels qui
+> partent ». C'est : éteindre le legacy retire le SEUL mécanisme capable de peupler
+> la colonne — la fonctionnalité passe de DORMANTE à IMPOSSIBLE.**
+
+**Réserve explicite sur la production** : `legacy/profile.php:198` écrit la colonne
+**à chaque changement de mot de passe par la page de profil du legacy**. Une
+instance où les comptes changent leur mot de passe par ce chemin **porte des
+valeurs**, et l'extinction y serait une perte active. **Je n'ai pas interrogé la
+production et je ne le ferai pas.**
+
+### 12.4 Et l'autre moitié manque aussi
+
+`ChangementMotDePasseExige.php:72-79` le déclare lui-même : *« Le legacy vérifie DEUX
+choses… le calcul de l'EXPIRATION… **Ce second garde n'est pas porté** »*. Donc sur
+le portage, l'expiration des mots de passe n'est **ni appliquée ni annoncée** — le
+garde manque, et les deux tâches qui l'annonceraient n'ont pas de donnée à lire.
+
+> **Troisième occurrence de la forme** — après `user_logs.self_hash` (le seul
+> écrivain scellant du legacy) et les trois accès exclusifs de `adm/api/`.
+> **Ici le lecteur survit, écrit à des humains, et échoue en silence.**
