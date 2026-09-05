@@ -12102,3 +12102,82 @@ absent », c'est-à-dire un DÉDOUANEMENT.*
 **`POST /profil/effacement` ne porte que `session.authentifiee`** — *pas de step-up, pas de
 rôle.* **Un geste destructeur en libre-service.** *La session lit le contrôleur avant de
 conclure ; je ne double pas son travail et je le note pour ne pas le perdre.*
+
+---
+
+## E-449
+
+### ARBITRAGE — `POST /profil/effacement` DOIT exiger le step-up
+
+**Une session me renvoie la portée d'un contrôle, et sa lecture est exacte.**
+
+**Le contrôleur est bon** : *identifiant de session, ressaisie du NOM du compte (pas une case),
+refus au dernier superadministrateur, journal AVANT anonymisation dans un ordre contraint et
+commenté. Le geste anonymise, il ne détruit pas — `user_logs` est une chaîne de hachage.*
+
+> **Le point exact, et il est étroit : le nom à retaper est AFFICHÉ sur la page de profil
+> elle-même.**
+
+**La friction protège donc du geste ACCIDENTEL, pas d'une SESSION COMPROMISE.** *« Il y a une
+confirmation » se relit trop facilement comme « c'est protégé ».* **Un contrôle dont le secret
+est imprimé à côté du champ n'est pas un second facteur : c'est un ralentisseur.**
+
+### La mesure qui décide, et elle a failli m'égarer dans les deux sens
+
+    comptes actifs                    10
+    dont totp_secret NULL              6      <- ⚠ j'ai failli publier ceci comme une faille
+    dont secret trop court              0
+
+**Six comptes actifs sur dix sans second facteur, alors que les CGU que je viens de porter
+disent « L'authentification à deux facteurs (TOTP) est obligatoire. Aucun contournement n'est
+autorisé ».** *J'allais en faire une quatrième fausse alarme.*
+
+**Une question de plus a tout renversé :**
+
+    id=2·3·4·5·10·12   sansTOTP=1   connexions = 0   <- JAMAIS connectes
+    id=1·14·15·16      sansTOTP=0   connexions = 863 · 886 · 2032 · 1641
+
+    ConnexionController.php:168   if (empty($compte->totp_secret)) -> enrolement force
+
+> **Tout compte qui s'est connecté une fois PORTE un secret. Les six sans TOTP sont dormants,
+> et le premier accès les enverrait à l'enrôlement.**
+
+### DÉCISION : le step-up est EXIGÉ, et il ne coûte AUCUN accès
+
+**La chaîne est mesurée, pas supposée :**
+
+    atteindre `/profil/effacement`  exige une session
+    avoir une session               exige d'avoir franchi la connexion
+    franchir la connexion sans secret  force l'enrolement (`:168`)
+    ------------------------------------------------------------------
+    donc quiconque atteint la route DISPOSE d'un second facteur
+
+**Le coût en accès est nul, et le gain est réel** : *la seule entrée irréversible de la liste
+des routes authentifiées-sans-rôle cesse d'être exerçable depuis une session volée.*
+
+**`POST /profil/step-up` existe déjà** — *c'est un intergiciel à poser, pas une capacité à
+écrire.*
+
+### ⚠ Et mes deux mesures ratées, dans le même quart d'heure
+
+**1. `WHERE is_active = 1` sur une colonne qui s'appelle `active`.** *Les trois requêtes ont
+rendu du VIDE — et mon `2>/dev/null` a mangé l'erreur.* **Le témoin (`COUNT(*) = 10`) passait,
+donc j'ai lu « la table répond, les comptes actifs sont introuvables ».** *C'est le piège que je
+porte sous son propre nom, commis dans la mesure qui devait fonder un arbitrage.*
+
+**2. « 6 comptes sur 10 sans 2FA » aurait été une alarme fausse et grave** — *elle accusait une
+promesse des CGU.* **Ce qui l'a arrêtée n'est pas la prudence : c'est d'avoir demandé si ces
+comptes s'étaient déjà connectés.** *Un compte inactif et un compte vulnérable ont exactement
+la même ligne dans un relevé qui ne compte que les secrets.*
+
+### Et un fait qui va dans le sens de DOSSIER-30
+
+**`POST /profil/effacement` est une capacité NEUVE, pas un portage.** *`legacy/profile.php`
+n'offre que l'export ; ses `DELETE` visent `active_sessions` et `remember_tokens`.*
+
+**Et pourtant `legacy/lang/fr/terms.php:78` promet : « Droit à l'effacement : demander la
+suppression de votre compte et de vos données. »**
+
+> **Le legacy annonçait ce droit dans ses CGU sans l'implémenter.** *Ce n'est pas un écart de
+> parité : c'est une amélioration intentionnelle qui ferme une promesse non tenue, et elle doit
+> être dite ainsi.*
