@@ -442,3 +442,100 @@ limite de connexion est donc **entièrement non éprouvée**, et *le seul
 > message.** Mais il ne change rien à (c) : après lui, l'écran cessera de mentir
 > **et le garde restera sans épreuve**. *Deux propriétés distinctes, et une seule
 > est corrigée — c'est à dire, pas à réparer dans le même geste.*
+
+---
+
+## 9. RELECTURE DU PORTAGE `e0c7d27` — 2026-09-05
+
+**Quatre contraintes sur cinq sont tenues. La cinquième — celle que l'auteur
+désigne lui-même — n'est PAS tenue par construction, et le déploiement est le cas
+DÉFAVORABLE.**
+
+### 9.1 ✅ Contraintes 2 à 5 — vérifiées au code
+
+| # | contrainte | verdict |
+|---|---|---|
+| 2 | limite de débit fail-closed, sur les **demandes reçues** | **tenue** — compteur en cache incrémenté **avant** de savoir si l'adresse existe ; `catch (\Throwable) → return false`. Et `put` plutôt que `increment`, avec sa raison écrite (le pilote `file` ne garantit pas l'atomicité). *Le défaut du legacy — compter les jetons ÉMIS — est refermé.* |
+| 3 | aucune écriture dans `login_attempts` | **tenue** — zéro occurrence ; la seule mention est un **commentaire** qui cite pourquoi. |
+| 4 | purge de `remember_tokens` **dans** la transaction | **tenue**, et non réécrite : elle vit dans `MotDePasse::reinitialise`, `DB::transaction(…)`, delete à l'intérieur. |
+| 5 | message identique **hors** du `if` | **tenue** — `return back()->with('succes', …)` est la **dernière** instruction de la méthode, hors de toute branche. *Remesuré sur le PORTAGE, pas reconduit du legacy.* |
+
+**Et le lien entrant tient** : `connexion.blade.php:78` porte
+`route('reinit.demander')` avec un `data-rw`. *La capacité est atteignable.*
+
+### 9.2 ⛔ Contrainte 1 — LE PARI TOMBE, ET PLUS DUREMENT QUE L'AUTEUR NE LE CRAINT
+
+L'auteur écrit : *« vérifié disponible et vérifié APPELÉ, mais je n'ai PAS mesuré
+que la réponse part réellement avant l'envoi **sous php-fpm**. »*
+
+**Mesuré : il n'y a pas de php-fpm.**
+
+```
+apache2ctl -M   ->  php_module (shared)        <- mod_php, PAS proxy_fcgi
+command -v php-fpm / ls /usr/local/etc/php-fpm*  ->  RIEN
+                ->  deflate_module (shared)    <- le filtre BUFFERISE
+                    filter_module (shared)
+php -r ini_get   ->  output_buffering = '0'   zlib.output_compression = '0'
+                     implicit_flush   = '1'    <- cote PHP : favorable
+```
+
+**`terminating()` ne défère la réponse que si `Response::send()` peut DÉTACHER la
+connexion — et le seul mécanisme qui le garantit est `fastcgi_finish_request()`,
+qui n'existe QUE sous FPM/FastCGI. Il est absent ici.**
+
+Sous mod_php, `send()` peut vider les tampons PHP — favorable, ils sont à zéro —
+mais **la chaîne de filtres d'Apache garde la main**, et `mod_deflate` compresse,
+donc bufferise. *La réponse peut ne pas avoir atteint le client quand
+`terminate()` déclenche l'envoi.*
+
+### 9.3 ⚠ ET LA MESURE CITÉE NE PEUT PAS DÉMONTRER LA PROPRIÉTÉ
+
+    branche INCONNUE  185,7 ms
+    branche CONNUE    188,1 ms      ecart 2,4 ms (1 %)
+
+**`MAIL_MAILER` est ABSENTE de l'environnement, donc le pilote est `log` : l'« envoi » est une écriture de fichier, en fractions de milliseconde.**
+
+> **La mesure a été prise dans la configuration où le terme coûteux N'EXISTE
+> PAS.** Elle montre que `terminating()` ne coûte rien quand il n'a rien à
+> différer. **Elle ne peut pas montrer qu'il diffère un envoi SMTP** — aucun
+> envoi SMTP n'a eu lieu.
+
+*C'est un témoin sur le mauvais axe : l'instrument rend bien le positif, sur autre
+chose que ce qu'on mesure.* **Et l'auteur le dit à moitié** — il annonce que la
+mesure est « au service, pas au réseau ». Le second biais, plus décisif, n'est pas
+énoncé : elle est **au pilote `log`, pas au SMTP**.
+
+### 9.4 Ce que ça change, et ce que ça ne change pas
+
+**Aujourd'hui : inoffensif.** Avec `log`, les deux branches écrivent un fichier ;
+l'écart de 2,4 ms est le résidu `UPDATE`+`INSERT` que l'auteur énonce, et il est
+correctement borné.
+
+**⚠ Le jour où le SMTP est posé** : le terme coûteux réapparaît **entier**, et
+`terminating()` ne garantit rien sur ce déploiement. **Aucun commit n'expliquera
+le changement** — c'est exactement l'écart « qui disparaît avec la configuration
+et revient avec elle » du §5, réalisé.
+
+**Ce qui trancherait** : une mesure **au réseau** — temps jusqu'au dernier octet
+sur les deux branches, avec un SMTP réel ou un bouchon lent. Non lisible, non
+faisable sans poser le transport.
+
+**Ce qui rendrait la propriété vraie PAR CONSTRUCTION, indépendamment du SAPI** :
+ne pas émettre depuis la requête du tout. Écrire le message en attente dans un
+magasin durable (table ou fichier), et le faire délivrer par un **processus
+séparé**. *C'est la seule forme qui ne dépende ni du SAPI, ni de `mod_deflate`,
+ni du tampon d'Apache* — et elle ne demande pas de file Laravel, dont le pilote
+`sync` la rendrait inopérante.
+
+### 9.5 Verdict
+
+**Le portage est bon et je ne demande pas de le retenir.** Les quatre contraintes
+mesurables sont tenues, la limite de débit corrige un défaut du legacy, et le
+résidu connu est énoncé au site plutôt que tu.
+
+**Ma seule réserve porte sur la contrainte 1, et elle n'est pas bloquante
+aujourd'hui** — elle le devient **le jour de la décision SMTP**. *Elle doit donc
+voyager AVEC cette décision, pas rester dans une relecture.* **Le commentaire de
+`ReinitialisationController` doit dire que `terminating()` ne défère pas par
+construction sur mod_php sans `fastcgi_finish_request`, et que la propriété est à
+remesurer au réseau quand le transport change.**
