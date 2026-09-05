@@ -1014,10 +1014,34 @@ raison.***
     portage  Comptes::supprimableSansPerte:509-512   refuse si le compte a des
                                                      ENTREES DE JOURNAL
 
-**Je ne tranche pas.** Sur une instance vivante, « avoir des entrées de journal » vise
-presque tous les comptes : la suppression administrative du portage est donc bien plus
-restrictive que celle du legacy. **Est-ce voulu ou hérité ? Je ne le sais pas, et
-aucune mesure de mon périmètre ne le dit.**
+**⚠ CORRIGÉ À 11:42 — c'est TRANCHÉ, et ma phrase était une INFÉRENCE déguisée en
+mesure.**
+
+**Voulu, et le fichier le dit** (`Comptes.php:501-507`) :
+
+> *« Oui s'il ne porte aucune ligne de journal — un compte fraîchement créé est dans
+> ce cas, `audit_log` écrivant toujours avec l'identifiant de l'AUTEUR et jamais de la
+> cible. **Sinon, l'anonymisation est le geste juste** : elle efface les données
+> personnelles et PRÉSERVE le journal. »*
+
+**Deux gestes complémentaires** — supprimer quand il n'y a rien à perdre, anonymiser
+sinon — et j'ai moi-même vérifié au §13.2 que l'anonymisation est portée **table pour
+table**. La conception répond à un vrai conflit : `user_logs` est une chaîne de
+hachage où retirer une ligne casse la vérification de toutes les suivantes.
+
+**Et ma magnitude était fausse, dans le sens qui alarme :**
+
+    j'avais ecrit   « vise presque tous les comptes »
+    mesure 11:42    12 comptes actifs · 4 avec journal · 8 SUPPRIMABLES
+
+**Un tiers, pas « presque tous ».** *« Presque tous » était une inférence sur une
+instance vivante — plausible, jamais mesurée — et elle rendait une conception
+délibérée méconnaissable en défaut.*
+
+> **Ce qui manquait n'était pas la justesse, c'était le RÉGIME de l'énoncé.** Une
+> inférence plausible placée dans un relevé de mesures **se lit comme une mesure** :
+> même famille que le chiffre relayé sans son heure. **Le lecteur n'a aucun moyen de
+> distinguer les deux si l'auteur ne le marque pas.**
 
 ### 13.5 Mon angle mort sur ce relevé
 
