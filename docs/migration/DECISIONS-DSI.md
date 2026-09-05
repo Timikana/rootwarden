@@ -10567,3 +10567,39 @@ mesuré, contrairement au précédent.*
 **Le `CHANGELOG` 1.47.0 porte la version fausse.** *Il est corrigé dans le même commit que
 cette entrée — un document qui affirme une dépendance inexistante ferait refuser un
 archivage légitime, indéfiniment.*
+
+---
+
+## E-417 — La flotte n'a rien produit cette heure, et c'était MA faute
+
+**2026-09-05, 14:35 CEST.** Banc libre, branche vérifiée.
+
+    depuis 13:35   2 commits · CODE 2 · DOC 0   -> et les DEUX sont les miens
+
+> **J'ai rendu trois arbitrages à 12:50, et je ne les ai routés qu'à 14:40.**
+
+**Pendant presque deux heures, le seul travail de code disponible existait, était décidé,
+et n'avait été confié à personne.** *L'instrument du §1 aurait dit « ratio sain, CODE 2 » —
+et il aurait décrit une flotte à l'arrêt.*
+
+**RÈGLE** : *un arbitrage rendu n'est pas un arbitrage livré. Le rendre et le router sont
+deux gestes, et le second est celui qui produit du code.* **La distance entre les deux est
+invisible à toute mesure de production, parce qu'elle ne laisse aucun commit — comme le
+travail évité que 0b m'a signalé ce matin, mais dans l'autre sens.**
+
+### Routé à 14:40, un lot par session, chacun avec sa condition de levée
+
+    c1   DOSSIER-31, les trois ecritures dans `ConnexionController`
+         -> libere `auth/login.php` ET `adm/api/update_user.php`
+    4f   DOSSIER-30, les trois gestes de libre-service sur `/profil`
+         -> libere `privacy.php` ET `profile.php`
+    5f   E-415, desarmer le bouton « Sceller » (un RETRAIT, pas un ajout)
+         -> libere `adm/api/audit_seal.php`
+
+**Cinq des huit derniers blocages de l'extinction se lèvent par ces trois lots.** *Les
+trois autres — SMTP, scan sortant, pare-feu — sont des effets sur des tiers et
+appartiennent à l'exploitant.*
+
+### ✅ Étape 3 : la déclaration tient
+
+    3 cibles 0 · suites 0 · temoin 40 cles -> instrument sain
