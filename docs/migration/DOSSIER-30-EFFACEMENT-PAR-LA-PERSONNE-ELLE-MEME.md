@@ -179,3 +179,66 @@ lecteur ».* **Et le fait est plus fort que la décision :**
 > `git mv`.*
 
 **Aucun interdit d'archivage n'est requis de ce fait.**
+
+---
+
+# ✅ CLÔTURE DE LA CLASSE (12:25) — trois fichiers, et le reste est expliqué
+
+**Une sonde neuve a été construite pour la dimension qu'aucune des cinq autres ne lisait :
+l'ACTEUR.** *Elle ne cherche ni un nom, ni une table, ni une route : elle cherche une
+MUTATION dont la ligne visée est désignée par l'identifiant de SESSION.*
+
+## Comment elle a été calibrée, et pourquoi ça compte
+
+    1re forme   `$_SESSION['user_id']` present dans le FICHIER
+                -> 23 fichiers. FAUX : il y sert d'AUTEUR dans les lignes d'audit,
+                   pas de CIBLE. C'est la distinction que le portage ecrit lui-meme
+                   (`Comptes.php:505`), et ma sonde la piétinait.
+
+    2e forme    `$_SESSION['user_id']` en ARGUMENT d'un `execute()` mutant
+                -> 1 fichier. TROP SERRE : elle rate `profile.php`, dont 0b avait
+                   etabli qu'il est positif. L'indirection par variable
+                   (`$userId = $_SESSION['user_id']`) lui echappait.
+
+    3e forme    l'indirection comptee
+                -> 3 fichiers, et le CALIBRAGE passe :
+                   positifs connus  profile.php OK · privacy.php OK
+                   negatifs attendus  delete_user.php absent · toggle_user.php absent
+
+> **Deux positifs connus et deux négatifs attendus : c'est la première sonde de ce chantier
+> qui a été calibrée dans les DEUX sens avant d'être crue.**
+
+## Le résultat, et la classe est CLOSE
+
+    legacy/profile.php            7 mutations   email · ssh_key · password ·
+                                                force_password_change · sessions (2) ·
+                                                remember_tokens
+    legacy/privacy.php            6 mutations   la cascade complete de suppression
+    legacy/adm/api/change_password.php  3       password · sessions · remember_tokens
+
+    temoin : 189 couples prepare/execute apparies, 98 mutants
+    reste inexplique : 95 mutations visant AUTRE CHOSE que la session
+                       -> ce sont les gestes ADMINISTRATIFS, et c'est cohérent
+
+**Aucun quatrième fichier ne se cache.** *Le reste se referme.*
+
+## ⚠ Et elle a trouvé un fichier que le relevé humain n'avait pas signalé
+
+**`legacy/adm/api/change_password.php` mute la ligne de SESSION**, alors qu'il vit dans
+`adm/api/` — un chemin qui annonce l'administration. *Personne ne l'avait classé
+libre-service, parce que son EMPLACEMENT dit le contraire de ce que fait son code.*
+
+> **Un fichier rangé du côté administrateur peut porter un geste de libre-service, et
+> aucun relevé fondé sur l'arborescence ne le verra.**
+
+## Ce qui manque, définitivement énuméré
+
+    changer son adresse       ⛔ absent des DEUX cotes
+    poser sa propre cle SSH   ⛔ portage : route unique gardee `role:3`
+    supprimer son compte      ⛔ portage : suppression ADMINISTRATIVE seulement
+    changer son mot de passe  ✅ porte  (`/profil/mot-de-passe`)
+    fermer ses sessions       ~ DEGRADE (une session par empreinte, pas « toutes les
+                                autres »)
+
+**Trois manques, un dégradé, un porté. La classe est fermée et l'arbitrage de l'exploitant
+porte désormais sur une liste finie.**
