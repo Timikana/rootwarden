@@ -9741,3 +9741,56 @@ propriété est atteignable sans le chemin d'accès.*
 **L'échantillon est plus large qu'annoncé. Ça ne change aucune conclusion — mais ça évite de le relire
 comme un instantané de 24 h.** *C'est le genre de borne qu'on ne pense à poser qu'après avoir été trompé
 une fois.*
+
+### ✅ LE PRÉDICAT ÉPROUVÉ SANS ÉCRIRE — 5 contre 7, et le défaut se montre sur un banc synthétique
+
+**Méthode de la session 5 : exécuter le prédicat contre des lignes SYNTHÉTIQUES dans un CTE. Aucun
+`INSERT`, aucun `DELETE`, rien à annuler.**
+
+    GARDE (:50, avec `success=0`)   attendu 5   rendu 5   ✔
+    VUE   (:337, SANS `success`)    attendu 5   rendu 7   ✘
+
+    le banc porte ses propres contre-epreuves :
+      2 succes         -> ne doivent PAS compter, et c'est eux les +2
+      1 hors fenetre   -> ne doit PAS compter
+      1 autre adresse  -> ne doit PAS compter
+
+> **Le même banc montre le défaut ET valide le correctif, sans qu'une ligne existe.**
+
+**⚠ Et sa borne est aussi importante que sa méthode** : *ça éprouve la REQUÊTE, pas le CÂBLAGE.* **Ça
+n'établit pas que le code appelle ce prédicat, avec cette fenêtre, à cet endroit.**
+
+### ⛔ ET MON PROPRE ÉCHO DISAIT « LA TABLE N'A PAS ÉTÉ TOUCHÉE » — la mesure disait 23 → 24
+
+**Dans la MÊME sortie. J'ai vérifié au lieu de publier :**
+
+    la 24e ligne : id 16682, `rw-test-super`, success=1, step='2fa'
+    horodatee 07:22:23 — heure du CONTENEUR (UTC)
+    mon horloge : 09:24 CEST
+    -> 07:22 UTC = 09:22 CEST, soit DEUX MINUTES avant ma mesure
+
+**Ma requête n'a rien écrit — un `SELECT` sur un CTE ne le peut pas. La ligne vient d'une autre session qui
+vérifiait son second facteur pendant que je mesurais.**
+
+**Deux pièges évités dans le même relevé :**
+
+    1. j'allais AFFIRMER dans mon echo ce que ma propre mesure contredisait
+       trois lignes plus bas
+    2. et l'ecart de deux heures se lisait comme une ligne ANCIENNE — c'est
+       le decalage CEST/UTC, deja paye une fois sur ce chantier
+
+### ✅ ET CETTE LIGNE EST UNE PREUVE EN DIRECT DE L'ARGUMENT DE FRÉQUENCE
+
+**19 des 23 lignes étaient des `2fa`. La 24e est arrivée pendant la mesure, et c'est encore une `2fa`.**
+
+> **La table gagne une ligne à chaque vérification de second facteur de n'importe quelle session.** *C'est
+> exactement le mécanisme qui rend le message faux quasi permanent derrière une adresse partagée — et il
+> vient de se produire sous l'instrument qui le mesurait.*
+
+### ⚠ ET UN SECOND COÛT DE L'ÉPREUVE PAR LE CHEMIN VIVANT, que je n'avais pas cité
+
+    `login.php:47` ne purge qu'a l'OUVERTURE de `login.php` et au-dela de 24 h
+    or la fenetre mesuree est de ~34 h -> cette purge ne tourne pas de facon fiable
+
+> **Des lignes d'épreuve SURVIVRAIENT à l'épreuve et fausseraient toute mesure ultérieure du même
+> témoin.** *On aurait éprouvé le garde en détruisant l'instrument qui l'a mesuré.*
