@@ -308,11 +308,22 @@ class JournalAudit
      *
      * ══ POURQUOI CETTE METHODE, ET POURQUOI AVEC UN VERROU ────────────────
      *
-     * Le portage porte DEJA trois copies de cet insert (`ComptesController`,
-     * `PermissionsController`, `ServeursController`) et une quatrieme ecriture
-     * NUE assumee (`MotDePasse`, qui documente son choix). En ecrire une
-     * cinquieme etait la solution la moins couteuse et la plus mauvaise : ce
-     * depot a paye trois copies du garde SSRF et trois compteurs 2FA.
+     * ✅ LES TROIS COPIES SONT MIGREES — mesure du 2026-09-05 15:37,
+     * commentaires DEPOUILLES :
+     *
+     *     ComptesController       lit la tete : non   delegue : OUI
+     *     PermissionsController   lit la tete : non   delegue : OUI
+     *     ServeursController      lit la tete : non   delegue : OUI
+     *     JournalAudit (temoin)   lit la tete : OUI   verrou : OUI
+     *
+     * ⚠ Ce paragraphe annoncait « trois copies restent a migrer ». Il est reste
+     * VRAI plusieurs jours puis FAUX sans qu'aucun commit ne le touche — et une
+     * session s'appretait a refaire le travail sur sa foi. **Un avertissement
+     * qui survit a sa cause envoie refaire ce qui est fait.**
+     *
+     * Reste `MotDePasse`, ecriture NUE et ASSUMEE, qui documente son choix.
+     * En ecrire une copie de plus etait la solution la moins couteuse et la plus
+     * mauvaise : ce depot a paye trois copies du garde SSRF et trois compteurs 2FA.
      *
      * ⚠ ET LES TROIS COPIES EXISTANTES OMETTENT LE VERROU. Elles lisent la tete
      * de chaine par un simple `orderByDesc('id')->value('self_hash')`, hors
