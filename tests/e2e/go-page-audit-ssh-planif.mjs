@@ -8,9 +8,15 @@
  * L'ordonnanceur tourne dans un thread INVISIBLE a `ps` : une planification de
  * test posee en base peut declencher un VRAI releve SSH sur le parc. Et la
  * parade qu'on croyait suffisante ne l'est pas — « cible sure = tag inexistant »
- * est FAUX : `scheduler.py` n'execute son `INNER JOIN machine_tags` que si
- * `target_value` est NON VIDE, sinon il retombe sur un `SELECT ... FROM machines`
- * sans filtre, c'est-a-dire TOUT LE PARC, production comprise.
+ * etait FAUX tant que `scheduler.py` retombait, quand `target_value` etait vide,
+ * sur un `SELECT ... FROM machines` sans filtre : TOUT LE PARC, production
+ * comprise.
+ *
+ * ⚠ CETTE RAISON A CHANGE LE 2026-09-05 (E-280), et il faut la DATER plutot que
+ * la recopier : les deux chemins portent desormais un `else` qui REFUSE et
+ * journalise (`WHERE 1=0`, aucune machine). **La conclusion tient dans les deux
+ * mondes, mais pas pour la meme raison** — et qui reprendrait l'ancienne se
+ * protegerait d'un danger disparu en manquant celui qui existe.
  *
  * La surete n'est donc pas une intention, c'est une CONSTRUCTION : le filet de
  * cette suite avorte tout non-GET des que la connexion est finie. Meme un clic
