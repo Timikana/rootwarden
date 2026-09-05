@@ -11421,3 +11421,87 @@ existe pour empêcher, et il ne l'a pas empêché parce que l'unité n'était pa
 **Que la route ACCEPTE le verbe ne dit ni que sa GARDE égale celle du legacy, ni que le CORPS
 envoyé correspond à ce que le contrôleur lit.** *Les gardes de ces 15 routes ne sont pas
 confrontées ; la parité de charge utile encore moins.* **Mesurable, pas mesuré — et dit.**
+
+---
+
+## E-437
+
+### DIXIÈME capacité déjà portée — et un TROISIÈME mécanisme de perte, qui ne laisse qu'une case cochée
+
+**La capacité n°2 des onze — « créer un relevé planifié » — est portée. Vérifié en dépouillant
+les commentaires AVANT de compter.**
+
+    occurrences BRUTES de `/ssh-audit/schedules`   9
+    occurrences DEPOUILLEES                        4
+    -> CINQ etaient des commentaires
+
+    :705   ecris('/ssh-audit/schedules', corps)          CREER
+    :180   fetch(PASSERELLE + '/ssh-audit/schedules/'…)  SUPPRIMER
+    :194   fetch(… + '/toggle')                          BASCULER
+    :910   lis('/ssh-audit/schedules')                   LISTER
+    TEMOIN  1069 lignes lues · 5 occurrences de PASSERELLE
+    table `ssh_audit_schedules`  EXISTE
+
+*La session qui l'a mesurée en annonçait TROIS et n'avait pas relevé `:910`.* **Sa conclusion
+ne bouge pas — un site de plus la renforce — mais un compte qui fonde un verdict se vérifie
+même quand il va dans le bon sens.**
+
+> **Dixième capacité déclarée manquante et déjà présente. Sur les dix, AUCUNE n'a été trouvée
+> en la portant.**
+
+### ⛔ LE TROISIÈME MÉCANISME DE PERTE, ET C'EST LE PLUS DISCRET
+
+**Sept des seize routes de `ssh_audit` n'ont aucun appelant, et elles se répartissent en TROIS
+natures — pas une :**
+
+    save-config · fix · toggle · restore · reload
+        ecrivent `sshd_config`, rechargent sshd
+        -> sous-lot A3, NON PORTE, RETENU par arbitrage        travail NOMME
+    /ssh-audit/backups    lecture distante   -> TROU dans A2, sous-lot PORTE
+    /ssh-audit/trends     lecture en base    -> TROU dans A1, sous-lot PORTE
+
+**Les deux dernières ne sont ni orphelines par dépréciation — rien n'a été déprécié — ni
+retenues par arbitrage — rien n'a été décidé.**
+
+> **Ce sont des gestes d'un sous-lot DÉCLARÉ COMPLET qui ne l'est pas.**
+
+    depreciation              -> arbitrer ce qu'on garde     laisse un `_deprecated/`
+    arbitrage                 -> decider                     laisse un dossier ouvert
+    sous-lot declare complet  -> FINIR, et corriger la
+                                 declaration                 ⛔ laisse une CASE COCHEE
+
+**Les deux premiers mécanismes laissent une trace qu'on peut chercher. Le troisième laisse un
+artefact qui dit « rien à voir ici ».** *Et `/ssh-audit/trends` est en outre promise par
+`openapi.yaml` : un contrat public sans client.*
+
+### ⚠ CE QUE ÇA FAIT À LA MISSION, ET C'EST UN REFONDEMENT
+
+**La liste des onze portables a été réfutée DIX fois sur ses premiers items.** *Elle a été bâtie
+en inventoriant les ENTRÉES DE MENU, puis lue comme un inventaire de GESTES.*
+
+> **Le travail restant n'est pas « porter des capacités ». C'est FINIR des sous-lots déclarés
+> complets — et corriger les déclarations qui les couvrent.**
+
+*Et ces déclarations sont exactement ce que ce chantier a le plus de mal à tenir à jour : huit
+étaient périmées dans la seule journée du 2026-09-05.*
+
+### Et une déclaration qui a vieilli SOUS son propre correctif
+
+    2026-09-01   13 routes croisees dans ssh_audit.py
+    2026-09-05    8
+
+**Les cinq routes de planification portent désormais `require_permission` — la trouvaille a été
+corrigée, et le document qui la portait n'a pas suivi.** *Correction dans le sens RASSURANT,
+donc celle que personne ne rouvre.*
+
+> **Deuxième fois qu'un document vieillit sous un correctif qu'il a lui-même provoqué.** *Il
+> n'y a pas de mécanisme pour ça, sinon celui-ci : remesurer en revenant sur le module.*
+
+### ⚠ Et une heuristique à moi qui ne tranche pas ici
+
+**J'avais donné les LIBELLÉS comme l'artefact le plus fiable** — *« personne n'écrit quatre
+messages de résultat pour un geste que sa page n'accomplit pas ».* **La famille
+`ssh_audit.sched_*` compte 15 clés et AUCUN libellé de résultat.**
+
+*Zéro dans un sens comme dans l'autre : une famille sans résultat ne dit ni « porté » ni
+« absent ».* **Une heuristique qui ne rend rien doit être déclarée muette, pas interprétée.**
