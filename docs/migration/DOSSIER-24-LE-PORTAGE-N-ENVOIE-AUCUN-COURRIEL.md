@@ -182,3 +182,69 @@ exacte.* **Deux fois la même faute suffirait.**
 
 **Ce que je ne veux pas, c'est (a) SANS le savoir.** *C'est pour ça que cette réserve est ici et non dans
 une relecture.*
+
+---
+
+# ⛔ CORRECTION DU §3 — un de mes trois maillons ne prouve RIEN
+
+**La conclusion tient. La démonstration que j'en donnais portait un maillon invalide, et c'est le genre de
+maillon qui se recopie.**
+
+    ce que j'ai ecrit    function_exists('fastcgi_finish_request')  ->  NON
+    ce que j'ai mesure   PHP_SAPI de ma commande  ->  `cli`
+
+> **`fastcgi_finish_request()` appartient au SAPI FPM et n'existe JAMAIS en ligne de commande. Ce test rend
+> faux même sur une machine où php-fpm sert parfaitement le web.**
+
+**Mon `docker exec … php -r` est du CLI. Ce maillon ne mesurait pas le serveur, il mesurait mon
+interpréteur.**
+
+## ✅ LES DEUX MAILLONS QUI FONDENT LA CONCLUSION, EUX, TIENNENT
+
+    apache2ctl -M    php_module (shared)   <- mod_php charge dans Apache
+                     PAS de proxy_fcgi
+    binaire php-fpm  ABSENT
+    socket php-fpm   0
+
+**Ces deux-là mesurent le SERVEUR, et ils suffisent.** *La conclusion du §3 est inchangée :
+`fastcgi_finish_request()` n'est pas disponible au SAPI qui sert les pages, donc `terminating()` ne peut
+pas détacher la connexion.*
+
+## ⚠ ET LA PRÉCISION QUI COMPTE POUR QUI LIRA CE DOSSIER
+
+> **`terminating()` déplace le travail après l'ÉCRITURE de la réponse, pas après sa FIN.** *Sous php-fpm ce
+> sont la même chose ; sous mod_php, non.*
+
+    un demandeur qui chronometre le DERNIER OCTET du corps  -> ne voit pas l'envoi
+    un demandeur qui chronometre la FERMETURE de connexion  -> le voit
+
+**C'est pour ça que la mesure de 2,4 ms ne tranche pas** : *elle chronomètre la mauvaise borne, en plus
+d'avoir été prise avec le pilote `log`.* **Deux biais indépendants sur la même mesure.**
+
+## ✅ ET LE PORTAGE A FAIT MIEUX QU'UN COMMENTAIRE — c'est ce qui vous protège
+
+**Un commentaire ne produit aucun ÉVÉNEMENT le jour où sa prémisse cesse d'être vraie.** *C'est la famille
+qui a coûté quatre déclarations vraies périmées par un geste sur ce seul chantier, sans qu'aucune ne
+signale quoi que ce soit.*
+
+    la premisse est desormais VERIFIEE A L'EXECUTION :
+      `TRANSPORTS_LOCAUX` est une liste FERMEE
+      un transport INCONNU est traite comme DISTANT
+      et tout transport hors liste produit un `Log::warning` qui nomme
+      la CONSEQUENCE et le REMEDE
+
+> **Ce n'est pas une garde — elle n'empêche rien. C'est un ÉVÉNEMENT, là où il n'y en avait aucun.**
+
+**Concrètement pour vous : le jour où vous posez le SMTP, le journal vous le dira.** *Vous n'avez pas à
+vous souvenir de ce dossier — c'est le produit qui vous rappellera, au moment où ça compte.*
+
+## ⛔ ET LA SEULE MESURE QUI TRANCHERAIT N'A PAS ÉTÉ PRISE
+
+    le temps jusqu'a la FERMETURE DE CONNEXION, sur les deux branches
+
+**Trois raisons de ne pas la lancer, et la troisième suffit** : *elle consomme la limite de débit — qui
+compte les demandes REÇUES, et c'est sa qualité ; la branche connue exige un jeton réel sur un compte
+réel, ce que j'ai refusé ; et c'est le banc partagé.*
+
+**Inscrite comme non-mesure unique avec ses trois raisons, pas comme deux réserves séparées — une seule
+mesure les trancherait toutes les deux.**
