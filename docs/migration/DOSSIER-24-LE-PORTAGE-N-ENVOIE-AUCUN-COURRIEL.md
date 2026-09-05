@@ -103,3 +103,82 @@ dans la conversation.*
   envoi n'a été observé* ;
 - **si les cinq comptes sans adresse en ont une ailleurs** *(annuaire, autre système)* — *la question de
   savoir s'il faut leur en poser une est une décision sur des comptes réels, donc la vôtre.*
+
+---
+
+# ⚠⚠ 2026-09-05 — CE QUE POSER LE SMTP RÉOUVRIRA, et personne ne le verra passer
+
+**À lire AVANT de décider le SMTP. C'est une réserve de relecture que je déplace ici, parce qu'elle doit
+voyager avec VOTRE décision et non rester dans un échange entre sessions.**
+
+## 1. LE FLUX DE RÉINITIALISATION EST PORTÉ, ET SON ORACLE TEMPOREL EST FERMÉ — **avec `log`**
+
+    le legacy avait egalise le MESSAGE, pas le TEMPS :
+      adresse INCONNUE   1 bcrypt
+      adresse CONNUE     UPDATE + bcrypt + INSERT + un envoi SMTP SYNCHRONE
+
+**Le portage l'égalise avec `app()->terminating()` — pas une file, car `queue.default = sync` exécute en
+ligne.** *Mesure : branche inconnue **185,7 ms**, branche connue **188,1 ms**, écart **2,4 ms (1 %)**.*
+
+## 2. ⛔ MAIS CETTE MESURE A ÉTÉ PRISE LÀ OÙ LE TERME COÛTEUX N'EXISTE PAS
+
+    ce que LARAVEL LUI-MEME rapporte :  config('mail.default') = 'log'
+    `MAIL_MAILER` dans le conteneur  :  ABSENTE
+
+> **Avec le pilote `log`, l'« envoi » est une écriture de fichier. La mesure montre que `terminating()` ne
+> coûte rien QUAND IL N'A RIEN À DIFFÉRER. Elle ne peut pas montrer qu'il diffère un envoi SMTP — aucun
+> envoi SMTP n'a eu lieu.**
+
+## 3. ⛔ ET LE MÉCANISME CHOISI NE PEUT PAS DIFFÉRER SUR CE DÉPLOIEMENT
+
+    apache2ctl -M              php_module (shared)      <- mod_php
+                               deflate_module · filter_module   <- ils BUFFERISENT
+                               PAS de proxy_fcgi
+    command -v php-fpm         NON
+    function_exists('fastcgi_finish_request')   NON
+
+> **`terminating()` ne défère que si la réponse peut DÉTACHER la connexion. Le seul mécanisme qui le
+> garantit est `fastcgi_finish_request()`, qui n'existe QUE sous FPM. Il est absent ici.**
+
+*Le côté PHP est favorable — `output_buffering=0`, `implicit_flush=1` — mais la chaîne de filtres d'Apache
+garde la main, et `mod_deflate` compresse donc bufferise.*
+
+## 4. 🔴 CE QUE ÇA DONNE LE JOUR OÙ VOUS POSEZ LE SMTP
+
+    aujourd'hui   les deux branches ecrivent un fichier -> ecart 2,4 ms, INOFFENSIF
+    apres le SMTP le terme couteux revient ENTIER, et `terminating()` ne
+                  garantit rien sur ce deploiement
+    -> l'ecart de temps entre « cette adresse existe » et « elle n'existe pas »
+       peut revenir, sur le chemin de recuperation de compte
+
+> **Et AUCUN COMMIT NE L'EXPLIQUERA.** *C'est l'écart « qui disparaît avec la configuration et revient avec
+> elle » — celui qu'on ne sait pas relire six mois plus tard.*
+
+**⚠ Le risque concret n'est pas le défaut : c'est qu'on posera le SMTP en lisant « le temps est
+égalisé ».** *Et ce sera vrai de ce qui a été mesuré, faux de ce qui tournera.*
+
+## 5. ✅ CE QUI LE RENDRAIT VRAI PAR CONSTRUCTION — et je ne le prescris pas
+
+    ne pas emettre depuis la requete :
+      un magasin durable (table ou fichier) + un PROCESSUS SEPARE qui delivre
+
+**C'est la seule forme qui ne dépende ni du SAPI, ni de `mod_deflate`, ni du tampon d'Apache — et elle ne
+demande aucune file Laravel, dont `sync` la rendrait inopérante.**
+
+**⛔ Je ne le prescris pas, et je dis pourquoi** : *c'est un arbitrage de conception, et j'ai déjà prescrit
+`Mail::queue` une fois sur ce dépôt sans avoir mesuré le pilote — c'était inopérant pour cette raison
+exacte.* **Deux fois la même faute suffirait.**
+
+## 6. VOTRE DÉCISION, ET ELLE A TROIS FORMES
+
+    (a) poser le SMTP et ACCEPTER le residu, en le sachant
+        -> le flux delivre, l'oracle temporel revient, borne a un chemin
+           qui exige de connaitre une adresse
+    (b) poser le SMTP ET faire porter l'emission par un processus separe
+        -> la propriete tient par construction, quel que soit le serveur
+    (c) ne pas poser le SMTP
+        -> le flux reste agnostique, les liens partent au journal, et aucun
+           compte NEUF ne peut recevoir son mot de passe
+
+**Ce que je ne veux pas, c'est (a) SANS le savoir.** *C'est pour ça que cette réserve est ici et non dans
+une relecture.*
