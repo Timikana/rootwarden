@@ -128,3 +128,45 @@ dont le geste passe par la passerelle ont été archivées à tort.* **Elles son
 **Les deux chemins de `supervision` restent à instruire** — `/config/read` et
 `/config/save`, sachant que `/supervision/config` EST couvert. *Deux, et je ne les
 qualifie pas avant de les avoir mesurés.*
+
+---
+
+# ✅ CLÔTURE (19:55) — **zéro**. Le dossier n'avait pas d'objet, sauf le fait qui l'a ouvert.
+
+    annonce initiale         31 gestes sans repreneur
+    apres les PREFIXES        3
+    apres verification des
+      invocations             0
+
+**Les deux derniers étaient `/config/read` et `/config/save` — des FRAGMENTS.** *Le legacy
+comme le portage construisent `'/supervision/' + plateforme + '/config/read'`, et le
+portage l'invoque nommément :*
+
+    SupervisionController.php
+      'lecture'  => url("/api/gateway/supervision/{$plateforme}/config/read")
+      'ecriture' => url("/api/gateway/supervision/{$plateforme}/config/save")
+
+**Le troisième, `/a/b/c`, est un exemple de documentation.**
+
+## ⚠ La distinction que j'ai failli confondre, et dans les deux sens
+
+**« Couvert par un préfixe » veut dire que la passerelle AUTORISE. Cela ne dit pas que le
+portage APPELLE.** *J'ai d'abord conclu « couvert » sur la seule liste blanche — c'eût été
+la même faute que « présent dans l'arbre donc servi », inversée.*
+
+**Il a fallu chercher l'INVOCATION**, et elle était elle-même construite.
+
+> **Trois fois dans la même enquête, la réponse était « le chemin se construit ».** *Et
+> trois fois ma sonde cherchait un littéral.* **Ce n'est plus un piège d'instrument, c'est
+> la façon dont ce dépôt est écrit.**
+
+## Ce qui reste de ce dossier, et qui justifie qu'il ait existé
+
+**Ma Q3 mesurait les écritures SQL. Trois pages dont le geste passe par la passerelle ont
+été archivées à tort, et sont restaurées.** *C'est un fait, il tient, et il a coûté une
+capacité pendant quatre heures.*
+
+**Le reste de ce dossier était un artefact de mes propres sondes.** *Et le sens de l'erreur
+a été constant : ALARMER.* **Une alarme fait travailler, elle ne fait pas vérifier — c'est
+pourquoi il a fallu trois passes pour la ramener à zéro, alors qu'un dédouanement du même
+ordre aurait été cru du premier coup.**
