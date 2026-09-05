@@ -302,7 +302,7 @@ try {
         });
         if (archivee) {
             const { ctx, page } = await connecte('fr');
-            await verifieMenuLegacy(page, '/supervision', verifie);
+            await verifieMenuLegacy(page, '/supervision', verifie, constate);
             await ctx.close();
             console.log(lignes.join('\n'));
             console.log(`\n${lignes.filter((l) => l.startsWith('PASS')).length} PASS / ${echecs} FAIL — module archive`);

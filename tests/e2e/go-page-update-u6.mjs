@@ -209,7 +209,7 @@ if (CIBLE === 'legacy') {
     });
     if (archivee) {
         const { ctx, page } = await connecte('rw-test-admin', SECRET_ADMIN);
-        await verifieMenuLegacy(page, '/mises-a-jour', verifie);
+        await verifieMenuLegacy(page, '/mises-a-jour', verifie, constate);
         await ctx.close();
         console.log(lignes.join('\n'));
         console.log(`\n${lignes.filter(l => l.startsWith('PASS')).length} PASS / ${echecs} FAIL — module archive`);
