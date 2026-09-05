@@ -10285,3 +10285,67 @@ mesurent, arbitrent et portent, aucune n'a le geste d'archivage.
 > **Deux interdits d'archivage posés ce matin, onze capacités vérifiées portées, trois
 > pages libérées — et personne pour déplacer un fichier. C'est le seul goulot qui reste,
 > et il appartient à l'exploitant.**
+
+---
+
+## E-412 — Deux instruments de ma propre consigne de supervision sont épuisés, et l'un rend un verdict faux
+
+**2026-09-05, 11:35 CEST.** Banc libre, branche `Migration-Laravel` vérifiée avant écriture.
+
+### ⛔ L'étape 1 ne peut pas mesurer ce qu'on lui demande sur une fenêtre de 16 minutes
+
+    depuis 11:19   CODE 0 · DOC 1   ->  rapport ∞  ->  « au-dessus de 2:1 »
+
+**Ce nombre n'est pas une mesure : c'est du bruit qui a la forme d'un verdict.**
+
+    commits du jour        45  ->  1 toutes les 15 min en moyenne
+    fenetre de CE tour     16 min  ->  elle attend 1,1 commit
+
+> **Un ratio calculé sur un commit n'a pas de dénominateur.** *Et l'unique commit de la
+> fenêtre est le mien — donc l'instrument condamne la flotte sur une fenêtre où elle
+> n'avait statistiquement pas le temps de produire.*
+
+**C'est la règle du témoin appliquée à un rapport : zéro sur la sonde ET zéro sur le
+témoin veut dire « la mesure n'a pas eu lieu ».** *Ici : `code=0` ET `doc≈1`.*
+
+**RÈGLE** : *le rapport doc/code se calcule sur une fenêtre d'au moins dix commits, ou
+il ne se calcule pas.* **Une fenêtre plus courte que le temps de produire une unité de ce
+qu'elle mesure ne mesure rien.**
+
+### ⛔ L'étape 2 énumère une liste ÉPUISÉE, et la suivre serait la troisième récidive
+
+**Les onze capacités de l'ordre par risque croissant ont été vérifiées portées à 11 sur 11
+(E-411, relevé `b15a289`, plus cinq sessions indépendantes).** *Je les ai déjà assignées
+une fois ce matin : les cinq sont revenues « déjà portée », dont une que j'avais moi-même
+annulée la veille par commit.*
+
+> **Suivre la liste maintenant serait la troisième fois que ce chantier dépense une
+> fenêtre à établir qu'il n'y a rien à faire.**
+
+**Ce que dit 0b et qui est plus juste que « la liste est fausse »** : *« la liste était
+JUSTE quand elle a été écrite ; aucune liste de capacités restantes ne peut rester vraie
+plus de quelques heures ici. »* **Le remède n'est pas une meilleure liste — c'est que la
+mesure précède l'assignation.**
+
+### Ce que j'ai routé à la place, et c'est du travail réel
+
+    Q1  porte ?       RESOLU — 11 sur 11
+    Q2  requis ?      RESOLU — graphe calcule, 295 liens, 59 feuilles, db.php dernier
+    Q3  seul acces ?  OUVERT sur SEIZE fichiers  <- le seul travail qui reste
+
+    0b   la Q3 sur les 3 plus multi-gestes (server_actions 9 branches,
+         anonymize_user 7 tables, privacy 6 tables) — c'est son mandat, inchange
+    c6   la Q3 sur legacy/iptables/index.php — SON module, 3 branches, sans
+         elargir son perimetre d'un pouce
+
+### ✅ Étape 3 : la déclaration tient toujours
+
+    fr/auth.php 0 · en/auth.php 0 · cgu.blade.php 0 · suites 0
+    temoin : 40 cles lues -> instrument sain
+
+### Et ce que ce tour rend faux dans ma propre consigne
+
+**Le §2 de la consigne de supervision liste onze capacités à faire porter. Elles sont
+portées.** *Une consigne qui nomme les bons objets et un état périmé se lit comme à jour —
+c'est exactement le défaut que j'ai signalé ce matin sur le prompt d'extinction, et je
+viens de le retrouver dans l'autre consigne, une heure plus tard.*
