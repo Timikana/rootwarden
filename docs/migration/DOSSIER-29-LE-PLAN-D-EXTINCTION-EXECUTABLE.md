@@ -131,3 +131,49 @@ qu'un périmètre tenu de l'exploitant ne se lève pas sur la parole d'un pair.*
 
 **Ce que l'exploitant doit dire, et lui seul** : quelle session tient le `git mv`, ou que
 la session DSI l'exerce elle-même.
+
+---
+
+# ⚠ CORRECTION DE L'ORDRE (13:35) — deux graphes, et ils vont en SENS INVERSE
+
+**Le plan ci-dessus ordonne par le graphe d'INCLUSION : les feuilles d'abord, `db.php`
+dernier. C'est juste, et c'est incomplet.**
+
+> **Il existe un second graphe, invisible au premier : celui des appels HTTP.**
+
+    par `require`   une feuille peut partir     -> LES FEUILLES D'ABORD
+    par `fetch`     un fichier APPELE doit rester -> LES APPELANTS D'ABORD
+
+**Les deux ordres sont OPPOSÉS, et un fichier peut être feuille dans l'un et carrefour
+dans l'autre.** *`api_proxy.php` en est l'exemple : zéro entrant par `require`, **dix
+appelants** par `fetch`.*
+
+## La mesure qui l'établit
+
+**Huit fichiers blanchis geste par geste par la campagne Q3 — donc archivables selon Q1,
+Q2 et Q3. Q4 posée sur ce qui VIT ENCORE :**
+
+    libre            adm/api/anonymize_user.php
+    libre            adm/api/change_password.php
+    ⛔ APPELE (2)    adm/api/delete_user.php        <- manage_users.php, js/admin.js
+    ⛔ APPELE (1)    adm/api/notifications.php      <- menu.php
+    ⛔ APPELE (1)    adm/api/unlock_user.php        <- manage_users.php
+    ⛔ APPELE (4)    auth/enable_2fa.php            <- confirm_2fa.php, login.php
+    ⛔ APPELE (2)    auth/logout.php                <- verify.php, menu.php
+    ⛔ APPELE (1)    adm/includes/server_actions.php <- manage_servers.php
+    ⛔ APPELE (10)   api_proxy.php   TEMOIN, doit ressortir appele -> OK
+
+**Deux sur huit.** *Les six autres sont tenus vivants par des pages qui vivent encore.*
+
+## L'ordre réel de l'extinction, qui n'est pas celui que j'avais écrit
+
+    1. les PAGES d'abord            (`manage_users.php`, `manage_servers.php`, `menu.php`)
+    2. puis les POINTS D'ENTREE qu'elles appelaient  (`adm/api/*`)
+    3. puis l'INFRASTRUCTURE d'inclusion             (`db.php`, `verify.php`, `head.php`)
+
+> **Tant qu'une page vit, tout ce qu'elle appelle en HTTP vit avec elle.** *C'est pourquoi
+> l'extinction ne peut pas commencer par les points d'entrée, même quand ils sont
+> parfaitement portés : ils ne sont pas les feuilles de ce graphe-là, ils en sont les
+> racines.*
+
+**L'état à 13:35 : 52 fichiers métier servis (82 ce matin) · 49 archivés (19 ce matin).**
