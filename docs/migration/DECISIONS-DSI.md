@@ -10756,3 +10756,77 @@ numéro se dérivait de git, sans collision possible, et je le piétinais.*
 **Ce qui reste à trancher, et ce n'est pas à moi** : le CHANGELOG doit-il suivre le schéma
 dérivé, ou rester une suite sémantique tenue à la main ? *Les deux se défendent ; les avoir
 sans le dire ne se défend pas.*
+
+---
+
+## E-424 — Mon « compte restant : 0 » était vrai du BACKEND et faux du système, et le DOSSIER-20 le disait déjà
+
+**2026-09-05, 21:35 CEST.** *Découvert en vérifiant que le redémarrage avait bien refermé la
+chaîne. Il ne l'a pas refermée.*
+
+### La mesure qui a ouvert le sujet
+
+    lignes NUES depuis le redemarrage de 20:31:23 : 15
+    lignes CHAINEES                                :  5
+
+**J'avais annoncé « les onze sites repris, compte restant 0 ».** *Les quinze orphelines
+sont des `Permission refusee` et une `Mise a jour du mot de passe` — écrites par des
+fichiers que je n'ai jamais touchés.*
+
+    laravel/app/Http/Middleware/ExigePermission.php:73
+      DB::insert('INSERT INTO user_logs (user_id, action) VALUES (?, ?)', …)
+
+**Forme `DB::insert` avec du SQL BRUT — que ma sonde du matin ne couvrait pas.** *Elle
+cherchait `table('user_logs')->insert` et `INSERT INTO user_logs` dans les `.py`.*
+
+### ⛔ Et le fait le plus coûteux : ce dossier existait
+
+**`DOSSIER-20-CHAINE-AUDIT-COUVERTURE.md`, écrit le 2026-09-04 — la veille.**
+
+    25 ecrivains · 5 scellent · 20 ecrivent NU (80 %)
+      backend/ Python  11 ecrivains, 0 scellent
+      laravel/          6 ecrivains, 4 scellent
+      legacy/           8 ecrivains, 1 scelle
+
+**Il NOMME `ExigePermission.php` et `MotDePasse.php`.** *Et il porte lui-même une
+rectification : son premier compte était de 7, corrigé à 25 par un instrument plus large.*
+
+> **J'ai passé la matinée à re-dériver une mesure qui existait, et j'en ai publié une
+> version PLUS ÉTROITE.** *Mon « 11 sites, reste 0 » portait sur le backend seul ; je l'ai
+> écrit comme si le problème était clos.*
+
+### ⚠ Et mon prédicat de vérification s'est trompé sur le fichier que je venais de LIRE
+
+**Ma sonde a classé `ExigePermission` comme « chaîne ».** *Mesure, commentaires
+dépouillés :*
+
+    prev_hash dans le fichier ENTIER : 1
+    prev_hash DANS LE CODE           : 0
+    ->ajoute( dans le code           : 0
+    l'unique occurrence : « `user_logs` porte une chaine `prev_hash`/`self_hash` que
+      seul le scellage porte ouverte »   <- un COMMENTAIRE qui explique le choix
+
+**C'est le piège n°15 de mon propre catalogue, dans mon propre instrument, quelques heures
+après l'avoir écrit.** *Un fichier qui documente pourquoi il ne fait PAS une chose contient
+le nom de cette chose.*
+
+### Ce que je retiens, et c'est la cinquième fois aujourd'hui
+
+    « 73 orphelins »       -> 5      « 31 gestes »  -> 0
+    « 61 suites »          -> 33     « 11 sites, reste 0 » -> vrai du backend seul
+    et trois comptes d'ecrivains : 11, 7, 25, selon la FORME cherchee
+
+> **Cinq comptes, cinq instruments, cinq populations différentes.** *Le nombre n'était
+> jamais le problème : c'est que je nommais l'unité dans ma tête et pas dans l'énoncé.*
+
+**RÈGLE** : *avant de mesurer une population, chercher si elle a DÉJÀ été mesurée.* **Un
+dossier daté vaut mieux qu'une sonde neuve, et il porte ses propres rectifications.**
+
+### ⛔ Ce qui reste vrai et actionnable
+
+**Les onze écrivains du backend chaînent désormais** — c'est réel, le redémarrage l'a
+activé. **Mais `ExigePermission` et `MotDePasse` côté portage, et deux fichiers legacy,
+écrivent toujours nu**, et ils sont les plus fréquents : un refus de permission par requête
+refusée.
+
+*Je ne les corrige pas maintenant : le banc mesure, et `laravel/` est gelé.*
