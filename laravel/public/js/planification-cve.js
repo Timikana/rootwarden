@@ -202,25 +202,8 @@
         }
         try {
             const rep = await fetch(url, {
-                /*
-                 * ⚠ `|| 'POST'` N'EST PAS UN ORNEMENT.
-                 *
-                 * Sans defaut ecrit, un appelant qui omet le verbe fait retomber
-                 * `fetch` sur GET — et `GET /scan-cve/planifications` EXISTE
-                 * (`web.php:626`, l'index). La reponse n'est donc pas un 405 :
-                 * c'est un 200 avec la LISTE.
-                 *
-                 * La creation ne se produit pas, la reponse a la forme d'une
-                 * reussite, et NI le navigateur NI les journaux ne portent quoi
-                 * que ce soit d'anormal — une requete legitime a recu une
-                 * reponse legitime.
-                 *
-                 * Les quatre appelants actuels passent tous un verbe : c'est
-                 * exactement pourquoi il faut l'ecrire maintenant. Un defaut
-                 * latent dont l'activation est SILENCIEUSE ne se decouvre pas,
-                 * il se subit. Ses deux voisins portent deja le leur
-                 * (`notifications.js:45`, `comptes.js:47`).
-                 */
+                // Le verbe est EXIGE par la garde en tete de cette fonction : pas de
+                // defaut ici, et l'omission ne peut donc plus etre reinterpretee.
                 method: methode,
                 credentials: 'same-origin',
                 headers: corps ? { 'Content-Type': 'application/json' } : {},
