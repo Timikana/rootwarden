@@ -726,3 +726,94 @@ permission naîtrait avec un défaut à `1`, le legacy l'accorderait sans le dir
 > **L'heuristique juste est donc : pointer la Q3 sur les fichiers qui portent
 > PLUSIEURS gestes**, parce qu'un verdict de fichier y est nécessairement une
 > moyenne — et une moyenne cache la minorité.
+
+---
+
+## 11. `legacy/adm/api/` — les seize, par les trois questions (**2026-09-05 09:12 CEST**)
+
+**Correction de périmètre d'abord : les seize sont DÉJÀ passés par la Q1**, le
+2026-09-03 (§3 et §10). Ce qui n'avait jamais tourné sur eux, c'est la **Q2** et la
+**Q3**. Et mes verdicts Q1 ayant deux jours sur un dépôt où j'ai mesuré trois
+péremptions, **je les ai tous remesurés** ce matin.
+
+    population re-derivee : 83 .php metier servis, dont 16 dans adm/api/
+    gestes d'ECRITURE dans adm/api/ : 35
+
+### 11.1 Q2 — **aucun des seize n'est requis par un autre fichier**
+
+    graphe RESOLU des require (chemins absolus depuis le fichier porteur)
+    adm/api/* figurant parmi les cibles : 0 / 16
+    TEMOIN : adm/includes/audit_log.php -> 21 requerants
+
+**La Q2 n'en bloque aucun.**
+
+### 11.2 Q1 remesurée — onze portés, un partiel, trois non portés
+
+| fichier | verdict au 2026-09-05 |
+|---|---|
+| `anonymize_user` · `delete_user` · `unlock_user` · `change_password` | **PORTÉS** — `unlock_user` l'est **entièrement** : `Comptes.php:322` (compteurs) *et* `:326` (`DELETE login_attempts`), que je n'avais pas isolé le 03/09 |
+| `audit_seal` · `audit_verify` | **PORTÉS** — `JournalAudit::scelle` / `verifie` ⚠ le scellement porté a le défaut du §7 |
+| `global_search` · `notifications` | **PORTÉS** — `/recherche` ; `NotificationsController::supprimer:112` |
+| `update_permissions` · `update_notification_prefs` · `update_server_access` · `update_user_status` | **PORTÉS** — dont le préréglage sudo, porté depuis le 04/09 |
+| `update_user` | ⚠ **PARTIEL** — `ssh_key` porté ; **`password_expiry_override` et `password_expires_at` NON** |
+| `dismiss_onboarding` · `toggle_sudo` · `toggle_user` | ⚠ **NON PORTÉS** |
+
+⚠ **Deux faux positifs de ma sonde, écartés en lisant.** Mon motif SQL a « trouvé »
+`password_expiry_override` dans `ChangementMotDePasseExige.php:75` et
+`password_expires_at` dans `MotDePasse.php:248` : **les deux sont dans des
+COMMENTAIRES**. Et le premier de ces commentaires est titré *« CE QUI N'EST PAS PORTÉ
+ICI, ET NE DOIT PAS PASSER POUR FERMÉ »* — il déclare lui-même le manque.
+
+### 11.3 Q3 — **trois accès EXCLUSIFS, mesurés au motif serré**
+
+    UPDATE users SET sudo=    dans TOUT le legacy -> 1   adm/api/toggle_sudo.php:61
+    UPDATE users SET active=  dans TOUT le legacy -> 1   adm/api/toggle_user.php:81
+    onboarding_dismissed_at   dans TOUT le legacy -> 1   adm/api/dismiss_onboarding.php:24
+    TEMOIN  UPDATE users SET password= -> 5 sites
+
+**Ces trois fichiers sont le seul accès à leur geste, et le portage n'écrit aucune
+des trois colonnes.** `toggle_sudo` et `toggle_user` ne sont pas des capacités
+rares : ce sont des gestes d'administration ordinaires.
+
+### 11.4 ⛔ **Le vrai coût est dans `update_user.php`, et un commentaire du PORTAGE le nie**
+
+`MotDePasse.php:249`, dans le bloc qui change un mot de passe :
+
+> *« `password_expires_at` n'est pas touchée : **personne ne la lit**. »*
+
+**C'est faux.** Mesure de ce matin, hors commentaires :
+
+    backend/scheduler.py:623-629   SELECT … password_expires_at … WHERE
+                                   password_expires_at BETWEEN CURDATE()
+                                   AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)
+    backend/scheduler.py:640-650   send_email(u['email'],
+                                   « Votre mot de passe expire dans N jour(s) »)
+    backend/scheduler.py:820-824   un second lecteur, meme colonne
+
+Et le portage ne l'écrit pas : `MotDePasse.php:251-255` pose `password`,
+`password_updated_at`, `force_password_change` — **pas `password_expires_at`**.
+
+> **Un mot de passe changé par le PORTAGE laisse `password_expires_at` sur son
+> ancienne valeur.** Le planificateur continue d'en tirer des courriels : soit il
+> n'en envoie jamais (colonne à `NULL`), soit il annonce une expiration qui ne
+> correspond plus à rien.
+
+**Écrivains de `password_expires_at` — TOUS dans le legacy** : `profile.php:198`,
+`auth/reset_password.php:132`, `adm/api/update_user.php` ×4. **Zéro côté portage.**
+
+> **Éteindre le legacy retire le DERNIER écrivain d'une colonne dont un lecteur
+> vivant continue de tirer des courriels.** Même forme que le scellement du §6.3 —
+> *le dernier écrivain meurt, le lecteur survit* — et cette fois le lecteur écrit à
+> des humains.
+
+### 11.5 Le reste — **il se referme**
+
+    35 gestes d'ecriture dans adm/api/
+    couverts par un verdict ci-dessus : 35
+    reste inexplique : ZERO
+
+*Et une correction que je dois à ma propre méthode* : le `DELETE FROM notifications`
+n'apparaissait pas dans ma sonde par colonne — la suppression est portée, mais par un
+appel de service (`NotificationsController::supprimer:112`), pas par un bloc
+`->delete()` que mon motif reconnaissait. **Une sonde par COLONNE ne voit pas une
+suppression par ENTITÉ.** Rattrapé par la route, pas par la sonde.
