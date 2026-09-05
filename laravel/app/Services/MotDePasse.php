@@ -566,12 +566,29 @@ class MotDePasse
          * (`legacy/adm/api/audit_seal.php`). Mesure du 2026-08-23 : 3368 lignes,
          * dont 757 sans empreinte. Calculer la chaine ici, seul, la casserait.
          */
+        /*
+         * ⚠ CETTE ECRITURE ETAIT NUE, ET C'ETAIT UN CHOIX DOCUMENTE — REVERSE
+         * SUR ARBITRAGE DE L'EXPLOITANT LE 2026-09-05.
+         *
+         * Elle inserait sans `prev_hash`, donc HORS de la chaine de hachage.
+         * Une ligne non chainee ne se rattrape JAMAIS : la tete se calcule en
+         * sautant les lignes nues, et les y remettre exigerait de reecrire
+         * l'empreinte de toutes les autres.
+         *
+         * `ajoute()` lit la tete sous `lockForUpdate()` : sans ce verrou, deux
+         * ecritures concurrentes obtiennent le meme `prev_hash` et la chaine
+         * FOURCHE.
+         *
+         * LE `catch` RESTE, et il n'est pas decoratif : le changement de mot de
+         * passe a DEJA eu lieu quand on arrive ici. Faire echouer le geste parce
+         * que sa trace echoue laisserait un mot de passe change et un utilisateur
+         * qui croit le contraire.
+         */
         try {
-            DB::table('user_logs')->insert([
-                'user_id' => $idCompte,
-                'action' => $actionJournal,
-                'created_at' => now(),
-            ]);
+            // `app()` plutot qu'une injection : `MotDePasse` n'a AUCUN constructeur,
+            // et lui en donner un changerait ses trois sites d'instanciation.
+            // `JournalAudit` n'a pas de dependance — le conteneur le rend seul.
+            app(\App\Services\JournalAudit::class)->ajoute($idCompte, $actionJournal);
         } catch (\Throwable $e) {
             Log::warning('journalisation du changement de mot de passe', ['erreur' => $e->getMessage()]);
         }

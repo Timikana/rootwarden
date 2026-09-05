@@ -2587,6 +2587,34 @@ a.rw-onglet { text-decoration: none; display: inline-block; }
     color: var(--rw-texte-doux);
     font-size: 12px;
     text-align: right;
+
+    /* Le pied portait la seule version ; il porte desormais aussi les
+       conditions d'utilisation et le lien de soutien. `flex` avec
+       `wrap` : sur 390 px les trois passent a la ligne au lieu de
+       deborder. */
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 6px 16px;
+}
+
+/* ── LES LIENS DU PIED ────────────────────────────────────────────────────
+ *
+ * Sobres par defaut, soulignes au survol ET au focus clavier : un lien qui
+ * ne se distingue qu'a la souris n'existe pas pour qui navigue au clavier.
+ */
+.rw-pied__lien {
+    color: var(--rw-texte-doux);
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+    transition: color .15s ease, border-color .15s ease;
+}
+
+.rw-pied__lien:hover,
+.rw-pied__lien:focus-visible {
+    color: var(--rw-texte);
+    border-bottom-color: currentColor;
 }
 
 /* ── UNE TUILE QUI EST UN LIEN ────────────────────────────────────────────
@@ -2794,3 +2822,49 @@ a.rw-alerte:focus-visible { outline: 2px solid var(--rw-accent); outline-offset:
     .rw-alerte__texte { flex: 1 1 0; overflow: visible; white-space: normal; }
     .rw-alerte__lien { margin-left: 0; }
 }
+
+
+/* ── LE TEXTE DES CONDITIONS D'UTILISATION ────────────────────────────────
+ *
+ * La page `/cgu` n'affichait que son titre et ses deux boutons : le texte a ete
+ * porte le 2026-09-05. Ces regles existent pour qu'il soit LISIBLE — une CGU
+ * qu'on ne lit pas est aussi peu opposable qu'une CGU absente.
+ *
+ * `max-width` en `ch` : la mesure du CONFORT DE LECTURE est le nombre de
+ * caracteres par ligne, pas une largeur en pixels. 72ch tient sur 390 comme sur
+ * 1920, et la carte reste bornee par son propre conteneur.
+ */
+.rw-cgu {
+    max-width: 72ch;
+    margin: 18px 0 22px;
+    text-align: left;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--rw-texte);
+    max-height: 46vh;
+    overflow-y: auto;
+    padding-right: 10px;
+}
+
+.rw-cgu__date {
+    color: var(--rw-texte-doux);
+    font-size: 12px;
+    margin-bottom: 14px;
+}
+
+.rw-cgu__section { margin-bottom: 16px; }
+
+.rw-cgu__titre {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: var(--rw-texte);
+}
+
+.rw-cgu__liste {
+    list-style: disc;
+    padding-left: 22px;
+    margin: 0;
+}
+
+.rw-cgu__liste li { margin-bottom: 4px; }

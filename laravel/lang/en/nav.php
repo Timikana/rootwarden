@@ -20,6 +20,9 @@ return [
     'section_admin' => "ADMINISTRATION",
     'section_autre' => "OTHER",
 
+    'cgu' => "Terms of use",
+    'cafe' => "Buy me a coffee",
+    'cafe_titre' => "Support the project — buymeacoffee.com",
     'version' => "Version :numero",
     'version_inconnue' => "Version unknown",
 
