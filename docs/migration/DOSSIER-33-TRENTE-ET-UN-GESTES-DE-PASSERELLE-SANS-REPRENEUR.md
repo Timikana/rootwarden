@@ -77,3 +77,54 @@ perdu ?* **Trois issues, et la troisième est celle que l'inaction produit :**
 points d'entrée existent, sont gardés, et fonctionnent. Ce qui a disparu est l'interface
 qui les appelait.* **Une capacité dont le moteur tourne et dont le tableau de bord a été
 retiré ne se découvre pas par une panne.**
+
+---
+
+# ⛔ RECTIFICATION (19:40) — le titre de ce dossier est FAUX. Ils sont TROIS, pas trente et un.
+
+**Et sur les trois, un est un exemple de documentation.**
+
+    chemins du portage      226, dont 29 PREFIXES
+    temoin  /services/start   couvert ? OUI
+    temoin  /zzz/inexistant   couvert ? non
+
+    SANS REPRENEUR :
+      api          /a/b/c                      <- un exemple, pas un geste
+      supervision  /config/read, /config/save
+
+## Ce que ma sonde faisait de faux, et c'est la troisième fois en deux jours
+
+**Elle cherchait des chemins COMPLETS. Le portage en connaît vingt-neuf sous forme de
+PRÉFIXES**, et construit le reste à l'exécution :
+
+    laravel/public/js/services.js     `lit('/services/' + geste, {…})`
+    RoutesBackend.php:116             '/services/', '/admin/', '/bashrc/'
+
+**`ServicesSystemd.php` existe, `ServicesController` aussi, et le menu porte une entrée
+`services` gardée `can_manage_services`.** *J'ai annoncé sept gestes perdus sur un module
+entièrement porté.*
+
+## ⚠ Le motif, et il est le mien
+
+    « 73 orphelins, 651 Kio »   ->  le reseau en a rendu 5
+    « 31 gestes sans repreneur » ->  la mesure par prefixe en rend 3
+    « 61 suites sans objet »     ->  la session du banc en a compte 33
+
+> **Trois fois en deux jours, j'ai publié un compte que le bon instrument a divisé par dix
+> ou plus. Chaque fois, ma sonde cherchait une FORME LITTÉRALE là où le système compose.**
+
+**Et le sens de l'erreur est constant : elle ALARME.** *C'est le côté sûr, et c'est
+précisément pourquoi il ne se fait pas contredire — une alarme fait travailler, elle ne
+fait pas vérifier.* **Les trois n'ont été corrigées que parce que quelqu'un est allé
+mesurer autrement : le réseau, une autre session, et cette fois moi-même en cherchant
+pourquoi `services` paraissait perdu alors que son menu existe.**
+
+## Ce qui reste vrai de ce dossier
+
+**Le fait qui l'a ouvert reste entier** : *ma Q3 mesurait les écritures SQL, et trois pages
+dont le geste passe par la passerelle ont été archivées à tort.* **Elles sont restaurées.**
+*C'est le seul contenu de ce dossier qui tienne, et il vaut la peine qu'il ait été ouvert.*
+
+**Les deux chemins de `supervision` restent à instruire** — `/config/read` et
+`/config/save`, sachant que `/supervision/config` EST couvert. *Deux, et je ne les
+qualifie pas avant de les avoir mesurés.*
