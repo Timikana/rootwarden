@@ -20870,3 +20870,73 @@ pas parce qu'on a décidé de ne pas la porter, mais parce que la page qui la
 servait a été dépréciée et que personne n'a regardé ce qu'elle emportait.*
 **C'est une troisième catégorie, à côté de « portée » et « en arbitrage » :
 **orpheline par dépréciation**.
+
+
+## E-425 — ma formule « ce qui reste non porté est exactement ce qui ÉCRIT » est RÉFUTÉE, par mon propre registre
+
+**Cherché délibérément le 2026-09-05 22:55, sur la borne posée par la session 5** —
+*« un orphelin n'est pas une classe ; ce qui la réfuterait est un orphelin en
+LECTURE seule ; je n'en ai pas cherché, et je le dis plutôt que de laisser la
+formule voyager comme établie. »*
+
+**Elle avait raison de poser la borne. J'en ai trouvé deux.**
+
+    E-279  `/ssh-audit/trends`   GET · promise par `openapi.yaml`, appelee par PERSONNE
+                                 verifie sur legacy/, tests/, laravel/ ET backend/ :
+                                 deux fichiers la nomment — sa DEFINITION et le contrat
+    `/cve_trends`                GET · aucun appelant dans le portage
+                                 aucun dans le legacy vivant hors catalogues de langue
+                                 TEMOIN : `cve_results` EST appele (`legacy/security/js/main.js`)
+
+> **Il existe des routes de LECTURE sans aucun client. La frontière n'est donc pas
+> lecture/écriture.**
+
+### ⚠ Et la réfutation dormait dans le registre que je tiens
+
+**E-279 a été inscrit il y a plusieurs jours.** J'ai généralisé depuis deux modules
+sans l'interroger — *la faute exacte que je m'étais inscrite ce matin : « un
+registre qu'on n'interroge pas n'est pas une trace, c'est un dépôt ».*
+
+**Et la généralisation avait déjà voyagé** : la DSI a **reclassé la liste des
+onze** sur sa foi — *« ce n'est plus une file de travail, c'est une carte de la
+frontière »*. **Une reclassification d'artefact de planification, fondée sur une
+conclusion tirée de deux cas.**
+
+### Ce qui SURVIT, et il faut le dire aussi précisément que ce qui tombe
+
+    fail2ban   manquent install · restart                   -> ecritures   VRAI
+    bashrc     manquent deploy · prerequisites · restore     -> ecritures   VRAI
+    /policy/rollback   orphelin par depreciation             -> ecriture    VRAI
+
+**L'observation tient sur les trois cas mesurés. C'est la GÉNÉRALISATION qui
+tombe** — *« exactement ce qui écrit » affirmait une équivalence ; trois cas
+n'établissent qu'une implication, et dans un seul sens.*
+
+### Une catégorie de plus, distincte de l'orphelinat par dépréciation
+
+    orpheline par DEPRECIATION   avait une interface, la page est morte (`/policy/rollback`)
+    JAMAIS SERVIE                n'a jamais eu de client (`/ssh-audit/trends`, promise
+                                 par le contrat d'API et ecrite pour lui)
+
+**La seconde est plus difficile à voir** : rien ne manque, puisque rien n'a jamais
+existé. *Une route promise par un contrat et jamais appelée ne laisse aucune trace
+d'absence — elle a la forme complète d'une capacité.*
+
+### Note d'instrument : mon relevé automatique est INUTILISABLE, et je ne publie pas son compte
+
+J'ai bâti une sonde qui teste chaque route contre les fragments appelés, en
+remontant les préfixes pour neutraliser la composition. **Ses témoins l'ont
+réfutée deux fois :**
+
+    regle « n'importe quel prefixe »     -> /policy/rollback rendu ATTEINT (faux)
+    regle « dernier segment seulement »  -> /policy/rollback rendu ATTEINT (faux)
+                                            /bashrc/deploy   rendu ATTEINT (faux)
+
+**Cause** : `/policy/` figure dans les fragments relevés, extrait de
+`/policy/sftp/`. *Toute route à deux segments sous un point de composition est
+donc blanchie par une sœur.* **La parade au piège du préfixe crée son propre
+piège, et celui-là DÉDOUANE** — sens inverse des cinq variantes.
+
+> **Je ne publie pas les « 84 orphelines » que la sonde rendait.** *Un compte dont
+> les témoins échouent n'est pas un compte, c'est une liste de candidats* — et
+> `/list_machines` y figurait alors qu'il est appelé par `mises-a-jour.js`.
