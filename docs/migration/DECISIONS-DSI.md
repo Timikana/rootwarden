@@ -11363,3 +11363,61 @@ régime de lecture invoqué là où il n'était pas.**
 
 > **Une explication récente et vraie est le meilleur candidat pour une attribution fausse.**
 > *Elle est disponible, elle a servi le jour même, et elle explique la forme du symptôme.*
+
+---
+
+## E-436
+
+### Un repli de verbe absent, sur une route qui répond en GET : la création rend 200 et ne crée rien
+
+**Vérifié ligne à ligne. Latent aujourd'hui, et sa forme est celle qui ne produit AUCUN signal.**
+
+    planification-cve.js:181   method: methode,           <- AUCUN defaut ecrit
+    notifications.js:45        method: methode || 'GET',  <- defaut ecrit
+    comptes.js:47              method: methode || 'POST', <- defaut ecrit
+
+**Le jour où un appelant omet l'argument :**
+
+    fetch(url, { method: undefined })  ->  le navigateur retombe sur GET
+    web.php:626   Route::get('/scan-cve/planifications', … 'index')   <- ELLE EXISTE
+    -> 200 + la LISTE des planifications
+
+> **Ce n'est pas un 405. C'est un 200.** *La création ne se produit pas, et la réponse a la
+> forme d'une réussite.* **Ni le navigateur ni les journaux ne portent quoi que ce soit
+> d'anormal — une requête légitime a reçu une réponse légitime.**
+
+**Les quatre appelants actuels passent tous un verbe, donc rien ne casse aujourd'hui.** *C'est
+exactement pourquoi il faut l'écrire maintenant : un défaut latent dont l'activation est
+silencieuse ne se découvre pas, il se subit.*
+
+### Le correctif est d'un caractère, et il aligne sur les voisins
+
+    method: methode || 'POST',
+
+**À poser à la réouverture de la fenêtre** — `laravel/public/js/` est gelé jusqu'à la
+fermeture du lot 3.
+
+### Et deux constats mineurs du même relevé
+
+    notifications.js:45   le `|| 'GET'` est MORT — ses deux appelants passent `POST`
+                          explicitement. Un repli SUR que rien ne parcourt n'est pas
+                          un repli mesure.
+    lisJson('planif-libelles') || {}   rend `fetch(undefined)` si le bloc manque,
+                          donc une requete vers l'URL relative "undefined".
+                          Non observe ; la forme est la.
+
+### ⚠ Et une correction de mon propre tableau du 04/09
+
+    j'annoncais   9 / 3 / 5 appels
+    mesure        8 / 2 / 4
+
+**L'écart est constant et il s'explique : mon relevé comptait le `fetch` de la DÉFINITION du
+helper comme un site d'appel.** *Aucune conclusion ne bouge — mais « 5 » désignait deux
+ensembles différents selon la ligne du tableau.* **C'est précisément ce qu'un relevé gelé
+existe pour empêcher, et il ne l'a pas empêché parce que l'unité n'était pas dans l'énoncé.**
+
+### ⚠ Ce que ce relevé N'ÉTABLIT PAS, et la session le dit elle-même
+
+**Que la route ACCEPTE le verbe ne dit ni que sa GARDE égale celle du legacy, ni que le CORPS
+envoyé correspond à ce que le contrôleur lit.** *Les gardes de ces 15 routes ne sont pas
+confrontées ; la parité de charge utile encore moins.* **Mesurable, pas mesuré — et dit.**
