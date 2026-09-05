@@ -47,7 +47,23 @@ liste. Les six gestes SSH sont INEXPRIMABLES par ce helper.
 - **quatre cases a cocher tombaient au-dessus de leur libelle** : `.rw-champ__etiquette` est en
   `display: block`. Motif de `acces-sftp` repris — toute la ligne devient cliquable.
 
-**Suppression d'une regle.** Le legacy prend le nom DANS LE CHAMP DE SAISIE puis demande un
+**⚠ UN DEFAUT DU LEGACY REPARE EN PASSANT — ce n'est PAS de la parite, et personne ne l'avait
+demande.** Il n'apparaissait dans aucun releve d'ecart : il a ete trouve en lisant le geste
+qu'on portait, pas en cherchant des defauts.
+
+**La suppression d'une regle vise, sur le legacy, LE NOM QUI EST DANS LE CHAMP DE SAISIE.**
+`wazuh.js:287-289` lit `document.getElementById('wz-rule-name').value` puis demande un
+`confirm()`. **On peut donc ouvrir une regle, changer le nom dans le champ, et supprimer une
+AUTRE regle** — celle dont on vient de taper le nom, qu'on n'a jamais ouverte et dont on ne
+voit pas le contenu. *Le `confirm()` ne rattrape rien : il ne nomme pas ce qu'il supprime.*
+
+**La correction est structurelle, pas une verification de plus.** Le bouton nait DESACTIVE ; il
+ne s'active qu'apres l'ouverture d'une regle ; il vise `regleOuverte`, que SEULE la liste pose ;
+et « Nouveau » la remet a `null`, sans quoi « Nouveau » puis « Supprimer » viserait la
+precedente, invisible a l'ecran. *L'ecart entre ce qu'on voit et ce qu'on supprime devient
+inexprimable, au lieu d'etre surveille.*
+
+**Suppression d'une regle — le detail.** Le legacy prend le nom DANS LE CHAMP DE SAISIE puis demande un
 `confirm()` : on peut ouvrir une regle, changer le nom, et supprimer UNE AUTRE regle. Ici le
 bouton nait DESACTIVE, il ne s'active qu'apres l'ouverture d'une regle, il vise cette regle-la,
 et il OUVRE un panneau qui la NOMME. `confirm()` est proscrit — et surtout il ne nomme rien.
