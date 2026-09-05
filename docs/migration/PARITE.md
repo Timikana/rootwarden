@@ -20732,3 +20732,82 @@ DÉDOUANE.*
 `portee` est un ajout du portage sans équivalent legacy. *La colonne « ce qu'elle
 touche : rien — lecture pure » de la liste des portables ne décrit donc plus une
 capacité à porter : elle décrit une capacité portée.*
+
+
+## E-423 — `bashrc` : trois capacités manquantes, toutes des ÉCRITURES SSH, aucune portable sans arbitrage
+
+**Mesuré le 2026-09-05 22:45 avec les cinq formes de production de requête.**
+
+    FORME 1  fetch/XHR a prefixe compose   portage `PASSERELLE + chemin`
+                                           legacy  `${API}${path}`
+    FORME 2  <form action=…>               0 des DEUX cotes
+    FORME 3  action composee a l'execution 0 des deux (TEMOIN : la forme existe
+                                           bien dans `serveurs.js`)
+    FORME 4  DB::table() direct            aucune — `BashrcController` n'a que
+                                           `__construct` et `__invoke`
+    FORME 5  <a href=…>                    1 portage · 0 legacy
+
+**`bashrc` est un module a JS, pas a formulaires** — la mise en garde tiree de
+`serveurs` ne s'y applique pas, et les cinq formes le montrent au lieu de le
+supposer.
+
+### La différence d'ensembles
+
+    legacy   6 chemins   deploy · prerequisites · preview · restore · template · users
+    portage  3 chemins   preview · template · users
+    MANQUE   /bashrc/deploy · /bashrc/prerequisites · /bashrc/restore
+             -> ZERO fichier du portage les mentionne (TEMOIN : `preview` en
+                mentionne 3)
+
+### ⚠ Ce ne sont pas trois oublis : ce sont trois ÉCRITURES
+
+    install_prerequisites   POST · role:2 + can_manage_bashrc · 2 mentions SSH
+    deploy                  POST · role:2 + can_manage_bashrc · 6 mentions SSH
+    restore                 POST · role:2 + can_manage_bashrc · 4 mentions SSH
+    TEMOIN  get_template    0 mention SSH   ·   preview  2 mentions SSH — ET IL EST PORTE
+
+> **« Ouvre une session SSH » n'est PAS le discriminant** : `preview` en ouvre une
+> et il est porté. **La ligne est lecture contre ÉCRITURE** — les trois manquants
+> écrivent sur des machines, `preview` y lit.
+
+**Et le contrôleur le disait déjà** : *« B1 ne porte que la page ; les six routes
+qui joignent une machine partent par la passerelle — B2 pour les lectures, B4
+pour les écritures. »* **La découpe était nommée avant la mesure ; la mesure dit
+que B4 n'est pas fait.**
+
+### Ce que ça confirme sur l'archivage
+
+`bashrc` est l'une des trois pages **archivées à tort puis restaurées**. La mesure
+donne la raison exacte : **la page legacy est le seul accès vivant à trois gestes
+de passerelle non portés.** *Un constat d'archivage fondé sur les suites se serait
+trompé dans l'autre sens — en déclarant archivable une page qui est la seule porte.*
+
+### ⚠ Et le piège du préfixe m'a repris, en QUATRIÈME variante
+
+    mon motif    '/[a-z0-9_/-]+'  entre guillemets simples
+    la realite   lit('/bashrc/users?machine_id=' + mid)
+
+**Le littéral porte un `?` et un `=`**, hors de ma classe de caractères. Mon
+premier relevé rendait donc **2 chemins au lieu de 3** — et un manque de plus.
+
+    variante 1  l'URL est assemblee              `PASSERELLE + chemin`   evitee
+    variante 2  l'ancre est construite en JS     `'f2b-geoip-' + suffixe` PAYEE
+    variante 3  la sous-chaine attrape un voisin `install` ⊂ `install_all` PAYEE
+    variante 4  le litteral porte une query      `…users?machine_id=`     PAYEE
+
+> **Trois variantes payées sur quatre, en deux tâches, avec la règle en main.**
+> *Une règle qui nomme UN objet — « le chemin » — ne se transporte pas d'elle-même
+> aux autres objets de la même forme.* **Le remède n'est pas de la retenir mieux :
+> c'est de relever les fragments SANS présumer du délimiteur** — `grep -ohE
+> "/module/[a-z0-9_-]+"` puis dédupliquer.
+
+### Bilan des deux modules appariés ce soir
+
+    fail2ban   manquent install · restart                    ecritures machine
+    bashrc     manquent deploy · prerequisites · restore     ecritures machine
+
+> **Dans les deux modules, ce qui reste non porté est EXACTEMENT ce qui écrit sur
+> une machine.** *Ce n'est pas un reste : c'est la frontière que le chantier tient
+> délibérément.* **La liste des portables nomme donc des modules dont le reliquat
+> est l'ensemble des arbitrages** — ce qui rejoint E-422 : un catalogue de
+> soupçons, pas de manques.
