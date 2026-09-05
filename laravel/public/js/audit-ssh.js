@@ -13,11 +13,9 @@
  * Elle disait : *« L'ECRITURE, ET SON PERIMETRE EXACT : `POST
  * /ssh-audit/schedules`, et rien d'autre. Ni `DELETE /schedules/<id>`, ni
  * `POST /schedules/<id>/toggle`, ni aucune des routes qui joignent une
- * machine. »* Mesure du 2026-09-05, `grep 'ecris('` sur ce fichier :
- *
- *     :246  ecris('/ssh-audit/scan',   …)   backend:120  ssh_session(…)
- *     :335  ecris('/ssh-audit/config', …)   backend:362
- *     :583  ecris('/ssh-audit/schedules', …)
+ * machine. »* Mesure du 2026-09-05 : trois appels d'ecriture, et
+ * `/ssh-audit/scan` ouvre une session SSH (`ssh_session(ip, port, user, …)`,
+ * `ssh_audit.py`).
  *
  * Donc **trois** routes et non une ; **`/ssh-audit/scan` OUVRE une session SSH
  * sur la machine** (`ssh_session(ip, port, user, …)`, `ssh_audit.py:133`) ; et
@@ -32,11 +30,22 @@
  *
  * ══ CE QUE CE FICHIER ECRIT, LIGNE PAR LIGNE ══════════════════════════════
  *
- *     :246  POST   /ssh-audit/scan                    ⚠ OUVRE UNE SESSION SSH
- *     :335  POST   /ssh-audit/config                  lit la conf d'une machine
- *     :583  POST   /ssh-audit/schedules               ARME un releve recurrent
- *     A5    DELETE /ssh-audit/schedules/<id>          en supprime un
- *     A5    POST   /ssh-audit/schedules/<id>/toggle   en inverse l'etat
+ * ⚠ REPERES PAR LEUR APPELANT, PAS PAR LEUR NUMERO DE LIGNE — et c'est une
+ * correction de la version precedente de cette table, qui en portait trois.
+ * **A5 a insere 218 lignes au-dessus d'eux : les trois numeros ont glisse sans
+ * que personne ne touche a la table.** *Un numero de ligne dans un commentaire
+ * est un fait que toute edition situee AU-DESSUS rend faux — et il le devient
+ * en silence, puisque ni le commentaire ni le code cite n'ont bouge.* Un nom de
+ * fonction, lui, se deplace avec ce qu'il designe.
+ *
+ *     `lanceReleve`      POST   /ssh-audit/scan          ⚠ OUVRE UNE SESSION SSH
+ *     `litConfig`        POST   /ssh-audit/config        lit la conf d'une machine
+ *     `enregistrePlanif` POST   /ssh-audit/schedules     ARME un releve recurrent
+ *     `supprimePlanif`   DELETE /ssh-audit/schedules/<id>       en supprime un
+ *     `basculePlanif`    POST   /ssh-audit/schedules/<id>/toggle  en inverse l'etat
+ *
+ * Les deux derniers sont les SEULS a construire leur URL — voir leur docblock
+ * pour pourquoi elle est construite dans le helper et non par l'appelant.
  *
  * Les deux derniers n'ouvrent AUCUNE session SSH et n'ecrivent qu'en base.
  *
@@ -1008,11 +1017,20 @@
      *     le clic, le resultat est l'inverse de ce que cet ecran montrait. Un
      *     ecran qui PREDIRAIT l'etat mentirait une fois sur deux des que deux
      *     personnes agissent ;
-     *   - `DELETE` rend `success: True` SANS regarder `rowcount`
-     *     (`ssh_audit.py:903-906`) : une suppression d'un identifiant qui
-     *     n'existe plus se dit « reussie ». *Contrairement a `delete_rule` de
-     *     wazuh, qui rend `deleted > 0` — deux routes du meme depot, deux
-     *     conventions opposees.*
+     *   - ~~`DELETE` rend `success: True` SANS regarder `rowcount` : une
+     *     suppression d'un identifiant qui n'existe plus se dit « reussie ».~~
+     *     **CORRIGE PAR UNE AUTRE SESSION LE 2026-09-05 (`583ca86`)** : la route
+     *     rend desormais **404** avec `success: false`, `deleted: 0` et un
+     *     message explicite. *Le code ci-dessous n'a pas eu a changer — il teste
+     *     `r.ok` ET `corps.success` et affiche `corps.message`, donc il etait
+     *     deja juste pour les deux formes.*
+     *
+     *     ⚠ ET LE 404 A ETE PREFERE AU 200 DE `wazuh.delete_rule` POUR UNE
+     *     RAISON QUI N'EST PAS UN GOUT : `legacy/ssh-audit/js/main.js:775` ne
+     *     lit QUE `r.ok`. Un 200 porteur d'un refus lui aurait fait annoncer une
+     *     reussite. **S'aligner sur la convention d'une route VOISINE n'est
+     *     juste que si ses APPELANTS se comportent comme les miens** — ici ils
+     *     ne le font pas, et c'est l'appelant qui a tranche, pas la symetrie.
      *
      * Dans les deux cas, la seule chose que l'ecran peut honnêtement affirmer
      * est ce que la RELECTURE montre. C'est ce que disent les libelles.

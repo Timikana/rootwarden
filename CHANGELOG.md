@@ -100,8 +100,16 @@ Suspendre DESARME — y mettre une friction rendrait l'arret plus penible que l'
 Reactiver ARME. La suppression vise l'objet AFFICHE, jamais un identifiant repris d'un champ
 de saisie, et le panneau nomme l'intitule, la portee et la prochaine echeance.
 
+**⚠ RECTIFIE LE 2026-09-05 : la moitie `DELETE` de ce constat a ete reparee UNE HEURE apres
+ce commit**, par `583ca86` — la route rend desormais 404 avec `success: false` et un message.
+Mon code n'a pas eu a changer : il teste `r.ok` ET `corps.success`. **Et le 404 a ete prefere
+au 200 de `wazuh` parce que `legacy/ssh-audit/js/main.js:775` ne lit QUE `r.ok`** — j'avais
+ecrit « deux conventions opposees » en sous-entendant qu'une avait tort ; les deux ont raison,
+parce que leurs APPELANTS different. *S'aligner sur la convention d'une route voisine n'est
+juste que si ses appelants se comportent comme les miens.*
+
 **⚠ Ce que l'ecran ne peut PAS promettre.** `toggle` fait `SET enabled = NOT enabled` — une
-bascule AVEUGLE — et `DELETE` rend `success: True` sans regarder `rowcount`. Un ecran qui
+bascule AVEUGLE — et `DELETE` rendait `success: True` sans regarder `rowcount`. Un ecran qui
 predirait l'etat obtenu mentirait une fois sur deux des que deux personnes agissent. Les deux
 gestes RELISENT la liste, et les libelles disent que c'est la relecture qui fait foi.
 *`delete_rule` de wazuh, lui, rend `deleted > 0` : deux routes du meme depot, deux conventions
