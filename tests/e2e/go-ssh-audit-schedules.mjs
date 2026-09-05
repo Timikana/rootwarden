@@ -37,10 +37,23 @@
 import { BASE_URL, launchBrowser, newPage, login, sleep } from './helpers.mjs';
 
 /*
- * La portee qui ne resout RIEN. `scheduler.py` n'execute son `INNER JOIN
- * machine_tags` que si `target_value` est NON VIDE — sinon il retombe sur un
- * `SELECT ... FROM machines` sans filtre, c'est-a-dire tout le parc. Un tag
- * NOMME et sans machine resout donc zero cible, sans passer par aucun repli.
+ * La portee qui ne resout RIEN — et la raison a CHANGE le 2026-09-05, il faut
+ * donc la dater plutot que la recopier.
+ *
+ *   AVANT E-280   un `target_value` vide retombait sur un `SELECT ... FROM
+ *                 machines` sans filtre : la surete venait de ce que la valeur
+ *                 soit NON VIDE.
+ *   DEPUIS E-280  les deux chemins (`_run_scheduled_ssh_audit` et
+ *                 `_run_scheduled_scan`) portent un `else` qui REFUSE et
+ *                 journalise — `WHERE 1=0`, aucune machine.
+ *
+ * **La conclusion tient dans les deux mondes, mais pas pour la meme raison** :
+ * un tag NOMME qui ne porte AUCUNE machine donne un `INNER JOIN machine_tags`
+ * a zero ligne, quel que soit le comportement du repli.
+ *
+ * ⚠ Si vous concevez une prochaine cible « sure », ne reprenez pas l'ancienne
+ * raison : elle vous ferait vous proteger d'un danger qui n'existe plus tout en
+ * manquant celui qui existe.
  */
 const TAG_SANS_MACHINE_TYPE = 'tag';
 const TAG_SANS_MACHINE = 'rw-e2e-aucune-machine';
