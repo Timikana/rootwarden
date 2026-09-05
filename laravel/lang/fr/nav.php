@@ -20,6 +20,9 @@ return [
     'section_admin' => "ADMINISTRATION",
     'section_autre' => "AUTRE",
 
+    'cgu' => "Conditions d'utilisation",
+    'cafe' => "Offrir un cafe",
+    'cafe_titre' => "Soutenir le projet — buymeacoffee.com",
     'version' => "Version :numero",
     'version_inconnue' => "Version inconnue",
 

@@ -7,6 +7,14 @@
          mutante doit le porter (en-tete X-CSRF-TOKEN). --}}
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ $titre ?? config('app.name') }} · {{ config('app.name') }}</title>
+    {{-- FAVICON. Le portage n'en declarait AUCUN, et `public/favicon.ico`
+         faisait ZERO octet : le navigateur recevait un 200 et une image vide.
+         Un fichier vide servi en 200 est pire qu'un 404 — il ne fait chercher
+         nulle part. Les deux declarations reprennent celles du legacy
+         (`head.php:31-32`), `apple-touch-icon` comprise. --}}
+    <link rel="icon" type="image/png" sizes="32x32"
+          href="/img/favicon.png?v={{ @filemtime(public_path('img/favicon.png')) ?: '0' }}">
+    <link rel="apple-touch-icon" href="/img/favicon.png">
     <link rel="stylesheet" href="/css/rw.css?v={{ @filemtime(public_path('css/rw.css')) ?: '0' }}">
 </head>
 <body>
@@ -114,9 +122,26 @@
             « version inconnue » avant cela est le comportement correct.
         --}}
         <footer class="rw-pied" data-rw="pied-version">
-            {{ \App\Support\Version::numero() !== null
+            <span data-rw="pied-numero">{{ \App\Support\Version::numero() !== null
                 ? __('nav.version', ['numero' => \App\Support\Version::numero()])
-                : __('nav.version_inconnue') }}
+                : __('nav.version_inconnue') }}</span>
+
+            {{-- LES CONDITIONS D'UTILISATION ETAIENT INJOIGNABLES. La page existe
+                 (`cgu.blade.php`), la route existe (`GET /cgu`), et AUCUN lien n'y
+                 menait : zero occurrence dans ce gabarit et dans l'ecran de
+                 connexion. Une page d'engagement qui ne se rejoint pas equivaut a
+                 ne pas en avoir — elle n'existe que pour etre opposable, et elle
+                 ne l'est que si on peut y arriver.
+                 C'est le defaut SYMETRIQUE de celui corrige ce matin : la un lien
+                 vers une page absente, ici une page presente sans lien. --}}
+            <a class="rw-pied__lien" href="{{ route('cgu') }}"
+               data-rw="pied-cgu">{{ __('nav.cgu') }}</a>
+
+            {{-- Le legacy porte ce lien depuis toujours (`footer.php:20`). Le
+                 portage ne l'avait pas repris. --}}
+            <a class="rw-pied__lien" href="https://buymeacoffee.com/timikana"
+               target="_blank" rel="noopener" data-rw="pied-cafe"
+               title="{{ __('nav.cafe_titre') }}">&#9749; {{ __('nav.cafe') }}</a>
         </footer>
     </div>
 

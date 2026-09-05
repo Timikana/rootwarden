@@ -69,9 +69,49 @@ class ExigePermission
      */
     private function journaliseLeRefus(int $idCompte, string $permission): void
     {
+        /*
+         * ⚠ CETTE ECRITURE ETAIT NUE, ET C'ETAIT UN CHOIX — REVERSE SUR
+         * ARBITRAGE DE L'EXPLOITANT LE 2026-09-05.
+         *
+         * Elle inserait en SQL brut, sans `prev_hash` : chaque refus de
+         * permission posait une ligne HORS chaine. Mesure du 05/09 : c'etait la
+         * source la plus FREQUENTE — 17 lignes/heure sous la charge du banc, et
+         * une ligne non chainee ne se rattrape jamais.
+         *
+         * ══ L'ARGUMENT DU DOCBLOC RESTE VRAI, ET LE `catch` LE PORTE ═════════
+         *
+         * « Le refus est une propriete de securite ; sa trace est une propriete
+         * d'audit. Faire dependre la premiere de la seconde transformerait une
+         * base indisponible en porte ouverte. »
+         *
+         * Ce raisonnement n'est pas annule : il est SATISFAIT PAR LE `catch`.
+         * Le refus a deja eu lieu quand on arrive ici — cette methode ne decide
+         * rien, elle trace. Si la chaine est indisponible, on journalise
+         * l'echec et le refus TIENT.
+         */
+        /*
+         * ⚠ ET UNE GARDE QUI MANQUAIT AUX DEUX VERSIONS. `user_logs.user_id` est
+         * `NOT NULL` **et** porte une cle etrangere vers `users`
+         * (`user_logs_ibfk_1`). L'ancien code passait `$idCompte ?: null` : sur
+         * un refus ANONYME il tentait un `null` sur une colonne non nulle,
+         * l'insertion levait, et le `catch` l'avalait. La ligne etait perdue et
+         * personne ne le voyait.
+         *
+         * On ne tente plus une ecriture dont on SAIT qu'elle echouera : sans
+         * compte identifie, il n'y a pas d'auteur a inscrire, et le dire au
+         * journal applicatif vaut mieux qu'une exception silencieuse.
+         */
+        if (! $idCompte) {
+            Log::warning('refus de permission SANS compte identifie — non journalise en base', [
+                'permission' => $permission,
+            ]);
+
+            return;
+        }
+
         try {
-            DB::insert('INSERT INTO user_logs (user_id, action) VALUES (?, ?)',
-                [$idCompte ?: null, 'Permission refusee : ' . $permission]);
+            app(\App\Services\JournalAudit::class)
+                ->ajoute((int) $idCompte, 'Permission refusee : ' . $permission);
         } catch (\Throwable $e) {
             Log::warning('refus de permission non journalise', [
                 'permission' => $permission,
