@@ -156,7 +156,21 @@ class AppelantsDuBackendTest extends TestCase
             // simplement devenu invisible à l'analyseur.
             'journal-audit.js:73',        // routes Laravel
             'planification-cve.js:78',    // route Laravel
-            'planification-cve.js:180',   // routes Laravel
+            /*
+             * :180 -> :204 le 2026-09-06. DECALAGE DE LIGNE, pas site neuf :
+             * `894dde8` puis son suivi ont insere un bloc de commentaire dans
+             * `envoie()`. Meme fonction, meme verdict `delegue_sans_lecteur`,
+             * et les totaux de l'analyseur sont IDENTIQUES avant/apres
+             * (35 fichiers · 71 appels · 30/7/30/2/2/0).
+             *
+             * Site REEXAMINE a cette occasion, et le verdict de l'analyseur
+             * est CONSERVATEUR ici : il cherche `success` et ne le trouve pas,
+             * mais les quatre appelants lisent `r.ok` — un discriminant VALIDE,
+             * parce que le controleur porte un vrai statut sur chaque echec
+             * metier (404 introuvable, 400 champs refuses). « Sans lecteur »
+             * nomme l'absence d'UN lecteur, pas l'absence de lecture.
+             */
+            'planification-cve.js:204',   // routes Laravel
             'scan-cve.js:713',            // route Laravel
         ];
 
