@@ -20568,3 +20568,70 @@ l'intention qu'on avait, un état rapporté se lit contre ce qui est.*
 **Ce qui est corrigé** : le « 58 = 58 » figure dans le message de `feaaaa2` et a
 été transmis à deux sessions. **Le vrai chiffre est 63 = 63, et la parité tient** —
 la conclusion survit, la méthode non.
+
+
+## E-421 — le chantier n'a plus de LIGNE DE BASE VALIDE, et le lot du soir ne la remplace pas
+
+**Mesuré le 2026-09-05 22:15, à la fermeture de la fenêtre de la session 7.**
+
+    72 executions valides   PASS=1479   FAIL=11
+    66 conformes · 6 ECHEC · 0 FENETRE SALE · 0 GARDE INDISPO
+    ⚠ TOUTES `laravel` — la moitie LEGACY n'a JAMAIS ete atteinte
+    attendu : 165 (84 portage + 81 legacy)
+
+**Ce n'est pas une ligne de base : c'est 44 pour cent d'un lot, sur une cible sur
+deux.** *Inscrit ici pour qu'on ne le lise pas comme un remplacement — un compte
+partiel qui prend la place d'un compte complet est la forme la plus courante du
+« nombre sans son objet ».*
+
+### ⚠ ET LA CONSEQUENCE EST QU'IL N'Y EN A PLUS AUCUNE
+
+    derniere ligne de base COMPLETE   2026-09-03 11:45 · 167 · 2613 · 55
+    ce que sa mesureuse en dit        « elle ne mesure plus rien »
+
+Son argument, à l'ouverture de la fenêtre : **51 fichiers legacy sortis du service
+puis trois modules revenus, une douzaine de changements de code, 33 suites
+d'outillage neuves, et le backend Python redémarré à 20:31:23.**
+
+> **Le plan porte donc une ligne de base que sa propre autrice déclare périmée, et
+> aucune mesure complète n'a eu lieu depuis.** *Ce n'est pas un défaut de mesure :
+> c'est un état à connaître avant toute décision qui s'appuierait sur « le lot est
+> vert ».*
+
+### La frontière, vérifiée indépendamment et à la milliseconde
+
+    laravel/public/favicon.ico       2026-09-05 22:09:51.918
+    laravel/public/img/favicon.png   2026-09-05 22:09:51.914
+    puis 22:10:28-29                 layouts/portail, lang/{fr,en}/nav.php
+
+**Son « premier octet à 22:09:51 » est exact**, et la suite immédiatement suivante
+a rendu `FENETRE SALE` **en nommant le fichier**. *Le 73e résultat est jeté, les 72
+précédents portent chacun leur propre verdict de fenêtre, tous propres.*
+
+**C'est la contre-épreuve qui manquait à E-372** : le même garde avait crié à vide
+le 2026-09-03 sur trois fichiers vieux de plusieurs jours ; ici il crie juste, à la
+seconde, sur un fichier écrit soixante secondes plus tôt. **Un instrument qui rend
+le positif ET le négatif au bon moment est éprouvé ; celui du 03/09 ne l'était que
+d'un côté.**
+
+### Les six échecs, attribués par leur mesureuse — aucun n'est une régression
+
+    1        un 403 VOULU par les gardes activees a 20:31
+    2        un bouton retire volontairement (E-415)
+    3 et 4   consequences de la reparation des renvois de 18:03
+    5        une cible mouvante — trois modules revenus a 18:39
+    6        ⚠ une assertion TROP SPECIFIEE, de sa main
+
+**Le sixième mérite d'être gardé** : elle exige le mot « irréversible » là où le
+panneau dit « détruit la clé privée en cours » — *le libellé du produit est PLUS
+FORT que ce que le test exigeait, et le test a rougi quand même.*
+
+> **Une assertion qui nomme les MOTS attendus plutôt que la PROPRIÉTÉ attendue
+> échoue sur une amélioration.**
+
+### Note d'attribution
+
+Elle m'attribue trois commits `docs/` pendant sa fenêtre. **Un seul est de moi**
+(`4745ff9`, E-420) ; `d4e14d9` est de la QA, `c5a4861` de la DSI. *Sa conclusion ne
+bouge pas — zéro fichier hors `docs/` commité pendant la fenêtre, vérifié — mais
+« le Lead a commité trois fois pendant le gel » deviendrait faux au relais.*
