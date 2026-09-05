@@ -176,6 +176,30 @@
     }
 
     async function envoie(methode, url, corps) {
+        /*
+         * ⚠ LE VERBE EST EXIGE, PAS DEFAUTE. C'est une correction de ma
+         * propre correction, et la raison vaut d'etre lue.
+         *
+         * Sans defaut, une omission faisait retomber `fetch` sur GET — et
+         * `GET /scan-cve/planifications` EXISTE : 200 + la liste, silencieux,
+         * rien de cree. J'ai d'abord pose `|| 'POST'` pour rendre la
+         * defaillance BRUYANTE au lieu de silencieuse.
+         *
+         * ⛔ Mais sur CE module, une creation qui ABOUTIT planifie un scan
+         * CVE REEL. Le defaut deplacait le mode de defaillance au lieu de le
+         * supprimer : d'un 200 inerte vers un effet de bord.
+         *
+         * Exiger le verbe est bruyant ET inerte : le parametre manquant
+         * devient INEXPRIMABLE au lieu d'etre reinterprete. Aucun des quatre
+         * appelants n'en patit — ils passent tous un verbe explicite.
+         *
+         * (`notifications.js` et `comptes.js` gardent leur defaut : aucun de
+         *  leurs gestes n'a ce profil d'effet de bord.)
+         */
+        if (!methode) {
+            throw new Error("envoie() : verbe HTTP requis — une omission "
+                + "retomberait sur GET, que cette route sert.");
+        }
         try {
             const rep = await fetch(url, {
                 /*
@@ -197,7 +221,7 @@
                  * il se subit. Ses deux voisins portent deja le leur
                  * (`notifications.js:45`, `comptes.js:47`).
                  */
-                method: methode || 'POST',
+                method: methode,
                 credentials: 'same-origin',
                 headers: corps ? { 'Content-Type': 'application/json' } : {},
                 body: corps ? JSON.stringify(corps) : undefined,
