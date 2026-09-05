@@ -10007,3 +10007,65 @@ peut écrire `users` sans savoir *déverrouiller* un compte.
 périmé** : le flux est porté. **La consigne doit devenir : « ne l'ARCHIVE pas ».**
 *Une consigne qui nomme le bon objet et le mauvais verbe est plus dangereuse qu'une
 consigne absente, parce qu'elle se lit comme à jour.*
+
+### E-408 — RECTIFICATION (10:40) : ce n'est pas une course, c'est un ORDRE
+
+**J'avais écrit : « celle qui scelle la première fixe la chaîne, l'autre la déclarera
+rompue » — comme si les deux issues étaient symétriques. Elles ne le sont pas.**
+*Correction apportée par 0b, vérifiée clause par clause avant inscription.*
+
+    `JournalAudit::parcourt`  :187  orpheline      -> `continue`, la tete N'AVANCE PAS
+                              :216  DEJA SCELLEE   -> `$tete = $l->self_hash`, elle REPREND
+    `audit_seal.php`          :82   orpheline      -> `$lastHash = $computed`, elle AVANCE
+
+**Les deux chemins, et un seul marche :**
+
+    LE LEGACY SCELLE D'ABORD    sa tete avance a chaque orpheline -> les 1484 sont
+                                correctement chainees -> le parcours du portage les
+                                traverse comme scellees et reprend la tete a :216
+                                => CHAINE VALIDE, et le portage sait la verifier
+
+    LE PORTAGE SCELLE D'ABORD   les 1484 recoivent TOUTES le meme `$tete` en `prev_hash`
+                                -> rupture des la deuxieme
+                                -> `:280` `whereNull('self_hash')` interdit la reprise
+                                => CHAINE CASSEE **ET** OUTIL BLOQUE, irreversible
+
+> **Garder `audit_seal.php` ne préserve pas « la possibilité de comparer ». Il préserve le
+> SEUL OUTIL CAPABLE DE REFERMER LE TROU**, tant que `JournalAudit::scelle` n'est pas
+> corrigé.
+
+**L'ordre est donc contraint, et il n'a pas d'alternative** : *le legacy scelle les 1484,
+PUIS on corrige le portage.* **Jamais l'inverse — l'inverse ne se défait pas.**
+
+### ⚠ Et mon erreur d'adressage, qui est la plus coûteuse des deux
+
+**J'ai envoyé des garde-fous d'archivage à une session EN LECTURE SEULE**, qui l'avait dit
+à chaque tour. *Elle rend une population et un verdict ; quelqu'un d'autre déplace.*
+
+> **Un garde-fou adressé à qui ne tient pas le geste protège exactement personne, et il
+> donne à son auteur le sentiment d'avoir couvert le risque.** *C'est la forme
+> « dédouanement » du défaut d'adressage : rien ne contredit un avertissement bien reçu
+> par la mauvaise personne.*
+
+**Le `git mv` n'est tenu par aucune session identifiée à cette heure. C'est la vraie
+lacune de ce tour**, et elle passait inaperçue derrière deux verdicts justes.
+
+### Une observation de 0b que je fais mienne
+
+**Trois fois en deux jours, elle a failli accuser du code qui avait raison — et les trois
+fois, l'auteur avait ÉCRIT la raison dans le fichier.**
+
+> *Quand un choix surprenant porte un commentaire qui l'explique, le commentaire est plus
+> souvent juste que l'intuition qui s'en étonne.*
+
+**⚠ Avec sa borne, qui vaut ici** : le commentaire de `JournalAudit:180-182` ratifie le
+non-avancement de la tête, **et il a tort** — c'est précisément le défaut. *La règle vaut
+comme présomption, pas comme dispense de mesurer.*
+
+### Retrait d'une aggravation que 0b n'a PAS transmise
+
+*Elle allait signaler qu'un utilisateur reçoit « succès » puis attend un courriel qui
+n'arrive jamais.* **C'est faux** : `ReinitialisationController:176-185` porte un
+commentaire « PRÉPARÉ ET NON ENVOYÉ », et le libellé rendu dit *« un lien de
+réinitialisation lui a été PRÉPARÉ »* — **vrai dans les deux régimes, choisi pour
+l'être.** *Elle l'a mesuré avant de me l'envoyer : l'aggravation n'a jamais voyagé.*
