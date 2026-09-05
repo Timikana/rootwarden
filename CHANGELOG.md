@@ -82,6 +82,43 @@ commitee par `feaaaa2` (fichier partage, elle etait dans l'arbre) : elle est int
 
 ---
 
+## [1.51.2] - 2026-09-05
+
+### Correctif - changer son adresse ou sa cle repoussait l'echeance de son mot de passe
+
+**Mesure** : `SHOW COLUMNS FROM users` rend, pour `password_updated_at`,
+`extra=[DEFAULT_GENERATED on update CURRENT_TIMESTAMP]`. **Toute modification
+reelle de la ligne `users` deplace donc cette date** — et l'expiration du mot de
+passe se calcule depuis elle.
+
+Les deux gestes de libre-service livres en v1.51.1 ecrivent sur `users`. Sans
+correctif, **changer son adresse ou poser sa cle SSH repoussait l'echeance de son
+propre mot de passe**, en silence et sans rapport avec le geste demande.
+
+> **`MotDePasse:26-33` decrivait deja ce defaut, sur un autre declencheur** — *un
+> echec de connexion suivi d'un succes remet `failed_attempts` a 0, la ligne
+> change, et le compteur repart de zero* — et le declarait **LATENT** parce que
+> `PASSWORD_EXPIRY_DAYS` n'est pas definie (verifie : absente du conteneur).
+> **On ne s'appuie pas sur une option desactivee.**
+
+**Correctif** : `'password_updated_at' => DB::raw('password_updated_at')` dans les
+deux ecritures. **Pose dans le SERVICE et non dans l'appelant**, pour que les deux
+chemins en beneficient — la route d'administration `role:3` comme le libre-service.
+
+**Eprouve dans les DEUX sens**, sur une table TEMPORAIRE (par connexion, jetable) :
+
+    sans parade   -> date DEPLACEE
+    avec parade   -> date PRESERVEE
+
+*Non touche : `anonymise()` ecrit aussi sur `users`, et n'est pas corrige — le
+compte est desactive et son mot de passe rendu inutilisable dans la meme
+transaction, donc l'echeance n'a plus d'objet.*
+
+**Origine** : la propriete m'a ete donnee par une autre session, qui l'avait payee
+sur son propre lot par une date fausse de huit mois. *Elle ne l'a pas affirmee de
+mes gestes — elle m'a donne la propriete et m'a laisse la mesurer.* C'est ce qui a
+permis de la verifier au lieu de la croire.
+
 ## [1.51.1] - 2026-09-05
 
 ### Portage - DOSSIER-30 : les trois gestes de libre-service de `/profil`

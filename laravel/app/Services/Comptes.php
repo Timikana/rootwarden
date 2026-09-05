@@ -313,6 +313,11 @@ class Comptes
         DB::table('users')->where('id', $id)->update([
             'ssh_key' => $cle === '' ? null : $cle,
             'ssh_key_updated_at' => now(),
+            // Meme raison qu'a `changeCourriel` : sans cette ligne, poser sa cle
+            // repousserait l'echeance de son mot de passe. La correction est ICI
+            // et non dans l'appelant, pour que les DEUX chemins en beneficient —
+            // la route d'administration comme le libre-service.
+            'password_updated_at' => DB::raw('password_updated_at'),
         ]);
 
         return null;
@@ -355,7 +360,27 @@ class Comptes
             return 'profil.err_courriel_pris';
         }
 
-        DB::table('users')->where('id', $id)->update(['email' => $courriel]);
+        /*
+         * ⚠ `password_updated_at` PORTE `on update CURRENT_TIMESTAMP` (mesure :
+         * `SHOW COLUMNS` rend `DEFAULT_GENERATED on update CURRENT_TIMESTAMP`).
+         * Toute modification REELLE de la ligne `users` la deplace donc — et
+         * l'expiration du mot de passe se calcule depuis elle.
+         *
+         * Sans la ligne ci-dessous, changer son adresse REPOUSSERAIT l'echeance
+         * de son propre mot de passe, en silence et sans rapport avec le geste.
+         * `MotDePasse:26-33` decrivait deja ce defaut sur un autre declencheur —
+         * un echec de connexion suivi d'un succes — et le disait LATENT parce que
+         * `PASSWORD_EXPIRY_DAYS` n'est pas definie. **On ne s'appuie pas sur une
+         * option desactivee : un geste de libre-service ne doit pas dependre
+         * d'elle pour etre correct.**
+         *
+         * Eprouve dans les DEUX sens sur une table temporaire : sans la ligne, la
+         * date est DEPLACEE ; avec elle, PRESERVEE.
+         */
+        DB::table('users')->where('id', $id)->update([
+            'email' => $courriel,
+            'password_updated_at' => DB::raw('password_updated_at'),
+        ]);
 
         return null;
     }
