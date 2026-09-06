@@ -70,14 +70,25 @@
     # ⚠ NI HSTS NI CSP ICI, ET C'EST DELIBERE — une absence sans raison ecrite
     # est indiscernable d'un oubli.
     #
-    # HSTS : l'en-tete est lie a l'HOTE et IGNORE LE PORT (RFC 6797). Le legacy en
-    # envoie un (`max-age=31536000; includeSubDomains; preload`), et c'est pour
-    # cela qu'un navigateur ayant ouvert `https://localhost:8443` force ensuite
-    # `https://` sur `http://localhost:8444`. Le poser ici serait une porte a sens
-    # unique mise en cache UN AN, sur un certificat auto-signe. Elle se pose apres
-    # que le TLS est verifie au reseau, et sur decision — pas dans le meme geste.
-    # (Borne : les navigateurs n'appliquent pas HSTS a une adresse IP. Cela mord
-    # sur `localhost`, donc sur les postes de developpement, pas en production.)
+    # HSTS : pas d'en-tete ici. Porte a SENS UNIQUE mise en cache un an, sur un
+    # certificat auto-signe : cela se pose apres que le TLS est verifie au reseau,
+    # et sur decision — pas dans le meme geste.
+    #
+    # ⚠ CORRECTION DU 2026-09-06, ET ELLE VA CONTRE CE QUE J'AVAIS ECRIT ICI.
+    # J'avais affirme qu'un navigateur ayant ouvert `https://localhost:8443` force
+    # ensuite `https://` sur `http://localhost:8444`, rendant le portage
+    # inatteignable. **Mesure sur profil Chrome PERSISTANT, deux processus : aucun
+    # surclassement. `http://localhost:8444/connexion` rend 200, servi en clair.**
+    #
+    # La raison est dans la meme RFC que j'avais citee : **RFC 6797 §8.1 — un agent
+    # NE DOIT PAS traiter l'en-tete STS si la connexion presente des erreurs de
+    # certificat.** Le legacy sert un auto-signe : l'en-tete part, il n'est jamais
+    # enregistre. *J'avais cite la RFC pour la partie qui servait l'alarme et pas
+    # pour celle qui la desamorce.*
+    #
+    # Ce qui reste vrai : HSTS est lie a l'HOTE et ignore le PORT, et les
+    # navigateurs ne l'appliquent pas a une adresse IP litterale. La reserve ne
+    # vaut donc que pour qui a AJOUTE ce certificat a son magasin de confiance.
     #
     # CSP : le legacy en porte une, le portage n'en a aucune — ecart reel, signale.
     # `/connexion` sert du script inline ; une politique mal calibree casserait la
