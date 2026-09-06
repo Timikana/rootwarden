@@ -12772,3 +12772,69 @@ l'a reproduite avec `git` seul. C'est le bon réflexe, et il vient de `a809e6d` 
 
 **Deux instruments qui divergent valent mieux qu'un instrument prudent.** *C'est la seule
 méthode de la journée qui n'exige ni vigilance ni relecteur.*
+
+---
+
+## E-460
+
+### J'ai autorisé un portage sur un argument que je n'avais pas mesuré — et il était faux
+
+**J'ai donné le mot pour `/wazuh/detect` en reprenant la formule de la session qui me la
+proposait : *« une lecture qui répond à une question »*. Elle ne l'est pas.**
+
+    corps de la route   62 lignes
+      _upsert_agent     1        <- l'ECRITURE est dans le HELPER
+      INSERT · UPDATE   0        <- une sonde ancree sur la route rend « lecture pure »
+      execute_as_root   4        <- grep, cat, releves d'etat : aucune commande modifiante
+    TEMOIN /wazuh/install         _upsert_agent 0   -> le discriminant separe
+
+**Elle LIT la machine et ÉCRIT notre table d'inventaire.** *Aucune écriture sur la machine,
+donc portable au regard du discriminant — mais « lecture pure » était faux, et c'est sur ce mot
+que j'ai autorisé.*
+
+> **Le docstring disait vrai et la sonde disait faux.** *Elle était ancrée correctement et
+> cherchait les bons motifs — sauf celui-là.*
+
+**RÈGLE** : *un docstring qu'on contredit se revérifie contre le motif qu'il NOMME, pas contre
+ceux qu'on avait prévus.* **Un document qui décrit une écriture nomme le mécanisme de cette
+écriture ; c'est ce nom-là qu'il faut chercher.**
+
+### ⛔ Et le vrai obstacle, que ni la session ni moi n'avions vu
+
+    laravel/public/js/wazuh.js   ECRITURES_PERMISES = liste FERMEE
+                                 `ecris()` sur toute autre cible
+                                   -> { ok: false, interdit: true }
+                                 fail-closed ET BRUYANT
+
+**Et son commentaire nomme `detect` explicitement :**
+
+> *« Les six gestes SSH du module ne sont pas seulement absents du code : ils sont
+> INEXPRIMABLES par ce helper. Ajouter `/wazuh/install` demanderait d'ajouter une ligne à la
+> liste — un geste visible en relecture, là où un `fetch` de plus se serait fondu dans le
+> fichier. C'est la différence entre une règle qu'on applique et une règle qu'on doit se
+> rappeler. »*
+
+**Le dispositif a été écrit pour rendre cet ajout DÉLIBÉRÉ. L'ouvrir sur ma transmission serait
+exactement ce contre quoi il a été conçu** — *et il l'a été après qu'une injection ait été
+corrigée sur un module voisin, où la parade retenue fut une interface à liste fermée.*
+
+**L'exploitant a répondu directement : « n'y touche pas ». La liste reste fermée.**
+
+### UNE QUATRIÈME CATÉGORIE DE CAPACITÉ
+
+    portee · sous arbitrage · orpheline
+    + PORTABLE MAIS DERRIERE UNE GARDE DELIBEREE
+
+> **Une capacité peut être portable par sa NATURE et bloquée par son DISPOSITIF. Le coût n'est
+> alors pas le geste : c'est l'OUVERTURE DE LA GARDE.**
+
+**Aucun appariement ne pouvait la produire** : *on mesurait ce qui est appelé et ce qui ne l'est
+pas — jamais CE QUI EMPÊCHE D'APPELER.* **Question ajoutée aux relevés restants : existe-t-il
+une garde qui rend la cible inexprimable, et pourquoi a-t-elle été posée ?**
+
+### ⚠ Et mon propre instrument a raté en vérifiant
+
+*Mon extraction de `ECRITURES_PERMISES` a rendu trois clés — `config`, `methode`, `chemin` —
+là où la liste en porte quatre. Mon motif a attrapé les accolades d'un objet imbriqué.*
+**J'ai mesuré pour confirmer un refus, et mon instrument s'est trompé dans le sens qui
+MINIMISE la garde.** *Le compte juste vient d'une LECTURE, pas d'un motif.*
