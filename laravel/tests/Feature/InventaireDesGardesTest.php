@@ -172,10 +172,18 @@ class InventaireDesGardesTest extends TestCase
  *       Trois protections REELLES dans le controleur — identifiant de
  *       session, RESSAISIE du nom du compte, refus au dernier
  *       superadministrateur.
- *       ⚠ Aucune RE-AUTHENTIFICATION : le nom a retaper est AFFICHE sur la
- *       page de profil, donc la friction protege du geste accidentel et non
- *       d'une session compromise. `POST profil/step-up` existe et n'est pas
- *       exige. *Portee du controle ecrite plutot que supposee plus large.*
+ *       ⚠ RE-AUTHENTIFICATION EXIGEE depuis le 2026-09-06 (E-449, `f94c947`)
+ *       — et cette route reste dans CETTE liste, parce que la garde vit dans
+ *       le CONTROLEUR et non sur la route. `TableDesGardes` gele les gardes de
+ *       ROUTE ; l'y inscrire dirait qu'un intergiciel la porte, c'est-a-dire
+ *       une chose fausse dans le fichier meme qui existe pour dire le vrai.
+ *       *La garde est attestee par `EffacementLibreServiceTest` (C1/C2), pas
+ *       par ce releve.*
+ *       LES DEUX CONTROLES NE PROTEGENT PAS DE LA MEME CHOSE : le nom a
+ *       retaper est AFFICHE sur la page, donc il protege du geste ACCIDENTEL ;
+ *       le code TOTP protege d'une session VOLEE. `eff_code_aide` le dit a
+ *       l'ecran. *Deux controles ne font pas deux protections quand leurs
+ *       objets different.*
  *       CAPACITE NEUVE, non portee : `legacy/profile.php` n'offre que
  *       l'export, alors que `legacy/lang/fr/terms.php:78` promet le droit
  *       a l'effacement. Le legacy annoncait ce droit sans l'implementer.
