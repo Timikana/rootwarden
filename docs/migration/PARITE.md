@@ -21671,6 +21671,28 @@ eux.** *J'avais eu raison d'annoncer laquelle des deux valeurs était la moins �
 laquelle : c'était la relation, que je n'avais pas pensée comme une mesure.* Formulation de la session 7,
 sur ses propres données.
 
+### ⟶ LE MÉCANISME, QUATRE INSTANCES EN UNE JOURNÉE : **une valeur lue sans sa DATE**
+
+Cet écart en est la première forme. Le 2026-09-06 en a produit trois autres, sur des objets sans rapport,
+et c'est le même mécanisme à chaque fois.
+
+| # | ce qui a été lu | le verdict faux qu'il a produit |
+|---|---|---|
+| 1 | des suites nommant des chemins `adm/` **archivés depuis** | un `FAIL` qui accuse l'authentification |
+| 2 | `REF_LEGACY[go-socle-auth]=13`, posé **avant** l'archivage | *« soit ma prédiction est fausse, soit le 13 l'est »* — les deux étaient justes |
+| 3 | `8444` dans 124 fichiers, **avant** l'échange des ports | le port désignait le portage ; il désigne le legacy |
+| 4 | les défauts du compose, lus **après** un échange déjà commité | un travail fait signalé comme restant à faire (session 8) |
+
+> **Un relevé qui ne DATE pas ce qu'il lit rend des faits justes et des verdicts faux.** *Formulation de la
+> session 8, sur sa propre erreur.* **Aucune des quatre lectures n'était fausse** — chacune décrivait
+> exactement l'état d'un monde, et c'est la conclusion tirée qui traversait une frontière temporelle sans
+> le dire.
+
+**Et les quatre échouent en silence** : rien dans un nombre, un chemin ou une valeur par défaut ne porte sa
+date. *C'est pourquoi les gardes de cette manœuvre contrôlent un ÉTAT — `/up` rend 200 sur le portage, 404
+sur le legacy — et jamais une valeur.* **Un état se mesure au moment où l'on s'en sert ; une valeur ne dit
+jamais de quand elle parle.**
+
 ### Ce que ça dit du chantier, et qui dépasse cette suite
 
 **Le legacy est démonté pendant que les suites continuent de le nommer.** Chaque archivage transforme
