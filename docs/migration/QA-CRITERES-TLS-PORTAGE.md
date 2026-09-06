@@ -88,6 +88,102 @@ dégrade sans que la barre d'adresse le dise.*
 
 ---
 
+# ANNEXE HSTS — trois versions en une matinée, et seule la troisième est mesurée
+
+**Chronologie assumée, parce que la forme de l'erreur vaut plus que l'erreur.**
+
+    v1  ALARME       « le portage est deja inatteignable pour qui a ouvert le legacy »
+    v2  RETRACTATION « mesure au navigateur : aucun surclassement »
+    v3  CE QUI SUIT  la mesure de v2 N'AVAIT AUCUNE VALEUR PROBANTE
+
+## ⛔ v2 était sans valeur : l'instrument est AVEUGLE, témoin positif à l'appui
+
+Le gTLD **`.dev` est préchargé** dans la liste HSTS de Chrome : il doit être surclassé sans
+aucun réseau. Mesuré, dans les **deux** modes :
+
+    http://rootwarden.dev:8444   SANS --ignore-certificate-errors  -> code=200, NON surclasse
+    http://rootwarden.dev:8444   AVEC le drapeau                    -> code=200, NON surclasse
+
+**Ce navigateur ne surclasse rien, même là où la spécification l'exige.** Donc « aucun
+surclassement sur `localhost` » ne disait rien. *« Aucun surclassement » et « mon instrument
+ne sait pas voir un surclassement » sont la MÊME sortie* — la règle que je porte depuis des
+jours, et que j'ai enfreinte en la connaissant.
+
+⚠ **Et la reproduction n'a rien attrapé** : j'avais refait la mesure de `c1` indépendamment,
+et j'ai obtenu le même résultat **avec le même angle mort**. *Reproduire une mesure avec le
+même instrument ne la valide pas ; ça la répète.*
+
+## ✅ CE QUI EST ÉTABLI — par le MAGASIN, pas par le comportement
+
+Lecture directe de `<profil>/Default/TransportSecurity`, trois profils :
+
+    A  visite https://localhost:8443/auth/login.php        1 entree
+    B  visite https://rootwarden.test:8443/…  (hors localhost)  1 entree
+    C  CONTRE-EPREUVE : n'a visite QUE about:blank         1 entree
+
+    la MEME dans les trois :  host = 8/RrMmQlCD2Gsp14wUCE1P8r7B2C5+yE0+g79IPyRsc=
+                              expiry - observed = 31536000  (exactement 1 an)
+
+⚠ **Cette entrée ressemblait trait pour trait à celle du legacy** — `force-https`,
+`include_subdomains`, et un `max-age` d'un an **identique au sien**. *Tout concordait.*
+
+**Elle est `accounts.google.com`**, semée par Chrome à la création du profil. Empreinte
+calculée (SHA-256 du nom en forme DNS, base64) et comparée :
+
+    accounts.google.com   8/RrMmQlCD2Gsp14wUCE1P8r7B2C5+yE0+g79IPyRsc=   <<< CORRESPOND
+    localhost             +5SucHeyam84+YKFvzbLSOOu8EIOl0hrqv6OPw5r2/Q=   ABSENT du magasin
+    rootwarden.test       2shoigkPzIdaMDJxfT3Fx/R7AqeWzXKMWhtEqWj5WSM=   ABSENT du magasin
+
+**Le magasin est vivant et non vide** — l'entrée semée le prouve — **et `localhost` n'y est
+pas.** L'absence constatée n'est donc pas celle d'un instrument muet : c'est une absence
+mesurée, avec son témoin positif.
+
+> *La coïncidence du `max-age` à la seconde près est ce qui rend ce faux témoin dangereux :
+> 31536000 est une durée d'un an, la valeur la plus banale qui soit. Deux sources sans rapport
+> produisaient le même chiffre.*
+
+## ⛔ CE QUI N'EST PAS ÉTABLI : LA CAUSE
+
+**RFC 6797 §8.1** — un agent ne doit pas traiter l'en-tête si la connexion présente des
+erreurs de certificat — reste **plausible et non isolée**. Le legacy sert bien un auto-signé
+(`subject == issuer`, `CN=localhost`, vérifié). Mais `localhost` est aussi un cas spécial, et
+rien dans mes mesures ne départage les deux.
+
+## ⚠ CONSÉQUENCE POUR L'ATTESTATION — une exculpation qui EXPIRE
+
+**Si la cause est le certificat, alors installer un certificat APPROUVÉ fait revenir le
+problème en entier** — et c'est la trajectoire prévue de ce portail.
+
+**Donc ceci n'est pas un acquis durable, et la borne doit dire quand elle expire :**
+
+> « Aucun état HSTS n'a été enregistré pour ces hôtes **tant que le certificat n'est pas
+> approuvé** — magasin inspecté, témoin positif présent, cause non isolée. »
+
+*Une exculpation sans date d'expiration se relit comme une garantie.*
+
+## CE QUI N'A JAMAIS BOUGÉ
+
+    ✅ la redirection HTTP->HTTPS du LEGACY est cassee   (curl ET navigateur)
+    ✅ le vhost du portage ne la reproduit pas — port derive de la configuration
+    ✅ T2 tient : le code FINAL, jamais le premier. Fonde sur le defaut du legacy,
+       jamais sur le HSTS.
+
+## ⚠ LA LEÇON DE FORME, ET ELLE EST LA PLUS TRANSMISSIBLE
+
+**Trois versions en deux heures : alarme, rétractation, rétractation de la cause.**
+
+- La **v1** a été attrapée parce qu'elle **alarmait** — on relit ce qui accuse.
+- La **v2** a été **ratifiée par moi**, parce qu'elle arrivait **en correction**. *Une
+  correction se relit moins qu'une accusation* : elle a l'air d'être déjà le produit d'une
+  vérification.
+- La **v3** est venue d'une seule question : **« qu'est-ce que mon instrument m'a jamais
+  montré de POSITIF ? »**
+
+*C'est la seule question qui ait marché, et elle ne demande aucune connaissance du sujet.*
+
+---
+
+# ANNEXE v1/v2 — conservée pour la trace
 # ANNEXE — ajoutée le 2026-09-06, puis ⛔ **RÉTRACTÉE le même jour**
 
 ## ⛔ CE QUE CETTE ANNEXE AFFIRMAIT, ET QUI EST FAUX
