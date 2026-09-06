@@ -73,7 +73,7 @@ titre.**
 
 ---
 
-## ② `fetch` CÔTÉ NODE NE PASSE PLUS — trois suites, cause connue
+## ② `fetch` CÔTÉ NODE NE PASSE PLUS — **UNE** suite, mesurée
 
 **Puppeteer ignore le certificat auto-signé** (les suites qui lancent un
 navigateur portent le drapeau). **Node ne l'ignore pas, et rien ne le lui
@@ -84,8 +84,22 @@ node fetch  https://localhost:8446/connexion   ->  DEPTH_ZERO_SELF_SIGNED_CERT
 node fetch  http://localhost:8444/connexion    ->  301, puis la même erreur
 ```
 
-*Trois suites du LOT font un `fetch` hors `page.evaluate` :
-`go-socle-passerelle`, `go-adm-etiquettes-notes`, `go-auth-mot-de-passe`.*
+⚠ **J'avais écrit « trois suites ». La mesure en rend UNE.** *Le titre de
+cette section disait « trois suites, cause connue » : c'était une exposition
+POTENTIELLE tirée d'une lecture de code, présentée comme un coût constaté.*
+
+```
+LOT 4, verdict complet du 2026-09-06 18:27:58 :
+  go-socle-passerelle       ECHEC                    <- fetch Node vers le PORTAIL
+  go-adm-etiquettes-notes   PASS=18 FAIL=0  conforme
+  go-auth-mot-de-passe      PASS=27 FAIL=0  conforme
+```
+
+**Les deux autres font bien un `fetch` côté Node, mais pas vers le portail** —
+le chemin qui échoue est propre à `go-socle-passerelle`. *Rectification due à la
+session 7, qui avait émis le « trois » et l'a mesuré ensuite.*
+
+> **Le coût de mon correctif TLS est d'UNE suite.**
 
 > **Ce n'est pas un coût, c'est une conséquence** *(formulation de la session
 > 7)* : **le portage servait l'authentification en clair depuis le début de la
@@ -149,3 +163,30 @@ votre production aujourd'hui — le défaut est dans la CONFIGURATION de prod, q
 le portage y soit servi ou non ; `tests/pw/` (qui n'existe pas, vérifié par la
 session 4f) ; et les sondes des autres sessions, je n'ai balayé que `scripts/`,
 `tests/`, `backend/`, `laravel/`, `legacy/` et mes propres dossiers.
+
+
+---
+
+## ⑤ LE LOT 4 A CONCLU — zéro régression du produit sur 85 exécutions
+
+```
+85 executions   PASS=1722   FAIL=7
+77 conformes · 6 ECHEC · 2 ECART · 0 FENETRE SALE · 0 GARDE INDISPO
+fin 2026-09-06 18:27:58 CEST
+fenetre PROPRE aux deux bouts : ecritureCode=false sur les trois cibles
+```
+
+**C'est la première fois que la moitié `laravel` est jouée en entier.**
+
+*Les six ÉCHEC : `go-socle-passerelle` (mon TLS) · `go-page-search` (objet
+revenu) · `go-page-documentation` · `go-page-wazuh` · `go-fail2ban-f1` (garde
+E-152 réarmée par un redémarrage) · plus un rouge neuf, qui était un défaut de
+SUITE et non de produit.* **Les deux ÉCART sont deux références périmées, toutes
+deux dues à des correctifs du matin.**
+
+> **L'échange des ports peut être demandé.**
+
+⚠ **Ce que je n'ai pas vérifié moi-même** : la classification des six ÉCHEC et
+des deux ÉCART. *Je relaie une mesure faite par la session 7, avec sa méthode et
+son horodatage ; je n'ai reproduit que la fermeture du lot (trois façons) et
+l'état des ports.*
