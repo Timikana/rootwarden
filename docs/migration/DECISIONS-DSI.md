@@ -12470,3 +12470,92 @@ sont des flux ou des sondes de vie.* **Le tri par table ne peut rien en dire, et
 laissées non classées plutôt que rangées au jugé.**
 
 **État du tri : 12 sur 22 classées, 10 non tranchées.**
+
+---
+
+## E-455
+
+### E-449 EST LIVRÉ ET ATTESTÉ — et le scellement a payé pour la première fois
+
+**`f94c947` satisfait les six critères scellés, plus un septième. Attestation `6b71084`. Suite
+entière : 393 tests · 1370 assertions · 0 échec, à 09:15:13.** *Aucun chiffre du harnais de
+l'auteure n'a été repris — tout a été remesuré par la certificatrice.*
+
+    C1  la garde MORD        sans marque : `anonymise()` appele 0 fois, redirection /profil
+    C2  aucun acces perdu    avec marque : appele 1 fois, bon identifiant, /connexion
+    C3  ordre intact         session -> confirmation -> dernier SA -> STEP-UP -> journal
+                             -> anonymisation. La garde neuve s'insere SANS en deplacer
+                             aucune.
+    C4  action NEUVE         `profil_effacement` ; `compte_anonymiser` ABSENT du controleur
+    C5  marqueurs RETOURNES  ils assertent desormais la presence, et l'ordre
+    C6  portee ECRITE        et AFFICHEE — `eff_code_aide`, FR et EN non vides
+    C7  le fichier revenu    ses exemples d'action inconnue remplaces par des noms qui
+                             NE PEUVENT PAS devenir des actions
+
+**Éprouvé par mutation, témoin de la copie intacte à 13/70 :**
+
+    N1  garde neutralisee (if (false))        1 rouge  -> C1
+    N2  action reutilisee `compte_anonymiser` 2 rouges -> C2, C4
+    N3  appel a valide() renomme              2 rouges -> C1, C2
+
+*N1 est la preuve que C1 mesure LA GARDE et non autre chose : sans elle, C1 pourrait être vert
+parce qu'une des trois protections antérieures refuse en amont.*
+
+### ⛔ CE QUI JUSTIFIE TOUT LE PROTOCOLE, ET C'EST UNE PREMIÈRE
+
+> **Le premier jet exigeait le code à CHAQUE FOIS, sans honorer aucune marque. C2 tel que
+> scellé aurait échoué — et l'implémentation a changé À CAUSE d'un critère écrit avant qu'une
+> ligne ne soit posée.**
+
+**Un critère écrit après lecture aurait été satisfait par ce premier jet** : *il refuse sans
+marque, donc C1 passe.* **C'est exactement le déni de service qui a l'air d'une sécurité, et
+seul un critère antérieur pouvait le voir.**
+
+### DÉCISION ① — le refus d'inscrire dans `TableDesGardes` est CONFIRMÉ
+
+**J'avais demandé « la garde inscrite dans `TableDesGardes` ». La certificatrice a refusé,
+délibérément, et sa raison est meilleure que ma consigne.**
+
+    en-tete du fichier : « LES GARDES ATTENDUES, ROUTE PAR ROUTE »
+
+**La garde vit dans le CONTRÔLEUR, comme ses trois sœurs.** *L'y inscrire dirait qu'un
+intergiciel la porte — une chose fausse, dans le fichier même qui existe pour dire le vrai.*
+
+> **La route reste « authentifiée, sans rôle », ce qui est EXACT. C'est la raison écrite à côté
+> qui porte le step-up.**
+
+**Et ça révèle un angle mort PAR CONSTRUCTION** : *un relevé de gardes de route ne peut pas
+exprimer une garde de contrôleur, et les quatre step-up du dépôt sont dans ce cas.* **Le
+correctif honnête n'est pas d'y forcer une ligne fausse : c'est que le relevé DISE ce qu'il ne
+couvre pas.**
+
+### DÉCISION ② — le harnais de navigateur devient une suite PERMANENTE, et bornée
+
+**Il vit dans le bac à sable de l'auteure et n'est pas dans le dépôt. Je le veux dedans, pour
+une raison mesurée cette nuit :**
+
+> **Un des deux défauts qu'elle a corrigés était INVISIBLE DANS LE CODE — les deux champs se
+> rendaient sur une seule ligne, vu À L'IMAGE.** *Aucune assertion, ni des siennes ni de celles
+> de la certificatrice, n'aurait rougi.*
+
+**« Mes verrous mesurent des propriétés de structure, pas ce que quelqu'un voit. »** *Une suite
+qui regarde est la seule qui attrape cette classe.*
+
+⛔ **DEUX BORNES, et elles ne sont pas négociables :**
+
+    1. la suite NE DOIT PAS pouvoir ABOUTIR l'effacement. Elle exerce le rendu, le
+       refus sur mauvais code, le refus sur mauvais nom — jamais le succes, qui
+       demanderait d'effacer un compte reel.
+    2. elle est ENROLEE dans une liste du runner, OU elle porte dans son en-tete
+       la raison de son exclusion.
+
+*La seconde borne vient de `go-ssh-audit-schedules`, trouvée cette nuit : une suite hors lot ne
+rougit jamais ET garde ses effets de bord intacts.* **Livrer une suite non enrôlée qui touche un
+geste destructeur serait répéter, en connaissance de cause, ce qu'on vient de corriger.**
+
+### Ce qui n'est PAS attesté, et qui est dit
+
+**Le geste complet au navigateur — nom + code valide → compte réellement effacé — n'est mesuré
+qu'au niveau du contrôleur, avec un dépôt doublé.** *Le faire pour de vrai exigerait d'effacer
+un compte réel.* **Et l'absence du même manque sur d'autres routes n'est pas attestée non
+plus.**
