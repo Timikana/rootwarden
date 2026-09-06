@@ -73,9 +73,23 @@ services:
     security_opt:
       - no-new-privileges:true
     ports:
+      # 8444 -> 80 : ne sert plus de contenu, redirige vers HTTPS. Conserve parce
+      # que `LARAVEL_URL` et 87 suites le visent — l'echange des ports est un
+      # geste SEPARE, il ne se fait pas dans le meme lot que le TLS.
       - "${LARAVEL_PORT:-8444}:80"
+      # ⚠ AJOUTE LE 2026-09-06 : le portage servait l'authentification EN CLAIR.
+      # Mesure : seul 8444->80 etait publie, `https://…:8444` rendait 000, et le
+      # formulaire postait sur `http://`. Mot de passe et code TOTP transitaient
+      # en clair, alors que le legacy qu'on remplace a du TLS depuis toujours.
+      # Le defaut doit rester EGAL a celui de l'entrypoint, qui construit la
+      # redirection HTTP -> HTTPS avec ce port.
+      - "${LARAVEL_HTTPS_PORT:-8446}:443"
     volumes:
       - ./laravel:/var/www/html
+      # Certificats : MEME volume que le service `php`, donc meme certificat pour
+      # les deux portails. Rien a generer — et si le repertoire est vide, c'est
+      # l'entrypoint qui produit un auto-signe, avec le nommage du legacy.
+      - ./certs:/var/www/certs
       # Le numéro de version a UNE seule source : legacy/version.txt, écrit par le
       # mécanisme de bump. Le portage le LIT, en lecture seule, et n'en tient pas de
       # copie — une seconde copie dériverait, et ce chiffre a déjà dérivé deux fois

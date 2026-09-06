@@ -59,4 +59,82 @@ php artisan view:cache --no-interaction >/dev/null 2>&1 || true
 chown -R www-data:www-data storage/framework/views 2>/dev/null || true
 
 
+# ── TLS ──────────────────────────────────────────────────────────────────────
+# ⚠ LE PORTAGE SERVAIT L'AUTHENTIFICATION EN CLAIR. Mesure du 2026-09-06 :
+# le conteneur ne publiait que 8444->80, `https://…:8444` rendait 000, et le
+# formulaire de connexion postait sur `http://`. Mot de passe et code TOTP
+# transitaient en clair. **Le legacy qu'on remplace, lui, a du TLS : ce n'est pas
+# un manque herite, c'est une regression introduite par la migration.**
+#
+# MEMES VARIABLES QUE LE LEGACY, DELIBEREMENT. `SSL_MODE`, `SSL_CERT_PATH`,
+# `SSL_KEY_PATH` et le repertoire `/var/www/certs` sont ceux de `php/entrypoint.sh`
+# et le repertoire est le MEME volume : un seul reglage gouverne les deux portails,
+# et le certificat genere par l'un est reutilise par l'autre. Deux conventions
+# auraient fini par diverger.
+SSL_MODE="${SSL_MODE:-auto}"
+SERVER_NAME="${SERVER_NAME:-localhost}"
+SERVER_ADMIN="${SERVER_ADMIN:-admin@localhost}"
+CERT_DIR="/var/www/certs"
+
+# ⚠ CE DEFAUT N'EST PAS UN CONFORT : SANS LUI, APACHE NE DEMARRE PAS.
+# Apache leve `AH00111` sur une variable inconnue et s'arrete. Une installation
+# dont le `srv-docker.env` n'aurait pas encore recu `LARAVEL_HTTPS_PORT` verrait
+# donc le portail entier tomber. Le defaut ici garantit la definition.
+# Il doit rester EGAL au defaut du compose (`${LARAVEL_HTTPS_PORT:-8446}`) : ce
+# port n'est pas celui qu'Apache ecoute (443), c'est celui que l'HOTE PUBLIE, et
+# il ne sert qu'a construire la redirection HTTP -> HTTPS.
+LARAVEL_HTTPS_PORT="${LARAVEL_HTTPS_PORT:-8446}"
+
+if [ "$SSL_MODE" = "disabled" ]; then
+    # Choix EXPLICITE, pour un deploiement derriere un frontal qui termine le TLS.
+    # On le journalise fort : c'est exactement l'etat qui vient d'etre corrige, et
+    # il ne doit jamais redevenir un defaut silencieux.
+    echo "[laravel] ⚠ SSL_MODE=disabled - l'application est servie EN CLAIR." >&2
+    echo "[laravel]   Legitime UNIQUEMENT derriere un frontal qui termine le TLS." >&2
+else
+    mkdir -p "$CERT_DIR"
+    if [ "$SSL_MODE" = "custom" ]; then
+        SSL_CERT="${SSL_CERT_PATH:-${CERT_DIR}/custom.crt}"
+        SSL_KEY="${SSL_KEY_PATH:-${CERT_DIR}/custom.pem}"
+        if [ ! -f "$SSL_CERT" ] || [ ! -f "$SSL_KEY" ]; then
+            # On ECHOUE plutot que de retomber en clair : un repli silencieux vers
+            # HTTP rendrait le defaut invisible au moment ou il compte.
+            echo "[laravel] ERREUR SSL_MODE=custom : certificat introuvable" >&2
+            echo "[laravel]   cert=${SSL_CERT}  cle=${SSL_KEY}" >&2
+            exit 1
+        fi
+    else
+        # auto : meme nommage que le legacy, donc meme fichier reutilise.
+        SSL_CERT="${CERT_DIR}/${SERVER_NAME}.crt"
+        SSL_KEY="${CERT_DIR}/${SERVER_NAME}.pem"
+        if [ ! -f "$SSL_CERT" ] || [ ! -f "$SSL_KEY" ]; then
+            echo "[laravel] certificat auto-signe absent, generation : ${SSL_CERT}"
+            openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+                -keyout "$SSL_KEY" -out "$SSL_CERT" \
+                -subj "${CERT_INFO:-/C=FR/ST=IDF/L=Paris/O=RootWarden/OU=IT/CN=${SERVER_NAME}}" \
+                2>/dev/null
+        else
+            echo "[laravel] certificat existant reutilise : ${SSL_CERT}"
+        fi
+    fi
+
+    # ⚠ LA LISTE D'envsubst EST EXHAUSTIVE ET C'EST OBLIGATOIRE. Sans liste,
+    # envsubst remplacerait AUSSI `${APACHE_LOG_DIR}` et `${APACHE_DOCUMENT_ROOT}`
+    # — qu'Apache resout lui-meme — par du VIDE, et le vhost deviendrait invalide.
+    export SERVER_NAME SERVER_ADMIN LARAVEL_HTTPS_PORT
+    export SSL_CERT_PATH="$SSL_CERT" SSL_KEY_PATH="$SSL_KEY"
+    envsubst '${SERVER_NAME} ${SERVER_ADMIN} ${SSL_CERT_PATH} ${SSL_KEY_PATH} ${LARAVEL_HTTPS_PORT}' \
+        < /etc/apache2/sites-available/apache-ssl.conf.tmpl \
+        > /etc/apache2/sites-available/000-default.conf
+
+    # Le vhost est ecrit : s'il est invalide, on veut le savoir MAINTENANT, avec le
+    # message d'Apache, plutot qu'un conteneur qui redemarre en boucle.
+    apache2ctl configtest || {
+        echo "[laravel] ERREUR : le vhost TLS genere est invalide (voir ci-dessus)" >&2
+        exit 1
+    }
+    echo "[laravel] TLS actif - cert=${SSL_CERT} redirection HTTP -> :${LARAVEL_HTTPS_PORT}"
+fi
+
+
 exec "$@"
