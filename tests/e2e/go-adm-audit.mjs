@@ -367,11 +367,36 @@ try {
             `${t.lignes} lignes`);
     });
 
-    await etape('les deux boutons d\'integrite', async () => {
+    await etape('les boutons d\'integrite', async () => {
         const v = await page.$(C.boutonVerifier);
         const s = await page.$(C.boutonSceller);
         verifie('le role 3 voit « Verifier l\'integrite »', !! v);
-        verifie('le role 3 voit « Sceller les orphelines »', !! s);
+
+        /*
+         * ══ LE SCELLEMENT A ETE RETIRE — E-415, 2026-09-05 ════════════════
+         *
+         * Cette suite exigeait la PRESENCE du bouton « Sceller les orphelines ».
+         * Il a ete retire par decision (`13bd471`) et remplace par une etiquette
+         * d'etat : le scellement retroactif detruisait la propriete meme que la
+         * chaine porte. **L'etat se DIT ; il ne se repare pas.**
+         *
+         * L'assertion est donc RETOURNEE cote portage : on exige l'ABSENCE du
+         * bouton ET la PRESENCE de l'etiquette qui le remplace. Une absence seule
+         * ne prouverait rien — un gabarit casse la rendrait aussi.
+         *
+         * Le legacy garde son bouton : il n'a pas ete touche.
+         */
+        if (CIBLE === 'laravel') {
+            const etat = await page.$('[data-rw="audit-scellement-etat"]');
+            verifie('le bouton de scellement a bien ete RETIRE (E-415)', ! s,
+                s ? 'le bouton est encore rendu : la decision E-415 a ete defaite'
+                  : 'absent, comme decide');
+            verifie('et l\'etiquette qui le remplace est rendue', !! etat,
+                etat ? 'audit-scellement-etat present'
+                     : 'ni bouton ni etiquette : l\'ecran ne dit plus rien de l\'etat');
+        } else {
+            verifie('le role 3 voit « Sceller les orphelines »', !! s);
+        }
     });
 
     // ══ 3. Les filtres, par des clics ═══════════════════════════════════════
@@ -501,6 +526,14 @@ try {
     // Motif : « chemin destructeur -> simuler d'abord ». Le scellement ne se
     // defait pas, et le compteur d'orphelines est suivi par l'exploitant en §7.
     await etape('clic sur « Sceller » : la requete est emise puis abattue', async () => {
+        if (CIBLE === 'laravel') {
+            constate('clic sur le scellement',
+                'SANS OBJET — le geste a ete RETIRE par la decision E-415 (13bd471). '
+                + 'Il n\'y a plus ni bouton ni route a exercer, et une assertion qui '
+                + 'le tenterait mesurerait l\'absence d\'un objet, pas un defaut.');
+
+            return;
+        }
         await page.goto(`${BASE}${C.page}`, { waitUntil: 'networkidle2' });
         const emises = [];
         await page.setRequestInterception(true);
@@ -562,6 +595,14 @@ try {
     // donc pas de clic capable d'atteindre cette branche. Le `fetch` part DEPUIS
     // la page, donc avec la session et les en-tetes reels.
     await etape('la simulation integree, par requete forgee', async () => {
+        if (CIBLE === 'laravel') {
+            constate('simulation du scellement',
+                'SANS OBJET — le geste a ete RETIRE par la decision E-415 (13bd471). '
+                + 'Il n\'y a plus ni bouton ni route a exercer, et une assertion qui '
+                + 'le tenterait mesurerait l\'absence d\'un objet, pas un defaut.');
+
+            return;
+        }
         const d = await page.evaluate(async ([chemin, methode]) => {
             const options = { credentials: 'same-origin', headers: {} };
             if (methode !== 'GET') {
@@ -605,6 +646,14 @@ try {
     // ne pourra donc JAMAIS sceller une seule ligne — et pendant ce temps le
     // compteur d'orphelines grossit a chaque connexion.
     await etape('les deux points d\'API rendent-ils le meme verdict ?', async () => {
+        if (CIBLE === 'laravel') {
+            constate('les deux points d API du scellement',
+                'SANS OBJET — le geste a ete RETIRE par la decision E-415 (13bd471). '
+                + 'Il n\'y a plus ni bouton ni route a exercer, et une assertion qui '
+                + 'le tenterait mesurerait l\'absence d\'un objet, pas un defaut.');
+
+            return;
+        }
         const d = await page.evaluate(async ([routeV, sim]) => {
             const options = { credentials: 'same-origin', headers: {} };
             if (sim[1] !== 'GET') {
