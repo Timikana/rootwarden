@@ -160,7 +160,8 @@ plusieurs heures qui n'a jamais été faite en entier** — l'exploitant a tranc
 **Tant que `docker compose up -d` n'a pas été rejoué, les conteneurs écoutent les ANCIENS ports.**
 
     ecrit          docker-compose.yml (defauts) · srv-docker.env.example · srv-docker.env
-    prepare        docs/migration/patchs-en-attente/05-echange-des-ports-entrypoint.patch
+    prepare        patchs-en-attente/05-echange-des-ports-entrypoint.patch   (laravel/, gele)
+    prepare        patchs-en-attente/06-echange-des-ports-runner.patch       (scripts/, gele)
     NON fait       docker compose up -d
     reste a faire  les replis en dur des suites (tests/e2e/, gele — session 7)
 
@@ -187,10 +188,47 @@ bâtirait sa redirection HTTP → HTTPS vers `:8446` — **port que le legacy oc
 > fonctionne et qui accepte ses identifiants. *Aucun message d'erreur, et l'écran ressemble à celui qu'il
 > attendait.* Le patch `05` est prêt et `git apply --check` passe.
 
+### ⚠⚠ DEUXIÈME PRÉALABLE : LE RUNNER PORTAIT LES DEUX PORTS EN DUR
+
+Relevé par la session 8, **vérifié dans mon propre fichier** :
+
+    scripts/rejouer-lot.sh:93   BASE_LEGACY="${E2E_LEGACY_BASE:-https://localhost:8443}"
+    scripts/rejouer-lot.sh:94   BASE_LARAVEL="${E2E_LARAVEL_BASE:-http://localhost:8444}"
+
+**Après l'échange, ces deux défauts sont inversés** : un lot lancé sans `E2E_LEGACY_BASE` /
+`E2E_LARAVEL_BASE` jouerait **chaque moitié contre le mauvais portail**.
+
+**Et échanger les défauts ne suffit pas** — un défaut juste se repérime au prochain échange. Rien ne
+comparait la cible DÉCLARÉE à ce que la base SERT :
+
+    E2E_CIBLE=legacy          vient de $cible        -> l'INTENTION
+    E2E_BASE=https://…:8443   vient de $BASE_LEGACY  -> une VALEUR
+
+> **Deux prédicats indépendants qui ne se contredisent JAMAIS.** *La suite déclare `legacy`, mesure le
+> portage, et rend du vert sur le mauvais objet — pas un échec, un succès qui porte sur autre chose.*
+> C'est « le filet et le verdict doivent être le MÊME prédicat », vu du côté où les deux sont d'accord.
+
+`06` fait les deux : il échange les défauts **et** contrôle l'ÉTAT avant de jouer. Discriminant mesuré —
+`/up` rend **200** sur le portage, **404** sur le legacy, et `/zzz` sur le portage rend 404 *(donc `/up`
+n'est pas un fourre-tout)*. Fail-closed : tout autre code avorte.
+
+**Éprouvé, les cinq cas** — la fonction extraite de la copie modifiée, exercée contre les portails réels :
+
+| cible déclarée | base | code |
+|---|---|---|
+| `laravel` | `:8446` (portage aujourd'hui) | **0** |
+| `legacy` | `:8443` (legacy aujourd'hui) | **0** |
+| `legacy` | `:8446` | **1** — « BASE INCOHÉRENTE » |
+| `laravel` | `:8443` | **1** — « BASE INCOHÉRENTE » |
+| `laravel` | `:9999` | **1** — « portail INDÉTERMINABLE » |
+
+*Deux qui passent, trois qui mordent : la sonde rend le positif et le négatif.*
+
 ### La marche à suivre, à la fermeture du LOT 4
 
 ```bash
 git apply docs/migration/patchs-en-attente/05-echange-des-ports-entrypoint.patch
+git apply docs/migration/patchs-en-attente/06-echange-des-ports-runner.patch
 sudo -n docker compose up -d                      # recreation, PAS un restart
 # controle : les QUATRE ports, avec le temoin absurde sur chacun
 curl -sk -o /dev/null -w '%{http_code}\n' https://localhost:8443/connexion   # portage  -> 200 ou 302
