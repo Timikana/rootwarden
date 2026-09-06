@@ -11208,6 +11208,39 @@ relu — jamais « le premier bouton », jamais un balayage.*
 **Dédouanement** : l'en-tête de ce fichier est **honnête**, conforme au code — après quatre en-têtes menteurs
 dans les modules voisins.
 
+
+### ⟶ CORRECTION DU 2026-09-06 — `server_user_remove_key` A MAINTENANT UNE INTERFACE. **E-226 N'EST PAS FERMÉ.**
+
+Cet écart dit, dans son tableau : *« `server_user_remove_key` — **aucune interface de parc** »*, et conclut
+*« celui qui en approche le plus n'a pas d'interface »*. **La première moitié de cette phrase a changé
+aujourd'hui, la seconde non — et c'est la seconde qui portait l'écart.**
+
+Le geste est porté (`7f2c736`, v2.0.97) : un bouton par ligne de clé sur `/comptes-distants/{machine}/cles/{user}`.
+
+    AVANT   route vivante, zero appelant       ->  le geste existait sans main pour l'atteindre
+    APRES   une cle, un compte, une machine    ->  une main, et elle atteint UN cran
+
+**Ce que le portage NE donne PAS, et qui EST E-226** :
+
+| ce que l'écart réclame | état au 2026-09-06 |
+|---|---|
+| révoquer une clé compromise **sur tout le parc** | **toujours absent** — il faut ouvrir chaque machine, chaque compte |
+| que `regenerate_platform_key` révoque l'ancienne | **inchangé** — elle reste autorisée partout (le cœur de l'écart) |
+| que le panneau de P4 cesse d'annoncer une réponse à compromission | **inchangé** — le texte faux est toujours à l'écran |
+
+> **Un geste unitaire porté ne répond pas à un écart de PORTÉE.** *Retirer une clé compromise de quarante
+> machines par quarante visites d'écran n'est pas une révocation : c'est la même absence, avec un bouton.*
+
+⚠ **Ne pas relayer « E-226 est adressé » sur la foi de ce portage.** Il déplace exactement une ligne du
+tableau ci-dessus, et le CHANGELOG de `7f2c736` — qui parle du geste et pas de l'écart — se lit facilement
+comme s'il en disait plus. *C'est moi qui ai écrit les deux : le risque de sur-lecture est le mien.*
+
+**Et le portage a ajouté sa propre réserve** : `force` n'est pas construit, donc **la clé PLATEFORME reste
+inatteignable depuis l'écran**. Délibéré (arbitrage `DOSSIER-36`, autorisé nominalement) — mais si la clé
+compromise EST la clé plateforme, l'interface neuve ne sert à rien, et c'est `regenerate_platform_key` qui
+reprend la main, avec le défaut décrit par cet écart. **Le trou le plus grave d'E-226 est celui que le
+portage d'aujourd'hui ne pouvait pas toucher.**
+
 ---
 
 ## E-227 — ⚠⚠⚠ OUVRIR LA PAGE DE DIAGNOSTIC DÉPLOIE UN `NOPASSWD: ALL` SUR LA PRODUCTION
