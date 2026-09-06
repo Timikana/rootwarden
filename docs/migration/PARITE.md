@@ -21061,3 +21061,61 @@ DEUX.** *La différence tient au périmètre interrogé — comparer portage con
 legacy suppose que le legacy, lui, les serve encore.* **Quand la page legacy est
 dépréciée, la comparaison à deux termes rend un verdict qui a la forme d'un
 manque de portage et qui n'en est pas un.**
+
+
+## E-428 — `superv` : deux lectures orphelines PAR DÉPENDANCE, et une dixième variante du piège du préfixe
+
+**Mesuré le 2026-09-06 09:10.** 31 routes backend (9 GET · 21 POST · 1 DELETE),
+page legacy **dépréciée**, portage complet (JS 80 Ko, vue 80 Ko, contrôleur 47 Ko).
+
+### Les orphelines : `/supervision/agents` et `/supervision/agents/<machine_id>`
+
+    GET · role:2 + can_manage_supervision · « tous les agents installes, groupes par machine_id »
+    appelant cote portage : AUCUN fichier   (verifie sur js + vues + app)
+
+**Et la question ajoutée — *câbler produirait-il quelque chose ?* — donne la
+réponse :**
+
+    supervision_agents   0 ligne        TEMOIN : users = 10, la sonde repond
+    seul ecrivain        `_upsert_agent` (:531), appele depuis 5 sites
+    ces sites            routes de DEPLOIEMENT et de SCAN DE VERSION
+                         -> toutes deux sous ARBITRAGE
+
+> **Orphelines par DÉPENDANCE, pas par oubli.** *Les câbler rendrait une liste
+> vide, parce que rien ne peut alimenter la table tant que le déploiement est sous
+> arbitrage.* **Deuxième instance après `/ssh-audit/trends` — la question « y
+> a-t-il quelque chose à montrer ? » a maintenant deux cas et mérite d'entrer dans
+> le relevé par défaut.**
+
+**Une case cochée par oubli se comble ; une case cochée par dépendance se DATE.**
+
+### ⚠ DIXIÈME VARIANTE DU PIÈGE DU PRÉFIXE : la variable est AU MILIEU
+
+**Mon premier relevé annonçait QUATRE orphelines. Deux étaient fausses.**
+
+    /supervision/machines/<int:mid>/profile   annoncee ORPHELINE — a tort
+    la realite : SupervisionController:760
+        'url_profil' => url('/api/gateway/supervision/machines/{mid}/profile')
+        -> un GABARIT construit cote SERVEUR, substitue dans la vue
+
+**Le segment variable n'est ni en fin de chemin ni une chaîne de requête : il est
+AU MILIEU, et le gabarit est produit par PHP puis consommé par le JS.** *Aucune
+règle fondée sur « le préfixe jusqu'au dernier `/` » ne peut le voir.*
+
+    variante  6   le segment est le nom du geste          `'/policy/sftp/' + geste`
+    variante  7   accents — `PORTE` rend 0 sur 13 `PORTÉ`  (signalee par un pair)
+    variante  8   la variable est AU MILIEU                `…/machines/{mid}/profile`
+
+*Et comme les précédentes, elle rate du côté « c'est absent ».*
+
+### Et deux témoins qui ont échoué, dont un pour une bonne raison
+
+    /supervision/deploy       mon temoin — la route n'existe PAS
+                              (elle est `/supervision/<platform>/deploy`)
+    /supervision/profiles     emis par la VUE et le CONTROLEUR, pas par le JS
+                              -> mon perimetre excluait `laravel/app`
+
+> **Le premier n'était pas un échec de l'instrument : c'était un témoin INVALIDE.**
+> *J'ai affirmé qu'un chemin existait sans le vérifier, puis lu son absence comme
+> une panne de sonde.* **Un témoin se vérifie avant de servir de preuve — sinon il
+> transforme une erreur d'hypothèse en accusation d'instrument.**
