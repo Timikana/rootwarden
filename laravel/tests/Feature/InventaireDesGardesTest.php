@@ -270,4 +270,74 @@ class InventaireDesGardesTest extends TestCase
 
         return $table;
     }
+
+    /**
+     * ⚠ L'ANGLE MORT DE `TableDesGardes`, GELE PLUTOT QUE DECLARE.
+     *
+     * Ce releve ne peut pas exprimer une garde qui vit dans un CONTROLEUR. Son
+     * en-tete le dit maintenant — et une limitation qui n'est QUE dite se perime
+     * en silence, ce qui est le defaut que ce depot demonte le plus souvent.
+     *
+     * Ce test gele donc les sites. Un SIXIEME fait rougir, et c'est le but :
+     * une garde de controleur neuve doit etre inscrite dans l'en-tete, sans quoi
+     * un lecteur du releve conclura qu'un geste n'est garde que par sa route.
+     *
+     * Le decompte porte sur le SITE QUI DECIDE, pas sur les mentions : la
+     * definition de l'aide `ComptesController::exigeStepUp()` n'en est pas un, et
+     * la compter donnerait un total qui ne correspond a aucun geste.
+     */
+    #[Test]
+    public function les_gardes_de_CONTROLEUR_sont_recensees(): void
+    {
+        $sites = [];
+
+        foreach (glob(base_path('app/Http/Controllers/*.php')) ?: [] as $chemin) {
+            $lignes = file($chemin, FILE_IGNORE_NEW_LINES) ?: [];
+            $dansBloc = false;
+
+            foreach ($lignes as $numero => $ligne) {
+                $nu = trim($ligne);
+
+                // Depouiller par etat, et non par motif : ce fichier et ceux
+                // qu'il lit PORTENT leurs demonstrations en commentaire.
+                if (str_starts_with($nu, '/*')) {
+                    $dansBloc = true;
+                }
+                if ($dansBloc) {
+                    if (str_contains($nu, '*/')) {
+                        $dansBloc = false;
+                    }
+                    continue;
+                }
+                if (str_starts_with($nu, '*') || str_starts_with($nu, '//')) {
+                    continue;
+                }
+
+                if (preg_match('/!\s*\$this->stepUp->valide|\(\$refus = \$this->exigeStepUp/', $ligne) === 1) {
+                    $sites[] = basename($chemin) . ':' . ($numero + 1);
+                }
+            }
+        }
+
+        sort($sites);
+
+        // TEMOIN : l'enumeration a bien parcouru des fichiers. Une liste vide
+        // satisferait toute attente d'absence, et rendrait ce gel vacant.
+        $this->assertGreaterThan(30, count(glob(base_path('app/Http/Controllers/*.php')) ?: []),
+            'le balayage ne trouve presque aucun controleur : la mesure ci-dessous '
+            . "n'a pas eu lieu");
+
+        $this->assertSame([
+            'ComptesController.php:514',      // compte_supprimer
+            'ComptesController.php:539',      // compte_anonymiser
+            'PasserelleController.php:88',    // generique, action DERIVEE du chemin
+            'PermissionsController.php:165',  // permission_definir
+            'PortailController.php:196',      // profil_effacement (E-449)
+        ], $sites,
+            "Les gardes de step-up vivant dans un CONTROLEUR ont change.\n"
+            . "`TableDesGardes` ne peut pas les exprimer : son en-tete les recense, "
+            . "et il doit etre mis a jour DANS CE COMMIT.\n"
+            . "Un simple decalage de lignes compte aussi — c'est le prix d'un gel "
+            . "qui pointe l'endroit exact, et il oblige a relire le site.");
+    }
 }

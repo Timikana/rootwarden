@@ -19,6 +19,32 @@ namespace Tests\Support;
  *
  * Quand une garde change VOLONTAIREMENT, on modifie cette table dans le meme
  * commit que la route, et le message du commit dit pourquoi.
+ *
+ * ── ⚠ CE QUE CE RELEVE NE PEUT PAS EXPRIMER, PAR CONSTRUCTION ───────────────
+ *
+ * Il gele les gardes de ROUTE : intergiciels, role, permission. **Une garde qui
+ * vit dans un CONTROLEUR lui est invisible**, et y forcer une ligne dirait qu'un
+ * intergiciel la porte — une chose fausse, dans le fichier qui existe pour dire
+ * le vrai.
+ *
+ * C'est le cas de TOUS les step-up du depot. Releve du 2026-09-06 :
+ *
+ *     ComptesController:514      compte_supprimer
+ *     ComptesController:539      compte_anonymiser
+ *     PermissionsController:165  permission_definir
+ *     PortailController:196      profil_effacement      (E-449)
+ *     PasserelleController:88    generique, action DERIVEE du chemin
+ *
+ * Cinq sites, quatre actions nommees du portage et une garde generique de
+ * passerelle. **Une route de cette table peut donc etre plus gardee qu'elle n'y
+ * parait** — jamais moins : un site de controleur AJOUTE une exigence, il n'en
+ * retire aucune. Lire un tableau vide comme « rien ne garde ce geste » serait
+ * l'erreur symetrique de celle qu'on evite en n'y inscrivant pas le step-up.
+ *
+ * `InventaireDesGardesTest::les_gardes_de_CONTROLEUR_sont_recensees` gele cette
+ * liste : **cette limitation est mesuree, pas seulement declaree** — sans quoi
+ * elle serait exactement le genre de propriete affirmee en commentaire que ce
+ * depot passe son temps a demonter.
  */
 class TableDesGardes
 {
