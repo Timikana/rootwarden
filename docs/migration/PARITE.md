@@ -21256,3 +21256,56 @@ d'auto-déclaration exact, ce qui est assez rare pour être mesuré et dit.*
 déjà installé sur le serveur »*, POST, 2 mentions SSH, aucune écriture. **Portable
 sans arbitrage**, comme `/ssh-audit/backups`. Les cinq autres installent,
 désinstallent, redémarrent ou changent le groupe : arbitrage.
+
+
+## E-451 — `/wazuh/detect` NE SERA PAS PORTÉE : la porter demande d'ouvrir une liste fermée qui la nomme
+
+**Décision de l'exploitant le 2026-09-06 11:10.** *J'avais obtenu l'autorisation de
+la porter sur un argument que j'avais moi-même fourni — « une lecture qui répond à
+une question ». En allant l'écrire, DEUX prémisses ont bougé.*
+
+### ① `detect` n'est pas une lecture pure
+
+    docstring   « on remplit la table `wazuh_agents` a partir de /var/ossec/* »
+    ma 1re sonde (ancree sur le def)   aucun INSERT/UPDATE  -> j'ai conclu « lecture pure »
+    sonde ciblee                       `_upsert_agent` : 1 appel   TEMOIN : `install` 1 aussi
+
+**Elle lit la machine — cinq `execute_as_root` de `grep`, `cat` et relevés d'état,
+aucune commande modifiante — et ÉCRIT notre table d'inventaire.** *Aucune écriture
+sur la machine, donc portable au regard du discriminant ; mais « lecture pure »
+était faux, et c'est le mot qui avait emporté l'autorisation.*
+
+> **Le docstring disait vrai et ma sonde disait faux.** *Elle était ancrée
+> correctement et cherchait les bons motifs — sauf celui-là. **Un docstring qu'on
+> contredit se revérifie contre le motif qu'il nomme, pas contre ceux qu'on avait
+> prévus.***
+
+### ② ⛔ Et le vrai obstacle : la porter demande d'OUVRIR UNE LISTE FERMÉE
+
+    laravel/public/js/wazuh.js   ECRITURES_PERMISES = { config · options · regle · regleSuppr }
+                                 4 entrees, et `ecris()` sur toute autre cible rend
+                                 { ok: false, interdit: true }  — fail-closed ET BRUYANT
+
+**Et son commentaire nomme `detect` explicitement :**
+
+> *« Les six gestes SSH du module (`install`, `install_all`, **`detect`**,
+> `uninstall`, `restart`, `group`) ne sont pas seulement absents du code : ils sont
+> **inexprimables** par ce helper. Ajouter `/wazuh/install` demanderait d'ajouter
+> une ligne à la liste — un geste visible en relecture, là où un `fetch` de plus se
+> serait fondu dans le fichier. C'est la différence entre une règle qu'on applique
+> et une règle qu'on doit se rappeler. »*
+
+**Le dispositif a été conçu pour rendre exactement cet ajout délibéré et visible.**
+*L'ouvrir sur la transmission d'un pair est précisément ce contre quoi il a été
+écrit* — et il l'a été après qu'une injection ait été corrigée sur un module
+voisin, où la parade retenue fut une interface à liste fermée.
+
+### Ce que ça établit au-delà de `detect`
+
+> **Une capacité peut être portable par sa NATURE et bloquée par son
+> DISPOSITIF.** *Mes six appariements classaient jusqu'ici en « porté », « sous
+> arbitrage » et « orphelin ». Il en faut une quatrième : **portable mais derrière
+> une garde délibérée**, où le coût n'est pas le geste mais l'ouverture de la
+> garde.*
+
+**Non porté. La liste reste à quatre entrées.**
