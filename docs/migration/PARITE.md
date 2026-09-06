@@ -21613,6 +21613,27 @@ assertions du bloc A ne peuvent pas passer**. Or les références portent `14` c
 legacy : **un écart d'une seule assertion là où j'en prédis deux.** *Soit ma prédiction est fausse, soit le
 `13` l'est.* La suite appartient au banc (session 7) ; c'est à l'exécution de trancher, pas à moi.
 
+### ⟶ CONTRÔLE DES TÉMOINS, 2026-09-06 après l'alerte de la session 8 — **ils tiennent, et une limite à dire**
+
+La session 8 a relayé que **`:8444` rend `301` sur TOUT depuis 13:08, chemin inexistant compris** : un
+contrôle qui y cherche un `404` est aveugle. **E-454 ne s'appuie sur `:8444` nulle part** — la colonne
+« portage » a été mesurée sur `:8446`. Revérifié :
+
+    :8444  /zzz_nexiste_pas  301      /profil  301     <- aveugle, ne discrimine plus rien
+    :8446  /zzz_nexiste_pas  404      /profil  302     <- discrimine
+    :8443  /zzz_nexiste_pas  404      /auth/login.php  200
+
+⚠ **MAIS UNE LIMITE DE MON PROPRE TÉMOIN, qu'il faut dire.** Sur le legacy, **un chemin absurde et une page
+archivée rendent le MÊME `404`**. Le témoin prouve donc *« rien ne sert ce chemin »* — **il ne prouve pas
+« cette page a été archivée »**, ni qu'elle a jamais existé.
+
+> **Un `404` ne distingue pas l'archivage de l'inexistence.** *Le fait d'archivage vient de l'ARBRE
+> (`legacy/_deprecated/adm` existe, `legacy/adm/` porte 0 fichier `.php`), jamais du réseau.*
+
+C'est pourquoi cet écart est mesuré sur **deux objets** — l'arbre et le réseau — et non sur le `404` seul.
+*Un contrôle d'archivage fondé sur un `404` attesterait aussi bien d'une page jamais écrite, d'une faute de
+frappe dans son propre chemin, ou d'un service à terre.*
+
 ### Ce que ça dit du chantier, et qui dépasse cette suite
 
 **Le legacy est démonté pendant que les suites continuent de le nommer.** Chaque archivage transforme
