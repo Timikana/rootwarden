@@ -12838,3 +12838,86 @@ une garde qui rend la cible inexprimable, et pourquoi a-t-elle été posée ?**
 là où la liste en porte quatre. Mon motif a attrapé les accolades d'un objet imbriqué.*
 **J'ai mesuré pour confirmer un refus, et mon instrument s'est trompé dans le sens qui
 MINIMISE la garde.** *Le compte juste vient d'une LECTURE, pas d'un motif.*
+
+---
+
+## E-461
+
+### Trois de mes prémisses réfutées, dont la commande de remesure que j'avais fournie
+
+**J'ai ordonné le retrait de trois routes `/policy/`. Deux l'ont été. La troisième ne devait pas
+l'être, et c'est mon instrument qui disait le contraire.**
+
+    ma commande de remesure balayait   laravel/public/js  ·  laravel/resources
+    elle ne balayait NI `tests/`, NI `legacy/`, NI l'OpenAPI
+
+    /policy/list dans tests/  ->  go-policies.mjs, DEUX assertions vivantes
+
+> **Un instrument borné à deux répertoires rend un zéro qui ressemble à une absence.** *C'est
+> le motif que j'ai enseigné à cette flotte toute la nuit, logé dans la commande que je lui
+> donnais pour vérifier.*
+
+**`/policy/list` est donc une capacité de LECTURE non portée, pas un résidu** — *catégorie
+différente, décision différente.* **Elle n'a pas été touchée.**
+
+### ⛔ Et ma contre-épreuve attendait un code que ce backend NE PEUT PAS produire
+
+    backend/server.py:142   @app.route('/<path:path>', methods=['OPTIONS'])
+
+**Une route ATTRAPE-TOUT est déclarée pour tout chemin : Flask ne rend jamais 404, il rend
+405.**
+
+> **Toute assertion « la route est retirée si elle rend 404 » passerait À VIDE.** *Elle
+> attendrait un code que le service ne produit pas — un vert qui ne mesure rien.*
+
+**Le discriminant d'existence de ce backend est `401` contre `405`.** *La session a posé le
+témoin d'inexistence AVANT de conclure, et c'est lui qui a cassé mon instruction.*
+
+### Et il n'y avait aucune entrée de `StepUp` à retirer
+
+    StepUp.php:41   le nom d'action est DERIVE du chemin :
+                    `/policy/sudo/deploy` -> `policy_sudo_deploy`
+
+**Le portage dérive précisément pour éviter le nom partagé du legacy que je craignais.** *Ma
+consigne « le retrait doit emporter son entrée » reposait sur un mécanisme qui n'existe pas
+ici.*
+
+*Et `ACTIONS_PORTAGE` porte QUATRE entrées, comptées en LISANT — la quatrième suit un bloc
+`/* */` de 27 lignes, où mon motif s'était arrêté. C'est la seconde fois aujourd'hui que je
+compte cette liste avec un motif et que je me trompe.*
+
+---
+
+## E-462
+
+### `ruff` a disparu du conteneur — et c'est ma reconstruction qui l'a emporté
+
+    /opt/venv/bin/ruff        absent      ·   introuvable dans le PATH
+    TEMOIN                    `coverage` et les autres outils du venv SONT la
+    backend/requirements.txt  ruff : 0 occurrence
+    image rootwarden-python   creee 2026-09-06T10:06:05
+    ma reconstruction         10:03
+
+**Il vivait dans un conteneur, pas dans une déclaration.** *Ma reconstruction l'a emporté, et
+rien ne l'a réinstallé parce que rien ne le nommait.*
+
+**C'est l'outil qui a attrapé un `NameError` sur une branche fail-closed d'un correctif gelé —
+que `git apply --check`, `ast.parse` ET l'import du module avaient tous laissé passer.**
+
+### ⚠ Et je borne mon propre constat : la perte est LOCALE, pas totale
+
+    .github/workflows/ci.yml   cite `ruff`
+
+**La barrière de CI le garde. Ce qui est perdu, c'est le contrôle AVANT commit, pas le
+contrôle.** *Le dire évite de transformer un outil manquant en incident.*
+
+**Ce qui reste vrai** : *un outil qui n'existe que dans un conteneur disparaît au premier
+`--build`, et personne ne l'apprend — on apprend seulement que les contrôles sont devenus plus
+faibles, plus tard et ailleurs.*
+
+### ⚠ Et mes backticks se sont exécutés pour la QUATRIÈME fois aujourd'hui
+
+*Dans un `echo` de la mesure ci-dessus : `docker compose up -d --build` a été exécuté comme
+commande.* **Le piège n°14 de mon propre catalogue, quatre fois en une journée, toujours dans
+la prose d'un constat.** *Ce n'est plus une inattention : c'est une habitude de rédaction, et
+seule une garde par construction — heredoc systématique — la ferme.*
