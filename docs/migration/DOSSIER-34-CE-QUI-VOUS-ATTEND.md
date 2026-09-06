@@ -1,133 +1,138 @@
-# DOSSIER 34 — ce qui vous attend, au 2026-09-05 à 23:40
+# DOSSIER 34 — ce qui vous attend
 
-**Établi par la session 8 (DSI délégué).** *Onze entrées de registre écrites entre 22:30 et
-23:35 vous concernent. Les recoudre n'est pas votre travail — le voici fait.*
+**Remesuré le 2026-09-06 à 11:36 CEST.** *Version précédente : 2026-09-05 à 23:40. Sept de ses
+treize points sont tombés depuis — ils sont listés en bas, avec ce qui les a fermés.*
 
-> **Chaque geste porte : ce qu'il coûte · ce qu'il se passe si vous ne faites rien · et la
-> commande exacte.** *Rien ici n'a été exécuté.*
-
----
-
-## ⑴ RECRÉER LES CONTENEURS — et ce geste en règle TROIS d'un coup
-
-**C'est le seul geste de cette liste qui répare plusieurs choses à la fois.**
-
-    ce qu'il repare
-      a) l'affichage de la version    le portail montre `2.0.94`, la vraie valeur est `2.0.11`
-      b) le montage detache            le conteneur sert un inode ORPHELIN
-      c) il est le SEUL moyen de       un redemarrage ne relit PAS `env_file:`
-         changer une variable d'env
-
-**Si vous ne faites rien** : *le pied de page continue d'afficher un numéro faux — et il est
-**PLUS ÉLEVÉ** que le vrai, donc il rassure.* **Quiconque ouvre une page pour vérifier qu'une
-livraison est en service lit « oui, et même largement ».** *Un numéro trop bas aurait fait
-chercher ; celui-là ne fera rien chercher à personne.*
-
-    sudo docker compose up -d --force-recreate rootwarden_laravel rootwarden_php
-
-**Contrôle après** :
-
-    sudo docker exec rootwarden_laravel cat /var/www/html/version.txt     # doit rendre 2.0.11
-    stat -c %i legacy/version.txt
-    sudo docker exec rootwarden_laravel stat -c %i /var/www/html/version.txt   # doivent CONCORDER
-
-⚠ **Un lot tourne depuis 23:22.** *Attendez sa fermeture — la QA prévient.*
+> **Chaque chiffre porte SA COMMANDE DE REMESURE.** *Un chiffre récité n'a plus de source : il a
+> une habitude. Ce document a lui-même transporté « ~240 commits d'avance » pendant treize
+> heures ; la valeur était 62.*
 
 ---
 
-## ⑵ LE CHOIX QUI NE SE POSE QU'UNE FOIS : `docker-compose.prod.yml`
+## ⑴ ⛔ LA FORME DE L'ÉCHANGE DES PORTS — c'est le seul blocage technique restant
 
-**La production porte le même montage de FICHIER, et elle n'a PAS encore dérivé.**
+**Tout le reste est prêt.** *Le prédicat de plateforme des 87 suites est posé (`a329876`), son
+export l'est aussi (`3b8d093`), `LEGACY_URL` est en configuration. Les suites suivront la cible
+quelle que soit l'adresse.*
 
-    docker-compose.prod.yml:124   - ./legacy/version.txt:/var/www/html/version.txt:ro
-    prod a v1.37.15 — aucun bump par le script n'y a encore eu lieu
+**Mais l'échange n'est pas une substitution de chiffres :**
 
-> **C'est le seul endroit où vous pouvez encore choisir sans réparer d'abord.** *En
-> développement, le mal est fait et le remède posé ; en production, la page est blanche.*
+    portage   publie  ${LARAVEL_PORT}:80          HTTP SEUL
+    legacy    publie  ${HTTP_PORT}:80  ET  ${HTTPS_PORT}:443
 
-**Deux options, et la première ne sacrifie rien :**
+*Échanger les numéros donnerait du HTTP sur 8443 — un port conventionnellement TLS.*
 
-    A. monter le REPERTOIRE plutot que le fichier
-       -> le montage suit le CHEMIN, l'ecriture atomique redevient possible
-    B. garder l'ecriture EN PLACE que j'ai posee en dev
-       -> simple, deja eprouve, au prix de l'atomicite
+    A. donner le TLS au portage    certificat, vhost, `a2enmod ssl`
+                                   -> il prend vraiment 8080 ET 8443
+    B. le portage prend 8080 seul  8443 reste au legacy
+                                   -> ce n'est plus « prendre son adresse »
 
-**Ma recommandation : A pour la production.** *J'ai pris B en développement parce qu'elle était
-immédiate, pas parce qu'elle est meilleure.*
+**Si vous ne tranchez pas, les ports restent en l'état — ce qui ne casse rien.**
 
-**Si vous ne faites rien** : *la production dérivera au premier bump, et le défaut y sera plus
-difficile à voir qu'ici — parce qu'il **se répare tout seul à chaque redémarrage** et revient
-au bump suivant.* **Chacun le verra à un moment différent du cycle, et chacun aura raison.**
+    remesure : grep -n 'PORT}:' docker-compose.yml
 
 ---
 
-## ⑶ ⛔ LE SMTP : UNE DE VOS TROIS ISSUES A UN FAUX REMÈDE
+## ⑵ ⛔ CE QUI EMPÊCHE D'ÉTEINDRE LE LEGACY — et ce ne sont pas des liens
 
-**`DOSSIER-24` vous offrait trois issues. Celle qui paraissait gratuite ne l'est pas.**
+    30 fichiers .php metier servis   (hors vendor, hors _deprecated)
+    76 catalogues de langue          (des `return [...]`, aucun geste)
 
-    fichier /var/www/html/.env   MAIL_MAILER=log     <- la valeur SURE, et elle PERD
-    env du processus             MAIL_MAILER=smtp    <- injecte par `env_file:`
-    ce que Laravel SERT          smtp                <- mesure dans le conteneur qui sert
+    remesure : python3 — rglob('*.php') moins '_deprecated' et 'vendor'
 
-> **`.env` porte DÉJÀ `log`.** *Si vous l'ouvrez pour vérifier avant d'agir, vous y lisez la
-> valeur sûre, vous en concluez que l'envoi est désarmé, et vous ne faites rien.* **Vous n'avez
-> même pas besoin d'éditer pour vous tromper.**
+**Le portage ne dépend PLUS du legacy** : *les 4 contrôleurs posent `lienLegacy => null` sans
+condition, les 8 lignes de vue sont sous un `@if` jamais vrai, `api_proxy` a 0 occurrence non
+commentée, la passerelle est une route Laravel, l'authentification est propre.*
 
-**Les trois issues, avec leur prix réel :**
+> **Mais ne pas LIER et pouvoir ÉTEINDRE sont deux propriétés distinctes.** *Seule la première
+> est acquise.*
 
-    accepter l'oracle en le sachant     gratuit, et c'est une decision, pas un oubli
-    poser `php-fpm`                     le ferme PAR CONSTRUCTION — la reponse est
-                                        terminee avant que la poignee TLS parte
-    desarmer                            editer `srv-docker.env` PUIS recreer (⑴)
+**Deux fichiers portent des capacités qu'aucun autre chemin n'atteint :**
 
-**Ce qui est en jeu** : *un POST sur `/mot-de-passe-oublie` — page **publique**, liée depuis
-l'écran de connexion — envoie un courriel réel. Et sous `mod_php` sans `php-fpm`, la poignée
-TLS (78 ms rien que pour ouvrir la socket) se produit **pendant** la requête et **seulement**
-dans la branche « l'adresse existe ».* **L'écart de temps dit si une adresse est connue.**
+    legacy/iptables/index.php   branche `restore` -> POST /iptables-restore
+                                bloque sur l'arbitrage du PORT SSH
+    legacy/security/index.php   /cve_scan (chemin compose) + /cve_whitelist
+                                l'un bloque sur S7b
 
-⛔ **Ne demandez à personne de mesurer cet écart au réseau** : *la branche « connue » exige une
-adresse réelle, donc un vrai courriel vers une vraie personne.* **Deux sessions ont refusé de
-le faire, et elles ont eu raison.**
+**Et trois autres pages restent pour leurs gestes d'écriture sous arbitrage** — *`bashrc`
+(deploy, prerequisites, restore), `fail2ban` (install, restart), `ssh` (K4).*
+
+> **Le legacy meurt le jour où vous tranchez ces gestes. Pas avant, et rien d'autre ne le
+> retient.**
 
 ---
 
-## ⑷ TROIS CAPACITÉS SONT MORTES SANS QUE CE SOIT DÉCIDÉ
+## ⑶ ⛔ L'ORACLE D'ÉNUMÉRATION — `DOSSIER-24`, toujours actif
+
+    processus MAIL_MAILER   smtp      <- ce qui OPERE
+    fichier .env            log       <- ce qu'on LIT en croyant verifier
+
+    remesure : docker exec rootwarden_laravel sh -c 'echo $MAIL_MAILER'
+               docker exec rootwarden_laravel grep '^MAIL_MAILER' /var/www/html/.env
+
+**Un POST sur `/mot-de-passe-oublie` — page publique — envoie un courriel réel. Sous `mod_php`
+sans `php-fpm`, la poignée TLS part PENDANT la requête et SEULEMENT dans la branche
+« l'adresse existe ».**
+
+    accepter en le sachant   gratuit, et c'est une DECISION
+    poser `php-fpm`          le ferme PAR CONSTRUCTION
+    desarmer                 editer `srv-docker.env` PUIS RECREER
+
+⛔ **« Désarmer » a un faux remède** : *`.env` porte déjà `log` et PERD contre l'environnement du
+processus.* **Qui l'ouvre pour vérifier y lit la valeur sûre et ne fait rien.**
+
+---
+
+## ⑷ TROIS CAPACITÉS MORTES SANS DÉCISION
 
     /policy/rollback      POST — ouvre une session SSH, ECRIT sur les machines
     /policy/deployments   GET  — lecture
     /policy/list          GET  — lecture
 
-**Les routes existent, sont gardées, et RIEN ne les appelle.** *Leur interface —
-`server_user_policy.js` et `health_check.php` — vit dans `_deprecated/`.*
+    remesure : grep -rl 'policy/<nom>' laravel/public/js laravel/resources   -> 0 chacune
 
-> ⚠ **Et le portage porte un test qui exerce le step-up sur `rollback` : la règle est VERTE.**
-> *Une capacité orpheline dont la garde passe ses tests ne produit aucun signal, nulle part —
-> et un vert se lit « cette capacité est saine ».*
-
-**Trois issues, et c'est un arbitrage produit que je ne prends pas** : *leur rendre une
-interface · les retirer · les laisser en l'état en le sachant.* **La troisième est légitime ;
-elle ne l'est que si elle est écrite.**
+*Leur interface vivait dans `_deprecated/`.* ⚠ **Et leur garde PASSE SES TESTS — un vert se lit
+« saine ».** *Trois issues : leur rendre une interface · les retirer · les laisser en le
+sachant. La troisième est légitime SI elle est écrite.*
 
 ---
 
-## ⑸ LES GESTES DÉJÀ CONNUS, INCHANGÉS
+## ⑸ 28 SUITES HORS DE TOUT LOT
 
-    pousser        git push origin Migration-Laravel     (~235 commits d'avance)
-    fusionner      main date du 2026-09-03
-    rotation       le mot de passe SMTP est en clair dans l'env du conteneur
-    relire         `security/backend-cve` — 6 commits jamais relus
-    K4             deploiement sur la machine 3, portee arbitree `rootwarden` SEUL
-    DOSSIER-32     scan sortant et application du pare-feu — effets sur des tiers
+    116 fichiers `go-*.mjs`  ·  88 enrolees  ·  28 HORS LOT
+
+    remesure : python3 — les deux tableaux de rejouer-lot.sh contre les fichiers du disque
+
+**Une suite hors lot ne rougit JAMAIS et garde ses effets de bord intacts.** *Deux d'entre elles
+visaient la production ; les deux sont corrigées.* **Ce qui manque n'est pas une liste plus
+longue : c'est que l'écart soit un CONTRÔLE — enrôlée, ou portant la raison de son exclusion,
+et le runner refuse de démarrer sinon.**
 
 ---
 
-## CE QUE JE RECOMMANDE, DANS CET ORDRE
+## ⑹ LES GESTES CLASSIQUES, INCHANGÉS
 
-    1. attendre la fermeture du lot (la QA previent)
-    2. ⑴ recreer les conteneurs — repare trois choses
-    3. ⑶ trancher le SMTP, en sachant que « desarmer » coute ⑴
-    4. ⑵ choisir pour la production PENDANT qu'elle est encore saine
-    5. ⑷ ecrire la decision sur les trois orphelines, meme si c'est « on laisse »
+    rotation du mot de passe SMTP    en clair dans l'environnement du conteneur
+    `security/backend-cve`           6 commits jamais relus, jamais poussee
+    `security/semgrep-regles-mortes` 32 commits, idem
+    K4 sur la machine 3              portee arbitree `rootwarden` SEUL
+    DOSSIER-32                       scan sortant, effets sur des tiers
+    migrations 063/064/065           ecrites, non appliquees
+    `laravel/.env:68`                `LEGACY_URL` MORT — l'environnement gagne.
+                                     A retirer, sinon on l'editera sans effet.
+    `docker-compose.prod.yml`        AUCUNE sonde de vie sur le service web
 
-> **Le seul de ces cinq qui se dégrade en attendant est ⑵** — *chaque bump en production
-> rapproche le moment où le choix devra être précédé d'une réparation.*
+---
+
+## ✅ CE QUI EST TOMBÉ DEPUIS LA VERSION DE 23:40
+
+    conteneurs recrees          version 2.0.11 servie · inode 1998793 des DEUX cotes
+    adresse de contact          gauderic.broussier@magiline.fr, en service
+    durcissement Apache         `Server: Apache` — plus de version ni d'IP interne
+    sonde de vie du legacy      visait la racine archivee — healthy en 10 s
+    poussee                     Migration-Laravel a jour
+    fusion                      main = origin/main = 3b0c50c, 305 commits
+    step-up sur l'effacement    livre, atteste sur 7 criteres SCELLES avant lecture
+    comptes 77 / 78             supprimes
+
+    remesure de l'amont : git fetch && git rev-list --left-right --count 'origin/main...main'
