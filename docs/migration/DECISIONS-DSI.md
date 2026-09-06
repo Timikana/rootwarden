@@ -12334,3 +12334,78 @@ soit programmé :**
 > **Assigner un portage inventé coûte plus cher que de constater qu'il n'y en a pas.** *Une
 > tâche mal dimensionnée est exécutée mal ou refusée — j'ai déjà eu les deux ce soir, et le
 > refus était la bonne issue.*
+
+---
+
+## E-452
+
+### Des critères SCELLÉS avant lecture — et un risque d'autorisation croisée que personne n'avait vu
+
+**La session qui certifiera le step-up a scellé ses six critères AVANT de lire le code**
+(`4ff0853`, empreinte `ab53508d05650012`).
+
+> *« Des critères écrits APRÈS lecture se moulent sur ce qui a été construit. »*
+
+**Ils portent sur des PROPRIÉTÉS, jamais sur une forme** — *elle ne dicte pas comment le geste
+s'écrit, seulement ce qu'il doit tenir.* **C'est la première fois de ce chantier qu'une
+attestation est définie avant son objet.**
+
+### ⛔ C4 est une trouvaille de sécurité, et je l'ai vérifiée
+
+    StepUp::valide(int $idCompte, string $action): bool
+        return Cache::get($this->cleMarque($idCompte, $action)) !== null;
+
+**La marque est portée par le NOM DE L'ACTION.** *Réutiliser `compte_anonymiser` pour
+l'effacement de son propre compte ferait qu'une marque obtenue pour anonymiser le compte
+D'AUTRUI validerait l'effacement du SIEN — même clé, même quinze minutes.*
+
+**Et ce n'est pas une hypothèse** : *`StepUp.php:68` et `:156` documentent le défaut du legacy
+que ce dépôt a corrigé — un step-up consenti pour ANNULER une politique autorisait un
+DÉPLOIEMENT.* **Le même piège, à un nom d'action près.**
+
+### La paire C1/C2, et pourquoi elle est indissociable
+
+    C1  la garde MORD              sans marque -> refus ET COMPTE INTACT
+    C2  elle ne coute AUCUN acces  avec marque -> le geste ABOUTIT
+
+> *« C1 sans C2 est un déni de service qui a l'air d'une sécurité — un contrôle qui refuse
+> tout le monde satisfait C1 parfaitement. »*
+
+**Et C1 asserte l'ÉTAT DU COMPTE, pas la réponse** : *un refus qui affiche une erreur et
+anonymise quand même serait VERT sur le message.*
+
+### ✅ Et un trou d'attestation annoncé AVANT, pas après
+
+**Le geste est un `<form method="POST">` ; la modale de step-up écoute un `fetch`.** *Le raccord
+se mesure AU NAVIGATEUR, pas sur le banc PHPUnit.*
+
+> **Elle annonce que c'est le trou le plus probable de son attestation, et qu'elle le dira
+> plutôt que de laisser un vert le suggérer.** *Un dédouanement déclaré d'avance n'en est plus
+> un.*
+
+---
+
+## E-453
+
+### ⚠ MES PROMPTS RÉCITENT DES CHIFFRES QUE RIEN N'OBLIGE À REMESURER
+
+**« ~240 commits d'avance » figurait dans mes prompts de mission depuis hier soir. La mesure
+après `fetch` en donnait 62.** *Il n'a été trouvé que parce que l'exploitant m'a fait pousser.*
+
+> *« Un chiffre faux dans un tableau de bord est plus tenace qu'un chiffre faux dans une
+> mesure, parce qu'il n'a pas de moment où on le refait : il est RÉCITÉ, pas RELEVÉ. »*
+
+**Et la parade est déjà écrite dans ce chantier — pour les DOCUMENTS :**
+
+    `PLAN-DE-MIGRATION.md`   chaque chiffre porte SA COMMANDE DE REMESURE
+    mes prompts de mission   des dizaines de chiffres, AUCUNE commande
+
+**J'impose au dépôt une règle que je ne m'impose pas à moi-même dans l'artefact que je produis
+toutes les heures.** *Et cet artefact est celui que sept sessions exécutent — donc le pire
+endroit où loger un chiffre non remesurable.*
+
+**RÈGLE POUR MES PROMPTS** : *tout chiffre annoncé porte la commande qui le refait, ou il ne
+figure pas.* **Un chiffre sans sa commande n'est pas une mesure, c'est une citation.**
+
+*Même famille que le « 82 exécutions, 1158 assertions » d'une session qui datait de trois
+semaines, et que le `1484` que j'ai figé en dur.*
