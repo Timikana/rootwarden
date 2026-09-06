@@ -295,3 +295,76 @@ route qui ÉCRIT, la table vide mesure l'usage passé, pas l'utilité future.**
 `/update-logs`. *Le tri par table ne peut rien en dire : ce sont des flux ou des
 sondes de vie, et il faut les lire.* **La méthode a une seconde limite, et c'est
 celle-là.**
+
+---
+
+## 8. TRI CLOS — 2026-09-06, 11:00 CEST. **22 sur 22, et AUCUNE n'est portable.**
+
+### 8.1 Une septième catégorie : *pas une capacité*
+
+**Trois routes n'ont pas d'appelant parce qu'elles n'ont jamais été destinées à
+en avoir un dans une interface :**
+
+| route | ce que c'est |
+|---|---|
+| `/update_security_exec` | **rappel machine-à-machine** — jeton HMAC `X-Update-Token`, appelé par un cron **sur la machine distante** |
+| `/update_zabbix` | **redirection 307** vers `/supervision/zabbix/deploy` — un shim, aucun effet propre |
+| `/test` | **sonde de vie** — rend une chaîne statique, ne lit rien, n'écrit rien |
+
+> **Les chercher comme des capacités perdues était une erreur de catégorie de ma
+> part**, pas un défaut du produit. *Une route sans appelant d'interface n'est
+> une perte que si elle était censée en avoir un.*
+
+### 8.2 Le tri complet des 22
+
+| verdict | routes | ce que ça demande |
+|---|---|---|
+| **faux positif — forme 4** | `/admin/temp_permissions` ×2 · `classify{,_bulk}` · `/server_user_keys` · `/list_machines` (← `/serveurs`) | **rien** |
+| **pas une capacité** | `/update_security_exec` · `/update_zabbix` · `/test` | **rien** |
+| **supplantée par une route plus riche** | `/schedule_update` (← `/schedule_advanced_update`) · `/apt_update` (← `/update` + `/security_updates`) · `/update-logs` (← le flux de `/update`) | **rien** — *à confirmer contre l'inventaire du module* |
+| **retenue par ARBITRAGE** | `/deploy` · `/logs` · `/preflight_check` — **le sous-lot K4**, bloqué sur `NOPASSWD: ALL` | **DÉCIDER** |
+| **jamais câblée** | `/server_users_inventory` · `/admin/notification_prefs` | garder ou retirer |
+| **trou par dépendance** | `/cve_trends` | **DATER** |
+| **trou asymétrique** | `/server_user_remove_key` — lecture portée, écriture non | confronter au découpage |
+| **candidates, touchent une MACHINE** | `/custom_update` · `/apt_check_lock` · `/exclude_user` | **arbitrage** |
+
+### 8.3 ⛔ RÉPONSE À « PORTE CE QUI EST PORTABLE » : rien ne l'est
+
+**Le critère posé est : lecture pure, aucune machine touchée, aucun geste de
+masse. Aucune des 22 ne le satisfait.**
+
+- **8 n'ont rien à porter** — déjà portées autrement, ou pas des capacités ;
+- **3 sont le sous-lot K4**, bloqué sur un arbitrage nommé (`NOPASSWD: ALL`) ;
+- **3 touchent une machine** (`/custom_update` installe des paquets,
+  `/apt_check_lock` interroge le verrou apt en SSH, `/exclude_user` écrit une
+  exclusion) ;
+- **`/cve_trends`** est un trou **par dépendance** : le câbler afficherait une
+  tendance sur trente jours d'une table à **1 ligne** ;
+- **les 2 jamais câblées** demandent une décision, pas un portage ;
+- **`/server_user_remove_key`** exige de savoir si le découpage a séparé lecture
+  et écriture à dessein.
+
+> **Ce n'est pas un refus de porter : c'est le résultat du tri.** *Les capacités
+> portables sans arbitrage avaient déjà été portées — c'est précisément ce que
+> les dix réfutations de la nuit établissaient, item par item.*
+
+### 8.4 ⚠ Ma méthode a des faux NÉGATIFS, pas seulement des faux positifs
+
+**J'avais déclaré un seul angle mort (la forme 4). Il y en a un second, et de
+sens opposé.**
+
+En reprenant `updates.py`, un `grep` **sans retrait des commentaires** m'a montré
+`/apt_update`, `/custom_update` et `/schedule_update` comme « appelées par le
+portage ». **Elles ne le sont pas : les trois n'apparaissent que dans des
+commentaires.** *Seul `/update` est un appel réel.*
+
+> **J'ai failli publier l'inverse de mon propre relevé**, et ce qui m'a arrêtée
+> est la règle que j'avais posée douze heures plus tôt : **« cité » n'est pas
+> « appelé »**. *Une méthode ne protège que si on l'applique à la mesure qui
+> semble la confirmer.*
+
+**Et le témoin de contrôle a servi une seconde fois** : j'ai interrogé ma sonde
+sur `/cles-ssh` et `/serveurs`, **que je sais portés**. Elle les rend « absent »
+— *parce qu'elle ne voit que les chemins **backend**, les routes du portage étant
+appelées par `route('nom')`.* **Sans ces deux contrôles, j'aurais lu « absent »
+comme « inexistant » sur les cinq dernières.**
