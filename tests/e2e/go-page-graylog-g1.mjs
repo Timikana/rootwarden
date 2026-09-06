@@ -52,7 +52,51 @@ import { litEnBase, compteEnBase } from './lib-base.mjs';
 import { constateArchivage } from './archive.mjs';
 
 const BASE = process.env.E2E_BASE || 'https://localhost:8443';
-const CIBLE = /8444|laravel/i.test(BASE) ? 'laravel' : 'legacy';
+const CIBLE = (() => {
+    /*
+     * ══ LA CIBLE VIENT DE L'ENVIRONNEMENT, L'URL N'EST QU'UN REPLI ════════
+     *
+     * `/8444|laravel/i.test(BASE)` deduit la cible d'un NUMERO DE PORT. Tant que
+     * le portage vit sur 8444 c'est juste ; **le jour ou les ports s'echangent,
+     * ce predicat rend 87 suites MENTEUSES et non rouges** — elles appliqueraient
+     * les attentes du legacy au portage, et rendraient du VERT.
+     *
+     * `E2E_CIBLE` devient donc l'autorite, et `rejouer-lot.sh` l'exporte pour
+     * chaque moitie. Le motif d'URL ne sert plus qu'aux lancements a la main.
+     *
+     * ⚠ ET IL N'Y A PAS DE GARDE DE COHERENCE ENTRE LES DEUX — c'est deliberé,
+     * et l'inverse a ete demande puis ecarte apres mesure :
+     *
+     *     E2E_CIBLE=laravel + BASE=…:8443
+     *       AVANT l'echange  incoherent   (a refuser)
+     *       APRES l'echange  CORRECT      (a accepter)
+     *
+     * **Une garde « l'environnement doit concorder avec le motif d'URL »
+     * refuserait exactement la configuration que cet elargissement existe pour
+     * permettre.** Le motif d'URL n'est pas un invariant : c'est la chose meme
+     * qu'on rend caduque. On ne garde pas une valeur contre une heuristique
+     * qu'on sait perimee.
+     *
+     * CE QUI EST INVARIANT, ET SUR QUOI LA GARDE SE POSE : la cible appartient a
+     * une LISTE FERMEE. Une valeur hors liste est refusee bruyamment, au
+     * chargement, avant qu'une seule assertion ne s'execute — une faute de frappe
+     * ne doit pas se lire comme « legacy » par repli silencieux.
+     */
+    const CIBLES = ['laravel', 'legacy'];
+    const declaree = process.env.E2E_CIBLE;
+    if (declaree !== undefined && declaree !== '') {
+        if (! CIBLES.includes(declaree)) {
+            throw new Error(
+                `E2E_CIBLE=${JSON.stringify(declaree)} n'est pas une cible connue `
+                + `(${CIBLES.join(' | ')}). Rien n'est joue : une cible inconnue `
+                + `retomberait sur « legacy » et la suite mesurerait le mauvais portail.`);
+        }
+
+        return declaree;
+    }
+
+    return /8444|laravel/i.test(BASE) ? 'laravel' : 'legacy';
+})();
 const MDP = process.env.E2E_TEST_PASS || 'RootWarden@2026-Test!';
 
 /** Role 3 : il contourne `checkPermission`, donc il atteint la page. */

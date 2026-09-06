@@ -5,6 +5,100 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [2.0.82] - 2026-09-06
+
+> ## ⚠ LA SEQUENCE SAUTE ICI — 1.54.2 devient 2.0.82 (E-458)
+>
+> **Ce journal tenait un numero A LA MAIN pendant que le produit DERIVAIT le
+> sien.** Les deux ont diverge le 2026-09-05 a 22:16 (`fe797fc`), quand
+> `VERSION-JALON` est passe a `2.0` : a partir de la, le portail affichait une
+> valeur derivee que ce fichier ne suivait plus.
+>
+>     produit   `scripts/version.sh` -> jalon + `rev-list --count --first-parent <ancre>..HEAD`
+>               ancre = dernier commit touchant `VERSION-JALON` = `fe797fc`
+>     journal   une suite tenue a la main, arrivee a `1.54.1`
+>
+> **Le CHANGELOG adopte le numero DERIVE a partir de cette entree.**
+>
+> **⛔ Les entrees anterieures restent en `1.x` et ne seront PAS renumerotees** :
+> elles nomment ce qui a ete livre sous ce nom-la. *Renumeroter le passe
+> mentirait sur ce qui a ete livre sous quel nom, et casserait tout renvoi
+> exterieur.* **La discontinuite s'ecrit donc a l'endroit exact ou elle se
+> produit, plutot que d'etre lissee.**
+>
+> **`2.0.82` est la version du commit qui a LIVRE ce correctif** (`d01e236`), pas
+> celle du commit qui renumerote cette entete. *Un numero derive ne peut etre
+> connu qu'une fois le commit existant — l'entete d'une entree porte donc la
+> version de la LIVRAISON, pas celle de la reecriture.*
+>
+> **⚠ Et l'arbitrage qui a demande ce changement citait `2.0.11`.** Recalcule au
+> moment d'ecrire : `2.0.82` a `d01e236`, `2.0.83` a HEAD. **Le nombre avait
+> bouge de 71 commits entre l'arbitrage et son application** — une nuit a huit
+> sessions. *C'est le defaut que cette entree corrige, en train de se produire
+> sur le message qui la commande.*
+
+
+
+### Extinction - E-456 : la modale de step-up POSTait vers un fichier archive
+
+**Symptome, EN SERVICE.** `legacy/js/utils.js` ouvrait une modale TOTP et POSTait
+sur `/auth/step_up_verify.php`. **Ce fichier a ete archive le 2026-09-05 a 12:46**
+(`de9669c`, « vague 1 — 28 fichiers retires du service ») : le POST rendait 404 et
+l'utilisateur ne pouvait pas achever son geste. **Casse depuis ~19 h.**
+
+**⚠ L'archivage a emporte UNE MOITIE D'UNE PAIRE.** Le verificateur est parti, le
+poseur `legacy/auth/step_up.php` est reste servi, et `api_proxy.php:69` continuait
+de repondre `403 + {step_up_required, action}`.
+
+**⚠ Et le declencheur n'est PAS un appel nomme** — c'est le wrapper
+`window.fetch` (`utils.js:42`), qui intercepte TOUTE reponse 403 portant
+`step_up_required`. `utils.js` etant charge par `menu.php`, le piege etait actif
+**sur tout le portail**. *Aucun `grep` du nom de la fonction ne l'aurait trouve.*
+
+**Ce que le step-up garde** (`api_proxy.php:56-58`) : `/policy/{sudo,sftp}/deploy`,
+`.../remove` et `/policy/rollback` — trois gestes qui donnent **de facto root sur
+la machine cible**.
+
+**Arbitrage : RETIRER L'APPELANT, pas restaurer le verificateur.** Trois raisons
+mesurees :
+
+1. **Le sens de la panne est FERME** — les trois gestes sont refuses. Ce n'est pas
+   un trou de securite, c'est une capacite perdue.
+2. **Le portage porte la capacite** : `politiques.js:237` compose
+   `/policy/sudo/<geste>`, `acces-sftp.js:216` compose `/policy/sftp/<geste>` (en
+   URL CONSTRUITE). Retirer d'ici ne perd rien au niveau du PRODUIT — seulement
+   au niveau d'un portail qu'on eteint.
+3. **⚠ RESTAURER LE VERIFICATEUR RE-ARMERAIT UN GESTE DE PRODUCTION.**
+   `tests/e2e/go-policies.mjs:131` POSTe `/api_proxy.php/policy/sudo/deploy` avec
+   `machine_id: 1` — `srv-zabbix`. **Ce POST n'est refuse aujourd'hui que PAR
+   EFFET DE L'ARCHIVAGE, pas par une garde**, et cette suite n'est dans aucune
+   liste du runner : aucun lot ne le revelerait. *Les deux ecarts confies comme
+   independants sont le meme fait vu des deux cotes.*
+
+**Correctif.**
+- `legacy/js/utils.js` : les **87 lignes** de `rwOpenStepUpModal` retirees. Le
+  wrapper testait deja `&& window.rwOpenStepUpModal` : il rend desormais la 403
+  d'origine, inchangee. **Le refus cesse d'etre un 404 et redevient lisible.**
+- `legacy/api_proxy.php` : le message promettait *« Re-authentification 2FA
+  requise »* — **une promesse qu'aucun chemin ne peut plus tenir**. Remplace par
+  un refus qui dit ce qu'il est et ou faire le geste. **La FORME de la reponse
+  est inchangee** (`step_up_required` et `action` conserves) pour ne rippler sur
+  aucune suite.
+- **Deux docblocks devenus faux, corriges** : `utils.js` (le wrapper decrivait un
+  flux qui n'existe plus) et `auth/step_up.php:25` (il decrivait le cote
+  frontend). *Un commentaire qui decrit un flux disparu se lit comme un etat.*
+
+**Tests.** `node --check` vert sur `utils.js`, `php -l` vert sur `api_proxy.php`
+et `auth/step_up.php` (via le conteneur). Plus aucune reference EXECUTABLE a
+`step_up_verify` dans le chemin servi — les trois restantes sont de la prose,
+dont deux que ce commit a reecrites.
+
+**Non traite ici, et volontairement** : `go-policies.mjs` (E-457) appartient au
+banc, qui ecrit dans `tests/` aujourd'hui. **Croisement demande avant toute
+touche.**
+
+---
+
 ## [1.54.1] - 2026-09-05
 
 ### Extinction - la queue : cinq fichiers d'actifs, et une sonde fausse d'un ordre de grandeur
