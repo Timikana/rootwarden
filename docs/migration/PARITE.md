@@ -21199,3 +21199,113 @@ soumis au navigateur.
   `margin-bottom` et un `<label>` est inline par défaut. *Le champ du nom est corrigé avec celui
   du code : en laisser un des deux garderait le défaut à moitié, pour une paire qui se lit
   ensemble.*
+
+
+## E-450 — les 12 renvois `lienLegacy` : ZÉRO est vivant, et l'autre mécanisme n'envoie personne non plus
+
+**Relevé refait directement le 2026-09-06 11:05**, l'index fourni étant décalé.
+
+### Les 12 occurrences, énumérées
+
+    4 controleurs   AuditSsh · Groupes · Wazuh · Documentation
+                    -> `'lienLegacy' => null`, SANS CONDITION
+    8 lignes de vue wazuh · documentation · groupes · audit-ssh
+                    -> toutes dans un `@if ($lienLegacy)` donc JAMAIS RENDUES
+
+**Et les quatre portent leur raison** : *« ⛔ NUL DEPUIS LE 2026-09-05 : la cible
+est ARCHIVÉE et rend 404. Offrir un lien vers une page retirée est le défaut que
+ce chantier a corrigé deux fois ailleurs. La vue garde le nul et n'affiche plus le
+renvoi. »*
+
+> **Le balisage reste, le lien n'atteint pas l'utilisateur.** *« Le commentaire le
+> dit et le lien reste » est vrai du CODE et faux de l'ÉCRAN.*
+
+### L'autre mécanisme — le seul vivant — n'envoie personne au legacy non plus
+
+`LiensLegacy::resoudre()` est appelé de deux endroits (`notifications.blade.php:100`,
+`RechercheController:30`). Tout chemin absent de `REMPLACEMENTS` (18 entrées)
+tombe vers l'ancien portail.
+
+    liens ecrits en dur par le backend   5
+    tombant vers le legacy               0
+
+**Parce que `normalise()` retire `/index.php`** : `/tickets/index.php` → `/tickets/`,
+qui EST dans la table. Idem `/update/index.php`. *Et les trois cibles concernées
+sont archivées — si l'un était tombé, c'était un 404.*
+
+> **La prémisse « le portage envoie encore chercher sur l'ancien portail à douze
+> endroits » est fausse. Il n'y envoie personne, par aucun des deux mécanismes.**
+
+### ⚠ Onzième variante du piège : comparer des clés NON NORMALISÉES
+
+**Mon premier relevé annonçait trois liens tombant vers le legacy.** *J'avais
+comparé les chaînes brutes à une table dont l'accès passe par `normalise()`.*
+**Une table qui normalise ses clés ne se compare pas par égalité de chaînes** —
+et comme les dix précédentes, l'erreur allait vers « c'est cassé ».
+
+### Le panneau « non porté » de `wazuh` est EXACT
+
+    detect · group · install · install_all · restart · uninstall
+    emis par le portage : 0 fichier CHACUNE
+    `/wazuh/install` n'apparait qu'UNE fois — dans un COMMENTAIRE (`wazuh.js:15`)
+
+**Les six que le panneau annonce sont bien les six absentes.** *Un panneau
+d'auto-déclaration exact, ce qui est assez rare pour être mesuré et dit.*
+
+**Et l'une des six est une LECTURE** : `/wazuh/detect` — *« Détecte un agent Wazuh
+déjà installé sur le serveur »*, POST, 2 mentions SSH, aucune écriture. **Portable
+sans arbitrage**, comme `/ssh-audit/backups`. Les cinq autres installent,
+désinstallent, redémarrent ou changent le groupe : arbitrage.
+
+
+## E-451 — `/wazuh/detect` NE SERA PAS PORTÉE : la porter demande d'ouvrir une liste fermée qui la nomme
+
+**Décision de l'exploitant le 2026-09-06 11:10.** *J'avais obtenu l'autorisation de
+la porter sur un argument que j'avais moi-même fourni — « une lecture qui répond à
+une question ». En allant l'écrire, DEUX prémisses ont bougé.*
+
+### ① `detect` n'est pas une lecture pure
+
+    docstring   « on remplit la table `wazuh_agents` a partir de /var/ossec/* »
+    ma 1re sonde (ancree sur le def)   aucun INSERT/UPDATE  -> j'ai conclu « lecture pure »
+    sonde ciblee                       `_upsert_agent` : 1 appel   TEMOIN : `install` 1 aussi
+
+**Elle lit la machine — cinq `execute_as_root` de `grep`, `cat` et relevés d'état,
+aucune commande modifiante — et ÉCRIT notre table d'inventaire.** *Aucune écriture
+sur la machine, donc portable au regard du discriminant ; mais « lecture pure »
+était faux, et c'est le mot qui avait emporté l'autorisation.*
+
+> **Le docstring disait vrai et ma sonde disait faux.** *Elle était ancrée
+> correctement et cherchait les bons motifs — sauf celui-là. **Un docstring qu'on
+> contredit se revérifie contre le motif qu'il nomme, pas contre ceux qu'on avait
+> prévus.***
+
+### ② ⛔ Et le vrai obstacle : la porter demande d'OUVRIR UNE LISTE FERMÉE
+
+    laravel/public/js/wazuh.js   ECRITURES_PERMISES = { config · options · regle · regleSuppr }
+                                 4 entrees, et `ecris()` sur toute autre cible rend
+                                 { ok: false, interdit: true }  — fail-closed ET BRUYANT
+
+**Et son commentaire nomme `detect` explicitement :**
+
+> *« Les six gestes SSH du module (`install`, `install_all`, **`detect`**,
+> `uninstall`, `restart`, `group`) ne sont pas seulement absents du code : ils sont
+> **inexprimables** par ce helper. Ajouter `/wazuh/install` demanderait d'ajouter
+> une ligne à la liste — un geste visible en relecture, là où un `fetch` de plus se
+> serait fondu dans le fichier. C'est la différence entre une règle qu'on applique
+> et une règle qu'on doit se rappeler. »*
+
+**Le dispositif a été conçu pour rendre exactement cet ajout délibéré et visible.**
+*L'ouvrir sur la transmission d'un pair est précisément ce contre quoi il a été
+écrit* — et il l'a été après qu'une injection ait été corrigée sur un module
+voisin, où la parade retenue fut une interface à liste fermée.
+
+### Ce que ça établit au-delà de `detect`
+
+> **Une capacité peut être portable par sa NATURE et bloquée par son
+> DISPOSITIF.** *Mes six appariements classaient jusqu'ici en « porté », « sous
+> arbitrage » et « orphelin ». Il en faut une quatrième : **portable mais derrière
+> une garde délibérée**, où le coût n'est pas le geste mais l'ouverture de la
+> garde.*
+
+**Non porté. La liste reste à quatre entrées.**

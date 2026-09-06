@@ -1306,8 +1306,23 @@ joue() {
 
   remetLesCompteursAZero
 
-  if [ "$cible" = legacy ]; then export E2E_BASE="$BASE_LEGACY"
-  else                            export E2E_BASE="$BASE_LARAVEL" ; fi
+  # ⚠ `E2E_CIBLE` EST POSEE ICI, ET PAS AILLEURS.
+  #
+  # Les 87 suites decidaient de leur plateforme en LISANT LE NUMERO DE PORT dans
+  # l'URL (`/8444|laravel/i.test(BASE)`). Le port servait d'IDENTITE. Le jour ou
+  # les ports s'echangent, ce motif rend l'inverse de la verite — et les suites
+  # ne DEVIENNENT PAS ROUGES : elles appliquent les attentes de l'autre
+  # plateforme et rendent du VERT. Une suite qui ment coute plus cher qu'une
+  # suite qui tombe.
+  #
+  # `a329876` a fait de `E2E_CIBLE` l'autorite, le motif d'URL n'etant plus
+  # qu'un repli. SANS L'EXPORT CI-DESSOUS, ce repli reprend la main et le defaut
+  # revient entier au premier lot lance apres l'echange.
+  #
+  # Meme discriminant que `E2E_BASE`, une ligne plus bas : la cible du lot est
+  # `$cible`, elle n'est pas deduite.
+  if [ "$cible" = legacy ]; then export E2E_BASE="$BASE_LEGACY" ; export E2E_CIBLE=legacy
+  else                            export E2E_BASE="$BASE_LARAVEL" ; export E2E_CIBLE=laravel ; fi
 
   # Prealable 6 : le cas particulier de vague 0.
   if [ "$suite" = go-vague0-legacy ]; then

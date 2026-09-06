@@ -21,9 +21,15 @@
  *       exit;
  *   }
  *
- * Cote frontend (JS) : si reponse contient step_up_required=true, ouvrir
- * un modal qui demande le code 2FA, POSTer sur step_up_verify.php avec
- * action=<x>, puis re-tenter l'action initiale.
+ * ⚠ CE QUE FAISAIT LE FRONTEND N'EXISTE PLUS (E-456, 2026-09-06).
+ * Il ouvrait un modal, POSTait sur `step_up_verify.php` puis rejouait l'action.
+ * `step_up_verify.php` a ete ARCHIVE le 2026-09-05 (`de9669c`) et le modal a
+ * ete RETIRE de `js/utils.js` : plus AUCUN chemin ne peut satisfaire un
+ * step-up depuis ce portail. Les gestes gardes restent donc REFUSES — sens
+ * ferme, decide plutot que subi.
+ *
+ * Ce fichier reste servi parce que `stepUpVerify()` est ce qui REFUSE. Le
+ * geste correspondant vit dans le portage (`politiques.js`, `acces-sftp.js`).
  */
 
 if (!function_exists('stepUpVerify')) {
