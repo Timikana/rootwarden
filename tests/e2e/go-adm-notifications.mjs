@@ -76,6 +76,7 @@ import puppeteer from 'puppeteer';
 import { createHmac } from 'crypto';
 import { litEnBase, compteEnBase } from './lib-base.mjs';
 import { mkdirSync } from 'node:fs';
+import { constateArchivage } from './archive.mjs';
 
 const BASE = process.env.E2E_BASE || 'https://localhost:8443';
 const CIBLE = /8444|laravel/i.test(BASE) ? 'laravel' : 'legacy';
@@ -296,6 +297,29 @@ let prefInitiale = null;
 const session = {};
 
 try {
+    /*
+     * ══ LE SUJET DE CETTE SUITE N'EXISTE PLUS COTE LEGACY ═════════════════
+     *
+     * ⚠ ET MON INVENTAIRE L'AVAIT CLASSEE « MIXTE », DONC ECARTEE. Le
+     * 2026-09-05 j'ai outille 33 suites au sujet archive, en ecartant celles
+     * qui CITENT un chemin encore servi. Celle-ci en cite un — mais son SUJET
+     * est archive, et elle a rendu ses rouges au lot suivant.
+     *
+     * **Mon critere demandait « cite-t-elle un chemin vivant » la ou il fallait
+     * demander « son SUJET vit-il ».** Un chemin d'API partage ne dit rien de la
+     * page qu'une suite mesure.
+     *
+     * LE CONSTAT VIENT AVANT LA CONNEXION : la sonde de `archive.mjs` n'ouvre pas
+     * de navigateur, et se connecter d'abord consommerait un code TOTP — garde
+     * anti-rejeu par COMPTE et persistant — pour mesurer une page absente.
+     */
+    if (CIBLE === 'legacy') {
+        const archivee = await constateArchivage({
+            base: BASE, chemin: C.page, fichiers: [], verifie, constate,
+        });
+        if (archivee) throw new Error('__archivee__');
+    }
+
     retireLaFixture();
     prefInitiale = prefEnBase();
     fixture = poseLaFixture();
@@ -550,7 +574,10 @@ try {
         erreursJs.slice(0, 3).join(' | '));
 
 } catch (e) {
+    // `__archivee__` est la sortie NORMALE d'un sujet archive, pas une panne.
+    if (String(e && e.message || e).includes('__archivee__')) { /* le constat a tout dit */ } else {
     verifie('deroulement de la suite', false, String(e.message || e).split('\n')[0]);
+    }
 } finally {
     // CHAQUE etape dans son propre `try` : une exception ici emporterait le
     // journal entier, et treize suites dependent de ces comptes.

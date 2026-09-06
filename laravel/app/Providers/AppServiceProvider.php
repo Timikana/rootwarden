@@ -11,7 +11,17 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        //
+        /*
+         * Le depot des jetons « se souvenir de moi » derriere son interface.
+         *
+         * C'est cette liaison qui rend la propriete d'authentification
+         * verrouillable A SEC : la session 6 substitue un depot en memoire et
+         * mesure `JetonMemorisation::decide()` sans base ni navigateur.
+         */
+        $this->app->bind(
+            \App\Support\DepotJetonsMemorisation::class,
+            \App\Support\DepotJetonsMemorisationBase::class,
+        );
     }
 
     public function boot(): void

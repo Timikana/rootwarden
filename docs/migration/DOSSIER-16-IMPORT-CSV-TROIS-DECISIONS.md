@@ -363,3 +363,73 @@ attaquant distribué. (c) RENCHÉRIT (b), il ne le ferme pas.**
 **Et sa mesure rend (b) plus grave que ma formulation** : *`mail_helper.php` pose `$mail->Timeout = 15`.*
 **La branche « l'adresse existe » est bornée par quinze secondes — observable en UNE requête, à l'œil. Et
 le maximum est atteint quand le SMTP est en panne : une panne de courriel rend l'énumération triviale.**
+
+---
+
+# ✅ LES TROIS DÉCISIONS SONT RENDUES — 2026-09-04 13:55
+
+**L'exploitant a délégué : « continue et prends les décisions ».** *Les trois sont tranchées, et la
+deuxième a changé depuis ma recommandation d'hier — parce qu'une mesure l'a rendue impraticable.*
+
+## ✅ 1. La colonne `sudo` — issue (a) : EXIGER LE RÔLE 3, avec compte-rendu
+
+    forme retenue :  coercer `sudo` a 0 si l'importeur n'est pas role 3
+                     ET rendre compte PAR LIGNE, avec `$results['errors'][]`
+                     qui existe deja (import_csv.php:143)
+
+**Pourquoi (a) et pas (b) « la refuser » :** *retirer une colonne d'un format de fichier documenté change
+un contrat.* **Pourquoi pas (c) « la garder » :** *un rôle 2 obtiendrait par fichier ce que le geste dédié
+réserve au rôle 3.*
+
+**⚠ Et le compte-rendu n'est pas un ornement.** *La coercition de `role_id` (`:156`) est SILENCIEUSE — le
+legacy a choisi la moins bonne forme.* **Un importeur qui croit avoir accordé `sudo` et ne l'a pas accordé
+prendra la décision suivante sur une croyance fausse.**
+
+**Et il faut savoir ce que `sudo` fait aujourd'hui** : *rien.* `users.sudo` ne confère plus rien sur aucune
+machine — ni par l'import, ni par `toggle_sudo.php` (`DOSSIER-16`, le renversement d'E-130). **La décision
+protège donc contre le RÉVEIL du chemin d'octroi, pas contre un privilège actif.**
+
+## ✅ 2. Le compte importé inutilisable — je CHANGE ma recommandation d'hier
+
+    HIER    « `email` obligatoire ET forcer `force_password_change` »
+    AUJOURD'HUI  « `email` obligatoire ET AFFICHER LE MOT DE PASSE UNE FOIS »
+
+**Ce qui a changé** : le `DOSSIER-24`. *Le portage n'envoie AUCUN courriel — `MAIL_MAILER` est absent, le
+repli est `log`, et les deux jeux de variables ne partagent aucun nom.* **Et le flux de réinitialisation
+n'est pas porté, pour cette raison même.**
+
+> **Forcer le changement d'un mot de passe que personne ne connaît, sans canal de délivrance et sans flux
+> de réinitialisation, produit un compte définitivement inaccessible.** *C'est ce que ma recommandation
+> d'hier aurait fabriqué, en série, à chaque import.*
+
+**L'affichage unique — que j'avais écarté — est la seule issue qui rende un compte UTILISABLE aujourd'hui.**
+*Elle existe déjà côté portage : le sous-lot D3 le fait.* **Et sa faiblesse est réelle et bornée : on peut
+manquer l'affichage. Une adresse obligatoire donne alors le second recours, quand le SMTP sera configuré.**
+
+**`force_password_change` reste souhaitable et se posera QUAND le point 2 du `DOSSIER-24` sera fait. Pas
+avant.**
+
+## ✅ 3. La politique de mot de passe sur les MACHINES — divergence ASSUMÉE, et déclarée
+
+**Le portage passe `false`, comme le formulaire.** *Un mot de passe de machine est imposé par la machine :
+lui appliquer une politique de complexité de comptes humains n'a pas d'objet.*
+
+**Rien à changer. La décision est de le DÉCLARER** — *au CHANGELOG et dans le catalogue —, pour qu'un futur
+relevé de parité ne le compte pas comme un écart oublié.*
+
+---
+
+## ⛔ ET CE QUE JE NE DÉCIDE PAS, MÊME AVEC « PRENDS LES DÉCISIONS »
+
+    les 5 comptes forces SANS ADRESSE     leur en poser une est une decision
+                                          sur des comptes REELS, pas un arbitrage produit
+    le SMTP du portage (DOSSIER-24)       c'est le geste qui fait sortir un courriel
+                                          vers un serveur reel : un effet SORTANT
+    `bashrc` deploiement · l'annulation   ils ECRIVENT sur des machines reelles.
+    · le declenchement K4                 « Prends les decisions » delegue des
+                                          DECISIONS, pas l'exercice de gestes
+                                          destructeurs sur l'infrastructure.
+
+> **Un arbitrage produit se délègue. L'autorisation d'écrire en root sur une machine de production ne se
+> déduit pas d'une phrase générale.** *Si vous voulez ces trois-là, nommez-les — et je les ferai porter
+> câblés et non exercés, comme A3, F8 et A4.*

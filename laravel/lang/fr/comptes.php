@@ -16,10 +16,6 @@ return [
     'title' => 'Comptes du portail',
     'desc' => "Créer un compte, fixer un mot de passe, déverrouiller un accès, réinitialiser un second facteur.",
 
-    'reste_titre' => "Une capacité de cet onglet n'est pas encore portée.",
-    'reste_texte' => "L'import de comptes par fichier CSV vit toujours sur l'ancien portail. Les trois onglets de la page d'administration, eux, sont portés : ils se rejoignent par les onglets ci-dessus.",
-    'reste_lien' => "Ouvrir l'ancien portail",
-
     'col_nom' => 'Nom',
     'col_courriel' => 'Courriel',
     'col_societe' => 'Société',
@@ -40,7 +36,7 @@ return [
 
     'creer_titre' => 'Créer un compte',
     'creer' => 'Créer',
-    'cree' => "Compte « :nom » créé (identifiant :id). Il devra fixer son mot de passe à la première connexion.",
+    'cree' => "Compte « :nom » créé (identifiant :id). Il devra changer ce mot de passe à sa première connexion.",
 
     'mdp_placeholder' => ':minimum car. min.',
     'mdp_poser' => 'Enregistrer',
@@ -60,6 +56,54 @@ return [
     'totp_reinitialise' => 'Second facteur réinitialisé.',
     'annuler' => 'Annuler',
 
+    'imp_titre' => 'Importer des comptes depuis un fichier CSV',
+    'imp_aide' => 'Le fichier doit porter une ligne d\'en-tête. Les colonnes :colonnes sont obligatoires ; :facultatives sont facultatives.',
+    'imp_champ' => 'fichier CSV',
+    'imp_fichier' => 'Fichier CSV (:ko kio au plus)',
+    /*
+     * ══ L'EXEMPTION D'EXPIRATION DE MOT DE PASSE ═════════════════════════
+     *
+     * TROIS valeurs, et « vide » n'est pas « zéro » : `null` suit la règle
+     * globale, `0` exempte, `N` fixe une durée propre au compte. Les libellés
+     * le disent, parce qu'un menu qui offrirait « aucune » deux fois ne
+     * laisserait pas choisir.
+     */
+    'exp_titre'   => "Expiration du mot de passe",
+    'exp_aide'    => "Réservé au superadministrateur, et jamais sur son propre compte.",
+    'exp_globale' => "Suivre la règle globale",
+    'exp_exempte' => "Exempter ce compte",
+    'exp_jours'   => "Durée propre au compte (en jours)",
+    'exp_valider' => "Enregistrer",
+    'exp_pose'    => "Expiration enregistrée. L'échéance est recalculée depuis la date du dernier changement de mot de passe.",
+    'exp_valeur'  => "Valeur d'expiration invalide : attendu une durée positive, zéro pour exempter, ou rien pour suivre la règle globale.",
+    /*
+     * ⚠ CE REFUS EST UN GESTE PORTE, PAS UNE REPRISE. Le legacy annonce
+     * l'anti-auto-édition dans un commentaire (`update_user.php:42`) et ne la
+     * fait pas — zéro comparaison avec l'identifiant de session dans tout le
+     * fichier. Le message dit la raison, pas seulement le refus.
+     */
+    'exp_pas_soi' => "Vous ne pouvez pas modifier l'expiration de votre propre mot de passe : s'exempter soi-même d'une règle de sécurité doit passer par quelqu'un d'autre.",
+
+    'imp_valider' => 'Importer les comptes',
+    'imp_roles_aide' => 'La colonne « role » accepte : :roles. Toute autre valeur donne le rôle le plus faible.',
+    'imp_courriel_exige' => 'L\'adresse de courriel est OBLIGATOIRE ici, alors que l\'ancien portail l\'acceptait vide — un compte sans adresse et sans mot de passe connu n\'a ni accès ni récupération.',
+    'imp_mdp_avert' => 'Le mot de passe de chaque compte créé est affiché UNE SEULE FOIS ci-dessous. Il n\'est enregistré nulle part et ne sera plus jamais affiché : recopiez-le avant de quitter cette page. La personne devra le changer à sa première connexion — il a transité par cet écran, il ne doit pas rester le sien.',
+    'imp_bilan_titre' => 'Bilan de l\'import',
+    'imp_lues' => ':n ligne(s) lue(s).',
+    'imp_crees' => ':n compte(s) créé(s).',
+    'imp_tronque' => 'Le fichier dépasse :max lignes : les suivantes n\'ont PAS été traitées.',
+    'imp_manquantes' => 'Colonnes obligatoires absentes de l\'en-tête : :colonnes. Rien n\'a été importé.',
+    'imp_erreurs_titre' => ':n ligne(s) à signaler',
+    'imp_ligne' => 'Ligne :n',
+    'imp_secrets_titre' => 'Mots de passe des comptes créés — affichés une seule fois',
+    'imp_doublon' => 'Un compte porte déjà ce nom : ligne ignorée.',
+    'imp_err_illisible' => 'Le fichier n\'a pas pu être ouvert.',
+    'imp_err_vide' => 'Le fichier est vide ou sans ligne d\'en-tête.',
+    'imp_err_courriel' => 'Adresse de courriel absente ou invalide : ligne ignorée.',
+    'imp_err_ecriture' => 'La création a échoué en base : ligne ignorée.',
+    'imp_err_role' => 'La valeur « :valeur » de la colonne « role » n\'est pas un rôle : le compte a été créé avec le rôle « Utilisateur ». Valeurs acceptées : :roles.',
+    'imp_rang_ramene' => 'Compte créé, mais avec le rôle « Utilisateur » : vous ne pouvez créer qu\'un rôle inférieur au vôtre.',
+    'imp_sudo_refuse' => 'Compte créé SANS sudo : accorder sudo demande le rôle « Superadministrateur ».',
     'err_nom' => "Le nom est obligatoire et ne peut dépasser 255 caractères.",
     'err_nom_pris' => 'Ce nom est déjà utilisé par un autre compte.',
     'err_inconnu' => "Ce compte n'existe pas.",
@@ -87,6 +131,8 @@ return [
     'supprime' => 'Compte « :nom » supprimé.',
     'anonymise' => "Compte « :nom » anonymisé. :nombre ligne(s) de journal conservée(s).",
     'err_soi_meme' => "Vous ne pouvez pas agir sur votre propre compte.",
+    'cree_valeur_role' => 'La valeur de rôle soumise n\'est pas un rôle : le rôle « Utilisateur » a été posé.',
+    'cree_rang_ramene' => 'Compte « :nom » créé (identifiant :id) — mais avec le rôle « Utilisateur » : vous ne pouvez créer qu\'un rôle inférieur au vôtre.',
     'err_rang' => "Impossible d'agir sur un compte de rôle égal ou supérieur au vôtre.",
     'err_dernier_sa' => "C'est le dernier super-administrateur actif : il ne peut pas être retiré.",
     'err_journal_present' => "Ce compte porte :nombre ligne(s) de journal d'audit : la suppression les emporterait et romprait la chaîne. Anonymisez-le.",

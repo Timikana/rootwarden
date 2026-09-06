@@ -200,7 +200,7 @@ try {
         });
         if (archivee) {
             const { ctx, page } = await connecte('rw-test-admin', SECRET_ADMIN);
-            await verifieMenuLegacy(page, '/supervision', verifie);
+            await verifieMenuLegacy(page, '/supervision', verifie, constate);
             /*
              * QUATRE EMPLACEMENTS POINTAIENT VERS CE MODULE, PAS DEUX.
              * `verifieMenuLegacy` n'en mesure qu'un : la barre laterale. Le

@@ -306,3 +306,236 @@ protection qu'elle n'exerce pas.**
 EN (`laravel/lang/*/profil.php`). Une clé pour un contrôle éteint est correcte
 **si** le contrôle est porté ; **non vérifié** — c'est à la relecture du portage
 de la politique, pas ici.
+
+---
+
+## 8. `login_attempts` — mesuré le 2026-09-05, et la crainte est fondée pour une raison plus forte
+
+Le DSI demande si le flux de réinitialisation alimente `login_attempts`, avec la
+conséquence qu'*« une demande de réinitialisation qui échoue pourrait fermer la
+CONNEXION de toute une adresse »*.
+
+### 8.1 Le legacy ne l'alimente PAS — zéro occurrence
+
+```
+grep 'login_attempts|recordLoginAttempt' forgot_password.php reset_password.php
+   -> AUCUNE occurrence dans les deux fichiers
+```
+
+Le flux legacy a son **propre** compteur, sur `password_reset_tokens.ip_address`
+(3/IP/heure) — celui dont le §7.1 montre qu'il ne borne pas ce qu'il devrait.
+**Les deux compteurs sont disjoints, et c'est ce qui protège la connexion
+aujourd'hui.**
+
+### 8.2 ⚠ Mais le compteur de connexion N'A AUCUN FILTRE D'ÉTAPE — la colonne existe pourtant
+
+```sql
+-- login.php:50, LE GARDE qui bloque réellement :
+SELECT COUNT(*) FROM login_attempts
+WHERE ip_address = ? AND success = 0 AND attempted_at >= …
+--                      ^^^^^^^^^^^  filtre l'echec, PAS l'etape
+```
+
+Et le schéma porte bien une colonne `step` :
+
+```
+id · ip_address · username · success · step (varchar(16)) · attempted_at
+```
+
+**Le portage l'utilise** (`SecondFacteurController`, `step = '2fa'`) ; **le garde
+du legacy l'ignore.**
+
+> **Conséquence pour qui portera ce flux :** *toute* écriture dans
+> `login_attempts`, depuis *n'importe quel* flux, **avec ou sans `step`**,
+> compte dans le verrou de connexion du legacy. La crainte du DSI n'est donc pas
+> un « pourrait » conditionnel : **le compteur legacy est structurellement
+> incapable de distinguer les étapes.** Écrire les échecs de réinitialisation
+> dans cette table fermerait la connexion de l'adresse.
+>
+> **Contrainte de portage : ne pas écrire les échecs de réinitialisation dans
+> `login_attempts`** — ou n'y écrire qu'avec un `step` dédié **et** ajouter le
+> filtre correspondant au garde du legacy, ce qui est une modification du
+> legacy et sort du portage.
+
+### 8.3 ⚠ ET UN DÉFAUT LIVE, TROUVÉ EN MESURANT : l'écran annonce un verrou qui n'existe pas
+
+```php
+// login.php:337 — dans la VUE, pour AFFICHER « adresse bloquée »
+SELECT MAX(attempted_at) AS last_attempt, COUNT(*) AS cnt
+FROM login_attempts
+WHERE ip_address = ? AND attempted_at >= DATE_SUB(NOW(), INTERVAL 600 SECOND)
+if (($lockInfo['cnt'] ?? 0) >= 5): … « 🔒 votre adresse est bloquée N minutes »
+```
+
+**Cette requête n'a NI `success = 0` NI `step`.** Elle compte **toutes** les
+tentatives, **succès compris** — là où le garde de `:50`, lui, filtre les échecs.
+
+> **L'écran et le garde ne comptent pas la même chose.** Cinq connexions
+> **réussies** depuis la même adresse en dix minutes affichent
+> *« votre adresse est bloquée »* — **alors que rien n'est bloqué** : le
+> formulaire fonctionne, `:50` ne compte aucun échec.
+
+**Et l'occupation n'est pas théorique** : c'est un outil interne, derrière une
+sortie NAT d'entreprise. **Cinq connexions réussies en dix minutes depuis une
+même adresse publique est un mardi matin ordinaire.**
+
+C'est la famille du défaut qu'on démonte, **inversée** : d'habitude l'écran
+annonce une protection que le code n'exerce pas ; ici il annonce une
+**restriction** que le code n'applique pas. *Le coût est le même — on cesse de
+croire l'écran.*
+
+**Non corrigé** : c'est `legacy/auth/login.php`, hors de mon périmètre d'écriture
+et hors du portage de ce flux. **Signalé pour arbitrage.**
+
+### 8.4 Mise à jour de ma liste de contrôle (§4) — point 5
+
+Mon point 5 disait *« révocation des sessions et des cookies `remember` **après le
+commit** »*, en décrivant le legacy. **E-393 a tranché depuis, et dans l'autre
+sens** : `MotDePasse::applique` fait désormais la purge de `remember_tokens`
+**DANS** la transaction — *un jeton survivant défait le geste, qui est tout son
+objet.*
+
+**Le portage de la réinitialisation doit faire pareil**, sinon le défaut revient
+par une autre porte : deux chemins écrivent un mot de passe, et un seul
+révoquerait vraiment.
+
+*Et l'asymétrie avec `active_sessions` reste justifiée : le portage ne lit jamais
+cette table (ses sessions vivent en fichiers), donc une ligne survivante y est
+inerte — mesuré au site de `MotDePasse.php`.*
+
+### 8.5 Le témoin remesuré — et la ventilation par étape aggrave d'un ordre de grandeur
+
+Le DSI mesure *« 23 lignes, 23 succès, zéro échec »*. **Remesuré par moi, confirmé,
+et la ventilation dit plus :**
+
+| étape | `success` | lignes |
+|---|---|---|
+| `2fa` | 1 | **19** |
+| `login` | 1 | 4 |
+| — | 0 | **0** |
+
+*Fenêtre : 2026-09-03 20:46 → 2026-09-05 06:03, soit ~34 h — donc la purge des
+24 h (`login.php:47`) n'a pas tourné sur toute la période, et l'échantillon n'est
+pas une fenêtre glissante propre.*
+
+**Trois conséquences, dont deux que la formulation « cinq connexions réussies »
+ne portait pas :**
+
+**a) Ce ne sont pas des connexions — ce sont des vérifications de SECOND
+FACTEUR.** 19 lignes sur 23. La requête d'affichage ne filtre pas `step`, donc
+**cinq passages de 2FA en dix minutes suffisent**, et ils s'accumulent environ
+cinq fois plus vite que les lignes de connexion. *Le message faux se déclenche
+sur l'événement le plus fréquent de la table.*
+
+**b) Une seule adresse distincte ici** — environnement de développement. **En
+production derrière un NAT d'entreprise, toutes les personnes partagent une
+adresse** : les lignes `2fa` de tout le monde se cumulent. Sur une équipe d'une
+dizaine, cinq vérifications en dix minutes est **une heure de travail normal**,
+pas un mardi matin. **Le message serait quasi permanent.**
+
+**c) Et le VRAI garde n'a jamais tiré non plus.** Zéro ligne `success = 0`
+signifie que `login.php:50` **n'a jamais eu quoi que ce soit à compter**. La
+limite de connexion est donc **entièrement non éprouvée**, et *le seul
+« verrouillage » que quiconque ait jamais vu sur cet écran est le faux.*
+
+> **Le correctif arbitré (`AND success = 0` à `:337`) est juste et suffit pour le
+> message.** Mais il ne change rien à (c) : après lui, l'écran cessera de mentir
+> **et le garde restera sans épreuve**. *Deux propriétés distinctes, et une seule
+> est corrigée — c'est à dire, pas à réparer dans le même geste.*
+
+---
+
+## 9. RELECTURE DU PORTAGE `e0c7d27` — 2026-09-05
+
+**Quatre contraintes sur cinq sont tenues. La cinquième — celle que l'auteur
+désigne lui-même — n'est PAS tenue par construction, et le déploiement est le cas
+DÉFAVORABLE.**
+
+### 9.1 ✅ Contraintes 2 à 5 — vérifiées au code
+
+| # | contrainte | verdict |
+|---|---|---|
+| 2 | limite de débit fail-closed, sur les **demandes reçues** | **tenue** — compteur en cache incrémenté **avant** de savoir si l'adresse existe ; `catch (\Throwable) → return false`. Et `put` plutôt que `increment`, avec sa raison écrite (le pilote `file` ne garantit pas l'atomicité). *Le défaut du legacy — compter les jetons ÉMIS — est refermé.* |
+| 3 | aucune écriture dans `login_attempts` | **tenue** — zéro occurrence ; la seule mention est un **commentaire** qui cite pourquoi. |
+| 4 | purge de `remember_tokens` **dans** la transaction | **tenue**, et non réécrite : elle vit dans `MotDePasse::reinitialise`, `DB::transaction(…)`, delete à l'intérieur. |
+| 5 | message identique **hors** du `if` | **tenue** — `return back()->with('succes', …)` est la **dernière** instruction de la méthode, hors de toute branche. *Remesuré sur le PORTAGE, pas reconduit du legacy.* |
+
+**Et le lien entrant tient** : `connexion.blade.php:78` porte
+`route('reinit.demander')` avec un `data-rw`. *La capacité est atteignable.*
+
+### 9.2 ⛔ Contrainte 1 — LE PARI TOMBE, ET PLUS DUREMENT QUE L'AUTEUR NE LE CRAINT
+
+L'auteur écrit : *« vérifié disponible et vérifié APPELÉ, mais je n'ai PAS mesuré
+que la réponse part réellement avant l'envoi **sous php-fpm**. »*
+
+**Mesuré : il n'y a pas de php-fpm.**
+
+```
+apache2ctl -M   ->  php_module (shared)        <- mod_php, PAS proxy_fcgi
+command -v php-fpm / ls /usr/local/etc/php-fpm*  ->  RIEN
+                ->  deflate_module (shared)    <- le filtre BUFFERISE
+                    filter_module (shared)
+php -r ini_get   ->  output_buffering = '0'   zlib.output_compression = '0'
+                     implicit_flush   = '1'    <- cote PHP : favorable
+```
+
+**`terminating()` ne défère la réponse que si `Response::send()` peut DÉTACHER la
+connexion — et le seul mécanisme qui le garantit est `fastcgi_finish_request()`,
+qui n'existe QUE sous FPM/FastCGI. Il est absent ici.**
+
+Sous mod_php, `send()` peut vider les tampons PHP — favorable, ils sont à zéro —
+mais **la chaîne de filtres d'Apache garde la main**, et `mod_deflate` compresse,
+donc bufferise. *La réponse peut ne pas avoir atteint le client quand
+`terminate()` déclenche l'envoi.*
+
+### 9.3 ⚠ ET LA MESURE CITÉE NE PEUT PAS DÉMONTRER LA PROPRIÉTÉ
+
+    branche INCONNUE  185,7 ms
+    branche CONNUE    188,1 ms      ecart 2,4 ms (1 %)
+
+**`MAIL_MAILER` est ABSENTE de l'environnement, donc le pilote est `log` : l'« envoi » est une écriture de fichier, en fractions de milliseconde.**
+
+> **La mesure a été prise dans la configuration où le terme coûteux N'EXISTE
+> PAS.** Elle montre que `terminating()` ne coûte rien quand il n'a rien à
+> différer. **Elle ne peut pas montrer qu'il diffère un envoi SMTP** — aucun
+> envoi SMTP n'a eu lieu.
+
+*C'est un témoin sur le mauvais axe : l'instrument rend bien le positif, sur autre
+chose que ce qu'on mesure.* **Et l'auteur le dit à moitié** — il annonce que la
+mesure est « au service, pas au réseau ». Le second biais, plus décisif, n'est pas
+énoncé : elle est **au pilote `log`, pas au SMTP**.
+
+### 9.4 Ce que ça change, et ce que ça ne change pas
+
+**Aujourd'hui : inoffensif.** Avec `log`, les deux branches écrivent un fichier ;
+l'écart de 2,4 ms est le résidu `UPDATE`+`INSERT` que l'auteur énonce, et il est
+correctement borné.
+
+**⚠ Le jour où le SMTP est posé** : le terme coûteux réapparaît **entier**, et
+`terminating()` ne garantit rien sur ce déploiement. **Aucun commit n'expliquera
+le changement** — c'est exactement l'écart « qui disparaît avec la configuration
+et revient avec elle » du §5, réalisé.
+
+**Ce qui trancherait** : une mesure **au réseau** — temps jusqu'au dernier octet
+sur les deux branches, avec un SMTP réel ou un bouchon lent. Non lisible, non
+faisable sans poser le transport.
+
+**Ce qui rendrait la propriété vraie PAR CONSTRUCTION, indépendamment du SAPI** :
+ne pas émettre depuis la requête du tout. Écrire le message en attente dans un
+magasin durable (table ou fichier), et le faire délivrer par un **processus
+séparé**. *C'est la seule forme qui ne dépende ni du SAPI, ni de `mod_deflate`,
+ni du tampon d'Apache* — et elle ne demande pas de file Laravel, dont le pilote
+`sync` la rendrait inopérante.
+
+### 9.5 Verdict
+
+**Le portage est bon et je ne demande pas de le retenir.** Les quatre contraintes
+mesurables sont tenues, la limite de débit corrige un défaut du legacy, et le
+résidu connu est énoncé au site plutôt que tu.
+
+**Ma seule réserve porte sur la contrainte 1, et elle n'est pas bloquante
+aujourd'hui** — elle le devient **le jour de la décision SMTP**. *Elle doit donc
+voyager AVEC cette décision, pas rester dans une relecture.* **Le commentaire de
+`ReinitialisationController` doit dire que `terminating()` ne défère pas par
+construction sur mod_php sans `fastcgi_finish_request`, et que la propriété est à
+remesurer au réseau quand le transport change.**

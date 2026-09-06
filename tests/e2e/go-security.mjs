@@ -13,6 +13,41 @@
  */
 import { BASE_URL, launchBrowser, newPage, login, sleep } from './helpers.mjs';
 
+/**
+ * ⚠ LA PORTEE DES PLANIFICATIONS CREEES ICI — ET POURQUOI CE N'EST PLUS `all`.
+ *
+ * Cette suite mesure le CSRF, l'authentification, le role et l'echappement XSS.
+ * Aucune de ces quatre proprietes n'a besoin d'une portee de PARC — et les trois
+ * requetes en portaient une : `target_type: 'all'`.
+ *
+ * Mesure du 2026-09-04 :
+ *   `backend/routes/cve.py:490`   target_type = data.get('target_type', 'all')
+ *                                 -> `all` par DEFAUT, et AUCUNE validation
+ *   `backend/scheduler.py:171`    `_run_scheduled_scan` : 0 filtre de cycle de vie
+ *                                 (temoin : `_run_scheduled_ssh_audit` en porte 4)
+ *   -> `all` resout LES TROIS MACHINES, `srv-zabbix` (id 1, PRODUCTION) comprise
+ *
+ * Un scan CVE ouvre une session SSH PAR MACHINE et envoie un courriel par machine
+ * a resultats.
+ *
+ * LA MENACE N'ETAIT PAS IMMEDIATE, et il faut le dire exactement : `next_run =
+ * it.get_next(datetime)` (`cve.py:505`) rend toujours un instant FUTUR, donc
+ * `0 3 * * *` cree a 15h vise demain 3h, et le predicat du planificateur est
+ * `next_run <= now` (`scheduler:648`). **Elle survivait en revanche a un echec de
+ * nettoyage** : `enabled` vaut 1 par defaut, donc une suite qui meurt entre la
+ * creation et la suppression laisse une planification qui prend le parc a 3h.
+ *
+ * LA CONDITION QUI REND CETTE PORTEE SURE EST QUE LA VALEUR SOIT NON VIDE :
+ * `scheduler:190` n'execute son `INNER JOIN machine_tags` que
+ * `if target_type == 'tag' and target_value`. Un tag VIDE retombe dans le `else`
+ * final — c'est-a-dire sur tout le parc. Ce tag ne porte 0 machine (mesure), donc
+ * la resolution rend ZERO cible sans passer par aucun repli.
+ *
+ * Les TROIS requetes l'emploient, y compris celle qui doit etre refusee par le
+ * CSRF : une surete qui repose sur un garde n'est pas une surete.
+ */
+const PORTEE_NULLE = 'rw-e2e-aucune-machine';
+
 let failed = 0;
 function check(label, ok, details = '') {
     if (ok) { console.log(`   [OK] ${label}`); }
@@ -30,29 +65,29 @@ function check(label, ok, details = '') {
 
         // Appel direct via fetch SANS le wrapper utils.js (on simule une XSS qui
         // bypass le shim ; l'attaque doit etre bloquee cote serveur).
-        const r = await page.evaluate(async () => {
+        const r = await page.evaluate(async (portee) => {
             // Bypass le wrapper en utilisant XMLHttpRequest direct
             const xhr = new XMLHttpRequest();
             xhr.open('POST', '/api_proxy.php/cve_schedules', false);
             xhr.setRequestHeader('Content-Type', 'application/json');
             try {
-                xhr.send(JSON.stringify({ name: 'EVIL', cron_expression: '0 3 * * *', target_type: 'all' }));
+                xhr.send(JSON.stringify({ name: 'EVIL', cron_expression: '0 3 * * *', target_type: 'tag', target_value: portee }));
                 return { status: xhr.status, body: xhr.responseText };
             } catch (e) { return { status: 0, body: String(e) }; }
-        });
+        }, PORTEE_NULLE);
         check('POST sans CSRF -> 403', r.status === 403, `got ${r.status}`);
 
         // Avec CSRF (via le wrapper natif) -> doit passer
-        const ok = await page.evaluate(async () => {
+        const ok = await page.evaluate(async (portee) => {
             const meta = document.querySelector('meta[name="csrf-token"]');
             const r = await fetch('/api_proxy.php/cve_schedules', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': meta?.content || '' },
                 body: JSON.stringify({ name: 'TEST_sec_csrfok', cron_expression: '0 3 * * *',
-                                       min_cvss: 7, target_type: 'all', target_value: '' }),
+                                       min_cvss: 7, target_type: 'tag', target_value: portee }),
             });
             return r.status;
-        });
+        }, PORTEE_NULLE);
         check('POST avec CSRF -> 200', ok === 200, `got ${ok}`);
 
         // Cleanup
@@ -93,18 +128,18 @@ function check(label, ok, details = '') {
         await login(page);
 
         // Cree un schedule avec un payload XSS dans le nom
-        const created = await page.evaluate(async () => {
+        const created = await page.evaluate(async (portee) => {
             const meta = document.querySelector('meta[name="csrf-token"]');
             const r = await fetch('/api_proxy.php/cve_schedules', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': meta?.content || '' },
                 body: JSON.stringify({
                     name: 'TEST_sec_<img src=x onerror=window.__pwned=1>',
-                    cron_expression: '0 3 * * *', min_cvss: 7, target_type: 'all', target_value: '',
+                    cron_expression: '0 3 * * *', min_cvss: 7, target_type: 'tag', target_value: portee,
                 }),
             });
             return r.status === 200;
-        });
+        }, PORTEE_NULLE);
         check('Schedule XSS cree', created);
 
         // Charge la page security et verifie que window.__pwned reste undefined

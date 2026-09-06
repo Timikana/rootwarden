@@ -85,7 +85,13 @@ class DocumentationController extends Controller
             // Non pas « ce compte est administrateur », mais « cette page-la
             // lui est ouverte ». Les deux ne coincident pas.
             'lienDerive' => $derive !== null && isset($derive['route']) ? route($derive['route']) : null,
-            'lienLegacy' => rtrim((string) config('app.url_legacy'), '/') . '/documentation.php',
+            /*
+             * ⛔ NUL DEPUIS LE 2026-09-05 : la cible est ARCHIVEE et rend 404.
+             * Offrir un lien vers une page retiree est le defaut que ce chantier
+             * a corrige deux fois ailleurs (supervision le 03/09, /profil le 05/09).
+             * La vue garde le nul et n'affiche plus le renvoi.
+             */
+            'lienLegacy' => null,
         ]);
     }
 }

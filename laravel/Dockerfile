@@ -27,9 +27,30 @@ RUN set -eux; \
 COPY --from=composer:2.9 /usr/bin/composer /usr/bin/composer
 
 # Front controller Laravel : Apache doit servir public/ et non la racine.
+# ⚠ `ServerTokens` ET `ServerSignature` SE CORRIGENT A LEUR SOURCE.
+#
+# `conf-enabled` charge par ordre ALPHABETIQUE : `rootwarden-laravel.conf`
+# precede `security.conf`, qui porte les defauts Debian `ServerTokens OS` et
+# `ServerSignature On`. LA DERNIERE DEFINITION GAGNE — donc les poser dans
+# notre propre fichier ne servait a RIEN.
+#
+# Mesure au reseau AVANT correction, sur une requete rejetee par Apache :
+#     Server: Apache/2.4.68 (Debian)
+#     <address>Apache/2.4.68 (Debian) Server at 10.10.10.3 Port 80</address>
+# -> version divulguee ET adresse IP interne. Le legacy, lui, ne rendait que
+#    `Server: Apache`.
+#
+# On ne DOUBLE donc pas la directive en esperant gagner l'ordre : on corrige
+# `security.conf`, pour qu'il n'y ait qu'UNE definition.
+#
+# `ServerAdmin` vient de l'environnement, comme cote legacy. Apache expanse
+# `${SERVER_ADMIN}` depuis l'environnement du processus — verifie par
+# contre-epreuve : une variable inconnue leve `AH00111`, celle-ci non.
 ENV APACHE_DOCUMENT_ROOT=/var/www/html/public
 RUN set -eux; \
     a2enmod rewrite headers; \
+    sed -ri 's/^ServerTokens .*/ServerTokens Prod/; s/^ServerSignature .*/ServerSignature Off/' \
+        /etc/apache2/conf-available/security.conf; \
     sed -ri 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' \
         /etc/apache2/sites-available/000-default.conf; \
     printf '%s\n' \
@@ -38,9 +59,7 @@ RUN set -eux; \
         '    AllowOverride All' \
         '    Require all granted' \
         '</Directory>' \
-        '# Ne pas divulguer la version du serveur' \
-        'ServerTokens Prod' \
-        'ServerSignature Off' \
+        'ServerAdmin ${SERVER_ADMIN}' \
         > /etc/apache2/conf-available/rootwarden-laravel.conf; \
     a2enconf rootwarden-laravel
 

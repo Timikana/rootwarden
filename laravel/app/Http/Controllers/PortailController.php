@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\Onboarding;
 use App\Services\AlertesAccueil;
 use App\Services\SessionsActives;
 use App\Services\Droits;
 use App\Services\Comptes;
+use App\Services\JournalAudit;
 use App\Services\Machines;
 use App\Services\MotDePasse;
 use App\Services\StepUp;
@@ -30,8 +32,185 @@ class PortailController extends Controller
         private readonly Comptes $comptes,
         private readonly AlertesAccueil $alertes,
         private readonly SessionsActives $sessions,
-    )
+        private readonly Onboarding $onboarding,
+        private readonly JournalAudit $journal,
+        private readonly StepUp $stepUp,
+    ) {
+    }
+
+    /**
+     * LES TROIS GESTES DE LIBRE-SERVICE.
+     *
+     * Leur cote ADMINISTRATIF etait porte, et porte avec soin — c'est l'ACTEUR
+     * qui distinguait, et l'acteur n'apparait QUE dans la garde de la route.
+     * Une passe par table, par route ou par libelle les voyait donc couverts.
+     *
+     * AUCUNE GARDE DE ROLE NI DE PERMISSION sur les trois : chacun agit sur SON
+     * compte, et l'identifiant vient de la SESSION, jamais de la requete. C'est
+     * la meme forme que `changerMotDePasse`.
+     */
+    public function changerCourriel(Request $requete): RedirectResponse
     {
+        $idCompte = (int) $requete->session()->get('utilisateur_id', 0);
+        if ($idCompte === 0) {
+            return redirect()->route('connexion');
+        }
+
+        $err = $this->comptes->changeCourriel($idCompte, (string) ($requete->input('courriel') ?? ''));
+        if ($err !== null) {
+            return redirect()->route('profil')->with('courriel_erreur', __($err));
+        }
+
+        $this->journal->ajoute($idCompte, 'profil: adresse de courriel modifiee');
+
+        return redirect()->route('profil')->with('courriel_message', __('profil.courriel_ok'));
+    }
+
+    /**
+     * Poser sa propre cle SSH. L'unique ecriture existante
+     * (`POST /comptes/{id}/cle-ssh`) est gardee `role:3` : un compte de role 1
+     * ou 2 ne pouvait pas poser la sienne, alors que la cle sert SON acces.
+     *
+     * La validation est celle du service, deja portee et deja eprouvee — on ne
+     * la redecrit pas ici. Une cle VIDE efface la cle, et c'est un geste valide
+     * que `verifieCleSsh` accepte explicitement.
+     */
+    public function definirCleSsh(Request $requete): RedirectResponse
+    {
+        $idCompte = (int) $requete->session()->get('utilisateur_id', 0);
+        if ($idCompte === 0) {
+            return redirect()->route('connexion');
+        }
+
+        $cle = (string) ($requete->input('cle_ssh') ?? '');
+        $err = $this->comptes->definitCleSsh($idCompte, $cle);
+        if ($err !== null) {
+            return redirect()->route('profil')->with('cle_erreur', __($err));
+        }
+
+        $this->journal->ajoute(
+            $idCompte,
+            trim($cle) === '' ? 'profil: cle SSH retiree' : 'profil: cle SSH posee',
+        );
+
+        return redirect()->route('profil')->with(
+            'cle_message',
+            __(trim($cle) === '' ? 'profil.cle_retiree' : 'profil.cle_ok'),
+        );
+    }
+
+    /**
+     * ⚠ CE N'EST PAS UNE SUPPRESSION, ET C'EST LA PARTIE QUI COMPTE.
+     *
+     * `user_logs` est une chaine de hachage : retirer une ligne casse la
+     * verification de TOUTES les suivantes. `supprimableSansPerte():504-507` le
+     * dit deja — « l'anonymisation est le geste juste : elle efface les donnees
+     * personnelles et PRESERVE le journal ».
+     *
+     * « Effacez-moi » contre « la chaine ne doit pas rompre » est un vrai
+     * conflit, et l'anonymisation est la reponse que le droit admet. Le geste
+     * execute est donc `anonymise()`, deja porte, et la DEMANDE est tracee avant
+     * — pour qu'il reste une ligne disant que le sujet a exerce son droit, meme
+     * une fois son identite detachee du compte.
+     *
+     * ⚠ ORDRE CONTRAINT : on journalise AVANT d'anonymiser. Apres, la session
+     * est morte et le compte inactif ; une ecriture qui echouerait laisserait un
+     * effacement sans trace, ce qui est le pire des deux mondes.
+     */
+    public function demanderEffacement(Request $requete): RedirectResponse
+    {
+        $idCompte = (int) $requete->session()->get('utilisateur_id', 0);
+        if ($idCompte === 0) {
+            return redirect()->route('connexion');
+        }
+
+        $compte = $this->comptes->trouve($idCompte);
+        if (! $compte) {
+            return redirect()->route('profil')->with('effacement_erreur', __('comptes.err_inconnu'));
+        }
+
+        /*
+         * LA CONFIRMATION EST UNE SAISIE, PAS UNE CASE. Le nom du compte doit
+         * etre retape : un geste irreversible ne doit pas etre a un clic d'un
+         * geste ordinaire.
+         */
+        if (trim((string) ($requete->input('confirmation') ?? '')) !== (string) $compte['name']) {
+            return redirect()->route('profil')->with('effacement_erreur', __('profil.eff_err_confirmation'));
+        }
+
+        /*
+         * ⚠ LE DERNIER SUPERADMINISTRATEUR NE PEUT PAS SE RETIRER. Le legacy
+         * porte cette protection, le portage ne l'avait pas. Sur un portail
+         * d'administration, un compte ne doit pas pouvoir retirer le dernier
+         * acces privilegie — le portail deviendrait inadministrable.
+         */
+        if ((int) $compte['role_id'] === 3 && $this->comptes->superadminsActifs() <= 1) {
+            return redirect()->route('profil')->with('effacement_erreur', __('comptes.err_dernier_sa'));
+        }
+
+        /*
+         * ══ LA RE-AUTHENTIFICATION, ET ELLE COMBLE UNE ASYMETRIE ═════════
+         *
+         *     ComptesController:479   anonymiser le compte d'AUTRUI  -> step-up EXIGE
+         *     ici                     anonymiser le SIEN             -> rien
+         *
+         * Le meme geste, gardé d'un cote et pas de l'autre. **Ce n'est pas une
+         * capacite qu'on ajoute, c'est un motif deja etabli dans le depot que
+         * cette route n'avait pas suivi.**
+         *
+         * ⚠ ET LES DEUX CONTROLES NE PROTEGENT PAS DE LA MEME CHOSE — le dire
+         * ici, sinon le prochain lecteur verra deux gardes et conclura qu'il y
+         * en a deux du meme genre :
+         *
+         *     retaper le nom   protege du geste ACCIDENTEL. Rien de plus : le
+         *                      nom est AFFICHE sur la page qui le demande.
+         *     le second facteur protege d'une session VOLEE — c'est le seul des
+         *                      deux qui exige quelque chose que le voleur n'a pas.
+         *
+         * ⚠ ET LE CODE EST DANS LE MEME FORMULAIRE, pas dans une modale. Les
+         * trois consommateurs existants rendent `step_up_required` en JSON a une
+         * modale branchee sur `fetch` ; celui-ci est un `<form method="POST">`.
+         * *Un second ecran ajouterait un etat a perdre entre les deux
+         * soumissions, pour un geste qui doit en avoir le moins possible.*
+         *
+         * `verifie()` porte la liste fermee, le quota, l'anti-rejeu et la pose de
+         * la marque. On ne reimplemente rien — la marque posee ici ne sert a
+         * personne d'autre, mais passer par le service garde UNE seule mecanique.
+         */
+        /*
+         * ⚠ LA MARQUE D'ABORD, LE CODE ENSUITE — c'est le motif des trois autres
+         * consommateurs, et mon premier jet ne l'avait pas.
+         *
+         * J'exigeais le code a CHAQUE fois. C'est plus strict, et c'etait le
+         * mauvais arbitrage : **une garde qui refuse une re-authentification
+         * qu'on vient de faire n'est pas plus sure, elle est plus penible** — et
+         * la penibilite d'un geste de sortie se paie en personnes qui renoncent
+         * a exercer un droit.
+         *
+         * La marque est cherchee pour CETTE action seule. Une marque obtenue
+         * pour anonymiser le compte d'autrui n'ouvre pas celle-ci : c'est le
+         * defaut du legacy que `StepUp` corrige deja (`:68`, `:156` — il pose
+         * `_step_up_<ce que le client envoie>`, si bien qu'un step-up consenti
+         * pour annuler une politique autorisait un deploiement).
+         */
+        if (! $this->stepUp->valide($idCompte, 'profil_effacement')) {
+            $verdict = $this->stepUp->verifie(
+                $idCompte,
+                'profil_effacement',
+                (string) ($requete->input('code_2fa') ?? ''),
+            );
+            if ($verdict !== StepUp::OK) {
+                return redirect()->route('profil')->with('effacement_erreur', __($verdict));
+            }
+        }
+
+        $this->journal->ajoute($idCompte, 'profil: effacement demande par le sujet (anonymisation)');
+        $this->comptes->anonymise($idCompte);
+
+        $requete->session()->flush();
+        $requete->session()->invalidate();
+
+        return redirect()->route('connexion')->with('message', __('profil.eff_fait'));
     }
 
     public function cgu(Request $requete): View
@@ -136,7 +315,55 @@ class PortailController extends Controller
             return $a;
         }, $alertes['alertes']);
 
+        /*
+         * ══ L'ASSISTANT DE PREMIERE CONFIGURATION ════════════════════════
+         *
+         * `null` = rien a rendre, et le gabarit n'a AUCUN predicat a recopier.
+         * Trois raisons de ne rien rendre, et une seule est un choix :
+         *
+         *   - le role est inferieur au minimum (le legacy l'inclut a partir du
+         *     role 2, `index.php:162`) ;
+         *   - la personne l'a masque ;
+         *   - il n'y a pas de session (aucun identifiant a mesurer).
+         *
+         * ⚠ ET LA MESURE NE SE FAIT QUE SI ON REND. Huit `COUNT(*)` sur chaque
+         * chargement de l'accueil pour un bloc masque seraient huit requetes
+         * pour rien — et l'accueil est la page la plus servie du portail.
+         */
+        $assistant = null;
+        if ($idCompte > 0
+            && $role >= Onboarding::ROLE_MINIMAL
+            && ! $this->onboarding->masque($idCompte)) {
+            $etapes = Onboarding::etapes($this->onboarding->mesures($idCompte));
+
+            /*
+             * LE LIEN D'UNE ETAPE SE RESOUT PAR LE MENU, exactement comme celui
+             * d'une alerte quinze lignes plus haut — meme `$parCle`, meme regle.
+             * Une etape dont la page est fermee au compte n'affiche AUCUN lien
+             * plutot qu'un lien vers un 403, et une page NON PORTEE renvoie vers
+             * l'ancien portail avec son marqueur.
+             */
+            $etapes = array_map(function (array $e) use ($parCle) {
+                $entree = $e['nav'] !== null ? $parCle->get($e['nav']) : null;
+                $e['lien'] = null;
+                $e['externe'] = false;
+                if ($entree !== null) {
+                    if (isset($entree['route'])) {
+                        $e['lien'] = route($entree['route']);
+                    } else {
+                        $e['lien'] = rtrim((string) config('app.url_legacy'), '/') . $entree['legacy'];
+                        $e['externe'] = true;
+                    }
+                }
+
+                return $e;
+            }, $etapes);
+
+            $assistant = Onboarding::progression($etapes) + ['etapes' => $etapes];
+        }
+
         return view('accueil', [
+            'onboarding' => $assistant,
             'modulesAccessibles' => $entrees->count(),
             'modulesPortes'      => $entrees->filter(fn ($e) => isset($e['route']))->count(),
             'libelleRole'        => $this->libelleRole((int) $requete->session()->get('role_id', 0)),
@@ -214,6 +441,19 @@ class PortailController extends Controller
         }, $etat['sessions']);
 
         return view('profil', [
+            /*
+             * LE COMPTE LUI-MEME, pour les trois gestes de libre-service. Il
+             * manquait : la vue ne lisait que des donnees de SESSION, ce qui
+             * suffisait tant qu'aucun champ ne pre-remplissait une valeur
+             * STOCKEE. `trouve()` lit par identifiant de session, jamais par un
+             * parametre de requete.
+             *
+             * ⚠ Sans cette ligne, `$compte['name'] ?? ''` rendrait une chaine
+             * VIDE et non une erreur — l'etiquette de confirmation
+             * d'effacement demanderait de saisir un nom qu'elle n'afficherait
+             * pas. Un `??` sur une variable absente ne se signale nulle part.
+             */
+            'compte'           => $this->comptes->trouve((int) $requete->session()->get('utilisateur_id', 0)) ?? [],
             'sessions'         => $sessions,
             'sessionsLisibles' => $etat['lisible'],
             'sessionsTotal'    => (int) ($etat['total'] ?? 0),

@@ -34,6 +34,7 @@ return [
     'source_hybrid'           => 'Hybrid — recommended',
     'source_precise'          => 'Precise — NVD everywhere, slower',
     'source_aide'             => 'Fast queries OpenCVE only and reports more false positives. Hybrid cross-checks NVD for the kernel, OpenSSL and OpenSSH. Precise queries NVD everywhere: more reliable, slower.',
+    'portee_exigee' => 'A scope is REQUIRED: pick a tag or specific servers. The "whole fleet" option was removed — it used to be the default, and a scheduled scan without an explicit scope reached production.',
     'cible_all'               => 'All servers',
     'cible_tag'               => 'By tag',
     'cible_machines'          => 'Selected servers',

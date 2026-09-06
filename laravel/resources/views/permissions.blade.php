@@ -14,6 +14,19 @@
         <p class="rw-prose">{{ __('perms.source', ['nombre' => count($permissions)]) }}</p>
     </div>
 
+    {{-- CES TROIS NOTES SONT RENDUES UNE FOIS, PAS PAR COMPTE. La section
+         « acces » vit dans la boucle des comptes ; y placer ces avertissements
+         les repeterait autant de fois qu'il y a de comptes — c'est le defaut
+         des « 31 fois ancien portail » vu a l'image sur le menu. --}}
+    <div class="rw-encart" data-rw="perms-sudo-notes">
+        <p class="rw-prose rw-aide">{{ __('perms.acces_aide') }}</p>
+        <p class="rw-prose rw-alerte rw-alerte--attention" data-rw="perms-sudo-apt">
+            {{ __('perms.acces_apt_avert') }}
+        </p>
+        <p class="rw-prose rw-aide" data-rw="perms-sudo-absents">{{ __('perms.acces_absents') }}</p>
+        <p class="rw-prose rw-aide" data-rw="perms-sudo-nopasswd">{{ __('perms.acces_nopasswd_derive') }}</p>
+    </div>
+
     <p class="rw-annonce" data-rw="perms-annonce" role="status" aria-live="polite"></p>
 
     {{-- Le panneau de re-authentification, le MEME que D4. C'est lui qui rend la
@@ -157,14 +170,33 @@
 
                 <p class="rw-sous-titre-fort">{{ __('perms.acces') }}</p>
                 <div class="rw-grille rw-grille--compacte">
+                    {{-- UN SEUL CONTROLE POUR TOUT L'ETAT. Une case a cocher plus une
+                         liste de prereglages autoriseraient une combinaison
+                         impossible — coche sans prereglage, ou prereglage sans
+                         acces. Ici « pas d'acces » est une valeur de la liste, et
+                         il n'y a pas d'etat inexprimable.
+
+                         Le prereglage AFFICHE est celui de la base. Une ligne
+                         d'acces creee sans prereglage vaut `none`
+                         (`NOT NULL DEFAULT 'none'`, migration 051) : l'ecran
+                         disait « acces accorde » sans dire que le deploiement
+                         RETIRERAIT le sudo. Il le dit desormais. --}}
                     @foreach ($machines as $m)
+                        @php($aAcces = in_array((int) $m->id, $acces[$c['id']], true))
                         <label class="rw-liste-selection__etiquette">
-                            <input type="checkbox"
-                                   data-rw="acces-{{ $m->id }}-{{ $c['id'] }}"
-                                   data-user-id="{{ $c['id'] }}"
-                                   data-machine-id="{{ $m->id }}"
-                                   @checked(in_array((int) $m->id, $acces[$c['id']], true))>
                             <span class="rw-liste-selection__nom">{{ $m->name }}</span>
+                            <select class="rw-saisie rw-saisie--compacte"
+                                    data-rw="acces-{{ $m->id }}-{{ $c['id'] }}"
+                                    data-user-id="{{ $c['id'] }}"
+                                    data-machine-id="{{ $m->id }}"
+                                    data-actuel="{{ $aAcces ? ($presets[$c['id']][(int) $m->id] ?? 'none') : '' }}"
+                                    aria-label="{{ $m->name }}">
+                                <option value="" @selected(! $aAcces)>{{ __('perms.acces_aucun') }}</option>
+                                @foreach ($presetsProposes as $pr)
+                                    <option value="{{ $pr }}"
+                                            @selected($aAcces && ($presets[$c['id']][(int) $m->id] ?? 'none') === $pr)>{{ __('perms.preset_' . $pr) }}</option>
+                                @endforeach
+                            </select>
                         </label>
                     @endforeach
                 </div>

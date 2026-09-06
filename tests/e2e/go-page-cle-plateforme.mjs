@@ -94,6 +94,7 @@ import puppeteer from 'puppeteer';
 import { createHmac } from 'crypto';
 import { litEnBase, compteEnBase } from './lib-base.mjs';
 import { mkdirSync } from 'node:fs';
+import { constateArchivage } from './archive.mjs';
 
 const BASE = process.env.E2E_BASE || 'http://localhost:8444';
 const CIBLE = /8444|laravel/i.test(BASE) ? 'laravel' : 'legacy';
@@ -276,6 +277,34 @@ async function etape(titre, fn) {
 
 try {
     /*
+     * ══ LE SUJET DE CETTE SUITE N'EXISTE PLUS COTE LEGACY ═════════════════
+     *
+     * Une suite de parite dont la moitie legacy a ete archivee ne doit pas
+     * ECHOUER : un rouge permanent finit par ne plus etre lu, et il occupe la
+     * place ou l'on aurait cherche une vraie regression. Elle CONSTATE, et sa
+     * moitie portage continue de s'exercer.
+     *
+     * LE CONSTAT VIENT AVANT LA CONNEXION, et ce n'est pas un detail : la sonde
+     * de `archive.mjs` n'ouvre pas de navigateur (Apache rend 404 pour un chemin
+     * absent AVANT toute redirection de connexion). Se connecter d'abord ferait
+     * consommer un code TOTP — dont le garde anti-rejeu est par COMPTE et
+     * PERSISTANT — pour aller mesurer une page qui n'existe plus.
+     *
+     * ⚠ ET LE CONSTAT EXIGE UN 404, PAS UNE ABSENCE DE PAGE. Le 2026-09-05 ces
+     * repertoires rendaient 403 : le `git mv` avait emporte les `.php` et laisse
+     * le JavaScript, si bien que le dossier existait encore. `constateArchivage`
+     * traite tout statut != 404 comme « encore servie » et rend `false` : le
+     * constat aurait ete FAUX et la suite rouge quand meme. L'archivage a ete
+     * acheve (`7588e71`) avant que cette ligne soit ecrite.
+     */
+    if (CIBLE === 'legacy') {
+        const archivee = await constateArchivage({
+            base: BASE, chemin: C.page, fichiers: [], verifie, constate,
+        });
+        if (archivee) throw new Error('__archivee__');
+    }
+
+    /*
      * LA PRECONDITION, MESUREE ET NON SUPPOSEE. La garde est « la permission OU
      * le role 3 ». Si un compte d'epreuve venait a DETENIR la permission, le
      * chemin mesure ci-dessous cesserait d'etre le contournement — et les
@@ -359,19 +388,58 @@ try {
                 if (! p) return { ouvert: false, texte: '' };
                 const b = p.getBoundingClientRect();
 
+                const listeEffets = p.querySelector('[data-rw="cle-panneau-effets"]');
+
                 return {
                     // `offsetParent` vaut `null` pour un element en `position: fixed` :
                     // on mesure la place REELLEMENT occupee.
                     ouvert: ! p.hidden && b.height > 0 && getComputedStyle(p).display !== 'none',
                     texte: (p.innerText || '').replace(/\s+/g, ' ').trim(),
+                    // Le panneau ENUMERE ce que le geste fait. C'est cette liste
+                    // qui rend la perte lisible, et elle a son ancre propre.
+                    effets: listeEffets
+                        ? [...listeEffets.querySelectorAll('li')].map((e) => (e.textContent || '').trim())
+                        : null,
                 };
             }, C);
             constate('panneau de decision', vu.ouvert ? `« ${vu.texte.slice(0, 120)} »` : '(ferme)');
             verifie('le clic OUVRE un panneau de decision', vu.ouvert,
                 'le panneau ne s\'affiche pas — un geste de flotte partirait sans etre annonce');
-            verifie('le panneau annonce que le geste est SANS RETOUR',
-                vu.ouvert && /sans retour|irr[ée]versible|no return/i.test(vu.texte),
-                `le panneau ne nomme pas l'irreversibilite : « ${vu.texte.slice(0, 90)} »`);
+            /*
+             * ══ ASSERTER LA PROPRIETE, PAS LE VOCABULAIRE ═════════════════
+             *
+             * Premiere redaction : `/sans retour|irr[ée]versible|no return/`.
+             * Elle a rougi le 2026-09-05 sur un panneau qui dit
+             *
+             *     « il agit sur la flotte entiere, en une fois, et DETRUIT LA
+             *       CLE PRIVEE EN COURS »
+             *     « les machines gardent l'ANCIENNE cle publique : apres ce
+             *       geste RootWarden ne peut plus s'y connecter par cle »
+             *
+             * — c'est-a-dire un avertissement PLUS FORT que le mot qu'elle
+             * exigeait. **Une assertion qui nomme les MOTS attendus plutot que
+             * la PROPRIETE attendue echoue sur une amelioration**, et elle
+             * envoie corriger l'ecran qui vient de s'ameliorer.
+             *
+             * La propriete reelle tient en deux morceaux, et le premier est
+             * STRUCTUREL — donc insensible a une reformulation :
+             *
+             *   1. le panneau ENUMERE les effets du geste (`cle-panneau-effets`),
+             *      et l'enumeration n'est pas vide ;
+             *   2. le texte nomme une CONSEQUENCE qu'on ne peut pas defaire,
+             *      quelle que soit la tournure choisie pour le dire.
+             */
+            const effets = vu.effets || [];
+            verifie('le panneau ENUMERE les effets du geste',
+                vu.ouvert && effets.length > 0,
+                vu.effets === null
+                    ? 'l\'ancre cle-panneau-effets est absente du panneau'
+                    : `${effets.length} effet(s) enumere(s)`);
+
+            const PERTE = /d[ée]truit|destruction|supprime|perdue?|definitiv|irr[ée]versible|sans retour|no return|ne peut plus/i;
+            verifie('le panneau annonce une PERTE DEFINITIVE, quelle qu\'en soit la tournure',
+                vu.ouvert && (PERTE.test(vu.texte) || effets.some((e) => PERTE.test(e))),
+                `le panneau ne nomme aucune consequence irrattrapable : « ${vu.texte.slice(0, 90)} »`);
             verifie('AUCUNE requete n\'est partie avant consentement',
                 passees.length === avantPassees && avortees.length === avantAvortees,
                 `${passees.length - avantPassees} passee(s), ${avortees.length - avantAvortees} avortee(s)`,
@@ -680,7 +748,11 @@ try {
         verifie('les trois captures sont ecrites', true, '', dossier);
     });
 } catch (e) {
+    // `__archivee__` n'est pas une panne : c'est la sortie NORMALE quand le
+    // sujet legacy a ete archive. Le constat a deja tout dit.
+    if (String(e && e.message || e).includes('__archivee__')) { /* rien a ajouter */ } else {
     verifie('deroulement de la suite', false, String(e.message || e).split('\n')[0]);
+    }
 } finally {
     // ══ SURETE — LE FILET NE SE SUPPOSE PAS, IL SE MESURE ════════════════
     try {

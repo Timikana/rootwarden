@@ -68,6 +68,7 @@
  */
 import puppeteer from 'puppeteer';
 import { createHmac } from 'crypto';
+import { constateArchivage } from './archive.mjs';
 
 const BASE = process.env.E2E_BASE || 'https://localhost:8443';
 const CIBLE = /8444|laravel/i.test(BASE) ? 'laravel' : 'legacy';
@@ -373,6 +374,30 @@ async function etape(titre, fn) {
 }
 
 try {
+    /*
+     * ══ LE SUJET DE CETTE SUITE N'EXISTE PLUS COTE LEGACY ═════════════════
+     *
+     * Une suite de parite dont la moitie legacy a ete archivee ne doit pas
+     * ECHOUER : un rouge permanent finit par ne plus etre lu. Elle CONSTATE.
+     *
+     * LE CONSTAT VIENT AVANT LA CONNEXION : la sonde n'ouvre pas de navigateur,
+     * et se connecter d'abord consommerait un code TOTP — garde anti-rejeu par
+     * COMPTE et persistant — pour mesurer une page qui n'existe plus.
+     */
+    if (CIBLE === 'legacy') {
+        /*
+         * Le sujet n'est pas une PAGE mais deux points d'API d'administration.
+         * On constate sur l'un et on fait verifier l'autre en `fichiers` : le
+         * geste mesure portait sur les DEUX, en constater un seul laisserait
+         * croire que l'autre repond encore.
+         */
+        const archivee = await constateArchivage({
+            base: BASE, chemin: '/adm/api/delete_user.php',
+            fichiers: ['/adm/api/anonymize_user.php'], verifie, constate,
+        });
+        if (archivee) throw new Error('__archivee__');
+    }
+
     // ══ PARTIE A — le garde refuse, et NOMME l'action ═══════════════════════
     const s1 = await connecte();
     pageVivante = s1.page;
@@ -637,7 +662,10 @@ try {
                 : `non mesurable : aucun step-up n'a reussi (statuts ${apres.join(' ')})`);
     });
 } catch (e) {
+    // `__archivee__` est la sortie NORMALE d'un sujet archive, pas une panne.
+    if (String(e && e.message || e).includes('__archivee__')) { /* le constat a tout dit */ } else {
     verifie('deroulement de la suite', false, String(e).split('\n')[0]);
+    }
 } finally {
     /* LES PRIVILEGES AVANT LES FERMETURES : la revocation a besoin d'une page
      * vivante et de sa session. */

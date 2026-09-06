@@ -8,21 +8,91 @@
  * DANS LE MEME COMMIT que le geste : un en-tete qui affirme une propriete que
  * le fichier n'a plus est pire qu'un en-tete absent, parce qu'on le croit.
  *
- * L'ECRITURE, ET SON PERIMETRE EXACT : `POST /ssh-audit/schedules`, et rien
- * d'autre. Ni `DELETE /schedules/<id>`, ni `POST /schedules/<id>/toggle`, ni
- * aucune des routes qui joignent une machine.
+ * ⚠⚠ ET CETTE PHRASE ETAIT DEJA FAUSSE AVANT A5, SUR TROIS POINTS.
+ *
+ * Elle disait : *« L'ECRITURE, ET SON PERIMETRE EXACT : `POST
+ * /ssh-audit/schedules`, et rien d'autre. Ni `DELETE /schedules/<id>`, ni
+ * `POST /schedules/<id>/toggle`, ni aucune des routes qui joignent une
+ * machine. »* Mesure du 2026-09-05 : trois appels d'ecriture, et
+ * `/ssh-audit/scan` ouvre une session SSH (`ssh_session(ip, port, user, …)`,
+ * `ssh_audit.py`).
+ *
+ * Donc **trois** routes et non une ; **`/ssh-audit/scan` OUVRE une session SSH
+ * sur la machine** (`ssh_session(ip, port, user, …)`, `ssh_audit.py:133`) ; et
+ * la clause qui promettait le contraire etait la plus fausse des trois.
+ *
+ * *Ce n'est pas A5 qui l'a perimee : un commit anterieur a ajoute ces deux
+ * appels sans revenir sur l'en-tete qui les interdisait.* **Une declaration de
+ * perimetre ne vieillit pas toute seule — elle est perimee par un geste, et le
+ * geste ne la relit pas.** C'est pourquoi ce qui suit ENUMERE au lieu de
+ * compter, et cite la ligne de chaque appel : un lecteur peut refuter cette
+ * liste sans quitter le fichier.
+ *
+ * ══ CE QUE CE FICHIER ECRIT, LIGNE PAR LIGNE ══════════════════════════════
+ *
+ * ⚠ REPERES PAR LEUR APPELANT, PAS PAR LEUR NUMERO DE LIGNE — et c'est une
+ * correction de la version precedente de cette table, qui en portait trois.
+ * **A5 a insere 218 lignes au-dessus d'eux : les trois numeros ont glisse sans
+ * que personne ne touche a la table.** *Un numero de ligne dans un commentaire
+ * est un fait que toute edition situee AU-DESSUS rend faux — et il le devient
+ * en silence, puisque ni le commentaire ni le code cite n'ont bouge.* Un nom de
+ * fonction, lui, se deplace avec ce qu'il designe.
+ *
+ *     `lanceReleve`      POST   /ssh-audit/scan          ⚠ OUVRE UNE SESSION SSH
+ *     `litConfig`        POST   /ssh-audit/config        lit la conf d'une machine
+ *     `enregistrePlanif` POST   /ssh-audit/schedules     ARME un releve recurrent
+ *     `supprimePlanif`   DELETE /ssh-audit/schedules/<id>       en supprime un
+ *     `basculePlanif`    POST   /ssh-audit/schedules/<id>/toggle  en inverse l'etat
+ *
+ * Les deux derniers sont les SEULS a construire leur URL — voir leur docblock
+ * pour pourquoi elle est construite dans le helper et non par l'appelant.
+ *
+ * Les deux derniers n'ouvrent AUCUNE session SSH et n'ecrivent qu'en base.
+ *
+ * ══ POURQUOI A5 EXISTE, ET CE N'EST PAS UNE CAPACITE MANQUANTE ════════════
+ *
+ * Le portage ARMAIT une planification (`:583`) et ne pouvait ni la supprimer ni
+ * la suspendre : on armait depuis le portail neuf et l'on ne desarmait que
+ * depuis celui qu'on eteint. Or l'ordonnanceur tourne dans un fil invisible a
+ * `ps`, une planification est RECURRENTE, son echeance ne demande la permission
+ * de personne, et son objet est **une session SSH sur les machines de sa
+ * portee**.
+ *
+ * *Une capacite manquante gene ; celle-la laissait un geste ACTIF sans son
+ * interrupteur — et le jour ou le legacy s'eteint, l'interrupteur part avec lui
+ * pendant que la planification reste en base.*
+ *
+ * ⛔ TOUJOURS ABSENTS, ET PAR ABSENCE : `POST /ssh-audit/policies` (voir
+ * ci-dessous), et les gestes de masse.
  *
  * ══ CE QUE CE SCRIPT N'EMET JAMAIS ═══════════════════════════════════════
  *
- * Aucune requete autre que `GET`. Et parmi les `GET`, **aucun appel n'est
- * compose vers `POST /ssh-audit/policies`** — SEC-013 : l'ecriture de
- * politique est gardee par `require_role(2)` SEUL, la lecture par
- * `can_audit_ssh` + `require_machine_access`. L'ecriture est donc moins
- * gardee que la lecture, sur la MEME URL, et la passerelle ne peut pas les
- * separer : elle compare des CHEMINS, jamais des methodes.
+ * ~~Aucune requete autre que `GET`.~~ Voir la liste ligne par ligne ci-dessus.
  *
- * La fermeture se fait par l'ABSENCE. Une entree qu'on n'offre pas ne se
+ * **Aucun appel n'est compose vers `POST /ssh-audit/policies`**, et la
+ * fermeture se fait par l'ABSENCE : une entree qu'on n'offre pas ne se
  * contourne pas.
+ *
+ * ⚠ MAIS SA RAISON A CHANGE, ET C'EST UNE AUTRE SESSION QUI L'A CHANGEE.
+ *
+ * Ce paragraphe disait : *« SEC-013 : l'ecriture de politique est gardee par
+ * `require_role(2)` SEUL, la lecture par `can_audit_ssh` +
+ * `require_machine_access`. L'ecriture est donc moins gardee que la lecture, sur
+ * la MEME URL, et la passerelle ne peut pas les separer : elle compare des
+ * CHEMINS, jamais des methodes. »*
+ *
+ * **C'etait vrai, et ca ne l'est plus depuis `356caea` (2026-09-05)** : la route
+ * porte desormais `@require_permission('can_audit_ssh')` et
+ * `@require_machine_access` en plus du role (`ssh_audit.py:549-582`, mesure).
+ * *La dissymetrie est reparee ; ce que le portage n'offre pas, il ne l'offre
+ * plus faute de PORTAGE, pas faute de garde.*
+ *
+ * **Et c'est la seconde fois dans ce fichier qu'une declaration est perimee par
+ * un geste qui ne l'a pas relue** — la premiere par un commit du portage, celle-ci
+ * par un commit du backend. *Une declaration qui cite l'etat d'un AUTRE depot
+ * doit citer sa mesure et sa date, sinon elle devient une croyance datee de
+ * rien.* La passerelle, elle, compare toujours des chemins et jamais des
+ * methodes : cette moitie-la reste vraie.
  *
  * ══ `/results` : CE QUI LA REFERME N'EST PAS UNE GARDE ════════════════════
  *
@@ -64,12 +134,17 @@
     }
 
     /*
-     * ══ A2 : CE FICHIER ECRIT DESORMAIS, ET LE HEADER LE DIT ═════════════
+     * ══ LE HELPER NE PREND PAS DE METHODE EN PARAMETRE ═══════════════════
      *
-     * UNE SEULE route en ecriture : `POST /ssh-audit/schedules`. Le helper ne
-     * prend pas de methode en parametre — il ne sait faire qu'un POST, sur le
-     * chemin qu'on lui donne. Un helper generique `envoie(methode, chemin)`
-     * ouvrirait DELETE et les deux `toggle` sans qu'aucun code les demande.
+     * Il ne sait faire qu'un POST, sur le chemin qu'on lui donne. Un helper
+     * generique `envoie(methode, chemin)` ouvrirait DELETE et les deux `toggle`
+     * sans qu'aucun code les demande.
+     *
+     * ⚠ LE COMMENTAIRE QUI VIVAIT ICI DISAIT « UNE SEULE route en ecriture » —
+     * il y en avait TROIS (`:246`, `:335`, `:583`). *Le nombre n'etait pas une
+     * propriete du helper mais de ses APPELANTS, et il a change sans lui.* La
+     * propriete du helper, elle, tient toujours : il ne sait qu'un POST. C'est
+     * elle qui est enoncee ici, et elle seule.
      */
     function ecris(chemin, corps) {
         return fetch(PASSERELLE + chemin, {
@@ -83,6 +158,49 @@
                 function () { return { ok: false, corps: null }; }
             );
         }).catch(function () { return { ok: false, corps: null }; });
+    }
+
+    /*
+     * ══ DEUX HELPERS NOMMES, PAS UN HELPER GENERIQUE ═════════════════════
+     *
+     * `envoie(methode, chemin)` aurait ouvert d'un coup DELETE et POST sur tout
+     * chemin — donc les gestes de masse et ceux qui joignent une machine, sans
+     * qu'aucun code les demande. C'est la decision deja prise dans `groupes.js`,
+     * ou `ecris()` ne sait qu'un POST et `supprime()` qu'un DELETE.
+     *
+     * ⚠ ET L'IDENTIFIANT EST FORCE EN ENTIER ICI, pas concatene par l'appelant.
+     * `'/ssh-audit/schedules/' + id` avec un `id` venu d'ailleurs est une URL
+     * CONSTRUITE : invisible a tout releve par motif, et le module wazuh vient
+     * de payer exactement cette forme. `Number(id) | 0` rend un entier ou zero
+     * — et le backend route sur `<int:schedule_id>`, donc zero ne peut viser
+     * aucune ligne existante.
+     */
+    function supprimePlanif(id) {
+        var n = Number(id) | 0;
+        return fetch(PASSERELLE + '/ssh-audit/schedules/' + n, {
+            method: 'DELETE',
+            credentials: 'same-origin',
+            headers: { 'Accept': 'application/json' },
+        }).then(function (r) {
+            return r.json().then(
+                function (j) { return { ok: r.ok, corps: j }; },
+                function () { return { ok: r.ok, corps: null }; }
+            );
+        }).catch(function () { return { ok: false, corps: null, reseau: true }; });
+    }
+
+    function basculePlanif(id) {
+        var n = Number(id) | 0;
+        return fetch(PASSERELLE + '/ssh-audit/schedules/' + n + '/toggle', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Accept': 'application/json' },
+        }).then(function (r) {
+            return r.json().then(
+                function (j) { return { ok: r.ok, corps: j }; },
+                function () { return { ok: r.ok, corps: null }; }
+            );
+        }).catch(function () { return { ok: false, corps: null, reseau: true }; });
     }
 
     function vide(hote, texte, erreur) {
@@ -152,6 +270,10 @@
             // Le libelle revient a celui d'A2 : deux gestes se partagent ce
             // bouton, et un libelle qui survit a son panneau ment.
             c.textContent = t('planif_valider');
+            // ...et sa CLASSE aussi. A5 le passe en rouge pour la suppression ;
+            // un bouton reste rouge sur le panneau suivant annoncerait un geste
+            // destructeur la ou il n'y en a pas.
+            c.className = 'rw-bouton rw-bouton--avertissement';
         }
         // ...et le lien legacy REVIENT : les quatre gestes non portes en ont
         // besoin, et c'est leur action principale.
@@ -455,12 +577,17 @@
      * parc » vaut mieux qu'un selecteur vide, qui se lit comme une panne.
      */
     function majValeur() {
-        var type = planifPortee ? planifPortee.value : 'all';
+        // Repli VIDE, plus « all ». Le commentaire ci-dessus choisissait « tout
+        // le parc » pour ne pas afficher un selecteur vide — un raisonnement
+        // d'AFFICHAGE, qui produisait le defaut le plus large a la SOUMISSION.
+        var type = planifPortee ? planifPortee.value : '';
         if (! planifValeur || ! planifValeurBloc) { return; }
         planifValeur.innerHTML = '';
         dis(planifValeurAide, '');
 
-        if (type === 'all') {
+        // `!type` couvre le repli : sans selecteur, on ne demande pas une
+        // valeur pour une portee qu'on ne connait pas.
+        if (! type || type === 'all') {
             planifValeurBloc.hidden = true;
             return;
         }
@@ -514,7 +641,7 @@
     if (planifValider) {
         planifValider.addEventListener('click', function () {
             var nom = (planifNom && planifNom.value || '').trim();
-            var type = planifPortee ? planifPortee.value : 'all';
+            var type = planifPortee ? planifPortee.value : '';
             var valeur = (type !== 'all' && planifValeur) ? planifValeur.value : '';
 
             // LES DEUX REFUS SONT DES TEXTES, jamais un blocage muet.
@@ -523,7 +650,13 @@
                 if (planifNom) { planifNom.focus(); }
                 return;
             }
-            if (type !== 'all' && ! valeur) {
+            /*
+             * `! type` D'ABORD : sans selecteur, le repli valait « all » et
+             * cette garde ne tirait pas — on soumettait donc un releve du parc
+             * entier sans valeur. Desormais l'absence de portee REFUSE, comme
+             * une valeur manquante.
+             */
+            if (! type || (type !== 'all' && ! valeur)) {
                 dis(planifMessage, t('planif_valeur_requise'));
                 return;
             }
@@ -800,9 +933,135 @@
 
                 ligne.appendChild(n);
                 ligne.appendChild(d);
+
+                /*
+                 * ⚠ L'ASYMETRIE EST VOULUE : SUSPENDRE PART DIRECTEMENT,
+                 * REACTIVER PASSE PAR LE PANNEAU.
+                 *
+                 * Suspendre est le geste qui DESARME. Y mettre une friction
+                 * reviendrait a rendre plus penible l'arret d'un releve SSH
+                 * recurrent que son armement — l'inverse de ce qu'on veut.
+                 * Reactiver, lui, ARME : son echeance ouvrira une session SSH
+                 * sur les machines de la portee, et ne demandera la permission
+                 * de personne. Il s'annonce donc avant.
+                 */
+                var bBascule = document.createElement('button');
+                bBascule.type = 'button';
+                bBascule.className = 'rw-bouton rw-bouton--discret';
+                bBascule.setAttribute('data-rw', p.enabled ? 'audit-ssh-planif-suspendre' : 'audit-ssh-planif-reactiver');
+                bBascule.textContent = p.enabled ? t('planif_suspendre') : t('planif_reactiver');
+                bBascule.addEventListener('click', function () {
+                    if (p.enabled) { lanceBascule(p); return; }
+                    ouvrePanneau(t('planif_ce_qui_est_arme'), [
+                        String(p.name || ''),
+                        cible(p),
+                        t('planif_prochaine_le') + ' ' + (p.next_run ? String(p.next_run).slice(0, 16) : t('planif_aucune_echeance')),
+                        t('planif_bascule_aveugle'),
+                    ], t('planif_reactiver'));
+                    if (pLegacy) { pLegacy.hidden = true; }
+                    if (pConfirmer) {
+                        pConfirmer.hidden = false;
+                        pConfirmer.disabled = false;
+                        pConfirmer.textContent = t('planif_reactiver');
+                    }
+                    gesteConfirme = function () { fermePanneau(); lanceBascule(p); };
+                });
+                ligne.appendChild(bBascule);
+
+                var bSuppr = document.createElement('button');
+                bSuppr.type = 'button';
+                bSuppr.className = 'rw-bouton rw-bouton--danger';
+                bSuppr.setAttribute('data-rw', 'audit-ssh-planif-supprimer');
+                // Le libelle COURT : le titre du panneau, reutilise ici, debordait
+                // sur sa propre ligne — vu a l'image. C'est le PANNEAU qui porte
+                // la phrase entiere, pas le bouton qui l'ouvre.
+                bSuppr.textContent = t('planif_suppr_court');
+                bSuppr.addEventListener('click', function () {
+                    /*
+                     * LE PANNEAU NOMME CE QU'IL SUPPRIME — l'intitule, la
+                     * portee, la prochaine echeance. Et il vise `p`, l'objet
+                     * AFFICHE : jamais un identifiant repris d'un champ de
+                     * saisie. C'est le defaut que le legacy porte sur les regles
+                     * wazuh, ou l'on peut ouvrir une chose et en supprimer une
+                     * autre.
+                     */
+                    ouvrePanneau(t('planif_suppr_texte'), [
+                        String(p.name || ''),
+                        cible(p),
+                        t('planif_prochaine_le') + ' ' + (p.next_run ? String(p.next_run).slice(0, 16) : t('planif_aucune_echeance')),
+                    ], t('planif_suppr_titre'));
+                    if (pLegacy) { pLegacy.hidden = true; }
+                    if (pConfirmer) {
+                        pConfirmer.hidden = false;
+                        pConfirmer.disabled = false;
+                        pConfirmer.textContent = t('planif_suppr_valider');
+                        pConfirmer.className = 'rw-bouton rw-bouton--danger';
+                    }
+                    gesteConfirme = function () { lanceSuppression(p); };
+                });
+                ligne.appendChild(bSuppr);
+
                 liste.appendChild(ligne);
             });
             hotePlanifs.appendChild(liste);
+        });
+    }
+
+    /*
+     * ⚠ NI L'UNE NI L'AUTRE N'ANNONCE L'ETAT OBTENU — ELLES RELISENT.
+     *
+     * Deux mesures du backend l'imposent :
+     *
+     *   - `toggle` fait `SET enabled = NOT enabled` (`ssh_audit.py:921`) : une
+     *     bascule AVEUGLE. Si quelqu'un a change la ligne entre l'affichage et
+     *     le clic, le resultat est l'inverse de ce que cet ecran montrait. Un
+     *     ecran qui PREDIRAIT l'etat mentirait une fois sur deux des que deux
+     *     personnes agissent ;
+     *   - ~~`DELETE` rend `success: True` SANS regarder `rowcount` : une
+     *     suppression d'un identifiant qui n'existe plus se dit « reussie ».~~
+     *     **CORRIGE PAR UNE AUTRE SESSION LE 2026-09-05 (`583ca86`)** : la route
+     *     rend desormais **404** avec `success: false`, `deleted: 0` et un
+     *     message explicite. *Le code ci-dessous n'a pas eu a changer — il teste
+     *     `r.ok` ET `corps.success` et affiche `corps.message`, donc il etait
+     *     deja juste pour les deux formes.*
+     *
+     *     ⚠ ET LE 404 A ETE PREFERE AU 200 DE `wazuh.delete_rule` POUR UNE
+     *     RAISON QUI N'EST PAS UN GOUT : `legacy/ssh-audit/js/main.js:775` ne
+     *     lit QUE `r.ok`. Un 200 porteur d'un refus lui aurait fait annoncer une
+     *     reussite. **S'aligner sur la convention d'une route VOISINE n'est
+     *     juste que si ses APPELANTS se comportent comme les miens** — ici ils
+     *     ne le font pas, et c'est l'appelant qui a tranche, pas la symetrie.
+     *
+     * Dans les deux cas, la seule chose que l'ecran peut honnêtement affirmer
+     * est ce que la RELECTURE montre. C'est ce que disent les libelles.
+     */
+    function lanceBascule(p) {
+        annoncePlanif(t('chargement'), false);
+        basculePlanif(p.id).then(function (r) {
+            if (r.reseau || ! r.ok || ! r.corps || ! r.corps.success) {
+                annoncePlanif(t('planif_bascule_echec', {
+                    message: (r.corps && r.corps.message) || t('planifs_err'),
+                }), true);
+                return;
+            }
+            annoncePlanif(t('planif_bascule_faite'), false);
+            chargePlanifs();
+        });
+    }
+
+    function lanceSuppression(p) {
+        if (pConfirmer) { pConfirmer.disabled = true; }
+        annoncePlanif(t('chargement'), false);
+        supprimePlanif(p.id).then(function (r) {
+            fermePanneau();
+            if (r.reseau || ! r.ok || ! r.corps || ! r.corps.success) {
+                annoncePlanif(t('planif_suppr_echec', {
+                    message: (r.corps && r.corps.message) || t('planifs_err'),
+                }), true);
+                return;
+            }
+            annoncePlanif(t('planif_suppr_faite'), false);
+            chargePlanifs();
         });
     }
 

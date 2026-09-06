@@ -19,6 +19,32 @@ namespace Tests\Support;
  *
  * Quand une garde change VOLONTAIREMENT, on modifie cette table dans le meme
  * commit que la route, et le message du commit dit pourquoi.
+ *
+ * ── ⚠ CE QUE CE RELEVE NE PEUT PAS EXPRIMER, PAR CONSTRUCTION ───────────────
+ *
+ * Il gele les gardes de ROUTE : intergiciels, role, permission. **Une garde qui
+ * vit dans un CONTROLEUR lui est invisible**, et y forcer une ligne dirait qu'un
+ * intergiciel la porte — une chose fausse, dans le fichier qui existe pour dire
+ * le vrai.
+ *
+ * C'est le cas de TOUS les step-up du depot. Releve du 2026-09-06 :
+ *
+ *     ComptesController:514      compte_supprimer
+ *     ComptesController:539      compte_anonymiser
+ *     PermissionsController:165  permission_definir
+ *     PortailController:196      profil_effacement      (E-449)
+ *     PasserelleController:88    generique, action DERIVEE du chemin
+ *
+ * Cinq sites, quatre actions nommees du portage et une garde generique de
+ * passerelle. **Une route de cette table peut donc etre plus gardee qu'elle n'y
+ * parait** — jamais moins : un site de controleur AJOUTE une exigence, il n'en
+ * retire aucune. Lire un tableau vide comme « rien ne garde ce geste » serait
+ * l'erreur symetrique de celle qu'on evite en n'y inscrivant pas le step-up.
+ *
+ * `InventaireDesGardesTest::les_gardes_de_CONTROLEUR_sont_recensees` gele cette
+ * liste : **cette limitation est mesuree, pas seulement declaree** — sans quoi
+ * elle serait exactement le genre de propriete affirmee en commentaire que ce
+ * depot passe son temps a demonter.
  */
 class TableDesGardes
 {
@@ -56,6 +82,12 @@ class TableDesGardes
             ['POST', 'comptes-distants/{machine}/classer-en-attente', ['role:2', 'perm:can_manage_remote_users']],
             ['GET', 'comptes-distants/{machine}/cles/{username}', ['role:2', 'perm:can_manage_remote_users']],
             ['DELETE', 'comptes/{id}', ['role:3', 'perm:can_admin_portal']],
+            /*
+             * `feaaaa2`. La colonne `password_expires_at` existait deja et le
+             * portage la LIT en deux endroits ; son seul ecrivain vivant etait le
+             * fichier qu'on eteint. Garde sur la ROUTE, pas dans le controleur.
+             */
+            ['POST', 'comptes/{id}/expiration', ['role:3', 'perm:can_admin_portal']],
             ['POST', 'comptes/{id}/anonymiser', ['role:3', 'perm:can_admin_portal']],
             ['POST', 'comptes/{id}/cle-ssh', ['role:3', 'perm:can_admin_portal']],
             ['POST', 'comptes/{id}/deverrouiller', ['role:3', 'perm:can_admin_portal']],
@@ -94,6 +126,18 @@ class TableDesGardes
             ['GET', 'documentation', []],
             ['GET', 'wazuh', ['role:2', 'perm:can_manage_wazuh']],
             ['POST', 'serveurs/importer', ['role:2', 'perm:can_admin_portal']],
+            ['POST', 'comptes/importer', ['role:2', 'perm:can_admin_portal']],
+            // Export RGPD art. 20. AUCUNE garde de role, et c'est FIDELE :
+            // `legacy/profile/export.php:27` fait
+            // `checkAuth([ROLE_USER, ROLE_ADMIN, ROLE_SUPERADMIN])` — tout compte
+            // connecte, des le role 1. L'identifiant vient de la SESSION et aucun
+            // parametre n'est offert : il n'y a pas d'objet a garder au-dela de
+            // l'authentification.
+            ['GET', 'profil/donnees-personnelles', []],
+            // Masquer l'assistant d'accueil : le geste ne touche que la
+            // preference d'affichage DU COMPTE LUI-MEME, resolue depuis la
+            // session. Aucun objet a garder au-dela de l'authentification.
+            ['POST', 'accueil/assistant/masquer', []],
             ['GET', 'notifications/preferences', ['role:3', 'perm:can_admin_portal']],
             ['POST', 'notifications/preferences', ['role:3', 'perm:can_admin_portal']],
             ['POST', 'notifications/tout-lire', ['role:1']],
@@ -106,6 +150,45 @@ class TableDesGardes
             ['GET', 'politiques', ['role:3']],
             ['GET', 'profil', []],
             ['POST', 'profil/mot-de-passe', []],
+            /*
+             * LES TROIS GESTES DE LIBRE-SERVICE — `feaaaa2`, DOSSIER-30.
+             *
+             * Aucune garde de role ni de permission, et ce n'est PAS un oubli :
+             * la cible EST le demandeur, l'identifiant venant de la SESSION et
+             * jamais de la requete. Exiger un role ici interdirait a un role 1 de
+             * poser la cle qui sert son propre acces. Le pendant administratif
+             * (`POST comptes/{id}/cle-ssh`) reste `role:3` — deux routes, deux
+             * arites, et c'est la difference d'arite qui fonde la difference de
+             * garde.
+             */
+            ['POST', 'profil/courriel', []],
+            ['POST', 'profil/cle-ssh', []],
+            /*
+             * ⚠ IRREVERSIBLE, ET SANS RE-AUTHENTIFICATION — a lire ensemble.
+             *
+             * Le geste est une ANONYMISATION (`user_logs` est une chaine de
+             * hachage ; retirer une ligne romprait la verification de toutes les
+             * suivantes). Le controleur porte trois protections reelles :
+             * l'identifiant vient de la session, la confirmation exige la
+             * RESSAISIE du nom du compte, et le dernier superadministrateur ne
+             * peut pas se retirer.
+             *
+             * **Ce que la ressaisie couvre, et ce qu'elle ne couvre pas.** Le nom
+             * a retaper est AFFICHE sur la page de profil elle-meme : la friction
+             * protege contre le geste accidentel, pas contre une session
+             * compromise. `POST profil/step-up` existe et n'est PAS exige ici.
+             * *Ce n'est pas un defaut — c'est la portee du controle, et elle
+             * merite d'etre ecrite plutot que supposee plus large.*
+             *
+             * NON PORTE DEPUIS LE LEGACY — c'est une capacite NEUVE. Mesure :
+             * `legacy/profile.php` n'offre que l'EXPORT (16 formulaires, aucun
+             * d'effacement ; ses `DELETE` visent `active_sessions` et
+             * `remember_tokens`). Et pourtant `legacy/lang/fr/terms.php:78`
+             * promet « Droit a l'effacement : demander la suppression de votre
+             * compte et de vos donnees ». **Le legacy annoncait ce droit dans ses
+             * CGU sans l'implementer ; le portage comble l'ecart.**
+             */
+            ['POST', 'profil/effacement', []],
             ['POST', 'profil/step-up', []],
             ['POST', 'profil/step-up/revoquer', []],
             ['GET', 'rapport-conformite', ['role:2', 'perm:can_view_compliance']],
@@ -176,6 +259,19 @@ class TableDesGardes
             'GET groups'              => 'redirection depuis le legacy',
             'GET ssh-audit'           => 'redirection depuis le legacy',
             'GET documentation.php'   => 'redirection depuis le legacy',
+
+            // ── LA REINITIALISATION DE MOT DE PASSE ─────────────────────
+            // Publiques PAR NECESSITE : on ne peut pas exiger une session de
+            // quelqu'un qui a perdu le moyen d'en ouvrir une. Ce qui les borne
+            // n'est donc pas une garde de session mais une LIMITE DE DEBIT qui
+            // echoue FERME et compte les demandes RECUES — un compteur qui ne
+            // compte que les demandes REUSSIES ne limite pas l'enumeration, il
+            // la finance — plus un jeton de 32 octets, hache, a usage unique et
+            // valable une heure.
+            'GET mot-de-passe-oublie'  => 'demander un lien : aucune session a exiger',
+            'POST mot-de-passe-oublie' => 'soumettre l adresse : borne par la limite de debit',
+            'GET reinitialiser'        => 'le lien recu par courriel porte le jeton',
+            'POST reinitialiser'       => 'poser le nouveau mot de passe, jeton a usage unique',
             'GET terms.php'           => 'redirection depuis le legacy',
             'GET adm/admin_page.php'  => 'redirection depuis le legacy',
             'GET commandlog'          => 'redirection d\'une partie archivee',

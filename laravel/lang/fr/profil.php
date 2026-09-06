@@ -11,12 +11,9 @@ return [
     'second_facteur_titre'  => 'Second facteur',
     'second_facteur_valeur' => 'Actif',
     'second_facteur_texte'  => "Un code à usage unique est exigé à chaque connexion. Il n'existe aucun accès sans second facteur.",
-
-    'non_porte_titre' => 'Pas encore ici',
     // E-203 : les sessions SONT listees desormais. La chaine decrivait un
     // manque qui vient d'etre comble — un libelle qui survit au defaut
     // qu'il decrit devient faux sans que rien ne le signale.
-    'non_porte_texte' => 'Les connexions mémorisées ne sont pas encore listées ici : l\'ancien portail les affiche. Le changement de mot de passe et les sessions ouvertes, eux, se gèrent désormais sur cette page.',
     /*
      * ── SOUS-LOT A2 : LE CHANGEMENT DE MOT DE PASSE ──────────────────────
      *
@@ -43,6 +40,13 @@ return [
     'mdp_erreur_compte' => 'Compte introuvable.',
 
     // ══ E-203 : LES SESSIONS OUVERTES ════════════════════════════════════
+    'rgpd_titre' => 'Vos données personnelles',
+    'rgpd_aide' => 'Téléchargez la copie de toutes les données que ce portail détient sur vous (RGPD, articles 15 et 20). Le fichier est un JSON, lisible et réutilisable ailleurs.',
+    'rgpd_bouton' => 'Télécharger mes données',
+    'rgpd_contenu' => 'Le fichier contient votre profil, vos droits, vos accès machines, votre historique d\'actions et de connexions, vos sessions ouvertes, vos préférences de notification et les dates de vos changements de mot de passe.',
+    'rgpd_protege' => 'Deux choses n\'y figurent pas, volontairement : les empreintes de vos anciens mots de passe, et vos identifiants de session en entier — ils sont coupés à huit caractères, parce qu\'un fichier que vous archivez ou transférez ne doit pas contenir de quoi rejouer une session.',
+    'rgpd_borne' => 'Les deux historiques les plus longs sont bornés. Si le vôtre dépasse la borne, le fichier le DIT : il porte le nombre total de lignes à côté du nombre exporté.',
+    'rgpd_trace' => 'Votre demande est enregistrée dans le journal d\'audit, comme l\'exige la tenue du registre.',
     'sessions_titre' => 'Vos sessions ouvertes',
     'sessions_aide'  => "Chaque connexion à ce portail ou à l'ancien ouvre une session. Fermer une session la déconnecte immédiatement, des deux côtés.",
     'sessions_vide'  => "Aucune session enregistrée — pas même celle-ci, ce qui n'est pas normal.",
@@ -63,4 +67,40 @@ return [
     'sessions_revoquee'  => 'Session fermée.',
     'sessions_introuvable' => "Cette session n'existe plus — elle a peut-être déjà été fermée.",
     'sessions_pas_la_sienne' => "Pour fermer la session courante, utilisez « Déconnexion ».",
+
+    /* Libre-service du sujet : adresse, cle SSH, effacement (2026-09-05). */
+    'courriel_titre' => 'Adresse de courriel',
+    'courriel_aide' => 'C\'est l\'adresse qui reçoit le lien de réinitialisation. La changer ici ne change rien d\'autre.',
+    'courriel_label' => 'Nouvelle adresse',
+    'courriel_enregistrer' => 'Enregistrer l\'adresse',
+    'courriel_ok' => 'Adresse de courriel enregistrée.',
+    'err_courriel_vide' => 'Une adresse est nécessaire : c\'est votre chemin de retour si vous perdez votre mot de passe. Pour l\'effacer, utilisez l\'effacement du compte.',
+    'err_courriel_long' => 'Adresse trop longue (255 caractères au plus).',
+    'err_courriel_forme' => 'Cette adresse n\'a pas une forme valide.',
+    'err_courriel_pris' => 'Cette adresse sert déjà à un autre compte.',
+    'cle_titre' => 'Votre clé SSH',
+    'cle_aide' => 'Une seule clé publique, sur une seule ligne, au format « algorithme base64 [commentaire] ».',
+    'cle_vide_aide' => 'Enregistrer un champ vide retire votre clé.',
+    'cle_label' => 'Clé publique',
+    'cle_enregistrer' => 'Enregistrer la clé',
+    'cle_ok' => 'Clé SSH enregistrée.',
+    'cle_retiree' => 'Clé SSH retirée.',
+    'eff_titre' => 'Effacer mon compte',
+    'eff_aide' => 'Vos données personnelles sont effacées : nom, adresse, société, clé SSH, second facteur. Le compte est désactivé et aucun mot de passe ne permet plus d\'y entrer.',
+    'eff_prevenu' => 'Le journal d\'audit est conservé, sans votre identité. Il est scellé par une chaîne de vérification : en retirer des lignes rendrait invérifiables toutes les suivantes. Ce geste est irréversible et vous déconnecte immédiatement.',
+    'eff_confirmation_label' => 'Pour confirmer, saisissez le nom de votre compte : :nom',
+    /*
+     * ⚠ DEUX CONTROLES, DEUX PORTEES — et le libelle le DIT, parce que la page
+     * en montre deux et que rien ne distingue leur objet a l'oeil.
+     *
+     *   retaper le nom     protege du geste ACCIDENTEL, et rien de plus : le
+     *                      nom est AFFICHE juste au-dessus du champ.
+     *   le second facteur  protege d'une session VOLEE — le seul des deux qui
+     *                      exige quelque chose que le voleur n'a pas.
+     */
+    'eff_code_label' => 'Code de votre application d\'authentification (six chiffres)',
+    'eff_code_aide'  => "Le nom retapé protège d'un geste accidentel — il est écrit juste au-dessus. Ce code-ci protège d'une session volée : c'est le seul des deux qu'un intrus ne peut pas fournir. Le même geste sur le compte de quelqu'un d'autre l'exige déjà.",
+    'eff_bouton' => 'Effacer définitivement mon compte',
+    'eff_err_confirmation' => 'Le nom saisi ne correspond pas à celui du compte. Rien n\'a été effacé.',
+    'eff_fait' => 'Votre compte a été effacé. Les données personnelles ont été retirées et le journal d\'audit conservé sans votre identité.',
 ];

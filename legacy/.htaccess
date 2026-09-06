@@ -18,6 +18,30 @@ Options -Indexes
     Require all denied
 </FilesMatch>
 
+# Bloquer TOUT ce qui est archive.
+#
+# ⚠ MESURE DU 2026-09-05 : sans cette regle, l'archivage ne desservait RIEN.
+# La racine servie EST l'arbre legacy, `_deprecated/` s'y trouve, et un fichier
+# archive repondait 500 la ou un chemin inexistant repond 404 : Apache
+# l'atteignait, PHP l'executait, et il n'echouait qu'a son premier `require`.
+# Autrement dit, dix-neuf fichiers « archives » etaient encore EXECUTES a
+# chaque visite, y compris le code de leur portee globale.
+#
+# 404 plutot que 403 : un fichier retire ne doit pas signaler qu'il a existe.
+RedirectMatch 404 ^/_deprecated/
+
+# ── LA SORTIE ────────────────────────────────────────────────────────────────
+# Une URL archivee rendait la page 404 NUE d'Apache : 236 octets, zero lien,
+# aucune mention du portail. Cinquante et un fichiers ont ete archives le
+# 2026-09-05 ; chaque signet vers l'un d'eux etait une impasse muette.
+#
+# ⚠ Le CODE reste 404 — seul le CORPS change. 72 suites assertent le statut, et
+# une redirection aurait casse ce contrat en plus de masquer les vrais 404.
+#
+# `_sortie.php` ne fait ni `require`, ni base, ni session : une page d'erreur
+# qui leve une erreur ne laisse plus aucune sortie.
+ErrorDocument 404 /_sortie.php
+
 # Bloquer l'acces a version.txt (info disclosure - pentest 2026-05-20)
 <Files "version.txt">
     Require all denied

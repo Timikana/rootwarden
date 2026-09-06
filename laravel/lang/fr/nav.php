@@ -20,6 +20,9 @@ return [
     'section_admin' => "ADMINISTRATION",
     'section_autre' => "AUTRE",
 
+    'cgu' => "Conditions d'utilisation",
+    'cafe' => "Offrir un cafe",
+    'cafe_titre' => "Soutenir le projet — buymeacoffee.com",
     'version' => "Version :numero",
     'version_inconnue' => "Version inconnue",
 
@@ -68,6 +71,7 @@ return [
     // Etat du portage
     'non_porte'              => 'ancien portail',
     'non_porte_titre'        => "cette page n'est pas encore portée, elle s'ouvre dans l'ancien portail",
+    'theme_basculer'          => 'Changer de theme (clair / sombre)',
     'langue'                 => 'Langue',
     'langue_fr'              => 'francais',
     'langue_en'              => 'anglais',

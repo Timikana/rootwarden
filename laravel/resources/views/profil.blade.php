@@ -157,17 +157,176 @@
             @endif
         </div>
 
-        {{-- Ce qui reste non porte sur cette page, et QUOI exactement : le
-             changement de mot de passe, lui, l'est desormais (A2). Un intitule
-             qui reste vague apres un portage partiel laisse croire que rien n'a
-             bouge. --}}
-        <div class="rw-tuile">
-            <span class="rw-tuile__titre">{{ __('profil.non_porte_titre') }}</span>
-            <p class="rw-tuile__texte">{{ __('profil.non_porte_texte') }}</p>
-            <p class="rw-tuile__lien">
-                <a class="rw-lien" href="{{ rtrim(config('app.url_legacy'), '/') }}/profile.php"
-                   target="_blank" rel="noopener">{{ __('auth.ouvrir_ancien_portail') }} ↗</a>
-            </p>
-        </div>
+        {{-- LA TUILE « Pas encore ici » A ETE RETIREE le 2026-09-05.
+             Son texte disait : « Les connexions memorisees ne sont pas encore
+             listees ici : l'ancien portail les affiche. » MESURE : `legacy/profile.php`
+             ne les liste JAMAIS — ses deux seules occurrences de `remember_tokens`
+             sont un `DELETE` (:209), pose apres un changement de mot de passe.
+             Le libelle inventait un manque ET renvoyait vers un portail qui ne le
+             comblait pas. Les trois gestes qui manquaient vraiment — changer son
+             adresse, poser sa cle SSH, demander l'effacement — sont portes depuis
+             la v1.51.1. Il ne reste rien a aller chercher ailleurs. --}}
     </div>
+
+    {{-- L'EXPORT EST UN GET, DONC UN LIEN. C'est une LECTURE : elle ne modifie
+         rien, elle n'a pas a passer par un formulaire POST, et un lien reste
+         copiable et ouvrable dans un onglet. Le telechargement vient de
+         `Content-Disposition: attachment`, pas d'un attribut `download` — que
+         le navigateur pourrait ignorer et que le serveur, lui, impose.
+
+         `a.rw-bouton` ne garde pas son soulignement de lien : un element se lit
+         comme un bouton OU comme un lien, pas comme les deux. --}}
+    {{--
+        LES TROIS GESTES DE LIBRE-SERVICE. Leur cote administratif etait deja
+        porte : c'est l'ACTEUR qui manquait. Chaque region porte son `data-rw`
+        pour etre assertable, et aucune classe n'est neuve — toutes existent
+        deja dans `rw.css`, verifie avant le premier rendu.
+    --}}
+    <section class="rw-note" data-rw="profil-courriel">
+        <h2 class="rw-sous-titre">{{ __('profil.courriel_titre') }}</h2>
+        <p class="rw-prose rw-aide" data-rw="profil-courriel-aide">{{ __('profil.courriel_aide') }}</p>
+        @if (session('courriel_message'))
+            <p class="rw-confirmation" data-rw="profil-courriel-succes">{{ session('courriel_message') }}</p>
+        @endif
+        @if (session('courriel_erreur'))
+            <p class="rw-erreur" data-rw="profil-courriel-erreur">{{ session('courriel_erreur') }}</p>
+        @endif
+        <form method="POST" action="{{ route('profil.courriel') }}" data-rw="profil-courriel-form">
+            @csrf
+            <label class="rw-champ">
+                <span>{{ __('profil.courriel_label') }}</span>
+                <input type="email" name="courriel" maxlength="255" required
+                       value="{{ $compte['email'] ?? '' }}"
+                       data-rw="profil-courriel-champ">
+            </label>
+            <div class="rw-actions">
+                <button type="submit" class="rw-bouton"
+                        data-rw="profil-courriel-enregistrer">{{ __('profil.courriel_enregistrer') }}</button>
+            </div>
+        </form>
+    </section>
+
+    <section class="rw-note" data-rw="profil-cle-ssh">
+        <h2 class="rw-sous-titre">{{ __('profil.cle_titre') }}</h2>
+        <p class="rw-prose rw-aide" data-rw="profil-cle-aide">{{ __('profil.cle_aide') }}</p>
+        <p class="rw-prose rw-aide" data-rw="profil-cle-vide-aide">{{ __('profil.cle_vide_aide') }}</p>
+        @if (session('cle_message'))
+            <p class="rw-confirmation" data-rw="profil-cle-succes">{{ session('cle_message') }}</p>
+        @endif
+        @if (session('cle_erreur'))
+            <p class="rw-erreur" data-rw="profil-cle-erreur">{{ session('cle_erreur') }}</p>
+        @endif
+        <form method="POST" action="{{ route('profil.cle-ssh') }}" data-rw="profil-cle-form">
+            @csrf
+            <label class="rw-champ">
+                <span>{{ __('profil.cle_label') }}</span>
+                <textarea name="cle_ssh" rows="3" data-rw="profil-cle-champ">{{ $compte['ssh_key'] ?? '' }}</textarea>
+            </label>
+            <div class="rw-actions">
+                <button type="submit" class="rw-bouton"
+                        data-rw="profil-cle-enregistrer">{{ __('profil.cle_enregistrer') }}</button>
+            </div>
+        </form>
+    </section>
+
+    <section class="rw-section" data-rw="profil-rgpd">
+        <h2 class="rw-sous-titre">{{ __('profil.rgpd_titre') }}</h2>
+        <p class="rw-prose rw-aide">{{ __('profil.rgpd_aide') }}</p>
+        <p class="rw-prose rw-aide" data-rw="rgpd-contenu">{{ __('profil.rgpd_contenu') }}</p>
+        <p class="rw-prose rw-aide" data-rw="rgpd-protege">{{ __('profil.rgpd_protege') }}</p>
+        <p class="rw-prose rw-aide" data-rw="rgpd-borne">{{ __('profil.rgpd_borne') }}</p>
+        <p class="rw-prose rw-aide" data-rw="rgpd-trace">{{ __('profil.rgpd_trace') }}</p>
+
+        {{--
+            ⚠ IRREVERSIBLE. Place APRES le bloc RGPD parce qu'il en est la
+            consequence : le meme droit qui donne l'export donne l'effacement.
+            Le geste execute est l'ANONYMISATION — `user_logs` est une chaine de
+            hachage, retirer une ligne casserait la verification de toutes les
+            suivantes, et le code le dit deja (`supprimableSansPerte:504-507`).
+        --}}
+        <div class="rw-note" data-rw="profil-effacement">
+            <h2 class="rw-sous-titre">{{ __('profil.eff_titre') }}</h2>
+            <p class="rw-prose rw-aide" data-rw="profil-eff-aide">{{ __('profil.eff_aide') }}</p>
+            <p class="rw-prose rw-aide" data-rw="profil-eff-prevenu">{{ __('profil.eff_prevenu') }}</p>
+            @if (session('effacement_erreur'))
+                <p class="rw-erreur" data-rw="profil-eff-erreur">{{ session('effacement_erreur') }}</p>
+            @endif
+            <form method="POST" action="{{ route('profil.effacement') }}" data-rw="profil-eff-form">
+                @csrf
+                {{--
+                    ⚠ `<div class="rw-champ">` + `<label class="rw-etiquette">`, ET
+                    PAS `<label class="rw-champ">` — vu a l'image.
+
+                    `.rw-champ` ne pose que `margin-bottom` (`rw.css:146`), et un
+                    `<label>` est INLINE par defaut : les deux champs de ce
+                    formulaire se rendaient **sur une seule ligne**, collés, le
+                    second ayant l'air d'un ajout. `.rw-etiquette`, elle, est en
+                    `display: block` — c'est le motif employe partout ailleurs
+                    dans le portage, et celui-ci ne le suivait pas.
+
+                    *Le champ du nom est corrige avec celui du code : en laisser
+                    un des deux inline garderait le defaut a moitie, pour une
+                    paire qui se lit ensemble.*
+                --}}
+                <div class="rw-champ">
+                    <label class="rw-etiquette" for="eff-confirmation">
+                        {{ __('profil.eff_confirmation_label', ['nom' => $compte['name'] ?? '']) }}
+                    </label>
+                    <input class="rw-saisie" id="eff-confirmation" type="text" name="confirmation"
+                           autocomplete="off" required data-rw="profil-eff-champ">
+                </div>
+                {{--
+                    ⚠ LE SECOND FACTEUR EST DANS LE MEME FORMULAIRE, pas dans une
+                    modale. Les trois autres gestes gardés du portage rendent
+                    `step_up_required` en JSON a une modale branchee sur `fetch` ;
+                    celui-ci est un `<form method="POST">`. **Un second ecran
+                    ajouterait un etat a perdre entre deux soumissions**, pour un
+                    geste qui doit en avoir le moins possible.
+
+                    Et les DEUX controles ne protegent pas de la meme chose : le
+                    nom retape protege du geste ACCIDENTEL — il est affiche juste
+                    au-dessus — et le code protege d'une session VOLEE. `eff_code_aide`
+                    le dit a l'ecran, parce que rien ne les distingue a l'oeil.
+                --}}
+                <div class="rw-champ">
+                    <label class="rw-etiquette" for="eff-code">{{ __('profil.eff_code_label') }}</label>
+                    {{-- `inputmode` et `pattern` sont des gardes du NAVIGATEUR :
+                         ils evitent une frappe malheureuse, ils ne controlent
+                         rien. `StepUp::verifie()` tranche, et lui seul.
+
+                         ⚠ ET `required` EST GARDE ALORS QUE LE SERVEUR PEUT
+                         S'EN PASSER — releve par la QA, et la raison est mesuree.
+
+                         Le controleur court-circuite `verifie()` quand une marque
+                         fraiche existe : ce code-la n'est alors pas lu. Mais
+                         **cette marque ne survit presque jamais a une requete** —
+                         `verifie()` est le seul a la poser, et le geste aboutit
+                         dans la foulee (le compte est anonymise, la session
+                         detruite). Elle ne subsiste que si `anonymise()` echoue
+                         APRES un step-up reussi.
+
+                         `required` sert donc le seul chemin qui se produise
+                         reellement, et son cout dans l'autre est de retaper un
+                         code apres un echec d'ecriture. *L'incoherence est reelle
+                         et elle est ecrite : sans cette note, un lecteur conclurait
+                         que le code est TOUJOURS exige, ce qui est faux cote
+                         serveur.* --}}
+                    <input class="rw-saisie" id="eff-code" type="text" name="code_2fa"
+                           autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]{6}"
+                           maxlength="6" required data-rw="profil-eff-code">
+                </div>
+                <p class="rw-aide rw-prose" data-rw="profil-eff-code-aide">{{ __('profil.eff_code_aide') }}</p>
+
+                <div class="rw-actions">
+                    <button type="submit" class="rw-bouton rw-bouton--danger"
+                            data-rw="profil-eff-bouton">{{ __('profil.eff_bouton') }}</button>
+                </div>
+            </form>
+        </div>
+        <div class="rw-actions">
+            <a class="rw-bouton" data-rw="rgpd-telecharger"
+               href="{{ route('profil.donnees-personnelles') }}">{{ __('profil.rgpd_bouton') }}</a>
+        </div>
+    </section>
+
 @endsection

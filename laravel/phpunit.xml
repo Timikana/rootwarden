@@ -17,20 +17,95 @@
             <directory>app</directory>
         </include>
     </source>
+    <!--
+      ⚠ `force="true"` N'EST PAS DECORATIF — E-447, arbitrage DSI du 2026-09-06.
+
+      L'attribut `force` de PHPUnit vaut `false` PAR DEFAUT : un `<env>` sans lui
+      n'ecrase PAS une variable deja presente dans l'environnement du processus.
+      C'est la meme semantique que `safeLoad()` de Dotenv, un etage plus haut.
+
+      Mesure du 2026-09-06 00:40, a travers ce bootstrap :
+
+          MAIL_MAILER    xml=array      servi=smtp      <- ECRASE PAR L'ENV
+          DB_CONNECTION  xml=sqlite     servi=sqlite       identique
+          DB_DATABASE    xml=:memory:   servi=:memory:     identique
+          (11 autres)                                      identiques
+
+      `srv-docker.env` injecte `MAIL_MAILER=smtp` par `env_file:` au demarrage du
+      conteneur : le banc tournait cable sur un SMTP EXTERNE REEL (ssl0.ovh.net)
+      en croyant capturer les courriels dans un tableau.
+
+      Les treize autres gagnaient deja — mais **par ABSENCE, et une absence n'est
+      protegee par rien**. Ce qui tient la base a distance est une
+      NON-CORRESPONDANCE DE NOMS : `srv-docker.env` porte `DB_NAME`/`DB_USER`
+      (noms du legacy), Laravel attend `DB_DATABASE`/`DB_USERNAME`. Le jour ou
+      quelqu'un range ce fichier aux noms Laravel et ajoute `DB_CONNECTION=mysql`,
+      toute suite PHPUnit tape sur la base REELLE au lieu de `:memory:`, en
+      silence et sans qu'aucun test ne change. **Ce rangement serait un geste de
+      proprete : c'est ce qui le rend probable.**
+
+      Forcer les quatorze coute ZERO aujourd'hui et ferme la classe entiere.
+
+      > Un `<env>` sans `force` n'est pas une declaration, c'est un souhait.
+    -->
     <php>
-        <env name="APP_ENV" value="testing"/>
-        <env name="APP_MAINTENANCE_DRIVER" value="file"/>
-        <env name="BCRYPT_ROUNDS" value="4"/>
-        <env name="BROADCAST_CONNECTION" value="null"/>
-        <env name="CACHE_STORE" value="array"/>
-        <env name="DB_CONNECTION" value="sqlite"/>
-        <env name="DB_DATABASE" value=":memory:"/>
-        <env name="DB_URL" value=""/>
-        <env name="MAIL_MAILER" value="array"/>
-        <env name="QUEUE_CONNECTION" value="sync"/>
-        <env name="SESSION_DRIVER" value="array"/>
-        <env name="PULSE_ENABLED" value="false"/>
-        <env name="TELESCOPE_ENABLED" value="false"/>
-        <env name="NIGHTWATCH_ENABLED" value="false"/>
+        <env name="APP_ENV" value="testing" force="true"/>
+        <env name="APP_MAINTENANCE_DRIVER" value="file" force="true"/>
+        <env name="BCRYPT_ROUNDS" value="4" force="true"/>
+        <env name="BROADCAST_CONNECTION" value="null" force="true"/>
+        <env name="CACHE_STORE" value="array" force="true"/>
+        <env name="DB_CONNECTION" value="sqlite" force="true"/>
+        <env name="DB_DATABASE" value=":memory:" force="true"/>
+        <env name="DB_URL" value="" force="true"/>
+        <env name="MAIL_MAILER" value="array" force="true"/>
+        <env name="QUEUE_CONNECTION" value="sync" force="true"/>
+        <env name="SESSION_DRIVER" value="array" force="true"/>
+        <env name="PULSE_ENABLED" value="false" force="true"/>
+        <env name="TELESCOPE_ENABLED" value="false" force="true"/>
+        <env name="NIGHTWATCH_ENABLED" value="false" force="true"/>
+
+        <!--
+          ⚠ ET `<env force="true">` NE SUFFIT PAS EN LARAVEL — mesure du 2026-09-06 01:0x.
+
+          `Illuminate\Support\Env` construit son depot avec les adaptateurs par
+          defaut de Dotenv, et le PREMIER interroge est `ServerConstAdapter`,
+          qui lit **`$_SERVER`**. Or `<env>` de PHPUnit ne touche QUE `putenv()`
+          et `$_ENV` (`PhpHandler.php:138-146`) : `$_SERVER` reste intact.
+
+          Constate apres avoir pose `force="true"` sur les quatorze `<env>` :
+
+              getenv(MAIL_MAILER)      'array'    <- force a bien agi
+              $_ENV[MAIL_MAILER]       'array'    <- force a bien agi
+              $_SERVER[MAIL_MAILER]    'smtp'     <- INTACT
+              Env::get(MAIL_MAILER)    'smtp'     <- c'est LUI qui gagne
+              config(mail.default)     'smtp'
+
+          **Le banc restait cable sur le SMTP reel malgre le `force`.** Le verrou
+          `test_le_BANC_lui_est_INSENSIBLE_et_ca_doit_le_rester` l'a dit en
+          rougissant : c'etait son travail, et la mesure qui avait fonde E-447
+          interrogeait `getenv()`, c'est-a-dire le mauvais canal.
+
+          > Un `<env>` sans `force` est un souhait ; un `<env>` SEUL, en Laravel,
+          > est un souhait adresse a la mauvaise superglobale.
+
+          Les treize autres noms sont ABSENTS de `$_SERVER` — ils gagnaient deja,
+          et les doubler ici ne change aucune valeur servie. **On ferme la classe,
+          pas le seul cas connu** : c'est une absence qui les protegeait, et une
+          absence n'est protegee par rien.
+        -->
+        <server name="APP_ENV" value="testing" force="true"/>
+        <server name="APP_MAINTENANCE_DRIVER" value="file" force="true"/>
+        <server name="BCRYPT_ROUNDS" value="4" force="true"/>
+        <server name="BROADCAST_CONNECTION" value="null" force="true"/>
+        <server name="CACHE_STORE" value="array" force="true"/>
+        <server name="DB_CONNECTION" value="sqlite" force="true"/>
+        <server name="DB_DATABASE" value=":memory:" force="true"/>
+        <server name="DB_URL" value="" force="true"/>
+        <server name="MAIL_MAILER" value="array" force="true"/>
+        <server name="QUEUE_CONNECTION" value="sync" force="true"/>
+        <server name="SESSION_DRIVER" value="array" force="true"/>
+        <server name="PULSE_ENABLED" value="false" force="true"/>
+        <server name="TELESCOPE_ENABLED" value="false" force="true"/>
+        <server name="NIGHTWATCH_ENABLED" value="false" force="true"/>
     </php>
 </phpunit>

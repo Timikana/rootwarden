@@ -18,19 +18,14 @@
         </p>
     @endif
 
-    {{-- UNE CAPACITE NON PORTEE N'EST PAS UN SILENCE. Les TROIS onglets
-         d'`admin_page.php` sont portes depuis D6a — comptes (D3/D4), serveurs
-         (D6a), acces & permissions (D5) — et se rejoignent par les onglets
-         ci-dessus. Ne reste que l'import CSV, sous-lot D6b. --}}
-    <div class="rw-encart" data-rw="comptes-non-porte">
-        <p><strong>{{ __('comptes.reste_titre') }}</strong></p>
-        <p class="rw-prose">{{ __('comptes.reste_texte') }}</p>
-        <p>
-            <a class="rw-bouton rw-bouton--discret" data-rw="comptes-lien-legacy"
-               href="{{ rtrim(config('app.url_legacy'), '/') }}/adm/admin_page.php"
-               target="_blank" rel="noopener">{{ __('comptes.reste_lien') }} ↗</a>
-        </p>
-    </div>
+    {{-- LE BLOC « CAPACITE NON PORTEE » A ETE RETIRE ICI, ET C'EST LE POINT.
+         Il disait « ne reste que l'import CSV » et renvoyait vers
+         `admin_page.php`. L'import est porte depuis D6c : le laisser aurait fait
+         d'un ecran qui OFFRE la capacite un ecran qui la declare absente.
+
+         C'est la classe de defaut la plus repetee de ce chantier — une
+         declaration VRAIE quand elle a ete ecrite et FAUSSE quand la capacite a
+         ete portee, sans que rien ne la touche. Elle part avec ses trois cles. --}}
 
     <p class="rw-annonce" data-rw="comptes-annonce" role="status" aria-live="polite">
         @if (session('succes')){{ session('succes') }}@endif
@@ -49,6 +44,112 @@
             <button type="button" class="rw-bouton" data-rw="comptes-secret-fermer">{{ __('comptes.compris') }}</button>
         </div>
     </div>
+
+    @if (($secretsImport ?? []) !== [])
+        {{-- ⚠ DIVERGENCE DECLAREE AVEC LA NORME DE CET ECRAN, JUSTE AU-DESSUS.
+             Le panneau `comptes-secret` ne met JAMAIS un secret dans le HTML de
+             la page : il arrive par la reponse d'un geste AJAX et le JS l'injecte
+             (E-113 — le legacy le placait dans la page, d'ou il partait dans
+             l'historique du navigateur).
+
+             Ici les secrets sont N, et ils SONT dans le HTML — mais dans le corps
+             d'une reponse a un POST, qui n'entre pas dans l'historique comme une
+             URL rejouable. C'est le motif de `ClesApiController`, choisi pour la
+             meme raison que lui : un message de session les deposerait sur le
+             disque du conteneur (pilote `file`).
+
+             Le prix est celui de ce motif : recharger repropose le formulaire, et
+             les secrets disparaissent. C'est voulu.
+
+             ⚠ CE BLOC SERT LES DEUX CHEMINS DE CREATION — l'import CSV et la
+             creation unitaire. Il s'appelait `comptes-import-secrets` quand il
+             n'en servait qu'un ; ce nom serait devenu faux. --}}
+        <section class="rw-carte rw-carte--pleine" data-rw="comptes-secrets-remis">
+            <h2 class="rw-sous-titre">{{ __('comptes.imp_secrets_titre') }}</h2>
+            <p class="rw-prose rw-alerte rw-alerte--attention">{{ __('comptes.imp_mdp_avert') }}</p>
+            <div class="rw-tableau-cadre">
+                <table class="rw-tableau">
+                    <thead>
+                        <tr><th>{{ __('comptes.col_nom') }}</th><th>{{ __('comptes.secret_titre') }}</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($secretsImport as $s)
+                            <tr>
+                                <td>{{ $s['nom'] }}</td>
+                                <td><code class="rw-code">{{ $s['mdp'] }}</code></td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    @endif
+
+    @if (($import ?? null) !== null)
+        <section class="rw-carte rw-carte--pleine" data-rw="comptes-import-bilan">
+            <h2 class="rw-sous-titre">{{ __('comptes.imp_bilan_titre') }}</h2>
+            @if ($import['manquantes'] !== [])
+                <p class="rw-prose rw-erreur" data-rw="comptes-import-manquantes">
+                    {{ __('comptes.imp_manquantes', ['colonnes' => implode(', ', $import['manquantes'])]) }}
+                </p>
+            @else
+                <p data-rw="comptes-import-compte">
+                    {{ __('comptes.imp_crees', ['n' => $import['crees']]) }}
+                    {{ __('comptes.imp_lues', ['n' => $import['lignes']]) }}
+                </p>
+                @if ($import['tronque'])
+                    {{-- Une coupe se DIT. Un bilan qui annonce 500 lignes lues sans
+                         dire que le fichier en portait plus se lit comme complet. --}}
+                    <p class="rw-prose rw-erreur" data-rw="comptes-import-tronque">
+                        {{ __('comptes.imp_tronque', ['max' => \App\Services\Comptes::IMPORT_MAX_LIGNES]) }}
+                    </p>
+                @endif
+                @if ($import['erreurs'] !== [])
+                    <p><strong data-rw="comptes-import-erreurs">{{ __('comptes.imp_erreurs_titre', ['n' => count($import['erreurs'])]) }}</strong></p>
+                    <ul>
+                        @foreach ($import['erreurs'] as $e)
+                            <li class="rw-prose">
+                                <strong>{{ __('comptes.imp_ligne', ['n' => $e['ligne']]) }}</strong>
+                                @if ($e['nom'] !== '') — {{ $e['nom'] }} @endif
+                                — {{ $e['texte'] }}
+                            </li>
+                        @endforeach
+                    </ul>
+                @endif
+            @endif
+        </section>
+    @endif
+
+    <section class="rw-carte rw-carte--pleine">
+        <details data-rw="comptes-import-bloc">
+            <summary class="rw-sous-titre-fort">{{ __('comptes.imp_titre') }}</summary>
+
+            <p class="rw-prose rw-aide">{{ __('comptes.imp_aide', [
+                'colonnes' => implode(', ', $importColonnes ?? []),
+                'facultatives' => 'role, ssh_key, active, sudo',
+            ]) }}</p>
+            <p class="rw-prose rw-aide">{{ __('comptes.imp_roles_aide', ['roles' => implode(', ', $importRoles ?? [])]) }}</p>
+            <p class="rw-prose rw-aide" data-rw="comptes-import-courriel">{{ __('comptes.imp_courriel_exige') }}</p>
+            <p class="rw-prose rw-alerte rw-alerte--attention" data-rw="comptes-import-mdp">{{ __('comptes.imp_mdp_avert') }}</p>
+
+            <form method="POST" action="{{ route('comptes.importer') }}"
+                  enctype="multipart/form-data" data-rw="comptes-import-formulaire">
+                @csrf
+                <label class="rw-champ">
+                    <span class="rw-champ__etiquette" for="comptes-import-fichier">
+                        {{ __('comptes.imp_fichier', ['ko' => $importMaxKo ?? 512]) }}
+                    </span>
+                    <input class="rw-saisie" type="file" name="fichier" id="comptes-import-fichier"
+                           accept=".csv,text/csv,text/plain" required
+                           data-rw="comptes-import-fichier">
+                </label>
+                <div class="rw-actions">
+                    <button type="submit" class="rw-bouton"
+                            data-rw="comptes-import-valider">{{ __('comptes.imp_valider') }}</button>
+                </div>
+            </form>
+        </details>
+    </section>
 
     <section class="rw-carte rw-carte--pleine">
         <details data-rw="comptes-creation-bloc">
@@ -129,6 +230,34 @@
                                     data-id="{{ $c['id'] }}">{{ __('comptes.mdp_generer') }}</button>
                         </td>
                         <td class="rw-tableau__actions">
+                            {{--
+                                L'EXEMPTION D'EXPIRATION — superadministrateur
+                                seulement, et JAMAIS sur son propre compte.
+
+                                ⚠ LE CONTROLE N'EST PAS RENDU SUR SA PROPRE LIGNE.
+                                Le serveur refuse deja ce cas (`exp_pas_soi`), mais
+                                offrir un selecteur qui rendra 403 apprend seulement
+                                que le produit se contredit. **Un geste qu'on ne
+                                rend pas ne se contourne pas ; un geste qu'on rend
+                                et que le serveur refuse est une promesse rompue.**
+
+                                Liste FERMEE : trois choix, pas une saisie libre.
+                                Le legacy accepte n'importe quel entier, negatif
+                                compris — et `-1` poserait une echeance dans le
+                                PASSE, donc un compte expire a l'instant meme.
+                            --}}
+                            @if ($estSuperadmin && (int) $c['id'] !== (int) session('utilisateur_id'))
+                                <label class="rw-visuellement-cache"
+                                       for="exp-{{ $c['id'] }}">{{ __('comptes.exp_titre') }}</label>
+                                <select id="exp-{{ $c['id'] }}" class="rw-saisie rw-saisie--compacte"
+                                        data-rw="compte-expiration-{{ $c['id'] }}" data-id="{{ $c['id'] }}">
+                                    <option value=""@selected($c['password_expiry_override'] === null)>{{ __('comptes.exp_globale') }}</option>
+                                    <option value="0"@selected((int) $c['password_expiry_override'] === 0 && $c['password_expiry_override'] !== null)>{{ __('comptes.exp_exempte') }}</option>
+                                    @foreach ([30, 60, 90, 180, 365] as $j)
+                                        <option value="{{ $j }}"@selected((int) $c['password_expiry_override'] === $j)>{{ $j }} j</option>
+                                    @endforeach
+                                </select>
+                            @endif
                             @if (! empty($c['locked_until']))
                                 <button type="button" class="rw-bouton rw-bouton--minuscule"
                                         data-rw="compte-deverrouiller-{{ $c['id'] }}"

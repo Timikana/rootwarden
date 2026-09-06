@@ -84,7 +84,7 @@ return [
 
     'portee_titre' => 'What this page can do today',
     // R2: creation IS ported now — see fr.
-    'portee_texte' => 'Reading groups, their members, creation and the bulk drift scan are ported. Deletion and the bulk CVE scan still go through the old portal — each button explains what it engages before sending you there.',
+    'portee_texte' => 'Reading groups, their members, creation, deletion and the bulk drift scan are ported. Only the bulk CVE scan still goes through the old portal — its button explains what it engages before sending you there.',
     'parc_entier'  => 'An administrator role can target the whole fleet: no machine assignment bounds bulk actions.',
 
     // R2 — creating a group. E-274 closed by construction: saving goes through

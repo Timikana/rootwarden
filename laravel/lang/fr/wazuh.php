@@ -92,6 +92,63 @@ return [
     'col_date' => 'Date',
     'col_user' => 'Utilisateur',
     'col_action' => 'Action',
+    /*
+     * ══ R2 — LES TROIS GESTES D'ECRITURE, ET CE QU'ENREGISTRER VEUT DIRE ═══
+     *
+     * ⚠ LES TROIS N'ONT PAS LE MEME EFFET, ET L'ECRAN DOIT LE DIRE PAR GESTE.
+     * Mesure du 2026-09-05 sur `backend/routes/wazuh.py` — qui LIT ce que
+     * chaque geste ECRIT :
+     *
+     *   wazuh_config           lu par `install()` et `install_all()`
+     *                          -> effet DIFFERE, reel
+     *   wazuh_machine_options  2 occurrences dans TOUT le depot : son propre
+     *                          SELECT et son propre INSERT
+     *                          -> AUCUN effet aujourd'hui
+     *   wazuh_rules            lu par `list_rules` et `get_rule` seulement
+     *                          -> AUCUN effet aujourd'hui
+     *
+     * Un ecran qui dirait « Enregistre. » sur les trois ferait croire trois
+     * fois la meme chose, et deux fois ce serait faux. *Ce n'est pas une
+     * precaution de style : c'est la difference entre regler une surveillance
+     * et croire l'avoir reglee.*
+     */
+    'enr_config_effet' => "Enregistrer ne touche aucune machine : cette configuration est LUE au moment d'installer un agent. Elle décide de ce que fera la PROCHAINE installation — les agents déjà installés ne changent pas.",
+    'enr_options_effet' => "⚠ Enregistrer ne touche aucune machine, ET rien ne consomme ces options aujourd'hui : aucun chemin d'installation ne les lit. Elles sont conservées en base et relues par cet écran, rien de plus.",
+    'enr_regles_effet' => "⚠ Enregistrer ne touche aucune machine, ET rien ne consomme ces règles aujourd'hui : aucun chemin de déploiement ne les lit. Elles sont conservées en base et relues par cet écran, rien de plus.",
+
+    'fim_aide' => "Un chemin absolu par ligne, 50 au plus. Le serveur refuse tout chemin qui ne commence pas par « / » : ce texte le décrit, il ne le contrôle pas ici.",
+
+    'enr_encours' => 'Enregistrement…',
+    'enr_ok' => 'Enregistré.',
+    'enr_echec' => "L'enregistrement a échoué.",
+    'enr_refuse' => 'Refusé par le serveur : :message',
+    'enr_reseau' => "Le serveur n'a pas répondu. Rien n'a été enregistré.",
+
+    'mdp_conserve' => "Un champ laissé vide CONSERVE le mot de passe déjà enregistré — il ne l'efface pas. Il n'existe aucun geste d'effacement sur cet écran.",
+    'config_charge' => 'Configuration chargée.',
+    'options_charge' => 'Options chargées.',
+
+    'regle_liste_titre' => 'Règles enregistrées',
+    'regle_editeur_titre' => 'Créer ou modifier une règle',
+    'regle_type' => 'Type',
+    'regle_contenu' => 'Contenu',
+    'regle_nouvelle' => 'Nouvelle règle',
+    'regle_ouvrir' => 'Ouvrir',
+    'regle_aide_nom' => 'Lettres, chiffres, tiret et souligné, 100 caractères au plus. Le serveur tranche : ce texte décrit la forme admise, il ne la contrôle pas ici.',
+    'regle_aide_xml' => "Pour les types « rules » et « decoders », le serveur vérifie que le contenu est du XML — quand son outil de validation est disponible. En son absence il enregistre sans vérifier : un contenu accepté n'est donc pas la preuve qu'il est valide.",
+    'regle_taille' => '512 Ko au plus.',
+    'type_rules' => 'Règles (XML)',
+    'type_decoders' => 'Décodeurs (XML)',
+    'type_cdb' => 'Liste CDB (texte)',
+
+    'suppr_titre' => 'Supprimer une règle',
+    'suppr_question' => 'Supprimer définitivement la règle « :nom » ?',
+    'suppr_consequence' => "Elle est retirée de la base. Aucune machine n'est touchée — et rien n'est restauré : il n'existe pas d'annulation.",
+    'suppr_confirmer' => 'Supprimer cette règle',
+    'suppr_annuler' => 'Annuler',
+    'suppr_ok' => 'Règle supprimée.',
+    'suppr_absente' => "Aucune règle de ce nom n'a été trouvée : rien n'a été supprimé.",
+
     'loading' => 'Chargement…',
     'saving' => 'Sauvegarde…',
     'saved' => 'Sauvegarde.',
@@ -106,7 +163,7 @@ return [
     // dementir — et un compte ecrit a cote d'une enumeration se desynchronise.
     // Ici il n'y a PAS de compte : l'enumeration est la seule source.
     'np_titre' => 'Ce que cette page ne fait pas encore',
-    'np_liste' => "Installer un agent · installer sur tout le parc · relever l'état d'un agent · désinstaller · redémarrer · changer le groupe — ces six ouvrent une session SSH sur la machine. Et : enregistrer la configuration · enregistrer les options d'un serveur · créer ou supprimer une règle.",
+    'np_liste' => "Installer un agent · installer sur tout le parc · relever l'état d'un agent · désinstaller · redémarrer · changer le groupe. Ces six — et depuis R2 ces six SEULEMENT — ouvrent une session SSH sur la machine, et c'est pour cela qu'ils ne sont pas ici.",
     'np_ouvrir' => "Ouvrir Wazuh sur l'ancien portail",
 
     /*
@@ -125,7 +182,7 @@ return [
      *     qu'elle a ecrit, donc l'ecran CONFIRME, et la boucle se referme sans
      *     que rien ne soit applique.
      */
-    'np_reserve' => "Trois de ces gestes n'ont pas l'effet que leur nom suggère, y compris sur l'ancien portail : changer le groupe ne transmet pas le groupe à la machine, et enregistrer des options ou une règle n'atteint aucun serveur.",
+    'np_reserve' => "Et UN des six n'a pas l'effet que son nom suggère, y compris sur l'ancien portail : changer le groupe ne transmet jamais le groupe à la machine — la valeur est validée, écrite en base, et la seule commande distante est un redémarrage de l'agent. Le verdict porte donc sur le REDÉMARRAGE. (Les deux autres gestes que cette phrase nommait — enregistrer des options, enregistrer une règle — sont sur cette page désormais, chacun avec ce qu'enregistrer fait et ne fait pas.)",
 
     // ── DISTINGUER « ZERO MESURE » DE « JE N'AI PAS SU LIRE » ────────────
     'err_config'  => "La configuration du manager n'a pas pu être lue. Ce n'est pas « aucune configuration ».",
@@ -139,7 +196,7 @@ return [
 
     // ── CE QUE LA PAGE DIT D'ELLE-MEME ──────────────────────────────────
     'portee_titre' => 'Ce que cette page peut faire aujourd’hui',
-    'portee_texte' => "Elle lit : la configuration du manager, les agents enregistrés, les options par serveur et les règles en place. Elle ne joint aucune machine et n'écrit rien.",
+    'portee_texte' => "Elle lit : la configuration du manager, les agents enregistrés, les options par serveur et les règles en place. Elle ÉCRIT aussi, depuis R2 : la configuration, les options d'un serveur, et la création, la modification ou la suppression d'une règle. Elle ne joint AUCUNE machine — les six gestes qui ouvrent une session SSH ne sont pas ici, et chaque geste d'écriture dit ci-dessous ce qu'enregistrer fait et ne fait pas.",
 
     /*
      * ══ TRENTE-HUIT CLES DE CE CATALOGUE NE SONT PAS RENDUES PAR R1 ══════

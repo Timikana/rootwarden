@@ -69,7 +69,43 @@ class AuditSshController extends Controller
     ];
 
     /** Les portees que le backend accepte — sa liste, pas une copie choisie. */
-    public const PORTEES = ['all', 'environment', 'tag', 'machines'];
+    /**
+     * Les portees PROPOSABLES pour une planification. `all` n'y est plus.
+     *
+     * ══ SIX ETAGES, ET LE BACKEND REFUSE DEJA ═════════════════════════════
+     *
+     *   ssh_audit.py:816   PORTEES = ('tag','environment','machines')
+     *              :826    `target_type == 'all'` -> 400, par DECISION
+     *   -> garde ECRITE mais INERTE : les `.py` sont lus au DEMARRAGE.
+     *      **Apres le redemarrage que l'exploitant attend, l'ecran proposerait
+     *      ce que le serveur rejette.**
+     *
+     * Ce que le portage portait, et qui est ferme ici :
+     *
+     *   1. `all` PREMIER de cette liste -> l'option SELECTIONNEE par defaut
+     *   2. `planif_portee_all`, le libelle de cette option -> devient mort
+     *   3. `audit-ssh.js:458`  `planifPortee ? … : 'all'`  <- repli
+     *   4. `audit-ssh.js:517`  idem, sur le chemin de SOUMISSION
+     *
+     * ⚠ 5. LA VUE N'A RIEN A CORRIGER, et c'est ce qui la sauve : elle construit
+     * ses `<option>` DEPUIS cette constante (`audit-ssh.blade.php:194`). *Sur
+     * `scan-cve` la liste etait ecrite a la main dans le gabarit, et retirer la
+     * constante y aurait laisse une option que le serveur refuse (E-387).*
+     * **Une liste rendue depuis sa source ne peut pas la contredire.**
+     *
+     * ⛔ 6. ET UN ETAGE HORS DE PORTEE, DECLARE : la colonne elle-meme est
+     * `enum('all','tag','environment','machines') NOT NULL DEFAULT 'all'`. Un
+     * `INSERT` omettant `target_type` obtiendrait donc `all` PAR LA BASE. Le
+     * portage l'envoie toujours, et le backend refuse desormais cette valeur —
+     * le mode de defaillance est un 400, pas un relevé du parc en silence. *Mais
+     * le defaut du schema reste, et une migration n'est pas de mon ressort.*
+     *
+     * **`tag` rend le meme service en exigeant un geste explicite** : le
+     * durcissement ferme les ACCIDENTS, rien ne ferme l'INTENTION — et un `all`
+     * delibere, c'est une session SSH vers chaque machine, production comprise,
+     * sur un calendrier et sans personne devant l'ecran.
+     */
+    public const PORTEES = ['environment', 'tag', 'machines'];
 
     public function __construct(
         private readonly Machines $machines,
@@ -138,7 +174,13 @@ class AuditSshController extends Controller
                 ),
             ] : ['environment' => [], 'tag' => [], 'machines' => []],
             'libelles' => __('ssh_audit'),
-            'lienLegacy' => rtrim((string) config('app.url_legacy'), '/') . '/ssh-audit/',
+            /*
+             * ⛔ NUL DEPUIS LE 2026-09-05 : la cible est ARCHIVEE et rend 404.
+             * Offrir un lien vers une page retiree est le defaut que ce chantier
+             * a corrige deux fois ailleurs (supervision le 03/09, /profil le 05/09).
+             * La vue garde le nul et n'affiche plus le renvoi.
+             */
+            'lienLegacy' => null,
         ]);
     }
 }

@@ -30,7 +30,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-    :root {
+    :root:not([data-theme="light"]) {
         --rw-fond: #0f1722;
         --rw-surface: #17202e;
         --rw-surface-2: #1c2637;
@@ -2182,13 +2182,40 @@ a.rw-onglet { text-decoration: none; display: inline-block; }
  * `tab-size: 4` pour que les tabulations du fichier ne s'affichent pas comme
  * huit colonnes, ce qui deplacerait tout ce qui suit.
  */
-.rw-saisie--code {
+/*
+ * ⚠ CE BLOC S'APPELAIT `.rw-saisie--code`, ET IL PORTAIT LE MEME NOM QU'UNE
+ * AUTRE DEFINITION — DEUX INTENTIONS IRRECONCILIABLES SOUS UN SEUL NOM.
+ *
+ * Vu A L'IMAGE le 2026-09-05, en portant Wazuh R2 : le contenu d'une regle
+ * s'affichait CENTRE et LETTRE PAR LETTRE dans sa zone d'edition.
+ *
+ *     :173  .rw-saisie--code  22px · letter-spacing .35em · text-align center
+ *           -> le champ du CODE TOTP, ou l'espacement aide a lire six chiffres
+ *     ici   .rw-saisie--code  12px · white-space pre · tab-size 4
+ *           -> une zone d'EDITION de fichier
+ *
+ * Le second ne redefinissait ni `letter-spacing` ni `text-align` : **les quatre
+ * zones d'edition heritaient donc de la mise en forme du champ TOTP.** La
+ * cascade ne fusionne pas des intentions, elle empile des proprietes — et une
+ * propriete qu'on n'a pas pensé a remplacer survit sans rien signaler.
+ *
+ * Le nom est donc SEPARE plutot que le conflit arbitre : deux roles visuels,
+ * deux classes, et il redevient impossible de les melanger par inadvertance.
+ * *Six champs TOTP gardent `--code`, quatre editeurs prennent `--edition`.*
+ *
+ * `tab-size: 4` pour que les tabulations du fichier ne s'affichent pas comme
+ * huit colonnes, ce qui deplacerait tout ce qui suit.
+ */
+.rw-saisie--edition {
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     font-size: 12px;
     line-height: 1.5;
     tab-size: 4;
     white-space: pre;
     overflow-wrap: normal;
+    /* Explicites, et non implicites : c'est leur absence qui a fait le defaut. */
+    letter-spacing: normal;
+    text-align: left;
 }
 
 /*
@@ -2352,6 +2379,92 @@ a.rw-onglet { text-decoration: none; display: inline-block; }
  * utilitaire : la distinction tient a un purge pres, et elle ne dit rien a un
  * lecteur d'ecran.
  */
+
+/*
+ * ══ L'ASSISTANT DE PREMIERE CONFIGURATION ═══════════════════════════════════
+ *
+ * Une liste d'ETAPES, pas une liste d'etats : chaque ligne porte un rang, un
+ * intitule, une explication, et parfois une action. Elle ne se borne donc PAS a
+ * `78ch` comme `.rw-liste-etats__ligne` — cette borne sert a garder deux
+ * colonnes lisibles cote a cote, alors qu'ici la prose de l'etape a besoin de
+ * sa largeur et l'action reste a droite.
+ */
+.rw-entete-avec-action {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.rw-liste-etapes {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 14px 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.rw-liste-etapes__ligne {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 12px 14px;
+    border: 1px solid var(--rw-bordure);
+    border-radius: var(--rw-rayon);
+    background: var(--rw-surface);
+}
+
+/*
+ * Une etape franchie s'efface SANS disparaitre — meme regle que
+ * `.rw-liste-etats__ligne--absent` : seule la surface recule, le contraste du
+ * texte reste au-dessus du seuil. **Pas d'`opacity` globale** : le legacy pose
+ * `opacity-60` sur toute la ligne, ce qui fait passer son texte gris SOUS le
+ * seuil de contraste.
+ */
+.rw-liste-etapes__ligne--faite {
+    background: var(--rw-surface-2);
+    border-style: dashed;
+}
+
+.rw-liste-etapes__rang {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--rw-surface-2);
+    border: 1px solid var(--rw-bordure);
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--rw-texte-doux);
+}
+
+.rw-liste-etapes__ligne--faite .rw-liste-etapes__rang {
+    color: var(--rw-succes, var(--rw-texte));
+    border-color: currentColor;
+}
+
+.rw-liste-etapes__corps { flex: 1 1 320px; min-width: 0; }
+
+.rw-liste-etapes__titre {
+    margin: 0 0 2px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--rw-texte);
+}
+
+/*
+ * L'action reste a DROITE sur une ligne large et passe DESSOUS quand la place
+ * manque — `margin-left: auto` avec `flex-wrap` sur le parent. Elle ne se
+ * retrecit jamais : c'est la seule chose actionnable de la ligne.
+ */
+.rw-liste-etapes__action { flex: 0 0 auto; margin-left: auto; align-self: center; }
+
 .rw-liste-etats {
     display: flex;
     flex-direction: column;
@@ -2474,6 +2587,34 @@ a.rw-onglet { text-decoration: none; display: inline-block; }
     color: var(--rw-texte-doux);
     font-size: 12px;
     text-align: right;
+
+    /* Le pied portait la seule version ; il porte desormais aussi les
+       conditions d'utilisation et le lien de soutien. `flex` avec
+       `wrap` : sur 390 px les trois passent a la ligne au lieu de
+       deborder. */
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 6px 16px;
+}
+
+/* ── LES LIENS DU PIED ────────────────────────────────────────────────────
+ *
+ * Sobres par defaut, soulignes au survol ET au focus clavier : un lien qui
+ * ne se distingue qu'a la souris n'existe pas pour qui navigue au clavier.
+ */
+.rw-pied__lien {
+    color: var(--rw-texte-doux);
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+    transition: color .15s ease, border-color .15s ease;
+}
+
+.rw-pied__lien:hover,
+.rw-pied__lien:focus-visible {
+    color: var(--rw-texte);
+    border-bottom-color: currentColor;
 }
 
 /* ── UNE TUILE QUI EST UN LIEN ────────────────────────────────────────────
@@ -2681,3 +2822,227 @@ a.rw-alerte:focus-visible { outline: 2px solid var(--rw-accent); outline-offset:
     .rw-alerte__texte { flex: 1 1 0; overflow: visible; white-space: normal; }
     .rw-alerte__lien { margin-left: 0; }
 }
+
+
+/* ── LE TEXTE DES CONDITIONS D'UTILISATION ────────────────────────────────
+ *
+ * La page `/cgu` n'affichait que son titre et ses deux boutons : le texte a ete
+ * porte le 2026-09-05. Ces regles existent pour qu'il soit LISIBLE — une CGU
+ * qu'on ne lit pas est aussi peu opposable qu'une CGU absente.
+ *
+ * `max-width` en `ch` : la mesure du CONFORT DE LECTURE est le nombre de
+ * caracteres par ligne, pas une largeur en pixels. 72ch tient sur 390 comme sur
+ * 1920, et la carte reste bornee par son propre conteneur.
+ */
+.rw-cgu {
+    max-width: 72ch;
+    margin: 18px 0 22px;
+    text-align: left;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--rw-texte);
+    max-height: 46vh;
+    overflow-y: auto;
+    padding-right: 10px;
+}
+
+.rw-cgu__date {
+    color: var(--rw-texte-doux);
+    font-size: 12px;
+    margin-bottom: 14px;
+}
+
+.rw-cgu__section { margin-bottom: 16px; }
+
+.rw-cgu__titre {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: var(--rw-texte);
+}
+
+.rw-cgu__liste {
+    list-style: disc;
+    padding-left: 22px;
+    margin: 0;
+}
+
+.rw-cgu__liste li { margin-bottom: 4px; }
+
+/* ══ CE QUE L'EXPLOITANT A DEMANDE LE 2026-09-05 ═══════════════════════════
+ *
+ * Trois manques, tous trouves EN SE SERVANT du produit et aucun par une sonde :
+ * la lune du bascule de theme, le profil en pastille, et le texte des CGU.
+ *
+ * ⚠ LE BASCULE DE THEME N'AVAIT JAMAIS ETE PORTE, et il ne figurait dans
+ * AUCUNE des 16 capacites de l'inventaire — parce que cet inventaire a ete
+ * construit a partir des ENTREES DE MENU, et qu'un bascule n'en est pas une.
+ * L'unite de l'inventaire a decide de ce qu'il pouvait voir.
+ * Le legacy l'avait (`menu.php:200`, soleil et lune en SVG).
+ */
+
+/* ── LE THEME EXPLICITE ────────────────────────────────────────────────────
+ *
+ * TROIS etats, et c'est le troisieme qu'on oublie :
+ *   1. « sombre » choisi   -> `data-theme="dark"`   gagne meme si l'OS est clair
+ *   2. « clair » choisi    -> `data-theme="light"`  gagne meme si l'OS est sombre
+ *   3. RIEN choisi         -> aucun attribut, et `prefers-color-scheme` decide
+ *
+ * D'ou la garde `:not([data-theme="light"])` posee sur la media query : sans
+ * elle, un utilisateur d'OS sombre ne pourrait PAS obtenir le clair — la media
+ * query gagnerait, et le bouton mentirait dans un sens sur deux.
+ *
+ * Les declarations sombres ne sont PAS recopiees ici : elles sont derivees du
+ * bloc `@media` par script. Deux listes ecrites a la main divergent.
+ */
+:root[data-theme="dark"] {
+        --rw-fond: #0f1722;
+        --rw-surface: #17202e;
+        --rw-surface-2: #1c2637;
+        --rw-bordure: #2a3746;
+        --rw-bord-defilement: rgba(148, 173, 209, .40);
+        --rw-texte: #e8eef6;
+        --rw-texte-doux: #9fb0c4;
+        --rw-accent: #5b8cff;
+        --rw-accent-texte: #0b1220;
+        --rw-accent-doux: #1b2942;
+        --rw-danger: #fca5a5;
+        --rw-danger-fond: #2a1618;
+        --rw-succes: #6ee7a8;
+        --rw-succes-fond: #16281f;
+        --rw-avertissement: #fcd34d;
+        --rw-avert-fond: #2a2410;
+        --rw-ombre: 0 1px 3px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .35);
+}
+
+/* Le bouton lui-meme. Soleil ET lune sont dans le DOM ; c'est le theme APPLIQUE
+ * qui decide lequel se voit — pas le JS, qui n'a donc rien a synchroniser. */
+.rw-theme {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px; height: 30px;
+    padding: 0;
+    border: 1px solid var(--rw-bordure);
+    border-radius: var(--rw-rayon);
+    background: var(--rw-surface-2);
+    color: var(--rw-texte-doux);
+    cursor: pointer;
+    line-height: 1;
+    font-size: 15px;
+}
+.rw-theme:hover { color: var(--rw-texte); border-color: var(--rw-accent); }
+.rw-theme__soleil, .rw-theme__lune { display: none; }
+/* Theme CLAIR applique -> on propose le sombre -> on montre la LUNE. */
+.rw-theme__lune   { display: inline; }
+.rw-theme__soleil { display: none; }
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .rw-theme__lune   { display: none; }
+    :root:not([data-theme="light"]) .rw-theme__soleil { display: inline; }
+}
+:root[data-theme="dark"]  .rw-theme__lune   { display: none; }
+:root[data-theme="dark"]  .rw-theme__soleil { display: inline; }
+:root[data-theme="light"] .rw-theme__lune   { display: inline; }
+:root[data-theme="light"] .rw-theme__soleil { display: none; }
+
+/* ── LE PROFIL EN PASTILLE ─────────────────────────────────────────────────
+ *
+ * `<details>` et non un menu en JS : il s'ouvre au clavier, se ferme a Echap,
+ * et fonctionne si le script ne charge pas. Un menu de compte qui depend du JS
+ * est un menu de compte qui disparait quand le JS tombe.
+ */
+.rw-profil { position: relative; }
+.rw-profil > summary {
+    list-style: none;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px; height: 30px;
+    border-radius: 999px;
+    background: var(--rw-accent);
+    color: var(--rw-accent-texte);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .3px;
+    user-select: none;
+}
+.rw-profil > summary::-webkit-details-marker { display: none; }
+.rw-profil > summary:hover { filter: brightness(1.08); }
+
+.rw-profil__menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    z-index: 40;
+    min-width: 210px;
+    padding: 10px;
+    border: 1px solid var(--rw-bordure);
+    border-radius: var(--rw-rayon);
+    background: var(--rw-surface);
+    box-shadow: var(--rw-ombre);
+    text-align: left;
+}
+.rw-profil__nom { display: block; font-weight: 600; margin-bottom: 2px; }
+.rw-profil__role { display: block; color: var(--rw-texte-doux); font-size: 12px; margin-bottom: 10px; }
+.rw-profil__menu .rw-bouton { width: 100%; }
+
+/* ── LES CGU ───────────────────────────────────────────────────────────────
+ *
+ * ⚠ LA SECTION 8 S'APPELLE « CONTACT » ET NE NOMMAIT PERSONNE : la phrase
+ * finissait sur un deux-points suivi de RIEN. Le legacy rendait l'adresse juste
+ * apres (`_deprecated/terms.php:109`) ; le portage l'a perdue au passage.
+ *
+ * ⚠ ET LE BLOC DE SOUTIEN N'ETAIT RENDU NULLE PART : `support_title` et
+ * `support_desc` VIVENT dans le catalogue depuis le portage du 05/09 et
+ * n'avaient aucun lecteur. Deux cles mortes sur 36.
+ *
+ * La carte GRANDIT et c'est la PAGE qui defile, comme faisait le legacy. Une
+ * boite a hauteur fixe montrait 29 % du texte (504 px pour 1710 px) et l'ombre
+ * de bord passait SUR un titre. Les boutons apres le texte valent mieux pour un
+ * consentement : on accepte au bout de ce qu'on a lu.
+ */
+.rw-cgu {
+    max-width: 72ch;
+    margin: 18px 0 22px;
+    text-align: left;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--rw-texte);
+    /* ⚠ CES TROIS-LA ANNULENT LA BOITE A HAUTEUR FIXE definie plus haut. Sans
+     * elles, `max-height: 46vh` survit a cette redefinition — une propriete non
+     * mentionnee n'est pas remise a zero, elle est HERITEE du bloc precedent.
+     * Le defaut serait invisible : la page rendrait, avec 29 % du texte. */
+    max-height: none;
+    overflow-y: visible;
+    padding-right: 0;
+}
+.rw-cgu__contact { margin-top: 6px; }
+.rw-cgu__contact a { color: var(--rw-accent); text-decoration: none; }
+.rw-cgu__contact a:hover { text-decoration: underline; }
+
+.rw-cgu__soutien {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--rw-bordure);
+}
+.rw-cgu__soutien-icone { font-size: 26px; line-height: 1.1; }
+.rw-cgu__soutien-titre { font-weight: 600; margin: 0 0 2px; }
+.rw-cgu__soutien-texte { color: var(--rw-texte-doux); font-size: 13px; margin: 0; }
+
+/* La couleur de la marque : elle ne suit PAS le theme, c'est son role. */
+.rw-cgu__cafe {
+    display: inline-block;
+    margin-top: 10px;
+    padding: 7px 16px;
+    border-radius: var(--rw-rayon);
+    background: #ffdd00;
+    color: #3d2c00;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+}
+.rw-cgu__cafe:hover { background: #ffe74d; }

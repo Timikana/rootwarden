@@ -78,6 +78,34 @@ class StepUp
         // par un step-up ; ce que le portage ajoute, c'est un chemin pour y
         // repondre (PARITE E-119).
         'permission_definir',
+        /*
+         * ⚠ QUATRIEME ENTREE — ET ELLE COMBLE UNE ASYMETRIE, PAS UN OUBLI DE
+         * FONCTIONNALITE.
+         *
+         *     ComptesController:479   anonymiser le compte d'AUTRUI  -> step-up EXIGE
+         *     PortailController       anonymiser le SIEN             -> aucun
+         *
+         * **Le meme geste, sur le meme compte, gardé d'un cote et pas de
+         * l'autre.** Le motif `compte_anonymiser` existe deja pour la voie
+         * administrative ; celle du sujet l'avait saute. *Il n'y a donc pas une
+         * capacite a porter : il y a un motif ETABLI dans le depot qu'une route
+         * n'a pas suivi.*
+         *
+         * ⚠ ET UNE ENTREE DISTINCTE PLUTOT QUE `compte_anonymiser` REUTILISE.
+         * Les marques sont posees PAR ACTION : partager le nom ferait qu'une
+         * re-authentification donnee pour anonymiser le compte d'autrui
+         * ouvrirait aussi l'effacement du sien, pendant quinze minutes, sans que
+         * personne l'ait demande. *Deux gestes distincts, deux marques.*
+         *
+         * ⚠ ET LE COUT EST NUL EN ACCES : atteindre cette route exige une
+         * session, avoir une session exige d'avoir franchi la connexion, et
+         * `ConnexionController` force l'enrolement quand `totp_secret` est vide.
+         * **Quiconque atteint la route dispose donc d'un second facteur.** *Les
+         * comptes sans secret n'ont pas zero acces a ce geste : ils ont zero
+         * connexion — un compte dormant et un compte vulnerable ont la meme
+         * ligne dans un releve qui ne compte que les secrets.*
+         */
+        'profil_effacement',
     ];
 
     /**

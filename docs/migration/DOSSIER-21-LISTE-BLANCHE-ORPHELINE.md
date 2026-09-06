@@ -116,3 +116,116 @@ ouvert.* **C'est pourquoi E-236 ne peut être fermé qu'au backend.**
   exploitable aujourd'hui* ;
 - **les 63 entrées de `$ALLOWED_PROXY_PREFIXES` une par une** : *seules les 58 sans `role >= 2` ont été
   classées, et 23 d'entre elles sans aucune autorisation.* **Il peut en rester.**
+
+---
+
+# 🔴 GRAVITÉ RELEVÉE — 2026-09-04, 16:05. Il ne faut pas `curl` : il faut TROIS CLICS.
+
+**Ce dossier reposait sur une phrase qui vient d'être mesurée FAUSSE, et dans le sens rassurant :
+« aucun chemin cliquable, c'est une requête forgée, pas un parcours d'écran ».**
+
+## 1. LE PORTAIL CONTIENT UN FORGEUR DE REQUÊTES GRAPHIQUE, AU MENU
+
+    legacy/documentation.php:11    checkAuth([ROLE_USER, ROLE_ADMIN, ROLE_SUPERADMIN])
+    legacy/includes/menu.php:161   la page est une ENTREE DU MENU PRINCIPAL
+    documentation.php:1624         <input id="api-endpoint">   champ LIBRE, zero validation
+                    :1636          <textarea id="api-payload">{"machines": [1]}
+                    :1744          fetch('/api_proxy.php' + endpoint, options)
+
+> **Les 23 routes orphelines de la liste blanche ne demandent pas un outil : elles demandent trois clics,
+> depuis le menu, pour tout compte de rôle 1.**
+
+**Ce qui borne encore** : *`api_proxy.php:110` refuse `..`, `//` et `\` — donc pas de traversée de chemin,
+et ce `//` ferme au passage la forme à schéma relatif.* **Ça borne la FORME de l'URL. Ça ne borne aucune
+des routes atteignables.**
+
+## 2. ⚠ DEUX ROUTES NUES, ET LEUR DÉFAUT PAR DÉFAUT EST DESTRUCTEUR
+
+    /apt_update    @require_api_key + @require_machine_access
+                   ni role, ni permission
+                   -> defaut `method='full'`  =  apt full-upgrade
+    /dpkg_repair   idem
+                   -> tue apt/dpkg et SUPPRIME LES VERROUS
+
+**39 des 63 préfixes de la liste blanche passent pour un rôle 1. Ces deux-là sont nues sur le disque.**
+
+## 3. 🔴 ET L'EXPOSITION EST VIVANTE — mesurée, avec ses témoins
+
+    role1 actifs                                          7
+    role1 actifs AVEC une machine assignee                1
+    dont SANS `can_update_linux` (= exposition vivante)    1
+    TEMOIN lignes `user_machine_access`                    2
+    TEMOIN colonnes `can_%` de `permissions`              18
+
+    et la machine assignee est :
+      compte role1 id=2  ->  machine id=1  (srv-zabbix, PROD)
+
+> **🔴 Un compte actif de rôle 1, qui ne porte PAS la permission de mise à jour, peut déclencher
+> `apt full-upgrade` et `dpkg_repair` sur `srv-zabbix` EN PRODUCTION — par le menu, sans outil.**
+
+**C'est la machine que toutes les consignes de ce chantier interdisent de joindre. Le produit l'offre à un
+compte de rôle 1 en trois clics.**
+
+## 4. ✅ LE CORRECTIF EST AUTORISÉ, ET CE N'EST PAS `@require_role(2)`
+
+    ce que le REFLEXE dicterait   @require_role(2)
+    ce qui se passerait           web.php:442-446 « role 1 ADMIS s'il porte
+                                  can_update_linux » -> le backend defairait
+                                  la page qu'il protege
+    ✅ ce que je tranche          @require_permission('can_update_linux')
+
+**Justification mesurée** : *`can_update_linux` EXISTE comme colonne, 2 comptes la portent, et le backend
+ne la vérifie NULLE PART — 0 occurrence dans `backend/routes/`.* **Les deux portails l'exigent à l'étage
+PAGE ; le backend ne l'exige pas du tout. Le correctif ne fait que cesser d'être plus permissif que la page
+qu'il sert, et il ne casse aucun appelant légitime : ils portent tous la permission.**
+
+**⚠ Et `ADMIN_SEULEMENT` du portage devra peut-être suivre. Ce n'est pas encore mesuré.**
+
+## 5. CE QUI VOUS REVIENT
+
+    ✅ le correctif backend       AUTORISE, il ne demande rien de vous
+    📌 le compte role1 id=2       son assignation a `srv-zabbix` est une donnee
+                                  de PRODUCTION. La retirer, ou lui accorder la
+                                  permission, est une decision sur un compte
+                                  REEL — donc la votre, pas la mienne.
+
+**Si rien n'est fait : le correctif ferme le chemin, et l'assignation reste.** *C'est suffisant pour la
+sécurité et insuffisant pour l'hygiène — un compte de rôle 1 assigné à la production restera assigné à la
+production.*
+
+## 6. ⚠ ET CE FICHIER SE LIT DE TRAVERS POUR LA TROISIÈME FOIS
+
+**`/apt_update` a été cru présent dans `ADMIN_SEULEMENT`** : *les lignes 111-112 appartiennent à la liste
+AUTORISÉE, et le `];` d'`ADMIN_SEULEMENT` ne vient qu'après.* **Troisième relevé de ce fichier à se lire de
+travers — aucun n'a produit d'erreur publiée, et les trois ont demandé une seconde lecture.**
+
+*C'est un défaut de FORME du fichier, pas des lecteurs : deux listes longues, séparées par une accolade,
+qu'aucun outil ne distingue à l'œil.*
+
+---
+
+# ⚠ AJOUT — DEUX des sondes de `health_check.php` ne mesurent RIEN
+
+**Mesuré le 2026-09-05.**
+
+    legacy/adm/health_check.php:223
+      ['SSH Audit Policies', 'GET', '/ssh_audit/policies', …]
+                                      ^^^^^^^^^ tiret BAS
+
+    routes reelles portant « policies » : 7, toutes en `ssh-audit/` (tiret)
+    routes avec un tiret BAS : ZERO  (TEMOIN)
+
+> **Cette sonde vise un chemin qui n'existe pas. Elle n'a jamais rien mesuré.**
+
+**C'est la SECONDE sonde de ce fichier à ne rien mesurer** — *la première est « SSH Audit Backups », que le
+correctif E-391 dégrade volontairement pour un rôle 2 sans `can_audit_ssh`.*
+
+> **Une page de contrôle de santé dont les sondes mentent est pire qu'une page absente : elle rend un vert
+> que personne ne remet en question.**
+
+**⛔ Je ne fais rien corriger** : *`health_check.php` ÉCRIT sur `srv-zabbix` — la PRODUCTION — AU
+CHARGEMENT. C'est la page que toutes les consignes de ce chantier interdisent d'ouvrir, et le portage ne la
+reprend pas.* **Son extinction ferme le problème ; la corriger demanderait de l'ouvrir.**
+
+**Ce qui vaut d'être su : si quelqu'un s'appuie sur cette page pour dire que le parc va bien, deux de ses
+lignes vertes ne portent aucune mesure.**

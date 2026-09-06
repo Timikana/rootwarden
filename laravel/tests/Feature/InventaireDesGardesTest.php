@@ -159,7 +159,41 @@ class InventaireDesGardesTest extends TestCase
          * Les autres n'ont pas d'objet a proteger au-dela de l'authentification :
          *   accueil, cgu (GET+POST), profil        l'ecran de tout compte
          *   profil/mot-de-passe, profil/step-up*   ses propres identifiants
+ *   profil/courriel, profil/cle-ssh        SES propres coordonnees et SA
+ *       propre cle — `feaaaa2`, DOSSIER-30. La cible EST le demandeur,
+ *       l'identifiant vient de la SESSION. Le pendant administratif
+ *       (`POST comptes/{id}/cle-ssh`) reste `role:3` : deux arites, deux
+ *       gardes. Exiger un role ici interdirait a un role 1 de poser la cle
+ *       qui sert son propre acces.
+ *   profil/effacement                      SON propre compte — et c'est la
+ *       seule entree IRREVERSIBLE de cette liste, donc celle a relire.
+ *       Le geste est une ANONYMISATION : `user_logs` est une chaine de
+ *       hachage, retirer une ligne romprait la verification des suivantes.
+ *       Trois protections REELLES dans le controleur — identifiant de
+ *       session, RESSAISIE du nom du compte, refus au dernier
+ *       superadministrateur.
+ *       ⚠ RE-AUTHENTIFICATION EXIGEE depuis le 2026-09-06 (E-449, `f94c947`)
+ *       — et cette route reste dans CETTE liste, parce que la garde vit dans
+ *       le CONTROLEUR et non sur la route. `TableDesGardes` gele les gardes de
+ *       ROUTE ; l'y inscrire dirait qu'un intergiciel la porte, c'est-a-dire
+ *       une chose fausse dans le fichier meme qui existe pour dire le vrai.
+ *       *La garde est attestee par `EffacementLibreServiceTest` (C1/C2), pas
+ *       par ce releve.*
+ *       LES DEUX CONTROLES NE PROTEGENT PAS DE LA MEME CHOSE : le nom a
+ *       retaper est AFFICHE sur la page, donc il protege du geste ACCIDENTEL ;
+ *       le code TOTP protege d'une session VOLEE. `eff_code_aide` le dit a
+ *       l'ecran. *Deux controles ne font pas deux protections quand leurs
+ *       objets different.*
+ *       CAPACITE NEUVE, non portee : `legacy/profile.php` n'offre que
+ *       l'export, alors que `legacy/lang/fr/terms.php:78` promet le droit
+ *       a l'effacement. Le legacy annoncait ce droit sans l'implementer.
          *   profil/sessions/fermer                 ses propres sessions
+     *   accueil/assistant/masquer              SA propre preference
+     *   profil/donnees-personnelles            SES propres donnees — export
+     *       RGPD art. 20, FIDELE au legacy qui l'ouvre a tout compte connecte
+     *       des le role 1. L'identifiant vient de la SESSION, aucun parametre
+     *       n'est offert : il n'y a pas d'objet a garder au-dela de
+     *       l'authentification.
          *   documentation                          FIDELE au legacy, qui pose
          *       `checkAuth([1,2,3])` sans aucun `checkPermission` : son seul
          *       cloisonnement est un SEUIL DANS LA PAGE (`role >= 2` sur cinq
@@ -183,7 +217,12 @@ class InventaireDesGardesTest extends TestCase
             'GET cgu',
             'GET documentation',
             'GET profil',
+            'GET profil/donnees-personnelles',
+            'POST accueil/assistant/masquer',
             'POST cgu',
+            'POST profil/cle-ssh',
+            'POST profil/courriel',
+            'POST profil/effacement',
             'POST profil/mot-de-passe',
             'POST profil/sessions/fermer',
             'POST profil/step-up',
@@ -230,5 +269,75 @@ class InventaireDesGardesTest extends TestCase
         }
 
         return $table;
+    }
+
+    /**
+     * ⚠ L'ANGLE MORT DE `TableDesGardes`, GELE PLUTOT QUE DECLARE.
+     *
+     * Ce releve ne peut pas exprimer une garde qui vit dans un CONTROLEUR. Son
+     * en-tete le dit maintenant — et une limitation qui n'est QUE dite se perime
+     * en silence, ce qui est le defaut que ce depot demonte le plus souvent.
+     *
+     * Ce test gele donc les sites. Un SIXIEME fait rougir, et c'est le but :
+     * une garde de controleur neuve doit etre inscrite dans l'en-tete, sans quoi
+     * un lecteur du releve conclura qu'un geste n'est garde que par sa route.
+     *
+     * Le decompte porte sur le SITE QUI DECIDE, pas sur les mentions : la
+     * definition de l'aide `ComptesController::exigeStepUp()` n'en est pas un, et
+     * la compter donnerait un total qui ne correspond a aucun geste.
+     */
+    #[Test]
+    public function les_gardes_de_CONTROLEUR_sont_recensees(): void
+    {
+        $sites = [];
+
+        foreach (glob(base_path('app/Http/Controllers/*.php')) ?: [] as $chemin) {
+            $lignes = file($chemin, FILE_IGNORE_NEW_LINES) ?: [];
+            $dansBloc = false;
+
+            foreach ($lignes as $numero => $ligne) {
+                $nu = trim($ligne);
+
+                // Depouiller par etat, et non par motif : ce fichier et ceux
+                // qu'il lit PORTENT leurs demonstrations en commentaire.
+                if (str_starts_with($nu, '/*')) {
+                    $dansBloc = true;
+                }
+                if ($dansBloc) {
+                    if (str_contains($nu, '*/')) {
+                        $dansBloc = false;
+                    }
+                    continue;
+                }
+                if (str_starts_with($nu, '*') || str_starts_with($nu, '//')) {
+                    continue;
+                }
+
+                if (preg_match('/!\s*\$this->stepUp->valide|\(\$refus = \$this->exigeStepUp/', $ligne) === 1) {
+                    $sites[] = basename($chemin) . ':' . ($numero + 1);
+                }
+            }
+        }
+
+        sort($sites);
+
+        // TEMOIN : l'enumeration a bien parcouru des fichiers. Une liste vide
+        // satisferait toute attente d'absence, et rendrait ce gel vacant.
+        $this->assertGreaterThan(30, count(glob(base_path('app/Http/Controllers/*.php')) ?: []),
+            'le balayage ne trouve presque aucun controleur : la mesure ci-dessous '
+            . "n'a pas eu lieu");
+
+        $this->assertSame([
+            'ComptesController.php:514',      // compte_supprimer
+            'ComptesController.php:539',      // compte_anonymiser
+            'PasserelleController.php:88',    // generique, action DERIVEE du chemin
+            'PermissionsController.php:165',  // permission_definir
+            'PortailController.php:196',      // profil_effacement (E-449)
+        ], $sites,
+            "Les gardes de step-up vivant dans un CONTROLEUR ont change.\n"
+            . "`TableDesGardes` ne peut pas les exprimer : son en-tete les recense, "
+            . "et il doit etre mis a jour DANS CE COMMIT.\n"
+            . "Un simple decalage de lignes compte aussi — c'est le prix d'un gel "
+            . "qui pointe l'endroit exact, et il oblige a relire le site.");
     }
 }

@@ -426,3 +426,104 @@ voit en lisant la planification.
   **du Lead**, pas la mienne — elle exigerait la base, hors du périmètre accordé.
   *Je la porte comme sienne, pas comme un fait à deux voix* ;
 - **rien n'a été déclenché.**
+
+---
+
+## 10. PRÉPARATION DE « CRÉER UN RELEVÉ PLANIFIÉ » — 2026-09-05, 23:38 CEST
+
+**Demandée en préparation d'un portage. Mesuré : la capacité EST DÉJÀ PORTÉE.**
+*Lecture seule, fenêtre 3 du LOT, `docs/` seul.*
+
+### 10.1 Le geste est porté — QUATRE appels réels, commentaires exclus
+
+> **⚠ CORRIGÉ : j'avais publié TROIS.** Le DSI en a mesuré quatre, et sa mesure
+> tient — j'avais manqué `:910 lis('/ssh-audit/schedules')`, la LISTE.
+>
+> **La cause est identifiable à la commande** : mon relevé passait
+> `grep -n … | head -8` sur **9** occurrences. **La troncature a coupé exactement
+> la neuvième**, qui était l'appel manquant.
+>
+> **C'est une QUATRIÈME forme d'échec de mesure**, distincte des trois déjà
+> cataloguées (mauvais axe, mauvaise étendue, mauvaise forme) : **une sortie
+> TRONQUÉE lue comme exhaustive.** *Et elle est d'autant plus insidieuse que
+> `head -N` est ce qu'on emploie sans y penser pour garder une sortie lisible.*
+>
+> **Ma conclusion n'était pas en jeu** — mon second relevé, par AST et sans
+> troncature, comptait bien `/ssh-audit/schedules` parmi les six chemins appelés.
+> **Mais le CHIFFRE que j'ai publié était faux, et il fondait le verdict.**
+> *Le DSI a raison : un compte qui fonde un verdict se vérifie même quand il va
+> dans le bon sens — **et surtout quand il y va**, parce que c'est là qu'on ne le
+> recompte pas.*
+
+```
+laravel/public/js/audit-ssh.js
+  :705   ecris('/ssh-audit/schedules', corps)                     POST   — ARME
+  :910   lis('/ssh-audit/schedules')                             GET    — LISTE
+  :180   fetch(PASSERELLE + '/ssh-audit/schedules/' + n, …)       DELETE
+  :194   fetch(PASSERELLE + '/ssh-audit/schedules/' + n + '/toggle')
+```
+
+**Cinq des neuf occurrences de ce chemin sont des COMMENTAIRES**
+(`:14`, `:43-45`, `:172`). *Un relevé sans lecture en aurait compté huit — « cité »
+n'est pas « appelé », et c'est la deuxième fois ce soir que ma propre règle me
+rattrape.*
+
+**Et le fichier le déclare à son site**, en énumérant par NOM D'APPELANT et non
+par numéro de ligne — *parce qu'une insertion au-dessus périme un numéro en
+silence.*
+
+### 10.2 Les quatre réponses demandées
+
+| | |
+|---|---|
+| **① le geste** | `POST /ssh-audit/schedules` — **porté**, via la passerelle |
+| **② ce qu'il écrit** | table `ssh_audit_schedules` ; colonnes lues du corps : `name` (défaut `'Scan SSH periodique'`, tronqué à 100), `cron_expression`, `target_type`, `target_value` — **et `next_run` + `created_by` posés par le serveur** |
+| **③ les libellés** | `ssh_audit.sched_*` — **15 clés**, de `sched_new` à `sched_add`. **⚠ AUCUN libellé de RÉSULTAT** : la famille s'arrête à `sched_add`. *L'heuristique « personne n'écrit quatre messages de résultat pour un geste qu'il n'accomplit pas » ne s'applique pas ici — il n'y en a zéro, dans un sens comme dans l'autre.* |
+| **④ la garde** | `require_api_key` + `role:2` + **`perm:can_audit_ssh`** ; dans `ADMIN_SEULEMENT` ; **AUCUN step-up** — `MOTIFS_STEP_UP` ne couvre que `/policy/…` |
+
+### 10.3 ⚠ MON E-236 EST PARTIELLEMENT PÉRIMÉ SUR CE MODULE
+
+Le 2026-09-01 j'ai mesuré **13 routes croisées** dans `ssh_audit.py`. **Remesuré
+ce jour : 8.**
+
+**Les CINQ routes de planification portent désormais `require_permission`** — et
+le code porte le commentaire : *« Elles portaient `@require_role(2)` SEUL, alors
+que les deux pages du module… Même écart qu'E-402 sur les politiques. »*
+
+> **Ma trouvaille a été corrigée, et mon document ne l'a pas suivi.** *Correction
+> dans le sens rassurant — donc celle que personne ne rouvre.* **Deuxième fois
+> qu'un de mes documents vieillit sous un correctif qu'il a lui-même provoqué.**
+
+### 10.4 ⚠ SEPT ROUTES DU MODULE N'ONT AUCUN APPELANT — et elles se répartissent en TROIS natures
+
+Le DSI demande : *« si tu trouves d'autres routes sans appelant, dis-le — le
+module est peut-être plus creux qu'il n'en a l'air ».* **Il l'est : 7 sur 16.**
+
+| route | nature | catégorie |
+|---|---|---|
+| `/ssh-audit/save-config` · `/fix` · `/toggle` · `/restore` · `/reload` | **écrivent `sshd_config`, rechargent `sshd`** | **A3 — sous-lot NON PORTÉ**, retenu |
+| `/ssh-audit/backups` | lecture distante | **trou DANS A2**, sous-lot porté |
+| `/ssh-audit/trends` | lecture en base | **trou DANS A1**, sous-lot porté |
+
+> **La distinction porte, et elle est celle du §7.3 de `AUDIT-CATALOGUE-POLITIQUES` :**
+>
+> - **cinq routes appartiennent à un sous-lot qu'on a CHOISI de ne pas porter** —
+>   c'est du travail en attente, nommé, et la frontière « ce qui reste écrit »
+>   tient sur elles ;
+> - **deux sont des TROUS dans des sous-lots PORTÉS.** *A1 et A2 sont déclarés
+>   livrés ; deux de leurs gestes n'ont jamais été câblés.* **Ce ne sont ni des
+>   orphelines par dépréciation ni des retenues : c'est une TROISIÈME forme —
+>   un sous-lot déclaré complet qui ne l'est pas.**
+
+**Et rien ne les signale** : le sous-lot est marqué porté, sa page existe, ses
+autres gestes fonctionnent. *`/ssh-audit/trends` est de surcroît promise par
+`openapi.yaml` — donc un contrat public sans client.*
+
+### 10.5 Ce que je ne fais pas
+
+**Aucune planification créée**, sous aucune forme. *Le scheduler tourne dans un
+fil invisible à `ps`, et une planification de test peut déclencher un vrai scan
+SSH.* **Interdit respecté.**
+
+**Et je ne porte rien** : `laravel/` est hors de mon périmètre d'écriture, et la
+capacité n'a de toute façon pas besoin d'être portée — **elle l'est.**

@@ -590,9 +590,12 @@ Gestion_SSH_KEY/
     │   ├── 📄 verify_2fa.php      Saisie code TOTP 6 chiffres. Vérifie avec OTPHP (±1).
     │   ├── 📄 enable_2fa.php      Activation 2FA : génère secret TOTP + QR code.
     │   ├── 📄 confirm_2fa.php     Valide le premier code avant d'enregistrer le secret.
-    │   ├── 📄 reset_totp.php      Réinitialise secret TOTP d'un user (admin/superadmin).
-    │   └── 📄 migrate_crypto.php  ★ Script CLI/web. Re-chiffre tous les mots de passe
-    │                              BDD (ancienne clé → nouvelle clé ou AES → Sodium).
+    │   └── 📄 reset_totp.php      Réinitialise secret TOTP d'un user (admin/superadmin).
+    │
+    │   ⚠ migrate_crypto.php a QUITTÉ ce dossier (E-404) → scripts/migrate_crypto.php
+    │     Il ne s'archive pas avec le portail : c'est le SEUL geste qui termine une
+    │     rotation de la clé de CHIFFREMENT, et il est désormais autonome (plus
+    │     aucun require vers legacy/). Voir la section « Rotation de clé » plus bas.
     │
     ├── 📁 adm/
     │   ├── 📄 admin_page.php      ★ Page admin principale (superadmin). Orchestre les
@@ -785,7 +788,13 @@ srv-docker.env :
   OLD_SECRET_KEY=ancienne_cle
 
 PHP → decryptPassword() essaie OLD_SECRET_KEY en fallback
-PHP → migrate_crypto.php → re-chiffre toutes les données avec SECRET_KEY
+PHP → scripts/migrate_crypto.php → re-chiffre toutes les données avec SECRET_KEY
+      ⚠ CLI SEULEMENT (garde PHP_SAPI !== 'cli' → 403 ; l'ancienne description
+        « CLI/web » de ce document était fausse). Lancement :
+          docker cp scripts/migrate_crypto.php rootwarden_php:/tmp/ \
+            && docker exec rootwarden_php php /tmp/migrate_crypto.php
+        Après l'extinction du legacy, toute image php:cli ayant accès à la base
+        convient : le script ne dépend plus d'aucun fichier du portail.
 Python → decrypt_password() essaie OLD_SECRET_KEY en fallback
 ```
 

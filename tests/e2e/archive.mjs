@@ -108,9 +108,65 @@ async function repond(url) {
     });
 }
 
-export async function verifieMenuLegacy(page, routeportee, verifie) {
+/*
+ * ══ TROIS ISSUES, PAS DEUX — ET LA TROISIEME A COUTE VINGT ROUGES ═════════
+ *
+ * Mesure du 2026-09-05, moitie legacy du LOT : sur 22 suites rouges, **VINGT**
+ * echouaient sur cette seule assertion, avec le meme detail :
+ *
+ *     FAIL  l'entree de menu du legacy mene au portage
+ *           — aucun lien vers « /supervision » parmi 0 liens
+ *
+ * Zero liens. Pas « un menu qui pointe ailleurs » : **pas de page du tout**.
+ * `legacy/index.php` a ete archive dans la journee, donc la page qui PORTE le
+ * menu n'existe plus. Le controle lisait un 404, y trouvait zero ancre, et
+ * concluait que le menu ne menait nulle part.
+ *
+ * **Ce n'est pas vingt regressions, c'est un controle qui ECHOUE la ou il
+ * devrait S'ABSTENIR.** Et la dissymetrie compte : un controle qui echoue a
+ * tort fabrique de l'alarme — coûteuse mais visible ; un controle qui
+ * s'abstient a tort fabrique du DEDOUANEMENT, que personne ne rouvre. Celui-ci
+ * se trompait du cote le moins coûteux, ce qui n'en fait pas un bon controle.
+ *
+ * LE DISCRIMINANT EST L'ABSENCE TOTALE D'ANCRES. Une page legacy servie en
+ * porte toujours — menu, pied, fil. Zero ancre ne veut pas dire « le menu est
+ * faux », ca veut dire « il n'y a pas de page ». Les deux se distinguent, et
+ * « je n'ai pas pu regarder » n'est pas « rien a signaler ».
+ *
+ * ⚠ FAIL-CLOSED : si l'appelant ne fournit pas `constate`, on ECHOUE comme
+ * avant. Un appelant qui oublie l'argument ne doit pas heriter d'un silence.
+ */
+export async function verifieMenuLegacy(page, routeportee, verifie, constate) {
     const liens = await page.evaluate(() =>
         [...document.querySelectorAll('a[href]')].map(a => a.getAttribute('href')));
+
+    /*
+     * ⚠ LE DISCRIMINANT EST LE STATUT, PAS LE NOMBRE D'ANCRES.
+     *
+     * Premiere redaction : `liens.length === 0`. Elle marchait le 2026-09-05 a
+     * 23:09 parce qu'une URL archivee rendait le 404 NU d'Apache — 236 octets,
+     * zero ancre. **Elle aurait cesse de marcher a 23:18**, quand E-425 a pose
+     * un `ErrorDocument 404` qui NOMME et LIE le portail : la page archivee
+     * porte desormais UNE ancre, `liens.length` vaut 1, et les vingt suites
+     * seraient reparties en echec — avec « parmi 1 liens » au lieu de « parmi
+     * 0 », c'est-a-dire sous les traits d'un vrai defaut de menu.
+     *
+     * **Un discriminant fonde sur une consequence de l'etat (le corps est vide)
+     * se perime des que quelqu'un ameliore cet etat.** Celui fonde sur l'etat
+     * lui-meme (la page repond 404) survit : le CODE est conserve par E-425,
+     * et il est ce que le contrat d'archivage asserte partout ailleurs.
+     */
+    const statutPage = await repond(page.url());
+    if (statutPage === 404 && typeof constate === 'function') {
+        constate("entree de menu vers « " + routeportee + " »",
+            'NON MESURE — la page ou l\'on se trouve rend 404 (' + page.url() + ') : '
+            + 'ce n\'est pas un menu qui echoue, c\'est la page qui le portait qui a '
+            + 'ete archivee. Il n\'y a rien a juger, et l\'exigence n°3 du contrat '
+            + 'devient sans objet tant qu\'aucune page legacy ne subsiste pour porter '
+            + 'un menu.');
+
+        return;
+    }
     /*
      * LE LIEN DOIT ETRE ABSOLU, ET SON CHEMIN DOIT ETRE LA ROUTE — pas la
      * contenir.
