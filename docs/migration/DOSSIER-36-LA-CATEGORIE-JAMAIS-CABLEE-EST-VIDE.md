@@ -151,7 +151,7 @@ correctement.*
 | faux positif — forme 4 | **s'agrandit de 2** (`/server_users_inventory`, `/admin/notification_prefs`) |
 | **jamais câblée** | **VIDE** — la catégorie perd ses deux seuls membres |
 | trou asymétrique | **devient un trou franc, et il est PORTABLE** |
-| **retenue par ARBITRAGE (K4)** | **passe de 3 routes à UNE** |
+| **retenue par ARBITRAGE (K4)** | ⚠ **erreur d'ATTRIBUTION, pas de compte — voir ci-dessous** |
 | les 16 autres | inchangées |
 
 ## ⚠ CORRECTION DU 2026-09-06 15:00 — j'avais écrit « les 18 autres inchangées »
@@ -178,15 +178,58 @@ ClesSshController.php:106   'url_journal'   => url('/api/gateway/logs')
                             -> cles-ssh.js:390   await fetch(L.url_journal, …)
 ```
 
-> ⛔ **CONSÉQUENCE, ET ELLE DÉPASSE CE DOSSIER : le sous-lot K4 se réduit à
-> `/deploy` SEUL.** *`/logs` et `/preflight_check` n'ont jamais été bloquées sur
-> `NOPASSWD: ALL` — elles sont portées.* **Partout où trois routes sont
-> annoncées bloquées, il n'y en a qu'une.**
+> ⛔ **CONSÉQUENCE, ET ELLE DÉPASSE CE DOSSIER : le sous-lot K4 est
+> `/deploy`, SEUL.** *`/logs` et `/preflight_check` n'ont jamais été bloquées sur
+> `NOPASSWD: ALL`.*
+
+### ⚠ SECONDE CORRECTION — « K4 passe de 3 routes à une » décrit mal la faute
+
+**Rectifié par la session 5 (`6757be5`, §9.8), et elle a raison : ce n'est pas un
+COMPTE qui était faux, c'est une ATTRIBUTION.**
+
+```
+MODULE-SSH.md:139-141
+  K2 ✔ | le constat avant deploiement | POST /preflight_check | PORTE le 2026-08-21 (v1.37.30)
+  K3 ✔ | la lecture du flux           | GET  /logs            | PORTE le 2026-08-21 (v1.37.31)
+  K4   | le deploiement               | POST /deploy          | le seul restant
+```
+
+> **Ces deux routes ne sont pas « K4 qui sur-comptait ». Elles ne sont pas K4 du
+> tout — elles sont K2 et K3, portées depuis SEIZE JOURS.** *La frontière de
+> sous-lots avait été tracée précisément pour qu'elles partent sans attendre
+> l'arbitrage du troisième.*
+
+**Et l'origine est un mécanisme, pas une inattention** (`MODULE-SSH.md:45`) :
+
+> *« Un seul bouton (`index.php:152`) déclenche les trois routes **en cascade**,
+> sans reprise de main. »*
+
+**C'est vrai — DU LEGACY.** *Là-bas, déployer EST une cascade de trois routes ;
+le découpage K2/K3/K4 existe justement pour la DÉFAIRE.*
+
+> **Un énoncé vrai du système SOURCE, recopié mot pour mot sur la décomposition
+> du système CIBLE, devient faux sans qu'aucun mot change — et rien dans la
+> phrase ne dit de quel côté elle parle.**
+
+*C'est la classe de « arbre ou service » : une affirmation sans son régime est
+invérifiable.* **Ici le régime est le SYSTÈME, et sur un chantier de portage
+c'est une source d'erreur permanente.**
+
+⚠ **Aggravant, et il est à moi seule** : mon propre index de mémoire porte
+*« ssh/ : K1 à K3 PORTÉS (v1.37.31), reste K4 SEUL »*. **Le fait juste était
+chargé dans mon contexte quand j'ai écrit son contraire.**
 
 ⚠ **Et la réfutation était dans l'arbre depuis le 2026-09-03 11:54** (`f759662`),
 en clair, dans le docblock de `ClesSshController.php:29-31` — *qui énonce
 exactement les trois lignes ci-dessus.* **Trois jours avant le tri, le dépôt
 disait déjà que K4 se réduit à `/deploy`.**
+
+⚠ **LIMITE DU CONSTAT « ça n'a pas voyagé »**, dite par la session 5 : *sa
+contre-sonde couvre les FICHIERS.* **Elle ne voit pas ce qui a circulé ENTRE
+SESSIONS — et le §8.2 m'a été relayé par message le jour même.** *« N'a pas
+voyagé » est donc prouvé pour le DÉPÔT et indémontrable pour la CONVERSATION ;
+le seul vecteur réel a été nos deux messages, rectifiés dans le même canal.*
+**C'est la meilleure issue possible, pas une absence de propagation.**
 
 *Relevé conjointement par la session 5, qui a trouvé deux autres récupérations
 au même endroit (`/admin/temp_permissions`, à DOUBLE RÉGIME : lue par
