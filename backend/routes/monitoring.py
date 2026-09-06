@@ -323,17 +323,11 @@ def reboot_server():
         except Exception:
             pass
 
-        # Audit log entry
-        try:
-            with get_db_connection() as conn_a:
-                cur_a = conn_a.cursor()
-                cur_a.execute(
-                    "INSERT INTO user_logs (user_id, action) VALUES (%s, %s)",
-                    (user_id,
-                     f"[reboot] serveur '{row['name']}' (id={machine_id}) - {msg_action}"))
-                conn_a.commit()
-        except Exception:
-            pass
+        # Audit log entry, CHAINE (`prev_hash`/`self_hash`) depuis le 2026-09-05 :
+        # l'insertion nue precedente placait la ligne HORS de la chaine de hachage,
+        # donc hors de la propriete d'inalterabilite qu'elle est censee porter.
+        from audit_chain import journalise
+        journalise(user_id, f"[reboot] serveur '{row['name']}' (id={machine_id}) - {msg_action}")
 
         # Webhook notification
         try:

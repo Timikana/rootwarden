@@ -461,7 +461,16 @@ jobs:
   auto-tag:
     name: Auto tag version
     runs-on: ubuntu-latest
-    needs: [build-docker, security-scan, secrets-scan, sast-python, sast-semgrep, sca-python, sca-php, trivy-fs]
+    # ⚠ `test-php` et `test-python` ajoutes le 2026-09-04 (E-381). Sans eux, un ROUGE des
+    # suites de tests N'EMPECHAIT RIEN : ce job pose une etiquette (`contents: write`), et
+    # `maj.sh` TIRE une etiquette -> une compilation cassee devenait publiable en production.
+    # C'est le seul point de passage AUTOMATIQUE vers la prod, et rien ne le gardait.
+    # Mesure : run 33792110538 a conclu SUCCESS sur ce job alors que « Tests PHPUnit » etait
+    # rouge. Un job vert de plus n'est pas une garde de plus ; ici c'est un ROUGE qui bloque
+    # de plus. ⚠ Ne couvre PAS le code qui compile et qui casse (E-388, E-389, DOSSIER-25 :
+    # trois defauts destructeurs qui auraient passe cette CI).
+    needs: [build-docker, security-scan, secrets-scan, sast-python, sast-semgrep, sca-python, sca-php, trivy-fs,
+            test-php, test-python]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     permissions:
       contents: write

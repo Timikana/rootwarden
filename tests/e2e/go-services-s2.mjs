@@ -256,7 +256,7 @@ try {
         });
         if (archivee) {
             const s = await connecte(COMPTE, SECRET);
-            await verifieMenuLegacy(s.page, '/services', verifie);
+            await verifieMenuLegacy(s.page, '/services', verifie, constate);
             try { await s.ctx.close(); } catch { /* deja ferme */ }
             /*
              * PAS DE `console.log(lignes.join())` ICI : dans ces suites, `note()`

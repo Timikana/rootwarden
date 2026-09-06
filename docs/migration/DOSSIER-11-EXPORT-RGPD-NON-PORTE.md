@@ -116,3 +116,227 @@ capacité disparaîtra dans le geste le moins surveillé de tout le chantier.*
 - **s'il existe d'autres capacités réglementaires dans le même cas.** `anonymize_user.php` (RGPD
   art. 17) est mentionné au §8 du plan comme **fermé deux fois** — aucun appelant, et sa marque de
   step-up inobtenable. **Il faut le vérifier au même titre**, et ce n'est pas fait ici.
+
+---
+
+# ✅ PORTÉ le 2026-09-04 (`a48df2c`, v1.39.2) — et une divergence à ARBITRER
+
+**L'export est porté et vérifié par moi, fichier par fichier.** *Les trois arbitrages sont appliqués, et
+l'un mieux que je ne l'avais spécifié.*
+
+    ExportRgpd.php · ExportRgpdController.php · JournalAudit.php · lang/{fr,en}/profil.php
+    php -l : tous OK    ·    parite FR/EN : 42 = 42
+
+    :228  '_tronque' => $total > count($lignes)   + `_total` et `_exportees`
+    :244  mb_substr($s['session_id'], 0, 8) . '...'      la troncature est gardee
+    :182  « ne devient JAMAIS un objet portant `_error` »  le TYPE reste stable
+    ctrl:64  le journal d'audit est ecrit AVANT la lecture — l'ordre du legacy est tenu
+
+> **Et le commentaire des lignes 202-203 dit une chose que je n'avais pas spécifiée** : *« Le compte total
+> est lu SÉPARÉMENT de la page exportée : sans lui, "1000 lignes" et "exactement 1000 lignes existantes"
+> sont la même sortie. »* **C'est la règle du témoin, appliquée à un export.**
+
+---
+
+## ⚠ MAIS LE PORTAGE EST PLUS STRICT QUE LE LEGACY, ET ÇA BLOQUE HUIT COMPTES
+
+    web.php:98    Route::middleware(['session.authentifiee','session.revoquee',
+                                     'mot.de.passe.a.changer'])->group(…)
+    web.php:122     Route::get('/profil/donnees-personnelles', ExportRgpdController::class)
+                    -> DANS ce groupe
+
+    ChangementMotDePasseExige:99   EXEMPTES = ['profil', 'profil.mot-de-passe']
+                            :144   redirect()->route('profil', ['force_change' => 1])
+
+    le LEGACY   export.php:27   checkAuth([ROLE_USER, ROLE_ADMIN, ROLE_SUPERADMIN])
+                                AUCUNE garde sur force_password_change
+                                (la ligne 62 cite la colonne, mais dans le SELECT
+                                 des donnees EXPORTEES — ce n'est pas une garde)
+
+    mesure en base :  8 comptes actifs portent `force_password_change = 1`
+
+> **Huit des douze comptes actifs ne peuvent PAS exercer leur droit de portabilité sur le portage, alors
+> qu'ils peuvent sur le legacy.**
+
+**Et ça se compose avec le `DOSSIER-24`** : *cinq de ces huit n'ont aucune adresse de courriel, la
+réinitialisation n'est pas portée, et le portage n'envoie rien.* **Ils sont donc bloqués sur le changement
+de mot de passe ET sur l'export.**
+
+---
+
+## ⛔ L'ARBITRAGE, ET IL N'EST PAS À MOI
+
+**Le correctif tient en une ligne** — *ajouter `'profil.donnees-personnelles'` à `EXEMPTES`.* **Je ne
+l'écris pas, parce que la décision balance une obligation légale contre une posture de sécurité.**
+
+    POUR l'exemption
+      le droit de portabilite (art. 20) n'est pas conditionne a un changement
+        de mot de passe
+      le legacy ne le conditionne pas
+      huit comptes actifs sont bloques aujourd'hui, dont cinq sans recours
+
+    CONTRE l'exemption
+      `force_password_change` peut avoir ete pose PARCE QU'UN COMPTE EST SUSPECT
+      et exporter toutes les donnees personnelles est exactement ce qu'un
+        attaquant qui detient le mot de passe voudrait faire
+      -> l'exempter ouvrirait cette porte pendant la fenetre ou le compte est
+         justement considere comme compromis
+
+**Le commentaire du middleware (`:46`) dit « l'exemption tient en DEUX entrées » — c'est un choix
+raisonné, pas un oubli. En ajouter une troisième demande une raison de même niveau.**
+
+*Une troisième voie existe et je la nomme sans la recommander* : **exempter l'export SEULEMENT quand le
+drapeau n'a pas été posé par un geste d'administration** — *mais rien en base ne distingue aujourd'hui
+« forcé par politique d'expiration » de « forcé par suspicion ».* **Ce serait donc une colonne à ajouter,
+et un autre chantier.**
+
+---
+
+# ✅ DÉCISION RENDUE — 2026-09-04 13:50 : **EXEMPTER l'export**
+
+**L'exploitant a délégué : « continue et prends les décisions ».** *Voici la mienne, avec le raisonnement
+qui a survécu à la mesure — et la partie où mon propre argument est tombé.*
+
+## ✅ DÉCISION : ajouter `'profil.donnees-personnelles'` à `ChangementMotDePasseExige::EXEMPTES`
+
+### 1. L'obligation est inconditionnelle
+
+**L'article 20 ne se conditionne pas à un changement de mot de passe.** *Aucun fondement juridique ne
+permet de suspendre un droit d'accès aux données pour un motif de politique interne de mot de passe.*
+
+### 2. Le legacy ne le conditionne pas — donc nous avons introduit la régression
+
+    legacy/profile/export.php:27   checkAuth([ROLE_USER, ROLE_ADMIN, ROLE_SUPERADMIN])
+    le portage                      + `mot.de.passe.a.changer`
+
+**Ce n'est pas un durcissement hérité : c'est un durcissement que le portage AJOUTE, sur un droit.**
+
+### 3. ⚠ ET MON ARGUMENT PRINCIPAL EST TOMBÉ À LA MESURE — je le dis contre moi
+
+**J'allais écrire** : *« un attaquant qui détient le mot de passe peut déjà tout lire en naviguant, donc
+l'export n'accorde aucun accès nouveau ».* **Mesuré, c'est FAUX :**
+
+    password_history   0 vue du portage le mentionne
+    login_history      0 vue
+    user_logs          0 vue
+
+**L'export empaquette bien des données que le titulaire ne peut pas lire ailleurs.** *L'argument le plus
+commode était le plus faux, et il aurait fondé la décision.*
+
+### 4. Ce qui reste vrai : le résidu est de la RECONNAISSANCE, pas de l'ESCALADE
+
+**Vérifié colonne par colonne — l'export ne contient AUCUN secret :**
+
+    :101  `ssh_key`        la cle PUBLIQUE (le legacy l'exporte aussi)
+    :142  `session_id`     TRONQUE a 8 caracteres + '...'
+    :154  password_history `changed_at` SEUL
+    :163  api_keys         `key_prefix`, jamais la cle
+    :150  `password_hash`  n'apparait que dans un COMMENTAIRE qui dit qu'il est exclu
+
+> **Un attaquant détenant le mot de passe a déjà l'accès complet au compte. Ce que l'export lui donnerait
+> en plus est l'historique d'adresses IP et d'agents de la victime — de la reconnaissance, pas un
+> privilège.**
+
+### 5. Et l'arbitrage se joue entre un mal CERTAIN et un mal SPÉCULATIF
+
+    CERTAIN et PRESENT   8 comptes actifs sur 12 ne peuvent pas exercer un droit legal
+                         dont 5 sans AUCUN recours : pas d'adresse, pas de flux de
+                         reinitialisation porte, et un portage qui n'envoie rien
+                         (DOSSIER-24)
+
+    SPECULATIF           un compte force PARCE QUE suspect, dont l'attaquant
+                         exporterait un historique d'IP
+
+**Je tranche pour le certain.**
+
+### 6. Et la mitigation est déjà en place — elle n'a pas eu besoin d'être demandée
+
+    ExportRgpdController:64   le journal d'audit est ecrit AVANT la lecture
+
+**Un export anormal par un compte forcé est donc traçable, et il l'est dans la chaîne scellée.** *C'est ce
+qui rend le résidu du §4 acceptable : il est visible après coup.*
+
+---
+
+## ⛔ CE QUE JE NE DÉCIDE PAS, ET POURQUOI
+
+**La troisième voie — distinguer « forcé par expiration » de « forcé par suspicion » — reste écartée.**
+*Elle demande une colonne qui n'existe pas, donc un autre chantier. Et elle n'est pas nécessaire : la
+traçabilité du §6 couvre le même besoin sans changer le schéma.*
+
+**Le geste est une ligne dans `ChangementMotDePasseExige:99`.** *Il n'est pas dans mon périmètre
+d'écriture — je le route à la session de portage, avec ce raisonnement, pour qu'elle l'inscrive en
+commentaire à côté de la troisième entrée.*
+
+---
+
+# ⛔ RÉTRACTATION — la décision d'hier est ANNULÉE. L'exemption ne sera pas posée.
+
+**2026-09-04, 14:45.** *La session de portage a refusé d'écrire ma décision et a mesuré contre elle. Elle
+a raison, et c'est ma prémisse « CERTAIN » qui tombe.*
+
+## Ce que j'ai mesuré, après son objection
+
+    EXEMPTES = ['profil', 'profil.mot-de-passe']
+                ^^^^^^^^   ^^^^^^^^^^^^^^^^^^^^
+                l'ECRAN    le GESTE qui change le mot de passe
+                           -> tous DEUX deja exemptes
+
+    PortailController::changerMotDePasse  ne lit que `current_password` (:250)
+                                          AUCUN courriel, AUCUN jeton
+
+> **Un compte portant le drapeau atteint donc `/profil`, y change son mot de passe, et exporte ensuite.**
+> *Ce n'est pas un blocage : c'est une CONTRAINTE D'ORDRE, dont le remède est déjà exempté et de toute
+> façon obligatoire.*
+
+    ce que j'ecrivais   « 8 comptes ne peuvent pas exercer un droit legal,
+                          dont 5 sans AUCUN recours »            FAUX
+    ce qui est vrai     8 comptes doivent changer leur mot de passe AVANT
+                          d'exporter, sur un ecran deja ouvert a eux
+
+**Et « sans recours » nommait un autre problème** : *un mot de passe OUBLIÉ.* **Un compte qui ne connaît
+pas son mot de passe ne se connecte pas — donc il n'atteint AUCUNE route, exemptée ou non. L'exemption
+n'aurait rien changé pour eux.** *Leur problème est le flux de réinitialisation, qui attend le SMTP
+(`DOSSIER-24`).*
+
+## ⚠ Et le commentaire de la route dit déjà tout — je ne l'avais pas lu jusqu'au bout
+
+    web.php:113-121  « CONSEQUENCE DU GROUPE, DECLAREE [...] ne peut PAS exporter
+                       avant d'avoir change son mot de passe. C'est la parite avec
+                       le legacy, et c'est defendable »
+
+**La propriété était DÉCLARÉE au site de la route, assumée, et argumentée. J'ai tranché contre un choix
+raisonné sans avoir lu son raisonnement.** *Et une imprécision y subsiste, que je corrige ici : le
+courriel n'a rien à voir avec la LEVÉE du drapeau — il ne sert qu'à récupérer un mot de passe oublié.*
+
+## Ce que l'échange coûtait réellement
+
+    on PERDAIT   la propriete « cette liste ne contient que ce qui LIBERE »,
+                 ecrite dans le fichier comme « le SEUL endroit du portage ou
+                 allonger une liste d'exemptions AFFAIBLIT la garde »
+    on GAGNAIT   la levee d'une contrainte d'ORDRE au remede deja ouvert
+
+**On n'échange pas une garde contre rien.** *Le résidu que je qualifiais d'acceptable l'était ; il n'y
+avait simplement aucune raison de le prendre.*
+
+## ✅ LA DÉCISION QUI REMPLACE : ne rien exempter, et viser le VRAI blocage
+
+    1. `EXEMPTES` reste a DEUX entrees.        rien a ecrire
+    2. le vrai blocage des 8 comptes = un mot de passe qu'ils ne connaissent
+       pas -> geste d'administration, OU le flux de reinitialisation, qui
+       attend le SMTP (DOSSIER-24, point 2, mot de l'exploitant)
+
+## ⚠ CE QUE JE RETIENS, ET C'EST LA DEUXIÈME FOIS DANS LA MÊME DÉCISION
+
+**Deux arguments porteurs sont tombés sur cette seule décision.** *Le premier — « l'attaquant peut déjà
+tout lire en naviguant » — je l'ai cassé moi-même par la mesure, et je l'ai dit contre moi. Le second, je
+ne l'ai pas vu.*
+
+> **Et le sens n'est pas symétrique : celui que j'ai attrapé seule ALARMAIT ; celui qui a survécu
+> EXEMPTAIT.** *Retirer l'argument qui inquiète laisse intact celui qui rassure — et c'est celui-là qui
+> écrit dans le code.*
+
+**L'instrument qui l'a attrapé est le même que les trois fois précédentes : un pair qui allait AGIR sur la
+décision, pas une relecture.** *Voir `feedback_negatif_exige_un_temoin` et
+`feedback_rectification_fausse_voyage` — je viens d'en fournir un cinquième cas, et cette fois ma
+rectification n'a pas eu le temps de voyager.*

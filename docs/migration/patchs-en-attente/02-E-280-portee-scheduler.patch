@@ -36,7 +36,7 @@
 +            # `WHERE 1=0` plutot qu'un `return` : la branche `machines` employait
 +            # deja cette forme, et la remonter garde une seule facon d'echouer
 +            # dans cette fonction. Une regle appliquee ailleurs se remonte de la.
-+            logger.error(
++            _log.error(
 +                "Planification %s ignoree : portee illisible (target_type=%r, "
 +                "target_value %s) — AUCUNE machine scannee",
 +                schedule.get('id'), schedule.get('target_type'),

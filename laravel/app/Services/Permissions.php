@@ -53,6 +53,44 @@ use Illuminate\Support\Facades\DB;
  */
 class Permissions
 {
+    /**
+     * Les prereglages sudo PROPOSABLES — liste FERMEE, cote serveur.
+     *
+     * ⚠ CE N'EST PAS L'ENUM DE LA BASE, ET C'EST DELIBERE. `mysql/migrations/051`
+     * declare SEPT valeurs ; deux d'entre elles ne peuvent pas fonctionner :
+     *
+     *   `systemctl_specific`  exige une liste de SERVICES. Aucune colonne de
+     *                         `user_machine_access` ne la porte, et
+     *                         `ssh_utils.py:958-963` ne met aucune cle `services`
+     *                         dans la politique transmise.
+     *   `custom`              exige `sudo_custom_rules`. Cette colonne existe
+     *                         (051) et n'a AUCUN ecrivain dans tout le depot :
+     *                         cinq fichiers la citent, dont deux documents, le
+     *                         SELECT du collecteur et le ADD COLUMN.
+     *
+     * Or `sudo_manager.render_policy` leve `ValueError` dans les deux cas
+     * (`:124` liste vide, `:144` regles vides), et `add_to_sudoers` rattrape
+     * cette exception en repliant sur `NOPASSWD: ALL` — un repli FAIL-OPEN
+     * (`configure_servers.py:369-377`).
+     *
+     * **Proposer ces deux valeurs serait donc offrir un bouton « donner le root
+     * complet » etiquete « restreint ».** La liste sure est celle de ce que
+     * `render_policy` REND, pas celle de ce que la base accepte.
+     *
+     * Les deux absentes se DECLARENT a l'ecran, avec leur raison — une capacite
+     * retiree qui ne se declare pas est une capacite perdue en silence.
+     */
+    public const PRESETS = [
+        'none',
+        'all_nopasswd',
+        'restart_services',
+        'apt_only',
+        'read_logs',
+    ];
+
+    /** Les deux valeurs de l'ENUM qu'on ne propose PAS, et pourquoi. */
+    public const PRESETS_ABSENTS = ['systemctl_specific', 'custom'];
+
     /** @var array<int, string>|null memorise pour la duree de la requete */
     private ?array $colonnes = null;
 
@@ -201,6 +239,37 @@ class Permissions
     }
 
     /**
+     * Le prereglage sudo par machine, pour un compte.
+     *
+     * `sudo_preset` est `NOT NULL DEFAULT 'none'` (051) : une ligne d'acces
+     * creee sans preglage vaut donc « aucun sudo », et le deploiement RETIRE le
+     * sudo de ce compte sur cette machine. Ce n'est pas une absence de decision,
+     * c'est la decision « pas de sudo » — et l'ecran doit le dire.
+     *
+     * @return array<int, string> machine_id => prereglage
+     */
+    public function presetsDe(int $id): array
+    {
+        /*
+         * Les cles sont CASTEES en entier explicitement. `pluck()` conserve le
+         * type que rend le pilote, et une cle chaine ferait tomber le
+         * `?? 'none'` de la vue sur une machine qui porte pourtant un
+         * privilege : l'ecran afficherait « sans sudo » sur un compte qui a le
+         * sudo complet. Sur un ecran de privilege, un repli silencieux est un
+         * mensonge.
+         */
+        $sortie = [];
+        foreach (
+            DB::table('user_machine_access')->where('user_id', $id)
+                ->select('machine_id', 'sudo_preset')->get() as $ligne
+        ) {
+            $sortie[(int) $ligne->machine_id] = (string) ($ligne->sudo_preset ?: 'none');
+        }
+
+        return $sortie;
+    }
+
+    /**
      * Accorde ou retire l'acces d'un compte a une machine.
      *
      * ANTI-ESCALADE, relevee du legacy (`update_server_access.php:66`) : un role
@@ -210,18 +279,51 @@ class Permissions
      *
      * @return string|null la cle du message de refus, ou null si le geste a eu lieu
      */
-    public function definitAcces(int $id, int $machine, bool $accorde, int $auteur, int $roleAuteur): ?string
-    {
+    public function definitAcces(
+        int $id,
+        int $machine,
+        bool $accorde,
+        int $auteur,
+        int $roleAuteur,
+        ?string $preset = null,
+    ): ?string {
         if ($accorde && $id === $auteur && $roleAuteur < 3) {
             return 'perms.err_auto_acces';
         }
         if (DB::table('machines')->where('id', $machine)->doesntExist()) {
             return 'perms.err_machine';
         }
+        if ($preset !== null && ! in_array($preset, self::PRESETS, true)) {
+            return 'perms.err_preset';
+        }
         if ($accorde) {
             DB::table('user_machine_access')->insertOrIgnore([
                 'user_id' => $id, 'machine_id' => $machine,
             ]);
+            if ($preset !== null) {
+                /*
+                 * `sudo_nopasswd` est DERIVE du prereglage, il ne s'offre pas.
+                 *
+                 * Le legacy en fait une case a cocher INDEPENDANTE
+                 * (`manage_access.php:230`), ce qui autorise la paire
+                 * incoherente `all_nopasswd` + `nopasswd = 0`. On ne porte pas
+                 * ce choix libre, et c'est une capacite RETIREE, pas oubliee :
+                 * `restart_services` sans mot de passe etait exprimable et ne
+                 * l'est plus ici. Elle se declare a l'ecran.
+                 *
+                 * `sudo_runas` vaut 'root' cote serveur et n'est pas un champ :
+                 * le legacy le valide par une expression reguliere
+                 * (`update_server_access.php:117`) alors que son interface envoie
+                 * TOUJOURS 'root'. Une entree libre absente ne se contourne pas.
+                 */
+                DB::table('user_machine_access')
+                    ->where('user_id', $id)->where('machine_id', $machine)
+                    ->update([
+                        'sudo_preset' => $preset,
+                        'sudo_nopasswd' => $preset === 'all_nopasswd' ? 1 : 0,
+                        'sudo_runas' => 'root',
+                    ]);
+            }
         } else {
             DB::table('user_machine_access')
                 ->where('user_id', $id)->where('machine_id', $machine)->delete();

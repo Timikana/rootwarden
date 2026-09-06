@@ -3,10 +3,10 @@
   "dossier": "laravel/public/js",
   "totaux": {
     "fichiers": 35,
-    "appels": 68,
+    "appels": 71,
     "verifie": 30,
     "flux": 7,
-    "delegue": 27,
+    "delegue": 30,
     "delegue_sans_lecteur": 2,
     "ignore": 2,
     "illisible": 0
@@ -14,13 +14,13 @@
   "empreintes": {
     "acces-sftp.js": "22fd143b2372c73a",
     "approbations.js": "874aa42ba41121f0",
-    "audit-ssh.js": "33e9c4a747adf6d0",
+    "audit-ssh.js": "9ce35fcc6b40922d",
     "bashrc.js": "ad6d75455290bf31",
     "chatops.js": "607141666c99b287",
     "cle-plateforme.js": "847da8fc8e2f3f9c",
     "cles-ssh.js": "de7d0a5777ba4594",
     "comptes-distants.js": "9520ed9b433918f4",
-    "comptes.js": "b60f1d1ae2a77e0b",
+    "comptes.js": "d0669354a1cfd409",
     "derive-config.js": "d9d473c325b78901",
     "docker.js": "9dd84e29d334ce14",
     "fail2ban.js": "7b61fb71c08ed9df",
@@ -34,8 +34,8 @@
     "notifications-reglages.js": "8c2d9cc6c4a819d0",
     "notifications.js": "7b87f6a075247b8d",
     "pare-feu.js": "b02d82e5896ea8cf",
-    "permissions.js": "235d89f13fc92fb3",
-    "planification-cve.js": "c79107cc1487417b",
+    "permissions.js": "38c82830fe1aa646",
+    "planification-cve.js": "5b7bada4d958fecb",
     "politiques.js": "a5a3932f7cb1273a",
     "recherche.js": "6daca37c7755f94e",
     "sauvegardes.js": "3f2a80b29a1d48ea",
@@ -46,7 +46,7 @@
     "supervision.js": "e1ee09190066011e",
     "taches.js": "e2f38dc14fa64973",
     "tickets.js": "1b9803433b017d1e",
-    "wazuh.js": "c87a0aad1e41596f"
+    "wazuh.js": "150c5e47c0f94c5f"
   },
   "a_examiner": [
     {
@@ -81,7 +81,7 @@
     },
     {
       "fichier": "planification-cve.js",
-      "ligne": 180,
+      "ligne": 204,
       "fonction": "envoie",
       "cible": "url",
       "success": false,

@@ -3,6 +3,65 @@
 **À donner telle quelle à une session de portage.** Établi par la session 8 (DSI délégué) le
 **2026-09-02**, sur mesures horodatées.
 
+> # ⛔ ARRÊTE-TOI. CE DOCUMENT EST FAUX, ET SA LISTE A ÉTÉ RÉFUTÉE DIX FOIS.
+>
+> **Corrigé le 2026-09-05 à 23:52 par la session 8, qui l'avait écrit.**
+>
+> **Le §2 ci-dessous liste des capacités « à porter ». DIX d'entre elles étaient DÉJÀ
+> PORTÉES** — `fail2ban`, `politiques`, `serveurs`, `bashrc`, `sftp`, `groups`, le test de
+> connexion, le cycle de vie, « créer un relevé planifié »… **Sur les dix, AUCUNE n'a été
+> trouvée en la portant. Toutes l'ont été en la mesurant.**
+>
+> ## La cause, et elle n'était pas trouvable item par item
+>
+> **Cette liste a été bâtie en inventoriant les ENTRÉES DE MENU, puis elle est lue comme un
+> inventaire de GESTES.** *Une entrée de menu et un geste ne sont pas la même population, et
+> l'unité n'était nommée nulle part.*
+>
+> > **Dix relevés l'ont réfutée item par item ; UNE SEULE question sur la façon dont elle a
+> > été fabriquée les réfute tous.** *Avant de vérifier le contenu d'un artefact de
+> > planification, demande comment il a été fait.*
+>
+> ## Ce qui remplace cette liste
+>
+> **Il y a TROIS mécanismes par lesquels une capacité se perd, et ils demandent trois travaux
+> différents :**
+>
+>     depreciation              -> ARBITRER ce qu'on garde   laisse un `_deprecated/`
+>     arbitrage                 -> DECIDER                   laisse un dossier ouvert
+>     sous-lot declare complet  -> FINIR + corriger la
+>                                  declaration                ⛔ laisse une CASE COCHEE
+>
+> **Les deux premiers laissent une trace qu'on peut chercher. Le troisième laisse un artefact
+> qui dit « rien à voir ici ».** *Exemples mesurés : `/ssh-audit/backups` dans A2 et
+> `/ssh-audit/trends` dans A1 — deux sous-lots marqués PORTÉS.*
+>
+> ## Et la CAUSE du troisième, qui est un défaut de processus
+>
+>     I1 PORTÉ `3c3fe98`    F1 PORTÉ `v1.38.0`    F3 PORTÉ `v1.38.4`
+>
+> **Toutes les déclarations de portage citent un COMMIT. Aucune ne cite un PÉRIMÈTRE.** *Le
+> périmètre vit dans le découpage du module, écrit des jours plus tôt par une autre session, et
+> **rien ne confronte les deux à la livraison**.*
+>
+> **RÈGLE POSÉE** : *une déclaration « PORTÉ » qui ne cite pas le découpage qu'elle prétend
+> clore est un accusé de réception, pas une déclaration.*
+>
+>     forme exigee : « A1 PORTE `3c3fe98` — perimetre <doc>§<n>, N gestes, N cables »
+>
+> ## Ce que tu fais à la place du §2
+>
+> **Lis `docs/migration/DECISIONS-DSI.md`, entrées E-425 à E-440.** *Le travail restant y est
+> décrit, et il n'est pas « porter des capacités » : c'est **finir des sous-lots déclarés
+> complets et corriger les déclarations qui les couvrent**.*
+>
+> **Le §2 est conservé ci-dessous comme ARCHIVE** — pour qu'on puisse voir de quoi une liste
+> fausse a l'air, et parce que ses §3, §5 et §6 (interdits, pièges, forme) restent valides.
+>
+> ---
+>
+> **L'avertissement d'origine, qui s'est vérifié bien au-delà de ce qu'il annonçait :**
+>
 > **⚠ CE DOCUMENT A DÉJÀ POURRI UNE FOIS, EN QUATRE HEURES.** *Son §2 listait « test de connexion » à
 > porter — il l'était depuis sept jours — et son §3 interdisait le « cycle de vie », porté et joignable
 > depuis le 26 août.* **Les deux ont été trouvés par des sessions qui ont vérifié avant d'exécuter.**

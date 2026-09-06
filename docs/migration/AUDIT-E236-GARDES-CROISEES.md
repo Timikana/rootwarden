@@ -95,7 +95,62 @@ preuve).
 > Aucun administrateur, aucun DOSSIER-02. *(Correction à ma propre note : « la
 > 2FA n'existe QUE dans le legacy » est périmée — un portage l'a livrée depuis.)*
 
-### 3.2 `force_password_change` n'est pas une barrière sur le portage
+### 3.2 ⚠ REFERMÉ LE 2026-09-01 À 14:29 — ma mesure a 8 MINUTES DE RETARD
+
+**Ce paragraphe décrit un état qui n'existe plus, et je l'ai laissé debout trois
+jours.** Signalé par la session 3 (`c1`), **vérifié par ma propre mesure** le
+2026-09-04 :
+
+```
+laravel/app/Http/Middleware/ChangementMotDePasseExige.php   (1 sept. 14:29)
+bootstrap/app.php:73   'mot.de.passe.a.changer' => ChangementMotDePasseExige::class
+web.php:98             Route::middleware(['session.authentifiee',
+                                          'session.revoquee',
+                                          'mot.de.passe.a.changer'])->group(…
+web.php:1065           });          <- UN SEUL groupe authentifie
+web.php:1062           Route::any('/api/gateway/{chemin?}')   <- DEDANS
+```
+
+**Le middleware relit la base à CHAQUE requête** (`:120`,
+`->value('force_password_change')`) et n'exempte que **deux** routes — `profil`
+et `profil.mot-de-passe`. **Il couvre donc la passerelle**, qui était le chemin
+de mon §3.3.
+
+**Mon commit datait de 14:21 ; le correctif de 14:29. J'ai mesuré huit minutes
+avant qu'il n'atterrisse** — et c'est *ma* trouvaille qui a été corrigée : le
+docblock du middleware (`:17`) reprend ma phrase, *« le portage, lui, ne lisait
+ce drapeau nulle part »*.
+
+**CE QUE ÇA CHANGE À LA CONCLUSION DU §3.3.** La chaîne du porteur n'est plus
+« connexion → auto-enrôlement → passerelle ». Elle est :
+
+```
+connexion  ->  auto-enrolement 2FA  ->  session ouverte, drapeau pose
+           ->  TOUTE requete redirigee vers /profil        <- le middleware
+           ->  changement de mot de passe (sur /profil, exempte)
+           ->  drapeau efface  ->  alors seulement la passerelle
+```
+
+**Le porteur reste auto-armable** — il change son propre mot de passe sur une
+route exemptée — **mais la chaîne est plus longue d'un cran, et ce cran est un
+geste DÉLIBÉRÉ** (changer son mot de passe) là où le précédent était un
+**abandon** (quitter l'enrôlement). *La qualification « dormant à réveil
+autonome » tient ; « à un clic » ne tient plus.*
+
+**Et le reste du §3 tient intégralement** : l'auto-enrôlement sans
+administrateur, les 39 couples croisés, `check_machine_access` inerte dès le
+rôle 2, les 17 chemins qui écrivent.
+
+> **La leçon est de `c1` et elle est plus large que ce paragraphe** : *la
+> rectification était au dossier, pas à la source que les gens lisent* — ici
+> **l'inverse : le CODE a été corrigé, et le document qui mesure est resté.** Une
+> mesure porte sa date ; **une CONCLUSION tirée d'une mesure doit être relue
+> quand le code bouge**, et rien ne le déclenche automatiquement. C'est le
+> pendant exact de « un chiffre hérité se comporte comme une clôture ».
+
+---
+
+### 3.2-bis — l'état d'AVANT, conservé pour mémoire
 
 C'est le point décisif, et c'est la **septième** occurrence de « la garde est sur
 la PAGE, pas sur la REQUÊTE » — cette fois sur l'exigence de mot de passe

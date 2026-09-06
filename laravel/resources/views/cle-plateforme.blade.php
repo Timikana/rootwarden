@@ -625,13 +625,11 @@
      pendant la migration — mais l'annoncer comme une capacite manquante serait
      desormais faux, et c'est exactement le motif que ce module a passe la
      journee a corriger. --}}
-<div class="rw-encart" data-rw="cle-comparer">
-    <p class="rw-sous-titre-fort">{{ __('plateforme.comparer_titre') }}</p>
-    <p class="rw-prose">{{ __('plateforme.comparer_texte') }}</p>
-    <a class="rw-bouton rw-bouton--discret" data-rw="cle-lien-legacy"
-       href="{{ rtrim(config('app.url_legacy'), '/') }}/adm/platform_keys.php"
-       target="_blank" rel="noopener">{{ __('plateforme.comparer_lien') }} ↗</a>
-</div>
+        {{-- LA TUILE « Comparer avec l'ancien portail » A ETE RETIREE le 2026-09-05.
+             Son propre texte disait « Tous les gestes de cette page sont portes ici,
+             la rotation de la cle comprise » — et proposait quand meme un renvoi vers
+             `/adm/platform_keys.php`, qui rend 404 depuis l'archivage du jour.
+             Il n'y a plus rien a comparer, et le lien ne menait nulle part. --}}
 @endif
 
     <script id="cle-textes" type="application/json">@json($textes)</script>

@@ -22,8 +22,13 @@
                      posee sur les ROUTES : le legacy ne cache que les boutons. --}}
                 <button type="button" class="rw-bouton" data-rw="audit-verifier"
                         title="{{ __('audit.btn_verify_tip') }}">{{ __('audit.btn_verify') }}</button>
-                <button type="button" class="rw-bouton rw-bouton--avertissement" data-rw="audit-sceller"
-                        title="{{ __('audit.btn_seal_tip') }}">{{ __('audit.btn_seal') }}</button>
+                {{-- Le bouton « Sceller » a ete RETIRE le 2026-09-05 (arbitrage E-415).
+                     Les lignes non chainees le sont PAR CONSTRUCTION : les rattacher
+                     exigerait de reecrire le `prev_hash` de toutes les autres, donc de
+                     detruire la propriete que la chaine porte. L'etat se DIT ; il ne se
+                     repare pas. --}}
+                <span class="rw-etiquette rw-etiquette--neutre" data-rw="audit-scellement-etat"
+                      title="{{ __('audit.scellement_impossible_tip') }}">{{ __('audit.scellement_impossible') }}</span>
             @endif
             <a class="rw-bouton rw-bouton--discret" data-rw="audit-export-csv"
                href="{{ route('journal-audit.csv', array_filter([
@@ -38,29 +43,9 @@
          relit les valeurs, si elles datent d'avant ou d'apres. --}}
     <p class="rw-annonce" data-rw="audit-resultat" role="status" aria-live="polite"></p>
 
-    @if ($peutSceller)
-        {{-- LA DECISION SE PREND DANS LA PAGE. Le legacy pose un `confirm()`
-             natif, en francais code en dur : il recouvre la ligne sur laquelle on
-             decide, ne se style pas, et bloque Puppeteer.
-             Et il EMPECHE plutot que de reprocher : le scellement est
-             IRREVERSIBLE — remettre des NULL fabriquerait un autre etat, pas
-             celui d'avant — donc la confirmation naît desactivee et ne s'active
-             qu'a la saisie exacte du nombre de lignes concernees. --}}
-        <div class="rw-panneau-decision" data-rw="audit-panneau-sceller" hidden>
-            <p class="rw-panneau-decision__texte" data-rw="audit-panneau-texte"></p>
-            <label class="rw-champ">
-                <span class="rw-champ__etiquette" data-rw="audit-panneau-consigne"></span>
-                <input type="text" inputmode="numeric" class="rw-saisie rw-saisie--compacte"
-                       data-rw="audit-panneau-saisie" autocomplete="off">
-            </label>
-            <div class="rw-panneau-decision__actions">
-                <button type="button" class="rw-bouton rw-bouton--discret"
-                        data-rw="audit-annuler">{{ __('audit.annuler') }}</button>
-                <button type="button" class="rw-bouton rw-bouton--avertissement"
-                        data-rw="audit-confirmer" disabled>{{ __('audit.confirmer') }}</button>
-            </div>
-        </div>
-    @endif
+    {{-- Le panneau de decision du scellement a ete retire avec le bouton.
+         `journal-audit.js` garde ses deux acces (`if (btnSceller)`, `if (panneau)`),
+         donc la page se degrade sans erreur. --}}
 
     {{-- Un vrai formulaire GET : les filtres vivent dans l'adresse, donc une
          page filtree se partage et se recharge. Les noms de champ sont ceux du

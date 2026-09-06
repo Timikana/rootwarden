@@ -671,3 +671,196 @@ l'un fait que l'autre ne fait pas ; le choix est le vôtre.*
 **⛔ Et une borne que j'ai posée** : *ne rien écrire dans `ci.yml` sans votre mot.* **Un workflow est un
 effet sortant : il tourne sur l'infrastructure de GitHub avec un `GITHUB_TOKEN`, et `auto-tag` porte
 `contents: write`.**
+
+---
+
+## 2026-09-04, 14:55 — TROIS MOUVEMENTS, dont une RÉTRACTATION
+
+    ✅ DOSSIER-16   les trois arbitrages de l'import CSV : RENDUS         `0865de3`
+                    et le 2e CHANGE ma recommandation d'hier — le
+                    DOSSIER-24 l'avait rendue impraticable
+    ⛔ DOSSIER-11   l'exemption RGPD : ANNULEE                            `c253b6c`
+                    ma premisse « CERTAIN » etait une contrainte d'ORDRE
+    📌 DOSSIER-15   `security/backend-cve` : la branche est APTE,          `a249606`
+                    le merge attend VOTRE mot (votre propre regle),
+                    et un couplage avec l'invariant QA-009 se repare AVANT
+
+> **Une décision rendue puis retirée en trois heures n'est pas un accident de rythme.** *Elle a été retirée
+> par la session qui allait l'écrire, qui a refusé d'écrire et a mesuré d'abord. C'est le cinquième cas où
+> cet instrument — un pair qui va AGIR — attrape ce qu'aucune relecture n'attrape.*
+
+**CE QUI RESTE, ET AUCUN DE CES POINTS N'EST UN ARBITRAGE PRODUIT :**
+
+    le SMTP du portage (DOSSIER-24)      un effet SORTANT vers un serveur reel
+    le merge de `security/backend-cve`   votre regle le reserve a votre mot
+    `bashrc` · l'annulation · K4         ils ECRIVENT en root sur des machines
+    les 5 comptes forces sans adresse    poser une adresse sur des comptes REELS
+    supprimer `Migration-Laravel`        trois conditions, toujours non reunies
+
+    ⚠ ET UNE ACTION DE SECURITE QUI VOUS APPARTIENT, TOUJOURS OUVERTE :
+       `MAIL_SMTP_PASSWORD` (opnsense@timikana-heero.fr) a ete expose en clair
+       par ma propre commande non filtree. ROTATION recommandee. DOSSIER-24 §5.
+
+---
+
+## ✅ 2026-09-04, 15:40 — LE PIÈGE DU CACHE DE VUES EST FERMÉ, et je le portais encore
+
+**Mesuré dans le conteneur, à l'instant :**
+
+    /var/www/html/storage/framework/views    112 fichiers
+                                             112 www-data:www-data
+                                               0 root
+    le repertoire                            www-data:www-data 755
+    /connexion -> 200 · /scan-cve -> 302 · TEMOIN chemin inexistant -> 404
+
+**Le rebuild a appliqué `docker-entrypoint.sh:59`. Il n'y a plus de compilé `root`.** *Modifier une vue
+existante n'est plus dangereux — et deux l'ont été depuis, réseau vérifié.*
+
+> ⚠ **Je portais « 111 compilés root » et je l'ai transmis à TROIS sessions dans le tour d'aujourd'hui,
+> dont une consigne « ⛔ ne modifie AUCUNE vue existante » qui n'avait plus d'objet.** *Le chiffre était
+> juste le 03/09 au matin ; il est mort au rebuild, et aucun commit ne l'a touché — c'est la cinquième
+> déclaration d'état de ce chantier à périmer sans trace.*
+
+**Ce que je garde de la façon dont il est tombé** : *la contrainte périmée a forcé une VÉRIFICATION, et
+c'est cette vérification qui a révélé un `<option value="all">` que ma propre consigne avait manqué.* **Une
+contrainte périmée qui force à regarder reste utile — mais elle doit être datée pour qu'on sache la
+remesurer, pas récitée.**
+
+---
+
+## ⚠ 2026-09-04, 16:45 — UNE PRÉCONDITION AU REDÉMARRAGE QUE VOUS ATTENDEZ
+
+**Le redémarrage du backend appliquerait une garde ÉCRITE MAIS INERTE, et deux écrans ne sont pas encore
+d'accord avec elle.**
+
+    ssh_audit.py:816   PORTEES = ('tag','environment','machines')
+              :826     `target_type == 'all'`  ->  400, par DECISION
+
+    AuditSshController.php:72   PORTEES = ['all','environment','tag','machines']
+                                -> « Tout le parc » est l'option SELECTIONNEE
+                                   PAR DEFAUT
+    legacy/ssh-audit/index.php:237   <option value="all">
+    legacy/ssh-audit/js/main.js:737 · :741 · :759   trois replis sur 'all'
+
+    ssh_audit_schedules : 0 ligne   (temoin : machines = 3)
+
+> **Aujourd'hui les deux écrans fonctionnent parce que la garde n'est pas chargée. Après le redémarrage,
+> créer un relevé planifié sans changer la portée renverra une erreur.**
+
+**✅ Le geste qui l'évite est UNE ligne côté portage** (retirer `'all'` de `PORTEES`, et sa clé de
+libellé), *et il est routé.* **⛔ Le legacy, lui, n'est pas touché — il meurt, et quatre touches y
+ajouteraient un risque à un composant qu'on éteint.**
+
+    -> l'ecran du LEGACY continuera d'offrir « Tout le parc » et le backend
+       le refusera. C'est une DECISION, pas une regression : ne la faites pas
+       deboguer.
+
+**Ordre sûr : la ligne du portage, PUIS le redémarrage.** *L'inverse laisse une fenêtre où le portail porté
+refuse son propre défaut.*
+
+---
+
+## ✅ 2026-09-04, 17:00 — LA PRÉCONDITION DE REDÉMARRAGE EST LEVÉE
+
+**`882ad9b`, v1.40.1, E-395. Le portage n'offre plus « Tout le parc », et il y avait SIX étages là où ma
+consigne en nommait deux.**
+
+    1. AuditSshController:72   `all` PREMIER de PORTEES -> option par DEFAUT   ferme
+    2. `planif_portee_all`     le libelle de cette option                     retire
+    3. audit-ssh.js:458        repli `: 'all'`                                 -> ''
+    4. audit-ssh.js:517        idem, sur le chemin de SOUMISSION               -> ''
+    5. la VUE                  rien a faire — voir plus bas
+    6. la COLONNE              `DEFAULT 'all'` en base                        DECLARE
+
+**Le redémarrage du backend n'a donc plus cette conséquence.** *L'écran du legacy, lui, continuera d'offrir
+« Tout le parc » et le backend le refusera — décision inchangée, et écrite au tour précédent.*
+
+## ⚠ CE QUI RESTE, ET C'EST UNE MIGRATION — donc votre mot
+
+    cve_scan_schedules.target_type   enum('all','tag','machines')
+                                     NOT NULL  DEFAULT 'all'
+    ssh_audit_schedules.target_type  enum('all','tag','environment','machines')
+                                     NOT NULL  DEFAULT 'all'
+    les deux tables : 0 ligne        (temoin : machines = 3)
+
+> **Un `INSERT` qui omet `target_type` obtient `'all'` PAR LA BASE.**
+
+**⚠ ET JE NOTE HONNÊTEMENT L'URGENCE : ce n'est PAS un trou vivant.** *Les deux chemins d'entrée envoient
+désormais toujours la valeur, et les deux backends refusent `'all'`. Le mode de défaillance d'un appelant
+fautif est un 400, pas un relevé silencieux.*
+
+    ce que ca vaut   de la DEFENSE EN PROFONDEUR : aujourd'hui la surete
+                     vient du CODE, et le schema la contredit
+    le geste         retirer le DEFAULT des deux colonnes — un INSERT qui
+                     omet la portee ECHOUERAIT alors, au lieu de viser le parc
+    le risque        NUL sur l'existant : 0 ligne dans les deux tables, et
+                     les deux appelants envoient toujours la valeur
+
+**Je ne le présente pas comme urgent. Je le présente parce qu'un jour un troisième appelant naîtra, et que
+ce jour-là le schéma décidera à sa place.**
+
+## ✅ ET UNE RÈGLE DE CONCEPTION QUI SORT DE CE GESTE, réutilisable
+
+    audit-ssh.blade.php:194   @foreach (AuditSshController::PORTEES as $portee)
+      -> la vue construit ses options DEPUIS la constante
+
+    scan-cve, lui, avait la liste ECRITE A LA MAIN dans le gabarit
+      -> c'est pour cela qu'il fallait l'y retirer aussi, et pourquoi ma
+         consigne d'alors etait incomplete
+
+> **Une liste rendue depuis sa source ne peut pas la contredire.** *Partout où une vue écrit à la main une
+> liste que le serveur valide, les deux divergeront un jour.*
+
+**C'est le même gain que « la restauration rend une DÉCISION » : la propriété tient par la CONSTRUCTION,
+pas par la vigilance.** *Et c'est la seule espèce de garde que ce chantier n'ait jamais vue se périmer.*
+
+---
+
+# ⛔ 2026-09-05, 08:40 — SEPT POINTEURS DE MES DOSSIERS SONT PÉRIMÉS. Les voici relocalisés PAR NOM.
+
+**Audit mécanique de mes 29 dossiers : 127 citations `fichier:ligne` vérifiées une par une.**
+
+    pointant une LIGNE VIDE   6
+    HORS du fichier           1
+    fichier introuvable       0
+    -> 7 perimees sur 127
+
+> **Un numéro de ligne est un fait que toute édition du fichier rend faux — EN SILENCE, puisque ni le
+> document ni le code cité n'ont bougé.**
+
+## LA TABLE DE RELOCALISATION, par NOM
+
+| dossier | ce qui était cité | l'objet, aujourd'hui | dérive |
+|---|---|---|---|
+| **00**, **10** | `ssh_audit.py:237` | `@bp.route('/ssh-audit/scan')` → **:120**, `def ssh_audit_scan` → **:125** | **−112** |
+| **00** | `ssh_audit.py:816` | `PORTEES = ('tag','environment','machines')` → **:897** | +81 |
+| **13** | `Supervision.php:273` | le badge `telegraf_output_token … as jeton_pose` → **:298** | +25 |
+| **15** | `test_invariant_machine_id.py:49` | `CLES = ('machine_id', …)` → **:53** | +4 |
+| **22** | `helpers.py:19` | `if role_id >= 3:` → **:338** *(docstring :323)* | **+319** |
+| **25** | `web.php:1031` | `Route::post('/journal-audit/sceller', …)` → **:1058** | +27 |
+
+**⚠ ET LA DÉRIVE N'EST PAS TOUJOURS VERS LE BAS.** *`ssh_audit.py:237` désignait le scan ; il est
+maintenant à `:120`.* **Une réorganisation déplace dans les deux sens — « les éditions au-dessus » ne
+décrit qu'une moitié du mécanisme.**
+
+## ✅ CE QUI NE CHANGE DANS AUCUN DES SIX DOSSIERS
+
+**Aucun fait, aucune mesure, aucune décision.** *Les objets existent tous, à leur nouveau numéro, et je les
+ai retrouvés par leur NOM en une commande chacun.*
+
+    ce qui change : le POINTEUR
+    ce qui ne change pas : le defaut, l'ampleur, l'arbitrage, le geste
+
+## ✅ ET LA RÈGLE QUE J'APPLIQUE DÉSORMAIS
+
+> **Repérer par le NOM — une route, une fonction, une constante, une clé. Un nom se déplace avec ce qu'il
+> désigne ; un numéro reste où on l'a écrit.**
+
+    `JournalAuditController::sceller`   et non `web.php:1031`
+    `PORTEES = (…)`                     et non `ssh_audit.py:816`
+    `if role_id >= 3:`                  et non `helpers.py:19`
+
+**⛔ Je ne réécris pas les 120 citations saines** : *elles sont justes aujourd'hui, et les réécrire toutes
+coûterait plus que de les revérifier quand un dossier redevient actionnable.* **Mais tout dossier que vous
+pourriez ACTIONNER est repris par nom avant de vous être présenté — `DOSSIER-25` l'a été hier, ceux-ci le
+sont maintenant.**

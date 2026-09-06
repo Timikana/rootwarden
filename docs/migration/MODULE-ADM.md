@@ -1259,3 +1259,88 @@ La section la plus utile, et elle est courte parce que le reste a été mesuré.
   backend et connais ses gardes. Le détail de son CRUD reste à inventorier au moment de D7 ;
 - **Aucune capture n'accompagne cet inventaire** : il ne produit aucune interface. Les trois largeurs
   se prennent au premier sous-lot qui rend une page — D1.
+
+---
+
+## 8. Interrogation du registre lui-même — **2026-09-04 20:37 CEST**
+
+On m'a demandé si ce document est un **registre symétrique** (il énumère les gestes
+du legacy et déclare chacun porté ou non) ou un **registre asymétrique** (il
+n'enregistre que ce qu'il a trouvé de porté, auquel cas son « 0 non porté » ne
+mesure rien). L'hypothèse de départ était : *« un document qui ne dit jamais non n'a
+pas été interrogé »*, appuyée sur un relevé donnant **30 « porté » / 0 « non
+porté »** sur ce fichier.
+
+### 8.1 Le reste inexpliqué **se referme** — la population est couverte
+
+    ECRITURES en base dans legacy/adm/         63, dans 22 fichiers, sur 19 tables
+    fichiers de adm/ NOMMES dans ce document   37 / 37
+    parmi eux, les 22 ECRIVAINS                22 / 22
+    reste inexplique                           ZERO
+
+**Aucun fichier de `adm/` n'échappe au document.** C'est l'instrument qui avait
+attrapé mon propre relevé partiel sur les écrivains du journal ; ici il ne trouve
+rien à redire.
+
+### 8.2 Et le document dit « non » partout — dans sa PROSE, pas dans un jeton
+
+| section | ce qu'elle enregistre |
+|---|---|
+| §4 | *« Ce qui est atteignable, et ce qui ne l'est pas »* |
+| §4.1 | un bouton « Déployer » **qui ne peut pas marcher** |
+| §4.3 | une conformité RGPD **que personne ne peut déclencher** |
+| §4.5 | *« Ce qui est mort, en une table »* |
+| §5.0decies | D6c — **CARACTÉRISÉ ; le PORT reste à faire** |
+| §5.4 | *« Ce que le portage devra construire, et qui n'existe pas encore »* |
+| §7 | *« Ce dont je ne suis pas sûr »* — **six entrées**, chacune avec sa raison et ce qui la lèverait |
+
+**21 lignes de négation** dans ce seul document. **C'est un registre symétrique
+(cas a).**
+
+### 8.3 ⚠ D'où venait le « 0 non porté » — et c'est la faute du jour, une fois de plus
+
+    jeton « NON PORTE » (majuscules) dans les DIX documents de module : 0
+    negations en PROSE :
+      ADM 21 · SUPERVISION 13 · SECURITY 10 · GRAYLOG 8 · FILTRAGE 7
+      SSH 5 · AUTH 5 · GROUPS 5 · BASHRC 3 · API-DOCS 0
+
+**Le relevé comptait un JETON DE VERDICT qu'aucun de ces documents n'emploie.** Ces
+fiches ne portent pas de colonne « porté / non porté » : elles nomment les manques
+en prose et en titres de section. **Zéro n'y mesurait pas l'absence de négatifs, il
+mesurait l'absence d'un mot.**
+
+**⚠ ET LE COMPTE « 21 » CI-DESSUS S'EST INVALIDÉ LUI-MÊME.** Remesuré à 20:44, le
+même motif rend **31** — parce que **la section que vous lisez a ajouté dix lignes de
+négation au document qu'elle mesure**. Un pair, avec son propre motif, en rendait
+**44** ; un motif volontairement large en rend **226**.
+
+> **Ces quatre nombres ne se départagent pas, et c'est le point : « une négation »
+> n'est pas un prédicat défini.** 226 attrape « aucun appelant », « aucune
+> permission », « zéro sur seize » — des négations sur les GARDES, pas sur l'état de
+> portage. Chaque motif mesure un objet différent.
+
+**Ce qui a réellement tranché n'est aucun de ces comptes : c'est le reste du §8.1,
+qui se referme à 37/37.** Un prédicat dont la POPULATION est définie se vérifie ;
+un comptage de tournures se discute. *Nous avons convergé sur la conclusion malgré
+des bases incommensurables — c'est de la chance, pas de la méthode.*
+
+*C'est la troisième fois aujourd'hui qu'un instrument ne connaît qu'une **forme** de
+la chose qu'il compte* — après le nom de base contre le chemin résolu, et l'ORM
+contre le SQL brut. **Et c'est la première fois que la forme manquante n'est pas
+syntaxique mais RÉDACTIONNELLE.**
+
+### 8.4 Le seul zéro restant est un zéro CORRECT sur une population VIDE
+
+`MODULE-API-DOCS.md` rend 0 négation. Vérifié : **les cinq fichiers de `legacy/api/`
+portent 0 écriture en base** — deux d'entre eux sont du vendor minifié. Il n'y a
+aucun geste à déclarer non porté. Et le document porte quand même une étape
+« **BLOQUÉE** », une étape « **NON** », une étape « **ZÉRO** » et un §4 *« Ce que je
+n'ai PAS fait »* : **c'est mon motif de négation qui ne connaissait pas son
+vocabulaire**, pas le document qui se taisait.
+
+> **La catégorie « document qui ne dit jamais non » n'a AUCUN membre parmi les
+> dix.** L'énoncé pouvait être vrai ; ce qui était faux, c'est que ces documents en
+> soient membres — et c'est l'instrument de sélection qui les y avait mis.
+
+**Conséquence utile** : la population de la Q3 sur `adm/` n'est pas « jamais
+établie ». Elle l'est par ce document, et son reste se referme à zéro.

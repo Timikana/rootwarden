@@ -231,7 +231,7 @@ try {
             // Cette suite n'a ni `COMPTE` ni `SECRET` : elle porte une TABLE de
             // comptes. On reprend celui des captures, comme son etape 2.
             const s = await connecte(COMPTE_CAPTURES, COMPTES[2].secret);
-            await verifieMenuLegacy(s.page, '/services', verifie);
+            await verifieMenuLegacy(s.page, '/services', verifie, constate);
             try { await s.ctx.close(); } catch { /* deja ferme */ }
             /*
              * PAS DE `console.log(lignes.join())` ICI : dans ces suites, `note()`

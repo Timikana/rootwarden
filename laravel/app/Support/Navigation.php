@@ -142,6 +142,49 @@ class Navigation
      * @param  array<string,bool>  $permissions
      * @return array<string, list<array<string,mixed>>>
      */
+    /**
+     * Le menu rendu porte-t-il encore au moins une entree vers l'ancien portail ?
+     *
+     * ══ POURQUOI UN PREDICAT ET NON UNE SUPPRESSION ═════════════════════
+     *
+     * La legende du gabarit expliquait la fleche « ↗ » — et le menu est passe a
+     * 32 entrees `route` et ZERO `legacy`. Elle decrivait donc un marqueur que
+     * plus aucune entree ne porte, aux DEUX endroits qui la rendent : barre
+     * laterale et tiroir mobile.
+     *
+     * **La supprimer serait correct aujourd'hui et faux le jour ou une entree
+     * repasse en `legacy`** — et cela arrivera : ce menu est passe de 24 a 32
+     * en une nuit, et `wazuh` n'etait portee qu'en lecture douze heures plus
+     * tot. Sans predicat, il faudrait se souvenir de la remettre.
+     *
+     * *Avant de retirer une contrainte, enumerer ce qu'elle excluait.* La
+     * legende n'exclut rien, mais la retirer emporterait une capacite qui
+     * redeviendra necessaire, sans trace de pourquoi elle a disparu — le
+     * defaut paye sur l'ancre `(\?|$)`, retiree pour un motif reel et
+     * emportant un service que personne ne lui avait demande.
+     *
+     * DERIVE DE L'ETAT, PAS ENUMERE : le predicat lit le menu REELLEMENT
+     * rendu, donc il suit les droits du compte. Un role qui ne voit aucune
+     * entree non portee ne lit pas une legende sans objet.
+     *
+     * Une entree porte `route` OU `legacy`, jamais les deux — invariant du
+     * fichier, verifie par un test. L'absence de `route` suffit donc.
+     *
+     * @param  array<string, list<array<string, mixed>>>  $menu
+     */
+    public static function porteDuLegacy(array $menu): bool
+    {
+        foreach ($menu as $entrees) {
+            foreach ($entrees as $entree) {
+                if (! isset($entree['route'])) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
     public static function pour(int $roleId, array $permissions, array $fonctionnalites = []): array
     {
         $visibles = [];

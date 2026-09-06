@@ -31,9 +31,52 @@
                 <p class="rw-aide">{{ __('auth.connexion_aide') }}</p>
             </div>
 
+            {{-- « SE SOUVENIR DE MOI », ET TROIS PHRASES QUI DISENT CE QU'IL FAIT.
+
+                 La premiere est celle qui compte : **ce cookie ne connecte
+                 jamais tout seul.** Il restitue l'identite et renvoie au second
+                 facteur — ou a l'enrolement si le compte n'en a pas encore. Le
+                 dire est ce qui distingue cette case d'un contournement, et
+                 l'ancien portail, lui, laisse passer les comptes sans second
+                 facteur (`auth/verify.php:139`, un `if` sans `else`).
+
+                 La deuxieme declare une limite HERITEE DU SCHEMA :
+                 `remember_tokens` porte `PRIMARY KEY (user_id)`
+                 (`mysql/init.sql:49-55`), donc un seul jeton par compte. Se
+                 souvenir ailleurs evince celui-ci — silencieusement si on ne le
+                 dit pas. **Une limite qu'on porte sans la declarer devient un
+                 choix qu'on assume sans l'avoir fait.**
+
+                 La troisieme est un desagrement de TRANSITION : ce cookie est
+                 chiffre par le cadre, l'ancien portail le lit en clair, donc il
+                 ne saura pas le lire et l'effacera. On ne l'exempte pas du
+                 chiffrement pour autant — un porteur d'identite n'a rien a faire
+                 dans une liste d'exceptions. --}}
+            <div class="rw-champ">
+                <label class="rw-champ rw-champ--case" data-rw="connexion-memorisation-etiquette">
+                    <input type="checkbox" name="memorisation" value="1"
+                           data-rw="connexion-memorisation" @checked(old('memorisation'))>
+                    <span>{{ __('auth.memorisation_libelle') }}</span>
+                </label>
+                <p class="rw-aide" data-rw="memorisation-duree">
+                    {{ __('auth.memorisation_duree', ['jours' => \App\Services\JetonMemorisation::JOURS]) }}
+                </p>
+                <p class="rw-aide" data-rw="memorisation-un-appareil">{{ __('auth.memorisation_un_appareil') }}</p>
+                <p class="rw-aide" data-rw="memorisation-ancien-portail">{{ __('auth.memorisation_ancien_portail') }}</p>
+            </div>
+
             {{-- Action principale a droite : c'est la que l'oeil arrive apres
-                 avoir parcouru le formulaire. --}}
+                 avoir parcouru le formulaire. Le recours, lui, va A GAUCHE : il
+                 n'est pas ce qu'on vient faire ici, et une porte de secours qui
+                 se presente comme l'action principale invite a l'emprunter.
+
+                 ⚠ SANS CE LIEN LE FLUX N'EXISTERAIT PAS. Quatre routes, deux
+                 vues, un service — et aucun moyen d'y arriver autrement qu'en
+                 tapant l'adresse. `scripts/pages-sans-lien.py` existe pour cette
+                 classe de defaut ; ici la mesure etait « 0 lien entrant ». --}}
             <div class="rw-actions">
+                <a class="rw-lien rw-actions__gauche" href="{{ route('reinit.demander') }}"
+                   data-rw="connexion-mot-de-passe-oublie">{{ __('reinit.titre') }}</a>
                 <button class="rw-bouton" type="submit">{{ __('auth.connexion_valider') }}</button>
             </div>
         </form>

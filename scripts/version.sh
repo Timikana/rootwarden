@@ -190,7 +190,50 @@ case "${1:-}" in
     --epreuve) epreuve ;;
     --ecrire)
         v="$(derive)"
-        printf '%s\n' "$v" > "$RACINE/$FICHIER_PRODUIT"
+        # ══ ECRITURE ATOMIQUE, ET ELLE N'EST PAS DECORATIVE ═══════════════════
+        #
+        # La forme precedente etait `printf … > "$FICHIER"`. Le shell TRONQUE le
+        # fichier a l'ouverture de la redirection, AVANT que `printf` n'ecrive :
+        # il existe une fenetre ou `version.txt` fait ZERO octet.
+        #
+        # `Version::numero()` y lit alors '', sa regex `^\d+\.\d+\.\d+$`
+        # echoue, il rend `null`, et le pied de page affiche « Version inconnue ».
+        # Ce n'est pas une hypothese : une capture du 2026-09-05 le porte, alors
+        # que le fichier est parfaitement lisible avant et apres.
+        #
+        # Un defaut TRANSITOIRE laisse un etat final correct — c'est le mecanisme
+        # d'ECRITURE qu'il faut regarder, jamais le lecteur.
+        #
+        # `mv` sur le meme systeme de fichiers est un `rename(2)` : le fichier
+        # passe d'une version complete a l'autre, sans etat intermediaire.
+        if [ -z "$v" ]; then
+            echo "version.sh: la derivation n'a rien rendu — RIEN N'EST ECRIT" >&2
+            exit 1
+        fi
+        tmp="$(mktemp "$RACINE/$FICHIER_PRODUIT.XXXXXX")"
+        # ⚠ `mktemp` CREE EN 0600, ET `mv` CONSERVE CE MODE.
+        # Mesure du 2026-09-05 : apres un bump, `version.txt` passait en 0600 et
+        # le serveur web — qui tourne en `www-data` — ne pouvait plus le lire.
+        # `is_file()` rendait vrai, `is_readable()` faux, et LES DEUX portails
+        # affichaient « Version inconnue » sans qu'aucune erreur ne soit levee.
+        # Le correctif d'atomicite avait donc introduit son propre defaut.
+        printf '%s\n' "$v" > "$tmp" || { echo "version.sh : ecriture du tampon impossible" >&2; rm -f "$tmp"; exit 1; }
+        # ⚠ ON N'UTILISE PAS `mv`. IL CHANGE L'INODE, ET LE MONTAGE LE SUIT PAS.
+        #
+        # `docker-compose.yml` monte ce fichier UN PAR UN
+        # (`./legacy/version.txt:/var/www/html/version.txt:ro`). Un montage de
+        # FICHIER est epingle a l'inode present au demarrage du conteneur : tout
+        # `mv`, `git checkout` ou reecriture par renommage le DETACHE, et le
+        # conteneur continue de servir l'ancien contenu depuis un inode que plus
+        # rien ne reference. Mesure du 2026-09-05 :
+        #
+        #     inode hote       1998793
+        #     inode conteneur  2013478      <- orphelin, fige a 2.0.94
+        #
+        # Le seul remede a un montage detache est de RECREER le conteneur, ce
+        # qui n'appartient pas a ce script. On ecrit donc EN PLACE : la
+        # redirection tronque et remplit l'inode existant, le montage tient.
+        cat "$tmp" > "$RACINE/$FICHIER_PRODUIT" && rm -f "$tmp"
         echo "$v -> $FICHIER_PRODUIT"
         ;;
     "") derive ;;

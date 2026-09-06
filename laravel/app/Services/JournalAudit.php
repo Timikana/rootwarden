@@ -242,53 +242,129 @@ class JournalAudit
     }
 
     /**
-     * Scelle les lignes orphelines.
+     * ⛔ NE SCELLE PLUS RIEN — arbitrage E-415 du 2026-09-05.
      *
-     * `$simulation` a `true` : rien n'est ecrit, et le compte annonce est celui
-     * que l'ecriture reelle produirait. C'est ce que le legacy offre sur sa
-     * branche non-POST — sauf qu'AUCUN element de son interface ne l'emet.
+     * ══ POURQUOI CETTE METHODE N'ECRIT PLUS ────────────────────────────────
      *
-     * FAIL-CLOSED CONSERVE : si la chaine porte une incoherence, on n'ecrit rien.
-     * Mais contrairement au legacy, l'incoherence est jugee sur la MEME lecture
-     * que la verification, donc une chaine saine n'en produit plus.
+     * Mesure du 2026-09-05 14:39 : 6272 lignes, 4788 scellees, 1484 nues, et
+     * **4788 `prev_hash` DISTINCTS** parmi les scellees — la chaine est INTACTE.
+     *
+     * Les 1484 nues portent un `prev_hash` NUL, toutes. Elles sont hors chaine
+     * PAR CONSTRUCTION : la tete se calcule en les sautant, ici comme dans le
+     * legacy (`SELECT self_hash … WHERE self_hash IS NOT NULL ORDER BY id DESC`).
+     *
+     *     id 1  prev=GENESIS    self=d36ccba57
+     *     id 2  prev=(null)     self=(NULL)      <- nue
+     *     id 3  prev=d36ccba57  self=5a070372c   <- reprend id=1, SAUTE id=2
+     *
+     * **Les y remettre exige de reecrire le `prev_hash` des 4788 autres**, donc
+     * de detruire la seule propriete que la chaine apporte. Les deux sceleurs du
+     * depot etaient deux impasses :
+     *
+     *     le LEGACY   avance sa tete, casse a la 1re scellee qui suit, et STOPPE
+     *     ce PORTAGE  posait 1484 `prev_hash` IDENTIQUES, et le `whereNull` qui
+     *                 l'accompagnait interdisait la reprise — CASSE **ET** BLOQUE
+     *
+     * ⚠ Le commentaire qui justifiait le non-avancement de la tete citait un
+     * comportement REEL (`audit_log_raw`) a l'appui du MAUVAIS objet : son
+     * homologue est `audit_seal.php`, qui scelle en lot, pas l'inserteur qui
+     * ecrit une ligne a la fois.
+     *
+     * ══ LE VRAI REMEDE EST AILLEURS, ET IL EST POSE ───────────────────────
+     *
+     * `backend/audit_chain.py` (v1.45.0) : 11 sites d'insertion nue repris,
+     * compte restant **0**. On a cesse d'en fabriquer. Les 1484 restent, et le
+     * DIRE est plus honnete que de leur donner un faux chainage.
+     *
+     * ══ FORME ─────────────────────────────────────────────────────────────
+     *
+     * L'ecriture n'est pas mise derriere un drapeau : elle est RETIREE. Une
+     * garde par construction ne depend pas de la justesse de l'instrument qui
+     * la verifierait, ni de la vigilance de qui relira ce fichier.
+     *
+     * @return array l'etat de la chaine, et le motif du refus
      */
     public function scelle(bool $simulation): array
     {
         $p = $this->parcourt();
 
-        $sortie = [
+        return [
             'simulation' => $simulation,
             'total' => $p['total'],
             'orphelines' => $p['orphelines'],
             'scellees' => 0,
+            'scellement_possible' => false,
+            'motif' => 'audit.scellement_impossible',
             'arret_sur_incoherence' => $p['erreur'] !== null,
             'erreur' => $p['erreur'],
             'tete' => $p['tete'],
         ];
-
-        if ($simulation || $p['erreur'] !== null || $p['aSceller'] === []) {
-            return $sortie;
-        }
-
-        $posees = 0;
-        DB::transaction(function () use ($p, &$posees): void {
-            foreach ($p['aSceller'] as [$id, $precedent, $propre]) {
-                // Garde-fou repris du legacy : n'ecrire QUE si la ligne est
-                // toujours orpheline. Entre le parcours et l'ecriture, une
-                // insertion concurrente a pu la sceller.
-                $posees += DB::table('user_logs')
-                    ->where('id', $id)->whereNull('self_hash')
-                    ->update(['prev_hash' => $precedent, 'self_hash' => $propre]);
-            }
-        });
-
-        $sortie['scellees'] = $posees;
-        $sortie['tete'] = $this->verifie()['tete'];
-
-        return $sortie;
     }
 
     /* ═══ Empreintes — la formule du legacy, au caractere pres ══════════════ */
+
+    /**
+     * Ajoute une ligne au journal, EN CHAINANT — l'ecrivain canonique.
+     *
+     * ══ POURQUOI CETTE METHODE, ET POURQUOI AVEC UN VERROU ────────────────
+     *
+     * ✅ LES TROIS COPIES SONT MIGREES — mesure du 2026-09-05 15:37,
+     * commentaires DEPOUILLES :
+     *
+     *     ComptesController       lit la tete : non   delegue : OUI
+     *     PermissionsController   lit la tete : non   delegue : OUI
+     *     ServeursController      lit la tete : non   delegue : OUI
+     *     JournalAudit (temoin)   lit la tete : OUI   verrou : OUI
+     *
+     * ⚠ Ce paragraphe annoncait « trois copies restent a migrer ». Il est reste
+     * VRAI plusieurs jours puis FAUX sans qu'aucun commit ne le touche — et une
+     * session s'appretait a refaire le travail sur sa foi. **Un avertissement
+     * qui survit a sa cause envoie refaire ce qui est fait.**
+     *
+     * Reste `MotDePasse`, ecriture NUE et ASSUMEE, qui documente son choix.
+     * En ecrire une copie de plus etait la solution la moins couteuse et la plus
+     * mauvaise : ce depot a paye trois copies du garde SSRF et trois compteurs 2FA.
+     *
+     * ⚠ ET LES TROIS COPIES EXISTANTES OMETTENT LE VERROU. Elles lisent la tete
+     * de chaine par un simple `orderByDesc('id')->value('self_hash')`, hors
+     * transaction. Le legacy, lui, le fait dans une transaction avec
+     * `FOR UPDATE` (`adm/includes/audit_log.php:107-116`) — et ce verrou n'est
+     * pas decoratif : **deux ecritures concurrentes qui lisent la meme tete
+     * produisent deux lignes portant le MEME `prev_hash`, donc une chaine
+     * FOURCHUE**, que `verifie()` signalera comme rompue sans pouvoir dire
+     * laquelle des deux branches est la bonne.
+     *
+     * Cette methode reprend donc le verrou du legacy. **Les trois copies
+     * restent a migrer** — ce n'est pas fait ici, et c'est declare.
+     */
+    public function ajoute(int $auteur, string $action): void
+    {
+        $action = mb_substr($action, 0, 255);
+        try {
+            DB::transaction(function () use ($auteur, $action): void {
+                $tete = DB::table('user_logs')->whereNotNull('self_hash')
+                    ->orderByDesc('id')->lockForUpdate()->value('self_hash') ?: self::GENESE;
+                $ts = time();
+                DB::table('user_logs')->insert([
+                    'user_id' => $auteur,
+                    'action' => $action,
+                    'created_at' => date('Y-m-d H:i:s', $ts),
+                    'prev_hash' => $tete,
+                    'self_hash' => $this->empreinte($tete, $auteur, $action, $ts),
+                ]);
+            });
+        } catch (\Throwable $e) {
+            /*
+             * Best-effort, comme le legacy : un echec de journalisation ne doit
+             * pas annuler le geste qu'il trace. Mais il se JOURNALISE, sans quoi
+             * une trace manquante serait indiscernable d'un geste non accompli.
+             */
+            \Illuminate\Support\Facades\Log::error('journal d\'audit : ecriture impossible', [
+                'auteur' => $auteur,
+                'erreur' => $e->getMessage(),
+            ]);
+        }
+    }
 
     public function empreinte(string $precedent, int $utilisateur, string $action, int $ts): string
     {

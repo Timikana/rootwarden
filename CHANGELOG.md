@@ -5,6 +5,2154 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [1.54.1] - 2026-09-05
+
+### Extinction - la queue : cinq fichiers d'actifs, et une sonde fausse d'un ordre de grandeur
+
+**Suite de la 1.54.0** : le meme defaut d'archivage incomplet laissait des ACTIFS derriere
+les pages parties. **Retires : `api/swagger/swagger-ui.css` et quatre logos** — orphelins,
+cites ni par une page vivante ni par le portage.
+
+    fichiers servis toutes extensions   120 -> 115
+    dont .php METIER                    26   (inchange)
+
+#### ⚠ Et ma sonde annoncait SOIXANTE-TREIZE orphelins pour 651 Kio
+**Elle en trouvait 73 ; le reseau en a rendu CINQ.** *Les 68 autres — catalogues de langue,
+`composer.json`, `openapi.yaml` — sont deja bloques par **six fichiers `.htaccess`** que ma
+sonde ne connaissait pas :
+
+    legacy/.htaccess · logs/ · auth/ · includes/ · vendor/ · lang/
+
+> **Un fichier PRESENT dans l'arbre n'est pas un fichier SERVI.** *Toute ma mesure de
+> l'extinction lisait le disque ; la seule qui tranche est la requete.*
+
+**C'est le pendant exact du defaut inverse trouve ce matin** : `_deprecated/` etait ABSENT
+de l'arbre servi selon mon compte, et SERVI selon le reseau. *Les deux fois, l'ecart est
+entre « ce que le depot contient » et « ce qu'Apache repond ».*
+
+#### Verifie au reseau
+    /api/swagger/swagger-ui.css  404  ·  /img/logos/sodium-logo.png  404
+    /js/utils.js  200  ·  /iptables/js/main.js  200   (charges par des pages vivantes)
+    temoin /zzz.png  404   ·   portage /connexion  200
+
+---
+
+## [1.54.0] - 2026-09-05
+
+### Extinction - l'archivage etait INACHEVE : le JavaScript restait servi
+
+**⚠ Signale par la session qui tient le banc, et le defaut est dans les vagues 1 a 5 :
+`git mv` a emporte les `.php` et laisse le `js/`.**
+
+    /bashrc/js/bashrc.js       200   26 Kio      <- module dont les pages sont archivees
+    /wazuh/js/wazuh.js         200   17 Kio
+    /ssh-audit/js/main.js      200   36 Kio
+    /bashrc/                   403               <- le REPERTOIRE existe encore
+
+**Et mon compte publie avait un angle mort** : j'annoncais « 26 fichiers servis » en ne
+comptant que les `.php` METIER. **130 fichiers etaient servis** — 26 metier, 76 catalogues
+de langue, 14 JS pour 1,7 Mio.
+
+#### Retire du service
+**10 fichiers JavaScript, 1637 Kio**, orphelins de modules dont les pages sont archivees :
+`bashrc` `fail2ban` `graylog` `groups` `ssh-audit` `ssh` `wazuh`, plus
+`adm/js/server_user_policy.js`, `js/admin.js` et `api/swagger/swagger-ui-bundle.js`
+(1491 Kio a lui seul).
+
+**Et 16 repertoires devenus vides**, ce qui fait passer sept modules de **403 a 404** — la
+condition exacte que `tests/e2e/archive.mjs` exige (`if (statut !== 404) …`). *Un
+repertoire vide rend « interdit » la ou l'outil attend « absent », et 12 suites restaient
+rouges pour cette seule raison.*
+
+#### ⚠ TROIS defauts de sonde dans la meme mesure, tous les miens
+    « chargeur » compte un COMMENTAIRE   `head.php:37` cite bashrc.js dans une phrase
+    appariement par NOM DE BASE          `main.js` existe dans SIX modules : un seul
+                                         charge faisait paraitre les six charges
+    comptage par EXTENSION UNIQUE        `.php` seul, alors que le legacy sert aussi
+                                         du JS, des images, du CSS
+
+**La forme qui tient : apparier le `<script src>` par CHEMIN RESOLU, commentaires
+depouilles.** *Temoin : 14 JS servis, 4 chemins reellement charges, 10 orphelins.*
+
+#### Verifie au reseau
+    /bashrc/js/bashrc.js  404  ·  /wazuh/js/wazuh.js  404  ·  /ssh-audit/js/main.js  404
+    /bashrc/ /wazuh/ /ssh-audit/ /graylog/ /groups/ /ssh/ /fail2ban/   403 -> 404
+    /iptables/ /security/   302   (vivants, bloques sur decision de l'exploitant)
+    /iptables/js/main.js 200 · /js/utils.js 200   (charges par des pages vivantes)
+    temoin inexistant 404  ·  portage /connexion 200
+
+    fichiers servis toutes extensions   130 -> 120
+
+---
+
+## [1.53.1] - 2026-09-05
+
+### Extinction - `import_csv.php` : le dernier blocage MESURABLE tombe
+
+Il etait retenu depuis ce matin sur « 4 tables ecrites, seule la moitie `users` est
+prouvee ». **Instruit ligne a ligne :**
+
+    INSERT machines      porte   route + `serveurs.blade.php`
+    INSERT users         porte   `ComptesController::importer` + `POST /comptes/importer`
+    INSERT user_logs     porte   et CHAINE depuis la v1.45.0
+    INSERT permissions   DELIBEREMENT non reproduit
+
+**Et la raison du quatrieme est meilleure qu'une equivalence.** `Permissions::pour()`
+(`:130-134`) traite l'absence de ligne comme « aucun droit ». Le portage refuse d'inserer
+les **15 colonnes NOMMEES a zero** du legacy, parce que `Permissions::toutes()` lit le
+**SCHEMA** :
+
+> *« une liste qui omettrait silencieusement une permission ajoutee apres coup »*
+
+**C'est une garde par construction : la liste est DERIVEE de sa source, elle ne peut pas
+la contredire.** *Le portage ne reproduit pas ce geste — il le rend inexprimable.*
+
+    Q4, commentaires depouilles : 0 appelant   (temoin : api_proxy -> 10)
+    .php metier servis   32 -> 31     (82 ce matin)
+    archives             69 -> 70     (19 ce matin)
+
+    /adm/includes/import_csv.php  404   ·   /api_proxy.php  302
+    portage /comptes 302  ·  /serveurs 302
+
+**Il ne reste plus AUCUN blocage mesurable.** Les trois derniers — le SMTP, le scan
+sortant, l'application de regles de pare-feu — sont des effets sur des tiers et
+appartiennent a l'exploitant.
+
+---
+
+## [1.53.0] - 2026-09-05
+
+### Extinction - vague 4 : trois fichiers liberes par les livraisons de la flotte
+
+    .php metier servis   35 -> 32     (82 ce matin)
+    archives             66 -> 69     (19 ce matin)
+    feuilles             20 . temoin Q4 : api_proxy -> 10 appelants (sain)
+
+Deux des trois ne sont pas partis par un progres de l'extinction, mais parce qu'un
+PORTAGE a leve leur Q3 :
+
+    adm/api/audit_seal.php        le bouton « Sceller » est desarme (v1.50.0)
+    adm/api/update_user.php       `password_expiry_override` est porte (E-419)
+    adm/includes/manage_permissions.php   LECTURE PURE, aucune ecriture
+
+> **Un arbitrage rendu ne libere rien ; c'est sa LIVRAISON qui libere.** *Les trois
+> etaient annonces bloques dans la consigne de mission au tour precedent, et les trois
+> etaient deja debloques quand je l'ai remesuree.*
+
+#### ⚠ Une correction de la sonde Q4
+Elle comptait un fichier comme APPELE quand un COMMENTAIRE le nommait. *Mon propre
+commentaire de retrait dans `profil.blade.php` faisait ressortir `profile.php` comme
+appele par le portage.* **Les commentaires sont desormais depouilles avant le comptage,
+blocs `/* */` et `{{-- --}}` compris.**
+
+#### Verifie au reseau
+    /adm/api/audit_seal.php    404   ·   /adm/api/update_user.php   404
+    /api_proxy.php             302   ·   /auth/login.php            200
+    portage /journal-audit     302   ·   /profil                    302
+
+---
+
+## [1.52.1] - 2026-09-05
+
+### Profil - une tuile annoncait un manque qui n'existait pas, et renvoyait vers un portail qui ne le comblait pas
+
+La page `/profil` portait une tuile « Pas encore ici » :
+
+> *« Les connexions memorisees ne sont pas encore listees ici : l'ancien portail les
+> affiche. »*
+
+**MESURE : `legacy/profile.php` ne les liste JAMAIS.** Ses deux seules occurrences de
+`remember_tokens` sont un `DELETE` (`:209`), pose apres un changement de mot de passe.
+
+> **Le libelle inventait un manque ET renvoyait vers un portail qui ne le comblait pas.**
+> *C'est la meme forme que la phrase de supervision corrigee le 2026-09-03 : une page qui
+> indique une sortie muree.*
+
+Et les trois gestes qui manquaient VRAIMENT — changer son adresse, poser sa cle SSH,
+demander l'effacement — sont portes depuis la v1.51.1. **Il ne reste rien a aller chercher
+ailleurs.**
+
+#### Retire
+- la tuile et son lien `target="_blank"` vers `{legacy}/profile.php` ;
+- les cles `profil.non_porte_titre` et `profil.non_porte_texte`, des DEUX catalogues.
+  **Parite verifiee par comparaison des JEUX : 63 = 63, aucun ecart.**
+- `auth.ouvrir_ancien_portail` est CONSERVEE : `accueil.blade.php` l'emploie encore.
+
+#### Verifie
+    php -l x2              propre
+    blade compile          11694 octets, aucune erreur
+    suites qui asserent
+      `non_porte_`         0
+    /profil 302 (garde)  ·  /connexion 200  ·  inexistant 404
+
+---
+
+## [1.52.0] - 2026-09-05
+
+### Comptes - E-419 : le quatrieme ecrivain que le legacy detenait seul
+
+**Ce qui est porte.** `password_expiry_override` : `MotDePasse::poseOverride()`,
+`ComptesController::expiration()`, une route `role:3`, un selecteur par ligne de compte.
+**0 ecrivain porte, un seul ecrivain vivant** (`legacy/adm/api/update_user.php`) — et le
+portage la LIT en deux endroits, dont `MotDePasse::expirationApres()` que je venais d'ecrire.
+
+**⛔ Le test a mordu sur un defaut reel.** `users.password_updated_at` porte
+`on update CURRENT_TIMESTAMP` : **toute modification de la ligne deplace la date**. Ecrire
+l'override rajeunissait donc le mot de passe, et l'echeance repartait de zero — *une expiration
+se serait repoussee indefiniment en basculant un reglage qui n'a rien a voir*. Correctif : lire
+la date AVANT, la reecrire explicitement a sa valeur ancienne, et faire UNE SEULE ecriture. *Le
+legacy a le meme defaut en pire : deux `UPDATE` a la suite, le second recalculant depuis la
+date que le premier a deplacee.*
+
+**⚠ Et le legacy annonce une anti-escalade qu'il ne fait pas** : « pas de self-edit sur
+role/password_expiry » (`:42`), et **zero comparaison avec l'identifiant de session dans tout le
+fichier**. Un superadministrateur pouvait s'exempter LUI-MEME de l'expiration, en silence. Le
+refus est ECRIT ici, et le selecteur n'est pas rendu sur sa propre ligne.
+
+**Deux bornes que le legacy n'a pas** : une valeur negative est REFUSEE (le legacy l'ecrirait,
+et `INTERVAL -1 DAY` poserait une echeance dans le PASSE), et le formulaire est une liste
+fermee.
+
+**⚠ Les trois copies du journal d'audit deleguent enfin.** Releve par une autre session :
+`journalise()` lisait la tete de chaine SANS `lockForUpdate()` et hors transaction, dans trois
+controleurs. Deux ecritures concurrentes auraient produit une chaine FOURCHUE. *J'avais ecrit
+moi-meme le docblock qui annonce « trois copies restent a migrer ».* Mesure apres : **0 lecture
+de tete en code**, 3 delegations, 1 seul verrou.
+
+**Tests.** 16 cas, 0 FAIL, en transaction annulee sur des etats FORCES — sans forcage le test
+passerait a vide (0 override sur 12 comptes, `PASSWORD_EXPIRY_DAYS` absente). Le geste est
+dormant, et c'est la raison de l'ecrire.
+
+**Notes exploitation.** Aucune migration. La route `POST /comptes/{id}/expiration` a ete
+commitee par `feaaaa2` (fichier partage, elle etait dans l'arbre) : elle est intacte et
+`route:list` la rend.
+
+---
+
+## [1.52.1] - 2026-09-05
+
+### Correctif - changer son adresse ou sa cle repoussait l'echeance de son mot de passe
+
+**Mesure** : `SHOW COLUMNS FROM users` rend, pour `password_updated_at`,
+`extra=[DEFAULT_GENERATED on update CURRENT_TIMESTAMP]`. **Toute modification
+reelle de la ligne `users` deplace donc cette date** — et l'expiration du mot de
+passe se calcule depuis elle.
+
+Les deux gestes de libre-service livres en v1.51.1 ecrivent sur `users`. Sans
+correctif, **changer son adresse ou poser sa cle SSH repoussait l'echeance de son
+propre mot de passe**, en silence et sans rapport avec le geste demande.
+
+> **`MotDePasse:26-33` decrivait deja ce defaut, sur un autre declencheur** — *un
+> echec de connexion suivi d'un succes remet `failed_attempts` a 0, la ligne
+> change, et le compteur repart de zero* — et le declarait **LATENT** parce que
+> `PASSWORD_EXPIRY_DAYS` n'est pas definie (verifie : absente du conteneur).
+> **On ne s'appuie pas sur une option desactivee.**
+
+**Correctif** : `'password_updated_at' => DB::raw('password_updated_at')` dans les
+deux ecritures. **Pose dans le SERVICE et non dans l'appelant**, pour que les deux
+chemins en beneficient — la route d'administration `role:3` comme le libre-service.
+
+**Eprouve dans les DEUX sens**, sur une table TEMPORAIRE (par connexion, jetable) :
+
+    sans parade   -> date DEPLACEE
+    avec parade   -> date PRESERVEE
+
+*Non touche : `anonymise()` ecrit aussi sur `users`, et n'est pas corrige — le
+compte est desactive et son mot de passe rendu inutilisable dans la meme
+transaction, donc l'echeance n'a plus d'objet.*
+
+⚠ **Et j'ai numerote ce correctif `1.51.2` alors que `version.txt` portait deja
+`1.52.0`** — la SECONDE regression de version en deux jours. Pire que la premiere :
+la commande AVAIT mesure et AFFICHE `1.52.0`, et l'increment etait fige dans le
+script. *Un controle dont le resultat ne commande pas l'action n'est pas un
+controle, c'est un commentaire.* Corrige en `1.52.1`, **derive** de la mesure.
+
+**Origine** : la propriete m'a ete donnee par une autre session, qui l'avait payee
+sur son propre lot par une date fausse de huit mois. *Elle ne l'a pas affirmee de
+mes gestes — elle m'a donne la propriete et m'a laisse la mesurer.* C'est ce qui a
+permis de la verifier au lieu de la croire.
+
+## [1.51.1] - 2026-09-05
+
+### Portage - DOSSIER-30 : les trois gestes de libre-service de `/profil`
+
+**Changer son adresse, poser sa propre cle SSH, demander l'effacement de son
+compte.** Les trois etaient absents du portage, et le cote ADMINISTRATIF de
+chacun etait porte -- avec soin.
+
+> **C'est l'ACTEUR qui distingue, et l'acteur n'apparait QUE dans la garde de la
+> route.** Une passe par TABLE voyait `users.ssh_key` ecrite ; une passe par
+> ROUTE voyait des routes existantes ; une passe par NOM trouvait les libelles
+> des deux cotes. *Les trois instruments rendaient COUVERT.*
+
+**Leur incompletude n'a jamais ete decidee : c'est le residu de quatre portages
+faits chacun du cote administrateur.** Deux des trois relevent du RGPD exerce par
+le sujet lui-meme -- rectification (art. 16) et effacement (art. 17).
+
+#### Ce qui a ete mesure avant d'ecrire
+
+    definitCleSsh              existe, appele UNIQUEMENT par la route `role:3`
+    ecritures de `email`       creation + import CSV + anonymisation (-> NULL)
+                               -> AUCUN chemin de mise a jour
+    superadminsActifs()        existe deja : la garde du dernier SA est une primitive
+    anonymise()                existe deja
+    classes CSS employees      11 sur 11 presentes dans `rw.css` (temoin negatif rendu)
+                               -> aucune retouche du fichier PARTAGE
+
+#### L'effacement n'est PAS une suppression, et c'est la partie qui compte
+
+`user_logs` est une chaine de hachage : **retirer une ligne casse la verification
+de TOUTES les suivantes.** Le code le disait deja --
+`supprimableSansPerte():504-507` : *l'anonymisation efface les donnees
+personnelles et PRESERVE le journal*.
+
+> « Effacez-moi » contre « la chaine ne doit pas rompre » est un vrai conflit, et
+> l'anonymisation est la reponse que le droit admet. **La conception existait ; il
+> lui manquait l'initiative du sujet.**
+
+Trois gardes sur ce geste : **refus si le compte est le dernier
+superadministrateur actif** (protection presente en legacy, absente du portage --
+un compte ne doit pas pouvoir retirer le dernier acces privilegie) ; **confirmation
+par SAISIE du nom du compte**, pas par une case ; et **la demande est journalisee
+AVANT l'anonymisation**, la session etant morte apres.
+
+#### Deux defauts evites par la verification, pas par la relecture
+
+- **`$compte` n'etait pas passe a la vue.** Les trois champs l'emploient ; sans
+  lui, `$compte['name'] ?? ''` aurait rendu une chaine VIDE **et non une erreur**,
+  donc une etiquette demandant de saisir un nom qu'elle n'affichait pas. *Un `??`
+  sur une variable absente ne se signale nulle part* ;
+- **le journal passe par `JournalAudit::ajoute()`**, qui prend un `lockForUpdate()`.
+  Le `journalise()` prive de `ComptesController` ne le fait PAS : c'est l'une des
+  « trois copies restent a migrer » que le docblock d'`ajoute()` annonce, et deux
+  ecritures concurrentes y produiraient une chaine FOURCHUE.
+
+**Verifie par ce que Laravel RAPPORTE** : `route:list --path=profil` rend les trois
+routes ; `php -l` sur les cinq fichiers PHP ; jeux de cles FR/EN **compares** et
+identiques, 58 de chaque cote.
+
+**Non fait, et dit** : aucune execution du geste d'effacement -- il anonymiserait
+un compte reel. Aucune capture d'ecran : le rendu n'a pas ete exerce.
+
+⚠ **Ce commit emporte une ligne qui n'est pas de moi** : `routes/web.php` portait
+`POST /comptes/{id}/expiration` d'une autre session, non commitee. Le commit par
+chemins protege du contenu d'AUTRES fichiers, pas d'un fichier PARTAGE -- il prend
+l'etat de l'arbre. Declare plutot que tu.
+
+## [1.51.0] - 2026-09-05
+
+### Auth - E-418 : les trois dernieres ecritures du legacy, et une affirmation de moi qui les bloquait
+
+**Ce qui est porte.** `login_history` (succes ET echec), `last_failed_login_at` et
+`password_expires_at` — trois colonnes dont **le seul ecrivain etait le legacy**, et dont les
+lecteurs survivent a son extinction.
+
+    login_history          5 067 lignes · derniere ecriture le jour meme · lu par ExportRgpd
+    last_failed_login_at   2 comptes renseignes · lu par les DEUX exports
+    password_expires_at    0 compte renseigne · lu par backend/scheduler.py, DEUX fois
+
+**⚠ Le dispositif concu contre ce mensonge y est aveugle.** `ExportRgpd` porte `_total`,
+`_exportees` et `_tronque` sur chaque section bornee, ecrits parce que le legacy livrait « un
+JSON qui se presente comme complet ». **Aucun des trois n'attraperait le gel** : rien n'est
+tronque, la donnee s'arrete. *Le compteur dirait la verite sur un ensemble mort.*
+
+**⛔ Et ce qui bloquait `password_expires_at`, c'etait un commentaire de moi** :
+« Le legacy la calcule et l'enregistre, mais **personne ne la lit** ». La moitie citee etait
+vraie — `verify.php:196-197` calcule depuis `password_updated_at`. **La conclusion, non** :
+`backend/scheduler.py` la lit deux fois, et la premiere ENVOIE un courriel. *J'avais infere
+« personne » de « pas le portail que je comparais » — mesurer l'appelant qu'on a sous les yeux
+n'est pas mesurer la chaine.* Consequence tant que l'affirmation a tenu : tout mot de passe
+change par le portage restait sans date d'expiration, donc le rappel ne partait JAMAIS pour
+cette personne, et rien ne le signalait.
+
+**La regle d'expiration a trois branches** : override 0 = exempte ; override > 0 = cette duree ;
+absent = la duree globale, ou aucune si elle vaut 0. **`0` et `NULL` ne se confondent pas** —
+`0` est une exemption demandee, `NULL` un « suis la regle globale ». La duree se lit dans
+**`PASSWORD_EXPIRY_DAYS`**, la variable que le legacy lit deja, et pas dans un nom neuf : le
+portage vient de payer cela sur le cout bcrypt (E-414).
+
+**Deux statuts sur quatre.** `login_history.status` est un enum a quatre valeurs ; le legacy
+n'ecrit que `success` et `failed_password`, et la base ne porte que celles-la. **`failed_2fa` et
+`locked` n'ont d'ecrivain nulle part** : le service les REFUSE plutot que de les offrir —
+porter un statut que personne n'ecrit fabriquerait une donnee qui n'a jamais existe.
+
+**Trois choix de placement** : le succes s'ecrit AVANT le second facteur, comme le legacy (ce
+statut dit « le mot de passe etait bon », pas « la session est ouverte » — le deplacer
+changerait le sens de 4 957 lignes deja ecrites) ; l'echec ne s'ecrit que si le compte existe
+(contrainte de cle etrangere, pas choix) ; `last_failed_login_at` va dans la meme ecriture que
+`failed_attempts`.
+
+**Tests.** 20 cas, 0 FAIL, **en transaction annulee sur des etats FORCES** — sans forcage le
+test passerait a vide : 0 expiration, 0 override, `PASSWORD_EXPIRY_DAYS` absente. **Temoin
+inverse** : la liste fermee elargie aux quatre statuts sur une copie renommee -> 3 FAIL, et ce
+sont les trois bonnes. Quatre gardes d'entree sur le harnais de mutation.
+
+**Notes exploitation.** Aucune migration. Le calcul d'expiration rend `null` pour tous
+aujourd'hui — **le geste est dormant, et c'est la raison de l'ecrire** : le jour ou
+`PASSWORD_EXPIRY_DAYS` sera posee, les mots de passe changes par le portage en tiendront compte.
+`legacy/auth/login.php` et `adm/api/update_user.php` deviennent archivables de ce fait.
+
+---
+
+## [1.50.0] - 2026-09-05
+
+### Audit - le bouton « Sceller » ne scelle plus, et c'est la seule reponse juste
+
+**Mesure du 2026-09-05 14:39** : 6272 lignes, 4788 scellees, 1484 nues, et **4788
+`prev_hash` DISTINCTS** parmi les scellees — la chaine est INTACTE.
+
+    id 1  prev=GENESIS    self=d36ccba57
+    id 2  prev=(null)     self=(NULL)      <- nue, `prev_hash` NUL aussi
+    id 3  prev=d36ccba57  self=5a070372c   <- reprend id=1, SAUTE id=2
+
+Les 1484 nues sont hors chaine **par construction** : la tete se calcule en les sautant,
+ici comme dans le legacy. Les y remettre exigerait de reecrire le `prev_hash` des 4788
+autres — donc de detruire la seule propriete que la chaine apporte.
+
+**Les deux sceleurs du depot etaient deux impasses** : le legacy avance sa tete, casse a la
+premiere scellee qui suit et STOPPE ; ce portage posait 1484 `prev_hash` IDENTIQUES, et le
+`whereNull` qui l'accompagnait interdisait la reprise — **casse ET bloque, irreversible**.
+
+#### Modifie
+- `JournalAudit::scelle` **n'ecrit plus**. L'ecriture n'est pas mise derriere un drapeau :
+  elle est **retiree**. *Une garde par construction ne depend pas de la justesse de
+  l'instrument qui la verifierait.* La methode rend l'etat et le motif du refus.
+- `parcourt()` est **inchange** : il sert la VERIFICATION, qui reste juste et qui porte
+  toute la valeur du journal.
+- La vue : le bouton devient un **etat** (`1484 evenements hors chaine`), le panneau de
+  decision est retire. `journal-audit.js` garde ses deux acces (`if (btnSceller)`,
+  `if (panneau)`) — la page se degrade **sans erreur**.
+- i18n FR/EN : 2 cles ajoutees de chaque cote, **jeux COMPARES** — 43 = 43, aucun ecart.
+
+#### La conjonction, verifiee avant le geste
+`->scelle(` n'a **qu'un seul appelant** (`JournalAuditController:130`, la route du bouton).
+**Aucune tache planifiee ne scelle** (mesure : 0). *Desarmer l'ecriture ne casse rien
+d'autre — ce qui n'etait pas acquis.*
+
+#### Verifie
+    blade compile          7499 octets, aucune erreur de syntaxe
+    php -l x3              propre, temoin negatif : « Errors parsing » OK
+    compiles appartenant
+      a root               0 / 115   -> le piege du cache root est desarme
+    /journal-audit         302 (garde)  ·  /connexion 200  ·  inexistant 404
+
+#### Non corrige, et dit
+Les **1484 lignes restent hors chaine**. Le vrai remede est en amont et il est pose depuis
+la 1.45.0 : `backend/audit_chain.py`, 11 sites d'insertion nue repris, compte restant 0.
+**On a cesse d'en fabriquer ; celles-la sont irrattrapables, et le DIRE est plus honnete
+que de leur donner un faux chainage.**
+
+---
+
+## [1.49.0] - 2026-09-05
+
+### Extinction - vague 3 : les POINTS D'ENTREE, liberes par le depart de leurs pages
+
+    .php metier servis   43 -> 35     (82 ce matin)
+    archives             58 -> 66     (19 ce matin)
+
+Huit points d'entree `adm/api/*` etaient PARFAITEMENT PORTES et retenus par leurs seuls
+appelants. Ces appelants partis en 1.48.0, ils se liberent : `dismiss_onboarding`
+`toggle_sudo` `toggle_user` `update_notification_prefs` `update_server_access`
+`unlock_user` `api_keys` `server_actions`.
+
+#### Le controle, par TABLE **et** par COLONNE
+Une table couverte ne dit rien de la colonne. Chaque cible a ete verifiee sur les deux.
+
+    dismiss_onboarding    users . onboarding_dismissed_at
+    toggle_sudo           users . sudo
+    toggle_user           users . active
+    update_notif_prefs    notification_preferences
+    update_server_access  user_machine_access
+    api_keys              api_keys . revoked_at
+
+⚠ **`users.sudo` a demande une sonde a part** : le mot `sudo` est trop courant pour qu'un
+motif large soit fiable. Mesure precise (`UPDATE users SET … sudo =` et
+`->update([… 'sudo'`) : **legacy 1 ecrivain, portage 2** (`Comptes.php`,
+`ComptesController.php`), backend 0.
+
+#### ⛔ Un fichier RETENU
+`adm/api/update_user.php` : la campagne Q3 le mesure **1 sur 3**. `ssh_key` est porte ;
+`password_expires_at` et `password_expiry_override` relevent du `DOSSIER-31`, dont
+l'arbitrage est rendu (« la donnee survit ») mais **pas encore livre**.
+
+#### Verifie au reseau
+    /adm/api/toggle_sudo.php    404   (retire)
+    /adm/api/update_user.php    302   (retenu)
+    /api_proxy.php              302   (vivant, temoin Q4 : 10 appelants)
+    portage /connexion          200
+
+---
+
+## [1.48.0] - 2026-09-05
+
+### Extinction - vague 2 : la CASCADE, 11 fichiers de plus
+
+**Archiver une page LIBERE ce qu'elle incluait.** Apres les 30 deplacements de la 1.47.0,
+le graphe a ete remesure : **59 feuilles -> 37**, et dix fichiers jusque-la tenus sont
+devenus libres — dont `manage_users.php` et `manage_servers.php`, les appelants memes qui
+retenaient trois points d'entree.
+
+    .php metier servis   52 -> 43     (82 ce matin)
+    archives             49 -> 58     (19 ce matin)
+
+#### Retire du service
+Deux ecrivains blanchis geste par geste (`anonymize_user`, `change_password`), puis neuf
+fichiers liberes par la cascade : `manage_access` `manage_notifications` `manage_roles`
+`manage_servers` `manage_users` `confirm_2fa` `migrate_totp` `reset_totp` `onboarding`.
+
+#### Deux alertes de l'inventaire qui TOMBENT, mesurees
+- **`manage_access.php` « seule facon vivante d'accorder un sudo »** : `sudo_preset` est
+  present cote portage (`Permissions.php`, 4 occurrences). L'alerte etait perimee.
+- **`onboarding.php`** : porte (`Onboarding.php`), et il n'ecrit rien.
+
+#### ⛔ Un fichier RETENU, et la raison
+`adm/includes/import_csv.php` : le legacy y ecrit **quatre** tables — `machines`,
+`permissions`, `user_logs`, `users`. `ComptesController::importer` existe et la route
+`POST /comptes/importer` est gardee, mais **seule la moitie `users` est prouvee**. *Moins
+plutot que faux.*
+
+#### Verifie au reseau
+    /adm/includes/manage_users.php   404   (retire)
+    /adm/includes/import_csv.php     200   (retenu, et directement rendu)
+    /api_proxy.php                   302   (vivant)
+    /menu.php                        403   (bloque par une regle preexistante)
+    portage /connexion               200
+
+---
+
+## [1.47.0] - 2026-09-05
+
+### Extinction - vague 1 : 28 fichiers retires du service, et l'archivage ne desservait rien
+
+#### ⛔ Le defaut de fond, corrige d'abord
+La racine servie par Apache **EST** l'arbre `legacy/`. `_deprecated/` s'y trouvait, et
+`.htaccess` ne le mentionnait pas.
+
+    /_deprecated/drift/index.php   500     <- Apache l'atteint, PHP l'EXECUTE
+    /chemin-inexistant.php         404     <- le serveur discrimine bien
+
+Un fichier « archive » repondait 500 la ou un inexistant repond 404 : il etait atteint,
+execute, et n'echouait qu'a son premier `require`. **Le code de sa portee globale
+tournait a chaque visite**, pour les dix-neuf deja deplaces.
+
+- `legacy/.htaccess` : `RedirectMatch 404 ^/_deprecated/`. **404 plutot que 403** : un
+  fichier retire ne doit pas signaler qu'il a existe.
+
+#### Retire du service
+**28 fichiers**, tous FEUILLES et tous en LECTURE PURE, re-controles a l'instant du geste.
+
+    .php metier servis   82 -> 53
+    archives             19 -> 47
+
+#### ⚠ Une QUATRIEME question, que la methode n'avait pas
+Le controle posait Q1 (le geste est-il porte), Q2 (le fichier est-il requis PAR LE
+LEGACY) et Q3 (est-il le seul acces a un geste non porte). **Il ne posait pas :**
+
+> **Q4 - quelque chose l'appelle-t-il encore PAR HTTP ?**
+
+`api_proxy.php` est une FEUILLE par `require` et un CARREFOUR par `fetch`. Archive puis
+REMIS dans le meme quart d'heure. Mesure, code separe du commentaire :
+
+    PORTAGE   CODE  0  ·  commentaire 6      <- il ne l'appelle PAS
+    LEGACY    CODE 14                        <- ses pages survivantes, si
+    HARNAIS   CODE 94
+
+⚠ **La premiere version de cette entree disait « cinq fichiers du portage l'appellent a
+l'execution ». C'ETAIT FAUX** : les six mentions sont des docblocks, et la sonde qui m'en
+avait convaincue interrogeait le portage en `https://` sur un port qui sert du `http://`.
+**Le revert etait bon, sa raison ne l'etait pas.**
+
+**Le graphe Q2 ne suit que `require`/`include`. Une extinction par vagues cree des
+dependances qu'il ne voit pas : tant qu'une page legacy vit, ce qu'elle appelle en HTTP
+doit vivre aussi.**
+
+#### Verifie au reseau apres le geste
+    /_deprecated/adm/api_keys.php   404      (retire)
+    /adm/api/toggle_user.php        302      (vivant)
+    /api_proxy.php                  302      (remis)
+    portage 8444 : 14 pages 302 . /connexion 200 . inexistant 404 . AUCUN 500
+
+⚠ **Reserve** : un `302` prouve que la route et la garde repondent, **pas que le corps de
+la page se rende**. La preuve complete demande une passe AUTHENTIFIEE.
+
+#### ⚠ Ce que ce changement rend faux
+**28 des 29 URL retirees sont referencees par les suites e2e.** Les suites de PARITE
+exercent le legacy par construction : elles vont echouer, et c'est attendu. **Une suite
+legacy rouge apres cette version n'est pas une regression, c'est un objet disparu.**
+
+#### Corrige aussi
+Le CHANGELOG portait **deux sections `1.45.0`** — deux sessions ont pris le meme numero
+sur un fichier partage, le meme jour. Le re-hachage bcrypt passe en `1.46.0`.
+
+---
+
+## [1.46.0] - 2026-09-05
+
+### Audit - le backend Python ecrivait 11 lignes de journal HORS de la chaine de hachage
+
+`user_logs` porte une chaine (`prev_hash`/`self_hash`) dont la propriete est qu'on ne
+peut retirer ni modifier une ligne sans que les suivantes cessent de se verifier.
+
+**Mesure du 2026-09-05 : sur 6271 lignes, 1484 n'ont NI `prev_hash` NI `self_hash`.**
+
+Ces lignes ne sont pas « en attente de scellement » : elles sont hors chaine **par
+construction**, parce que la tete se calcule en sautant les lignes nues, ici comme dans
+le portail PHP :
+
+    SELECT self_hash FROM user_logs WHERE self_hash IS NOT NULL ORDER BY id DESC LIMIT 1
+
+La chaine des 4787 scellees est **intacte** (4787 `prev_hash` distincts, chacun egal au
+`self_hash` de la precedente). Aucun scellement retroactif ne peut y remettre les nues
+sans reecrire le `prev_hash` des 4787 autres, c'est-a-dire sans detruire la seule
+propriete que la chaine apporte. **Une ligne non chainee se chaine a l'ecriture, ou
+jamais.**
+
+#### Ajoute
+- `backend/audit_chain.py` : ecriture chainee unique, empreinte identique a
+  `JournalAudit::empreinte` (epreuve croisee PHP/Python sur 3 cas, dont un `|` dans
+  l'action et des chaines vides). Lecture de tete sous `FOR UPDATE` — sans le verrou,
+  deux ecritures concurrentes obtiennent le meme `prev_hash` et la chaine fourche.
+
+#### Corrige
+- **11 sites d'insertion nue** repris dans `bashrc` `graylog` `policies` `services`
+  `ssh_audit` `wazuh` `monitoring` `ssh` (4 sites). Compte restant : **0**.
+- **`services.py` et `ssh_audit.py` n'avaient JAMAIS rien ecrit** : leur `INSERT` visait
+  une colonne `details` **qui n'existe pas** dans `user_logs`, et l'exception etait
+  avalee par un `logger.debug`. Mesure : 0 ligne `service_%`, 0 ligne `ssh_audit_%`
+  (temoin : 156 lignes `[graylog]` presentes).
+- **`policies.py` non plus** : `user_id or None` posait NULL sur une colonne `NOT NULL`.
+  Mesure : 0 ligne `[policy]`.
+- **Deux commentaires affirmaient une propriete que le code ne posait pas** :
+  `policies.py` annoncait « audit chain HMAC via trigger BDD » (mesure : **0 trigger sur
+  `user_logs`, 0 dans tout le schema**), et `ssh.py` intitulait « Audit log immutable »
+  une insertion sans `prev_hash`.
+- L'echec d'ecriture est desormais journalise en WARNING avec sa cause. Les insertions
+  remplacees etaient toutes enveloppees d'un `except` muet — c'est ce qui a permis a
+  1484 lignes de se poser hors chaine sans que personne ne le voie.
+- `ssh.py` (retrait d'empreinte de cle) : la ligne d'audit partage desormais la
+  transaction du `DELETE` qu'elle trace.
+
+#### Non corrige, et dit comme tel
+Les **1484 lignes existantes restent hors chaine**. Elles sont irrattrapables pour la
+raison ci-dessus, et leur donner un faux chainage couterait la propriete elle-meme.
+
+---
+
+## [1.45.0] - 2026-09-05
+
+### Auth - E-414 : le re-hachage bcrypt a la connexion, et « l'equivalent Laravel » n'en etait pas un
+
+**Ce qui est porte.** `legacy/auth/login.php:162-167` devient
+`MotDePasse::rehacheSiNecessaire()`, appele par `ConnexionController` juste apres une
+verification de mot de passe reussie. Avant ce lot : **0 occurrence** de
+`password_needs_rehash` dans le portage. *C'est le seul instant du produit ou le mot de passe
+en clair existe — aucune tache de fond ne peut faire ce geste.*
+
+**⚠ `Hash::needsRehash()` AURAIT ETE FAUX.** Il compare a `hashing.bcrypt.rounds`, qui lit
+`BCRYPT_ROUNDS`, tandis que TOUS les ecrivains de mot de passe du portage lisent `BCRYPT_COST`.
+Mesure en forcant `BCRYPT_COST` a 13 en memoire :
+
+    motif du projet                     ->  $2y$13$
+    Hash::make                          ->  $2y$12$
+    Hash::needsRehash sur un cout 12    ->  NON
+    password_needs_rehash, cout projet  ->  OUI
+
+Et `.env` pose `BCRYPT_ROUNDS=12` **sans poser `BCRYPT_COST`** : la divergence est le chemin par
+defaut, pas une hypothese. **Un equivalent qui lit une autre source de verite n'est pas un
+equivalent** — le geste aurait ete ecrit et n'aurait jamais tire.
+
+**Le geste est DORMANT** : 12 comptes, tous en `$2y$12$`, cout courant 12. *Son absence est
+indetectable tant que le cout ne bouge pas* — et c'est la raison de l'ecrire, la meme qui a fait
+porter l'assistant de premiere configuration.
+
+**⚠ Et le legacy raconte ce piege** : *« Avant, le commentaire l'annoncait mais ce n'etait pas
+fait »* (`login.php:159-161`). **Le portage avait herite du commentaire corrige et pas du
+geste.** Le geste est donc ecrit dans le MEME commit que son commentaire, et l'assertion le mord
+sur un compte FORGE au cout 10 — un test sur les douze comptes deja a jour serait passe A VIDE.
+
+**Trois choix contre le legacy** : l'echec se JOURNALISE (le legacy avale l'exception sans rien
+dire, et une mise a niveau qui echoue en silence ne se distingue pas d'une mise a niveau jamais
+ecrite) ; `password_updated_at` n'est PAS deplacee (le mot de passe n'a pas change, seule sa
+representation) ; et rien n'est ecrit dans `password_history` (elle refuse la REUTILISATION, et
+y ecrire ferait refuser son propre mot de passe au proprietaire).
+
+**Tests.** 14 cas, 0 FAIL, **en transaction annulee sur un compte forge au cout 10** : le
+prefixe change, le mot de passe reste le meme, un autre reste refuse, le second appel ne fait
+rien, `password_updated_at` ne bouge pas, `password_history` ne recoit rien, et l'etat du hache
+est verifie APRES l'annulation. **Temoin inverse : 4 FAIL, et ce sont les quatre bonnes.**
+
+**⚠ Et le premier temoin de ce lot etait VACANT** : il employait `python3`, absent du conteneur.
+La mutation n'a pas ete appliquee et le harnais a rendu « 14 cas · 0 FAIL » — *un resultat qui
+ressemblait a une mesure reussie*. Le harnais porte desormais QUATRE gardes d'entree :
+empreinte changee, `php -l` qui passe, classe renommee, mutation presente dans le fichier. Une
+mutation qui ne s'applique pas est DECLAREE, jamais comptee.
+
+**Notes exploitation.** Aucune migration. **Pour relever le cout bcrypt, poser `BCRYPT_COST`** —
+c'est la variable que lisent les ecrivains du portage. `BCRYPT_ROUNDS`, deja dans le `.env`, ne
+gouverne que `Hash::`, qui n'est employe nulle part. *Les deux ne se suivent pas.*
+
+---
+
+## [1.44.1] - 2026-09-05
+
+### Auth - E-406 bis : `terminating()` ne garantit PAS ici ce qu'il garantit ailleurs
+
+**Je m'etais signalee non sure de ce point en livrant 1.44.0. La relecture a repondu, et la
+reponse est non.**
+
+    Response::send() choisit dans cet ordre :
+      fastcgi_finish_request()      -> TERMINE la requete   (php-fpm)
+      litespeed_finish_request()    -> idem
+      closeOutputBuffers(); flush() -> VIDE LES TAMPONS SEULEMENT
+
+**Ce conteneur tourne sous mod_php** : Apache charge `libphp.so`, aucun binaire `php-fpm`,
+aucune socket. Seule la troisieme branche s'execute. **`terminating()` deplace donc le travail
+apres l'ECRITURE de la reponse, pas apres sa FIN** — sous php-fpm ce sont la meme chose, sous
+mod_php non.
+
+*Un demandeur qui chronometre le dernier octet du corps ne voit pas l'envoi ; un demandeur qui
+chronometre la fermeture de connexion le voit.* **La propriete n'est pas acquise par
+construction.**
+
+**⚠ Une precision de methode** : `function_exists('fastcgi_finish_request')` lance EN CLI rend
+toujours faux — la fonction appartient au SAPI FPM et n'existe jamais en ligne de commande. Le
+maillon decisif est le module charge par Apache et l'absence de binaire FPM. *Les deux menent a
+la meme conclusion ; un seul la prouve.*
+
+**Le defaut est LATENT** : `mail.default` vaut `log`, donc l'envoi est une ecriture de fichier
+du meme ordre que l'`INSERT` qu'il accompagne. Il devient vivant le jour ou un transport reseau
+est configure — **et ce jour-la personne ne relira ce fichier**.
+
+**Correctif : la premisse est VERIFIEE A L'EXECUTION et journalisee.** `TRANSPORTS_LOCAUX` est
+une liste FERMEE — un transport inconnu est traite comme distant — et tout transport hors liste
+produit un `Log::warning` nommant la consequence ET le remede (php-fpm, ou un ouvrier de file).
+*Un commentaire ne produit aucun evenement le jour ou sa premisse cesse d'etre vraie.*
+
+**Tests.** 18 cas, 0 FAIL : `smtp`, `ses`, `mailgun`, `postmark`, `resend`, `sendmail` et un
+transport invente traites comme distants ; `log`, `array`, `null` comme locaux ; la garde
+precede `terminating(` ; un seul `Mail::`, apres lui ; aucune ecriture dans `login_attempts`.
+**Temoin inverse** : `smtp` declare local sur une COPIE RENOMMEE -> 1 FAIL.
+
+**⚠ Non mesure, et annonce** : le temps jusqu'a la FERMETURE DE CONNEXION sur les deux branches.
+C'est la seule mesure qui trancherait ; elle consomme la limite de debit et la branche connue
+exige un jeton reel sur un compte reel.
+
+**Note pour l'exploitant.** Poser un SMTP sur ce portail demande **aussi** php-fpm ou un ouvrier
+de file. Sans l'un des deux, l'ecart de temps entre adresse connue et inconnue redevient
+mesurable — et le journal le dira, mais apres coup.
+
+---
+
+## [1.44.0] - 2026-09-05
+
+### Auth - E-406 : la reinitialisation de mot de passe est portee
+
+**Ce qui est porte.** `forgot_password.php` (206 l.) et `reset_password.php` (412 l.) →
+`ReinitialisationMotDePasse` + `Auth\ReinitialisationController` + deux vues + un catalogue
+FR/EN + quatre routes PUBLIQUES. Le CHANGEMENT du mot de passe n'est pas ici : il vit dans
+`MotDePasse::reinitialise()`, qui porte deja l'historique, la politique, la purge des jetons
+« se souvenir de moi » DANS la transaction (E-393) et celle des sessions actives. *Deux chemins
+ecrivent un mot de passe ; si un seul revoquait, le defaut reviendrait par l'autre porte.*
+
+**⚠ LE DEFAUT CENTRAL : l'anti-enumeration etait fermee sur le mauvais terme.** Le legacy avait
+egalise le MESSAGE. Le TEMPS, non :
+
+    adresse INCONNUE    1 x password_hash
+    adresse CONNUE      1 x UPDATE · 1 x password_hash · 1 x INSERT
+                        1 x envoi SMTP SYNCHRONE
+
+Un envoi SMTP dure des ordres de grandeur de plus qu'un bcrypt : la branche « l'adresse
+existe » etait nettement PLUS LENTE. L'oracle subsistait, simplement inverse.
+
+**Et une file d'attente n'y aurait rien change** : `queue.default = sync` (mesure) —
+`Mail::queue` s'execute EN LIGNE. Le mecanisme employe est `app()->terminating()` : l'envoi
+part APRES la reponse, sans dependre d'un ouvrier de file qui n'existe pas.
+
+    branche INCONNUE  185,7 ms   ·   branche CONNUE  188,1 ms   ·   ecart 2,4 ms (1 %)
+
+Le residu est ENONCE : un `UPDATE` et un `INSERT` ne se produisent que dans la branche connue.
+
+**⚠ LE SECOND DEFAUT : la limite de debit FINANCAIT l'enumeration.** Le legacy compte les
+lignes de `password_reset_tokens` par adresse IP — or une demande portant une adresse inconnue
+n'insere AUCUNE ligne, donc n'est jamais comptee. *Un compteur qui ne compte que les demandes
+reussies ne limite pas l'enumeration.* Le compteur vit desormais dans le CACHE et monte AVANT
+de savoir si l'adresse existe. **Pas dans `login_attempts`** : son garde ignore la colonne
+`step`, donc toute ecriture compte dans le verrou de CONNEXION par adresse.
+
+**Et elle echoue FERME.** Le legacy rend « autorise » sur toute `PDOException`. Une demande
+refusee se reessaie ; une limite desarmee ne se remarque qu'apres.
+
+**L'ecran dit « prepare », pas « envoye ».** `MAIL_MAILER = log` : rien ne part vers une boite.
+Une phrase qui affirmerait un envoi serait a rectifier le jour du SMTP ; celle-ci reste vraie
+dans les deux regimes. Le flux est agnostique au transport.
+
+**Le jeton** : 64 hexadecimaux, hache en bcrypt, une heure, usage unique, une nouvelle emission
+invalide les precedentes, la consommation ferme TOUS les jetons du compte, la FORME est
+verifiee avant le contenu, et le jeton est REVALIDE avant l'ecriture. **Aucune session n'est
+ouverte** : reinitialiser ne contourne pas le second facteur.
+
+**Deux choix de rendu** : un lien mort ne rend AUCUN formulaire — il offre de redemander un
+lien ; et la consequence (fermeture des sessions, revocation des connexions memorisees) est
+dite AVANT le geste.
+
+**Tests.** Cycle de vie du jeton : **26 cas, 0 FAIL, en TRANSACTION ANNULEE**. Au navigateur :
+**19 cas, 0 FAIL**, trois largeurs, captures REGARDEES. Parite FR/EN par PHP : **17 = 17**,
+trois jetons lies des deux cotes. Le MECANISME verifie et pas l'intention : un seul `Mail::`
+dans le code, APRES `terminating(` ; `Mail::queue` absent ; aucune ecriture dans
+`login_attempts`. **Temoin inverse** : `password_verify` remplace par `true` sur une copie →
+2 FAIL.
+
+**⚠ `password_reset_tokens` porte 0 ligne, et elle en porte toujours 0.** L'etat de la table est
+verifie APRES l'annulation. Au navigateur, seule la branche INCONNUE est exercee : elle brule
+un bcrypt et n'ecrit rien. *Y laisser un jeton de test donnerait a un compte reel un mot de
+passe a usage unique valable une heure.*
+
+**⚠ Ce qui n'est PAS mesure, et c'est annonce** : la DELIVRANCE (avec `MAIL_MAILER = log`,
+l'envoi ecrit dans le journal ; que le courriel PARTE ne peut pas etre mesure avant la decision
+SMTP), et le chemin complet de bout en bout, qui exigerait d'emettre un jeton reel sur un
+compte reel.
+
+**Notes exploitation.** Aucune migration : `password_reset_tokens` existe (016, verifiee sur
+`information_schema`, contrainte de cle etrangere vers `users`). Les quatre routes sont
+PUBLIQUES par necessite — qui a perdu son mot de passe ne peut pas s'authentifier pour le
+redemander. `routes/web.php` et `auth/connexion.blade.php` sont touches : **annonces AVANT
+ecriture** (`modifie:0` sur les deux).
+
+---
+
+## [1.43.0] - 2026-09-05
+
+### Accueil - E-405 : l'assistant de premiere configuration est porte
+
+**Ce qui est porte.** `legacy/includes/onboarding.php` (221 lignes, seul acces
+`index.php:162`) devient `App\Services\Onboarding` + `OnboardingController` + un partiel
+d'accueil + un catalogue FR/EN. Cote portage avant ce lot : **0 fichier**.
+
+**⚠ La forme est gouvernee par un fait, pas par un gout.** *Son absence est INDETECTABLE par
+quiconque travaille sur une installation deja configuree — c'est-a-dire par toute l'equipe.*
+On ne peut donc pas la valider par ce qu'on voit a l'ecran. Le service separe donc la MESURE
+de la DERIVATION : `mesures()` touche la base et ne decide rien, `etapes()` decide et ne
+touche rien. **Chaque detection est ainsi eprouvable en forcant son etat, sans ecrire.**
+
+**HUIT etapes, et non cinq.** `servers`, `users` et `api_key` manquaient a l'enumeration
+recue. Porter cinq sur huit aurait retire trois detections en silence — et personne ne s'en
+serait apercu, par la raison meme qui fait porter cette page.
+
+**⛔ Une etape ne pouvait PAS etre franchie, par construction.** L'etape `keypair` compte
+`platform_keypair`, une table qui **n'existe pas** : `ERROR 1146`, aucun fichier de `mysql/`
+ne la cree, et `012_platform_keypair.sql` n'ajoute que des colonnes a `machines`. Le
+`try/catch` avalait l'erreur et posait zero. Consequences : **l'assistant n'atteignait jamais
+8/8** donc n'affichait jamais son panneau final, **et l'avertissement de l'etape suivante,
+conditionne a ce zero, etait affiche en permanence**. Le portage lit la source qui existe —
+`machines.platform_key_deployed` — et le DIT a l'ecran.
+
+**⚠ « Plus de mot de passe » ne se lit pas sur une seule colonne.** Le legacy teste
+`password IS NOT NULL AND password != ''` : il ignore `root_password`, et `!= ''` compare des
+OCTETS — PHP chiffre la chaine vide en `sodium:…`, non vide, la ou Python rend `''`. Le
+portage reprend le predicat de `ClePlateforme::machines()`, sur les DEUX colonnes.
+
+**Trois choix contre le legacy** : le lien d'une etape se resout par le MENU (une page fermee
+au compte n'affiche aucun lien, plutot qu'un lien vers un 403) ; un FORMULAIRE et pas un
+script pour le masquage ; et une etape franchie s'efface **sans** `opacity` globale — celle du
+legacy fait passer son texte gris sous le seuil de contraste, et son marqueur porte ici un
+TEXTE et pas seulement une couleur.
+
+**L'avertissement dit la CONSEQUENCE.** Le legacy ecrit « Deploie la keypair avant » : il dit
+quoi faire et tait pourquoi. Sans cle deployee, effacer les mots de passe retire le DERNIER
+ACCES — c'est cela qui permet de decider.
+
+**Tests.** Table de verite pure : **23 cas, 0 FAIL**, huit detections forcees une par une,
+etat vierge, etat complet et mesures vides ; **temoin inverse** — seuil des administrateurs
+`> 1` mue en `> 0` sur une copie, **9 FAIL**. Masquage : **7 cas, 0 FAIL, dans une TRANSACTION
+ANNULEE** — il ecrit `users.onboarding_dismissed_at`, et sur une base partagee un drapeau
+laisse masquerait l'assistant pour toute mesure ulterieure. Au navigateur : **15 cas, 0 FAIL**,
+trois largeurs, captures REGARDEES. Parite FR/EN par PHP : **35 = 35**, et les 24 cles
+construites (8 etapes x 3) verifiees separement.
+
+**⚠ Ce que ce commit perime.** `index.php` sort du bloc bloque de l'inventaire et rejoint
+l'archivable : l'onboarding etait son seul contenu non porte. Il reste DEUX bloquants a
+l'extinction, aucun n'est ici — `migrate_crypto.php` (a preserver comme outil) et la
+REINITIALISATION (bloquee par le SMTP, non portee sur arbitrage : porter un flux qui ne
+delivre rien serait pire que son absence).
+
+**Notes exploitation.** Aucune migration : `users.onboarding_dismissed_at` existe deja
+(migration 042, verifie sur `information_schema`). Le legacy tolere son absence par un
+`try/catch` ; le portage ne pose pas de filet contre une absence qu'il a mesuree. Les huit
+`COUNT(*)` ne sont executes QUE si l'assistant doit etre rendu — l'accueil est la page la plus
+servie du portail. `rw.css`, `routes/web.php`, `accueil.blade.php` et `PortailController.php`
+sont touches : **annonces AVANT ecriture** avec leur mesure (`modifie:0` sur les quatre).
+
+---
+
+## [1.42.2] - 2026-09-05
+
+### Extinction du legacy - E-404 : `migrate_crypto.php` sort du portail SANS perdre sa capacite
+
+**Pourquoi ce fichier ne s'archive pas.** `encryption.py` traite `OLD_SECRET_KEY`
+en **dechiffrement seul** : la migration de cle est PARESSEUSE, une ligne jamais
+reecrite garde indefiniment le chiffre de l'ancienne cle, et **aucune ecriture de
+masse n'existe ailleurs**. Sans ce script, une rotation de la cle de CHIFFREMENT
+ne peut plus etre menee a terme — donc `OLD_SECRET_KEY` resterait deployee
+indefiniment et l'ancienne cle ne pourrait JAMAIS etre retiree.
+
+**⚠ Deux gestes portent le nom « rotation » dans ce depot.** Celui-ci est la
+rotation de la **cle de CHIFFREMENT** (`migrate_crypto.php`, re-chiffre les
+secrets EN BASE) — a ne pas confondre avec la rotation de la **cle PLATEFORME
+SSH** (`regenerate_platform_key`), qui ne revoque rien.
+
+**Deplacement.** `legacy/auth/migrate_crypto.php` -> `scripts/migrate_crypto.php`
+(`git mv`, l'historique suit).
+
+**⚠ Un `git mv` seul aurait preserve le FICHIER et perdu l'OUTIL.** Trois mesures
+l'ont montre, et chacune a change le geste :
+
+1. **Appelants** — **zero appelant de code**, les trois formes cherchees (direct,
+   par helper, chemin CONSTRUIT). Les seules mentions sont documentaires ou
+   destinees a un humain.
+2. **Dependance** — le script incluait `__DIR__ . '/../db.php'`, **et `db.php`
+   vit dans `legacy/`, c'est-a-dire dans l'arborescence qu'on eteint**. Le
+   deplacer en gardant ce `require` n'aurait fait que deplacer la date de sa
+   mort. La surface reellement consommee etait **UN seul symbole** : `$pdo`
+   (5 occurrences ; garde-fou sur la sonde, dont une premiere version ratait
+   `$pdo` parce qu'il est indente dans un `try`). Elle est desormais construite
+   **dans le script** : memes 4 variables d'environnement, memes valeurs par
+   defaut, memes deux attributs PDO, **patch A05 repris** (refus du mot de passe
+   par defaut hors debug). Seule la gestion d'erreur passe du WEB au CLI — le
+   garde `PHP_SAPI !== 'cli'` interdisant de toute facon tout autre contexte.
+   **Verifie : zero `require`/`include` EXECUTABLE dans le fichier deplace**
+   (mesure hors commentaires ; les 2 occurrences restantes sont de la prose).
+3. **Exclusion semgrep** — `.semgrep/rules-rootwarden.yml` excluait
+   `'legacy/auth/migrate_crypto.php'` de `rw-aes-cbc-encrypt`, **chemin en dur**.
+   Sans mise a jour, la regle se remettait a mordre sur un fichier legitime des
+   le deplacement. Redirigee vers `scripts/migrate_crypto.php` — et la regle a
+   **toujours un objet** : `openssl_encrypt(..., 'AES-256-CBC', ...)` est encore
+   la (`:187`). Relu depuis la STRUCTURE PARSEE, pas depuis le texte :
+   `exclude == ['scripts/migrate_crypto.php']`, 10 regles, YAML valide.
+
+**Lancement, mis a jour dans l'en-tete du script.** Le conteneur `rootwarden_php`
+ne monte que `./legacy` : la commande documentee ne pouvait plus atteindre le
+fichier. Remplacee par une forme qui ne depend d'aucun montage :
+
+    docker cp scripts/migrate_crypto.php rootwarden_php:/tmp/ \
+      && docker exec rootwarden_php php /tmp/migrate_crypto.php
+
+**Apres l'extinction du legacy, n'importe quelle image `php:cli` ayant acces a la
+base convient** — c'est precisement ce que ce deplacement preserve.
+
+**⚠ Ce qui devient FAUX ailleurs, signale et NON corrige** (hors perimetre) :
+
+| fichier | ce qu'il dit encore |
+|---|---|
+| `legacy/documentation.php:1390` | « lancez `/auth/migrate_crypto.php` » |
+| `legacy/documentation.php:1675` | `docker exec rootwarden_php php /var/www/html/auth/migrate_crypto.php` |
+| `ARCHITECTURE.md:594, 788` | situe le fichier dans l'arborescence `auth/` |
+| `docs/migration/INVENTAIRE-ARCHIVAGE.md:166, 478` | le decrit a son ancien emplacement |
+
+**Une instruction qui nomme un fichier absent ne se signale pas d'elle-meme : elle
+fait conclure que la capacite a disparu.** Le legacy n'est pas touche par decision
+du chantier — mais ces quatre references doivent etre reprises par leurs
+proprietaires.
+
+**⛔ Le script n'a PAS ete execute.** Une rotation re-chiffre TOUS les secrets de
+`machines` et `users` : c'est un geste sur des donnees de production, il
+appartient a l'exploitant.
+
+**Comptes du legacy apres ce geste** (chaque chiffre porte sa commande, cf.
+`docs/migration/`) : **82** fichiers metier servis (etait 83), dont **14** dans
+`legacy/auth/` (etait 15), **19** deja archives (inchange — ceci est un
+DEPLACEMENT, pas un archivage).
+
+**Reserve.** `semgrep` n'est installe ni sur l'hote ni dans le conteneur : la
+regle n'a **pas** pu etre exercee. Ce qui est verifie est la structure du
+fichier de regles, pas son comportement.
+
+**Tests.** `php -l` vert (via le conteneur). Suite backend : **667 passed,
+5 skipped, 2 xfailed, 0 FAILED** — aucun code Python touche, controle de
+non-regression.
+
+---
+
+## [1.42.1] - 2026-09-05
+
+### Securite - E-403 : les quatre routes de planification d'audit SSH
+
+**Symptome.** Les quatre routes portaient `@require_role(2)` **seul**, quand les
+deux pages du module exigent `can_audit_ssh` (`legacy/ssh-audit/index.php:12-13`,
+`laravel/routes/web.php:229`) :
+
+    GET    /ssh-audit/schedules
+    POST   /ssh-audit/schedules
+    DELETE /ssh-audit/schedules/<id>
+    POST   /ssh-audit/schedules/<id>/toggle
+
+**`toggle` est la plus consequente malgre sa taille : elle ne DESARME pas, elle
+BASCULE.** Un role 2 sans la permission pouvait donc **re-armer** un releve SSH
+recurrent que quelqu'un avait suspendu.
+
+**Correctif.** `@require_permission('can_audit_ssh')` sur les quatre, **en
+additif** — le role est conserve, comme pour E-402 et pour la meme raison.
+
+**⚠ PAS de `@require_machine_access`, et c'est mesure.** La table
+`ssh_audit_schedules` n'a **aucune colonne `machine_id`** (temoin :
+`user_machine_access.machine_id` = 1, donc la sonde fonctionne). Un decorateur
+d'acces machine qui ne trouve pas d'identifiant laisse TOUT passer : ce serait une
+garde sans objet collee a une garde qui commande, et le lecteur suivant en
+compterait deux la ou il y en a une.
+
+### Correction de registre - la garde des politiques est `E-402`, pas `E-392`
+
+**`E-392` etait deja pris** (`PARITE.md:227` : « dix rejeux 2FA fermaient l'etape
+du second facteur pour TOUTE une adresse », `4b3e656`). Le commit `356caea`
+annonce donc sa garde sous un numero occupe.
+
+**L'historique n'est PAS reecrit pour un numero** — le commit est enseveli sous
+d'autres et le cout depasserait le benefice. **Mais la correspondance est ecrite
+en deux endroits** (le commentaire de la garde dans `ssh_audit.py`, et cette
+entree), sans quoi une recherche par numero ne trouverait jamais le commit qui l'a
+posee. *Une erreur ecrite se corrige au vu de tous, jamais en silence.*
+
+### Correction - `delete_ssh_schedule` : `success` suit desormais l'EFFET
+
+La route rendait `success: True` **sans regarder `rowcount`** : « supprime » pour
+un identifiant qui n'existait pas. `wazuh.delete_rule` (`:1167`) rend deja
+`success: deleted > 0` — **deux routes du meme depot repondaient de facon opposee
+a « qu'est-ce que supprime veut dire ».**
+
+**⚠ Le cas zero rend 404, et NON 200 comme son homologue `wazuh`.**
+`tests/test_verdicts_deux_cents.py::test_aucune_route_NEUVE_ne_rejoint_la_famille_du_200_menteur`
+a refuse la premiere version, et le motif se verifie sur l'appelant :
+
+    legacy/ssh-audit/js/main.js:775
+      if (r.ok) { toast('Planification supprimee', 'success'); loadSshSchedules(); }
+
+**Il ne lit QUE le statut.** Un 200 porteur d'un refus lui aurait fait annoncer une
+reussite — exactement ce que l'invariant protege. Le portage, lui, lit
+`corps.success` (`audit-ssh.js:1023`) et affiche `corps.message` : **les deux
+appelants sont corrects avec un 404, un seul l'etait avec un 200.** Le message du
+cas zero est explicite a dessein, les deux portails retombant sinon sur un libelle
+d'erreur generique.
+
+**Defaut collateral signale, non corrige** (`laravel/`, hors perimetre) :
+`laravel/public/js/audit-ssh.js:14` affirme que le portage ne compose « ni
+`DELETE /schedules/<id>`, ni... ». **Il les compose** — `:171` et `:185`, en URL
+CONSTRUITE. Le sous-lot A5 les a ajoutees et le commentaire n'a pas suivi.
+
+**Tests.** `ruff` vert, import REEL, placement verifie par AST. Suite complete :
+**667 passed, 5 skipped, 2 xfailed, 0 FAILED**.
+
+**Notes d'exploitation.** `backend/**.py` est lu au demarrage : INERTE jusqu'au
+redemarrage de `rootwarden_python`.
+
+---
+
+## [1.42.0] - 2026-09-05
+
+### Audit SSH - E-401 : on armait un releve SSH recurrent et on ne pouvait pas le desarmer
+
+**Symptome.** Le portage cree une planification (`POST /ssh-audit/schedules`) et ne pouvait ni
+la supprimer ni la suspendre : **on armait depuis le portail neuf et l'on ne desarmait que
+depuis celui qu'on eteint.** L'ordonnanceur tourne dans un fil invisible a `ps`, une
+planification est RECURRENTE, son echeance ne demande la permission de personne, et son objet
+est une session SSH sur les machines de sa portee. Ce n'est pas une capacite manquante : c'est
+un geste ACTIF sans son interrupteur. Latent aujourd'hui — `ssh_audit_schedules` porte 0 ligne.
+
+**Correctif.** `DELETE /ssh-audit/schedules/<id>` et `POST /ssh-audit/schedules/<id>/toggle`,
+par DEUX helpers NOMMES — pas de `envoie(methode, chemin)`, qui aurait ouvert DELETE et POST
+sur tout chemin. **L'URL est construite DANS le helper** et l'identifiant force par
+`Number(id) | 0` : une URL concatenee par l'appelant est invisible a tout releve par motif,
+la forme exacte que le module wazuh vient de payer.
+
+**L'asymetrie est voulue** : suspendre part directement, reactiver passe par le panneau.
+Suspendre DESARME — y mettre une friction rendrait l'arret plus penible que l'armement.
+Reactiver ARME. La suppression vise l'objet AFFICHE, jamais un identifiant repris d'un champ
+de saisie, et le panneau nomme l'intitule, la portee et la prochaine echeance.
+
+**⚠ RECTIFIE LE 2026-09-05 : la moitie `DELETE` de ce constat a ete reparee UNE HEURE apres
+ce commit**, par `583ca86` — la route rend desormais 404 avec `success: false` et un message.
+Mon code n'a pas eu a changer : il teste `r.ok` ET `corps.success`. **Et le 404 a ete prefere
+au 200 de `wazuh` parce que `legacy/ssh-audit/js/main.js:775` ne lit QUE `r.ok`** — j'avais
+ecrit « deux conventions opposees » en sous-entendant qu'une avait tort ; les deux ont raison,
+parce que leurs APPELANTS different. *S'aligner sur la convention d'une route voisine n'est
+juste que si ses appelants se comportent comme les miens.*
+
+**⚠ Ce que l'ecran ne peut PAS promettre.** `toggle` fait `SET enabled = NOT enabled` — une
+bascule AVEUGLE — et `DELETE` rendait `success: True` sans regarder `rowcount`. Un ecran qui
+predirait l'etat obtenu mentirait une fois sur deux des que deux personnes agissent. Les deux
+gestes RELISENT la liste, et les libelles disent que c'est la relecture qui fait foi.
+*`delete_rule` de wazuh, lui, rend `deleted > 0` : deux routes du meme depot, deux conventions
+opposees sur ce que « supprime » veut dire.*
+
+**⚠ DEUX DECLARATIONS ETAIENT DEJA FAUSSES, ET AUCUNE DES DEUX N'EST DE CE LOT.**
+
+- **l'en-tete du fichier** disait *« `POST /ssh-audit/schedules`, et rien d'autre. Ni DELETE, ni
+  toggle, NI AUCUNE DES ROUTES QUI JOIGNENT UNE MACHINE »*. Mesure : **trois** routes
+  (`:246`, `:335`, `:583`), et **`/ssh-audit/scan` OUVRE une session SSH** (`ssh_audit.py:133`).
+  La clause la plus fausse etait celle qui promettait le plus. L'en-tete ENUMERE desormais,
+  avec le numero de ligne de chaque appel ;
+- **le paragraphe SEC-013** affirmait que `POST /ssh-audit/policies` etait moins gardee que sa
+  lecture. **`356caea`, aujourd'hui, y a ajoute `@require_permission('can_audit_ssh')` et
+  `@require_machine_access`.** Une declaration qui cite l'etat d'un AUTRE depot doit citer sa
+  mesure et sa date, sinon elle devient une croyance datee de rien ;
+- **`portee_texte` disait « n'ecrit rien »** — meme defaut que celui de wazuh la veille, vu a
+  l'image. Il distingue desormais les gestes qui ouvrent une session SSH de ceux qui n'ecrivent
+  qu'en base, *dont l'echeance, elle, en ouvrira*.
+
+**Tests.** 20 assertions au navigateur, 0 FAIL, trois largeurs, captures REGARDEES.
+Helpers eprouves en executant le script dans un DOM minimal : 6 appels, 0 FAIL, methode figee,
+aucune traversee de chemin. **Temoin inverse** : la coercition retiree sur une COPIE,
+`supprimePlanif('../../ssh-audit/scan')` fabrique une traversee vers la route qui ouvre une
+session SSH. `node --check`, `php -l`, parite FR/EN par PHP : **121 = 121**, et 74 cles
+employees par le JS, 0 absente.
+
+**⚠ AUCUNE ECRITURE N'A ETE EXECUTEE.** Pour rendre les deux boutons a l'image, la LECTURE a
+ete interceptee dans le navigateur et deux planifications fictives rendues — le DOM et le code
+sont les vrais, **rien n'est ecrit nulle part**. Creer une vraie planification armerait un
+releve SSH recurrent, le geste meme que ce lot sert a desarmer. **Ce que cela ne prouve pas :
+que le backend accepte le DELETE et le toggle.**
+
+**Notes exploitation.** Aucune migration ; `RoutesBackend` n'est PAS touche — l'entree
+`/ssh-audit/schedules` couvre deja `<id>` et `<id>/toggle` par comparaison de segment
+(`:238`). **Garde heritee, relevee et non corrigee** : les deux routes portent
+`@require_role(2)` seul, donc un compte role 2 depourvu de `can_audit_ssh` les atteint par la
+passerelle — le meme trou que `POST /ssh-audit/schedules` documente a `RoutesBackend:277`. Il
+est moins grave dans le sens du desarmement, mais `toggle` permet aussi de RE-ARMER. La garde
+vit dans le backend.
+
+---
+
+## [1.41.1] - 2026-09-05
+
+### Securite - E-392 : l'ECRITURE d'une politique SSH etait moins gardee que sa LECTURE
+
+**Symptome.** Les deux jumelles du meme chemin :
+
+    GET  /ssh-audit/policies   @require_permission('can_audit_ssh') + @require_machine_access
+    POST /ssh-audit/policies   @require_role(2)  SEUL
+
+**Un compte de role 2 sans `can_audit_ssh` pouvait donc ECRIRE une politique SSH
+qu'il n'avait pas le droit de LIRE**, et l'atteindre en trois clics par le
+forgeur de requetes de `legacy/documentation.php` (cf. E-389 a E-391). C'est
+E-390 **a l'envers** : la, la lecture etait nue et l'ecriture gardee.
+
+**Pourquoi le balayage d'E-390/E-391 ne l'avait pas rendue.** Son critere etait
+« ni role ni permission ». Cette route porte un role : elle sortait de la classe
+mesuree. **La mesure etait juste sur la question posee — c'est la question qui
+etait courte.** La classe qui la rend est *« garde PLUS FAIBLE que celle de son
+jumeau »*, meme chemin, autre methode.
+
+**Correctif.** `@require_permission('can_audit_ssh')` + `@require_machine_access`
+**en plus** de `@require_role(2)`.
+
+**⚠ Le role est CONSERVE, contre la prescription de « miroir exact ».** Un miroir
+strict du jumeau retirerait `require_role(2)`, que la lecture ne porte pas. Mais
+la page legacy admet un **role 1** porteur de la permission
+(`legacy/ssh-audit/index.php:12-13`) : ce « miroir » OUVRIRAIT l'ecriture de
+politique a un role 1. Mesure du 2026-09-05 : `can_audit_ssh` est portee par
+**1 role 3 et 1 role 2, zero role 1** (temoin : 12 comptes actifs) —
+l'elargissement serait donc invisible aujourd'hui et effectif au premier octroi.
+La garde est **additive**, pas symetrique.
+
+**⚠ Et `@require_machine_access` ne peut refuser personne ici** — ecrit en
+commentaire plutot que laisse lire comme une protection. `machine_id` est
+OPTIONNEL sur cette route (`None` = politique globale) et `check_machine_access`
+rend `True` sans condition des `role_id >= 2` (`helpers.py:364`), ce que la ligne
+au-dessus exige deja. Il est pose en miroir du jumeau et ne mordra que si le role
+venait a etre relache.
+
+**Aucun appelant casse, balaye sur les cinq arborescences.** Un seul appelant en
+POST : `legacy/ssh-audit/js/main.js:369`, sur une page qui exige deja
+`can_audit_ssh`. Le portage **ne compose pas** cette route — declare a quatre
+endroits independants (`AuditSshController.php:22`, `audit-ssh.js:18`,
+`web.php:224`, `lang/fr/ssh_audit.php:61`, SEC-013), et
+`audit-ssh.blade.php:122` documentait meme le defaut verbatim. Aucun script,
+aucune suite E2E : `tests/e2e/go-policies.mjs` porte le mot « policies » pour les
+politiques **sudo/sftp** (`/adm/server_user_sudo.php`), sans rapport.
+
+**Le critere « jumelle » balaye sur TOUT le backend.** 27 chemins portent
+plusieurs methodes ; **3** ont des gardes divergentes :
+
+| chemin | GET | POST |
+|---|---|---|
+| `/admin/notification_prefs` | `role(2)` | `role(3)` — **ecriture plus stricte** |
+| `/admin/temp_permissions` | `role(2)` | `role(3)` — **ecriture plus stricte** |
+| `/ssh-audit/policies` | permission + machine_access | + `role(2)` — **ecriture plus stricte** |
+
+**Apres ce correctif, aucune route du backend n'a d'ecriture moins gardee que sa
+lecture.**
+
+**Defaut collateral signale, non corrige.** `legacy/adm/health_check.php:223`
+sonde `'/ssh_audit/policies'` — avec un **tiret bas**, quand la route est
+`/ssh-audit/policies`. Cette sonde vise donc un chemin inexistant et n'a jamais
+rien mesure. `legacy/` n'est pas dans ce perimetre, et cette page est celle que
+les consignes du chantier interdisent d'ouvrir.
+
+**Tests.** `ruff` vert, import REEL du module, placement verifie par AST. Suite
+complete : **667 passed, 5 skipped, 2 xfailed, 0 FAILED** — compte de `skipped`
+inchange, et la route ne figurait pas dans la liste connue de
+`test_invariant_machine_id.py`.
+
+**Notes d'exploitation.** `backend/**.py` est lu au demarrage : INERTE jusqu'au
+redemarrage de `rootwarden_python`.
+
+---
+
+## [1.41.0] - 2026-09-05
+
+### Wazuh - E-400 : les trois gestes qui n'ouvrent pas de session SSH sont portes
+
+**Ce qui est porte.** `POST /wazuh/config`, `POST /wazuh/options`, `POST /wazuh/rules` et
+`DELETE /wazuh/rules/<name>`. **La ligne n'est pas « ecrire ou lire », c'est « ouvrir une
+session SSH ou non »** : les six gestes restants du module en ouvrent une, les quatre
+ci-dessus n'ecrivent qu'en base. Un classement par ECRITURE aurait mis les dix du meme cote.
+
+**⚠ Et « enregistrer » ne veut pas dire la meme chose sur les trois.** Mesure sur tout le
+depot — qui LIT ce que chaque geste ECRIT :
+
+    wazuh_config           lu par install() et install_all()      -> effet DIFFERE, reel
+    wazuh_machine_options  son propre SELECT et son propre INSERT -> AUCUN effet aujourd'hui
+    wazuh_rules            list_rules et get_rule seulement       -> AUCUN effet aujourd'hui
+
+L'ecran porte donc TROIS phrases d'effet distinctes, attachees chacune a son geste. Un
+« Enregistre. » identique ferait croire trois fois la meme chose, et deux fois ce serait faux.
+
+**La garde de R1 a change de nature, elle n'a pas disparu.** R1 fermait par l'absence (`lis()`
+ne savait faire qu'un GET). R2 pose une LISTE FERMEE de couples (methode, chemin) : `ecris()`
+refuse toute cible absente d'`ECRITURES_PERMISES`, et la cible est nommee par une CLE — c'est
+le helper qui construit l'URL, parce qu'une URL construite par l'appelant echapperait a la
+liste. Les six gestes SSH sont INEXPRIMABLES par ce helper.
+
+**Corrections trouvees en portant :**
+
+- **quatre champs lus sous un nom que le backend ne rend pas** : `active_response`, `sca`,
+  `rootcheck` (le backend rend `*_enabled`) et `kind` (il rend `rule_type`). Les quatre
+  rendaient « — » ou du vide SANS ERREUR — trois interrupteurs de surveillance affiches comme
+  inactifs quelle que soit leur valeur ;
+- **`portee_texte` disait « n'ecrit rien »** — vrai en R1, faux des la premiere ligne de R2 ;
+- **la page affichait DEUX FOIS la configuration** (liste de R1 + formulaire de R2). La liste
+  ne rend plus que les deux etats de mot de passe, qu'un champ de saisie ne peut pas dire ;
+- **une classe CSS, deux intentions, dix sites** : `.rw-saisie--code` etait defini DEUX fois —
+  le champ du code TOTP (centre, `letter-spacing .35em`) et une zone d'edition de fichier. Le
+  second ne redefinissait ni `letter-spacing` ni `text-align` : les quatre zones d'edition du
+  portage heritaient de la mise en forme du champ TOTP. **Le nom est SEPARE** —
+  `.rw-saisie--edition` pour les 4 zones, `.rw-saisie--code` pour les 6 champs TOTP ;
+- **quatre cases a cocher tombaient au-dessus de leur libelle** : `.rw-champ__etiquette` est en
+  `display: block`. Motif de `acces-sftp` repris — toute la ligne devient cliquable.
+
+**⚠ UN DEFAUT DU LEGACY REPARE EN PASSANT — ce n'est PAS de la parite, et personne ne l'avait
+demande.** Il n'apparaissait dans aucun releve d'ecart : il a ete trouve en lisant le geste
+qu'on portait, pas en cherchant des defauts.
+
+**La suppression d'une regle vise, sur le legacy, LE NOM QUI EST DANS LE CHAMP DE SAISIE.**
+`wazuh.js:287-289` lit `document.getElementById('wz-rule-name').value` puis demande un
+`confirm()`. **On peut donc ouvrir une regle, changer le nom dans le champ, et supprimer une
+AUTRE regle** — celle dont on vient de taper le nom, qu'on n'a jamais ouverte et dont on ne
+voit pas le contenu. *Le `confirm()` ne rattrape rien : il ne nomme pas ce qu'il supprime.*
+
+**La correction est structurelle, pas une verification de plus.** Le bouton nait DESACTIVE ; il
+ne s'active qu'apres l'ouverture d'une regle ; il vise `regleOuverte`, que SEULE la liste pose ;
+et « Nouveau » la remet a `null`, sans quoi « Nouveau » puis « Supprimer » viserait la
+precedente, invisible a l'ecran. *L'ecart entre ce qu'on voit et ce qu'on supprime devient
+inexprimable, au lieu d'etre surveille.*
+
+**Suppression d'une regle — le detail.** Le legacy prend le nom DANS LE CHAMP DE SAISIE puis demande un
+`confirm()` : on peut ouvrir une regle, changer le nom, et supprimer UNE AUTRE regle. Ici le
+bouton nait DESACTIVE, il ne s'active qu'apres l'ouverture d'une regle, il vise cette regle-la,
+et il OUVRE un panneau qui la NOMME. `confirm()` est proscrit — et surtout il ne nomme rien.
+`delete_rule` rendant 200 avec `success: false` quand rien n'a ete supprime, ce cas a son
+propre message : « aucune regle de ce nom » n'est pas « la suppression a echoue ».
+
+**Tests.** 26 assertions au navigateur, 0 FAIL, aux trois largeurs (1920/1400/390), captures
+REGARDEES — trois des defauts ci-dessus ne relevaient d'AUCUNE assertion. Liste fermee eprouvee
+sur 13 cibles dans un DOM simule, 0 FAIL, **temoin inverse rendu** (`install` ajoute a la liste
+sur une copie -> 1 FAIL et 1 requete partie). `node --check`, execution reelle du script dans un
+DOM minimal (3 GET au chargement, 0 ecriture, 0 geste SSH), `php -l`, parite FR/EN verifiee par
+PHP : **122 = 122, 0 divergence**, et 73 cles employees par la vue et le JS, 0 absente.
+
+**⚠ Ce qui n'est PAS mesure, et c'est annonce.** Aucune ecriture n'a ete executee : les trois
+gestes ecrivent dans une base partagee et la configuration decide de ce que fera la prochaine
+installation. Le chemin d'ecriture est verifie par LECTURE et par la liste fermee, pas au
+reseau. Meme raison que les trois non-mesures d'E-397/E-399 : le geste appartient a l'exploitant.
+
+**Notes exploitation.** Aucune migration. `rw.css`, `bashrc.blade.php` et `graylog.blade.php`
+sont touches : aucun n'etait modifie dans l'arbre au moment de l'ecriture, et la correction CSS
+repare les quatre zones d'edition du portage, pas seulement les deux nouvelles.
+
+---
+
+## [1.40.5] - 2026-09-04
+
+### Comptes - E-399 : la coercition de VALIDITE du role etait muette
+
+**Symptome.** Mesure de la QA : `roleAutorise()` rendait `array{int, bool}` et ce booleen ne
+rapportait que la coercition d'AUTORISATION.
+
+    auteur 3 ou 2, valeur hors liste   ->  role 1, EN SILENCE
+    auteur 1, n'importe quelle valeur  ->  role 1, ANNONCE
+
+Un superadministrateur qui se trompe de valeur creait un utilisateur en croyant creer un
+administrateur. Sur l'import CSV, un fichier de cinquante lignes dont la colonne `role` est
+mal orthographiee creait cinquante comptes de role 1 **et le bilan annoncait une reussite**.
+
+**Cause racine.** Un drapeau qui signifiait deux choses, et un repli muet dans une
+expression : `IMPORT_ROLES[mb_strtolower($data['role'] ?? 'user')] ?? 1` fabriquait `1` pour
+la colonne ABSENTE **et** pour le libelle INCONNU, sans les distinguer. Le premier est un
+defaut legitime, le second une valeur qui n'est pas un role.
+
+**Correctif.** La coercition RESTE — elle echoue du cote sur, `1` etant le role le moins
+privilegie, contrairement au `'all'` de `target_type` qui fabriquait la portee la plus large —
+mais elle **se dit**, avec deux signaux distincts.
+
+- `App\Support\RolePose` : objet `readonly`, trois proprietes NOMMEES — `role`,
+  `valeurInvalide` (phrase de validite), `rangRamene` (phrase de securite). Les deux drapeaux
+  sont INDEPENDANTS : une valeur invalide devient le plancher, que l'autorisation peut a son
+  tour refuser, et alors les deux sont vraies.
+- `Comptes::roleDuLibelle(string): ?int` : le cas dangereux est **inexprimable** — « inconnu »
+  ne s'ecrit plus `1` mais `null`. Colonne absente ou cellule vide restent un defaut
+  legitime et ne signalent rien.
+- `Comptes::rolePose(?int, int): RolePose` remplace `roleAutorise()`. **Une seule
+  implementation** : pas d'adaptateur qui garderait le drapeau ambigu en vie.
+- signal par LIGNE sur l'import (`imp_err_role`) citant la valeur soumise, bornee a
+  40 caracteres, et la liste des valeurs acceptees — sans elle, l'importeur d'un fichier de
+  500 lignes ne sait pas quoi corriger.
+- deux phrases qui s'AJOUTENT sur la creation manuelle (`cree_valeur_role` apres
+  `cree` / `cree_rang_ramene`), et la trace d'audit distingue les deux : une trace qui dit
+  « anti-escalade » sur une faute de frappe ferait chercher une tentative d'escalade la ou il
+  n'y en a pas eu.
+- `cree` corrige : *« devra changer ce mot de passe »* et non plus *« devra fixer son mot de
+  passe »* — la phrase datait d'avant E-397, quand personne ne connaissait le mot de passe.
+
+**Mesure des etages de fabrication du `1`.** Les quatre nommes par l'arbitrage sont exacts.
+**Deux autres existent et les deux sont MORTS** : `JetonMemorisation:189`
+(`(int) ($compte->role_id ?? 1)`) et le `DEFAULT 1` du schema — `users.role_id` est
+`IS_NULLABLE = NO` (`information_schema`), et les deux seuls ecrivains de la colonne la posent
+toujours. C'est la nullabilite en base, pas la lecture du code, qui le tranche.
+
+**Tests.** Table de verite jouee dans le conteneur : **20 cas, 0 FAIL**, invariant
+`role ∈ ROLES` sans violation sur 27 combinaisons, et **temoin inverse rendu** (une attente
+mutee fait rougir la table — l'instrument mord). `php -l` sur les cinq fichiers, parite FR/EN
+verifiee **par PHP** et non par expression reguliere : **94 = 94, 0 divergence**.
+
+**⚠ Notes exploitation — un rouge ATTENDU chez la QA.** `roleAutorise()` n'existe plus, et
+`laravel/tests/Feature/RoleAutoriseTest.php` porte 7 appels reels (lignes 97, 116, 129, 137,
+146, 188, 221) qui leveront `Call to undefined method`. Correspondance :
+`[$effectif, $abaisse] = $c->roleAutorise($d, $a)` devient `$p = $c->rolePose($d, $a)` puis
+`$p->role` / `$p->rangRamene`, plus `$p->valeurInvalide` qui est neuf. **Ce fichier n'a pas
+ete modifie ici** : `laravel/tests/` appartient a la QA.
+
+---
+
+## [1.40.4] - 2026-09-04
+
+### Comptes - E-397 : les deux chemins de creation etaient faux, en sens opposes
+
+**Symptome.** La creation unitaire d'un compte fabriquait un compte **inaccessible** : le
+`password` etait le hache de 64 octets aleatoires dont personne ne connait le clair, et
+`force_password_change` etait pose a 1 par-dessus. L'ecran annoncait une reussite. En face,
+l'import CSV **remettait** le mot de passe genere mais ne posait **pas** le drapeau : un
+secret vu par un tiers, transmis a la main, restait celui du compte indefiniment.
+
+**Cause racine.** Un raisonnement juste, transporte sur un objet dont une premisse avait
+cesse d'etre vraie. Le commentaire de `Comptes::importeUnCompte` justifiait l'absence du
+drapeau par *« forcer un changement sans canal de delivrance fabriquerait un compte
+inaccessible »* — vrai **si personne ne connait le mot de passe**, faux des qu'on
+l'AFFICHE. Le canal manquant etait le courriel (`MAIL_MAILER=log`) ; l'ecran en est un.
+`ChangementMotDePasseExige` exempte `profil` et `profil.mot-de-passe` (`:99`) et ne bloque
+rien d'autre (`:144`) ; `changerMotDePasse` n'exige que le mot de passe actuel
+(`PortailController:250`).
+
+**Correctif.** La meme paire sur les deux chemins : mot de passe **genere**, **remis une
+fois**, `force_password_change = 1`.
+
+- `ComptesController::creer` rend desormais `View|RedirectResponse` et **rend la vue
+  DIRECTEMENT** en reponse au POST — motif de `ClesApiController` : `SESSION_DRIVER=file`,
+  donc un secret passe par un message de session atterrirait sur le disque du conteneur. Le
+  message de succes passe par `session()->now()` et ne porte que le nom et l'identifiant.
+- `Comptes::importeUnCompte` pose `'force_password_change' => 1`, et son commentaire dit la
+  correction plutot que de la masquer.
+- `imp_secrets_titre` / `imp_mdp_avert` cessent de parler de l'import — ils servent les deux
+  chemins — et **enoncent** que la personne devra changer ce mot de passe a sa premiere
+  connexion, avec la raison : *il a transite par cet ecran*. FR et EN dans ce commit,
+  jeux de cles compares : **92 = 92**.
+- `data-rw="comptes-import-secrets"` devient `comptes-secrets-remis` : le bloc sert les deux
+  chemins, l'ancien nom serait devenu faux. Aucune suite ne l'ancrait.
+
+**Ce qui NE change pas.** Le journal d'audit ne recoit ni mot de passe ni secret : le nom du
+compte, le role, et la mention de la coercition anti-escalade quand elle a joue. Recharger la
+page fait disparaitre le mot de passe — propriete recherchee, deja celle de l'import.
+
+**Tests.** `php -l` sur les quatre fichiers PHP, compilation Blade reelle
+(`view:clear` + `view:cache`), parite des jeux de cles FR/EN par analyse PHP, controle au
+reseau sur `http://localhost:8444` (`/` 302, `/connexion` 200, `/comptes` 302 — aucun 500).
+
+**Notes exploitation.** Aucune migration, aucun changement de schema : la colonne
+`force_password_change` existe et etait deja ecrite par le chemin manuel.
+
+**⚠ RECTIFIE LE 2026-09-04 19:5x CEST — LA POPULATION EST NULLE, ET MA NOTE ETAIT PIRE
+QU'INUTILE.** Le Lead a demande de rendre cette remediation *« avec son objet — combien de
+comptes, crees quand »*. Mesure faite, en lecture seule :
+
+    journal (user_logs)   'Import CSV: % comptes importes'   0 evenement
+                          <- le message du PORTAGE (ComptesController:144)
+                          'Import CSV: % utilisateurs importes'  2 evenements
+                          <- le message du LEGACY (import_csv.php:182), 26/08
+    comptes crees le 2026-08-26                              0
+    users.force_password_change = 0                          4 sur 12
+
+**L'import PORTE n'a jamais cree un compte dans cette base.** Les deux evenements du 26/08
+viennent du legacy — dont l'import *jette* le mot de passe — et n'ont laisse aucun compte
+dont la date de creation soit ce jour-la.
+
+**Et les 4 comptes que ma requete designait sont les QUATRE FIXTURES :**
+
+    id  2  opsuser         role 1     4 fichiers de tests le citent
+    id 14  rw-test-user    role 1    50
+    id 15  rw-test-admin   role 2    70
+    id 16  rw-test-super   role 3    64
+
+*Suivre ma note aurait fait tourner le mot de passe des quatre comptes dedies aux mesures,
+donc casser le banc — 188 fichiers les citent. Une remediation dont la population est vide
+n'est pas un no-op : c'est un geste destructeur qui attend quelqu'un d'obeissant.*
+
+**Le defaut de forme, et il est le meme que celui d'E-397 :** j'ai decrit la population par
+une CATEGORIE (« les comptes deja crees par l'import ») et fourni un PREDICAT
+(`force_password_change = 0`) sans verifier que le predicat selectionne la categorie. Il
+selectionnait tout autre chose. *Une remediation se rend avec son objet DENOMBRE, jamais avec
+le critere qui servirait a le denombrer.*
+
+~~Les comptes
+**deja crees** par l'import avant cette version gardent un mot de passe non force — ils sont
+identifiables par `SELECT id, name FROM users WHERE force_password_change = 0` croise avec
+la date de creation, et le geste de remediation est
+`POST /comptes/{id}/mot-de-passe`. *Il n'est pas fait ici : il change des comptes existants.*~~
+
+**Ce qui reste vrai de cette note** : si l'import porte cree des comptes AVANT que la version
+1.40.4 ne soit deployee, ceux-la porteront un mot de passe non force. La population est nulle
+**aujourd'hui**, elle ne l'est pas par construction — et le seul discriminant fiable est
+l'evenement de journal `'Import CSV: N comptes importes'`, pas le drapeau.
+
+**⚠ Piege re-arme et desarme pendant ce travail.** `php artisan view:cache` lance en root
+recree des vues compilees appartenant a root dans un dossier `www-data` — le defaut de
+`docs/migration/PIEGE-CACHE-BLADE.md`, qui rend 500 sur **toutes** les pages. Constate par
+`ls -l`, corrige par `chown -R www-data:www-data storage/framework/views`, verifie au reseau.
+Le correctif permanent est en place dans `laravel/docker-entrypoint.sh` mais **n'agit qu'au
+demarrage du conteneur**, qui n'a pas encore ete redemarre.
+
+---
+
+## [1.40.3] - 2026-09-04
+
+### CI - E-381 : le job qui pose une etiquette ne dependait pas des tests
+
+**`auto-tag` gagne `test-php` et `test-python` dans ses `needs`** (`ci.yml:464`).
+Une ligne, et la propriete qu'elle change est la seule qui compte :
+
+    avant   un ROUGE de `test-php` ou `test-python` N'EMPECHAIT RIEN : `auto-tag`
+            posait l'etiquette (`contents: write`), et `maj.sh` TIRE une etiquette
+            -> une compilation cassee devenait publiable en production
+    apres   un rouge de l'une des deux suites empeche l'etiquette, donc coupe la
+            seule voie AUTOMATIQUE vers la production
+
+**Mesure qui l'a etabli** : le run `33792110538` (poussee de la bascule, 891
+commits) a conclu **SUCCESS sur `auto-tag`** alors que **« Tests PHPUnit » etait
+ROUGE**. Les huit `needs` d'origine excluaient les quatre jobs de lint et de test.
+
+> **Un job vert de plus n'est pas une garde de plus ; ici c'est un ROUGE qui
+> BLOQUE de plus.** *Le filet et le verdict doivent partager le meme predicat* —
+> dixieme occurrence de cette famille, et la premiere ou le predicat manquant est
+> une **liste de dependances** plutot qu'une condition.
+
+⚠ **CE QUE CE CORRECTIF NE COUVRE PAS, et il se dit avec lui** : il empeche qu'un
+**rouge** devienne publiable, **pas qu'un vert soit dangereux**. E-388, E-389 et le
+DOSSIER-25 — trois defauts destructeurs du meme jour, dont `/apt_update` menant a
+un `apt full-upgrade` sur une machine de production — **auraient tous les trois
+PASSE cette CI.** *L'etiquette reste le seul passage automatique vers la
+production ; ce correctif n'en garde qu'une porte.*
+
+**Verifie avant commit, temoin negatif compris** : `yaml` etant absent de l'hote,
+la validation a tourne dans `rootwarden_python` (PyYAML 6.0.3) — **14 jobs
+charges, `needs` a 10 entrees, aucune vers un job inconnu** — et un YAML
+volontairement casse est bien refuse (`ParserError`), donc l'instrument mesure.
+
+**Non touche, par decision** : les declencheurs restent `branches: [main]`
+(l'exploitant a repondu « rien pour l'instant » ; mesures versees au dossier :
+`origin/security/backend-cve` **n'existe pas**, donc un declencheur `security/**`
+serait **sans objet**, et `on: push` declenche une fois par **poussee** et non par
+commit — 891 commits ont produit **une** execution). Et les `--severity=ERROR` des
+lignes 305/327 restent en place : les trois regles semgrep qui ne compilent pas
+sont chez une autre session, et les doubler aurait empile deux causes de rouge
+dans un job deja tolere.
+
+### ⚠ Et une regression de version, faite puis reparee dans le meme quart d'heure
+
+**Mon commit `a53e13b` a ecrit `1.38.200` dans `legacy/version.txt`, qui portait
+`1.40.2`.** Un fichier **servi** — rendu dans le pied de page du socle sur toute
+page — et **lu par `auto-tag`**, qui aurait pu poser une etiquette `v1.38.200`
+*apres* une `v1.40.2` existante.
+
+**Cause, et elle est exactement celle que j'inscris contre les autres depuis deux
+jours** : j'ai releve `1.38.199` a **14:54** et je l'ai **reconduit sans
+remesurer** a **17:03**. Entre les deux, deux sessions sont passees par `1.40.1`
+puis `1.40.2` (`f92cdcf` 16:46, `d7382a3` 16:51).
+
+> **« Ne reconduis aucune affirmation sans la remesurer » vaut d'abord pour les
+> chiffres qu'on croit connaitre.** *Un numero de version est le cas le plus
+> traitre : il paraissait a moi, il change plusieurs fois par heure sur un chantier
+> a huit sessions, et rien dans son apparence ne dit son age.*
+
+**Et mon propre garde a echoue en silence** : le script qui devait ecrire
+`version.txt` **et** le CHANGELOG a leve une `AssertionError` **apres** avoir ecrit
+le premier. J'ai donc commite un bump **sans entree de journal** — *un controle
+place au milieu d'une sequence d'ecritures ne protege que ce qui le suit.*
+
+---
+
+## [1.40.2] - 2026-09-04
+
+### Securite - E-391 : les trois dernieres routes nues de `ssh_audit`
+
+**Suite d'E-390, en UN commit et non trois.** Trois commits successifs sur le
+meme defaut du meme module se lisent comme un module traite alors qu'il ne l'est
+pas — c'est exactement le reproche qu'E-390 s'adressait a lui-meme en inscrivant
+son reste en commentaire.
+
+**Symptome.** Apres E-390, trois routes du module n'avaient toujours ni role ni
+permission, alors que les deux pages qui les servent exigent `can_audit_ssh`
+(`legacy/ssh-audit/index.php:12-13`, `laravel/routes/web.php:229`) :
+
+| route | ce qu'elle fait |
+|---|---|
+| `POST /ssh-audit/scan` | **joint la machine** — `get_sshd_config`, audit complet d'un serveur |
+| `GET /ssh-audit/results` | historique des scores, grades et comptes de findings par machine |
+| `POST /ssh-audit/backups` | **joint la machine** — `list_backups` |
+
+Atteignables par un role 1 sans la permission via le forgeur de requetes de
+`legacy/documentation.php` (cf. E-389, E-390 et
+`docs/migration/RELEVE-ANGLES-4-ET-5.md`).
+
+**Le depot portait deja l'analyse, avec l'aveu que sa parade n'en etait pas une.**
+`laravel/public/js/audit-ssh.js:27-33`, verbatim :
+
+> `GET /ssh-audit/results` ne porte NI role NI permission : sa seule borne est
+> `require_machine_access`, inerte des le role 2. Ce qui la referme est la ligne
+> `if not machine_id: return 400` de son CORPS — un controle de VALIDITE, pas un
+> controle d'acces. On passe donc toujours le parametre, et on ne compte pas sur
+> ce filet.
+
+Un defaut documente depuis des jours et corrige aujourd'hui n'est pas la meme
+histoire qu'un defaut decouvert.
+
+**Correctif.** `@require_permission('can_audit_ssh')` sur les trois, entre
+`@require_api_key` et `@require_machine_access`. Le balayage AST **apres**
+correctif rend **0 route sans role ni permission** dans le module. Le commentaire
+d'E-390 qui annoncait ces trois routes comme restantes a ete remplace : il etait
+devenu faux, et un commentaire faux sur un garde se lit comme un etat.
+
+**⚠ CONSEQUENCE ACCEPTEE, ecrite ici pour que personne ne la debogue.**
+`legacy/adm/health_check.php:226` appelle `POST /ssh-audit/backups`. Comme
+`require_permission` lit les droits **en base** (`helpers.py:320-346`), **la
+sonde « SSH Audit Backups » de cette page echouera en 403 pour un compte de
+role 2 qui ne porte pas `can_audit_ssh`** (le role 3 court-circuite a `:338`).
+Decision assumee : `health_check.php` est la page que les consignes du chantier
+interdisent d'ouvrir — elle ECRIT sur `srv-zabbix` en production AU CHARGEMENT
+(cf. E-224). Degrader une de ses sondes reduit une capacite non desiree.
+
+**Aucun appelant serveur-a-serveur, verifie.** `AuditSshController.php` mentionne
+`GET /ssh-audit/results` dans son docblock, ce qui ressemble a un appelant : la
+recherche **hors commentaires** ne rend qu'un lien vers le legacy
+(`config('app.url_legacy') . '/ssh-audit/'`). Les trois routes ne sont donc
+appelees que depuis des sessions utilisateur (`legacy/ssh-audit/js/main.js`,
+`laravel/public/js/audit-ssh.js`), ou l'identite resolue est celle du compte —
+plus `health_check.php` ci-dessus. Sans cette verification, une garde qui lit
+`get_current_user()` aurait pu refuser un appel serveur depourvu de session.
+
+**Tests.** `ruff` vert, import REEL du module. Balayage AST avant (4 nues) et
+apres (0). Suite complete : **667 passed, 5 skipped, 2 xfailed, 0 FAILED** —
+compte de `skipped` inchange par ce correctif, et aucune des trois routes ne
+figurait dans la liste connue de `test_invariant_machine_id.py`.
+
+**⚠ Deux entrees portaient v1.40.1 — fusionnees, et ma premisse etait FAUSSE.**
+`882ad9b` et `f92cdcf` revendiquaient tous deux ce numero, la seconde session
+ayant lu `legacy/version.txt` avant que le bump de la premiere n'atterrisse. Je
+l'avais signale comme une collision **au motif que l'auto-tag de la CI lit ce
+fichier** : il ne le lit plus. `ci.yml` fait `VERSION=$(./scripts/version.sh)`,
+qui DERIVE le correctif par `rev-list --count --first-parent` depuis
+`VERSION-JALON` et **echoue plutot que de deviner** (INF-004, ferme apres que
+trois sessions ont revendique le meme numero le 2026-08-27). Temoins :
+`git tag -l 'v1.40*'` rend **0**, contre 3 pour `v1.39*` et 30 au total.
+`version.txt` est une chaine d'AFFICHAGE — 9 consommateurs, aucun identifiant de
+livraison. **Les deux entrees ont donc ete FUSIONNEES sous un en-tete unique, et
+aucune n'a ete renumerotee** : renumeroter suggererait que ce numero porte une
+autorite qu'il n'a pas. Le depot avait deja ferme ce mode de defaillance en
+rendant le numero NON PORTEUR, plutot qu'en disciplinant huit sessions.
+
+**Notes d'exploitation.** `backend/**.py` est lu au demarrage : INERTE jusqu'au
+redemarrage de `rootwarden_python`.
+
+---
+
+## [1.40.1] - 2026-09-04
+
+> **Deux commits portent ce numero** — `882ad9b` (« tout le parc » retire des
+> planifications) et `f92cdcf` (E-390) : la seconde session a lu
+> `legacy/version.txt` avant que le bump de la premiere n'atterrisse. Les deux
+> entrees sont **fusionnees ici, sans renumerotage**. Renumeroter suggererait que
+> ce numero porte une autorite qu'il n'a pas : l'etiquette de la CI est **derivee**
+> (`ci.yml` -> `scripts/version.sh`, `rev-list --count` depuis `VERSION-JALON`) et
+> ne consulte plus ce fichier depuis INF-004. `version.txt` est une chaine
+> d'AFFICHAGE (9 consommateurs), pas un identifiant de livraison.
+
+### Securite — precondition au redemarrage
+- **« Tout le parc » est retire des planifications de releve SSH (E-395).** Le backend refuse
+  desormais cette portee par decision (`ssh_audit.py:826`), mais sa garde est **inerte tant que
+  le processus n'a pas redemarre** : apres le redemarrage, l'ecran proposerait ce que le serveur
+  rejette. **`all` etait le premier element de la liste, donc l'option selectionnee par
+  defaut.**
+- **Six etages ferm(es), la consigne recue en annoncait deux** : la constante, le libelle de
+  l'option, et **deux replis dans le JS** dont un sur le chemin de soumission — leur commentaire
+  justifiait `all` par un raisonnement d'AFFICHAGE (« mieux qu'un selecteur vide »), ce qui
+  produisait le defaut le plus large a la SOUMISSION.
+- **La vue n'avait rien a corriger** : elle construit ses `<option>` depuis la constante. Sur
+  `scan-cve` la liste etait ecrite a la main et il fallait l'y retirer aussi (E-387). *Une liste
+  rendue depuis sa source ne peut pas la contredire.*
+
+### Conserve deliberement
+- **`planif_cible_parc` et `planif_cible_ambigue`** : ils AFFICHENT une planification existante
+  de portee `all`. Les retirer aurait montre une portee **vide** sur un releve du parc entier.
+  Seul `planif_portee_all`, le libelle de l'option devenue impossible, est retire.
+- **Le legacy n'est pas touche** : il offrira « tout le parc » et le serveur le rejettera. C'est
+  une decision — du code de production que la bascule retire — et elle est inscrite pour que
+  personne ne la debogue.
+
+### ⛔ Un etage hors de portee, declare
+- La colonne est `enum(...) NOT NULL DEFAULT 'all'`. Un `INSERT` omettant `target_type`
+  obtiendrait `all` **par la base**. Le portage l'envoie toujours et le backend le refuse : le
+  mode de defaillance est un 400, pas un releve silencieux. Une migration n'est pas de mon
+  ressort.
+
+### Tests et reserves
+- Cle composee verifiee : les trois portees restantes ont leur libelle dans les deux catalogues
+  (temoin : `all` a 0/0). `planif_portee_all` n'apparait plus que dans une PROSE du controleur,
+  jamais dans son code. `node --check` vert, parite FR/EN 107 = 107, equilibres identiques a
+  `HEAD`, reseau 200/302/404.
+- **L'ecran n'est pas exerce** (`/audit-ssh` exige une session). Pas de binaire PHP sur l'hote.
+
+### Securite - E-390 : le geste qui ECRIT etait garde, celui qui LIT non
+
+**Symptome.** `POST /ssh-audit/config` — la lecture de `sshd_config` sur une
+machine — portait `@require_api_key` + `@require_machine_access` et **rien
+d'autre**, tandis que sa jumelle d'ecriture `POST /ssh-audit/save-config` porte
+`@require_role(2)`. Or les deux portails exigent la meme permission a l'etage
+page : `legacy/ssh-audit/index.php:12-13` (`checkPermission('can_audit_ssh')`)
+et `laravel/routes/web.php:229` (`['role:1', 'perm:can_audit_ssh']`).
+
+**Ce que le trou rendait atteignable.** `legacy/documentation.php` est un forgeur
+de requetes graphique — champ d'endpoint libre, corps JSON libre, present au MENU
+PRINCIPAL et garde par `checkAuth([ROLE_USER, ...])` (cf. E-389 et
+`docs/migration/RELEVE-ANGLES-4-ET-5.md`). Un compte role 1 **sans**
+`can_audit_ssh` pouvait donc lire le `sshd_config` de ses machines assignees :
+`PermitRootLogin`, `AllowUsers`, les ports, les methodes d'authentification. Ce
+n'est pas un secret — c'est une carte du serveur.
+
+**Correctif.** `@require_permission('can_audit_ssh')` sur cette seule route,
+placee entre `@require_api_key` et `@require_machine_access`. **Pas
+`@require_role(2)`** : les deux pages admettent un role 1 porteur de la
+permission, et un role 2 au backend aurait defait la page qu'il sert — meme
+raison qu'E-389, quatrieme occurrence du jour de ce mode de defaillance du
+durcissement.
+
+**⚠ Trois routes du meme module restent nues, et c'est un ordre, pas un oubli.**
+`/ssh-audit/scan` (`:124`, joint la machine), `/ssh-audit/results` (`:319`,
+historique des scores et comptes de findings) et `/ssh-audit/backups` (`:636`,
+joint la machine). Les trois sont des lectures de posture de securite gardees par
+`can_audit_ssh` aux deux pages : meme correctif attendu, sur arbitrage separe.
+Le balayage complet du module est inscrit en commentaire a cote de la garde, pour
+qu'une liste de un ne se lise pas comme un module traite.
+
+**Tests.** `ruff` vert, import REEL du module (`require_permission` etait deja
+importe ici, contrairement a `updates.py`). Placement verifie par AST. Suite
+complete : **667 passed, 5 skipped, 2 xfailed, 0 FAILED** — et
+`test_les_connues_sont_TOUJOURS_TROUVEES` verifie PASSED et non SKIPPED, la
+session 6 ayant reprise sa liste entre-temps (`59484cb`).
+
+**Notes d'exploitation.** `backend/**.py` est lu au demarrage : INERTE jusqu'au
+redemarrage de `rootwarden_python`.
+
+### ⚠ Precondition de redemarrage signalee (aucun code ici)
+
+E-280 refuse `target_type = 'all'` a l'entree de `POST /ssh-audit/schedules`
+(`ssh_audit.py:826`). **Les deux ecrans offrent encore cette portee** — cote
+portage `AuditSshController::PORTEES` la porte en PREMIER element, donc comme
+option par defaut ; cote legacy elle vit a quatre endroits. Le refus etant inerte
+jusqu'au redemarrage, **le redemarrage transformerait un ecran fonctionnel en
+ecran qui refuse son propre defaut.** Arbitrage rendu : la garde RESTE (un `all`
+deliberement choisi est une planification recurrente et non surveillee sur tout
+le parc, production comprise — le durcissement du planificateur ferme les
+accidents, rien ne fermait l'intention), le portage cesse d'offrir la valeur, et
+le legacy n'est pas touche par decision assumee. Zero ligne en base
+(`ssh_audit_schedules`, temoin `machines` = 3) : rien a preserver.
+
+---
+
+## [1.40.0] - 2026-09-04
+
+### Ajoute
+- **« Se souvenir de moi » est porte (E-394).** Le portage VIDAIT `remember_tokens` sans jamais
+  la remplir ; il la remplit desormais. Case sur l'ecran de connexion, jeton de 32 octets hache
+  en base, cookie de 30 jours a attributs explicites.
+
+### ⛔ Securite — le contournement du legacy n'est PAS porte
+- **Le legacy conditionne sa re-authentification a `if ($totpSecret)` sans `else`** : pour un
+  compte sans second facteur, le cookie authentifie SEUL, sans defi et sans la redirection vers
+  l'enrolement que la connexion impose partout ailleurs. **Verifie par trois lectures
+  independantes.**
+- **Le portage porte une propriete INCONDITIONNELLE, tenue par le TYPE** :
+  `DecisionRestauration` n'a pas de cas « portail » — l'acces direct n'est pas « jamais rendu »,
+  il est **inexprimable**. Et l'exhaustivite de l'appelant est tenue par un `match` sur
+  l'enumeration : ajouter un cas leve une erreur au lieu de laisser passer la requete.
+- **Le jeton est emis APRES la reussite du defi**, jamais avant comme le legacy — sinon le cas
+  « restaure sans avoir jamais franchi le second facteur » devient produisible par le portage.
+- **Une restauration ne renouvelle pas le jeton** : pas d'expiration glissante, les 30 jours
+  courent depuis la derniere saisie du mot de passe.
+- **Le cookie reste CHIFFRE** : on n'exempte pas un porteur d'identite d'`EncryptCookies`.
+  Consequence de transition declaree a l'ecran — l'ancien portail, qui le lit en clair,
+  l'effacera.
+
+### Declare a l'ecran
+- Que la memorisation **demande toujours le second facteur** ; qu'elle ne vaut que pour **un
+  seul appareil** (limite du schema : `PRIMARY KEY (user_id)`) ; et que passer par l'ancien
+  portail l'annule.
+
+### Tests
+- `/connexion` rend **200** et son HTML porte `name="memorisation"` et les trois declarations ;
+  « 30 jours » y figure, donc le parametre resout. **Temoin : zero motif `auth.` dans le HTML
+  alors que la source en appelle douze.** Parite FR/EN 40 = 40, classes CSS verifiees.
+- Le verrou de la session 6 (`RestaurationParJetonTest`, `4948bdf`) skippait en nommant
+  l'absence ; il mord sur cette livraison.
+
+### Reserves
+- **Le flux n'est pas exerce de bout en bout** : franchir le defi exige un code TOTP valide.
+  Pas de binaire PHP sur l'hote de cette session.
+
+## [1.39.10] - 2026-09-04
+
+### Securite
+- **Un jeton « se souvenir de moi » survivant defaisait le changement de mot de passe
+  (E-393).** La purge de `remember_tokens` etait en meilleur effort et HORS transaction : si
+  elle echouait, le changement reussissait quand meme et un jeton emis sous l'ancien secret
+  continuait de restituer l'identite. Elle entre dans la transaction — **echouer visiblement
+  vaut mieux que reussir faussement.**
+- ⚠ **Corrige AVANT le portage qui rendrait le defaut atteignable** : le portage ne remplit
+  jamais `remember_tokens` aujourd'hui, donc le trou est inoffensif — et il naitrait au moment
+  ou l'on porte la capacite. *La forme « un defaut qui protege par accident cesse de proteger
+  quand on corrige l'accident ».*
+- **La purge d'`active_sessions` reste en meilleur effort, deliberement** : E-203 mesure
+  qu'elle ne ferme que les sessions de l'ancien portail. Les deux politiques divergent et le
+  code le dit.
+
+### Reserves
+- Le geste n'est pas exerce (il faudrait casser la table) ; la propriete est etablie par
+  lecture, l'assertion verifiant les positions relatives dans le fichier. Pas de binaire PHP
+  sur l'hote de cette session.
+
+## [1.39.9] - 2026-09-04
+
+### Corrige
+- **Dix rejeux 2FA fermaient l'etape du second facteur pour toute une adresse (E-392).**
+  `journalise()` etait appele avant l'aiguillage sur le verdict, donc un rejeu s'inscrivait en
+  `success = 0` avec `step = '2fa'` — et `ipBloquee()` compte exactement ces lignes. Un bureau
+  derriere un NAT partage une adresse, et un rejeu est le cas legitime le plus banal : meme
+  compte, second appareil, meme fenetre de trente secondes. **Un rejeu n'est pas un echec
+  d'identifiant : c'est une soumission en double d'un identifiant VALIDE — il doit etre inscrit
+  et ne doit pas compter.**
+- `journalise()` recoit desormais le **verdict** et non un booleen : une seule place decide
+  `success` ET `step`, qui ne peuvent donc plus se contredire. L'etape `2fa_rejeu` est distincte,
+  et `ipBloquee()` cesse de voir les rejeux **sans que son filtre change**. Les trois compteurs
+  homologues du legacy filtrent la meme valeur : ils cessent de les voir aussi.
+
+### ⛔ Ce que ce correctif ne ferme PAS, mesure et hors perimetre
+- **`legacy/auth/login.php:50` compte toute ligne `success = 0` SANS filtre d'etape, avec un
+  seuil de 5.** Cinq rejeux fermaient donc deja l'etape de CONNEXION du legacy — a la moitie du
+  seuil et sur un autre ecran. Changer l'etape ne l'en sort pas. **Pour le portage le correctif
+  est suffisant** : aucun de ses compteurs ne lit `login_attempts` sans filtre d'etape.
+
+### Conserve deliberement
+- `erreur_code_deja_utilise` reste distinct d'`erreur_code_invalide` : oracle faible, et c'est
+  la seule information qui dise a la personne legitime d'attendre la fenetre suivante plutot que
+  de ressaisir.
+
+### Reserves
+- **Le geste n'est pas exerce** : provoquer un rejeu exige une session et un code TOTP valide
+  resoumis dans sa fenetre. Pas de binaire PHP sur l'hote de cette session.
+
+## [1.39.8] - 2026-09-04
+
+### Corrige
+- **`groups.portee_texte` affirmait que la suppression passe encore par l'ancien portail
+  (E-391).** Elle est portee, et c'est verifie depuis TROIS couches autres que le JS : la
+  passerelle couvre `/groups/12` (`correspond()` accepte `$entree . '/'`), le backend expose
+  `DELETE /groups/<id>` (`groups.py:213`), et la vue n'a pas de controle en dur parce qu'il est
+  construit par le JS. Le second membre est exact : les quatre mentions de `cve_scan` dans
+  `groupes.js` sont des commentaires, et la seule action envoyee est `drift_scan`. **Neuvieme
+  occurrence de la conjonction dont un membre devient faux.**
+
+### Documente
+- **E-390 — deux de mes propres declarations**, dont le code a ete corrige en `7eabe64` : le
+  repli `|| 'all'` qui subsistait (« inerte n'est pas ferme ») et la cause fausse du commentaire
+  de `web.php:113-121` (« le courriel ne leve pas le drapeau »), qu'une session tierce avait
+  deja reprise mot pour mot en la lisant la plutot que dans le dossier corrige.
+- ⚠ **`7eabe64` cite « Ecart E-388 » et « v1.39.6 » : les deux sont faux.** Mon controle du
+  registre etait enchaine au `git commit` par `;` au lieu de `&&` — l'assertion a mordu, la
+  documentation n'a pas ete ecrite, et le commit est parti quand meme. E-388 appartient a une
+  autre session (la moitie backend d'E-387). **Quatrieme « controle qui ne commande pas
+  l'action » de la journee, et le premier dans le shell.**
+
+## [1.39.7] - 2026-09-04
+
+### Securite - E-389 : le backend etait plus permissif que les deux pages qu'il sert
+
+**Symptome.** Les 13 routes POST de `backend/routes/updates.py` n'avaient NI role
+NI permission — seules `@require_api_key` et `@require_machine_access`. Or les
+deux portails exigent une permission a l'etage PAGE (`can_update_linux`), et
+cette permission n'apparaissait NULLE PART dans `backend/routes/`.
+
+**Ce que le trou rendait atteignable.** `legacy/documentation.php` est un forgeur
+de requetes graphique — champ d'endpoint libre (`:1624`), corps JSON libre
+(`:1636`, pre-rempli `{"machines": [1]}`), concatenation brute dans le `fetch`
+(`:1744`) — garde par `checkAuth([ROLE_USER, ...])` (`:11`) et present AU MENU
+PRINCIPAL (`menu.php:161`). 39 des 63 prefixes de la liste blanche du proxy
+passent pour un role 1. Un compte role 1 actif sans `can_update_linux`, mais
+assigne a une machine, pouvait donc declencher `apt full-upgrade`
+(`/apt_update`, defaut `method='full'`) et `/dpkg_repair` (tue apt/dpkg,
+supprime les verrous) sur cette machine — en trois clics, sans requete forgee.
+
+**Correctif.** 12 gardes posees, chacune miroir de ce que sa page exige :
+
+- **10 routes** appelees par la page de mises a jour ->
+  `@require_permission('can_update_linux')`. **Pas** `@require_role(2)` : un
+  role 1 porteur de la permission a le DROIT de mettre a jour ses machines
+  (`laravel/routes/web.php:442-446`, garde reprise du legacy). Un role 2 au
+  backend aurait defait la page qu'il protege. Les deux etages court-circuitent
+  au meme seuil (role 3), donc la permission ne casse aucun appelant legitime.
+- **2 routes** (`/apt_check_lock`, `/update_zabbix`) -> `@require_role(2)` :
+  leur seul appelant est `adm/health_check.php`, qui exige role 2 +
+  `can_admin_portal`.
+- **1 route NON touchee** : `/update_security_exec`. Elle ne porte meme pas
+  `@require_api_key`, ce qui la faisait paraitre la plus nue des 13. Ce n'est
+  pas un trou : c'est un point d'entree machine-a-machine appele par un cron sur
+  la machine distante, avec son propre HMAC borne au `machine_id`
+  (`X-Update-Token`). Son docstring dit qu'il REMPLACE les decorateurs de
+  session « qu'un cron ne peut pas satisfaire » — un role l'aurait cassee.
+
+**Tests.** `ruff` vert, import reel du module (jamais `py_compile` : un
+decorateur non importe passe la compilation et leve au chargement — E-149 ;
+`require_permission` manquait effectivement a la ligne d'import). Placement
+verifie par AST sur les 12 : apres `require_api_key`, avant
+`require_machine_access`.
+
+**⚠ Suite pytest : 666 passed, 1 FAILED, et l'echec est ATTENDU.**
+`tests/test_invariant_machine_id.py::test_les_connues_sont_TOUJOURS_TROUVEES`
+tient une liste de routes sans autorisation propre et exige qu'elles restent
+trouvees. Son critere de selection (`:319`) exclut par conception toute route
+portant `require_role` ou `require_permission` : `update_zabbix` en sort donc,
+pour la cause n°1 que le test nomme lui-meme (« la route a ete CORRIGEE »), pas
+pour la cause n°2 (« l'instrument ne la voit plus »). Le precedent est inscrit
+dans ce meme fichier (l.71-74) : l'entree E-211 avait ete retiree pour
+exactement cette raison. **Le fichier appartient a la session 6 et n'a pas ete
+modifie ici** — l'entree `('updates.py', 'update_zabbix')` est a retirer par
+elle.
+
+**Notes d'exploitation.** `backend/**.py` est lu au demarrage : INERTE jusqu'au
+redemarrage de `rootwarden_python`. `ADMIN_SEULEMENT` du portage et
+`ADMIN_ONLY_PREFIXES` du legacy s'accordent et ne changent pas : seule
+`/update_security_exec` y figure, et elle n'est pas touchee.
+
+---
+
+## [1.39.6] - 2026-09-04
+
+### Securite - E-388 : la portee « tout le parc » des planifications CVE
+
+**Symptome.** Le chemin d'execution CVE du scheduler promouvait QUATRE etats en
+scan recurrent de tout le parc, `srv-zabbix` (production) compris, sans qu'aucun
+d'eux ne soit distinguable des autres ensuite :
+
+| etat de la ligne                | ce qui etait scanne |
+|---------------------------------|---------------------|
+| `target_type = 'all'`           | tout le parc (intention reelle) |
+| `target_type` vide, nul, inconnu| tout le parc (illisible) |
+| `'tag'` avec un champ tag vide  | tout le parc (case laissee blanche) |
+| `'machines'` avec liste vide    | tout le parc (rien de coche) |
+
+Les trois derniers sont des accidents. Le troisieme etait atteignable par le
+chemin normal de l'interface. Et aucune des requetes ne filtrait
+`lifecycle_status` : les machines archivees etaient scannees.
+
+**Cause racine.** La determination des cibles n'avait ni branche `'all'`
+explicite ni echec ferme : son `else` prenait tout le parc. C'est exactement le
+defaut corrige sur le chemin SSH par E-280, dans le meme fichier — la politique
+existait, elle n'avait jamais ete appliquee au second chemin.
+
+**Correctif.**
+
+- `backend/scheduler.py` — miroir de la politique E-280 sur le chemin CVE :
+  branche `'all'` explicite, `else` refusant (`WHERE 1=0` + journal d'erreur),
+  liste `machines` vide ou illisible fermee, filtre `lifecycle_status` sur les
+  quatre requetes, coercition entiere des identifiants.
+- `backend/routes/cve.py` — la portee `'all'` n'est plus offerte a la CREATION
+  (`PORTEES = ('tag', 'machines')`, releve de `PlanificationsCve::CIBLES`). Pas
+  de defaut fabrique : `(data.get(...) or '')` et non `.get(..., 'all')`, une
+  cle presente a `null` rendant `None` sans declencher le defaut. Un champ
+  absent, vide ou nul tombe donc hors liste — le refus est obtenu sans branche
+  supplementaire.
+- `backend/routes/cve.py` — **seconde porte fermee** : la boucle de champs de
+  `update_cve_schedule` (`PUT`) ecrivait `target_type` sans aucun controle. Une
+  planification `'tag'` se repointait sur `'all'` par une simple modification :
+  sans ce second garde, celui de la creation etait decoratif.
+
+**Ce que le correctif ne ferme PAS, deliberement.** Une ligne `'all'` deja en
+base continue d'etre lue, nommee par l'interface et EXECUTEE — la branche
+`'all'` du scheduler est explicite, et une modification qui ne touche pas la
+colonne `target_type` reste acceptee. Cesser d'offrir une portee n'est pas
+cesser de savoir la lire. `cve_scan_schedules` porte zero ligne aujourd'hui,
+donc le cas est theorique — il ne le restera pas.
+
+**Tests.** Selection de branche exercee sur 9 etats de ligne, conditions
+EXTRAITES du fichier et non retapees, avec garde-fou de compilation sur
+l'extrait : une seule entree lit tout le parc, le choix explicite. Coercition
+des identifiants exercee sur 8 valeurs : `[2,3]` scanne, `[]` / `{oops` /
+`null` / `[2.5]` ferment, `[0]` et `[-1]` ne matchent aucun identifiant. Les
+deux portes d'entree exercees sur 12 corps de requete. `ruff` vert sur les deux
+fichiers. Aucune requete HTTP emise et aucune ligne creee : un cas valide aurait
+arme le scheduler.
+
+**Notes d'exploitation.** `backend/**.py` est lu au demarrage du processus : ces
+deux fichiers sont INERTES jusqu'au redemarrage de `rootwarden_python`. La
+garde de creation suppose le portage a v1.39.5 (`7153ca3`), qui a cesse
+d'envoyer `'all'` — l'ordre inverse aurait casse la planification CVE portee.
+
+---
+
+## [1.39.5] - 2026-09-04
+
+### Securite
+- **Une planification CVE sans portee explicite armait un scan SSH sur la PRODUCTION
+  (E-387).** Le defaut « tout le parc » vivait a quatre etages dans le portage : dans la liste
+  fermee, dans le defaut de la validation, dans celui de l'ecriture, et dans le repli du JS.
+  **Omettre le champ suffisait** — et `_run_scheduled_scan` ne filtre pas les machines
+  archivees, donc joignait les trois machines dont `srv-zabbix`, qui est la production.
+- **Une portee est desormais EXIGEE** : une chaine vide, un `null` ou un champ absent tombent
+  hors de la liste fermee, donc sont refuses. Du fail-closed sans branche supplementaire.
+- **L'option « tout le parc » est retiree du formulaire**, et son retrait est **declare** sous
+  le selecteur (`planif.portee_exigee`, FR et EN). La portee se reconstitue par une etiquette
+  ou une liste explicite de machines.
+
+### Conserve deliberement
+- **Le libelle `planif.cible_all`.** `planification-cve.js:60` en a besoin pour NOMMER une
+  planification existante de type `all` : cesser de l'offrir n'est pas cesser de savoir le
+  lire, et le retirer aurait affiche une portee VIDE sur une planification qui joint tout le
+  parc.
+
+### Note d'ordre
+- **Ce commit doit preceder la garde symetrique de `cve.py:490`.** Si le backend refusait
+  `all` avant que le portage cesse de l'envoyer, la planification CVE du portage casserait —
+  et un correctif de securite qui casse la fonctionnalite qu'il protege se fait defaire.
+
+### Reserves
+- **Le geste n'est pas exerce** : aucune planification creee, et je n'en cree pas — une
+  planification de test peut declencher un vrai scan SSH.
+- `cve_scan_schedules` porterait 0 ligne ; non verifiable ici (`docker` refuse). Une ligne
+  existante de type `all` continuerait de fonctionner : seule la CREATION est fermee.
+
+## [1.39.4] - 2026-09-04
+
+### Ajoute
+- **L'import CSV de COMPTES est porte (E-386, sous-lot D6c).** `POST /comptes/importer`, meme
+  garde que la creation unitaire. La moitie SERVEURS de `import_csv.php` etait deja portee ;
+  celle-ci etait la derniere capacite du legacy qui n'ecrit sur aucune machine.
+- **Le motif suivi est celui du portage** — bilan avec `lignes/crees/manquantes/tronque`, un
+  canal d'erreurs PAR LIGNE, un plafond de 500 lignes dont le depassement est DIT — et non
+  celui du legacy, qui n'a ni plafond ni compte-rendu par ligne.
+
+### Plus etroit que le legacy, et declare a l'ecran
+- **`sudo` exige le role 3, et la coercition se dit par ligne.** Le legacy ecrit `users.sudo`
+  depuis le CSV sans aucun controle de role, alors que son geste dedie exige le role 3 (E-130).
+- **`email` devient obligatoire.** Le legacy l'accepte vide et fabrique alors des comptes sans
+  acces ni recuperation, en serie (E-131).
+- **Le mot de passe genere est rendu UNE FOIS** au lieu d'etre jete. L'arbitrage a change
+  depuis hier, et pour une raison mesuree : le portage n'envoie aucun courriel
+  (`MAIL_MAILER=log`) et le flux de reinitialisation n'est pas porte, donc forcer un
+  changement sans canal de delivrance aurait fabrique des comptes definitivement
+  inaccessibles.
+
+### Consolide
+- **`Comptes::roleAutorise()`** porte desormais la liste fermee ET l'anti-escalade, et
+  `ComptesController::creer` l'appelle : **sa copie en ligne, ecrite une heure plus tot pour
+  E-385, est retiree.** Le legacy porte trois copies de cette regle, de deux formes
+  differentes.
+- **Aucune ligne dans `permissions` a la creation.** Le legacy insere 15 colonnes nommees a
+  zero ; `Permissions::pour()` traite l'absence comme « aucun droit » et `toutes()` lit le
+  schema. Une liste codee en dur omettrait une permission ajoutee apres le portage — la meme
+  raison qui a fait conserver le `SELECT *` de l'export RGPD.
+
+### Retire
+- **L'encart « ne reste que l'import CSV »** et ses trois cles i18n. Le laisser aurait fait
+  d'un ecran qui offre la capacite un ecran qui la declare absente. Verifie : 0 reference
+  restante.
+
+### Tests
+- 39 classes `rw-*` employees, aucune absente de `rw.css` (temoin : une classe inventee est
+  bien vue absente). 58 cles employees par la vue, aucune absente des deux catalogues (temoin
+  idem). Parite FR/EN **92 = 92**. Equilibres identiques a `HEAD` sur les six fichiers.
+- **Reseau** : `POST /comptes/importer` sans jeton rend **419**, comme `POST /comptes`
+  (temoin), la ou une route absente rend **404** (temoin). La route resout et herite de la
+  garde de falsification.
+
+### Reserves
+- **Le geste n'est pas exerce** : aucun compte n'a ete cree. Pas de binaine PHP sur l'hote de
+  cette session.
+- La politique de mot de passe des MACHINES (E-132) reste une divergence assumee, hors de ce
+  sous-lot.
+
+## [1.39.3] - 2026-09-04
+
+### Securite
+- **Un compte de role 2 pouvait creer un SUPERADMINISTRATEUR (E-385).** `POST /comptes` est
+  garde `role:2` et `ExigeRole` compare avec `<` : un role 2 porteur de `can_admin_portal`
+  franchit la route. Le role demande etait borne par la liste fermee `Comptes::ROLES`
+  — c'est-a-dire a des valeurs VALIDES, pas a des valeurs PERMISES — et le role de l'auteur
+  etait recupere puis jete par la destructuration. La clause anti-escalade du legacy est
+  reprise : un non-superadministrateur ne cree qu'un role strictement inferieur au sien.
+  Le legacy documente l'incident qui l'a fait ecrire — *quelqu'un creait un superadmin,
+  recevait le magic-link sur son courriel et prenait le controle*.
+- **La coercition est ANNONCEE et TRACEE.** Le legacy a deux formes de cette regle : une
+  coercition annoncee a la creation (« feedback utilisateur au lieu d'un clamp silencieux »,
+  dit son propre commentaire) et un refus a la modification. On reprend la premiere, plus une
+  entree au journal d'audit : une decision de rang qui n'est pas journalisee ne se retrouve
+  pas.
+
+### ⚠ Note de methode — le defaut failli livrer EN corrigeant
+- Le premier jet posait un message flash `avertissement`. `comptes.blade.php` ne rend que
+  `succes` et `erreur`, et `avertissement` n'avait qu'une occurrence dans tout le portage :
+  celle-ci. **La coercition aurait donc ete silencieuse derriere une annonce qui n'atteignait
+  aucun ecran.** Un seul message desormais, par la cle que la vue affiche.
+
+### Reserves
+- **Non mesurable ici** : combien de comptes de role 2 portent `can_admin_portal` aujourd'hui
+  (`docker` refuse a cette session). Le garde est le defaut quelle que soit l'atteignabilite,
+  et cette permission s'accorde depuis `/permissions`.
+- Parite FR/EN 72 = 72 ; equilibres identiques a `HEAD` ; application demarree (200 sur
+  `/connexion`, temoin 404). Pas de binaire PHP sur l'hote de cette session, et la route
+  n'est pas exercee.
+
+## [1.39.2] - 2026-09-04
+
+### Ajoute
+- **L'export RGPD article 20 est PORTE (E-384).** `GET /profil/donnees-personnelles`, ouvert a
+  **tout compte connecte des le role 1** — la portabilite est un droit de la personne, pas un
+  privilege d'administration. L'identifiant vient de la SESSION, jamais de la requete, et
+  aucun parametre n'est offert. Seul l'article 17 (anonymisation) etait porte jusqu'ici.
+- **Les deux protections deliberees du legacy sont conservees** : `session_id` tronque a huit
+  caracteres — un jeton en clair dans un fichier archive ou transfere est une fuite
+  d'identifiant — et `password_history` reduit a `changed_at`. **Elles se lisent comme des
+  details d'implementation et sont des decisions de securite.**
+- **`JournalAudit::ajoute()`**, ecrivain canonique du journal chaine, avec le verrou
+  `FOR UPDATE` du legacy.
+
+### Corrige par rapport au legacy
+- **Les coupes s'annoncent.** `user_logs` (10 000) et `login_history` (1 000) etaient bornees
+  en silence. Mesure en base : deux comptes depassent la borne de `login_history`
+  aujourd'hui, et leur export etait incomplet sans aucun moyen de le savoir. Chaque section
+  bornee porte `_total`, `_exportees`, `_tronque` et `_borne` ; la borne elle-meme est
+  conservee.
+- **Une section illisible ne change plus de TYPE.** Le legacy remplacait la liste par
+  `{"_error": "fetch failed"}` et partait quand meme en 200. La section reste une liste vide,
+  et son nom entre dans `_metadata.sections_en_echec`.
+- **`json_encode` rendant `false` produit un 500**, plus un fichier vide nomme comme un
+  export ; et une session sans identifiant rend 403 au lieu d'un `WHERE user_id = 0`.
+
+### Conserve deliberement
+- **`SELECT *` sur `permissions`.** La regle « jamais de `SELECT *` » s'inverse sur un export
+  de portabilite : une liste fermee omettrait silencieusement une permission ajoutee apres le
+  portage, ce qui est le mode de defaillance que la portabilite vise a empecher.
+
+### ⚠ Un defaut du portage trouve en portant ceci, NON corrige
+- **Les trois copies existantes de l'insert du journal chaine lisent la tete sans verrou et
+  hors transaction** (`ComptesController`, `PermissionsController`, `ServeursController`),
+  la ou le legacy utilise `FOR UPDATE`. Deux ecritures concurrentes produiraient deux lignes
+  portant le meme `prev_hash`, donc une chaine fourchue. `JournalAudit::ajoute()` reprend le
+  verrou ; **les trois copies restent a migrer.**
+
+### ⚠ Reserves
+- **`laravel/tests/` est hors de mon perimetre d'ecriture : la suite des treize assertions du
+  §5 de la specification n'est pas ecrite.** Deux d'entre elles exigent deux comptes peuples.
+- **La vue et le fichier produit ne sont pas exerces** (302 sans session). Verifie au reseau :
+  la route resout — **302 et non 404**. Pas de binaine PHP sur l'hote de cette session ;
+  equilibres identiques a `HEAD`.
+- **Un compte portant `force_password_change` ne peut pas exporter** avant d'avoir change son
+  mot de passe — parite avec le legacy, mais 8 comptes actifs sur 12 portent ce drapeau.
+
+## [1.39.1] - 2026-09-04
+
+### Corrige
+- **Le socle expliquait une fleche que plus aucune entree du menu ne porte (E-383).** La
+  legende « les entrees marquees menent a l'ancien portail » etait rendue aux DEUX endroits
+  du menu — barre laterale et tiroir mobile — alors que `Navigation` compte desormais
+  **32 entrees `route` et ZERO `legacy`**. Elle est conditionnee par
+  `Navigation::porteDuLegacy()` plutot que supprimee : la supprimer serait correct
+  aujourd'hui et faux le jour ou une entree repasse en `legacy`, et ce menu est passe de 24 a
+  32 entrees en deux semaines. Le predicat teste l'ABSENCE de `route` et non la presence de
+  `legacy` — une entree qui n'aurait ni l'une ni l'autre ferait afficher la legende, donc le
+  sens de l'erreur va vers le trop-dire.
+
+### ⚠ Reserve
+- **Ce gabarit n'est pas exerce au reseau** : `/connexion` etend `layouts.socle`, pas
+  `layouts.portail`, et toute page de portail exige une session. Controle d'appariement des
+  directives Blade seulement (`@if` 3/3 apres contre 1/1 avant, avec temoin), et ecarts de
+  depouillement identiques a `HEAD`. **A confirmer par l'ouverture d'une page de portail.**
+
+## [1.39.0] - 2026-09-04
+
+### Ajoute
+- **L'octroi d'une politique sudo par (compte, machine) est PORTE (E-382).** Greffe sur
+  `/permissions`, pas un nouvel ecran : l'octroi d'acces etait deja porte, il manquait trois
+  colonnes de `user_machine_access`. `manage_access.php` etait **la seule facon vivante
+  d'accorder un sudo** — demonter le legacy la retirait, sur un produit dont c'est l'objet.
+
+### ⛔ Une capacite volontairement PLUS ETROITE que le legacy, et c'est un correctif
+- **Cinq prereglages proposes, pas les sept de l'ENUM.** `systemctl_specific` exige une liste
+  de services qu'aucune colonne ne porte ; `custom` exige `sudo_custom_rules`, qui n'a **aucun
+  ecrivain** dans tout le depot. `sudo_manager.render_policy` leve `ValueError` dans les deux
+  cas, et `add_to_sudoers` rattrape cette exception en repliant sur `NOPASSWD: ALL`. Un
+  administrateur du legacy qui choisit le prereglage le plus restrictif du menu obtient donc
+  le root complet sans mot de passe. **La liste sure est celle de ce que `render_policy` rend,
+  pas celle que la base accepte.** Les deux absentes sont declarees a l'ecran avec leur raison.
+- **`apt_only` est annonce EQUIVALENT ROOT**, d'apres son propre docstring : `apt install`
+  permet d'obtenir un interpreteur root. Aucun ecran ne le disait.
+- **Un acces sans prereglage vaut `none`**, donc le deploiement RETIRE le sudo. L'ecran
+  annoncait « acces accorde » sans le dire.
+
+### Retire, et declare
+- **Le choix independant de `sudo_nopasswd`** : il se deduit du prereglage. Le legacy en fait
+  une case libre, ce qui autorise la paire incoherente `all_nopasswd` + `nopasswd = 0` ;
+  `restart_services` sans mot de passe etait exprimable et ne l'est plus ici.
+- **`sudo_runas`** : ecrit `'root'` cote serveur, aucun champ. Le legacy le valide par une
+  expression reguliere alors que son interface envoie toujours `'root'`.
+
+### Tests et ⚠ reserves
+- Parite FR/EN **78 = 78** sur les jeux de cles, et chaque prereglage de la liste fermee a son
+  libelle dans les deux catalogues (temoin : un prereglage invente n'en a pas). `node --check`
+  vert avec temoin. Le detecteur `scripts/pages-sans-lien.py` reste a 0.
+- **La syntaxe PHP n'est pas verifiee** : aucun binaire PHP sur l'hote de cette session et
+  `docker` refuse. Les ecarts de mon depouillement sont identiques avant et apres sur les
+  quatre fichiers PHP, mesures contre `HEAD`. **A confirmer :**
+  `php -l` sur `app/Services/Permissions.php`, `app/Http/Controllers/PermissionsController.php`,
+  `lang/fr/perms.php`, `lang/en/perms.php`.
+- **La vue n'est pas exercee au reseau** : `/permissions` exige `role:3` et rend 302 sans
+  session. L'application demarre (200 sur `/connexion`, temoin 404 sur une URL absente).
+- **Aucun deploiement n'est exerce.** L'ecran ecrit en base ; l'application des politiques est
+  le geste reserve a l'exploitant.
+
 ## [1.38.199] - 2026-09-03
 
 ### Corrige
@@ -84,7 +2232,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ## [Non publié] — Migration v2.0 : dépréciation du frontend legacy (branche `Migration-Laravel`)
 
-> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.196** et n'a jamais ete
+> **⚠ `main` tourne en production a v1.37.15.** Cette branche est a **v1.38.197** et n'a jamais ete
 > fusionnee. Deux correctifs de **securite** n'existent donc que sur elle :
 > `6dea479` (**v1.37.16**, 7 correctifs issus de l'audit de migration) et `94a4ffe` (**v1.37.17**, le
 > mot de passe root ne sort plus dans le flux SSH). Il n'existe **aucune branche `main` locale** : un
@@ -2247,6 +4395,62 @@ contournable par un PUT.
 
 **Reference du LOT** : `go-page-cve-planification` entre avec **16 PASS sur le legacy** et **20 sur le
 portage**.
+
+### v1.38.197 — une planification de relevé SSH ne peut plus viser tout le parc par omission
+
+**Deux gestes, autorisés nommément, et ils ne valent qu'ensemble.**
+
+## `'all'` est refusé À L'ENTRÉE, pas seulement à l'écran
+
+`'all'` etait la **seule** portee n'exigeant aucun `target_value`, et le planificateur la traite en
+prenant tout le parc non archive. **Mesure du 2026-09-04 : les trois machines du parc, `srv-zabbix`
+(id 1) comprise, dont aucune n'est archivee.** « Tout le parc » n'est pas une abstraction — c'est la
+production.
+
+**La fermeture est au serveur, et c'est le point.** La regle invoquee pour retirer `'all'` de l'ecran
+— *une entree libre ABSENTE ne se contourne pas, une entree validee se contourne* — **est vraie du
+serveur**. Un `<select>` se contourne exactement comme un champ valide : par une requete forgee.
+*Poser la fermeture a l'ecran seul, c'est la poser la ou elle ne mord pas.*
+
+**Aucune compatibilite a preserver** : les deux tables de planification portent **0 ligne** (temoin :
+`machines_total = 3`). L'argument « garder `'all'` pour les planifications anterieures » n'avait pas
+d'objet.
+
+**Et le defaut implicite disparait avec.** Sans ca, `data.get('target_type') or 'all'` fabriquerait une
+valeur aussitot refusee, et un corps sans `target_type` recevrait un message parlant d'une portee qu'il
+n'a jamais envoyee. **Une portee ne se devine plus.**
+
+`'all'` recoit un message **distinct** du type inconnu : elle reste une valeur legale de l'ENUM en
+base, et un appelant qui la lit dans le schema doit savoir qu'elle est refusee **par decision**.
+
+## Le repli du planificateur : les cinq branches d'un coup
+
+Branche `'all'` **explicite**, et `else` qui **refuse** (`WHERE 1=0` + journal). *Ce n'est pas une
+enumeration de cas a tenir a jour : c'est un repli inverse.* Les trois branches restreintes portaient
+leur test de vacuite **dans la condition d'entree**, donc un champ blanc n'entrait jamais dans sa
+branche et sortait par le `else` final.
+
+**Le `WHERE 1=0` cite jusqu'ici a decharge est dans le `else` INTERNE de `machines`** : il couvre une
+liste *presente mais illisible*, jamais un champ *blanc*. Trois lecteurs prudents s'y sont trompes.
+
+## ⚠ ET LE PATCH GELE PORTAIT UN DEFAUT QUE TROIS CONTROLES N'ONT PAS VU
+
+Il appelait `logger.error(…)` alors que `scheduler.py` definit `_log` (`:28`). **`git apply --check`
+passait, `ast.parse` passait, l'import du module passait — seul `ruff` l'a vu** (`F821`).
+
+> **Le defaut etait sur la branche que le patch existe pour proteger** : un `NameError` sur le repli
+> fail-closed, au moment exact ou la planification doit etre refusee. *Un correctif qui leve sur son
+> propre chemin de refus ne refuse pas : il plante.*
+
+Corrige dans le code **et dans le fichier de patch**, pour que la prochaine session n'herite pas du
+defaut.
+
+**Mesure** : la garde d'entree exercee sur **neuf** cas — corps vide, `'all'` explicite, `null` JSON,
+espaces seuls, `tag` sans valeur, `tag` en espaces, `tag` renseigne, casse differente, type hors enum.
+`'ALL'` est refuse comme type inconnu : **ne pas normaliser la casse est plus strict** que de le faire,
+et c'est delibere.
+
+**Inerte jusqu'au redemarrage.** Aucune ligne ecrite dans les tables de planification.
 
 ### v1.38.196 — LOT3 : 55 FAIL bruts, **5 reels**, et six erreurs de mesure toutes du meme cote
 

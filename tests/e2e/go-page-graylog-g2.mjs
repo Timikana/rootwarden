@@ -339,7 +339,7 @@ try {
         });
         if (archivee) {
             const s = await connecte(COMPTE, SECRET);
-            await verifieMenuLegacy(s.page, '/graylog', verifie);
+            await verifieMenuLegacy(s.page, '/graylog', verifie, constate);
             for (const ctx of contextes) { try { await ctx.close(); } catch {} }
             await navigateur.close();
             note('');

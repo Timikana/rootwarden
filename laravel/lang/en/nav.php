@@ -20,6 +20,9 @@ return [
     'section_admin' => "ADMINISTRATION",
     'section_autre' => "OTHER",
 
+    'cgu' => "Terms of use",
+    'cafe' => "Buy me a coffee",
+    'cafe_titre' => "Support the project — buymeacoffee.com",
     'version' => "Version :numero",
     'version_inconnue' => "Version unknown",
 
@@ -68,6 +71,7 @@ return [
     // Etat du portage
     'non_porte'              => 'previous portal',
     'non_porte_titre'        => 'this page has not been ported yet, it opens in the previous portal',
+    'theme_basculer'          => 'Switch theme (light / dark)',
     'langue'                 => 'Language',
     'langue_fr'              => 'French',
     'langue_en'              => 'English',

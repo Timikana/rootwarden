@@ -5,11 +5,13 @@ use App\Http\Controllers\ChatopsController;
 use App\Http\Controllers\ClesApiController;
 use App\Http\Controllers\ClePlateformeController;
 use App\Http\Controllers\ClesSshController;
+use App\Http\Controllers\ExportRgpdController;
 use App\Http\Controllers\ComparaisonCveController;
 use App\Http\Controllers\ComptesController;
 use App\Http\Controllers\ComptesDistantsController;
 use App\Http\Controllers\AutorisationsPasserelleController;
 use App\Http\Controllers\Fail2banController;
+use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\ServicesController;
 use App\Http\Controllers\BashrcController;
 use App\Http\Controllers\AccesSftpController;
@@ -44,6 +46,7 @@ use App\Http\Controllers\SupervisionController;
 use App\Http\Controllers\TachesController;
 use App\Http\Controllers\TicketsController;
 use App\Http\Controllers\Auth\ConnexionController;
+use App\Http\Controllers\Auth\ReinitialisationController;
 use App\Http\Controllers\Auth\SecondFacteurController;
 use Illuminate\Support\Facades\Route;
 
@@ -60,6 +63,35 @@ Route::redirect('/', '/accueil')->name('racine');
 // ── Public ───────────────────────────────────────────────────────────────────
 Route::get('/connexion', [ConnexionController::class, 'formulaire'])->name('connexion');
 Route::post('/connexion', [ConnexionController::class, 'soumettre'])->name('connexion.soumettre');
+
+/*
+ * ══ LA REINITIALISATION DE MOT DE PASSE — QUATRE ROUTES PUBLIQUES ═════════
+ *
+ * ⚠ PUBLIQUES PAR NECESSITE, ET C'EST TOUT LEUR OBJET : qui a perdu son mot de
+ * passe ne peut pas s'authentifier pour le redemander. Elles vivent donc HORS du
+ * groupe authentifie, comme `/connexion`.
+ *
+ * Ce qui les borne n'est donc pas une garde de session mais :
+ *
+ *   - une LIMITE DE DEBIT qui echoue FERME et compte les demandes RECUES
+ *     (`ReinitialisationMotDePasse::autorise`) ;
+ *   - un JETON de 32 octets, hache en bcrypt, a usage unique, valable une heure ;
+ *   - un message IDENTIQUE que l'adresse existe ou non ;
+ *   - et AUCUNE ouverture de session : le compte se reconnecte, second facteur
+ *     compris. **Reinitialiser un mot de passe ne contourne pas la 2FA.**
+ *
+ * `/reinitialiser` porte `uid` et `jeton` en QUERY parce que c'est le lien du
+ * courriel. La SOUMISSION, elle, les repasse en champs caches : les remettre
+ * dans l'URL du POST deposerait le jeton dans le journal du serveur.
+ */
+Route::get('/mot-de-passe-oublie', [ReinitialisationController::class, 'demander'])
+    ->name('reinit.demander');
+Route::post('/mot-de-passe-oublie', [ReinitialisationController::class, 'envoyer'])
+    ->name('reinit.envoyer');
+Route::get('/reinitialiser', [ReinitialisationController::class, 'formulaire'])
+    ->name('reinit.formulaire');
+Route::post('/reinitialiser', [ReinitialisationController::class, 'appliquer'])
+    ->name('reinit.appliquer');
 
 // Etape intermediaire : le compte temporaire suffit, la session n'est PAS
 // encore authentifiee. Ces routes ne sont donc pas derriere le garde.
@@ -94,11 +126,75 @@ Route::get('/deconnexion', [ConnexionController::class, 'deconnexion']);
  * role 3, ce drapeau est le SEUL frein : le role 3 court-circuite chaque `perm:`
  * et chaque `role:`.
  */
-Route::middleware(['session.authentifiee', 'session.revoquee', 'mot.de.passe.a.changer'])->group(function () {
+/*
+ * ⚠ `memorisation` VIENT EN PREMIER, et l'ordre est la propriete.
+ *
+ * `session.authentifiee` renvoie vers la connexion des que `utilisateur_id`
+ * manque : place apres lui, l'aiguillage de restauration ne serait jamais
+ * atteint. Place avant, il ne fait que POSER `compte_temporaire` et rediriger
+ * vers le second facteur ou l'enrolement — **il n'ouvre aucune session**, donc
+ * il ne court-circuite pas le garde qu'il precede.
+ */
+Route::middleware(['memorisation', 'session.authentifiee', 'session.revoquee', 'mot.de.passe.a.changer'])->group(function () {
     Route::get('/cgu', [PortailController::class, 'cgu'])->name('cgu');
     Route::post('/cgu', [PortailController::class, 'accepterCgu'])->name('cgu.accepter');
     Route::get('/accueil', [PortailController::class, 'accueil'])->name('accueil');
+
+    /*
+     * L'ASSISTANT DE PREMIERE CONFIGURATION — son seul geste d'ecriture.
+     *
+     * ⚠ AUCUNE GARDE DE ROLE ICI, ET C'EST DELIBERE. L'assistant ne s'affiche
+     * qu'a partir du role 2 (`Onboarding::ROLE_MINIMAL`), mais ce geste-ci ne
+     * fait que poser un drapeau d'affichage sur SON PROPRE compte : il ne lit
+     * rien, n'expose rien, et son identifiant vient de la session. Une garde de
+     * role ne protegerait donc rien — elle donnerait seulement l'apparence
+     * d'une protection.
+     *
+     * *Et si un role 1 l'appelait, il masquerait un assistant qu'il ne voit
+     * deja pas. Le pire cas est un `UPDATE` sans effet visible.*
+     */
+    Route::post('/accueil/assistant/masquer', [OnboardingController::class, 'masquer'])
+        ->name('onboarding.masquer');
     Route::get('/profil', [PortailController::class, 'profil'])->name('profil');
+    /*
+     * L'export des donnees personnelles — RGPD art. 15 et 20.
+     *
+     * AUCUNE garde de role ni de permission, et c'est volontaire : la
+     * portabilite est un droit de la PERSONNE, pas un privilege
+     * d'administration. Le legacy fait de meme
+     * (`profile/export.php:27`, `checkAuth([ROLE_USER, ROLE_ADMIN, ROLE_SUPERADMIN])`).
+     * L'identifiant du compte vient de la SESSION, jamais de la requete, et
+     * aucun parametre n'est offert.
+     *
+     * ⚠ CONSEQUENCE DU GROUPE, DECLAREE : `mot.de.passe.a.changer` est un
+     * intergiciel de ce groupe. Un compte portant `force_password_change` doit
+     * donc changer son mot de passe AVANT d'exporter.
+     *
+     * **C'est une contrainte d'ORDRE, pas un blocage**, et c'est ce que la
+     * premiere redaction de ce commentaire disait mal. Le remede est deja
+     * exempte — `EXEMPTES = ['profil', 'profil.mot-de-passe']` dans
+     * `ChangementMotDePasseExige` — et il est de toute facon obligatoire : le
+     * compte atteint son profil, y change son mot de passe, puis exporte.
+     *
+     * ⚠ CE QUE CE COMMENTAIRE AFFIRMAIT ET QUI ETAIT FAUX : *« 6 comptes n'ont
+     * pas d'adresse de courriel pour LEVER ce drapeau seuls »*. Le courriel ne
+     * leve rien — `PortailController::changerMotDePasse` ne lit que
+     * `current_password`, aucun jeton, aucun envoi. Le courriel sert a recuperer
+     * un mot de passe OUBLIE, et un compte qui l'a oublie n'atteint AUCUNE
+     * route, exemptee ou non.
+     *
+     * Le chiffre, lui, tient : **8 comptes actifs sur 12** portaient ce drapeau
+     * au 2026-09-03. Leur blocage reel n'est pas ici — c'est un mot de passe
+     * qu'ils ne connaissent pas, et il se leve par un geste d'administration ou
+     * par le flux de reinitialisation, non porte.
+     *
+     * *Cette rectification est arrivee tard parce que j'avais corrige le dossier
+     * et laisse debout le commentaire : une autre session a repris ce cadrage en
+     * le lisant ICI. Le dossier porte la verite, le commentaire porte
+     * l'autorite — et c'est le commentaire qui voyage.*
+     */
+    Route::get('/profil/donnees-personnelles', ExportRgpdController::class)
+        ->name('profil.donnees-personnelles');
     // E-203 : fermer une session ouverte. Vise une EMPREINTE, jamais un
     // identifiant de session — celui-ci ne sort pas du serveur.
     Route::post('/profil/sessions/fermer', [PortailController::class, 'revoquerSession'])
@@ -110,6 +206,29 @@ Route::middleware(['session.authentifiee', 'session.revoquee', 'mot.de.passe.a.c
      */
     Route::post('/profil/mot-de-passe', [PortailController::class, 'changerMotDePasse'])
         ->name('profil.mot-de-passe');
+
+    /*
+     * LES TROIS GESTES DE LIBRE-SERVICE — meme forme que le mot de passe
+     * ci-dessus : aucune garde de role ni de permission, l'identifiant du compte
+     * venant de la SESSION et jamais de la requete. Leur cote administratif
+     * etait deja porte ; c'est l'ACTEUR qui manquait.
+     */
+    Route::post('/profil/courriel', [PortailController::class, 'changerCourriel'])
+        ->name('profil.courriel');
+    /*
+     * L'ecriture administrative de la cle (`/comptes/{id}/cle-ssh`) est gardee
+     * `role:3`. Ici la cible EST le demandeur, donc la garde de role n'a pas
+     * d'objet : un role 1 doit pouvoir poser la cle qui sert son propre acces.
+     */
+    Route::post('/profil/cle-ssh', [PortailController::class, 'definirCleSsh'])
+        ->name('profil.cle-ssh');
+    /*
+     * ⚠ IRREVERSIBLE. Le geste execute est l'ANONYMISATION, pas une suppression :
+     * `user_logs` est une chaine de hachage et retirer une ligne casserait la
+     * verification de toutes les suivantes. La demande est tracee AVANT.
+     */
+    Route::post('/profil/effacement', [PortailController::class, 'demanderEffacement'])
+        ->name('profil.effacement');
 
     /*
      * La re-authentification ponctuelle. AUCUNE garde de role : l'exigence porte
@@ -619,12 +738,35 @@ Route::middleware(['session.authentifiee', 'session.revoquee', 'mot.de.passe.a.c
      */
     Route::post('/comptes', [ComptesController::class, 'creer'])
         ->middleware(['role:2', 'perm:can_admin_portal'])->name('comptes.creer');
+    /*
+     * L'import CSV de comptes — sous-lot D6c. MEME garde que la creation
+     * unitaire : ce geste cree des comptes, et il ne doit pas etre plus
+     * accessible que le formulaire qui en cree un.
+     *
+     * La reponse REND LA VUE au lieu de rediriger : chaque compte importe recoit
+     * un mot de passe genere qui n'existe qu'une fois, et un message de session
+     * le deposerait sur le disque (pilote `file`).
+     */
+    Route::post('/comptes/importer', [ComptesController::class, 'importer'])
+        ->middleware(['role:2', 'perm:can_admin_portal'])->name('comptes.importer');
     Route::post('/comptes/{id}/mot-de-passe', [ComptesController::class, 'motDePasse'])
         ->whereNumber('id')->middleware(['role:2', 'perm:can_admin_portal'])->name('comptes.mot-de-passe');
     Route::post('/comptes/{id}/cle-ssh', [ComptesController::class, 'cleSsh'])
         ->whereNumber('id')->middleware(['role:3', 'perm:can_admin_portal'])->name('comptes.cle-ssh');
     Route::post('/comptes/{id}/deverrouiller', [ComptesController::class, 'deverrouiller'])
         ->whereNumber('id')->middleware(['role:3', 'perm:can_admin_portal'])->name('comptes.deverrouiller');
+
+    /*
+     * L'exemption d'expiration de mot de passe — `role:3`.
+     *
+     * `legacy/adm/api/update_user.php:31` pose `checkAuth([ROLE_SUPERADMIN])` et
+     * la garde vit ICI, pas dans le controleur. **La colonne
+     * `password_expiry_override` n'avait aucun ecrivain porte** alors que le
+     * portage la LIT en deux endroits — `MotDePasse::expirationApres()` et
+     * l'export RGPD. *Son seul ecrivain vivant etait le fichier qu'on eteint.*
+     */
+    Route::post('/comptes/{id}/expiration', [ComptesController::class, 'expiration'])
+        ->middleware(['role:3', 'perm:can_admin_portal'])->name('comptes.expiration');
     /*
      * Suppression et anonymisation — sous-lot D4. Role 3 sur la ROUTE : le
      * legacy exige le meme role, mais dans le corps du fichier.

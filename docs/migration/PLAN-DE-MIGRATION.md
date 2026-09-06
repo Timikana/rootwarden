@@ -217,7 +217,7 @@ n'a jamais été fait.*
 | entrées de menu portées | **28 sur 32** — remesuré **2026-09-02 02:17 CEST**, et **recoupé** : 28 `route` + 4 `legacy` = 32. `groups` (R1, `8cf1d26`) puis `ssh_audit` (A1, `30c8c6b`) ont basculé cette nuit. Restantes : `remote_users` · `iptables` · `wazuh` · `documentation`. ⚠ **La commande inscrite ici comptait aussi les commentaires d'en-tête** (30 pour 28) — même famille qu'E-278, corrigée au §2. |
 | parties du legacy archivées | **13** — et ⚠ **le compte qui reste n'est PAS 20 archivages** : c'est **11 unités + un socle INDIVISIBLE de 9** (`assets`, `img`, `js`, `lang`, `vendor`, `logs`, `includes`, `auth`, `profile`), dont aucun ne porte d'entrée de menu et qui **font tourner les modules restants**. *Un plan qui vise « 20 archivages » planifie neuf gestes qui n'existent pas.* Les deux qui paraissaient les moins solides (`assets`, `img`) ont été éprouvés : **consommateurs vivants par deux voies indépendantes** — les cinq pages `auth/` n'incluent **pas** `head.php` et lient la feuille et le favicon elles-mêmes. **Le compte ne devient pas 13.** ⚠ **Et la catégorie « porté, archivable, personne ne l'a fait » est VIDE** (relevé `2253785`, `MODULE-ARCHIVAGE-RESTANT.md`) : les cinq modules dont le dossier traîne — `security` S7b, `bashrc` B4, `fail2ban` F7, `graylog` G2, `ssh` K4 — ont **tous** un sous-lot ou un arbitrage nommé. *Le cas `services/`, un `git mv` qui attendait pendant que le dispatch allait ailleurs, ne se reproduit pas — il n'y a pas d'archivage gratuit à ramasser.* **Une seule arête de dépendance dans tout le graphe** : `legacy/ssh/js/main.js:133-136` injecte par `innerHTML` un lien vers `remote_users` **quand le préflight refuse un déploiement** — donc `remote_users` ne s'archive pas avant `ssh/`, **ou son lien se réécrit dans le legacy, et ce n'est plus un `git mv`.** ⚠ **`profile/export.php` est un export RGPD vivant que le profil porté n'offre pas** — et `profile/` étant du socle, son archivage n'aurait **ni sous-lot, ni relecture, ni captures** : *une capacité légale disparaîtrait dans le geste le moins surveillé du chantier.* Ce n'est pas une régression fonctionnelle mais une **non-conformité** — `DOSSIER-11`. `ls -1 legacy/_deprecated/ | wc -l` · `find legacy -maxdepth 1 -type d | wc -l`
 | modules entièrement dépréciés | **2** — `update/`, `supervision/` |
-| LOT de tests E2E | ✅ **LIGNE DE BASE — 2026-09-03 11:45 : 167 exécutions · 2613 PASS · 55 FAIL** (journaux `/tmp/rw-lot-fpELZT`, départ **08:16:26**, fin **11:23**). Répartition **85 laravel / 82 legacy** — le compte se referme sur les journaux, et ⚠ **le « 172 » annoncé au lancement était une extraction de jetons qui sur-comptait** (89+83). **ATTRIBUTION, car 55 FAIL brut est trompeur : 50 sont imputables à l'incident du cache de vues Blade (08:44→08:52), 5 sont RÉELS** — 4 dans `go-page-supervision-config-ecriture`, persistants au repos, cause première NON établie ; 1 dans `go-bashrc-b4 legacy` (E-373). **Équivalent hors incident : 167 · ~2663 · 5** (l'incident a coûté 50 PASS en plus des 50 FAIL, dérivé du rejeu au repos des sept). ⚠ **Le compte attendu avait grandi de 164 à 167 sans que personne ne remesure** — précédentes : 164 · 2550 · 1 (2026-09-02 07:54) et 158 · 2439 · 0 (2026-09-01). **Chaque chiffre porte sa date, celui-ci compris.** Recompté indépendamment par le Lead sur les lignes de verdict : 167 · 2613 · 55, verdicts refermés (157 conformes + 1 ECART + 8 ECHEC + 1 FENETRE SALE = 167). |
+| LOT de tests E2E | ✅ **LIGNE DE BASE — 2026-09-03 11:45 : 167 exécutions · 2613 PASS · 55 FAIL** (journaux `/tmp/rw-lot-fpELZT`, départ **08:16:26**, fin **11:23**). Répartition **85 laravel / 82 legacy** — le compte se referme sur les journaux, et ⚠ **le « 172 » annoncé au lancement était une extraction de jetons qui sur-comptait** (89+83). **ATTRIBUTION, car 55 FAIL brut est trompeur : 50 sont imputables à l'incident du cache de vues Blade (08:44→08:52), ~~5 sont RÉELS~~ → UN SEUL l'est** (corrigé le 2026-09-03 22:50, E-374) — les **4** de `go-page-supervision-config-ecriture` **ne se reproduisent PAS** quand la suite tourne seule (12·4 en enchaînement, **16·0 isolée**) : garde **anti-rejeu TOTP par compte et en base**, franchi par **trois invocations du runner dos à dos** sur `rw-test-admin`. *Contrôle : 12+4 = 16 = 16+0, même total d'assertions — un correctif aurait déplacé le compte, donc ce n'est pas du code.* Reste **1** : `go-bashrc-b4 legacy` (E-373), défaut du **legacy** à ne **PAS** corriger puisqu'il meurt avec lui. **⇒ ZÉRO défaut du portage à corriger sur 167 exécutions et 2613 assertions.** **Équivalent hors incident : 167 · ~2663 · 5** (l'incident a coûté 50 PASS en plus des 50 FAIL, dérivé du rejeu au repos des sept). ⚠ **Le compte attendu avait grandi de 164 à 167 sans que personne ne remesure** — précédentes : 164 · 2550 · 1 (2026-09-02 07:54) et 158 · 2439 · 0 (2026-09-01). **Chaque chiffre porte sa date, celui-ci compris.** Recompté indépendamment par le Lead sur les lignes de verdict : 167 · 2613 · 55, verdicts refermés (157 conformes + 1 ECART + 8 ECHEC + 1 FENETRE SALE = 167). |
 | tests backend | **REMESURE le 2026-09-01 a 14:16 CEST — `609 passed · 1 skipped · 1 xfailed`** (pytest, `rootwarden_python`) et **`279 passed · 895 assertions`** (`php artisan test`, `rootwarden_laravel`, 14:18). Commits `319c0ba` et `a5d8f36`. ⚠ *Le couple precedent — `566` / `277`, du 2026-08-28 16:28 — etait juste a son heure et perime a la reprise : **quatre jours d'arret, et les deux releves geles ont rougi SEULS**, chacun sur sa cause (une route neuve `POST /pare-feu/historique`, un `pare-feu.js` modifie sans changement de verdict).* **C'est leur seule raison d'exister : un releve qui ne rougit jamais ne prouve pas que rien n'a bouge, il prouve qu'il ne regarde plus.** Il n'y a jamais eu de contradiction entre `509` et `549` non plus : tous deux justes, a onze heures d'ecart — le seul chiffre faux etait `462`, qui comptait des `def test_`, donc des FONCTIONS et non des cas. **Un compte reste vrai le temps que personne n'ecrit** : celui-ci cessera de l'etre a la prochaine ecriture backend. `sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"` — **et jamais pendant qu'une autre session tient le banc.** |
 | écarts de parité documentés | **351** — identifiants dédupliqués, numérotés jusqu'à **E-371** (361 titres : 10 corrections inscrites À CÔTÉ, jamais substituées). Remesuré 2026-09-03 10:45 par `grep -ohE '^## (E-[0-9]+)' docs/migration/PARITE.md | awk '{print $2}' | sort -u | wc -l` — ⚠ **E-278 : ne JAMAIS compter `grep -c '^## E-'`**, qui compte des TITRES et dérive à chaque écart proprement amendé. ⚠ **E-280 est à sa CINQUIÈME passe** : mes quatre premières se sont trompées, les deux dernières **dans le sens qui rassure** — la propriété n'est pas « la requête porte un filtre archivées » mais « le périmètre est borné », et un champ de cible BLANC vise **tout le parc vivant** — ⚠ **sur 5 branches sur 5 dans HEAD et dans le service, sur 4 sur 5 après la fusion** (`a345e65` ne ferme que `_run_scheduled_scan · machines`). *Mon « 4 sur 5 » ne nommait pas son régime, dans le fichier dont c'est précisément le piège — corrigé sur mesure de la session 4.* La lecture d'autorité est `DOSSIER-08-PUSH-ET-MERGE.md` §4, pas mes relevés. |
 | `main` en production | **v1.37.15** — il lui manque **v1.37.16**, **v1.37.17** et **v1.37.48** |
@@ -5452,3 +5452,363 @@ désarmer. *`D-07` sans le correctif n'est pas neutre, il reconstitue la cause.*
 - **la propriété du cache en PRODUCTION n'est pas mesurée** (`DOSSIER-00:333`), et
   c'est la seule mesure qui décide si le piège y est armé. Ni la session 3 ni moi
   n'interrogeons la production.
+
+---
+
+## E-397 — la consigne demandait un alignement, la mesure a trouvé **deux** défauts
+
+**Commit `5e02519`, v1.40.4, 2026-09-04 19:4x CEST.** Consigne reçue : *« aligne la création
+manuelle sur l'import : le mot de passe généré est REMIS UNE FOIS »*, avec l'invitation
+explicite *« si ta mesure dit autre chose, elle gagne »*.
+
+**Elle disait autre chose, et sur l'objet de référence.** L'import n'était pas le modèle à
+copier : les deux chemins de création étaient faux, **chacun du défaut que l'autre n'avait
+pas**.
+
+| Chemin | Mot de passe | `force_password_change` | Conséquence |
+|---|---|---|---|
+| création manuelle | 64 octets aléatoires hachés, clair **jeté** | 1 | compte **inaccessible**, sur un écran qui annonce une réussite |
+| import CSV | généré et **remis** | **absent** | un secret vu par un tiers reste celui du compte **indéfiniment** |
+
+La bonne paire prend **un terme de chacun** — remettre **et** forcer — et elle est désormais
+la même sur les deux.
+
+### Ce que cet écart apprend, et qui vaut au-delà de lui
+
+> **Un raisonnement juste se périme quand son objet bouge, sans que rien ne le signale.**
+
+Mon commentaire d'hier justifiait l'absence du drapeau : *« forcer un changement sans canal
+de délivrance fabriquerait un compte inaccessible »*. C'était vrai **du cas où personne ne
+connaît le mot de passe**. La même phrase, sur un chemin qui l'AFFICHE, est fausse — et je
+l'ai reportée telle quelle.
+
+*C'est le pendant exact de la règle déjà écrite ici : **un commentaire qui AFFIRME est une
+donnée à mesurer, un commentaire qui JUSTIFIE est un argument**. Ce que je n'avais pas tiré :
+**un argument se relit quand son objet change**, sinon il devient une affirmation
+déguisée — et il protège le défaut au lieu de l'expliquer.* [[feedback_libelle_decrit_le_defaut]]
+
+**Et la consigne portait déjà l'ouverture qui a permis de la contredire** : « si ta mesure dit
+autre chose, elle gagne ». Sans cette phrase j'aurais aligné sur un modèle défectueux et
+**la moitié du défaut aurait survécu à sa propre correction**.
+
+### Un piège réarmé par ma propre main, et ce qu'il dit du correctif en attente
+
+`php artisan view:cache`, lancé en root pour contrôler que la vue compile, a recréé
+**112 vues compilées appartenant à `root`** dans un dossier `www-data` : la cause exacte de
+`PIEGE-CACHE-BLADE.md`, celle qui rend 500 sur **toutes** les pages. Constaté par `ls -l`,
+désarmé par `chown`, vérifié au réseau (`/` 302, `/connexion` 200, `/comptes` 302).
+
+> **La ligne ajoutée à `docker-entrypoint.sh` n'aurait rien empêché ici** : elle n'agit qu'au
+> démarrage, et le conteneur tourne depuis 23 h. **Tout contrôle de compilation lancé en root
+> entre deux démarrages réarme le piège** — et le seul témoin est `ls -l`, que rien n'oblige à
+> regarder. *À ajouter au dossier : le geste de contrôle le plus banal du portage est aussi
+> celui qui pose la mine.*
+
+**⚠ Et j'ai d'abord écrit « 151 », un chiffre que je n'avais pas compté** — il vient du
+dossier, où il datait d'une autre mesure. Compté ici : **112** (`ls -1 … | wc -l`), soit 39
+d'écart. *La règle de ce document — chaque chiffre porte sa commande de remesure — dispense
+de refaire une mesure DATÉE ET SOURCÉE ; elle n'autorise pas à en recopier une comme si elle
+venait d'être prise. Le nombre de vues compilées dépend de ce qui a été rendu depuis le
+dernier `view:clear` : c'est une grandeur qui bouge seule.*
+
+### Non fait, et dit
+
+- **aucune exécution E2E** : elle créerait un compte réel dans une base partagée pendant que
+  d'autres mesures peuvent tourner. La propriété « le mot de passe est bien remis à l'écran »
+  reste donc **vérifiée par lecture, pas au réseau** ;
+- **les comptes déjà créés par l'import** avant v1.40.4 gardent un mot de passe non forcé. La
+  remédiation existe (`POST /comptes/{id}/mot-de-passe`) et **n'a pas été jouée** : elle
+  change des comptes existants.
+
+---
+
+## E-399 — et **deux étiquettes qui affirmaient leur conclusion avant de l'avoir mesurée**
+
+**Commit `b600da7`, v1.40.5.** Le fond est dans `PARITE.md` : `roleAutorise()` rendait un
+booléen qui ne rapportait qu'une des deux coercitions, il rend désormais un objet à deux
+drapeaux **indépendants** — `valeurInvalide` (validité) et `rangRamene` (sécurité). Ce qui
+mérite d'être ici est ce que j'ai raté **en le mesurant**.
+
+### Deux fois dans le même tour, j'ai imprimé la conclusion SOUS la sortie, en dur
+
+    echo "$(grep -n rangRamene …)"
+    echo "  (une seule occurrence = la coercition d'AUTORISATION est MUETTE)"
+        -> la sortie montrait DEUX occurrences. La coercition n'etait pas muette.
+
+    echo "$(grep -rn roleAutorise … laravel/app)"
+    echo "  (vide = aucun)"
+        -> la sortie montrait UNE ligne. Elle etait inoffensive, mais l'etiquette
+           annoncait le vide sous une sortie non vide.
+
+**Les deux étiquettes étaient des `echo` inconditionnels.** Elles ne lisaient pas le
+résultat : elles le *préjugeaient*, et elles se seraient affichées à l'identique si la mesure
+avait dit l'inverse.
+
+> **C'est [[feedback_detail_echec_sur_pass]] déplacé du code vers le shell** : *un détail qui
+> ne vaut que pour un verdict se conditionne à ce verdict.* Ici le « détail » était la
+> conclusion elle-même, et le verdict n'existait pas — **il n'y avait aucune condition du
+> tout.**
+
+**Ce qui m'a sauvée les deux fois est d'avoir lu la sortie et non mon étiquette.** *C'est
+exactement ce qu'un lecteur pressé — ou une session qui relaie — ne fait pas.* Et la première
+des deux allait devenir une accusation publiée : j'étais à un message d'écrire à la DSI que
+la coercition d'autorisation était muette sur l'import, alors qu'elle est signalée par ligne
+depuis D6c.
+
+**Parade, et elle est mécanique** : une étiquette de verdict se calcule.
+
+    n=$(grep -c … ) ; [ "$n" -eq 0 ] && echo "  aucun" || echo "  $n occurrence(s)"
+
+*Jamais une phrase conclusive en `echo` littéral à côté d'une commande de mesure.* Le coût de
+la forme correcte est une substitution ; le coût de l'autre est une accusation fausse, et
+c'est la troisième fois que ce chantier la paie sous une forme ou une autre.
+
+### Le reste du tour, en une ligne chacun
+
+- **le cinquième et le sixième étage de fabrication du `1` sont MORTS**, et c'est
+  `information_schema` qui le tranche (`users.role_id IS_NULLABLE = NO`) — *un repli qui
+  ressemble à une fabrication n'en est pas une tant que son cas d'entrée est impossible ; la
+  lecture du code ne pouvait pas le dire* ;
+- **la garde par construction a servi deux fois** : `roleDuLibelle(): ?int` rend le cas
+  dangereux inexprimable, et `RolePose` remplace deux positions de tuple par deux noms ;
+- **j'ai refusé le singulier demandé par l'arbitrage** — « laquelle des deux coercitions » —
+  parce que les deux peuvent jouer ensemble. *Un singulier dans une consigne est une
+  affirmation sur la cardinalité, et celle-là était fausse.* Même famille que le
+  [[feedback_libelle_decrit_le_defaut]] du possessif au singulier.
+
+### Suite du même tour — **deux propriétés empruntées, et aucune n'était un choix**
+
+Les deux ont été relevées par des pairs sur des messages que j'avais écrits, pas sur du code.
+
+**① Une propriété de la COMPOSITION attribuée à la FONCTION.** J'avais écrit à la QA
+*« colonne absente ou cellule vide → rôle 1, `valeurInvalide = false` »* comme une propriété
+de `rolePose`. Remesuré :
+
+    rolePose(null, 3)                ->  valeurInvalide = TRUE
+    rolePose(roleDuLibelle(''), 3)   ->  valeurInvalide = false
+    roleDuLibelle('') rend 1, pas null
+
+Vrai du **chemin** `importeUnCompte`, faux de la fonction : ce qui distingue l'absence est
+`roleDuLibelle`, pas `rolePose`. *Le code est correct sur les deux chemins, chacun pour une
+raison différente — et ma phrase écrasait précisément cette différence.* **La QA a lu avant
+d'asserter ; sinon son test aurait été rouge en accusant mon code.**
+
+**② Un résultat LOCAL attribué à la CI.** J'ai annoncé *« l'étiquette serait `v1.39.728` »*
+après avoir lancé `./scripts/version.sh` dans mon arbre, où `HEAD` est la branche.
+`version.sh:92` calcule `$ancre..HEAD` : **il mesure le ref sur lequel il tourne.** La CI joue
+`main`, où le compte vaut 3 — et le sommet de `origin/main` est une fusion (`304a604`,
+`rev-list --parents -1` rend 3 jetons), donc `3 + 1 = 4`. **Les deux chiffres étaient justes
+pour deux intégrations différentes, et je n'avais pas vu qu'il y en avait deux.**
+
+> **Et il bougeait pendant l'échange : `728` valait `730` une heure plus tard, déplacé par le
+> commit qui le corrigeait.** *Un nombre dérivé de l'historique est une propriété du CHEMIN
+> **et de l'INSTANT**.* La forme qui ne se périme pas est la **commande**, pas la valeur —
+> ce que ce document exige déjà de chaque chiffre, et que j'ai enfreint dans un message.
+
+**Le lien entre les deux, et il n'est pas anecdotique** : dans les deux cas j'avais mesuré
+juste et nommé faux l'objet mesuré. *Ce n'est pas une erreur de mesure, c'est une erreur
+d'attribution — et elle est invisible à la relecture de la mesure, qui est correcte.*
+
+### Ce que la QA a vu de ma conception et que ma propre table ne mesurait pas
+
+> *Deux booléens ne valent mieux qu'un que si les QUATRE états existent. Si l'un impliquait
+> l'autre, le second serait redondant et cesserait d'être lu.*
+
+Ma table de vérité couvrait les trois combinaisons que le code produit et **n'a jamais posé la
+question de la quatrième**. La mutation qui fusionne les deux drapeaux ne casse aucune valeur
+de retour : ma table serait restée verte devant elle. *Le trou était au cœur de mon propre
+choix de conception, et mesurer des valeurs ne pouvait pas le voir — il fallait mesurer
+l'INDÉPENDANCE.* Même remarque pour `ROLE_PLANCHER` : verrouiller qu'il est le **moins
+privilégié** de la liste attrape ce qu'un invariant `role ∈ ROLES` laisse passer sans rien
+dire — *un plancher à 2 rendrait chaque refus promoteur.*
+
+### Une sonde a **l'autorité de sa réparation** — 10 fausses alarmes, 0 défaut
+
+La QA a nommé une classe de défaut qu'aucun contrôle i18n du dépôt ne voit : *un jeton
+`:xxx` présent dans un catalogue mais non lié par son appelant s'affiche en clair, et les
+contrôles cherchent des identifiants `module.cle`, pas des jetons* — le dépôt l'a déjà payé
+avec « 3 :count serveur(s) disponible(s) ». J'ai mesuré le catalogue `comptes` en entier.
+
+    23 cles a jetons · 0 defaut residuel · parite des JETONS par cle fr/en : 0 divergence
+
+**Le catalogue est sain. Ma sonde ne l'était pas** — quatre angles morts, tous du côté qui
+accuse :
+
+    v1 : 8 alarmes, 8 FAUSSES        v2 : 2 alarmes, 2 FAUSSES
+
+    ① la substitution vit cote CLIENT — `garnis(L.cle, { jeton })`, en split/join.
+       J'ai cherche `replace` dans le JS, obtenu 0, et lu ce zero comme
+       « le JS ne substitue pas ».                                  6 alarmes
+    ② `[^\]]*` s'arretait au `]` de `?? []`, cachant le 2e argument.  1
+    ③ `__($err, [...])` — cle par VARIABLE, invisible a un motif litteral. 1
+    ④ apres correction des trois : `garnis(L.cle, { nom })`, forme ABREGEE
+       ES6 — mon motif exigeait « jeton: ».                            2
+
+> **① est la forme la plus dangereuse : un zéro sur UNE implémentation lu comme un zéro sur
+> le MÉCANISME.** *`garnis` substitue par `split/join` ; chercher `replace` ne pouvait pas le
+> trouver, et le silence a rendu « personne ne substitue ».*
+
+**Et ④ est la leçon neuve de ce tour.** J'avais corrigé trois angles morts, relancé, obtenu
+deux alarmes — **et j'ai failli les rapporter comme réelles.**
+
+> **Une sonde qu'on vient de réparer emprunte l'autorité de la réparation.** *Le témoin ne dit
+> pas qu'elle est JUSTE, il dit seulement qu'elle MORD.* Les alarmes **survivantes** à une
+> correction sont les plus suspectes, pas les plus crédibles.
+
+*Corollaire de compte rendu, et il n'est pas cosmétique* : un rapport « 8 alarmes puis 2 »
+décrit une sonde, pas un défaut. **Compter les fausses alarmes de ses propres versions
+successives est ce qui distingue les deux** — sans ce compte, la v2 se lit comme un
+resserrement et non comme un instrument encore cassé.
+
+### ⚠ Et mon témoin, lui, a été posé dans l'ARBRE
+
+Pour vérifier que la v2 mord, j'ai introduit `:jetonTemoin` dans une clé de
+`laravel/lang/fr/comptes.php` — **le conteneur monte l'arbre**, donc la mutation a vécu ~1 s
+dans un fichier que sept sessions lisent. Contenu restauré, `git status` propre, **mtime
+déplacée** (20:06:33) et le fait signalé au pair plutôt que laissé à l'état d'anomalie
+inexplicable.
+
+*Le témoin devait porter sur une copie dans le `/tmp` du conteneur.* Encore la règle du banc
+rendu : **la charge se voit dans `ps`, l'écriture ne se voit nulle part** — et cette fois
+c'est un témoin de qualité qui a ouvert la fenêtre, pas une négligence. *Les deux bonnes
+pratiques se contrariaient, et je n'ai vu le conflit qu'après.*
+
+---
+
+## E-400 — le périmètre était juste, **l'ORDRE ne l'était pas**
+
+Wazuh R2 est porté (`bc77045`, v1.41.0) : le fond est dans `PARITE.md`. Ce qui vit ici est ce
+que l'arbitrage a corrigé de ma méthode, et il a raison.
+
+### `rw.css` est partagé : la règle est d'ANNONCER AVANT, pas de CONSTATER APRÈS
+
+J'ai mesuré qu'aucun des trois fichiers que je ne possède pas — `rw.css`,
+`bashrc.blade.php`, `graylog.blade.php` — n'était modifié dans l'arbre, ni depuis 10 jours
+pour les deux vues. **Puis j'ai écrit, puis je l'ai annoncé en proposant de scinder.**
+
+> **Ce que j'ai mesuré est exactement ce qui rendait le geste sûr — et c'est donc exactement ce
+> qu'il fallait annoncer, pas constater.** *Une mesure qui justifie un geste après coup ne
+> protège personne : elle explique pourquoi on a eu de la chance.*
+
+La scission, elle, était une mauvaise idée et l'arbitrage l'a refusée pour la bonne raison :
+**un renommage de classe et ses sites d'usage ne se séparent pas** — un commit laisserait soit
+une classe que rien n'emploie, soit des vues qui référencent une classe absente. *Et les quatre
+zones partagent UN rôle visuel : en corriger deux et signaler les deux autres aurait reproduit
+le défaut même que je décrivais.*
+
+### Deux formules que cette journée a produites, et qu'il faut garder
+
+> **Une valeur absente ne se signale pas : elle prend l'apparence d'une valeur fausse
+> PLAUSIBLE.**
+
+Quatre champs lus sous un nom que le backend ne rend pas rendaient « — » sans aucune erreur.
+*L'objet est un ÉCRAN, donc personne n'a d'instrument pour s'en apercevoir : mes 26 assertions
+étaient vertes, et seule l'image l'a montré.* Même famille que le `?? 1` mort d'E-399 et que le
+zéro d'une sonde — mais sans instrument possible.
+
+> **Une phrase vraie que le geste rend fausse, dans le commit qui la laisse.**
+
+`portee_texte` disait « n'écrit rien » : vrai en R1, faux dès la première ligne de R2.
+L'arbitrage m'avait nommé `np_liste` — sa quatrième cardinalité au singulier de la journée — et
+c'est la carte JUSTE AU-DESSUS qui devenait fausse. *La forme la plus vicieuse de cette famille
+n'est pas la déclaration qui a vieilli, c'est celle que MON PROPRE travail périme.*
+
+### Une réserve d'honnêteté que l'arbitrage a posée, et que je reprends
+
+Leur relevé mesure l'arbre **après** mon portage : il ne confirme ni n'infirme ma mesure des
+lecteurs backend. *Ce sont deux questions et deux instants.* Ils ratifient le raisonnement,
+pas le chiffre — qu'ils n'ont pas refait. **C'est la bonne façon de ratifier**, et elle laisse
+la mesure réfutable au lieu de la clore.
+
+---
+
+## E-401 à E-419 — la journée du 2026-09-05, et **une seule classe de défaut sous huit visages**
+
+*Le détail de chaque écart vit dans `PARITE.md`. Ce qui suit est ce que la journée a appris et
+qui ne s'y trouve pas — parce que ça ne concerne aucun écart en particulier.*
+
+### ⚠ HUIT DÉCLARATIONS PÉRIMÉES, DONT CINQ DE MOI
+
+    `portee_texte` (wazuh)     « n'ecrit rien »        -> perimee par MON commit
+    `portee_texte` (ssh-audit) idem                    -> perimee par MON commit
+    en-tete `audit-ssh.js`     « une seule ecriture »  -> perimee AVANT moi
+    paragraphe SEC-013         « moins gardee »        -> perimee par une AUTRE session
+    `MotDePasse` :314          « personne ne la lit »  -> fausse des l'ecriture
+    mes numeros de ligne       :246 :335 :583          -> perimes PAR LE HAUT
+    `PARITE.md` E-406          « le defaut est LATENT » -> perimee 14 h plus tard
+    « 0 route de mot de passe » (un pair)              -> perimee par MON E-406
+
+**La forme est unique et je la tiens enfin :**
+
+> **Toutes décrivaient un EFFET observable — « personne ne la lit », « n'écrit rien », « aucune
+> route », « une seule écriture ». Un effet a des causes multiples ; il suffit qu'une seule
+> bouge, et ce n'est jamais celle qu'on avait en tête en écrivant.**
+
+*Une déclaration qui lit un ÉTAT — un code 404, une nullabilité en base, un inode — survit.
+Une déclaration qui lit une conséquence de cet état meurt sans bruit.* La distinction vient du
+DSI, le mécanisme est le mien, et aucun des deux ne suffit seul.
+
+**Le remède n'est pas d'écrire moins :** c'est de **vérifier à l'exécution** ce qu'on serait
+tenté de commenter. `TRANSPORTS_LOCAUX` produit un `Log::warning` là où un paragraphe n'aurait
+produit aucun événement — et le jour où sa prémisse est tombée, **le paragraphe n'a pas été
+relu, l'avertissement a tiré**.
+
+### Un état qui se répare par INTERMITTENCE
+
+Le portail servait `2.0.94` pour une source à `2.0.11`. Deux inodes : un bind mount de
+**fichier** suit l'inode, et l'écriture atomique (`mv` = `rename(2)`) le remplace.
+
+**Ce que je n'avais pas modélisé, et qui a produit un faux désaccord entier :**
+
+> **Une recréation de conteneur RATTACHE le montage.** *Le défaut se répare tout seul à chaque
+> redémarrage et revient au bump suivant.*
+
+**Nous cherchons toujours ce qui casse ; nous modélisons rarement ce qui RÉPARE.** Or un état
+qui se répare par intermittence fait que *chacun mesure à un moment différent du cycle et
+chacun a raison* — septième faux désaccord de la semaine, second où les deux parties avaient
+raison sur des objets différents.
+
+### ⚠ Une valeur fausse qui FLATTE n'est contredite par personne
+
+`2.0.94` contre `2.0.11` : **le numéro faux est plus ÉLEVÉ que le vrai**. *Un numéro faible
+aurait fait chercher ; celui-là se lit « la livraison est en service, et même largement ».*
+
+C'est la famille du dédouanement appliquée à un chiffre — et son symétrique vaut aussi :
+**une erreur qui ALARME se propage comme une précaution et ne se rouvre pas**, parce que
+contester une prudence coûte et l'accepter ne coûte rien. *J'ai commis les deux le même jour.*
+
+### L'économie de la rectification : erreur DITE contre erreur ÉCRITE
+
+Une erreur qui n'a atteint aucun fichier a **une** copie ; une erreur écrite en a autant que de
+lecteurs futurs. **Je ne rectifie le dépôt que pour la seconde**, et je le vérifie avant de
+décider — deux fois aujourd'hui la réponse était « nulle part », et deux fois elle était
+« dans `PARITE.md`, où on la lit ».
+
+### Le harnais de mutation : quatre gardes d'entrée, et un témoin vacant
+
+Un témoin employait `python3`, **absent du conteneur** : la mutation ne s'est pas appliquée et
+le harnais a rendu **« 14 cas · 0 FAIL »** — *un résultat qui ressemblait à une mesure réussie.*
+Et la QA a trouvé pire : deux mutations qui cassaient la **syntaxe** rendaient 5 et 3 rouges
+venus du `Parse error`, **du côté qui rassure**.
+
+    garde 1  l'empreinte du fichier DOIT changer
+    garde 2  `php -l` / `node --check` DOIT passer
+    garde 3  la classe DOIT etre renommee — une copie renommee ne peut pas etre SERVIE
+    garde 4  la mutation DOIT etre presente dans le fichier
+    et la regle : lire LESQUELS des rouges, jamais COMBIEN
+
+*La garde 3 a refusé une mesure ce soir, et c'était son travail : refuser de mesurer plutôt que
+rendre un chiffre.*
+
+### Ce qui a le mieux tenu de toute la journée
+
+> **Un relevé qui porte de quoi le RÉFUTER transforme un désaccord en mesure.**
+
+Deux faux désaccords ont été dissous parce que le relevé portait **la commande littérale,
+l'objet et l'heure**. *Sans ces trois lignes, il reste deux affirmations opposées et le seul
+départage possible est « à qui se fier » — qui donne raison au plus proche du sujet, pas au
+plus juste.*
+
+**Et son corollaire, que le DSI a nommé** : *le marquage sauve ce que la mesure n'a pas
+couvert.* Une déduction transmise **étiquetée « déduction »** reste évaluable ; sans ce mot,
+elle devient une règle.

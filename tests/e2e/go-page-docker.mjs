@@ -251,7 +251,7 @@ try {
         });
         if (archivee) {
             const s = await connecte(COMPTE, SECRET);
-            await verifieMenuLegacy(s.page, '/docker', verifie);
+            await verifieMenuLegacy(s.page, '/docker', verifie, constate);
             note('');
             note(`${lignes.filter((l) => l.startsWith('PASS')).length} PASS / ${echecs} FAIL — module archive`);
             for (const ctx of contextes) { try { await ctx.close(); } catch {} }

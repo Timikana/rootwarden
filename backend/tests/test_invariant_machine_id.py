@@ -62,12 +62,20 @@ FACULTATIVES_CONNUES = {
     # du compte (`user_machine_access` + `get_current_user`). L'absence de garde
     # du decorateur ne cree pas de trou.
     ('docker.py', 'docker_results'),
-    # DEDOUANEE : redirection 307 vers `/supervision/zabbix/deploy`, qui porte
-    # role(2) + permission + machine_access. Le 307 preserve methode et corps :
-    # les gardes s'appliquent A L'ARRIVEE.
-    # `updates.py`, PAS `supervision.py` : le nom recopie du releve etait faux,
-    # et c'est le troisieme test de ce fichier qui l'a attrape.
-    ('updates.py', 'update_zabbix'),
+    # ── (`updates.py`, `update_zabbix`) EST RETIREE — 2026-09-04 ────────────
+    #
+    # Elle etait DEDOUANEE : redirection 307 vers `/supervision/zabbix/deploy`,
+    # qui porte role(2) + permission + machine_access, et le 307 preserve
+    # methode et corps — les gardes s'appliquaient A L'ARRIVEE.
+    #
+    # `07a530f` (E-389, « 13 routes POST sans role ni permission ») lui a pose
+    # `@require_role(2)`. Elle a donc une autorisation PROPRE et sort de la
+    # classe mesuree ici : la garder ferait rougir le premier test du fichier,
+    # qui asserte que ce releve ne nomme que des routes SANS autorisation.
+    #
+    # Retiree en ECRIVANT LA RAISON, comme le message du troisieme test le
+    # prescrit — c'est la premiere des deux causes qu'il demande de trancher :
+    # la route a ete CORRIGEE, elle n'a pas disparu.
     # ── E-211 (`ssh_audit.py`, `ssh_audit_policies_get`) EST RETIREE ─────────
     #
     # Elle porte desormais `@require_permission('can_audit_ssh')` : la route a

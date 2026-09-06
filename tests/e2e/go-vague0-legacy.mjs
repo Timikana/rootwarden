@@ -19,6 +19,7 @@
  */
 import puppeteer from 'puppeteer';
 import { createHmac } from 'crypto';
+import { constateArchivage } from './archive.mjs';
 
 const BASE = 'https://localhost:8443';
 const USER = process.env.E2E_USER || 'superadmin';
@@ -52,6 +53,34 @@ const lignes = [];
 let echecsTotal = 0;
 
 try {
+    /*
+     * ══ CETTE SUITE EST LEGACY SEULE, ET SON SUJET EST ARCHIVE ════════════
+     *
+     * Elle n'a pas de moitie portage : `BASE` est fige sur l'ancien portail.
+     * `/index.php` rend 404 depuis l'archivage — elle n'a donc plus rien a
+     * exercer, et ses assertions rougiraient toutes pour la meme raison.
+     *
+     * ⚠ ET LE CHEMIN COMPTE : `/` rend 403, pas 404, parce que la racine
+     * contient encore les sept `.php` qui restent servis. C'est `/index.php`
+     * qu'il faut sonder — la page, pas le repertoire. Un constat pose sur `/`
+     * verrait « encore servie » et rendrait `false`.
+     *
+     * Elle n'a ni `verifie` ni `constate` : on les lui fournit, ecrivant dans
+     * son propre tableau de sortie plutot que d'en inventer un second.
+     */
+    {
+        const dis = (l, v) => lignes.push(`INFO  ${l} : ${v}`);
+        const juge = (l, ok, d) => {
+            lignes.push(`${ok ? 'PASS' : 'FAIL'}  ${l}${d ? '  — ' + d : ''}`);
+            if (! ok) echecsTotal += 1;
+        };
+        const archivee = await constateArchivage({
+            base: BASE, chemin: '/index.php', fichiers: [],
+            verifie: juge, constate: dis,
+        });
+        if (archivee) throw new Error('__archivee__');
+    }
+
     // ── Connexion (+ TOTP + CGU) ────────────────────────────────────────────
     await page.goto(`${BASE}/auth/login.php`, { waitUntil: 'networkidle2' });
     await page.type('input[name="username"]', USER, { delay: 10 });
@@ -143,8 +172,11 @@ try {
         );
     }
 } catch (e) {
-    lignes.push('EXCEPTION ' + String(e).split('\n')[0]);
-    echecsTotal++;
+    // `__archivee__` est la sortie NORMALE d'un sujet archive, pas une panne.
+    if (! String(e && e.message || e).includes('__archivee__')) {
+        lignes.push('EXCEPTION ' + String(e).split('\n')[0]);
+        echecsTotal++;
+    }
 }
 
 console.log(lignes.join('\n'));

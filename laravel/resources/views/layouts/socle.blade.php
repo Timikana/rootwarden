@@ -9,6 +9,7 @@
     <title>{{ $titre ?? config('app.name') }} · {{ config('app.name') }}</title>
     {{-- ?v=<horodatage> : sans cela un navigateur sert indefiniment l'ancienne feuille. --}}
     <link rel="stylesheet" href="/css/rw.css?v={{ @filemtime(public_path('css/rw.css')) ?: '0' }}">
+    @include('composants.theme-tete')
 </head>
 <body>
 @yield('corps')

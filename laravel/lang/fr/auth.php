@@ -20,6 +20,10 @@ return [
     'connexion_sous_titre'   => 'Connexion au portail',
     'connexion_identifiant'  => 'Identifiant',
     'connexion_mot_de_passe' => 'Mot de passe',
+    'memorisation_libelle' => 'Se souvenir de moi sur cet appareil',
+    'memorisation_duree' => 'Pendant :jours jours, ce navigateur retiendra votre identité — mais il vous demandera TOUJOURS votre second facteur. Il ne vous connecte jamais tout seul.',
+    'memorisation_un_appareil' => 'Un seul appareil à la fois : cocher cette case sur un autre navigateur annule celui-ci. C\'est une limite du produit, pas un réglage.',
+    'memorisation_ancien_portail' => 'Et si vous passez par l\'ancien portail, il effacera cette mémorisation — le temps de la migration, les deux ne la partagent pas.',
     'connexion_valider'      => 'Se connecter',
     'connexion_aide'         => "Un code à usage unique vous sera demandé à l'étape suivante.",
 

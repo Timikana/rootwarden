@@ -160,8 +160,10 @@
             {{-- ACTION PRINCIPALE : le lien vers l'ancien portail. Un panneau
                  dont la seule issue serait « Fermer » ne serait pas une
                  decision. Marqueur `↗` comme dans le menu. --}}
-            <a class="rw-bouton" data-rw="groupes-panneau-legacy"
-               href="{{ $lienLegacy }}" target="_blank" rel="noopener">{{ __('groups.np_ouvrir') }} ↗</a>
+            @if ($lienLegacy)
+                <a class="rw-bouton" data-rw="groupes-panneau-legacy"
+                   href="{{ $lienLegacy }}" target="_blank" rel="noopener">{{ __('groups.np_ouvrir') }} ↗</a>
+            @endif
         </div>
     </div>
 

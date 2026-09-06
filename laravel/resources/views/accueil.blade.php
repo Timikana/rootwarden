@@ -5,6 +5,23 @@
     <p class="rw-sous-titre rw-prose">{{ __('accueil.orientation') }}</p>
 
     {{--
+        ═══ L'ASSISTANT DE PREMIERE CONFIGURATION ═══════════════════════════
+
+        AVANT les alertes, et c'est le seul endroit ou il a un sens : il ne
+        s'affiche que sur une installation qui n'est pas encore configuree, et
+        dans ce cas il EST la premiere chose a faire. Une fois masque ou
+        termine, il disparait et la page reprend sa forme habituelle.
+
+        Le predicat vit dans le controleur (`$onboarding === null`), pas ici :
+        role minimal, drapeau de masquage et absence de session y sont decides
+        une fois. **Un gabarit qui recopierait la garde en donnerait une seconde
+        version, et c'est ce que ce portage refuse partout.**
+    --}}
+    @if (($onboarding ?? null) !== null)
+        @include('composants.onboarding')
+    @endif
+
+    {{--
         ═══ E-264 — CE QUI DEMANDE L'ATTENTION ══════════════════════════════
 
         En TETE de page, avant les tuiles : une alerte placee sous douze tuiles
@@ -92,14 +109,11 @@
             <p class="rw-tuile__texte">{{ __('accueil.securite_texte') }}</p>
         </div>
 
-        <div class="rw-tuile">
-            <span class="rw-tuile__titre">{{ __('accueil.ancien_titre') }}</span>
-            <p class="rw-tuile__texte">{{ __('accueil.ancien_texte') }}</p>
-            <p class="rw-tuile__lien">
-                <a class="rw-lien" href="{{ rtrim(config('app.url_legacy'), '/') }}/index.php"
-                   target="_blank" rel="noopener">{{ __('auth.ouvrir_ancien_portail') }} ↗</a>
-            </p>
-        </div>
+        {{-- LA TUILE « Ancien portail » A ETE RETIREE le 2026-09-05.
+             Son texte disait « Toujours en service, avec les memes identifiants ».
+             MESURE : `/index.php` du legacy rend 404 depuis l'archivage du jour.
+             Un ecran qui annonce un portail en service et pointe vers un 404 est
+             le defaut corrige deux fois ailleurs (supervision 03/09, /profil 05/09). --}}
 
 
     {{--

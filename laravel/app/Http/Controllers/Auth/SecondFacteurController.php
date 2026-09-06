@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Services\JetonMemorisation;
 use App\Services\SessionsActives;
 use App\Services\Totp;
 use App\Support\TotpCrypto;
@@ -22,9 +23,44 @@ use Illuminate\View\View;
  */
 class SecondFacteurController extends Controller
 {
+    /**
+     * L'etape inscrite dans `login_attempts` — et pourquoi il en faut DEUX.
+     *
+     * ══ DIX REJEUX BLOQUAIENT TOUTE UNE ADRESSE ═══════════════════════════
+     *
+     * `journalise()` etait appele AVANT l'aiguillage sur le verdict, donc un
+     * rejeu s'inscrivait avec `success = 0` et `step = '2fa'` : un ECHEC. Or
+     * `ipBloquee()` compte exactement ces lignes et bloque a dix en dix minutes.
+     *
+     * **Un bureau derriere un NAT partage une adresse.** *Et un rejeu est le cas
+     * legitime le plus banal : le meme compte, un second appareil, la meme
+     * fenetre de trente secondes.* **Dix refus de rejeu fermaient donc l'etape
+     * du second facteur pour tout le monde derriere cette adresse.**
+     *
+     * ⚠ LA DISTINCTION QUI PORTE LE CORRECTIF : *un rejeu n'est pas un echec
+     * d'identifiant, c'est une soumission EN DOUBLE d'un identifiant VALIDE.*
+     * **Il doit etre inscrit et ne doit pas compter.**
+     *
+     * Ce qu'on ne fait donc PAS :
+     *   — l'inscrire en `success = 1`, ce serait falsifier le journal ;
+     *   — cesser de l'inscrire, alors qu'un rejeu est une PREUVE : quelqu'un
+     *     resoumet un code cryptographiquement valide, et c'est exactement ce
+     *     qu'on veut pouvoir relire apres coup.
+     *
+     * `ipBloquee()` n'est PAS touche : il filtre deja `step = '2fa'`, donc il
+     * cesse de voir les rejeux sans qu'on ait a modifier le compteur. Et les
+     * trois compteurs du legacy (`verify_2fa`, `confirm_2fa`, `enable_2fa`)
+     * filtrent la meme valeur : ils cessent de les voir aussi.
+     *
+     * `varchar(16)` en base ; `2fa_rejeu` en fait neuf.
+     */
+    private const ETAPE_2FA = '2fa';
+    private const ETAPE_REJEU = '2fa_rejeu';
+
     public function __construct(
         private readonly Totp $totp,
         private readonly SessionsActives $sessions,
+        private readonly JetonMemorisation $jetons,
     ) {
     }
 
@@ -125,7 +161,7 @@ class SecondFacteurController extends Controller
         }
 
         $verdict = $this->totp->verifie($idCompte, TotpCrypto::chiffre($secret), (string) $requete->input('2fa_code'));
-        $this->journalise($requete, (string) $temporaire['nom'], $verdict === 'ok');
+        $this->journalise($requete, (string) $temporaire['nom'], $verdict);
 
         if ($verdict === 'rejeu') {
             return back()->withErrors(['2fa_code' => __('auth.erreur_code_deja_utilise')]);
@@ -209,7 +245,7 @@ class SecondFacteurController extends Controller
 
         $verdict = $this->totp->verifie((int) $compte->id, $compte->totp_secret, (string) $requete->input('2fa_code'));
 
-        $this->journalise($requete, (string) $compte->name, $verdict === 'ok');
+        $this->journalise($requete, (string) $compte->name, $verdict);
 
         if ($verdict === 'rejeu') {
             return back()->withErrors(['2fa_code' => __('auth.erreur_code_deja_utilise')]);
@@ -264,13 +300,75 @@ class SecondFacteurController extends Controller
         $requete->session()->put('utilisateur_nom', (string) $compte->name);
         $requete->session()->put('role_id', (int) $compte->role_id);
 
+        /*
+         * ══ « SE SOUVENIR DE MOI » — L'EMISSION EST ICI, ET NULLE PART AILLEURS
+         *
+         * Ce point est le succes UNIQUE des deux chemins du second facteur, donc
+         * le seul endroit ou « le defi a ete franchi » est vrai. Le legacy emet
+         * le jeton a `login.php:176`, juste apres avoir pose `2fa_required` —
+         * c'est-a-dire AVANT le defi. On ne porte pas ce choix : voir
+         * `JetonMemorisation`, divergence 2.
+         *
+         * ⚠ ET UNE RESTAURATION NE RENOUVELLE PAS LE JETON. `memoriser` n'est
+         * pose que par `ConnexionController`, jamais par
+         * `RestaureMemorisation` : les trente jours courent depuis la derniere
+         * saisie du mot de passe, pas depuis la derniere visite. Une expiration
+         * glissante ferait vivre un porteur d'identite indefiniment sans qu'on
+         * ait jamais reverifie quoi que ce soit.
+         */
+        $memoriser = (bool) ($temporaire['memoriser'] ?? false);
+
         if ((int) ($compte->force_password_change ?? 0) === 1) {
             $requete->session()->put('changement_mot_de_passe_requis', true);
-
-            return redirect()->route('profil', ['force_change' => 1]);
+            $reponse = redirect()->route('profil', ['force_change' => 1]);
+        } else {
+            $reponse = redirect()->route('cgu');
         }
 
-        return redirect()->route('cgu');
+        return $memoriser ? $reponse->withCookie($this->cookieMemorisation((int) $compte->id)) : $reponse;
+    }
+
+    /**
+     * Le cookie du jeton — TOUS ses attributs explicites.
+     *
+     * ⚠ AUCUN TEST FEATURE NE VOIT UN ATTRIBUT DE COOKIE, et un test de
+     * navigateur exige le banc. **La parite avec le legacy se verifie donc par
+     * LECTURE**, et voici la table de correspondance
+     * (`legacy/auth/login.php:206-211`) :
+     *
+     *     expires   time() + 2592000        ->  30 jours (JetonMemorisation::JOURS)
+     *     path      '/'                     ->  '/'
+     *     secure    true                    ->  true
+     *     httponly  true                    ->  true
+     *     samesite  'Strict'                ->  'Strict'
+     *
+     * **La DUREE est un attribut de securite autant que les trois autres** — et
+     * si on laissait le defaut du cadre plutot que de l'ecrire, la divergence
+     * serait SILENCIEUSE : un cookie qui vit plus longtemps que prevu ne se voit
+     * nulle part. Elle est donc posee explicitement.
+     *
+     * ⚠ CONSEQUENCE DE PERIODE DE TRANSITION, DECLAREE. Ce cookie est CHIFFRE :
+     * `EncryptCookies` s'applique et on ne l'en exempte pas — un porteur
+     * d'identite n'a rien a faire dans une liste d'exceptions. Le legacy, lui,
+     * lit `$_COOKIE['remember_token']` en clair : il ne saura pas le lire et
+     * l'effacera (`functions.php:111`). **Donc visiter l'ancien portail annule la
+     * memorisation du nouveau.** *C'est un desagrement de transition, pas un
+     * defaut de securite — et il vaut mieux que d'exempter le jeton du
+     * chiffrement pour un portail qu'on demonte.*
+     */
+    private function cookieMemorisation(int $idCompte): \Symfony\Component\HttpFoundation\Cookie
+    {
+        return cookie()->make(
+            JetonMemorisation::COOKIE,
+            $this->jetons->emet($idCompte),
+            JetonMemorisation::JOURS * 24 * 60,
+            '/',
+            null,
+            true,      // secure
+            true,      // httpOnly
+            false,     // raw
+            'Strict',  // sameSite
+        );
     }
 
     /** Compteur d'echecs par IP sur 10 minutes, partage avec le legacy. */
@@ -279,7 +377,9 @@ class SecondFacteurController extends Controller
         try {
             $echecs = DB::table('login_attempts')
                 ->where('ip_address', $requete->ip() ?? '0.0.0.0')
-                ->where('step', '2fa')
+                // La CONSTANTE, pas le litteral : si l'etape des rejeux changeait
+                // de nom, ce compteur doit continuer de ne compter que celle-ci.
+                ->where('step', self::ETAPE_2FA)
                 ->where('success', 0)
                 ->where('attempted_at', '>', now()->subMinutes(10))
                 ->count();
@@ -290,14 +390,20 @@ class SecondFacteurController extends Controller
         }
     }
 
-    private function journalise(Request $requete, string $nom, bool $succes): void
+    /**
+     * Inscrit la tentative. Recoit le VERDICT et non un booleen, pour qu'UNE
+     * SEULE place decide `success` ET `step` : passes separement, les deux
+     * finiraient par se contredire — un rejeu inscrit en echec, ou un echec
+     * inscrit hors du compteur.
+     */
+    private function journalise(Request $requete, string $nom, string $verdict): void
     {
         try {
             DB::table('login_attempts')->insert([
                 'ip_address'   => $requete->ip() ?? '0.0.0.0',
                 'username'     => $nom,
-                'success'      => $succes ? 1 : 0,
-                'step'         => '2fa',
+                'success'      => $verdict === 'ok' ? 1 : 0,
+                'step'         => $verdict === 'rejeu' ? self::ETAPE_REJEU : self::ETAPE_2FA,
                 'attempted_at' => now(),
             ]);
         } catch (\Throwable) {

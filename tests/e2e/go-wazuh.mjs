@@ -7,6 +7,14 @@ import { BASE_URL, login, sleep } from './helpers.mjs';
 import fs from 'fs';
 import path from 'path';
 
+/*
+ * La machine d'essai, par son id. `1` est `srv-zabbix` (192.168.0.244), la
+ * PRODUCTION : elle ne doit apparaitre dans aucun corps de requete de cette
+ * suite.
+ */
+const MACHINE_ESSAI = 2;
+const PRODUCTION = 1;
+
 const SHOT_DIR = 'tests/e2e/screenshots/wazuh';
 fs.mkdirSync(SHOT_DIR, { recursive: true });
 const shot = (page, name) => page.screenshot({
@@ -92,7 +100,22 @@ try {
     console.log('8. Options save (invalid FIM path)');
     const bp = await call(page, '/api_proxy.php/wazuh/options', {
         method: 'POST', body: JSON.stringify({
-            machine_id: 1, fim_paths: ['/etc; rm -rf /']
+            /*
+             * ⚠ CETTE LIGNE VISAIT `machine_id: 1` — `srv-zabbix`,
+             * 192.168.0.244, la PRODUCTION.
+             *
+             * L'assertion qui suit exige `success === false` : le test verifie
+             * que le backend REFUSE un chemin FIM portant des metacaracteres de
+             * shell. L'intention est bonne, la cible ne l'etait pas.
+             *
+             * **Pour tester un garde, il faut envoyer la requete que le garde
+             * doit refuser — donc si le garde manque, la requete ABOUTIT.** Ici
+             * elle aboutissait sur la production, avec `/etc; rm -rf /` en
+             * charge. La propriete mesuree (« les metacaracteres sont rejetes »)
+             * ne depend d'AUCUNE machine en particulier : viser la production
+             * n'ajoutait rien a la mesure et portait tout le risque.
+             */
+            machine_id: MACHINE_ESSAI, fim_paths: ['/etc; rm -rf /']
         })
     });
     a(bp.success === false, 'FIM path avec shell chars rejete');

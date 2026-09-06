@@ -97,6 +97,26 @@ BASE_LARAVEL="${E2E_LARAVEL_BASE:-http://localhost:8444}"
 #
 # Mis a jour a chaque sous-lot qui ajoute ou retire une assertion. Un ecart n'est
 # pas forcement une regression — mais il doit toujours etre EXPLIQUE.
+# ══ ⚠ L'ATTENTE TOTP EST ENCAPSULEE *DANS* UNE INVOCATION, PAS *ENTRE* DEUX ══
+# Mesure du 2026-09-03 22:47 (E-374). Le garde anti-rejeu TOTP est par COMPTE et
+# EN BASE : il traverse les invocations de ce script, qui n'en voit rien.
+#
+#   3 invocations dos a dos, meme compte  ->  4 FAIL fantomes sur la 3e
+#   la MEME suite, seule, 5 min plus tard ->  16 PASS / 0 FAIL conforme
+#   controle : 12+4 = 16 = 16+0, meme total d'assertions -> ce n'est PAS du code
+#
+# Les suites `supervision-{onglets,profils,config,config-ecriture}` s'authentifient
+# TOUTES en `rw-test-admin`. Les enchainer par plusieurs appels de ce script perd
+# l'attente qu'il porte a l'interieur d'un seul appel.
+#
+# A FAIRE : grouper les suites d'un meme compte dans UNE invocation, ou attendre le
+# basculement de la fenetre TOTP entre deux appels. Ne pas conclure a un defaut du
+# produit sur un enchainement d'invocations.
+#
+# ⚠ Et le piege est symetrique : le 2026-09-03 au matin, une session avait
+# CONTOURNE ce script et perdu l'attente ; le soir elle l'a UTILISE, trois fois de
+# suite, et l'a perdue aussi. Un outil qui protege en silence ne signale pas non
+# plus qu'on l'appelle mal.
 # ── 75 depuis le 2026-09-03 (etait 74, posee le 2026-09-02 a 07:58 dans 5f8dd17).
 # Le +1 est l'entree `wazuh`, ajoutee a `Navigation.php` par `b6c7280` le
 # 2026-09-02 a 15:38 -- donc SEPT HEURES APRES que j'aie pose 74. Ma reference

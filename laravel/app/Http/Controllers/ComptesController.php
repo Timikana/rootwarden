@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\Comptes;
+use App\Services\MotDePasse;
 use App\Services\JournalAudit;
 use App\Services\StepUp;
 use Illuminate\Http\JsonResponse;
@@ -44,10 +45,14 @@ use Illuminate\View\View;
  */
 class ComptesController extends Controller
 {
+    /** Borne de taille du fichier importe, en kio — meme valeur que `serveurs`. */
+    private const IMPORT_MAX_KO = 512;
+
     public function __construct(
         private readonly Comptes $comptes,
         private readonly JournalAudit $journal,
         private readonly StepUp $stepUp,
+        private readonly MotDePasse $motDePasse,
     ) {
     }
 
@@ -60,26 +65,57 @@ class ComptesController extends Controller
     }
 
     /**
-     * Journalise dans `user_logs` en reprenant la chaine de hachage — le meme
-     * scellement que le sous-lot D1 verifie. Une ecriture non scellee creuserait
-     * le trou que D1 vient de mesurer.
+     * Journalise dans `user_logs` en reprenant la chaine de hachage.
+     *
+     * ══ ⚠ CETTE COPIE LISAIT LA TETE SANS VERROU, ET ELLE EST RETIREE ═════
+     *
+     * Elle faisait `orderByDesc('id')->value('self_hash')` **hors transaction et
+     * sans `lockForUpdate()`**, la ou `JournalAudit::ajoute()` fait les deux. Le
+     * docblock de cette derniere dit exactement ce que ma copie risquait :
+     *
+     * > *deux ecritures concurrentes qui lisent la meme tete produisent deux
+     * > lignes portant le MEME `prev_hash`, donc une chaine FOURCHUE, que
+     * > `verifie()` signalera comme rompue sans pouvoir dire laquelle des deux
+     * > branches est la bonne.*
+     *
+     * **Et c'est moi qui ai ecrit ce docblock**, en annoncant que « trois copies
+     * restent a migrer ». *Celle-ci en etait une, dans un fichier que je touche
+     * depuis deux jours sans la voir.* Un portail servi par huit sessions est
+     * precisement le contexte ou deux ecritures concurrentes arrivent — releve
+     * par une autre session, pas par moi.
+     *
+     * La methode reste, parce qu'elle borne l'action a 255 caracteres et donne
+     * un seul point d'appel aux quinze gestes de ce controleur ; **mais elle
+     * DELEGUE.** *Une copie qui delegue ne peut plus diverger.*
      */
     private function journalise(int $auteur, string $action): void
     {
-        $tete = DB::table('user_logs')->whereNotNull('self_hash')
-            ->orderByDesc('id')->value('self_hash') ?: JournalAudit::GENESE;
-        $ts = time();
-        DB::table('user_logs')->insert([
-            'user_id' => $auteur,
-            'action' => mb_substr($action, 0, 255),
-            'created_at' => date('Y-m-d H:i:s', $ts),
-            'prev_hash' => $tete,
-            'self_hash' => $this->journal->empreinte($tete, $auteur, mb_substr($action, 0, 255), $ts),
-        ]);
+        $this->journal->ajoute($auteur, $action);
     }
 
     public function __invoke(Request $requete): View
     {
+        return $this->rendu($requete);
+    }
+
+    /**
+     * Le rendu commun. `secretsImport` n'est JAMAIS lu depuis la session.
+     *
+     * ══ L'IMPORT NE REDIRIGE PAS, ET C'EST DELIBERE ═══════════════════════
+     *
+     * Chaque compte importe recoit un mot de passe genere qui n'existe qu'une
+     * fois. Le faire transiter par un message de session le deposerait sur le
+     * disque du conteneur — le pilote est `file`. Meme motif que
+     * `ClesApiController`, et meme prix, connu et assume : recharger la page
+     * apres un import repropose le formulaire au navigateur.
+     *
+     * @param  list<array{nom: string, mdp: string}>  $secretsImport
+     */
+    private function rendu(
+        Request $requete,
+        ?array $import = null,
+        array $secretsImport = [],
+    ): View {
         [, $roleId] = $this->qui($requete);
 
         return view('comptes', [
@@ -87,14 +123,47 @@ class ComptesController extends Controller
             'roles' => Comptes::ROLES,
             'estSuperadmin' => $roleId >= 3,
             'longueurMinimale' => Comptes::LONGUEUR_MINIMALE,
+            'importMaxKo' => self::IMPORT_MAX_KO,
+            'importColonnes' => Comptes::IMPORT_COLONNES,
+            'importRoles' => array_keys(Comptes::IMPORT_ROLES),
+            'import' => $import,
+            'secretsImport' => $secretsImport,
         ]);
+    }
+
+    /**
+     * L'import CSV de comptes — sous-lot D6c, la moitie COMPTES de
+     * `legacy/adm/includes/import_csv.php`. La moitie SERVEURS est portee
+     * ailleurs (`ServeursController::importer`).
+     *
+     * `mimes:csv,txt` se lit sur le CONTENU par Laravel, pas sur l'extension : un
+     * `.csv` renomme depuis un binaire est refuse ici plutot que de finir dans
+     * `fgetcsv`.
+     */
+    public function importer(Request $requete): View
+    {
+        $valide = $requete->validate([
+            'fichier' => ['required', 'file', 'mimes:csv,txt', 'max:' . self::IMPORT_MAX_KO],
+        ], [], ['fichier' => __('comptes.imp_champ')]);
+
+        [$auteur, $roleAuteur] = $this->qui($requete);
+
+        $resultat = $this->comptes->importeCsv($valide['fichier']->getRealPath(), $roleAuteur);
+
+        if ($resultat['bilan']['crees'] > 0) {
+            // Le NOMBRE, jamais les noms ni les secrets : le journal est lisible
+            // par qui peut lire le journal, et un mot de passe n'y a pas sa place.
+            $this->journalise($auteur, 'Import CSV: ' . $resultat['bilan']['crees'] . ' comptes importes');
+        }
+
+        return $this->rendu($requete, $resultat['bilan'], $resultat['secrets']);
     }
 
     /* ═══ Creation ═════════════════════════════════════════════════════════ */
 
-    public function creer(Request $requete): RedirectResponse
+    public function creer(Request $requete): View|RedirectResponse
     {
-        [$auteur] = $this->qui($requete);
+        [$auteur, $roleAuteur] = $this->qui($requete);
         $nom = trim((string) $requete->input('name', ''));
         if ($nom === '' || mb_strlen($nom) > 255) {
             return back()->with('erreur', __('comptes.err_nom'));
@@ -103,19 +172,86 @@ class ComptesController extends Controller
             return back()->with('erreur', __('comptes.err_nom_pris'));
         }
         $courriel = filter_var(trim((string) $requete->input('email', '')), FILTER_VALIDATE_EMAIL) ?: null;
-        $role = (int) $requete->input('role_id', 1);
-        if (! in_array($role, Comptes::ROLES, true)) {
-            $role = 1;
-        }
+        /*
+         * La liste fermee ET l'anti-escalade, en UN appel : `rolePose()` porte les
+         * deux, et l'import CSV appelle la meme. Deux copies divergeraient — le
+         * legacy en a TROIS, dont une muette.
+         *
+         * ⚠ `null` PLUTOT QU'UN REPLI A 1 QUAND LE CHAMP EST ABSENT.
+         * `input('role_id', 1)` fabriquait `1` pour un champ absent **et** pour
+         * `role_id=99`, sans distinguer les deux : le premier est un defaut
+         * legitime, le second une valeur qui n'est pas un role. Ici l'absence
+         * garde le plancher — personne n'a rien demande — et **toute valeur
+         * presente est jugee**, `(int) 'abc'` valant 0 et sortant de `ROLES`.
+         *
+         * *`ConvertEmptyStringsToNull` rend `role_id=""` comme `null` : c'est
+         * donc l'absence, pas une valeur invalide. Le `<select>` de la vue est une
+         * liste FERMEE — atteindre ce chemin demande une requete forgee, et c'est
+         * precisement pour celle-la que le signal existe.*
+         */
+        $roleBrut = $requete->input('role_id');
+        $pose = $this->comptes->rolePose(
+            $roleBrut === null ? Comptes::ROLE_PLANCHER : (int) $roleBrut,
+            $roleAuteur,
+        );
+        $role = $pose->role;
+
+        /*
+         * ══ ANTI-ESCALADE — REPRISE DU LEGACY, ELLE MANQUAIT ICI ══════════
+         *
+         * La liste fermee `Comptes::ROLES` bornait le role a [1,2,3] et rien ne
+         * le bornait au role de l'AUTEUR. Or cette route est gardee `role:2`,
+         * et `ExigeRole` compare avec `<` : un compte de role 2 porteur de
+         * `can_admin_portal` la franchit. Il pouvait donc creer un
+         * SUPERADMINISTRATEUR.
+         *
+         * Le legacy s'en protege, et son commentaire dit l'incident qui l'a fait
+         * ecrire (`manage_users.php:88-89`) : quelqu'un *« creait un superadmin,
+         * recevait le magic-link sur son email et prenait le controle »*. La
+         * regle est a `:92` — un non-superadmin ne cree qu'un role
+         * STRICTEMENT inferieur au sien.
+         *
+         * ⚠ ET LA FORME COMPTE. Le legacy pose ici une COERCITION, pas un refus,
+         * et il l'ANNONCE : son propre commentaire dit *« feedback utilisateur
+         * (toast) au lieu d'un clamp silencieux »*. On reprend les deux — la
+         * coercition ET l'annonce. Un rang ramene sans le dire ferait croire au
+         * demandeur qu'il a cree un administrateur.
+         *
+         * *La MODIFICATION de role, elle, REFUSE (`manage_roles.php:154`). Les
+         * deux formes sont voulues : creer avec un rang moindre reste utile,
+         * modifier vers un rang interdit n'a aucun sens.*
+         */
+
+        // Genere par le SERVICE, qui porte la politique : vingt caracteres par
+        // defaut — jamais moins que `LONGUEUR_MINIMALE`, 15 — et une de chaque
+        // classe GARANTIE plutot que probable. Son alphabet exclut aussi les
+        // caracteres de balisage, pour qu'aucun filtre d'affichage n'ampute la
+        // valeur remise (E-113).
+        $mdpGenere = $this->comptes->genereMotDePasse();
 
         $id = DB::table('users')->insertGetId([
             'name' => $nom,
-            // `password` est NOT NULL sans defaut. On pose un hache de 64 octets
-            // ALEATOIRES, dont personne ne connait le clair : le compte existe
-            // et aucune connexion n'est possible tant qu'un mot de passe n'a pas
-            // ete fixe. Idee reprise du legacy (`manage_users.php:97`), avec le
-            // cout partage plutot que `PASSWORD_DEFAULT`.
-            'password' => password_hash(bin2hex(random_bytes(32)), PASSWORD_BCRYPT,
+            /*
+             * ⚠ UN MOT DE PASSE GENERE ET REMIS, plus un hache dont personne ne
+             * connait le clair.
+             *
+             * Cette ligne posait `bin2hex(random_bytes(32))` hache : le compte
+             * existait et **aucune connexion n'etait possible**, alors que
+             * `force_password_change` etait pose a 1 juste dessous. *Deux
+             * exigences qui s'annulent : « change ton mot de passe » sur un
+             * compte dont le mot de passe est inconnu.*
+             *
+             * Le recours existait — un administrateur peut en fixer un apres
+             * coup (`web.php:622`) — **mais rien a l'ecran ne le disait**, et le
+             * chemin voisin, l'import CSV, faisait l'inverse. **Deux chemins de
+             * creation du meme produit, aux comportements opposes.**
+             *
+             * Le mot de passe est donc genere par le service — donc il satisfait
+             * la politique — remis UNE FOIS, et `force_password_change` reste a
+             * 1 : il a transite par un ecran et sera transmis de la main a la
+             * main, il ne doit pas rester celui du compte.
+             */
+            'password' => password_hash($mdpGenere, PASSWORD_BCRYPT,
                 ['cost' => (int) config('rootwarden.bcrypt_cost', 12)]),
             'email' => $courriel,
             'company' => trim((string) $requete->input('company', '')) ?: null,
@@ -124,9 +260,52 @@ class ComptesController extends Controller
             'sudo' => 0,
             'force_password_change' => 1,
         ]);
-        $this->journalise($auteur, "Creation du compte '{$nom}' (role={$role})");
+        // La coercition entre dans la TRACE : une decision de rang qui n'est pas
+        // journalisee ne se retrouve pas, et c'en est une.
+        // La trace distingue les deux coercitions comme l'ecran les distingue : une
+        // trace qui dit « anti-escalade » sur une faute de frappe ferait chercher
+        // une tentative d'escalade la ou il n'y en a pas eu.
+        $this->journalise($auteur, "Creation du compte '{$nom}' (role={$role})"
+            . ($pose->rangRamene ? ' [rang ramene au plancher : anti-escalade]' : '')
+            . ($pose->valeurInvalide ? ' [valeur de role invalide : plancher pose]' : ''));
 
-        return back()->with('succes', __('comptes.cree', ['nom' => $nom, 'id' => $id]));
+        /*
+         * ⚠ UN SEUL MESSAGE, ET IL PASSE PAR `succes`.
+         *
+         * Mon premier jet posait un `avertissement` — une cle que
+         * `comptes.blade.php` NE RENDAIT PAS (elle n'affiche que `succes` et
+         * `erreur`, `:36-37`), et qui n'avait qu'une seule occurrence dans tout
+         * le portage : la mienne. La coercition aurait donc ete SILENCIEUSE,
+         * derriere une annonce qui n'atteignait aucun ecran — exactement le
+         * defaut que cette annonce existe pour eviter.
+         */
+        /*
+         * ⚠ RENDU DIRECT, PAS DE REDIRECTION — le meme motif que
+         * `ClesApiController` et que l'import CSV. Le mot de passe en clair
+         * n'existe qu'une fois : le faire transiter par un message de session le
+         * deposerait sur le disque du conteneur (pilote `file`).
+         *
+         * `now()` et non `flash()` pour le message : il doit etre lisible DANS
+         * cette reponse, pas a la suivante — et ce message-la n'est pas un
+         * secret, seul le mot de passe l'est.
+         */
+        /*
+         * DEUX COERCITIONS, DEUX PHRASES, ET ELLES S'AJOUTENT.
+         *
+         * `cree_rang_ramene` est une phrase de SECURITE — *« vous ne pouvez creer
+         * qu'un rang inferieur au votre »*. `cree_valeur_role` est une phrase de
+         * VALIDITE — *« la valeur soumise n'est pas un role »*. Les rendre
+         * exclusives aurait tu l'une des deux quand les deux ont joue.
+         */
+        $annonce = $pose->rangRamene
+            ? __('comptes.cree_rang_ramene', ['nom' => $nom, 'id' => $id])
+            : __('comptes.cree', ['nom' => $nom, 'id' => $id]);
+        if ($pose->valeurInvalide) {
+            $annonce .= ' ' . __('comptes.cree_valeur_role');
+        }
+        $requete->session()->now('succes', $annonce);
+
+        return $this->rendu($requete, secretsImport: [['nom' => $nom, 'mdp' => $mdpGenere]]);
     }
 
     /* ═══ Mot de passe ═════════════════════════════════════════════════════ */
@@ -204,6 +383,63 @@ class ComptesController extends Controller
         $this->journalise($auteur, "Compte #{$id} deverrouille");
 
         return response()->json(['success' => true, 'message' => __('comptes.deverrouille')]);
+    }
+
+    /**
+     * L'exemption d'expiration de mot de passe d'un compte.
+     *
+     * ══ SUPERADMINISTRATEUR SEULEMENT, ET LA GARDE EST DANS LA ROUTE ══════
+     *
+     * `legacy/adm/api/update_user.php:31` pose `checkAuth([ROLE_SUPERADMIN])`.
+     * La route porte donc `role:3`, et rien n'est recopie ici.
+     *
+     * ══ ⚠ ET L'ANTI-AUTO-EDITION EST ECRITE, PAS SEULEMENT ANNONCEE ═══════
+     *
+     * Le legacy porte ce commentaire a `:42` :
+     *
+     *     // Anti-escalation : pas de self-edit sur role/password_expiry
+     *
+     * **Mesure : ZERO comparaison avec `$_SESSION['user_id']` dans tout le
+     * fichier.** *Le commentaire annonce une protection que le code ne fait
+     * pas* — et c'est la troisieme fois aujourd'hui que cette forme se
+     * presente, la premiere sur un controle de SECURITE.
+     *
+     * Ce qu'elle empeche est reel quoique borne : un superadministrateur peut
+     * s'exempter LUI-MEME de l'expiration, en silence. *Il peut deja presque
+     * tout ; ce que le commentaire promet, c'est precisement que ce geste-la ne
+     * se fasse pas sans temoin.* Ici il est refuse, et le refus se dit.
+     */
+    public function expiration(Request $requete, int $id): JsonResponse
+    {
+        [$auteur] = $this->qui($requete);
+        if (! $this->comptes->trouve($id)) {
+            return response()->json(['success' => false, 'message' => __('comptes.err_inconnu')], 404);
+        }
+        if ($id === $auteur) {
+            return response()->json(['success' => false, 'message' => __('comptes.exp_pas_soi')], 403);
+        }
+
+        /*
+         * ⚠ `has()` ET NON `input() === null`. `ConvertEmptyStringsToNull` rend
+         * un champ VIDE comme `null`, donc indiscernable d'un champ ABSENT — et
+         * ici les deux ont un sens OPPOSE : absent = « ne change rien »,
+         * vide = « retire l'exemption ». Le portage a deja paye ce piege (V10a).
+         */
+        if (! $requete->has('override')) {
+            return response()->json(['success' => false, 'message' => __('comptes.exp_valeur')], 422);
+        }
+
+        $brut = $requete->input('override');
+        $override = ($brut === null || $brut === '') ? null : (int) $brut;
+
+        if (! $this->motDePasse->poseOverride($id, $override)) {
+            return response()->json(['success' => false, 'message' => __('comptes.exp_valeur')], 422);
+        }
+
+        $libelle = $override === null ? 'globale' : ($override === 0 ? 'exempte' : $override . ' jours');
+        $this->journalise($auteur, "Expiration de mot de passe du compte #{$id} : {$libelle}");
+
+        return response()->json(['success' => true, 'message' => __('comptes.exp_pose')]);
     }
 
     /* ═══ Suppression et anonymisation — sous-lot D4 ═══════════════════════ */

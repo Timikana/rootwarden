@@ -91,7 +91,7 @@ return [
 
     // ── CE QUE LA PAGE DIT D'ELLE-MEME ───────────────────────────────────
     'portee_titre' => 'Ce que cette page peut faire aujourd’hui',
-    'portee_texte' => "Elle lit : les relevés déjà faits, la politique appliquée, l'état de la flotte et les relevés planifiés. Elle ne joint aucune machine et n'écrit rien.",
+    'portee_texte' => "Elle lit : les relevés déjà faits, la politique appliquée, l'état de la flotte et les relevés planifiés. Elle ÉCRIT aussi : elle relève un serveur — ce qui OUVRE une session SSH sur lui — elle lit son sshd_config, et elle arme, suspend ou supprime un relevé planifié. Les trois gestes sur les planifications n'écrivent qu'en base et ne joignent aucune machine ; c'est leur ÉCHÉANCE qui ouvrira les sessions SSH, sans demander la permission de personne.",
 
     // ── LES CAPACITES NON PORTEES ────────────────────────────────────────
     /*
@@ -110,6 +110,40 @@ return [
     'historique_choisir' => 'Choisissez un serveur pour voir ses relevés précédents.',
     'np_titre'  => 'Pas encore porté',
     'np_ouvrir' => "Ouvrir dans l'ancien portail",
+    /*
+     * ══ A5 — DESARMER UNE PLANIFICATION, ET CE QUE L'ECRAN PEUT PROMETTRE ══
+     *
+     * Le portage ARMAIT un releve SSH recurrent sans pouvoir le desarmer : on
+     * pouvait creer depuis le portail neuf et seulement supprimer depuis celui
+     * qu'on eteint. *Une capacite manquante gene ; celle-ci laissait un geste
+     * ACTIF sans son interrupteur.*
+     *
+     * ⚠ DEUX MESURES DECIDENT DE CES LIBELLES :
+     *
+     *   - `toggle` fait `SET enabled = NOT enabled` — une bascule AVEUGLE, pas
+     *     une pose de valeur. L'ecran ne peut donc pas annoncer l'etat obtenu,
+     *     il doit le RELIRE ;
+     *   - `DELETE` rend `success: True` SANS regarder `rowcount`. Une
+     *     suppression d'un identifiant inexistant se dit donc « reussie ». Le
+     *     libelle ne promet que ce que la relecture montre.
+     */
+    'planif_suppr_titre'   => 'Supprimer cette planification',
+    'planif_suppr_texte'   => 'La planification est retirée de la base. Aucune machine n\'est jointe par ce geste, et rien n\'est restauré : il n\'existe pas d\'annulation.',
+    'planif_suppr_court'   => 'Supprimer',
+    'planif_suppr_valider' => 'Supprimer la planification',
+    'planif_suppr_faite'   => 'Planification supprimée. La liste est relue ci-dessous.',
+    'planif_suppr_echec'   => 'La suppression a échoué : :message',
+
+    'planif_suspendre'     => 'Suspendre',
+    'planif_reactiver'     => 'Réactiver',
+    'planif_bascule_faite' => 'État modifié. La liste est relue ci-dessous — c\'est elle qui dit l\'état obtenu, pas ce bouton.',
+    'planif_bascule_echec' => 'Le changement d\'état a échoué : :message',
+    'planif_bascule_aveugle' => 'Ce bouton INVERSE l\'état enregistré ; il ne le pose pas. Si quelqu\'un l\'a changé entre-temps, le résultat est l\'inverse de ce que cet écran affichait — la liste relue fait foi.',
+
+    'planif_ce_qui_est_arme' => 'Ce que cette planification déclenche à son échéance : un relevé SSH sur les machines de sa portée. Son échéance ne demande la permission de personne.',
+    'planif_prochaine_le'    => 'Prochaine échéance :',
+    'planif_aucune_echeance' => 'aucune échéance enregistrée',
+
     'np_fermer' => 'Fermer',
     'np_sur_serveur' => 'Serveur visé : :nom',
 
@@ -216,7 +250,6 @@ return [
     'planif_freq_six_heures' => 'Toutes les six heures',
     'planif_freq_quotidien'  => 'Chaque jour à 02:00',
     'planif_freq_hebdo'      => 'Chaque lundi à 03:00',
-    'planif_portee_all'         => 'Tout le parc',
     'planif_portee_environment' => 'Un environnement',
     'planif_portee_tag'         => 'Un tag',
     'planif_portee_machines'    => 'Des serveurs désignés',

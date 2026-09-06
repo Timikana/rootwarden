@@ -88,6 +88,49 @@ return [
     'col_date' => 'Date',
     'col_user' => 'User',
     'col_action' => 'Action',
+    /* R2 — the three write actions. See fr for the measurement: the three do
+     * NOT have the same effect, and the screen says so per action.
+     *   wazuh_config          read by install()/install_all()  -> DEFERRED effect
+     *   wazuh_machine_options read by nothing but its own GET  -> no effect today
+     *   wazuh_rules           read by nothing but its own GET  -> no effect today
+     */
+    'enr_config_effet' => "Saving reaches no machine: this configuration is READ when an agent is installed. It decides what the NEXT installation will do — agents already installed do not change.",
+    'enr_options_effet' => "⚠ Saving reaches no machine, AND nothing consumes these options today: no installation path reads them. They are stored and read back by this screen, nothing more.",
+    'enr_regles_effet' => "⚠ Saving reaches no machine, AND nothing consumes these rules today: no deployment path reads them. They are stored and read back by this screen, nothing more.",
+
+    'fim_aide' => 'One absolute path per line, at most 50. The server refuses any path not starting with "/": this text describes that, it does not enforce it here.',
+
+    'enr_encours' => 'Saving…',
+    'enr_ok' => 'Saved.',
+    'enr_echec' => 'Saving failed.',
+    'enr_refuse' => 'Refused by the server: :message',
+    'enr_reseau' => 'The server did not answer. Nothing was saved.',
+
+    'mdp_conserve' => 'A field left empty KEEPS the password already stored — it does not clear it. There is no clearing action on this screen.',
+    'config_charge' => 'Configuration loaded.',
+    'options_charge' => 'Options loaded.',
+
+    'regle_liste_titre' => 'Stored rules',
+    'regle_editeur_titre' => 'Create or edit a rule',
+    'regle_type' => 'Type',
+    'regle_contenu' => 'Content',
+    'regle_nouvelle' => 'New rule',
+    'regle_ouvrir' => 'Open',
+    'regle_aide_nom' => 'Letters, digits, dash and underscore, at most 100 characters. The server decides: this text describes the accepted form, it does not enforce it here.',
+    'regle_aide_xml' => 'For the "rules" and "decoders" types, the server checks that the content is XML — when its validation tool is available. Without it, it stores without checking: accepted content is therefore not proof that it is valid.',
+    'regle_taille' => '512 KB at most.',
+    'type_rules' => 'Rules (XML)',
+    'type_decoders' => 'Decoders (XML)',
+    'type_cdb' => 'CDB list (text)',
+
+    'suppr_titre' => 'Delete a rule',
+    'suppr_question' => 'Permanently delete the rule ":nom"?',
+    'suppr_consequence' => 'It is removed from the database. No machine is touched — and nothing is restored: there is no undo.',
+    'suppr_confirmer' => 'Delete this rule',
+    'suppr_annuler' => 'Cancel',
+    'suppr_ok' => 'Rule deleted.',
+    'suppr_absente' => 'No rule with that name was found: nothing was deleted.',
+
     'loading' => 'Loading…',
     'saving' => 'Saving…',
     'saved' => 'Saved.',
@@ -97,9 +140,9 @@ return [
     // What R1 does not port, named one by one — see fr. No count next to the
     // enumeration: the enumeration is the only source.
     'np_titre' => 'What this page cannot do yet',
-    'np_liste' => "Install an agent · install across the fleet · read an agent's state · uninstall · restart · change the group — these six open an SSH session on the machine. And: save the configuration · save a server's options · create or delete a rule.",
+    'np_liste' => "Install an agent · install across the fleet · read an agent's state · uninstall · restart · change the group. These six — and since R2 these six ONLY — open an SSH session on the machine, which is why they are not here.",
     'np_ouvrir' => 'Open Wazuh on the old portal',
-    'np_reserve' => "Three of these actions do not have the effect their name suggests, even on the old portal: changing the group does not send the group to the machine, and saving options or a rule reaches no server.",
+    'np_reserve' => "And ONE of the six does not have the effect its name suggests, even on the old portal: changing the group never sends the group to the machine — the value is validated, written to the database, and the only remote command is an agent restart. The verdict is about the RESTART. (The other two actions this sentence used to name — saving options, saving a rule — are on this page now, each with what saving does and does not do.)",
 
     'err_config'  => 'The manager configuration could not be read. This is not "no configuration".',
     'err_servers' => 'The agent inventory could not be read. This is not "no agent".',
@@ -111,7 +154,7 @@ return [
     'choisir_serveur' => 'Choose a server to see its options.',
 
     'portee_titre' => 'What this page can do today',
-    'portee_texte' => 'It reads: the manager configuration, registered agents, per-server options and the rules in place. It joins no machine and writes nothing.',
+    'portee_texte' => "It reads: the manager configuration, registered agents, per-server options and the rules in place. Since R2 it also WRITES: the configuration, a server's options, and creating, editing or deleting a rule. It joins NO machine — the six actions that open an SSH session are not here, and each write action states below what saving does and does not do.",
 
     /*
      * Thirty-eight keys of this catalogue are NOT rendered by R1. They are not

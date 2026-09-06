@@ -492,3 +492,141 @@ une page qu'on a récemment travaillée.
 > d'absence n'est PAS un décompte de capacités manquantes, et n'est même pas un
 > décompte de ce que le produit AFFIRME — tant qu'on n'a pas mesuré, clé par clé,
 > laquelle atteint un écran.
+
+---
+
+## 11. Croisement geste par geste contre ce que le JS APPELLE — **2026-09-04 19:26 CEST**
+
+Le §7 déclarait ce croisement « le PREMIER travail à refaire ». Il est fait.
+**Résultat : la population réelle n'est pas de 18 déclarations mais de 7, et les
+sept sont VRAIES.**
+
+### 11.1 L'instrument, et ses deux témoins positifs
+
+Trois formes d'appel, comme la sonde à trois formes des tables : **appel direct**,
+**appel par helper** (le helper est retrouvé par sa définition et sa méthode figée),
+**URL construite par concaténation**.
+
+    TEMOIN 1  drift_scan       -> retrouve : groupes.js:521  ecris('/groups/'+id+'/run')
+    TEMOIN 2  test de connexion-> retrouve : serveurs.js:114 fetch(PASSERELLE+'/server_status')
+    TEMOIN 3  URL construite   -> retrouve : acces-sftp.js:216 appelle('/policy/sftp/' + geste)
+
+*Le troisième témoin est celui qui compte* : c'est la forme qui avait fait
+disparaître le geste `politiques` d'un relevé antérieur, et qu'aucun motif littéral
+ne voit.
+
+⚠ **Une imprécision de mon instrument, signalée parce qu'elle n'a PAS produit
+d'erreur ici** : le détecteur de helpers cherche `fetch(` dans les 800 caractères
+qui suivent une définition de fonction. Il a donc classé `resultatDe()`
+(`serveurs.js:98`) comme un helper d'appel alors que c'est un **sélecteur DOM** — le
+`fetch` suivait, il n'était pas dedans. **Sur-détection, pas cécité** : elle ajoute
+des candidats qu'on écarte en lisant, elle n'en cache aucun.
+
+### 11.2 ⚠ La population que j'avais inventoriée est PÉRIMÉE — de moitié
+
+| module | déclarations à mon inventaire | **aujourd'hui** | ce qui a changé |
+|---|---|---|---|
+| `ssh_audit` | 5 | **3** | `np_relever` et `np_planif_creer` **supprimées** — les gestes sont portés (`/ssh-audit/scan`, `/ssh-audit/schedules`) et les `np_*` restantes sont devenues des **panneaux d'avertissement**, pas des aveux d'absence |
+| `fail2ban` | 4 | **2** | la phrase est passée de quatre gestes à deux : désactiver une jail (`:1411`) et la géolocalisation (`:1089`) sont câblées et **retirées du texte** |
+| `groups` | 4 | **1** | `portee_texte` corrigée : elle dit maintenant que la suppression est portée. *C'est mon relevé de ce matin qui l'a fait bouger.* |
+| `serveurs` | 3 | **0** | les 3 clés restantes sont des `imp_diverge_*` — des **divergences avec le legacy**, pas des déclarations d'absence. La fausse déclaration du test de connexion a été **retirée** |
+| `superv` | 2 | **2** | l'une amendée, l'autre **fermée en portant la capacité** (voir 11.4) |
+
+### 11.3 Les sept déclarations d'aujourd'hui, et pourquoi chacune est VRAIE
+
+| déclaration | ce que le JS compose | verdict |
+|---|---|---|
+| `ssh_audit.np_parc` — relever tout le parc | `ecris('/ssh-audit/scan', {machine_id})` — **une** machine ; aucun appel sans paramètre | **VRAIE** |
+| `ssh_audit.np_config` — **modifier** `sshd_config` | `ecris('/ssh-audit/config', {machine_id})` est un **POST qui LIT** — ses propres commentaires distinguent « refus », « échec de LECTURE » et « fichier vide » | **VRAIE**, et la phrase est précise : elle dit *modification*, pas *affichage* |
+| `ssh_audit.politique_lecture_seule` — « cette page ne compose aucun appel qui l'écrirait » | seul `lis('/ssh-audit/policies?machine_id=')` | **VRAIE, et vérifiable telle qu'écrite** |
+| `fail2ban` — installer sur UNE machine | seul `/fail2ban/install_all` existe (parc entier) | **VRAIE** |
+| `fail2ban` — redémarrer le service | `/fail2ban/services` est `detecteServices()` — une détection | **VRAIE** |
+| `groups.np_cve` — scan CVE de masse | 4 mentions de `cve_scan`, **toutes en commentaire** | **VRAIE** |
+| `superv.secret_jeton_non_porte` | le portage n'écrit pas `telegraf_output_token` | **VRAIE** — et sa moitié fausse (« elle reste sur l'ancien portail ») a été **retirée** |
+
+> **Zéro déclaration fausse dans la population entière.** C'est le premier module
+> de ce chantier dont je ne rapporte aucun écart.
+
+### 11.4 ✅ Ma variante E a été fermée — **en portant, pas en corrigeant la phrase**
+
+Le 2026-09-02 j'avais relevé que `profils_assignation_ailleurs` renvoyait vers
+l'onglet « Déploiement » **où la colonne Profil n'était pas**. Aujourd'hui :
+
+    supervision.blade.php   <th>{{ __('superv.profil_colonne') }}</th>   + un <select>
+      et un commentaire : « manquait, donc un profil cree ne pouvait etre… »
+    SupervisionController.php:760   url('/api/gateway/supervision/machines/{mid}/profile')
+
+**Le renvoi est devenu vrai.** La phrase n'a pas bougé ; c'est la page qui a rejoint
+ce qu'elle annonçait.
+
+### 11.5 ⚠ Une asymétrie de risque, relevée en passant
+
+**`fail2ban` porte l'installation sur TOUT LE PARC (`install_all`, `:1804`) et pas
+l'installation sur UNE machine.** Le geste le plus large est porté, le plus étroit
+ne l'est pas. Je ne le classe pas comme un défaut — c'est un ordre de portage — mais
+c'est l'inverse de l'ordre de risque, et ça mérite d'être su de qui décidera la
+suite.
+
+---
+
+## 12. Les ONZE, remesurées par le CHEMIN D'APPEL — **2026-09-05 10:39-10:45 CEST**
+
+Liste d'origine : `PROMPT-FINIR-LES-CAPACITES.md:46-58`. Repérage **par le nom**,
+jamais par la ligne — les lignes d'`audit-ssh.js` ont bougé **pendant cette mesure**
+(246→368, 335→457, 583→705).
+
+| # | capacité | chemin d'appel mesuré | verdict |
+|---|---|---|---|
+| 1 | apparier les 5 catalogues | — | **livré** le 2026-09-02 (§8) |
+| 2 | créer un relevé planifié | `audit-ssh.js:705` `ecris('/ssh-audit/schedules')` | **PORTÉE** |
+| 3 | créer un groupe | `groupes.js:341` `ecris('/groups', corps)` | **PORTÉE** |
+| ~~4~~ | test de connexion | `serveurs.js` `POST /server_status` | déjà rayée |
+| 5 | import CSV serveurs | `web.php:792` + `serveurs.blade.php:133` | **PORTÉE** |
+| 6 | afficher `sshd_config` | `audit-ssh.js:457` `ecris('/ssh-audit/config')` | **PORTÉE** |
+| 7 | désactiver une jail | `fail2ban.js:1411` `litDistant('/fail2ban/disable_jail')` | **PORTÉE** |
+| 8 | géolocaliser une adresse | `fail2ban.js:1089` `litDistant('/fail2ban/geoip')` | **PORTÉE** |
+| 9 | relever un serveur | `audit-ssh.js:368` `ecris('/ssh-audit/scan')` | **PORTÉE** |
+| 10 | scan de dérive de masse | `groupes.js:521` `ecris('/groups/{id}/run', {action:'drift_scan'})` | **PORTÉE** |
+| 11 | rouvrir les 2 perdues de `superv` | rattachement : `supervision.blade.php:419` + `:460` + `SupervisionController:760` ; jeton : libellé amendé | **RÉPARÉES** |
+
+> **Onze sur onze : rien à porter dans cette liste.** La n°11 est réparée au sens
+> demandé — le rattachement est porté, et la phrase du jeton ne prétend plus qu'il
+> « reste sur l'ancien portail ». *La modification du jeton reste non portée, avec
+> une déclaration désormais exacte.*
+
+### 12.1 Deux capacités de DÉRIVE distinctes, pas une
+
+    derive-config.js:238   appelle('/drift/scan_all')                  le PARC
+    groupes.js:521         ecris('/groups/{id}/run', drift_scan)       un GROUPE
+    backend/routes/drift.py:142  @bp.route('/drift/scan_all')
+    backend/routes/groups.py:257 if action == 'drift_scan'
+
+**Les deux sont portées.** Une sonde qui cherche `drift_scan` littéral trouve la
+seconde et rate la première ; une qui cherche `/drift/scan_all` fait l'inverse.
+
+### 12.2 ⚠ Trois pages SORTENT de la liste tenue — les trois chaînes sont libres
+
+Mon §5.4 de `INVENTAIRE-ARCHIVAGE.md` avait retiré trois pages du bloc archivable par
+la Q3. **Les trois motifs sont tombés :**
+
+| page | ce qui la tenait | état au 2026-09-05 10:45 |
+|---|---|---|
+| `adm/admin_page.php` | préréglage sudo · import CSV de comptes | **portés** — `Permissions.php:322` ; `ComptesController::importer:131`, et les 3 clés `comptes.reste_*` sont **RETIRÉES**, l'i18n passant de 1 à **6 clés d'import** |
+| `legacy/index.php` | l'onboarding | **porté** — `Onboarding.php:228` (lecture) et **`:234` (écriture de `onboarding_dismissed_at`)** |
+| `legacy/auth/login.php` | « se souvenir de moi » | **porté** — `DepotJetonsMemorisationBase.php:39` écrit la table, case à cocher en `connexion.blade.php:34` |
+
+⚠ **Et le troisième maillon d'`admin_page.php` n'était pas un manque** :
+`manage_users.php` émet un jeton de réinitialisation **à la création**. Le portage ne
+le fait pas — il **génère et remet un mot de passe** (`ComptesController:218`,
+`genereMotDePasse()`), avec `force_password_change`. *Deux conceptions, pas une
+absence.* Son commentaire `:222-235` documente d'ailleurs le défaut qu'il a corrigé :
+un compte dont le haché était inconnu et à qui on demandait de changer un mot de
+passe que personne ne connaissait.
+
+### 12.3 La péremption, mesurée une quatrième fois — **en 23 minutes**
+
+    10:22  onboarding_dismissed_at cote laravel : 0
+    10:45  onboarding_dismissed_at cote laravel : 2  (Onboarding.php:228 et :234)
+
+*Et les lignes d'`audit-ssh.js` ont bougé entre 09:12 et 10:39.* **Sur ce dépôt, un
+relevé de plus d'une heure doit être présenté avec son heure ou refait.**

@@ -144,5 +144,16 @@ return [
         // Opt-in, en k-anonymity : seuls les cinq premiers caracteres de
         // l'empreinte SHA-1 quittent le serveur, jamais le mot de passe.
         'hibp' => filter_var(env('HIBP_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
+        /*
+         * Duree de validite d'un mot de passe, en jours. Zero = pas
+         * d'expiration, et c'est le defaut.
+         *
+         * ⚠ `PASSWORD_EXPIRY_DAYS` ET PAS UN NOM NEUF : c'est la variable que
+         * `legacy/adm/api/update_user.php:60` lit deja. **Une seconde variable
+         * pour la meme grandeur finirait par diverger** — et le portage vient
+         * de payer exactement cela sur le cout bcrypt, ou `BCRYPT_COST` et
+         * `BCRYPT_ROUNDS` gouvernent deux hachages differents (E-414).
+         */
+        'expiration_jours' => (int) env('PASSWORD_EXPIRY_DAYS', 0),
     ],
 ];

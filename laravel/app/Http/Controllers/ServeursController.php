@@ -120,27 +120,25 @@ class ServeursController extends Controller
     }
 
     /**
-     * Journalise dans `user_logs` EN REPRENANT LA CHAINE DE HACHAGE.
+     * Journalise dans `user_logs` en DELEGUANT au seul ecrivain qui verrouille.
      *
-     * Le legacy pose sa trace d'import par un `INSERT (user_id, action)` nu et
-     * fabrique donc une orpheline — 1 385 sur 5 939 le 2026-09-02, que son
-     * propre bouton « Sceller » ne peut jamais rattraper. Meme idiome que
-     * `comptes` et `permissions` : une ecriture non scellee creuserait le trou
-     * que D1 a mesure.
+     * ⚠ CETTE METHODE LISAIT LA TETE DE CHAINE SANS VERROU — corrige le
+     * 2026-09-05. Elle faisait `orderByDesc('id')->value('self_hash')` hors
+     * transaction, la ou `JournalAudit::ajoute()` prend `lockForUpdate()` sur la
+     * tete DANS une transaction.
+     *
+     * > *Deux ecritures concurrentes qui lisent la meme tete produisent deux
+     * > lignes portant le MEME `prev_hash`, donc une chaine FOURCHUE, que
+     * > `verifie()` signalera comme rompue sans pouvoir dire laquelle des deux
+     * > branches est la bonne.*
+     *
+     * C'etait l'une des « trois copies restant a migrer » que le docblock
+     * d'`ajoute()` annonce lui-meme. *Une copie qui delegue ne peut plus
+     * diverger.*
      */
     private function journalise(int $auteur, string $action): void
     {
-        $action = mb_substr($action, 0, 255);
-        $tete = DB::table('user_logs')->whereNotNull('self_hash')
-            ->orderByDesc('id')->value('self_hash') ?: JournalAudit::GENESE;
-        $ts = time();
-        DB::table('user_logs')->insert([
-            'user_id' => $auteur,
-            'action' => $action,
-            'created_at' => date('Y-m-d H:i:s', $ts),
-            'prev_hash' => $tete,
-            'self_hash' => $this->journal->empreinte($tete, $auteur, $action, $ts),
-        ]);
+        $this->journal->ajoute($auteur, $action);
     }
 
     public function modifier(Request $requete, int $id): RedirectResponse

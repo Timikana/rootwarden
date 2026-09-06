@@ -100,13 +100,27 @@
                         </label>
                         <label class="rw-etiquette-champ">
                             <span class="rw-champ__etiquette">{{ __('planif.champ_cible') }}</span>
+                            {{-- L'OPTION « tout le parc » A ETE RETIREE, et c'est une
+                                 capacite en moins — donc elle se declare, ci-dessous.
+
+                                 Elle etait le premier choix de la liste, et le
+                                 defaut a quatre etages jusqu'a
+                                 `_run_scheduled_scan`, qui ne filtre pas les
+                                 machines archivees : une planification sans
+                                 portee explicite armait un scan SSH sur la
+                                 PRODUCTION.
+
+                                 ⚠ Le libelle `planif.cible_all` est CONSERVE :
+                                 `planification-cve.js:60` en a besoin pour NOMMER
+                                 une ligne existante de type `all`. Cesser de
+                                 l'offrir n'est pas cesser de savoir le lire. --}}
                             <select id="sched-target" class="rw-saisie rw-saisie--compacte">
-                                <option value="all">{{ __('planif.cible_all') }}</option>
                                 @foreach ($tags as $tag)
                                     <option value="tag:{{ $tag }}">{{ __('planif.cible_tag') }} — {{ $tag }}</option>
                                 @endforeach
                                 <option value="multi">{{ __('planif.cible_machines') }}</option>
                             </select>
+                            <span class="rw-aide" data-rw="planif-portee-exigee">{{ __('planif.portee_exigee') }}</span>
                         </label>
                     </div>
 

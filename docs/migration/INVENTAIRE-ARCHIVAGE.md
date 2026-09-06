@@ -91,13 +91,36 @@ sont ARCHIVABLES.**
 
 ## 2. Les blocs d'archivage, et l'ordre entre eux
 
-### BLOC A — archivable dès maintenant, 3 fichiers
+### BLOC A — ⚠ **CORRIGÉ le 2026-09-04 : il n'était pas de 3 fichiers, mais de 2**
 
-    adm/includes/audit_log.php · adm/api/audit_seal.php · adm/api/audit_verify.php
+**J'avais publié « archivable dès maintenant » pour les trois. C'était faux pour
+le troisième, et je ne l'ai vu qu'en lisant `profile/export.php` pour une autre
+raison.** J'avais sauté l'**étape 8 du cycle d'archivage — la passe des liens
+ENTRANTS** — sur mon propre bloc.
 
-Contrôle **avant** le `git mv` : `scelle`/`verifie` doivent rendre > 0 côté
-`laravel/`. Ils rendent 2 et 18. *L'ordre compte : une assertion « rend 404 » sur
-un chemin déjà retiré passe en ne mesurant rien.*
+| fichier | liens entrants | verdict |
+|---|---|---|
+| `adm/api/audit_seal.php` | 1 : `adm/audit_log.php:218` | **ARCHIVABLE** avec la page |
+| `adm/api/audit_verify.php` | 1 : `adm/audit_log.php:191` | **ARCHIVABLE** avec la page |
+| `adm/includes/audit_log.php` | ⚠ **17 requérants distincts** | **SOCLE — PAS archivable** |
+
+Ce que `adm/includes/audit_log.php` fait tomber s'il part aujourd'hui :
+
+    auth/login.php:19                     la page de CONNEXION
+    profile.php:81, :100
+    profile/export.php:36                 le fichier que ce chantier doit GARDER
+    adm/api/*                             12 points d'entree
+    adm/includes/manage_users.php:124
+
+**La page `adm/audit_log.php` est portée** (`web.php:989`), donc ses deux
+endpoints tombent avec elle. **Le helper, lui, reste tant qu'il reste un écrivain
+du journal** — et `profile/export.php`, non archivable par ailleurs, en est un.
+
+> **La leçon, et elle vaut pour tout le reste de l'inventaire** : *un fichier peut
+> avoir son équivalent porté ET rester non archivable, parce que quelque chose
+> d'autre en dépend.* « Porté » et « archivable » sont deux questions, et j'ai rendu
+> la seconde en ne mesurant que la première. **Les blocs B, C et D n'ont PAS reçu
+> cette passe.**
 
 ### BLOC B — les 26 pages appariées une à une
 
@@ -144,6 +167,23 @@ tirent un `adm/api/*` ou un `adm/includes/*`. Voir le bloc D.
 
 *`migrate_crypto.php` n'est pas mort en tant qu'outil* — il est mort **en tant que
 page servie**. À déplacer vers un dossier de scripts, pas à supprimer.
+
+**✅ FAIT — E-404, `959367e` (2026-09-05) : `legacy/auth/migrate_crypto.php` →
+`scripts/migrate_crypto.php`.** Le renommage est suivi par `git log --follow`.
+
+**⚠ Et le déplacement seul n'aurait pas suffi, ce que ce relevé ne pouvait pas
+voir depuis les appelants :** le script incluait `__DIR__ . '/../db.php'`, **et
+`db.php` vit dans `legacy/`, c'est-à-dire dans l'arborescence qu'on éteint.**
+Repointer le `require` n'aurait fait que déplacer la date de sa mort — le fichier
+aurait survécu à l'archivage et serait devenu inexécutable le jour de
+l'extinction. La surface réellement consommée était **un seul symbole**, `$pdo`
+(5 occurrences), désormais construit dans le script : mêmes variables
+d'environnement, mêmes défauts, mêmes attributs PDO, **patch A05 repris**.
+**Zéro `require`/`include` exécutable subsiste.**
+
+*Corollaire pour les autres candidats de ce document : « 0 appelant » répond à
+« qui l'appelle », pas à « de quoi dépend-il ». Les deux questions décident d'un
+déplacement, et la seconde ne se lit pas dans un relevé d'appelants.*
 
 ### BLOC D — LE SOCLE : ni sous-lot, ni relecture, ni captures
 
@@ -205,3 +245,1009 @@ partie** — il porte un geste (voir §3).
 **Donc : le bloc A est actionnable, le bloc C aussi, le bloc B ne l'est pas encore
 page par page.** Ce qui manque n'est pas de la mesure de masse, c'est
 l'appariement geste par geste des 16 fichiers `adm/includes/` et `auth/` ci-dessus.
+
+---
+
+## 5. La passe des liens entrants, faite — et **une TROISIÈME question qui manquait**
+
+**Mesure du 2026-09-04.** J'avais écrit que les blocs B, C et D n'avaient pas reçu
+la passe. Elle est faite, par un **graphe de dépendances résolu** : chaque
+`require`/`include` est résolu en chemin absolu depuis le fichier qui le porte —
+**303 arcs vers 25 cibles**, 5 non résolus et tous identifiés (`vendor/autoload`,
+un chemin de langue dynamique, des auto-références).
+
+### 5.1 Pourquoi ni le nom ni le chemin ne marchent, et ce qui a été essayé
+
+**Deux instruments ont échoué avant celui-ci, dans les deux sens :**
+
+| instrument | défaut | preuve |
+|---|---|---|
+| **nom de base** | **surcompte** — `notifications.php` est une *sous-chaîne* de `manage_notifications.php` ; `audit_log.php` désigne DEUX fichiers ; `index.php` en désigne **dix** | il rendait 21 requérants pour `adm/audit_log.php`, qui n'en a aucun |
+| **chemin relatif au dépôt** | **sous-compte** — les `require` PHP sont **relatifs** (`__DIR__ . '/../includes/…'`), donc `adm/includes/audit_log.php` n'apparaît nulle part tel quel | il rendait **7** là où la vérité est **21** |
+
+*Et une version intermédiaire rendait **0 pour tout le bloc B*** — une exclusion en
+arrière qui rejetait le `/` des `__DIR__ . '/…'`. **Le témoin l'a tuée sur place** :
+`adm/includes/audit_log.php` devait rendre beaucoup, il rendait zéro. Sans ce
+témoin je publiais « aucune des 26 n'est requise », qui se trouve être **la bonne
+réponse obtenue par un instrument mort**.
+
+### 5.2 Le résultat : 25 fichiers seulement sont REQUIS
+
+    db.php                        60 requerants        footer.php                 18
+    auth/verify.php               56                   includes/howto_tip.php     15
+    head.php                      25                   adm/includes/crypto.php     8
+    menu.php                      24                   includes/totp_crypto.php    5
+    auth/functions.php            24                   auth/step_up.php            5
+    adm/includes/audit_log.php    18 fichiers (21 arcs) includes/feature_flags.php  4
+    includes/lang.php             19                   auth/password_policy.php    4
+
+**Ce sont les seuls dont l'archivage casse autre chose que des LIENS.** Le socle
+du §BLOC D est donc confirmé et, pour la première fois, **ordonné par poids**.
+
+### 5.3 Bloc B et bloc C : les verdicts TIENNENT
+
+    BLOC B (26 pages)  requises par un autre fichier : 0
+    BLOC C (2 « MORT ») liens entrants en CODE        : 0  (temoin : 26 pour audit_log.php)
+
+### 5.4 ⚠ Mais la question que je posais n'était pas la seule qui compte
+
+La passe des liens entrants répond à *« qu'est-ce qui CASSE si je retire ce
+fichier ? »*. Elle ne répond pas à :
+
+> **« Quel geste devient INATTEIGNABLE si je retire ce fichier ? »**
+
+Et le graphe rend la réponse d'un coup. **Neuf fichiers n'ont qu'UN SEUL
+requérant** :
+
+    adm/admin_page.php  est le SEUL acces a 7 fichiers :
+        includes/manage_users.php      :243      includes/manage_servers.php   :270
+        includes/manage_roles.php      :245      includes/manage_permissions   :277
+        includes/manage_access.php     :275   ⚠  includes/manage_notifications :279
+        includes/import_csv.php        :44    ⚠
+
+    index.php  est le SEUL acces a :
+        includes/onboarding.php        :162   ⚠
+
+**Or les trois marqués ⚠ portent des capacités NON PORTÉES** (§3) : le préréglage
+sudo, l'import CSV de comptes, l'accueil des nouveaux comptes.
+
+> **`adm/admin_page.php` et `index.php` figurent dans mon BLOC B comme portés et
+> archivables. Les archiver ne casserait RIEN — et supprimerait du produit les
+> trois dernières capacités non portées, en laissant leurs fichiers sur le
+> disque.** Aucune erreur 500, aucun lien mort, aucune suite rouge. La capacité
+> cesse simplement d'exister.
+
+### 5.5 Les trois questions, et pourquoi elles ne se déduisent pas l'une de l'autre
+
+    1. le geste est-il PORTE cote laravel/ ?          -> ce que je mesurais
+    2. le fichier est-il REQUIS par un autre ?        -> la passe, oubliee au bloc A
+    3. le fichier est-il le SEUL ACCES a un geste
+       NON porte ?                                    -> personne ne l'avait posee
+
+**La 3 est la dangereuse, parce que rien ne tombe.** La 2 se paie par un incident
+visible ; la 3 se paie par une capacité disparue que personne ne cherche.
+
+> **Conséquence opérationnelle** : `adm/admin_page.php` et `index.php` sortent du
+> bloc B. Ils sont **archivables en DERNIER dans leur chaîne**, après le portage du
+> préréglage sudo, de l'import CSV de comptes et de l'onboarding — ou après un
+> arbitrage explicite d'abandon de ces trois capacités.
+
+---
+
+## 6. Question 3 appliquée au BLOC A — **mesure du 2026-09-04 15:19 CEST**
+
+### 6.1 La réponse à la question posée : les deux endpoints sont archivables
+
+| fichier | le geste qu'il porte | le portage le porte-t-il ? | Q3 |
+|---|---|---|---|
+| `adm/api/audit_verify.php` | vérifier l'intégrité de la chaîne | **oui** — `web.php:995` `/journal-audit/verifier`, `journal-audit.js:100` | **pas le seul accès** |
+| `adm/api/audit_seal.php` | sceller les lignes orphelines | **oui** — `JournalAudit.php:255` `scelle()`, `:281` `->update(['prev_hash','self_hash'])`, bouton `audit-sceller` | **pas le seul accès** |
+| `adm/includes/audit_log.php` | l'écriture **scellée à l'insertion** | 4 écrivains Laravel la font | non bloquant par Q3 — **bloqué par Q2** (18 requérants) |
+
+**Les deux endpoints sortent donc archivables des trois questions.** Le helper
+reste, pour la raison déjà établie au §BLOC A.
+
+### 6.2 ⚠ Mais la question 3 a fait apparaître autre chose, et c'est plus lourd
+
+    user_logs, base du banc, 2026-09-04 15:19 CEST
+      6240 lignes  ·  1484 SANS empreinte (23,8 %)  ·  4756 scellees
+      derniere non scellee : 2026-09-03 09:21:40
+
+    ECRIVAINS DE user_logs, TOUTES COUCHES ET TOUTES FORMES : 25
+      5 scellent a l'insertion  ·  20 ecrivent NU  ->  80 %
+
+| couche | écrivains | scellent |
+|---|---|---|
+| `backend/` (Python, `INSERT INTO` brut) | 11 | **0** |
+| `laravel/` | 6 | 4 |
+| `legacy/` | 8 | **1** — `audit_log.php:118`, et c'est le seul |
+
+**Le scellement est un geste MANUEL** — un bouton `audit-sceller` avec un mode
+simulation. L'intégrité de la chaîne d'audit dépend donc de quelqu'un qui appuie.
+
+### 6.3 ⚠ Et la conséquence que l'archivage va produire
+
+`legacy/adm/includes/audit_log.php:118` est **le seul écrivain scellant du
+legacy**, et il porte **21 arcs**. Quand le legacy tombera, il tombera avec.
+
+> **Après la migration, le scellement à l'insertion n'existera plus que dans les 4
+> écrivains Laravel. Les 11 écrivains Python, qui écrivent tous nu, ne bougent
+> pas.** La proportion de lignes non scellées ne va donc pas diminuer avec
+> l'extinction du legacy : **elle va augmenter.**
+
+Ce n'est pas une objection à l'archivage — c'est une conséquence qu'il faut avoir
+choisie plutôt que subie. Et elle relève de la classe 3 : *rien ne casse, et une
+propriété du produit se dégrade sans qu'aucune mesure existante la surveille.*
+
+### 6.4 ⚠ ET J'AI FAILLI PUBLIER L'INVERSE — la même faute qu'au §5.1, autre forme
+
+`MotDePasse.php:300-306` porte ce commentaire :
+
+> *« LE JOURNAL S'ECRIT NU, **comme partout ailleurs**. […] la chaîne n'est PAS
+> calculée à l'insertion : elle l'est par un scellement séparé. […] Calculer la
+> chaîne ici, seul, la casserait. »*
+
+**J'ai d'abord conclu que ce commentaire MENTAIT** — huitième « en-tête qui ment »,
+j'allais l'annoncer. Ma sonde avait trouvé **5 écrivains, dont 4 scellaient** :
+dans ce cadre, `MotDePasse` était l'exception et « comme partout ailleurs » était
+faux.
+
+**Ma sonde ne voyait qu'UNE FORME SYNTAXIQUE** :
+`DB::table('user_logs')->insert([…])`. Elle était aveugle à
+`DB::insert('INSERT INTO user_logs …')` — SQL brut, présent dans le portage lui-même
+(`ExigePermission.php:73`) — **et aux onze écrivains Python**.
+
+> **Le commentaire dit VRAI : 80 % des écritures sont nues, et son raisonnement
+> tient — calculer la chaîne dans un seul écrivain sur vingt-cinq ne réparerait
+> rien.** Ce sont les 4 écrivains scellants qui sont l'exception.
+
+**C'est la même faute qu'au §5.1 et le même jour : un instrument qui ne connaît
+qu'une écriture de la chose qu'il compte.** Là c'était le nom de base contre le
+chemin résolu ; ici c'est l'ORM contre le SQL brut. Et cette fois l'erreur
+n'aurait pas produit un faux zéro mais **une accusation**, contre un commentaire
+juste — et contre l'auteur qui avait pris la peine de justifier son choix.
+
+*Ce qui l'a attrapée : une famille d'actions massivement non scellées
+(« Permission refusee » ×710) que mes cinq écrivains n'expliquaient pas.* **Un
+reste inexpliqué dans la mesure, pas une relecture.**
+
+---
+
+## 7. ⛔ Trouvé en fermant la Q3 : **le scellement porté casserait la chaîne**
+
+**Mesure du 2026-09-04 15:26 CEST.** Ce n'est pas une question d'archivage — c'est
+un défaut destructeur et irréversible, trouvé en cherchant si `audit_seal.php`
+était le seul accès à son geste. **Il ne l'est pas ; mais son homologue porté est
+faux.**
+
+### 7.1 La régression, par comparaison des deux implémentations
+
+    legacy/adm/api/audit_seal.php:78-82
+        if ($prevSelf === null) {
+            $pending[] = [$r['id'], $lastHash, $computed];
+            $lastHash = $computed;        <-- LA TETE AVANCE
+        }
+
+    laravel/app/Services/JournalAudit.php:178-187
+        if ($l->self_hash === null) {
+            $aSceller[] = [$l->id, $tete, $this->empreinte($tete, ...)];
+            continue;                      <-- $tete N'AVANCE PAS
+
+**Toutes les orphelines reçoivent donc le MÊME `prev_hash`.** Deux orphelines
+consécutives suffisent à produire une chaîne incohérente.
+
+### 7.2 Atteignable, et irréversible
+
+    POST /journal-audit/sceller            web.php:1031
+    journal-audit.js  simule (?simulation=1), affiche « N a sceller »,
+                      puis confirmeScellement() ECRIT
+
+`scelle()` écrit avec `->whereNull('self_hash')` — le garde-fou repris du legacy.
+**Une fois les lignes écrites elles ne sont plus nulles : le même outil ne peut plus
+les corriger.** Et `verifie()` rapporterait `CHAINON_ROMPU`, donc `scelle()`
+refuserait de retourner (`arret_sur_incoherence`). **Chaîne cassée ET outil bloqué.**
+
+Ampleur mesurée : **1484 orphelines**, paires consécutives dès les ids 91/92,
+92/93, 96/97. Le défaut mord au premier clic, pas dans un cas limite.
+
+### 7.3 La cause — **le bon raisonnement, la mauvaise référence**
+
+`JournalAudit.php:180-183` justifie explicitement la tête immobile :
+
+> *« La tête N'AVANCE PAS : c'est ce que fait `audit_log_raw`, et c'est donc ce que
+> la chaîne inscrite en base signifie. »*
+
+**C'est vrai d'`audit_log_raw`, qui insère UNE ligne à la fois. Ce n'est pas vrai
+d'un SCELEUR, qui en traite un lot.** L'auteur a comparé son code à
+`audit_log_raw` alors que son homologue est `audit_seal.php`.
+
+> **Un commentaire peut citer un comportement RÉEL d'une fonction RÉELLE et rester
+> faux, parce que c'est la mauvaise fonction de référence.** Ce n'est pas un
+> « en-tête qui ment » : c'est un en-tête juste sur le mauvais objet — et c'est plus
+> difficile à voir, parce que le vérifier confirme la citation.
+
+### 7.3bis ⚠ La course n'est PAS symétrique — mesuré le 2026-09-05 10:18
+
+On m'a présenté le risque ainsi : *« les deux implémentations calculent des hachages
+différents ; celle qui scelle la première fixe la chaîne, l'autre la déclarera
+rompue »*. **C'est vrai à moitié, et la moitié qui manque décide de l'ordre des
+opérations.**
+
+`JournalAudit::parcourt()` **avance sa tête sur une ligne DÉJÀ SCELLÉE** (`:216`,
+`$tete = $l->self_hash`) ; il ne l'avance que sur les **orphelines** (`:187`,
+`continue`). Donc :
+
+| qui scelle en premier | résultat |
+|---|---|
+| **le legacy** (`audit_seal.php:82`, tête qui avance) | les 1484 deviennent des lignes correctement chaînées → le parcours du portage les traverse comme scellées, `prev_hash === $tete` tient → **chaîne valide, et le portage sait la vérifier** |
+| **le portage** | les 1484 reçoivent le MÊME `prev_hash` → rupture dès la deuxième, et `whereNull('self_hash')` interdit toute reprise → **chaîne cassée et outil bloqué** |
+
+> **Ce n'est pas une course entre deux gagnants possibles : c'est un seul chemin qui
+> marche.** Le sceleur du legacy est aujourd'hui **le seul qui puisse fermer les 1484
+> correctement** — et le portage saura vérifier son travail. L'inverse est faux.
+
+**Conséquence** : garder `audit_seal.php` n'est pas seulement « préserver la
+possibilité de comparer ». C'est préserver **le seul outil capable de refermer le
+trou**, tant que `JournalAudit::scelle` n'est pas corrigé.
+
+### 7.4 Et le trou d'août : la chaîne l'a ENJAMBÉ
+
+    Connexion reussie, SCELLEES   4563   2026-05-26 -> 2026-09-03
+    Connexion reussie, NUES        389   2026-08-12 12:38 -> 2026-08-15 12:54
+
+**Un seul écrivain de cette chaîne existe dans les trois couches** :
+`legacy/auth/login.php:201`, qui SCELLE. Aucun dans `laravel/` ni `backend/`, dans
+les deux orthographes. **Les 389 viennent donc du même endroit que les 4563** — un
+bloc contigu de trois jours, avec du scellé avant et après.
+
+`audit_log_raw` chaîne depuis « la dernière ligne dont `self_hash` n'est pas NULL » :
+**il enjambe les orphelines sans les voir.** La chaîne répond donc « intègre »
+aujourd'hui avec 389 lignes de connexion d'août en dehors d'elle.
+
+*Je ne sais pas ce qui s'est passé du 12 au 15 août et je ne le suppose pas.* Ce que
+la mesure établit : le trou existe, il est contigu, et la chaîne l'a refermé
+par-dessus.
+
+---
+
+## 8. Question 3 sur les blocs C et D — **mesure du 2026-09-04 15:34 CEST**
+
+### 8.1 BLOC C — deux touches, dont une **de sécurité**
+
+| fichier | le geste | équivalent ? | Q3 |
+|---|---|---|---|
+| `scripts/migrate_crypto.php` *(était `auth/`, E-404)* | **rotation de clé** : re-chiffrer TOUS les secrets de `machines` et `users`, de `OLD_SECRET_KEY` vers `SECRET_KEY` | ⚠ **non** | **TOUCHE — seul accès** |
+| `auth/migrate_totp.php` | chiffrer les secrets TOTP restés en clair (un coup, idempotent, CLI) | **non** — 0 occurrence | **touche, faible** |
+
+**⚠ Et la nuance sur `migrate_crypto.php` est tout le sujet.** `OLD_SECRET_KEY`
+existe bien côté backend — **17 occurrences** — mais `backend/encryption.py:24-25`
+dit exactement ce qu'il en fait :
+
+> *« L'ancienne clé (`OLD_SECRET_KEY`) est uniquement utilisée pour le
+> **déchiffrement** (migration transparente) ; le re-chiffrement utilise toujours
+> `SECRET_KEY`. »*
+
+**C'est une migration PARESSEUSE : une ligne ne passe à la clé neuve que si
+quelque chose l'ÉCRIT.** Une ligne jamais réécrite garde indéfiniment le
+chiffré de l'ancienne clé. Et il n'existe côté backend que **2 écritures de secret
+en masse**, toutes deux dans `ssh.py` et pour un autre métier (effacer / ressaisir
+un mot de passe), aucune pour une rotation.
+
+> **Le geste « terminer une rotation, maintenant, sur toutes les lignes » n'existe
+> que dans `migrate_crypto.php`. L'archiver signifie qu'une rotation ne pourra plus
+> jamais être MENÉE À TERME — donc que `OLD_SECRET_KEY` devra rester déployée
+> indéfiniment, et que l'ancienne clé ne pourra jamais être retirée.**
+
+**✅ Cette menace est levée (E-404).** Le fichier est sorti du portail et rendu
+**autonome** : après l'extinction du legacy, toute image `php:cli` ayant accès à
+la base peut le lancer.
+
+    docker cp scripts/migrate_crypto.php rootwarden_php:/tmp/ \
+      && docker exec rootwarden_php php /tmp/migrate_crypto.php
+
+**⚠ Le lancement a dû changer, et pas pour une raison de chemin** : le conteneur
+`rootwarden_php` ne monte que `./legacy`, et **aucun conteneur ne monte
+`scripts/`**. La commande `docker exec` historique était donc devenue inopérante
+quel que soit le chemin — préserver le fichier sans préserver son lancement
+aurait été *un archivage avec une étape de plus*.
+
+**⛔ Le script n'a PAS été exécuté** : une rotation re-chiffre tous les secrets de
+`machines` et `users` — geste sur des données de production, il appartient à
+l'exploitant.
+
+Mon verdict du §BLOC C — *« mort en tant que page, vivant en tant qu'outil : à
+déplacer vers un dossier de scripts, pas à supprimer »* — **tient, et la Q3 lui
+donne une raison bien plus forte que « c'est un outil »**.
+
+### 8.2 BLOC D — le socle passe la Q3, et c'était prévisible
+
+| fichier de socle | requérants | le geste devient-il inatteignable ? |
+|---|---|---|
+| `includes/totp_crypto.php` | 5, tous `auth/*` | non — l'enrôlement 2FA est porté (`views/auth/enrolement.blade.php`) |
+| `adm/includes/crypto.php` | 8, tous legacy | non — tombe avec eux |
+| `includes/feature_flags.php` | `index.php`, `menu.php`, `wazuh/` | non — `Navigation::pour()` prend `$fonctionnalites` |
+| `includes/howto_tip.php` | 15 pages | non — tombe avec elles (les clés `tip.*` relèvent de l'étape 9 du cycle) |
+| `api/openapi.php` + `api/docs.php` | 0 | non — **remplacés**, et le portage le DIT (`web.php:974`, `autorisations.remplace_texte`) |
+| `api_proxy.php` | 0 | non — remplacé par `/api/gateway`, 74 emplois |
+
+**⚠ Un seul cas demande une précision : `includes/mail_helper.php`.**
+
+    requerants : auth/forgot_password.php:19   +   adm/includes/manage_users.php:133
+    envois de courriel REELS cote laravel/ : 0   (seul `config/mail.php` existe)
+
+**Ce n'est pas une touche Q3 indépendante** : `mail_helper.php` est l'expéditeur du
+courriel de la **réinitialisation de mot de passe**, déjà identifiée au §3 comme le
+bloquant que personne n'avait. Il tombe avec elle, dans la même chaîne. *Mais il
+confirme l'ampleur de ce bloquant : le portage n'envoie aucun courriel, du tout.*
+
+### 8.3 Ce que la Q3 attrape, et pourquoi
+
+**Sur l'ensemble des blocs C et D — 93 fichiers — la Q3 ne touche que DEUX
+fichiers, et les deux sont des scripts CLI « un coup ».** Avec l'onboarding déjà
+arbitré, les trois touches de la Q3 sur tout l'inventaire sont :
+
+    l'assistant de premiere configuration      (une fois par installation)
+    la rotation de cle de chiffrement          (une fois par incident)
+    le chiffrement des secrets TOTP en clair   (une fois par version)
+
+> **Les touches de la question 3 se groupent sur les capacités RARES par nature.**
+> Et ce n'est pas un hasard : *c'est leur rareté même qui les rend invisibles aux
+> questions 1 et 2.* Une capacité utilisée tous les jours a quelqu'un pour la
+> réclamer, un test pour la couvrir, une page pour la nommer. Une capacité utilisée
+> une fois par installation n'a rien de tout cela — et **rare ne veut pas dire
+> secondaire** : la rotation de clé est précisément le remède d'un incident de
+> sécurité.
+
+**La Q3 est donc terminée sur les quatre blocs.** Reste à l'appliquer à ce qui n'a
+jamais été inventorié : les **16 fichiers non appariés** du §4.
+
+---
+
+## 9. Les 16 non appariés — **lot 1/3 : les sept `auth/`** (2026-09-04 15:35 CEST)
+
+Q3 pointée en premier, comme demandé.
+
+| fichier | geste | équivalent `laravel/` | verdict |
+|---|---|---|---|
+| `auth/verify.php` (371 l.) | le garde central : session, blocage 2FA, expiration de mot de passe, en-têtes de sécurité | middlewares (`ChangementMotDePasseExige`, `ExigePermission`…) | **SOCLE** — 56 requérants (Q2) |
+| `auth/functions.php` (317 l.) | utilitaires de session/CSRF/permissions | idem | **SOCLE** — 24 requérants (Q2) |
+| `auth/enable_2fa.php` | enrôlement TOTP initial (QR + validation du 1er code) | `views/auth/enrolement.blade.php` | **PORTÉ** |
+| `auth/confirm_2fa.php` | confirmation du code après activation | même flux d'enrôlement | **PORTÉ** |
+| `auth/step_up.php` (5 req.) | exiger une re-auth pour un geste destructeur | `web.php:160` `POST /profil/step-up` | **PORTÉ** |
+| `auth/step_up_verify.php` | valider le code TOTP du step-up | `web.php:164` (+ révocation) | **PORTÉ** |
+| `auth/reset_totp.php` | un superadmin remet à zéro le TOTP d'un compte | `web.php:643` `POST /comptes/{id}/second-facteur` | **PORTÉ** |
+
+### 9.1 ⚠ TOUCHE Q3, et elle frappe une page du BLOC B
+
+**`auth/login.php` n'est pas dans ce lot — il était classé PORTÉ au bloc B. Mais
+mesurer le step-up m'a fait ouvrir son formulaire, et il porte un geste de plus.**
+
+    legacy/auth/login.php:10    « L'option "Se souvenir de moi" (token 30 jours) »
+                        :179    if (isset($_POST['remember_me']) …)
+                        :183    REPLACE INTO remember_tokens (user_id, token_hash, expires_at)
+                        :190    setcookie('remember_token', …)
+                        :397    <input type="checkbox" id="remember_me" …>
+
+    laravel/resources/views/auth/connexion.blade.php
+        occurrences de remember / souvenir / rester : 0
+
+    ECRITURES de `remember_tokens` cote laravel/, TOUTES FORMES : 0
+        (ORM · SQL brut · DB::statement — temoin : les 3 formes sont vues
+         sur `user_logs`, dont le SQL brut d'ExigePermission.php:73)
+
+**Le portage ne fait que SUPPRIMER de cette table** — `MotDePasse.php:295` (purge au
+changement de mot de passe) et `Comptes.php:572` (anonymisation).
+
+> **`auth/login.php` est le seul accès à « se souvenir de moi ». L'archiver retire
+> la capacité, et la table `remember_tokens` restera en base avec un portage qui
+> n'y écrit jamais et n'en supprime que le contenu d'autrui.** Troisième page du
+> bloc B à sortir par la Q3, après `admin_page.php` et `index.php`.
+
+### 9.2 Deux corrections à mes propres relevés — **les deux dans le même sens**
+
+**1. La déclaration du step-up a été CORRIGÉE depuis mon relevé de cette nuit.**
+
+    ce que j'avais mesure   « Cette action exige une re-authentification, QUI N'EST
+                              PAS ENCORE DISPONIBLE sur cette interface. Effectuez-la … »
+    ce qu'elle dit a 15h35  « Cette action exige une re-authentification.
+                              Confirmez-la a… »
+
+Le geste a été porté et la phrase rectifiée. **Ma lecture était juste à son heure ;
+elle a une demi-vie de quelques heures sur ce dépôt.** C'est la deuxième fois de la
+journée après le préréglage sudo.
+
+**2. Et j'ai évité de justesse le piège que j'avais déjà payé deux fois.** Ma
+première sonde sur la table `permissions` ne cherchait que la forme ORM
+(`DB::table('permissions')->…`) : elle rendait **3 occurrences, toutes des
+LECTURES**, donc « le portage n'écrit jamais les permissions ». **Faux.**
+`Permissions.php:155` écrit en **SQL brut** via `DB::statement`, avec
+`INSERT … ON DUPLICATE KEY UPDATE`, exactement comme le legacy. La sonde
+multi-formes l'a vu ; la sonde à une forme aurait produit une accusation.
+
+### 9.3 Ce que je NE classe pas
+
+**`verify.php` porte en en-tête une responsabilité n°8, « Initialisation
+permissions par défaut si absentes ».** Je n'ai trouvé que la **documentation** de
+ce geste, pas son code. Le portage crée la ligne au **premier réglage**
+(`ON DUPLICATE KEY UPDATE`) et non à la création du compte : la différence ne porte
+que sur un compte n'ayant jamais reçu aucune permission. **Je ne sais pas si les
+valeurs d'initialisation du legacy sont toutes à zéro** — et sans ça je ne peux pas
+dire si « pas de ligne » et « ligne du legacy » sont équivalents. **Non classé.**
+
+---
+
+## 10. Lots 2 et 3 des non appariés — **les 16 sont faits** (2026-09-04 15:38 CEST)
+
+### 10.1 `manage_servers.php` (939 l.), rendu en GESTES — aucune touche Q3
+
+| geste | équivalent `laravel/` |
+|---|---|
+| créer un serveur (`INSERT INTO machines` :136) | `Serveurs.php:294` |
+| modifier un serveur (`UPDATE machines` :186) | `Serveurs.php:536`, `:730` |
+| supprimer un serveur (`DELETE FROM machines` :207) | `Serveurs.php:776` (réel) + `web.php:740` |
+| tester la connexion (`/server_status` :589) | `serveurs.js:114` — porté, mesuré le 2026-09-02 |
+| cycle de vie (`/server_lifecycle` :641) | porté, en écriture directe (pas de route) |
+| 6 appels à `server_actions.php` | voir §10.3 |
+
+### 10.2 ⚠ `manage_roles.php` — **TOUCHE Q3 : changer le rôle d'un compte**
+
+    UPDATE users SET password = ?, force_password_change = TRUE   :88   -> PORTE (web.php:622)
+    UPDATE users SET totp_secret = NULL                           :115  -> PORTE (web.php:643)
+    UPDATE users SET role_id = ?                                  :162  -> ⚠ AUCUN EQUIVALENT
+
+    ECRITURES de users.role_id cote laravel/, hors tests, TOUTES FORMES : 0
+      (blocs `->update([…])` multi-lignes + SQL brut ; temoin : la meme sonde
+       voit 3 ecritures de `users.totp_secret`)
+    routes de changement de role : 0
+
+**La création d'un compte POSE bien un `role_id`** (`ComptesController` `insertGetId`)
+— mais poser un rôle à la création n'est pas le **changer** ensuite. Aucun chemin.
+
+> **`adm/includes/manage_roles.php` est le seul accès au changement de rôle d'un
+> compte.** Et cette touche-là **casse ma propre généralisation du §8.3** : ce n'est
+> pas une capacité rare « une fois par installation », c'est un geste
+> d'administration courant. **Q1 l'a manquée parce que le fichier porte TROIS
+> gestes dont DEUX sont portés** — le motif du §0.2, à l'échelle du geste.
+
+### 10.3 Les trois autres, et une touche qui rejoint un bloquant connu
+
+| fichier | gestes | verdict |
+|---|---|---|
+| `manage_permissions.php` (274 l.) | **aucune écriture** — fragment d'affichage | tombe avec `admin_page.php` |
+| `manage_notifications.php` (142 l.) | **aucune écriture** — fragment d'affichage | tombe avec `admin_page.php` |
+| `server_actions.php` (268 l.) | CRUD serveur (doublon de `manage_servers`), `machine_tags` (`Serveurs.php:630` `insertOrIgnore`, `:638`), `server_notes` (`:659` + `web.php:761`) | **tout porté** |
+| `manage_users.php` (459 l.) | créer un compte → porté ; ligne de `permissions` à la création → **équivalent** (voir 10.4) ; **`INSERT INTO password_reset_tokens` :142** → ⚠ **0 écriture au portage** | **touche, rattachée au bloquant du §3** |
+
+**La touche de `manage_users.php` n'est pas indépendante** : `password_reset_tokens`
+n'a qu'une occurrence côté portage, `config/auth.php:98`, l'échafaudage du cadriciel.
+Elle appartient à la chaîne de réinitialisation de mot de passe déjà identifiée. *Mais
+elle en élargit la portée* : le legacy émet un jeton **à la création du compte**, donc
+le flux « le nouveau compte choisit son mot de passe lui-même » n'existe pas non plus
+au portage.
+
+### 10.4 ✅ Le non-classé du §9.3 est RÉSOLU — et il n'y avait pas de touche
+
+`manage_users.php:116-117` :
+
+    INSERT INTO permissions (user_id, can_deploy_keys, …)
+    VALUES (?, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+
+**Tout à zéro.** Donc « pas de ligne » et « ligne du legacy » sont équivalents en
+comportement, et l'absence d'initialisation au portage n'ôte aucun droit. **Et la
+ligne est créée par `manage_users.php` à la CRÉATION du compte, pas paresseusement
+par `verify.php`** — l'en-tête de `verify.php` annonce cette responsabilité, je n'en
+ai jamais trouvé le code, et je n'en ai plus besoin : le geste est ailleurs et il est
+sans conséquence.
+
+*C'est le second en-tête de la journée qui annonce plus que ce que son fichier fait.*
+
+**⚠ COMPLÉMENT DU 2026-09-04 15:40 — mon relevé de 15:38 était INCOMPLET, et la
+question posée méritait mieux.** L'`INSERT` du legacy ne cite que **14** des **18**
+colonnes de permission. Les quatre absentes prennent donc leur **défaut de schéma**,
+et je ne l'avais pas mesuré.
+
+    colonnes citees par manage_users.php:116   14, toutes a 0 explicitement
+    colonnes de `permissions` au schema        18 (+ user_id)
+    NON citees   can_manage_bashrc · can_manage_graylog
+                 can_manage_wazuh  · can_manage_api_keys
+    defaut au schema des 18                    0 pour TOUTES (NOT NULL)
+
+**Conclusion inchangée mais désormais fondée : une ligne créée par le legacy est
+tout à zéro, défauts de schéma compris. « Pas de ligne » et « ligne du legacy » sont
+équivalents, et il n'y a d'écart d'autorisation dans AUCUN des deux sens.**
+
+*Et un détail qui vaut d'être noté* : les quatre colonnes non citées sont
+précisément celles des modules ajoutés **après** l'écriture de cet `INSERT`
+(bashrc, graylog, wazuh, clés d'API). **L'`INSERT` du legacy a donc dérivé de son
+schéma, et il n'est inoffensif que par coïncidence** — le jour où une colonne de
+permission naîtrait avec un défaut à `1`, le legacy l'accorderait sans le dire.
+
+
+### 10.5 Bilan de la Q3 sur les 16 — et la révision de mon heuristique
+
+    TOUCHES : 3
+      login.php            « se souvenir de moi »        (page du BLOC B)
+      manage_roles.php     changer le role d'un compte   (geste COURANT)
+      manage_users.php     jeton de reinit a la creation (chaine deja connue)
+
+> **⚠ Ma généralisation du §8.3 était trop étroite.** J'avais écrit que les touches
+> de la Q3 se groupent sur les capacités **rares par nature**. Deux des trois
+> touches ci-dessus ne le sont pas : « se souvenir de moi » est employé à chaque
+> connexion, et changer un rôle est un geste d'administration ordinaire.
+>
+> **Ce qu'elles ont en commun n'est pas la RARETÉ, c'est que le fichier porteur a
+> plusieurs gestes dont la MAJORITÉ est portée.** `login.php` : connexion portée,
+> souvenir non. `manage_roles.php` : deux gestes sur trois portés. C'est le motif du
+> §0.2 — et il explique aussi les trois touches « rares » du §8.3, dont les fichiers
+> portaient un geste unique et invisible.
+>
+> **L'heuristique juste est donc : pointer la Q3 sur les fichiers qui portent
+> PLUSIEURS gestes**, parce qu'un verdict de fichier y est nécessairement une
+> moyenne — et une moyenne cache la minorité.
+
+---
+
+## 11. `legacy/adm/api/` — les seize, par les trois questions (**2026-09-05 09:12 CEST**)
+
+**Correction de périmètre d'abord : les seize sont DÉJÀ passés par la Q1**, le
+2026-09-03 (§3 et §10). Ce qui n'avait jamais tourné sur eux, c'est la **Q2** et la
+**Q3**. Et mes verdicts Q1 ayant deux jours sur un dépôt où j'ai mesuré trois
+péremptions, **je les ai tous remesurés** ce matin.
+
+    population re-derivee : 83 .php metier servis, dont 16 dans adm/api/
+    gestes d'ECRITURE dans adm/api/ : 35
+
+### 11.1 Q2 — **aucun des seize n'est requis par un autre fichier**
+
+    graphe RESOLU des require (chemins absolus depuis le fichier porteur)
+    adm/api/* figurant parmi les cibles : 0 / 16
+    TEMOIN : adm/includes/audit_log.php -> 21 requerants
+
+**La Q2 n'en bloque aucun.**
+
+### 11.2 Q1 remesurée — onze portés, un partiel, trois non portés
+
+| fichier | verdict au 2026-09-05 |
+|---|---|
+| `anonymize_user` · `delete_user` · `unlock_user` · `change_password` | **PORTÉS** — `unlock_user` l'est **entièrement** : `Comptes.php:322` (compteurs) *et* `:326` (`DELETE login_attempts`), que je n'avais pas isolé le 03/09 |
+| `audit_seal` · `audit_verify` | **PORTÉS** — `JournalAudit::scelle` / `verifie` ⚠ le scellement porté a le défaut du §7 |
+| `global_search` · `notifications` | **PORTÉS** — `/recherche` ; `NotificationsController::supprimer:112` |
+| `update_permissions` · `update_notification_prefs` · `update_server_access` · `update_user_status` | **PORTÉS** — dont le préréglage sudo, porté depuis le 04/09 |
+| `update_user` | ⚠ **PARTIEL** — `ssh_key` porté ; **`password_expiry_override` et `password_expires_at` NON** |
+| `dismiss_onboarding` · `toggle_sudo` · `toggle_user` | ⚠ **NON PORTÉS** |
+
+⚠ **Deux faux positifs de ma sonde, écartés en lisant.** Mon motif SQL a « trouvé »
+`password_expiry_override` dans `ChangementMotDePasseExige.php:75` et
+`password_expires_at` dans `MotDePasse.php:248` : **les deux sont dans des
+COMMENTAIRES**. Et le premier de ces commentaires est titré *« CE QUI N'EST PAS PORTÉ
+ICI, ET NE DOIT PAS PASSER POUR FERMÉ »* — il déclare lui-même le manque.
+
+### 11.3 Q3 — **trois accès EXCLUSIFS, mesurés au motif serré**
+
+    UPDATE users SET sudo=    dans TOUT le legacy -> 1   adm/api/toggle_sudo.php:61
+    UPDATE users SET active=  dans TOUT le legacy -> 1   adm/api/toggle_user.php:81
+    onboarding_dismissed_at   dans TOUT le legacy -> 1   adm/api/dismiss_onboarding.php:24
+    TEMOIN  UPDATE users SET password= -> 5 sites
+
+**Ces trois fichiers sont le seul accès à leur geste, et le portage n'écrit aucune
+des trois colonnes.** `toggle_sudo` et `toggle_user` ne sont pas des capacités
+rares : ce sont des gestes d'administration ordinaires.
+
+### 11.4 ⛔ **Le vrai coût est dans `update_user.php`, et un commentaire du PORTAGE le nie**
+
+`MotDePasse.php:249`, dans le bloc qui change un mot de passe :
+
+> *« `password_expires_at` n'est pas touchée : **personne ne la lit**. »*
+
+**C'est faux.** Mesure de ce matin, hors commentaires :
+
+    backend/scheduler.py:623-629   SELECT … password_expires_at … WHERE
+                                   password_expires_at BETWEEN CURDATE()
+                                   AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)
+    backend/scheduler.py:640-650   send_email(u['email'],
+                                   « Votre mot de passe expire dans N jour(s) »)
+    backend/scheduler.py:820-824   un second lecteur, meme colonne
+
+Et le portage ne l'écrit pas : `MotDePasse.php:251-255` pose `password`,
+`password_updated_at`, `force_password_change` — **pas `password_expires_at`**.
+
+> **Un mot de passe changé par le PORTAGE laisse `password_expires_at` sur son
+> ancienne valeur.** Le planificateur continue d'en tirer des courriels : soit il
+> n'en envoie jamais (colonne à `NULL`), soit il annonce une expiration qui ne
+> correspond plus à rien.
+
+**Écrivains de `password_expires_at` — TOUS dans le legacy** : `profile.php:198`,
+`auth/reset_password.php:132`, `adm/api/update_user.php` ×4. **Zéro côté portage.**
+
+> **Éteindre le legacy retire le DERNIER écrivain d'une colonne dont un lecteur
+> vivant continue de tirer des courriels.** Même forme que le scellement du §6.3 —
+> *le dernier écrivain meurt, le lecteur survit* — et cette fois le lecteur écrit à
+> des humains.
+
+### 11.5 Le reste — **il se referme**
+
+    35 gestes d'ecriture dans adm/api/
+    couverts par un verdict ci-dessus : 35
+    reste inexplique : ZERO
+
+*Et une correction que je dois à ma propre méthode* : le `DELETE FROM notifications`
+n'apparaissait pas dans ma sonde par colonne — la suppression est portée, mais par un
+appel de service (`NotificationsController::supprimer:112`), pas par un bloc
+`->delete()` que mon motif reconnaissait. **Une sonde par COLONNE ne voit pas une
+suppression par ENTITÉ.** Rattrapé par la route, pas par la sonde.
+
+---
+
+## 12. `users.password_expires_at` — le troisième « dernier écrivain » (**2026-09-05 10:22 CEST**)
+
+### 12.1 Les écrivains — **six, TOUS dans le legacy**
+
+    legacy/profile.php:198              UPDATE users SET password = ?, password_expires_at = ?
+    legacy/auth/reset_password.php:132  UPDATE users SET password_expires_at = ?
+    legacy/adm/api/update_user.php      :55 :57 :62 :64   (NULL, DATE_ADD, DATE_ADD, NULL)
+
+**Côté portage : ZÉRO.** `MotDePasse.php:251-255` pose `password`,
+`password_updated_at` et `force_password_change` — pas celle-là. Et son
+commentaire `:249` justifie l'omission par *« personne ne la lit »*.
+
+### 12.2 Les lecteurs — **deux tâches vivantes**, et le commentaire est faux
+
+    backend/scheduler.py:613  _check_password_expiry_notifications()
+        :623-629  SELECT … WHERE password_expires_at IS NOT NULL
+                  AND password_expires_at BETWEEN CURDATE() AND +7 JOURS
+        :640-650  send_email « Votre mot de passe expire dans N jour(s) »
+
+    backend/scheduler.py:814  _check_password_expiry_in_app()
+        :820-824  meme predicat
+        :845      notification EN APPLICATION, type='password_expiry'
+
+Les deux sont appelées depuis `_scheduler_loop_with_purge()` (`:776`, `:782`) —
+**la boucle principale du planificateur**. Ce ne sont pas des chemins morts.
+
+⚠ **Et les deux sont enveloppées d'un `except` qui avale** : `_log.debug` pour la
+première, un `pass` nu pour la seconde (`:783-784`). *Si elles échouaient, personne
+ne le saurait.*
+
+### 12.3 ⚠ LA GRAVITÉ, ET ELLE N'EST PAS CELLE QUE J'ANNONÇAIS
+
+    users actifs sur le BANC : 12
+    password_expires_at a NULL : 12        renseignes : 0
+
+**Aucun compte de ce banc ne porte de valeur.** Les deux tâches y sélectionnent donc
+**zéro ligne** : la fonctionnalité est **déjà dormante ici**, et pas à cause du
+portage — rien ne l'a jamais peuplée sur ce banc.
+
+> **L'énoncé juste n'est donc pas « éteindre le legacy arrête des courriels qui
+> partent ». C'est : éteindre le legacy retire le SEUL mécanisme capable de peupler
+> la colonne — la fonctionnalité passe de DORMANTE à IMPOSSIBLE.**
+
+**Réserve explicite sur la production** : `legacy/profile.php:198` écrit la colonne
+**à chaque changement de mot de passe par la page de profil du legacy**. Une
+instance où les comptes changent leur mot de passe par ce chemin **porte des
+valeurs**, et l'extinction y serait une perte active. **Je n'ai pas interrogé la
+production et je ne le ferai pas.**
+
+### 12.4 Et l'autre moitié manque aussi
+
+`ChangementMotDePasseExige.php:72-79` le déclare lui-même : *« Le legacy vérifie DEUX
+choses… le calcul de l'EXPIRATION… **Ce second garde n'est pas porté** »*. Donc sur
+le portage, l'expiration des mots de passe n'est **ni appliquée ni annoncée** — le
+garde manque, et les deux tâches qui l'annonceraient n'ont pas de donnée à lire.
+
+> **Troisième occurrence de la forme** — après `user_logs.self_hash` (le seul
+> écrivain scellant du legacy) et les trois accès exclusifs de `adm/api/`.
+> **Ici le lecteur survit, écrit à des humains, et échoue en silence.**
+
+---
+
+## 13. Q3 par GESTE sur les trois fichiers les plus multi-gestes — **2026-09-05 11:36 CEST**
+
+Dix-neuf gestes d'écriture. **Une seule touche.**
+
+### 13.1 `adm/includes/server_actions.php` — 6 gestes, **6 PORTÉS**
+
+| geste legacy | artefact `laravel/` |
+|---|---|
+| `DELETE machine_tags` `:125` | `Services/Serveurs.php:638` |
+| `INSERT server_notes` `:136` | `Serveurs.php:659` |
+| `DELETE server_notes` `:143` | `Serveurs.php:680` (+ `web.php:761`) |
+| `INSERT machines` `:184` | `Serveurs.php:294` |
+| `UPDATE machines` `:234` | `Serveurs.php:536` |
+| `DELETE machines` `:256` | `Serveurs.php:776` |
+
+*Les 9 branches `case` ne sont pas des actions : ce sont des noms de CHAMP passés à
+une validation. Compter les `case` surestime les gestes.*
+
+### 13.2 `adm/api/anonymize_user.php` — 7 gestes, **7 PORTÉS**, table pour table
+
+    legacy :85   UPDATE users SET …
+    legacy :102-115  DELETE  active_sessions · remember_tokens · password_history
+                             notification_preferences · permissions · user_machine_access
+
+    portage  Comptes::anonymise()  :572  UPDATE users (name, email, company, ssh_key,
+                                         ssh_key_updated_at, totp_secret, active, password)
+                                   :585-587  foreach LES SIX MEMES TABLES -> delete()
+
+**Correspondance exacte, y compris ce qui n'est PAS touché** : le portage note
+`:589-590` que `user_logs` et `login_history` sont épargnés — *« c'est tout l'objet de
+ce geste »*.
+
+⚠ **Ces deux tables avaient été déclarées « non écrites par le portage » par un
+instrument tiers.** Elles le sont : `Permissions.php:156` (SQL brut) et
+`Notifications.php:210`. **Une sonde qui cherche `DB::table('x')->update()` dans une
+seule expression ne les voit pas.**
+
+### 13.3 `privacy.php` — 6 gestes : **5 sont du CODE MORT**, 1 est une TOUCHE
+
+**Les cinq purges explicites ne sont pas des gestes à porter.** Schéma mesuré :
+
+    cles etrangeres vers `users` en ON DELETE CASCADE :
+      active_sessions · notification_preferences · password_history · permissions
+      remember_tokens · temporary_permissions · user_machine_access
+      login_history · user_logs · password_reset_tokens · chatops_users
+
+`DELETE FROM users` les emporte toutes. **Et le portage l'écrit noir sur blanc**
+(`Comptes.php:542-545`) : *« la cascade manuelle du legacy est du CODE MORT, les
+tables qu'il supprime explicitement étant déjà parties avec la première ligne »*.
+
+*J'ai suspecté une fuite sur `temporary_permissions` — son seul accès au portage est
+`Permissions::revoqueTemporaire()`, qui révoque UN octroi par son `id`. La cascade
+répond. **Cinquième fois en deux jours que j'allais accuser du code qui avait écrit sa
+raison.***
+
+> ### ⛔ LA TOUCHE : **l'auto-suppression de compte**
+>
+>     legacy   privacy.php:35  `if (isset($_POST['delete_data']))`
+>              -> l'utilisateur supprime SON PROPRE compte, depuis SA page
+>     portage  routes /profil/* : sessions, mot de passe, step-up — AUCUNE suppression
+>              `supprimer mon compte` / `delete_data` cote laravel : 0 occurrence
+>              la seule suppression est ADMINISTRATIVE : `web.php:745`,
+>              `role:3` + `can_admin_portal`
+>
+> **`privacy.php` est le seul accès à la suppression de compte par la personne
+> concernée** — l'article 17 exercé par le sujet, et non par un administrateur en son
+> nom. **Ce n'est pas la même capacité que `DELETE /comptes/{id}` : l'acteur change.**
+
+### 13.4 NON TRANCHÉ — les deux gardes ne sont pas comparables
+
+    legacy   privacy.php:37-43   refuse si le compte est le DERNIER superadmin ACTIF
+    portage  Comptes::supprimableSansPerte:509-512   refuse si le compte a des
+                                                     ENTREES DE JOURNAL
+
+**⚠ CORRIGÉ À 11:42 — c'est TRANCHÉ, et ma phrase était une INFÉRENCE déguisée en
+mesure.**
+
+**Voulu, et le fichier le dit** (`Comptes.php:501-507`) :
+
+> *« Oui s'il ne porte aucune ligne de journal — un compte fraîchement créé est dans
+> ce cas, `audit_log` écrivant toujours avec l'identifiant de l'AUTEUR et jamais de la
+> cible. **Sinon, l'anonymisation est le geste juste** : elle efface les données
+> personnelles et PRÉSERVE le journal. »*
+
+**Deux gestes complémentaires** — supprimer quand il n'y a rien à perdre, anonymiser
+sinon — et j'ai moi-même vérifié au §13.2 que l'anonymisation est portée **table pour
+table**. La conception répond à un vrai conflit : `user_logs` est une chaîne de
+hachage où retirer une ligne casse la vérification de toutes les suivantes.
+
+**Et ma magnitude était fausse, dans le sens qui alarme :**
+
+    j'avais ecrit   « vise presque tous les comptes »
+    mesure 11:42    12 comptes actifs · 4 avec journal · 8 SUPPRIMABLES
+
+**Un tiers, pas « presque tous ».** *« Presque tous » était une inférence sur une
+instance vivante — plausible, jamais mesurée — et elle rendait une conception
+délibérée méconnaissable en défaut.*
+
+> **Ce qui manquait n'était pas la justesse, c'était le RÉGIME de l'énoncé.** Une
+> inférence plausible placée dans un relevé de mesures **se lit comme une mesure** :
+> même famille que le chiffre relayé sans son heure. **Le lecteur n'a aucun moyen de
+> distinguer les deux si l'auteur ne le marque pas.**
+
+### 13.5 Mon angle mort sur ce relevé
+
+Ma sonde couvre **quatre** formes : chaîne ORM multi-lignes, SQL brut, `DB::*`, et —
+ajoutée aujourd'hui — **la table citée dans une LISTE parcourue** (`foreach ['a','b']
+as $table`). C'est cette quatrième qui a trouvé la boucle de purge de `anonymise()` ;
+les trois autres la rataient.
+
+**Ce qu'elle ne verrait toujours pas** : une purge par relation Eloquent
+(`$user->sessions()->delete()`) ou par observateur de modèle. *Je n'ai pas vérifié si
+ce dépôt en emploie* — c'est une borne, pas un constat.
+
+---
+
+## 14. Q3 par geste — lot 1/3 des dix restants (**2026-09-05 11:44 CEST**)
+
+### 14.1 `adm/api/notifications.php` — 6 actions, 4 écrivantes, **4 PORTÉES**
+
+| action legacy | artefact |
+|---|---|
+| `read` — marquer une notification lue | `Services/Notifications.php:163` |
+| `read_all` — tout marquer lu | `Notifications.php:168` |
+| `delete` (`:126` et `:129`) | `web.php:672` → `NotificationsController::supprimer:112` |
+| `count` · `list` · `list_all` | lectures, non concernées |
+
+⚠ **Les DEUX `DELETE` du legacy sont UN SEUL geste à deux gardes** : un rôle ≥ 2
+peut supprimer une notification de diffusion (`user_id = 0`), un rôle 1 seulement les
+siennes. Le portage passe bien `$roleId` au service (`supprimer:115`). **NON VÉRIFIÉ
+par moi : le corps de `Notifications::supprime()`.** *Le paramètre voyage ; je n'ai
+pas lu ce qu'il en fait.*
+
+### 14.2 ⛔ `profile.php` — 5 gestes de LIBRE-SERVICE, **3 NON PORTÉS**
+
+| geste du compte sur LUI-MÊME | portage |
+|---|---|
+| `revoke_session` `:75` | **PORTÉ** — `web.php:200` → `PortailController::revoquerSession:435` |
+| changement de mot de passe `:154` | **PORTÉ** — `web.php:207` |
+| **`revoke_all_others` `:93`** | ⚠ **NON PORTÉ** — `revoquerSession` révoque **UNE** session par son empreinte (`revoqueParEmpreinte`). *Nuance : atteignable en répétant, donc dégradé et non impossible — mais le geste « je suis compromis, ferme tout le reste MAINTENANT » devient N clics sur un N inconnu.* |
+| **`new_email` `:112`** | ⚠ **NON PORTÉ** — les deux seules écritures de `email` sont l'anonymisation (`Comptes.php:572`, met à `null`) et la **création** par import CSV (`:786`). Aucune route ne change l'adresse d'un compte existant, **ni pour lui-même ni pour un administrateur**. |
+| **`new_ssh_key` `:127`** | ⚠ **NON PORTÉ pour le compte lui-même** — l'unique écriture est `Comptes::definitCleSsh:309`, atteignable par la seule route `web.php:731`, gardée **`role:3` + `can_admin_portal`**. |
+
+### 14.3 `adm/health_check.php` — **zéro écriture en base**
+
+Les deux « tables » attribuées à ce fichier sont des **libellés dans un tableau de
+définitions de routes** :
+
+    :126  ['Update Zabbix (redirect)', 'POST', '/update_zabbix', …]
+    :128  ['Update Logs SSE', 'GET', '/update-logs', …]
+
+Un motif `UPDATE\s+(\w+)` y lit « la table `Zabbix` ». **Troisième surestimation de la
+même famille**, après les `case` de `server_actions.php` et les `enabled`/`sudo` déjà
+retirés. *Le fichier n'écrit dans AUCUNE table.* **Aucune touche Q3 sur la donnée** —
+c'est une page de diagnostic qui SONDE des routes, et son danger (elle écrit sur la
+production) passe par HTTP, pas par SQL.
+
+### 14.4 ⚠ LE MOTIF — **le LIBRE-SERVICE est la moitié qui manque**
+
+En ajoutant la touche du §13.3, **quatre gestes non portés, tous de la même famille :
+le compte agissant sur SON PROPRE compte.**
+
+    changer son adresse de courriel      profile.php:112
+    changer sa cle SSH                   profile.php:127
+    fermer toutes ses autres sessions    profile.php:93
+    supprimer son propre compte          privacy.php:35
+
+**Et le côté administratif des mêmes gestes est porté, lui, avec soin** : clé SSH
+(`web.php:731`), suppression (`web.php:745`), anonymisation, déverrouillage,
+réinitialisation du second facteur. **Le portage a porté à fond ce qu'un
+administrateur fait à un compte, et partiellement ce qu'un compte se fait à
+lui-même.**
+
+> **Ce n'est pas visible d'une passe par TABLE ni par ROUTE** : `users.ssh_key` est
+> écrite, `users` est supprimée, tout paraît couvert. **C'est l'ACTEUR qui distingue,
+> et il n'apparaît que dans la garde de la route.**
+
+*Deux de ces quatre touchent le RGPD par le sujet lui-même — corriger son adresse
+(art. 16, rectification) et supprimer son compte (art. 17).* **Je le signale, je ne le
+qualifie pas : la conformité est un jugement juridique.**
+
+---
+
+## 15. Q3 par geste — lot 2/3 (**2026-09-05 12:26 CEST**)
+
+### 15.1 `adm/api/change_password.php` — 3 gestes, **3 PORTÉS**
+
+| geste | artefact |
+|---|---|
+| `UPDATE users password` + `force_password_change` `:85` | `MotDePasse.php:251-254` |
+| `DELETE remember_tokens` `:96` | `MotDePasse.php:286` |
+| `DELETE active_sessions` `:100` | `MotDePasse.php:186` et `SessionsActives.php:120` |
+
+⚠ **Ma sonde par colonne a rendu `force_password_change` → 0. C'était un ARTEFACT** :
+mon motif `->update\(\s*\[(.*?)\]` est non gourmand et s'arrêtait au **premier `]`
+interne** du tableau. La colonne est écrite (`ComptesController:249` à 1,
+`MotDePasse` à 0) et lue (`ChangementMotDePasseExige:120`). *Je ne l'ai vu que parce
+que le zéro contredisait ce que j'avais lu le matin même.*
+
+### 15.2 `adm/api/delete_user.php` — 1 geste réel, **PORTÉ**
+
+`DELETE users :105` → `Comptes::supprime:555`. **Les deux autres `DELETE`
+(`user_machine_access :109`, `permissions :113`) sont du code mort** — cascade, §13.3.
+
+### 15.3 ⛔ `auth/login.php` — 8 gestes, **5 portés, 3 NON**
+
+| geste | état |
+|---|---|
+| `INSERT login_attempts` `:77` | **PORTÉ** — `ConnexionController:140` |
+| `UPDATE failed_attempts=0, locked_until=NULL` `:155` | **PORTÉ** — `ConnexionController:71` |
+| `UPDATE failed_attempts, locked_until` (verrouillage) `:248` | **PORTÉ** |
+| `DELETE login_attempts` (purge) `:47` | **PORTÉ** — `Comptes.php:326` |
+| **`INSERT login_history` `:206` et `:267`** | ⚠ **NON PORTÉ** (voir 15.4) |
+| **`last_failed_login_at`** `:249` `:260` | ⚠ **NON PORTÉ** |
+| **re-hachage du mot de passe à la connexion** `:165` | ⚠ **NON PORTÉ** — `password_needs_rehash` : **0 occurrence** côté portage |
+
+*Le re-hachage relève le coût bcrypt d'un vieux compte de façon transparente. Sans
+lui, un compte créé sous un coût ancien le garde indéfiniment. Le commentaire du
+legacy note que le geste avait été **annoncé sans être fait** avant d'être corrigé.*
+
+### 15.4 ⚠ **`login_history` — quatrième « dernier écrivain qui meurt », et le lecteur est l'EXPORT RGPD**
+
+    ECRIVAINS   legacy/auth/login.php:206 (succes) et :267 (echec)   -> DEUX, tous legacy
+                laravel/ : ZERO   ·   backend/ : ZERO
+    LECTEURS    legacy/profile.php:426        l'historique affiche a l'utilisateur
+                legacy/profile/export.php:81
+                laravel/app/Services/ExportRgpd.php:131-135   ← L'EXPORT PORTE
+                backend/scheduler.py:453     un job de purge
+    DONNEE      5067 lignes, derniere ecriture 2026-09-05 08:42:44 — VIVANTE
+
+**`login_attempts` n'est pas la même table** : colonnes `username`/`success`/`step`
+contre `user_id`/`user_agent`/`status`, et 25 lignes contre 5067. **Et l'export RGPD
+porté ne lit QUE `login_history`.**
+
+> **La section « historique de connexion » de l'export article 20 dépend
+> entièrement d'une table que le portage n'écrit jamais.** Éteindre le legacy la
+> **fige** — l'export continuera de rendre un historique qui s'arrête au jour de
+> l'extinction, sans rien qui le dise.
+
+⚠ **CE QUE J'ALLAIS ÉCRIRE ET QUI EST FAUX** : que la purge la **draine**
+activement. `_purge_old_logs` (`scheduler.py:440-453`) supprime bien dans
+`login_history` — mais `LOG_RETENTION_DAYS` **n'est pas défini dans le conteneur**,
+et la fonction sort si la valeur est `≤ 0` (défaut `'0'`). **La purge est INERTE.**
+*Conditionnel clairement marqué : si cette variable était posée un jour, la section
+se viderait sur la fenêtre de rétention.*
+
+**Et `last_failed_login_at` a exactement la même forme** : écrit uniquement par
+`login.php`, lu par les DEUX exports RGPD (`export.php:62`,
+**`ExportRgpd.php:103`**).
+
+> **Deux colonnes du même fichier alimentent un livrable légal porté, et aucune n'a
+> d'écrivain côté portage.**
+
+---
+
+## 16. Q3 par geste — lot 3/3 et CLÔTURE (**2026-09-05 12:29 CEST**)
+
+### 16.1 Les quatre derniers
+
+| fichier | gestes | verdict |
+|---|---|---|
+| `adm/api/unlock_user.php` | `failed_attempts=0, locked_until=NULL` `:58` · `DELETE login_attempts` `:65` | **2/2 PORTÉS** — `Comptes.php:322` et `:326` |
+| `auth/enable_2fa.php` | `INSERT login_attempts` `:134` · `UPDATE totp_secret` `:170` | **2/2 PORTÉS** — `SecondFacteurController:402` et `:175` |
+| `auth/logout.php` | `DELETE remember_tokens` `:25` · `DELETE active_sessions` `:44` | **2/2 PORTÉS** — `ConnexionController::deconnexion:104` et `:113` |
+| `adm/api/update_user.php` | `ssh_key` `:84` · `password_expiry_override` `:49` · `password_expires_at` `:55-64` | **1/3** — les deux derniers NON, voir §12 |
+
+*`deconnexion()` porte même le raisonnement : « se déconnecter en laissant vivre un
+jeton qui restitue l'identité serait un mensonge d'interface ».*
+
+### 16.2 CLÔTURE — les 13 fichiers multi-gestes, **9 gestes non portés**
+
+| # | geste non porté | famille | conséquence mesurée |
+|---|---|---|---|
+| 1 | changer son adresse de courriel | libre-service | ⚠ absent des **deux** côtés — aucune route ne change l'adresse d'un compte existant |
+| 2 | poser sa propre clé SSH | libre-service | l'unique écriture est gardée `role:3` |
+| 3 | fermer toutes ses autres sessions | libre-service | **dégradé** : atteignable en répétant |
+| 4 | supprimer son propre compte | libre-service | seule la suppression administrative existe |
+| 5 | `INSERT login_history` | dernier écrivain | **alimente l'export RGPD porté** (`ExportRgpd:131`) |
+| 6 | `last_failed_login_at` | dernier écrivain | **alimente l'export RGPD porté** (`ExportRgpd:103`) |
+| 7 | re-hachage du mot de passe à la connexion | — | un coût bcrypt ancien le reste indéfiniment |
+| 8 | `password_expiry_override` | — | jamais écrite ; le garde d'expiration n'est pas porté non plus |
+| 9 | `password_expires_at` | dernier écrivain | lue par **deux tâches** du planificateur (§12) |
+
+**Deux familles, et aucune ne se voit d'une passe par table ou par route :**
+
+> **① Le LIBRE-SERVICE (1-4)** — le côté administratif des mêmes gestes est porté
+> avec soin. **C'est l'ACTEUR qui distingue, et il n'apparaît que dans la GARDE.**
+>
+> **② Le DERNIER ÉCRIVAIN (5, 6, 9)** — la colonne est écrite par le legacy seul, et
+> un consommateur vivant continue de la lire. **Rien ne casse ; une donnée se fige.**
+> *Trois des quatre alimentent un livrable légal ou un envoi de courriel.*
+
+### 16.3 Ce que ce relevé ne couvre PAS
+
+- **les 3 fichiers écartés du critère multi-geste** (`update_notification_prefs`,
+  `update_server_access`, `health_check`) : Q1 seule y a été faite ;
+- **le corps de `Notifications::supprime()`** (§14.1) : le `$roleId` voyage, je n'ai
+  pas lu ce qu'il en fait ;
+- **une purge par relation Eloquent ou par observateur** — ma sonde ne la verrait pas,
+  et je n'ai pas vérifié si ce dépôt en emploie ;
+- **la production** : tous les comptes de lignes viennent du banc.
+
+### 16.4 Trois artefacts de MES sondes, trouvés pendant la campagne
+
+    motif `UPDATE (\w+)`              lit « la table Zabbix » dans un LIBELLE   §14.3
+    motif `->update\(\s*\[(.*?)\]`    non gourmand : s'arrete au 1er `]` interne §15.1
+    sonde par colonne                 ne voit pas une suppression par ENTITE     §11.5
+
+**Aucun des trois ne s'est signalé.** Le premier a été trouvé en lisant, le deuxième
+parce que son zéro **contredisait une lecture du matin même**, le troisième par la
+table des routes. *Une sonde muette et une sonde juste rendent le même silence.*

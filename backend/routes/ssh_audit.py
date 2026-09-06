@@ -44,14 +44,14 @@ def _log_audit_action(machine_id, action, details, user_id='0'):
         return
     try:
         uid = int(user_id) if user_id and user_id.isdigit() else 0
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute(
-            "INSERT INTO user_logs (user_id, action, details, created_at) "
-            "VALUES (%s, %s, %s, NOW())",
-            (uid, f'ssh_audit_{action}', f'{details} sur machine #{int(machine_id)}'))
-        conn.commit()
-        conn.close()
+        # ⚠ Cette insertion visait une colonne `details` qui N'EXISTE PAS dans
+        # `user_logs` : elle levait a chaque appel, et l'exception etait avalee
+        # plus bas par un `logger.debug`. Mesure du 2026-09-05 : **0 ligne**
+        # `ssh_audit_%` en base, alors que d'autres ecrivains y figurent (temoin :
+        # 156 lignes `[graylog]`). Le detail rejoint donc `action`, seule colonne
+        # qui existe, et l'ecriture est CHAINEE.
+        from audit_chain import journalise
+        journalise(uid, f'ssh_audit_{action} - ' + f'{details} sur machine #{int(machine_id)}')
     except Exception as e:
         logger.debug("ssh_audit action log insert failed: %s", e)
 
@@ -119,6 +119,7 @@ def _save_audit_result(machine_id, result, config_raw, ssh_version, audited_by):
 
 @bp.route('/ssh-audit/scan', methods=['POST'])
 @require_api_key
+@require_permission('can_audit_ssh')
 @require_machine_access
 @threaded_route
 def ssh_audit_scan():
@@ -314,6 +315,7 @@ def ssh_audit_fleet():
 
 @bp.route('/ssh-audit/results', methods=['GET'])
 @require_api_key
+@require_permission('can_audit_ssh')
 @require_machine_access
 @threaded_route
 def ssh_audit_results():
@@ -359,6 +361,32 @@ def ssh_audit_results():
 
 @bp.route('/ssh-audit/config', methods=['POST'])
 @require_api_key
+# ══ E-390 : LE GESTE QUI ECRIT ETAIT GARDE, CELUI QUI LIT NON ══════════════
+#
+# `POST /ssh-audit/config` portait `@require_api_key` + `@require_machine_access`
+# et rien d'autre, tandis que sa jumelle `POST /ssh-audit/save-config` porte
+# `@require_role(2)`. Or les DEUX pages exigent la meme permission :
+#   legacy  : legacy/ssh-audit/index.php:12-13  checkPermission('can_audit_ssh')
+#   portage : laravel/routes/web.php:229        ['role:1', 'perm:can_audit_ssh']
+#
+# Ce que rendait ce trou : `legacy/documentation.php` est un forgeur de requetes
+# graphique (champ d'endpoint libre, corps libre), au MENU, ouvert a tout compte
+# connecte. Un role 1 SANS `can_audit_ssh` pouvait donc lire le `sshd_config`
+# de ses machines assignees — `PermitRootLogin`, `AllowUsers`, les ports, les
+# methodes d'authentification. Ce n'est pas un secret, c'est une carte.
+#
+# Une PERMISSION et pas `@require_role(2)` : les deux pages admettent un role 1
+# qui la porte, et un role 2 backend aurait defait la page qu'il sert (meme
+# raison qu'E-389 sur `updates.py`).
+#
+# ⚠ Court-circuit au role 3 (`helpers.py:338`) : un superadmin passe SANS porter
+# la ligne. Voulu — mais ce garde ne s'applique donc pas a tous.
+#
+# ✅ E-391 : LES TROIS AUTRES ROUTES NUES DU MODULE SONT FERMEES (meme garde).
+# `/ssh-audit/scan`, `/ssh-audit/results` et `/ssh-audit/backups` portent
+# desormais `@require_permission('can_audit_ssh')`. Le module n'a plus de route
+# sans role ni permission — verifie par le balayage AST, pas par cette liste.
+@require_permission('can_audit_ssh')
 @require_machine_access
 @threaded_route
 def ssh_audit_config():
@@ -521,6 +549,40 @@ def ssh_audit_policies_get():
 @bp.route('/ssh-audit/policies', methods=['POST'])
 @require_api_key
 @require_role(2)
+# ══ E-402 : L'ECRITURE ETAIT MOINS GARDEE QUE LA LECTURE ═══════════════════
+#
+# ⚠ Le commit qui a pose cette garde (`356caea`) l'annonce sous « E-392 ».
+# Ce numero etait DEJA PRIS (`PARITE.md:227`, le blocage 2FA par adresse IP).
+# Le registre porte E-402 ; l'historique n'est pas reecrit pour un numero,
+# donc c'est ici et au CHANGELOG que la correspondance se lit.
+#
+# Sa jumelle `GET /ssh-audit/policies` (l.476) porte
+# `@require_permission('can_audit_ssh')`. Celle-ci portait `@require_role(2)`
+# SEUL : un compte de role 2 sans la permission pouvait ECRIRE une politique
+# SSH qu'il n'avait pas le droit de LIRE. C'est E-390 a l'envers — la, la
+# lecture etait nue et l'ecriture gardee.
+#
+# Le balayage qui a ferme E-390/E-391 cherchait « ni role ni permission » : il
+# ne POUVAIT pas voir cette route, qui porte un role. La classe qui la rend est
+# « garde PLUS FAIBLE que celle de son jumeau » — meme chemin, autre methode.
+#
+# ⚠ LE ROLE EST CONSERVE, ET C'EST DELIBERE. Un miroir exact du jumeau
+# retirerait `require_role(2)` : la lecture ne l'a pas. Mais la page legacy
+# admet un role 1 porteur de la permission (`ssh-audit/index.php:12-13`), donc
+# ce « miroir » OUVRIRAIT l'ecriture de politique a un role 1. Mesure du
+# 2026-09-05 : `can_audit_ssh` est portee par 1 role 3 et 1 role 2, zero role 1
+# (temoin : 12 comptes actifs) — l'elargissement serait donc invisible
+# aujourd'hui et effectif au premier octroi. La garde est ADDITIVE : role 2 ET
+# permission.
+#
+# ⚠ `@require_machine_access` NE PEUT REFUSER PERSONNE ICI, et il faut le dire
+# plutot que de le laisser lire comme une protection : `machine_id` est
+# OPTIONNEL sur cette route (`None` = politique globale), et
+# `check_machine_access` rend `True` sans condition des `role_id >= 2`
+# (`helpers.py:364`) — ce que la ligne au-dessus exige deja. Il est pose en
+# miroir du jumeau, et il ne mordra que si le role venait a etre relache.
+@require_permission('can_audit_ssh')
+@require_machine_access
 @threaded_route
 def ssh_audit_policies_set():
     """Definit une policy (audit/ignore) pour une directive."""
@@ -631,6 +693,7 @@ def ssh_audit_toggle():
 
 @bp.route('/ssh-audit/backups', methods=['POST'])
 @require_api_key
+@require_permission('can_audit_ssh')
 @require_machine_access
 @threaded_route
 def ssh_audit_backups():
@@ -716,7 +779,24 @@ def ssh_audit_reload():
 
 @bp.route('/ssh-audit/schedules', methods=['GET'])
 @require_api_key
+# ══ E-403 : LES QUATRE ROUTES DE PLANIFICATION D'AUDIT ═════════════════════
+#
+# Elles portaient `@require_role(2)` SEUL, alors que les deux pages du module
+# exigent `can_audit_ssh` (`legacy/ssh-audit/index.php:12-13`,
+# `laravel/routes/web.php:229`). Meme ecart qu'E-402 sur les politiques.
+#
+# `toggle` est la plus consequente malgre sa taille : elle ne DESARME pas, elle
+# BASCULE. Un role 2 sans la permission pouvait donc RE-ARMER un releve SSH
+# recurrent que quelqu'un avait suspendu.
+#
+# ⚠ ADDITIF, pas miroir — et PAS de `@require_machine_access` : la table
+# `ssh_audit_schedules` n'a AUCUNE colonne `machine_id` (mesure du 2026-09-05,
+# temoin `user_machine_access.machine_id` = 1). Un decorateur d'acces machine
+# qui ne trouve pas d'identifiant laisse TOUT passer : ce serait une garde sans
+# objet collee a une garde qui commande, et le lecteur suivant en compterait
+# deux la ou il y en a une.
 @require_role(2)
+@require_permission('can_audit_ssh')
 @threaded_route
 def list_ssh_schedules():
     """Liste les planifications de scans SSH Audit."""
@@ -739,6 +819,7 @@ def list_ssh_schedules():
 @bp.route('/ssh-audit/schedules', methods=['POST'])
 @require_api_key
 @require_role(2)
+@require_permission('can_audit_ssh')
 @threaded_route
 def create_ssh_schedule():
     """Cree une planification de scan SSH Audit."""
@@ -786,16 +867,61 @@ def create_ssh_schedule():
     # sans lui la base leve et l'appelant recoit un 500 opaque, la ou un 400
     # nomme ce qui ne va pas. *Une garde redondante qui ameliore le message n'est
     # pas une garde inutile.*
-    PORTEES = ('all', 'tag', 'environment', 'machines')
-    target_type = (data.get('target_type') or 'all').strip()
+    # ══ `'all'` N'EST PLUS UNE PORTEE ACCEPTABLE ═══════════════════════════
+    #
+    # `'all'` etait la SEULE portee n'exigeant aucun `target_value`, et le
+    # planificateur la traite en prenant tout le parc non archive. Mesure du
+    # 2026-09-04 : les TROIS machines du parc, `srv-zabbix` (id 1) comprise, dont
+    # aucune n'est archivee. « Tout le parc » n'est donc pas une abstraction —
+    # c'est la production.
+    #
+    # ET LA FERMETURE EST ICI, PAS DANS LE `<select>`. La regle invoquee pour
+    # retirer `'all'` de l'ecran — *une entree libre ABSENTE ne se contourne pas,
+    # une entree validee se contourne* — est vraie du SERVEUR. Un `<select>` se
+    # contourne exactement comme un champ valide : par une requete forgee. Poser
+    # la fermeture a l'ecran seul, c'est la poser la ou elle ne mord pas.
+    #
+    # AUCUNE COMPATIBILITE A PRESERVER : `ssh_audit_schedules` et
+    # `cve_scan_schedules` portent 0 ligne (mesure, temoin `machines_total = 3`).
+    # L'argument « garder `'all'` pour les planifications anterieures » n'avait
+    # pas d'objet.
+    #
+    # `tag` rend le meme service — un tag peut couvrir le parc — en exigeant un
+    # geste EXPLICITE. C'est la forme que V10a a imposee aux surcharges de
+    # supervision, pour la meme raison.
+    #
+    # ⚠ ET LE DEFAUT IMPLICITE DISPARAIT AVEC. Sans ca,
+    # `data.get('target_type') or 'all'` fabriquerait une valeur aussitot
+    # refusee : un corps sans `target_type` recevrait un message parlant de
+    # `'all'` qu'il n'a jamais envoye. **Une portee ne se devine plus.**
+    PORTEES = ('tag', 'environment', 'machines')
+    target_type = (data.get('target_type') or '').strip()
     target_value = (data.get('target_value') or '').strip() or None
 
+    if not target_type:
+        return jsonify({
+            'success': False,
+            'message': ("target_type requis : une planification n'a plus de portee "
+                        f"par defaut. Valeurs acceptees : {', '.join(PORTEES)}.")
+        }), 400
+    if target_type == 'all':
+        # Message DISTINCT du type inconnu : `'all'` reste une valeur legale de
+        # l'ENUM en base, et un appelant qui la lit dans le schema doit savoir
+        # qu'elle est refusee par DECISION, pas par faute de frappe.
+        return jsonify({
+            'success': False,
+            'message': ("La portee 'all' n'est plus acceptee : une planification "
+                        "de relevé SSH ne peut plus viser tout le parc par defaut. "
+                        f"Designez la portee ({', '.join(PORTEES)}) — un tag peut "
+                        "couvrir le parc, mais il faut l'ecrire.")
+        }), 400
     if target_type not in PORTEES:
         return jsonify({
             'success': False,
             'message': f"target_type doit valoir l'un de : {', '.join(PORTEES)}"
         }), 400
-    if target_type != 'all' and not target_value:
+    if not target_value:
+        # Les trois portees restantes l'exigent toutes : plus d'exception.
         return jsonify({
             'success': False,
             'message': (f"Une portee '{target_type}' exige target_value. "
@@ -820,6 +946,7 @@ def create_ssh_schedule():
 @bp.route('/ssh-audit/schedules/<int:schedule_id>', methods=['DELETE'])
 @require_api_key
 @require_role(2)
+@require_permission('can_audit_ssh')
 @threaded_route
 def delete_ssh_schedule(schedule_id):
     """Supprime une planification de scan SSH Audit."""
@@ -827,9 +954,37 @@ def delete_ssh_schedule(schedule_id):
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute("DELETE FROM ssh_audit_schedules WHERE id = %s", (schedule_id,))
+        deleted = cur.rowcount
         conn.commit()
         conn.close()
-        return jsonify({'success': True, 'message': 'Planification supprimee'})
+        # E-403 bis : `success` suit l'EFFET, pas l'absence d'exception. Cette
+        # route rendait `True` sans regarder `rowcount` — donc « supprime » pour
+        # un identifiant qui n'existait pas. `wazuh.delete_rule` (`:1167`) rend
+        # deja `success: deleted > 0` : deux routes du meme depot repondaient de
+        # facon opposee a « qu'est-ce que supprime veut dire ».
+        #
+        # Le message du cas zero est explicite A DESSEIN : les deux portails
+        # affichent `corps.message` quand il existe et retombent sinon sur un
+        # libelle d'erreur generique (`audit-ssh.js:1023`). Sans lui, une
+        # suppression concurrente afficherait « erreur » pour une planification
+        # qui a bel et bien disparu.
+        if not deleted:
+            # ⚠ 404 ET NON 200, contre la forme de `wazuh.delete_rule` (`:1167`)
+            # qui rend `success: False` avec un 200. La difference n'est pas un
+            # gout : `tests/test_verdicts_deux_cents.py` a REFUSE le 200 ici, et
+            # le motif se verifie sur l'appelant —
+            #   legacy/ssh-audit/js/main.js:775
+            #     if (r.ok) { toast('Planification supprimee', 'success'); ... }
+            # il ne lit QUE le statut. Un 200 porteur d'un refus lui aurait fait
+            # annoncer une reussite. Le portage, lui, lit `corps.success`
+            # (`audit-ssh.js:1023`) et affiche `corps.message` : les deux sont
+            # donc corrects avec un 404, un seul l'etait avec un 200.
+            return jsonify({
+                'success': False, 'deleted': 0,
+                'message': "Aucune planification supprimee : l'identifiant "
+                           "n'existe plus (deja supprimee ?)"}), 404
+        return jsonify({'success': True, 'deleted': deleted,
+                        'message': 'Planification supprimee'})
     except Exception as e:
         logger.error("[ssh-audit/schedules DELETE] %s", e)
         return jsonify({'success': False, 'message': 'Erreur interne'}), 500
@@ -838,6 +993,7 @@ def delete_ssh_schedule(schedule_id):
 @bp.route('/ssh-audit/schedules/<int:schedule_id>/toggle', methods=['POST'])
 @require_api_key
 @require_role(2)
+@require_permission('can_audit_ssh')
 @threaded_route
 def toggle_ssh_schedule(schedule_id):
     """Active/desactive une planification."""

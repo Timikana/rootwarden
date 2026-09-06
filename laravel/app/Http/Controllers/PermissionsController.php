@@ -48,19 +48,26 @@ class PermissionsController extends Controller
         ];
     }
 
-    /** Meme scellement que D1 : une ecriture nue creuserait le trou qu'il mesure. */
+    /**
+     * Journalise dans `user_logs` en DELEGUANT au seul ecrivain qui verrouille.
+     *
+     * ⚠ CETTE METHODE LISAIT LA TETE DE CHAINE SANS VERROU — corrige le
+     * 2026-09-05. Elle faisait `orderByDesc('id')->value('self_hash')` hors
+     * transaction, la ou `JournalAudit::ajoute()` prend `lockForUpdate()` sur la
+     * tete DANS une transaction.
+     *
+     * > *Deux ecritures concurrentes qui lisent la meme tete produisent deux
+     * > lignes portant le MEME `prev_hash`, donc une chaine FOURCHUE, que
+     * > `verifie()` signalera comme rompue sans pouvoir dire laquelle des deux
+     * > branches est la bonne.*
+     *
+     * C'etait l'une des « trois copies restant a migrer » que le docblock
+     * d'`ajoute()` annonce lui-meme. *Une copie qui delegue ne peut plus
+     * diverger.*
+     */
     private function journalise(int $auteur, string $action): void
     {
-        $tete = DB::table('user_logs')->whereNotNull('self_hash')
-            ->orderByDesc('id')->value('self_hash') ?: JournalAudit::GENESE;
-        $ts = time();
-        DB::table('user_logs')->insert([
-            'user_id' => $auteur,
-            'action' => mb_substr($action, 0, 255),
-            'created_at' => date('Y-m-d H:i:s', $ts),
-            'prev_hash' => $tete,
-            'self_hash' => $this->journal->empreinte($tete, $auteur, mb_substr($action, 0, 255), $ts),
-        ]);
+        $this->journal->ajoute($auteur, $action);
     }
 
     public function __invoke(Request $requete, Machines $machines): View
@@ -68,9 +75,11 @@ class PermissionsController extends Controller
         $comptes = $this->comptes->liste();
         $droits = [];
         $acces = [];
+        $presets = [];
         foreach ($comptes as $c) {
             $droits[$c['id']] = $this->permissions->pour($c['id']);
             $acces[$c['id']] = $this->permissions->machinesDe($c['id']);
+            $presets[$c['id']] = $this->permissions->presetsDe($c['id']);
         }
 
         return view('permissions', [
@@ -78,6 +87,14 @@ class PermissionsController extends Controller
             'permissions' => $this->permissions->toutes(),
             'droits' => $droits,
             'acces' => $acces,
+            'presets' => $presets,
+            /*
+             * La liste FERMEE vient du SERVICE, pas de la vue : c'est la meme
+             * qui valide cote serveur. Deux listes divergeraient, et celle qui
+             * decide n'est pas celle qu'on lit.
+             */
+            'presetsProposes' => Permissions::PRESETS,
+            'presetsAbsents' => Permissions::PRESETS_ABSENTS,
             'machines' => $machines->liste(),
             // Sous-lot D5b : la moitie de `manage_permissions.php` que D5 avait
             // laissee dehors. Lue en base ; l'octroi passe par la passerelle,
@@ -181,16 +198,43 @@ class PermissionsController extends Controller
             return response()->json(['success' => false, 'message' => __('perms.err_valeur')], 422);
         }
         $accorde = $requete->boolean('value');
-        $err = $this->permissions->definitAcces($id, $machine, $accorde, $auteur, $roleAuteur);
+
+        /*
+         * `has()` pour l'EXISTENCE, `input() ?? ''` pour la valeur.
+         * `ConvertEmptyStringsToNull` est dans le groupe `web` : `input('preset')`
+         * rend `null` pour une chaine vide, ce qui est indiscernable d'un champ
+         * non soumis. Ici la distinction compte — « ne touche pas au prereglage »
+         * n'est pas « mets-le a vide ».
+         */
+        $preset = $requete->has('preset')
+            ? (string) ($requete->input('preset') ?? '')
+            : null;
+
+        $err = $this->permissions->definitAcces($id, $machine, $accorde, $auteur, $roleAuteur, $preset);
         if ($err !== null) {
             return response()->json(['success' => false, 'message' => __($err)], 403);
         }
+        $trace = $accorde ? 'Octroi' : 'Retrait';
+        if ($accorde && $preset !== null) {
+            // Un octroi de PRIVILEGE se trace avec le privilege accorde : sans le
+            // prereglage, le journal ne dit pas ce qui a ete donne.
+            $trace .= " (sudo: {$preset})";
+        }
         $this->journalise($auteur,
-            ($accorde ? 'Octroi' : 'Retrait') . " de l'acces machine #{$machine} pour le compte #{$id}");
+            $trace . " de l'acces machine #{$machine} pour le compte #{$id}");
 
+        /*
+         * `preset` est rendu pour que l'ECRAN affiche ce que le serveur a ECRIT,
+         * et non ce qui lui a ete demande. Sur un ecran de privilege la
+         * difference compte : une liste qui montre « sudo complet » alors que la
+         * base porte autre chose ferait decider la suite sur une croyance
+         * fausse. Un octroi sans prereglage explicite vaut `none` — c'est le
+         * defaut de la colonne (051), pas une absence de decision.
+         */
         return response()->json([
             'success' => true,
             'actif' => $accorde,
+            'preset' => $accorde ? ($preset ?? 'none') : null,
             'message' => $accorde ? __('perms.acces_accorde') : __('perms.acces_retire'),
         ]);
     }

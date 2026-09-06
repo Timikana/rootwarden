@@ -156,17 +156,14 @@ def _get_ssh_creds(row):
 
 
 def _audit_log(user_id: int, action: str, details: str):
-    """Journalise une action dans user_logs."""
-    try:
-        with get_db_connection() as conn:
-            cur = conn.cursor()
-            cur.execute(
-                "INSERT INTO user_logs (user_id, action, created_at) VALUES (%s, %s, NOW())",
-                (user_id, f"[bashrc] {action} - {details}")
-            )
-            conn.commit()
-    except Exception as e:
-        logger.warning("Audit log bashrc echec : %s", e)
+    """Journalise une action CHAINEE dans `user_logs`.
+
+    Le chainage passe par `audit_chain.journalise` : avant, cette fonction
+    inserait sans `prev_hash` ni `self_hash`, et ses 19 lignes etaient donc
+    hors chaine (mesure du 2026-09-05).
+    """
+    from audit_chain import journalise
+    journalise(user_id, f"[bashrc] {action} - {details}")
 
 
 # ── Helpers SSH ──────────────────────────────────────────────────────────────

@@ -34,6 +34,7 @@ return [
     'source_hybrid'           => 'Hybride — recommande',
     'source_precise'          => 'Precis — NVD partout, plus lent',
     'source_aide'             => 'Rapide interroge OpenCVE seul et remonte plus de faux positifs. Hybride croise NVD sur le noyau, OpenSSL et OpenSSH. Precis interroge NVD partout : plus fiable, plus lent.',
+    'portee_exigee' => 'Une portée est OBLIGATOIRE : choisissez une étiquette ou des machines précises. L\'option « tout le parc » a été retirée — elle était le choix par défaut, et un scan planifié sans portée explicite joignait la production.',
     'cible_all'               => 'Tous les serveurs',
     'cible_tag'               => 'Par tag',
     'cible_machines'          => 'Serveurs choisis',
