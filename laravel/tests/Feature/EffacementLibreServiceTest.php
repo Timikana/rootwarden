@@ -3,7 +3,10 @@
 namespace Tests\Feature;
 
 use App\Http\Controllers\PortailController;
+use App\Services\Comptes;
+use App\Services\JournalAudit;
 use App\Services\StepUp;
+use Illuminate\Support\Facades\Cache;
 use Tests\TestCase;
 
 /**
@@ -28,14 +31,16 @@ use Tests\TestCase;
  * > y en a un contre l'accident et **aucun** contre le vol de session : ils ne
  * > protegent pas de la meme chose, et le dire est la moitie du travail.
  *
- * ══ CE QUI EST DECIDE ET PAS ENCORE FAIT — E-449 ═════════════════════════
+ * ══ CE QUI ETAIT DECIDE ET QUI EST FAIT — E-449, `f94c947` ══════════════
  *
  * Le DSI a arbitre pour exiger le step-up ici. Le pendant ADMINISTRATIF le fait
  * deja : `ComptesController:333` garde `compte_anonymiser`. **L'asymetrie est
  * l'inverse de l'intuition** — un administrateur qui anonymise le compte d'un
  * AUTRE se re-authentifie ; le sujet qui anonymise le SIEN, non.
  *
- * ⚠ ET CE N'EST PAS « UN INTERGICIEL A POSER ». Mesure du 2026-09-06 :
+ * ⚠ CE N'ETAIT PAS « UN INTERGICIEL A POSER », et le correctif l'a confirme :
+ * la garde vit dans le CONTROLEUR, comme ses trois soeurs. Mesure du 2026-09-06,
+ * conservee parce qu'elle explique la FORME retenue :
  *
  *     intergiciels declares dans `bootstrap/app.php`   7, AUCUN de step-up
  *     consommateurs du step-up                         3, TOUS cote controleur
@@ -52,6 +57,18 @@ use Tests\TestCase;
  * les trois consommateurs rendent `step_up_required: true` en JSON a une modale
  * qui ecoute un `fetch`. Poser le step-up demande donc **une vue, un module JS,
  * un service et un controleur** — pas un intergiciel.
+ *
+ * ══ CE QUE LE CORRECTIF A FAIT DE MIEUX QUE LA CONSIGNE ══════════════════
+ *
+ * Le second facteur est dans le MEME formulaire, pas dans une modale : cela
+ * DISSOUT le probleme forme-contre-`fetch` au lieu de le contourner, et evite
+ * un quatrieme mecanisme. Le motif est ecrit dans la vue — *un second ecran
+ * ajouterait un etat a perdre entre deux soumissions*, pour un geste qui doit
+ * en avoir le moins possible.
+ *
+ * Et la portee des deux controles est passee du CODE a l'ECRAN (`eff_code_aide`).
+ * Je demandais que la phrase survive dans le fichier ; elle atteint desormais
+ * l'utilisateur, chez qui la confusion etait tout aussi probable.
  */
 class EffacementLibreServiceTest extends TestCase
 {
@@ -205,58 +222,199 @@ class EffacementLibreServiceTest extends TestCase
             "`compte_anonymiser` a quitte la liste fermee des actions du portage");
     }
 
-    public function test_le_step_up_du_LIBRE_SERVICE_reste_A_POSER(): void
+    // ══════════════════════════════════════════════════════════════════════
+    // C1 / C2 — LA GARDE MORD, ET ELLE NE COUTE AUCUN ACCES
+    //
+    // Criteres SCELLES avant lecture du correctif : `4ff0853`, empreinte
+    // `ab53508d05650012`. Le correctif atteste est `f94c947`.
+    // ══════════════════════════════════════════════════════════════════════
+
+    private const NOM_DU_COMPTE = 'compte-epreuve';
+
+    /**
+     * Le harnais, et **pourquoi il double le depot plutot que la base**.
+     *
+     * La propriete a mesurer est « le compte a-t-il ete anonymise », pas « quel
+     * message a ete rendu ». Un refus qui affiche une erreur ET anonymise quand
+     * meme serait VERT sur la reponse. On observe donc l'APPEL a `anonymise()`,
+     * qui est l'effet lui-meme.
+     *
+     * `StepUp` reste le VRAI service : c'est lui qu'on mesure.
+     *
+     * @return object le registre des appels, `->anonymises` etant la liste des
+     *                identifiants reellement anonymises
+     */
+    private function harnais(): object
     {
-        /*
-         * ⚠ CE TEST EST UN CONSTAT DATE, PAS UN FEU VERT.
-         *
-         * Il gele l'etat du 2026-09-06 : le libre-service n'exige AUCUNE
-         * re-authentification. Le DSI a arbitre pour l'exiger (E-449) ; le geste
-         * n'est pas fait, et il n'est pas d'une ligne.
-         *
-         * **Quand il sera pose, ce test rougira — et c'est voulu.** Il faudra
-         * alors le RETOURNER (asserter la presence), inscrire la garde dans
-         * `TableDesGardes`, et retirer `profil/effacement` de la liste gelee des
-         * routes authentifiees-sans-controle-supplementaire. Un marqueur qui date
-         * un manque doit rougir le jour ou le manque est comble, sinon personne
-         * ne sait qu'il est perime.
-         */
-        $corps = $this->corps();
+        $registre = new \stdClass();
+        $registre->anonymises = [];
 
-        $this->assertStringNotContainsString('stepUp', $corps,
-            "LE STEP-UP EST POSE SUR `/profil/effacement` — c'est ce qu'E-449 "
-            . 'demandait. Retourner ce marqueur : asserter desormais sa PRESENCE, '
-            . 'inscrire la garde dans `TableDesGardes`, et relire la portee ecrite '
-            . 'a cote (la ressaisie couvre l\'accident, le step-up couvre le vol '
-            . 'de session — deux controles, deux objets).');
+        $comptes = $this->createStub(Comptes::class);
+        $comptes->method('trouve')->willReturn([
+            'id' => self::COMPTE, 'name' => self::NOM_DU_COMPTE, 'role_id' => 1, 'active' => 1,
+        ]);
+        // Deux superadministrateurs : la garde du DERNIER ne doit pas se
+        // declencher, sinon elle refuserait avant meme le step-up et C1
+        // passerait pour la mauvaise raison.
+        $comptes->method('superadminsActifs')->willReturn(2);
+        $comptes->method('anonymise')->willReturnCallback(
+            static function (int $id) use ($registre): void { $registre->anonymises[] = $id; }
+        );
 
-        $this->assertNotContains('profil_effacement', StepUp::ACTIONS_PORTAGE,
-            'une action `profil_effacement` existe : voir ci-dessus, le marqueur '
-            . 'est a retourner.');
+        $this->instance(Comptes::class, $comptes);
+        $this->instance(JournalAudit::class, $this->createStub(JournalAudit::class));
+
+        return $registre;
     }
 
-    public function test_le_step_up_n_est_pose_par_AUCUN_intergiciel(): void
+    public function test_C1_SANS_marque_fraiche_le_compte_reste_INTACT(): void
     {
         /*
-         * La prémisse « c'est un intergiciel a POSER » est fausse, et ce test la
-         * gele pour qu'elle ne se reforme pas. Les TROIS consommateurs du step-up
-         * l'appellent depuis un CONTROLEUR ; aucun intergiciel ne le porte.
+         * La confirmation est CORRECTE : on ne mesure donc pas la garde du nom,
+         * qui existait deja. Ce qui manque est la seule chose neuve.
+         */
+        $registre = $this->harnais();
+
+        $reponse = $this->connecte(1)->post('/profil/effacement', [
+            'confirmation' => self::NOM_DU_COMPTE,
+        ]);
+
+        $this->assertSame([], $registre->anonymises,
+            'LE COMPTE A ETE ANONYMISE SANS RE-AUTHENTIFICATION : la garde du '
+            . 'step-up ne mord pas. Une session volee suffit a exercer le geste '
+            . 'irreversible.');
+
+        // Et le geste n'a pas ABOUTI non plus : la redirection de succes mene a
+        // la connexion (session detruite), celle d'echec au profil.
+        $this->assertStringContainsString('/profil', (string) $reponse->headers->get('Location'),
+            'la reponse a la forme d\'une reussite alors que rien n\'a ete efface');
+    }
+
+    public function test_C2_AVEC_une_marque_valide_le_geste_ABOUTIT(): void
+    {
+        /*
+         * ⚠ CE TEST EST LE TEMOIN DE C1, ET C'EST SA RAISON D'ETRE PREMIERE.
          *
-         * Consequence pratique : poser le step-up ici demande une vue (le geste
-         * est un `<form>`, pas un `fetch`), un module JS (la modale ecoute un
-         * `fetch` et lit `step_up_required`), une entree dans une liste FERMEE, et
-         * un controleur. C'est une decision, pas une ligne.
+         * « `anonymise()` n'a pas ete appele » et « ce harnais ne sait pas voir
+         * un appel » sont la MEME sortie. C2 montre que le meme harnais observe
+         * l'anonymisation quand elle a lieu : le zero de C1 cesse d'etre vacant.
+         *
+         * Et il porte sa propre propriete : **une garde qui refuse tout le monde
+         * satisfait C1 parfaitement.** C1 sans C2 est un deni de service qui a
+         * l'air d'une securite — c'est ce qui serait arrive si la vue avait pose
+         * `code_2fa` et le controleur lu un autre nom.
+         */
+        $registre = $this->harnais();
+
+        Cache::put('step_up:marque:' . self::COMPTE . ':profil_effacement', true, 900);
+
+        $reponse = $this->connecte(1)->post('/profil/effacement', [
+            'confirmation' => self::NOM_DU_COMPTE,
+        ]);
+
+        $this->assertSame([self::COMPTE], $registre->anonymises,
+            'une marque de step-up VALIDE ne suffit pas a exercer le geste : la '
+            . 'garde refuse un compte qui vient de se re-authentifier. Verifier '
+            . 'le couplage du champ (`name="code_2fa"` cote vue contre '
+            . '`input(...)` cote controleur) et le nom de l\'action.');
+
+        $this->assertStringContainsString('/connexion', (string) $reponse->headers->get('Location'),
+            'le geste a abouti mais la session n\'est pas rendue a la connexion');
+    }
+
+    public function test_C4_l_action_est_NEUVE_et_ne_reutilise_aucune_autre(): void
+    {
+        /*
+         * ⚠ LE POINT LE PLUS COUTEUX A RATER. Reutiliser `compte_anonymiser`
+         * aurait fait qu'une marque consentie pour l'anonymisation
+         * ADMINISTRATIVE ouvre l'effacement de son propre compte — le defaut
+         * `policy_action` du legacy, ou un step-up consenti pour ANNULER une
+         * politique autorisait un DEPLOIEMENT pendant quinze minutes.
+         */
+        $this->assertContains('profil_effacement', StepUp::ACTIONS_PORTAGE,
+            "l'action du libre-service a quitte la liste FERMEE");
+
+        $corps = $this->corps();
+        $this->assertStringContainsString("'profil_effacement'", $corps,
+            "le controleur n'exige plus l'action qui lui est propre");
+        $this->assertStringNotContainsString("'compte_anonymiser'", $corps,
+            'le libre-service REUTILISE le nom d\'action de l\'anonymisation '
+            . 'administrative : une marque obtenue pour l\'une ouvre l\'autre');
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // C5 — LES DEUX MARQUEURS DATES, RETOURNES LE 2026-09-06 (E-449, f94c947)
+    //
+    // Ils asseraient l'ABSENCE et portaient dans leur message ce qu'il faudrait
+    // faire le jour ou ils rougiraient. Ce jour est venu : ils asserent
+    // desormais la PRESENCE. **Retournes, pas supprimes** — un marqueur qu'on
+    // efface emporte la trace du manque avec le manque.
+    // ══════════════════════════════════════════════════════════════════════
+
+    public function test_C5_le_step_up_du_libre_service_est_POSE(): void
+    {
+        $corps = $this->corps();
+
+        $this->assertStringContainsString('stepUp', $corps,
+            'LE STEP-UP A DISPARU de `/profil/effacement`. Il y a ete pose le '
+            . '2026-09-06 (E-449) : son retrait est une regression, pas un choix '
+            . 'a redocumenter.');
+
+        // L'ORDRE : la garde doit preceder l'ecriture, pas seulement exister.
+        $posteGarde   = strpos($corps, 'stepUp');
+        $posteAnonyme = strpos($corps, '$this->comptes->anonymise');
+        $this->assertLessThan($posteAnonyme, $posteGarde,
+            "la re-authentification est exigee APRES l'anonymisation : elle ne "
+            . 'garde plus rien');
+    }
+
+    public function test_C5_la_garde_est_cote_CONTROLEUR_comme_ses_trois_soeurs(): void
+    {
+        /*
+         * Le second marqueur, retourne dans le meme sens : il assertait qu'aucun
+         * intergiciel ne portait le step-up, et cela reste VRAI apres le
+         * correctif — c'etait le point de la consigne corrigee.
+         *
+         * ⚠ ET C'EST POURQUOI CETTE GARDE N'EST PAS INSCRITE DANS
+         * `TableDesGardes`. Ce releve gele les gardes de ROUTE ; celle-ci vit
+         * dans le controleur, comme les trois autres consommateurs de `StepUp`.
+         * L'y inscrire dirait qu'un intergiciel la porte — c'est-a-dire une
+         * chose fausse, dans le fichier meme qui existe pour dire le vrai. La
+         * route reste « authentifiee, sans role », et c'est la RAISON ecrite a
+         * cote qui porte desormais le step-up.
          */
         $app = (string) file_get_contents(base_path('bootstrap/app.php'));
 
         $this->assertStringNotContainsString('StepUp::class', $app,
-            'un intergiciel de step-up est desormais declare : la forme du portage '
-            . 'a change, relire ce fichier en entier');
+            'un intergiciel de step-up est desormais declare : la forme du '
+            . 'portage a change, et `TableDesGardes` doit alors le refleter — ce '
+            . "qu'elle ne fait pas aujourd'hui, deliberement.");
+    }
 
-        $this->assertStringContainsString('<form method="POST"', (string) file_get_contents(
-            base_path('resources/views/profil.blade.php')),
-            'la page de profil ne soumet plus par formulaire : si elle est passee '
-            . 'au `fetch`, le chemin du step-up est desormais ouvert et ce constat '
-            . 'est perime');
+    public function test_C6_la_PORTEE_des_deux_controles_est_ecrite_A_L_ECRAN(): void
+    {
+        /*
+         * Deux controles ne font pas deux protections quand ils protegent de
+         * choses differentes. Le nom retape protege du geste ACCIDENTEL — il est
+         * affiche juste au-dessus — et le code protege d'une session VOLEE.
+         *
+         * Le correctif va plus loin que ce qui etait demande : la distinction
+         * n'est pas seulement en commentaire, elle est DITE A L'UTILISATEUR par
+         * `eff_code_aide`. Ce test tient les deux, et la parite FR/EN avec.
+         */
+        $vue = (string) file_get_contents(base_path('resources/views/profil.blade.php'));
+
+        $this->assertStringContainsString('eff_code_aide', $vue,
+            'la portee des deux controles n\'est plus dite a l\'ecran : le '
+            . 'lecteur verra deux controles et conclura qu\'il y en a deux');
+
+        foreach (['fr', 'en'] as $langue) {
+            $cles = require base_path("lang/$langue/profil.php");
+            foreach (['eff_code_aide', 'eff_code_label'] as $cle) {
+                $this->assertArrayHasKey($cle, $cles, "`$cle` manque en « $langue »");
+                $this->assertNotSame('', trim((string) $cles[$cle]),
+                    "`$cle` est vide en « $langue » : la phrase n'atteint aucun ecran");
+            }
+        }
     }
 }
