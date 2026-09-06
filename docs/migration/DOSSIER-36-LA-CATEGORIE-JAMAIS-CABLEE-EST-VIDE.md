@@ -109,6 +109,46 @@ offert.** *Les deux portent la même garde — `require_api_key`, `require_role(
    modifie un `authorized_keys` distant.* **Si un banc doit le toucher, c'est la
    machine 3 (`192.168.0.2`), et sur le mot de l'exploitant — pas avant.**
 
+### ⚠ TROISIÈME CORRECTION — un QUATRIÈME paramètre, et c'est une escalade
+
+**J'ai écrit « porter la fine ne crée aucun pouvoir neuf » après avoir lu les
+TROIS paramètres requis. Il y en a un quatrième, facultatif.** *Relevé par la
+session 4f à la réception de la dépêche, vérifié ici.*
+
+```
+backend/routes/ssh.py:2422-2426   contrat declare
+    machine_id          int   requis
+    username            str   requis
+    fingerprint_sha256  str   requis
+    force               bool  « si true, autorise la suppression de la CLE PLATEFORME »
+
+backend/routes/ssh.py:2474
+    if key_row.get('is_platform_key') and not force:
+        return jsonify({... "Suppression bloquee : c'est la cle plateforme RootWarden."}), 400
+    # commentaire du dépôt, :2472 — « ne pas se locker hors du serveur »
+```
+
+> **La clé plateforme est celle par laquelle RootWarden atteint la machine. La
+> retirer, c'est se fermer la porte** — et `force=true` lève la seule garde qui
+> l'empêche.
+
+**Mon raisonnement était juste sur les trois paramètres que j'avais lus, et je
+n'ai pas vérifié qu'il n'y en avait pas un quatrième.** *Arbitrer qu'un geste
+n'élargit aucun pouvoir est une affirmation sur la TOTALITÉ de son contrat ; je
+l'ai fondée sur la partie que j'avais ouverte.*
+
+### La décision tient, avec une contrainte qui n'y était pas
+
+⛔ **`force` doit être INEXPRIMABLE côté portage** — *pas « envoyé à false » :
+absent de la construction du corps.* **Forme proposée par 4f et retenue :**
+
+> *Un `force: false` explicite se retourne d'un caractère ; une absence de champ
+> demande d'écrire une ligne, et cette ligne se voit en relecture.*
+
+*C'est la garde par CONSTRUCTION, préférée au contrôle — le rang le plus haut de
+`feedback_garde_par_construction`, et la même forme que la liste fermée qui a
+corrigé l'injection de V10a.*
+
 **C'est la seule capacité portable que le tri des 22 ait laissée**, et elle
 n'apparaissait pas comme telle parce qu'elle était rangée en « trou asymétrique,
 confronter au découpage ». *La confrontation est faite : le découpage n'a pas
