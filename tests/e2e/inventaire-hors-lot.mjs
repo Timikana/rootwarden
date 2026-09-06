@@ -40,6 +40,11 @@
  * des gestes non-GET sans filet, ce qui est un motif de RELECTURE, pas un
  * verdict. Une suite peut ecrire legitimement dans une fixture qu'elle nettoie.
  *
+ * Et il ne distingue pas une CIBLE d'une GARDE : `go-adm-import-csv` cite
+ * `192.168.0.244` dans un `SELECT` qui verifie que `srv-zabbix` est INTACTE.
+ * L'etiquette dit donc « mentionne », jamais « vise ». **Un outil qui nomme sa
+ * propre limite se fait relire ; un outil qui affirme se fait croire.**
+ *
  * Il ne voit pas non plus une classe enrolee qui n'exerce rien : le meme angle
  * mort que la session 6 nomme chez elle — la racine garantit qu'on CHARGE, pas
  * qu'on MESURE.
@@ -96,11 +101,26 @@ function inspecte(fichier) {
     const brut = readFileSync(E2E + fichier, 'utf8');
     const code = codeSeul(brut);
 
+    /*
+     * ⚠ TROIS FORMES D'ECRITURE, PAS UNE. Le premier jet ne cherchait que
+     * `method: 'POST'` — la forme de `fetch`. Le 2026-09-06, un pair a trouve
+     * `go-policies.mjs:131` qui deploie un sudo sur `machine_id: 1`
+     * (`srv-zabbix`, la PRODUCTION) par `xhr.open('POST', ...)`.
+     * **Mon inventaire l'avait declaree NON armee.** Un motif qui ne connait
+     * qu'une syntaxe rend un faux negatif — et celui-la se trompe du cote qui
+     * DEDOUANE, donc personne ne le rouvre.
+     */
+    const ecritures = [
+        ...(code.match(/method: *['"](POST|PUT|DELETE|PATCH)['"]/g) || []),
+        ...(code.match(/\.open\( *['"](POST|PUT|DELETE|PATCH)['"]/g) || []),
+        ...(code.match(/\.(post|put|patch|delete)\(/g) || []),
+    ];
+
     return {
-        nonGet: (code.match(/method: *'(POST|PUT|DELETE|PATCH)'/g) || []).length,
+        nonGet: ecritures.length,
         filet: /setRequestInterception/.test(code),
         production: (code.match(/machine_id: *1[^0-9]|192\.168\.0\.244/g) || []).length,
-        portee: /target_type: *'all'/.test(code),
+        portee: /target_type: *['"]all['"]/.test(code),
         gestes: [...new Set((code.match(/deploy|scan-all|scan_all|rotate|revoke|purge|schedules/g) || []))],
     };
 }
@@ -135,13 +155,32 @@ console.log(`temoin : ${temoinNom} porte des non-GET, l'inspection rend le posit
 
 const armees = [];
 console.log('');
+/*
+ * ⚠ NE JAMAIS FAIRE D'UN DETECTEUR LA PORTE DES AUTRES.
+ *
+ * Le premier jet faisait `if (i.nonGet === 0) continue;` — donc une suite dont
+ * le compte de non-GET etait nul n'etait JAMAIS examinee pour la production ni
+ * pour la portee. **Un seul motif aveugle rendait tous les autres muets**, et
+ * c'est ce qui s'est produit sur `go-policies.mjs` : XHR non reconnu, donc
+ * `nonGet = 0`, donc `machine_id: 1` jamais regarde.
+ *
+ * Chaque signal est desormais evalue pour lui-meme, et une suite est retenue si
+ * L'UN QUELCONQUE d'entre eux parle.
+ */
 for (const s of horsListe) {
     const i = inspecte(`${s}.mjs`);
-    if (i.nonGet === 0) continue;
+    if (i.nonGet === 0 && i.production === 0 && !i.portee) continue;
     armees.push(s);
     const alertes = [];
     if (!i.filet) alertes.push('AUCUN FILET');
-    if (i.production) alertes.push('⚠ VISE LA PRODUCTION');
+    /*
+     * ⚠ « MENTIONNE », PAS « VISE » — et la nuance est le fruit d'un faux
+     * positif immediat. `go-adm-import-csv` cite `192.168.0.244` dans un
+     * `SELECT` de son `finally` : « srv-zabbix est intacte ». C'est une garde,
+     * pas une cible. **Cet outil ne sait pas distinguer une ecriture d'une
+     * verification, et une etiquette qui l'affirmerait mentirait.**
+     */
+    if (i.production) alertes.push('⚠ MENTIONNE LA PRODUCTION — cible ou garde ? a lire');
     if (i.portee) alertes.push('⚠ PORTEE `all`');
     console.log(`  ${s.padEnd(32)} ${String(i.nonGet).padStart(2)} non-GET  `
         + `${i.gestes.join(' ').padEnd(22)} ${alertes.join(' · ')}`);
