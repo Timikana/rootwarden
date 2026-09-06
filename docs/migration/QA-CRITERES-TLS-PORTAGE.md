@@ -88,53 +88,82 @@ dégrade sans que la barre d'adresse le dise.*
 
 ---
 
-# ANNEXE — ajoutée le 2026-09-06 après lecture de `8862849`
+# ANNEXE — ajoutée le 2026-09-06, puis ⛔ **RÉTRACTÉE le même jour**
 
-⚠ **Cette annexe n'AJOUTE aucun critère et n'en assouplit aucun : elle RESTREINT ce que je
-m'autoriserai à conclure.** Une addition qui ne fait que rétrécir la portée d'une attestation
-est sans danger pour le scellement ; une qui l'élargirait ne le serait pas. *Je le dis parce
-que « j'ai complété mes critères après avoir lu le code » est, en général, exactement ce que
-le scellement existe pour empêcher.*
+## ⛔ CE QUE CETTE ANNEXE AFFIRMAIT, ET QUI EST FAUX
 
-## T2 sera VERT alors que des navigateurs resteront CASSÉS
+> « Le portage est déjà inatteignable pour qui a ouvert le legacy dans le même navigateur. »
+> « Ton 301 ne s'exécutera JAMAIS pour ces navigateurs. »
 
-Mesuré sur l'artefact commité, sans rien appliquer :
+**Les deux sont faux. Mesuré, profil Chrome PERSISTANT, deux processus distincts :**
 
-    apres reconstruction   8444 -> 80    (HTTP, redirige vers https://<hote>:8446)
-                           8446 -> 443   (TLS)
+    1) legacy en TLS      code=200   en-tete HSTS RECU : max-age=31536000;
+                                     includeSubDomains; preload
+    2) portage en CLAIR   code=200   url finale = http://localhost:8444/connexion
+       SURCLASSEMENT ?    NON
+       TEMOIN racine      code=200   (le navigateur navigue bien — l'instrument voit)
 
-    un navigateur empoisonne par le HSTS du legacy reecrit
-      http://localhost:8444   ->   https://localhost:8444   AVANT d'envoyer
-    or 8444 restera du 80 en clair                          ->   000  (mesure)
+**L'en-tête est envoyé et il n'est pas appliqué.** Le portage reste joignable en clair après
+une visite du legacy dans le même profil.
 
-> **Le 301 que `c1` a construit ne s'exécutera jamais pour ces navigateurs : la requête ne
-> part pas en HTTP.** Le correctif TLS ne restaure donc pas leur accès.
+### Pourquoi — et je ne prétends pas avoir isolé LA cause
 
-**Et `curl` n'a pas d'état HSTS** : ma mesure de T2 exercera la redirection du *serveur*, qui
-sera correcte. **Un T2 vert ne voudra pas dire « on peut atteindre le portail par HTTP » —
-seulement « le serveur redirige correctement ceux qui l'atteignent ».**
+Deux raisons peuvent l'expliquer, et mon épreuve ne les départage pas :
 
-*C'est le retournement exact de ce que j'écrivais en T4 : l'amnésie du client rend la
-redirection mesurable, et c'est la même amnésie qui empêche de voir qui reste bloqué.*
-**L'instrument qui permet la mesure est celui qui cache le défaut.**
+1. **RFC 6797 §8.1** : un agent NE DOIT PAS traiter l'en-tête si la connexion présente des
+   erreurs de certificat. Le legacy sert un **auto-signé** — vérifié : `subject == issuer`,
+   `CN=localhost`. *La RFC que j'ai citée pour la partie qui servait l'alarme contient aussi
+   celle qui la désamorce.*
+2. **`localhost` est un cas spécial** dans les navigateurs (origine réputée sûre).
 
-### Ce que j'attesterai donc, mot pour mot
+*Je le dis parce que « j'ai vérifié que c'est faux » et « j'ai compris pourquoi » sont deux
+choses, et je n'ai que la première.*
 
-- ✅ « le serveur redirige HTTP vers HTTPS, et la cible répond »
-- ⛔ **PAS** « le portail est joignable depuis n'importe quel navigateur »
+## ⚠ POURQUOI CETTE RÉTRACTION COMPTE PLUS QUE L'ERREUR
 
-**Remède, hors du dépôt** : aller directement sur `https://…:8446`, ou purger l'état HSTS du
-navigateur. *Aucune mesure d'ici ne le dira, et aucun correctif d'ici ne le fera* — l'état vit
-dans le poste. Ça ne concerne que `localhost` (HSTS n'est pas appliqué aux adresses IP), donc
-les postes de développement et non les utilisateurs.
+J'avais écrit que l'annexe était sans danger **parce qu'elle ne faisait que RESTREINDRE**.
+Le raisonnement sur le sens de l'ajout était juste, et **il ne protégeait pas de ce cas** :
 
-## T2, moitié STATIQUE — déjà mesurée sur `8862849`
+> **Une restriction fondée sur un fait faux retire de la portée quelque chose qui marche.**
+> J'aurais refusé d'attester « le portail est joignable » pour une raison inexistante — et le
+> défaut RÉEL, la redirection cassée du legacy, serait resté couvert par le même geste.
+
+**Le sens de l'ajout n'était pas le problème. La prémisse l'était, et ni `c1` ni moi ne
+l'avions mesurée.** *Elle l'a introduite, je l'ai amplifiée d'un cran, et elle allait entrer
+dans un document scellé sans que personne n'ait ouvert un navigateur.*
+
+⚠ **Et un témoin a failli la confirmer pour la mauvaise raison.**
+`http://localhost:8080` rend `net::ERR_SSL_PROTOCOL_ERROR`, ce qui ressemble exactement à un
+surclassement HSTS. **C'en est un autre défaut** : le 301 cassé du legacy renvoie vers
+`https://localhost:8080`, où un serveur en clair reçoit du TLS. *Deux causes différentes, une
+seule trace — et j'aurais lu celle qui allait dans mon sens.*
+
+## CE QUI SURVIT DE TOUT CELA
+
+    ✅ la redirection HTTP->HTTPS du LEGACY est cassee   (curl ET navigateur)
+    ✅ le vhost du portage ne la reproduit pas — port derive de la configuration
+    ⛔ « le portage est deja inatteignable »              RETIRE
+    ⚠ reserve etroite et MESURABLE : la reserve ne vaudrait que pour qui a
+       AJOUTE le certificat auto-signe a son magasin de confiance. Ce n'est plus
+       « qui a ouvert le legacy » — c'est une population qu'on peut nommer.
+
+## T2 — l'exigence reste, et elle vaut indépendamment
+
+**Le code FINAL après redirection, jamais le premier.** *Un 301 est un succès pour qui lit le
+premier code et une panne pour qui suit le lien.* Cette exigence n'a jamais dépendu du HSTS ;
+elle est fondée sur le défaut du legacy, mesuré deux fois et par deux instruments.
+
+**Bornage de l'attestation, revu sur ce qui est mesuré :**
+
+> « le serveur redirige HTTP vers HTTPS et la cible répond » — **et** « aucun état HSTS
+> n'empêche l'accès depuis un navigateur dont le certificat n'est pas approuvé, mesuré sur
+> profil persistant ».
+
+## T2, moitié STATIQUE — mesurée sur `8862849`, et elle tient
 
     laravel/apache-ssl.conf.tmpl:44   RewriteCond %{HTTP_HOST} ^([^:]+)
     laravel/apache-ssl.conf.tmpl:45   RewriteRule ^/?(.*) https://%1:${LARAVEL_HTTPS_PORT}/$1 [R=301,L]
 
-`%1` est l'hôte **sans son port**, le port vient de la configuration et non de la requête. La
-moitié structurelle de T2 est **satisfaite** ; la moitié réseau attend la reconstruction.
-
-*Et le motif du refus de `%{HTTP_HOST}` est écrit dans le fichier, aux lignes 28-30 — un
-lecteur qui trouve la forme trouve aussi pourquoi l'autre a été écartée.*
+`%1` est l'hôte **sans son port**, le port vient de la configuration et non de la requête. Le
+motif du refus de `%{HTTP_HOST}` est écrit lignes 28-30 : *un lecteur qui trouve la forme
+trouve aussi pourquoi l'autre a été écartée.*
