@@ -1620,8 +1620,10 @@ elif [ "$ecarts" -eq 0 ] && [ "$sans_ref" -gt 0 ]; then
   # Le dire est tout l'objet de ce bloc — le code de sortie reste 0 A DESSEIN.
   echo "LOT SANS ECART — $jouees execution(s), dont $sans_ref SANS REFERENCE."
   echo
-  echo "  ⚠ Ces $sans_ref execution(s) n'ont echoue nulle part, et leur compte n'a ete"
-  echo "    compare a rien. Ce n'est PAS « conforme » : c'est « rien ne s'est casse »."
+  # « Ces 1 execution(s) » : le compte est deja sur la ligne du dessus, et un
+  # accord qui boite se lit pendant un incident. On reprend par un pronom.
+  echo "  ⚠ Elles n'ont echoue nulle part, et leur compte n'a ete compare a rien."
+  echo "    Ce n'est PAS « conforme » : c'est « rien ne s'est casse »."
   echo "    Une reference s'inscrit depuis un compte MESURE, pas suppose — les voici"
   echo "    avec le PASS observe, pretes a inscrire dans REF_LARAVEL / REF_LEGACY :"
   printf '      %s\n' "${SANS_REF[@]}"

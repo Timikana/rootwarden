@@ -21431,6 +21431,36 @@ est correct et coûte une comparaison : il attrapera une suite ajoutée sans ré
 ne se déclenchera jamais.* **Décision remise à la session 7**, qui tient le banc : si elle préfère retirer un
 garde dont le commit raconte un défaut inexistant, je le retire.
 
+### ⟶ LE GARDE MORD — éprouvé le 2026-09-06, **sans lancer aucune suite**
+
+*Objection de la session 7, et elle est juste* : **« un garde qui ne peut pas mordre est
+indiscernable d'un garde cassé »**. Celui-ci naît muet — `sans_ref` reste à 0 par construction tant que les
+quatre tableaux concordent. *Elle avait payé le matin même trois exécutions de `go-socle-i18n.mjs` pour
+prouver qu'un refus mordait ; il ne mordait pas, le fichier ne portait pas le code. Trois sorties
+plausibles, zéro observation.*
+
+Éprouvé sur la **chaîne réelle extraite du fichier** — les tableaux sourcés par bash, le bloc de verdict et
+le bloc de résumé chargés tels quels, aucune suite jouée, aucun LOT lancé :
+
+| entrée | verdict rendu | `sans_ref` |
+|---|---|---|
+| suite **absente** des références | `(pas de reference)` | **1** |
+| `go-page-pare-feu`, `pass=23` (sa référence) | `conforme` | 0 |
+| `go-page-pare-feu`, `pass=99` | `ECART attendu=23` | 0 |
+
+Et la ligne finale, imprimée par le bloc réel :
+
+    LOT SANS ECART — 167 execution(s), dont 1 SANS REFERENCE.
+      ⚠ Elles n'ont echoue nulle part, et leur compte n'a ete compare a rien.
+        [...]  laravel/go-page-zzz-jamais-referencee=42
+
+**Contre-épreuve, l'état d'aujourd'hui** : `sans_ref=0` → `LOT conforme — 167 execution(s), toutes
+referencees.` *La sonde rend le positif ET le négatif : la mesure a eu lieu.*
+
+**Un défaut d'affichage corrigé au passage** : la ligne disait `Ces 1 execution(s)`. Le compte est déjà sur
+la ligne au-dessus, et **un accord qui boite se lit pendant un incident** — repris par un pronom, éprouvé au
+singulier et au pluriel.
+
 **Et le désaccord est ce qui a trouvé, pas l'instrument.** La session 7 rapportait 2 orphelines laravel et 1
 legacy là où j'avais 0 ; **ses chiffres sont faux aussi** (la vérité est 0 aux quatre coins), et son
 instrument était cassé de son propre aveu. *Mais un zéro est exactement ce qu'un pair ne rattrape jamais —
