@@ -17,7 +17,8 @@ FROM php:8.4-apache
 RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
-        libicu-dev libzip-dev zlib1g-dev unzip git curl; \
+        libicu-dev libzip-dev zlib1g-dev unzip git curl \
+        openssl gettext-base; \
     docker-php-ext-configure intl; \
     docker-php-ext-install -j"$(nproc)" pdo_mysql intl zip opcache; \
     apt-get clean; \
@@ -48,7 +49,7 @@ COPY --from=composer:2.9 /usr/bin/composer /usr/bin/composer
 # contre-epreuve : une variable inconnue leve `AH00111`, celle-ci non.
 ENV APACHE_DOCUMENT_ROOT=/var/www/html/public
 RUN set -eux; \
-    a2enmod rewrite headers; \
+    a2enmod rewrite headers ssl; \
     sed -ri 's/^ServerTokens .*/ServerTokens Prod/; s/^ServerSignature .*/ServerSignature Off/' \
         /etc/apache2/conf-available/security.conf; \
     sed -ri 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' \
@@ -62,6 +63,18 @@ RUN set -eux; \
         'ServerAdmin ${SERVER_ADMIN}' \
         > /etc/apache2/conf-available/rootwarden-laravel.conf; \
     a2enconf rootwarden-laravel
+
+# ── TLS ──────────────────────────────────────────────────────────────────────
+# Le vhost final est GENERE au demarrage par l'entrypoint (envsubst) : les chemins
+# de certificat et le port HTTPS publie ne sont pas connus a la construction.
+COPY laravel/apache-ssl.conf.tmpl /etc/apache2/sites-available/apache-ssl.conf.tmpl
+# Le repertoire existe des la construction ; son CONTENU vient du volume ./certs,
+# partage avec le service `php` — un seul certificat pour les deux portails.
+RUN mkdir -p /var/www/certs
+
+# 80  : redirige vers HTTPS, ne sert aucun contenu
+# 443 : le seul port qui sert l'application
+EXPOSE 80 443
 
 WORKDIR /var/www/html
 

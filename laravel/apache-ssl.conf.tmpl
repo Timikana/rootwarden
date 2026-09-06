@@ -1,0 +1,88 @@
+# =============================================================================
+# apache-ssl.conf.tmpl - VirtualHost HTTPS du frontend Laravel (RootWarden v2.0)
+# =============================================================================
+#
+# TEMPLATE : Apache ne le lit jamais tel quel. `docker-entrypoint.sh` le passe a
+# `envsubst` au demarrage et produit /etc/apache2/sites-available/000-default.conf.
+#
+# Variables substituees par l'ENTRYPOINT (envsubst) :
+#   ${SERVER_NAME}          nom ou adresse publique du serveur
+#   ${SERVER_ADMIN}         adresse affichee par les pages d'erreur Apache
+#   ${SSL_CERT_PATH}        chemin absolu du certificat (.crt)
+#   ${SSL_KEY_PATH}         chemin absolu de la cle privee (.pem)
+#   ${LARAVEL_HTTPS_PORT}   port HTTPS **PUBLIE PAR L'HOTE** — voir plus bas
+#
+# Variables NON substituees, resolues par APACHE lui-meme — ne jamais les
+# ajouter a la liste d'envsubst, il les remplacerait par du vide :
+#   ${APACHE_LOG_DIR}       vient de /etc/apache2/envvars
+#   ${APACHE_DOCUMENT_ROOT} posee par ENV dans le Dockerfile
+# =============================================================================
+
+
+# ── VirtualHost HTTP (port 80) : REDIRECTION SEULE, aucun contenu en clair ───
+<VirtualHost *:80>
+    ServerName ${SERVER_NAME}
+    ServerAdmin ${SERVER_ADMIN}
+    DocumentRoot ${APACHE_DOCUMENT_ROOT}
+
+    # ⚠ POURQUOI PAS `https://%{HTTP_HOST}/$1`, LA FORME DU LEGACY.
+    #
+    # `%{HTTP_HOST}` porte le port de la requete. Le conteneur ecoute 80 et 443,
+    # mais l'hote PUBLIE ces ports ailleurs. La forme du legacy renvoie donc vers
+    # un port qui n'a pas de TLS — mesure du 2026-09-06 sur le legacy lui-meme :
+    #
+    #     http://localhost:8080/auth/login.php -> 301 https://localhost:8080/...
+    #     https://localhost:8080/...           -> 000  (rien n'ecoute en TLS la)
+    #
+    # **Sa redirection HTTPS mene dans le vide, et personne ne l'avait vu.** On ne
+    # la recopie pas : on garde l'hote TEL QUE LE VISITEUR L'A ECRIT (donc son
+    # adresse IP s'il est passe par l'IP, et non le `ServerName` du conteneur) et
+    # on remplace le port par celui que l'hote publie reellement.
+    RewriteEngine On
+    RewriteCond %{HTTPS} !=on
+    # %1 = l'hote sans son port, capture par la condition ci-dessous.
+    RewriteCond %{HTTP_HOST} ^([^:]+)
+    RewriteRule ^/?(.*) https://%1:${LARAVEL_HTTPS_PORT}/$1 [R=301,L]
+
+    ErrorLog ${APACHE_LOG_DIR}/error.log
+    CustomLog ${APACHE_LOG_DIR}/access.log combined
+</VirtualHost>
+
+
+# ── VirtualHost HTTPS (port 443) : le seul qui sert l'application ────────────
+<VirtualHost *:443>
+    ServerName ${SERVER_NAME}
+    ServerAdmin ${SERVER_ADMIN}
+    # Front controller Laravel : la racine est public/, jamais la racine du depot.
+    DocumentRoot ${APACHE_DOCUMENT_ROOT}
+
+    SSLEngine on
+    SSLCertificateFile    ${SSL_CERT_PATH}
+    SSLCertificateKeyFile ${SSL_KEY_PATH}
+
+    # Durcissement TLS, repris du legacy : TLS 1.0/1.1 sont obsoletes, ECDHE pour
+    # la confidentialite persistante, compression desactivee (CRIME/BREACH).
+    SSLProtocol -all +TLSv1.2 +TLSv1.3
+    SSLCipherSuite ECDHE+AESGCM:ECDHE+CHACHA20:DHE+AESGCM:DHE+CHACHA20:!aNULL:!MD5:!DSS
+    SSLHonorCipherOrder on
+    SSLCompression off
+
+    # ⚠ NI HSTS NI CSP ICI, ET C'EST DELIBERE — une absence sans raison ecrite
+    # est indiscernable d'un oubli.
+    #
+    # HSTS : l'en-tete est lie a l'HOTE et IGNORE LE PORT (RFC 6797). Le legacy en
+    # envoie un (`max-age=31536000; includeSubDomains; preload`), et c'est pour
+    # cela qu'un navigateur ayant ouvert `https://localhost:8443` force ensuite
+    # `https://` sur `http://localhost:8444`. Le poser ici serait une porte a sens
+    # unique mise en cache UN AN, sur un certificat auto-signe. Elle se pose apres
+    # que le TLS est verifie au reseau, et sur decision — pas dans le meme geste.
+    # (Borne : les navigateurs n'appliquent pas HSTS a une adresse IP. Cela mord
+    # sur `localhost`, donc sur les postes de developpement, pas en production.)
+    #
+    # CSP : le legacy en porte une, le portage n'en a aucune — ecart reel, signale.
+    # `/connexion` sert du script inline ; une politique mal calibree casserait la
+    # page. Cela se mesure a l'ecran, pas dans le meme lot que le TLS.
+
+    ErrorLog ${APACHE_LOG_DIR}/error.log
+    CustomLog ${APACHE_LOG_DIR}/access.log combined
+</VirtualHost>
