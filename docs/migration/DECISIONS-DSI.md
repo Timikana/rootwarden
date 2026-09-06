@@ -12698,3 +12698,77 @@ déjà la capacité.*
 **Aucun `grep` du nom de la fonction ne l'aurait trouvé : le seul appelant est un
 INTERCEPTEUR.** *Après l'appel direct, l'appel par helper et l'URL construite, voici l'appel
 par interception — et c'est la seule des quatre qu'on ne peut pas chercher par son nom.*
+
+---
+
+## E-459
+
+### La bonne question n'est pas « quelles SYNTAXES émettent une requête », c'est « OÙ VIT LA CIBLE »
+
+**J'avais posé cinq formes à chercher, en demandant le mécanisme et pas la liste. La session a
+rendu le mécanisme, et il réfute ma façon de poser la question.**
+
+    1-2  appel direct / helper      la cible est AU SITE D'APPEL
+    3    URL construite             en partie au site d'appel
+    4    INTERCEPTION               la cible vit dans la REPONSE
+    5    ATTRIBUT DECLARATIF        la cible vit dans le BALISAGE
+    6    FORMULAIRE SANS `action`   la cible vit dans le CHEMIN DU FICHIER
+
+> **Un relevé doit énumérer les LIEUX où une cible peut vivre, pas les syntaxes qui en nomment
+> une.** *Classer par syntaxe produit une liste à maintenir — et une liste est toujours en
+> retard d'une forme. Classer par LIEU produit un critère qui se vérifie.*
+
+**C'est la correction de fond de toutes mes consignes d'appariement de la nuit.** *E-428 avait
+corrigé leur CONTENU ; celle-ci corrige leur PRINCIPE.*
+
+### Ce que les deux formes neuves valent, mesuré
+
+**FORME 5 — htmx 2.0.4 est chargé, et il POSTe depuis `menu.php` :**
+
+    legacy/menu.php:179 et :380
+      <button hx-post="/adm/api/notifications.php" hx-vals='{"action":"read_all"}'>
+
+*`menu.php` est inclus par TOUTES les pages servies : ces deux POST existent sur tout le
+portail, et aucun JS ne les nomme.* **La cible est correctement gardée — `checkAuth`,
+`checkCsrfToken`, écritures bornées à `WHERE (user_id = ? OR user_id = 0)`.** *Ce n'est pas un
+trou ; c'est un chemin qu'aucun relevé de la flotte ne POUVAIT compter.*
+
+**FORME 6 — 11 `<form>` servis, 9 sans `action`, dont 8 en POST.** *Un formulaire sans `action`
+soumet vers l'URL de sa propre page.*
+
+> **Déplacer le fichier déplace la cible, silencieusement.** *C'est « une cible désignée par sa
+> position n'est pas une cible », appliqué à une arborescence.*
+
+⚠ **Et la session borne elle-même la portée de mon alerte** : *les huit cibles de la forme 6
+sont des PAGES, déjà inventoriées comme telles. Le point aveugle est de MÉTHODE, pas de
+conséquence.* **Ma réserve sur douze heures d'appariement vaut pour les formes 4 et 5, pas pour
+la 6 — et elle le dit pour que je ne surdimensionne pas ma propre alerte.**
+
+### ⚠ E-458 s'est produit SUR LE MESSAGE QUI LA COMMANDAIT
+
+    ma consigne citait   2.0.11
+    valeur reelle a `d01e236`, avec la formule LUE dans le script :
+      jalon 2.0 · ancre `fe797fc` · rev-list --count --first-parent
+      -> 2.0.82        perimee de 71 commits
+
+**J'ai ordonné d'adopter le numéro dérivé en citant un numéro dérivé périmé.** *Le défaut que
+la décision corrige, en train de se produire dans la décision.*
+
+**Et le choix de la session est le bon** : *l'entrée porte `2.0.82`, la version du commit qui a
+LIVRÉ le correctif — pas celle du commit qui renumérote l'en-tête.* **Un numéro dérivé ne peut
+être connu qu'une fois le commit existant.**
+
+*Elle n'a pas exécuté `scripts/version.sh` — il ÉCRIT `version.txt`. Elle a lu la formule et
+l'a reproduite avec `git` seul. C'est le bon réflexe, et il vient de `a809e6d` / `76dfd2f`.*
+
+### ⚠ Et ce qui a révélé sa propre erreur n'est ni un pair ni un rouge
+
+**Sa première sonde rendait 34 formulaires là où il y en a 11 — elle balayait `legacy/vendor/`.**
+*Le piège que je lui avais signalé le matin même sur le comptage des fichiers métier, 83 contre
+850.*
+
+> **Ce qui l'a révélé est le DÉSACCORD DE DEUX INSTRUMENTS.** *Aucun des deux ne se serait
+> dénoncé seul — le `grep` rendait 34 avec aplomb.*
+
+**Deux instruments qui divergent valent mieux qu'un instrument prudent.** *C'est la seule
+méthode de la journée qui n'exige ni vigilance ni relecteur.*
