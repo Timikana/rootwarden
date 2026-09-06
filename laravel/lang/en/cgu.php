@@ -18,7 +18,7 @@ return [
     'accept' => 'I accept the terms',
     'last_updated' => 'Last updated:',
     's1_title' => '1. Purpose',
-    's1_p1' => 'These Terms of Service govern the access and use of the RootWarden platform, an internal tool for centralized Linux infrastructure management (SSH keys, updates, firewall, services, vulnerabilities).',
+    's1_p1' => 'These Terms of Service govern the access and use of the :nom platform, an internal tool for centralized Linux infrastructure management (SSH keys, updates, firewall, services, vulnerabilities).',
     's1_p2' => 'By accessing the platform, you agree to be bound by these terms. If you do not agree, please do not use the platform.',
     's2_title' => '2. Access and authentication',
     's2_l1' => 'Access is restricted to users with an account assigned by an administrator.',
@@ -49,5 +49,5 @@ return [
     's8_title' => '8. Contact',
     's8_p1' => 'For any questions regarding these terms or to report a security incident, contact the administration team:',
     'support_title' => 'Support the project',
-    'support_desc' => 'RootWarden is an independent open-source project. If you use it and it saves you time, you can support its development.',
+    'support_desc' => ':nom is an independent open-source project. If you use it and it saves you time, you can support its development.',
 ];

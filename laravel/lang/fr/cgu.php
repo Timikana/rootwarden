@@ -18,7 +18,7 @@ return [
     'accept' => 'J\'accepte les conditions',
     'last_updated' => 'Derniere mise a jour :',
     's1_title' => '1. Objet',
-    's1_p1' => 'Les presentes Conditions Generales d\'Utilisation (CGU) regissent l\'acces et l\'utilisation de la plateforme RootWarden, outil interne de gestion centralisee de l\'infrastructure Linux (cles SSH, mises a jour, pare-feu, services, vulnerabilites).',
+    's1_p1' => 'Les presentes Conditions Generales d\'Utilisation (CGU) regissent l\'acces et l\'utilisation de la plateforme :nom, outil interne de gestion centralisee de l\'infrastructure Linux (cles SSH, mises a jour, pare-feu, services, vulnerabilites).',
     's1_p2' => 'En accedant a la plateforme, vous acceptez d\'etre lie par ces conditions. Si vous n\'acceptez pas, veuillez ne pas utiliser la plateforme.',
     's2_title' => '2. Acces et authentification',
     's2_l1' => 'L\'acces est reserve aux utilisateurs disposant d\'un compte attribue par un administrateur.',
@@ -49,5 +49,5 @@ return [
     's8_title' => '8. Contact',
     's8_p1' => 'Pour toute question relative a ces conditions ou pour signaler un incident de securite, contactez l\'equipe d\'administration :',
     'support_title' => 'Soutenir le projet',
-    'support_desc' => 'RootWarden est un projet open-source independant. Si vous l\'utilisez et qu\'il vous fait gagner du temps, vous pouvez soutenir son developpement.',
+    'support_desc' => ':nom est un projet open-source independant. Si vous l\'utilisez et qu\'il vous fait gagner du temps, vous pouvez soutenir son developpement.',
 ];
