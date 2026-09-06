@@ -80,11 +80,28 @@
     # inatteignable. **Mesure sur profil Chrome PERSISTANT, deux processus : aucun
     # surclassement. `http://localhost:8444/connexion` rend 200, servi en clair.**
     #
-    # La raison est dans la meme RFC que j'avais citee : **RFC 6797 §8.1 — un agent
-    # NE DOIT PAS traiter l'en-tete STS si la connexion presente des erreurs de
-    # certificat.** Le legacy sert un auto-signe : l'en-tete part, il n'est jamais
-    # enregistre. *J'avais cite la RFC pour la partie qui servait l'alarme et pas
-    # pour celle qui la desamorce.*
+    # ⚠ CE QUI EST ETABLI, ET CE QUI NE L'EST PAS — la difference compte ici.
+    #
+    # ETABLI, par lecture DIRECTE du magasin HSTS de Chrome
+    # (`<profil>/Default/TransportSecurity`) apres visite du legacy en TLS :
+    # **aucune entree pour `localhost`, ni pour un nom hors-localhost teste par
+    # `--host-resolver-rules`.** L'en-tete est envoye et il n'est pas enregistre.
+    # Le fichier EST lisible et contient bien une entree (semee a la creation du
+    # profil, vue sur un profil n'ayant visite que `about:blank`) : l'absence
+    # constatee n'est donc pas celle d'un instrument muet.
+    #
+    # PAS ETABLI : la CAUSE. RFC 6797 §8.1 (pas de traitement de l'en-tete sur une
+    # connexion a erreur de certificat) est l'explication plausible — le legacy
+    # sert un auto-signe — mais elle n'est pas isolee. Le temoin POSITIF manque :
+    # le gTLD `.dev`, precharge dans Chrome, n'est pas surclasse non plus par ce
+    # navigateur, avec ou sans `--ignore-certificate-errors`. **Tant qu'aucun
+    # surclassement n'a ete OBSERVE, « je n'en vois pas » et « je ne sais pas en
+    # voir » restent indiscernables sur le comportement.**
+    #
+    # ⚠ CONSEQUENCE PRATIQUE, ET C'EST ELLE QUI COMPTE : si la cause est bien le
+    # certificat, alors **installer un certificat APPROUVE fait revenir le
+    # probleme en entier**. C'est la trajectoire prevue de ce portail. Ne pas
+    # traiter ce constat comme une exculpation durable.
     #
     # Ce qui reste vrai : HSTS est lie a l'HOTE et ignore le PORT, et les
     # navigateurs ne l'appliquent pas a une adresse IP litterale. La reserve ne
