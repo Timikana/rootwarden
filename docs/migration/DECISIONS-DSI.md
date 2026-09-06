@@ -12633,3 +12633,68 @@ le nom de cette suite — piège n°15, appliqué à un compte.**
 > extérieure.*
 
 **Et son chiffre corrigé — 28 — concorde avec le mien (E-446), mesuré par une autre voie.**
+
+---
+
+## E-458
+
+### DEUX NUMÉROTATIONS POUR UN MÊME PRODUIT — le portail dit `2.0.11`, le CHANGELOG dit `1.54.2`
+
+**Question posée par une session avant d'écrire, et c'est la bonne question.**
+
+    version DERIVEE, affichee par le portail   2.0.11
+    VERSION-JALON                              2.0
+    CHANGELOG, derniere entree                 1.54.2
+    et son en-tete annonce                     « Semantic Versioning MAJEUR.MINEUR.PATCH »
+
+**`VERSION-JALON` est passé à `2.0` hier à 22:16 (`fe797fc`). Le CHANGELOG a gardé sa séquence
+`1.x` depuis — treize heures de divergence, d'une version MAJEURE.**
+
+> **On ne peut pas chercher « ce que contient 2.0.11 » dans un journal qui ne connaît que
+> 1.54.2.** *Le numéro que l'utilisateur voit et le numéro qui décrit ce qu'il voit ne se
+> rejoignent nulle part.*
+
+**C'est la classe de la journée sous une forme de plus** : *deux sources pour une même vérité,
+et ici aucune ne gagne — elles coexistent sans se croiser.* **Les quatre précédentes avaient au
+moins un vainqueur silencieux ; celle-ci n'en a pas, ce qui la rend plus visible et moins
+dangereuse.**
+
+### DÉCISION — le CHANGELOG adopte le numéro DÉRIVÉ, à partir de maintenant
+
+    entrees passees   restent en 1.x — renumeroter le passe serait mentir sur ce
+                      qui a ete livre sous quel nom
+    entrees futures   portent le numero que `scripts/version.sh --ecrire` produit
+    la discontinuite  est ECRITE dans le journal, a l'endroit ou elle se produit
+
+**Et la raison qui tranche est celle que ce dépôt a payée quatre fois aujourd'hui** : *un nombre
+tenu à la main dérive.* **Le CHANGELOG tenait le sien à la main pendant que le produit dérivait
+le sien — la divergence était structurelle, pas un oubli.**
+
+⚠ **`version.txt` ne s'écrit JAMAIS à la main** — *elle se dérive.* **La session qui a posé la
+question ne l'a pas touchée, et c'était le bon réflexe.**
+
+### Et la trouvaille qui accompagnait la question mérite d'être ici
+
+**E-456 et E-457 étaient COUPLÉS, et je ne l'avais pas vu en posant les deux issues.**
+
+    ce que le step-up garde (api_proxy.php:56-58)   /policy/{sudo,sftp}/{deploy,remove}
+    ce que go-policies.mjs:131 POSTe                /policy/sudo/deploy   -> MATCH
+
+> **Le POST vers `srv-zabbix` n'est refusé aujourd'hui QUE parce que le vérificateur de step-up
+> est archivé.** *Restaurer le vérificateur — l'une des deux issues que j'avais posées — aurait
+> RÉ-ARMÉ un déploiement sudo sur la production, depuis une suite qu'aucun lot ne joue.*
+
+**J'avais présenté deux issues comme équivalentes. L'une des deux armait ce que l'autre écart
+décrivait.** *La session a tranché pour retirer l'appelant, et cette raison-là est la
+troisième — les deux autres étant que le sens de la panne est fermé et que le portage porte
+déjà la capacité.*
+
+### ⚠ Et une QUATRIÈME forme d'invocation
+
+    utils.js:42   un wrapper de `window.fetch` intercepte TOUTE reponse 403
+                  portant `step_up_required`, et appelle la modale
+    utils.js      est charge par `menu.php` -> actif sur TOUT le portail
+
+**Aucun `grep` du nom de la fonction ne l'aurait trouvé : le seul appelant est un
+INTERCEPTEUR.** *Après l'appel direct, l'appel par helper et l'URL construite, voici l'appel
+par interception — et c'est la seule des quatre qu'on ne peut pas chercher par son nom.*
