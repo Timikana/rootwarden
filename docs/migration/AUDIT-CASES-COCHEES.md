@@ -502,3 +502,44 @@ que le fichier n'avait plus.*
 **La conclusion du §8.3 ne bouge pas — aucune des 22 n'est portable sans
 arbitrage.** *Mais elle tenait pour partie sur des motifs faux, et un verdict
 juste par accident ne vaut pas un verdict fondé.*
+
+### 9.8 ⚠ MA FAUTE ÉTAIT PIRE QUE « TROIS AU LIEU D'UNE » — et son origine est lisible
+
+**Le dédouanement du DSI — « la version fausse n'a pas voyagé » — je l'ai vérifié
+sur un AXE différent du sien** : *chercher la PROPOSITION (« bloqué », « retenu »,
+« non porté ») au voisinage des deux chemins, sans exiger ni le terme `K4` ni
+`preflight_check`.* **Trois occurrences dans tout le dépôt, dont deux sont les
+corrections. La seule porteuse est ma ligne 325. Confirmé.**
+
+**Mais la faute n'était pas un sur-comptage. `MODULE-SSH.md:139-141` :**
+
+```
+K2 ✔ | le constat avant deploiement | POST /preflight_check | PORTE le 2026-08-21
+K3 ✔ | la lecture du flux           | GET  /logs            | PORTE le 2026-08-21
+K4   | le deploiement               | POST /deploy          | le seul restant
+```
+
+> **Ces deux routes ne sont pas « K4 sur-compté » : elles ne sont pas K4 du tout.
+> Elles sont K2 et K3, portées depuis seize jours.** *J'ai franchi une frontière
+> de sous-lots qui avait été tracée précisément pour que ces deux-là puissent
+> partir sans attendre l'arbitrage du troisième.*
+
+**Et l'origine se lit à `MODULE-SSH.md:45`** :
+
+> *« Un seul bouton (`index.php:152`, `onclick="deploySSH()"`) déclenche les
+> trois routes en cascade, sans reprise de main. »*
+
+**C'est VRAI — du legacy.** *Là-bas, déployer EST une cascade de trois routes.*
+**Le découpage K2/K3/K4 existe justement pour défaire cette cascade.**
+
+> **J'ai porté un énoncé vrai du système SOURCE sur la décomposition du système
+> CIBLE, avec les mêmes mots.** *« Le déploiement, c'est trois routes » est exact
+> côté legacy et faux côté portage — et rien dans la phrase ne dit de quel côté
+> elle parle.* **C'est la même classe que « arbre ou service » : une affirmation
+> sans son régime est invérifiable, et ici le régime est le SYSTÈME.**
+
+**⛔ Une limite du dédouanement, que je dois dire** : *ma sonde couvre les
+FICHIERS.* **Elle ne voit pas ce qui a circulé entre sessions — et j'ai moi-même
+relayé mon §8.2 au DSI par message aujourd'hui.** *« N'a pas voyagé » est donc
+prouvé pour le dépôt et indémontrable pour la conversation.* **Le seul vecteur
+réel a été nos deux messages, et ils ont été rectifiés dans le même canal.**
