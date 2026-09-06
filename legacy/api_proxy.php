@@ -65,7 +65,15 @@ foreach ($_stepupPatterns as $_pat) {
             http_response_code(403);
             echo json_encode([
                 'success' => false,
-                'message' => 'Re-authentification 2FA requise pour cette action',
+                // E-456 : ce message promettait une re-authentification qui n'est plus
+                // possible depuis ce portail — `auth/step_up_verify.php` est archive depuis
+                // le 2026-09-05 (`de9669c`) et le modal qui le sollicitait a ete retire de
+                // `js/utils.js`. Le refus est donc DEFINITIF ici, et le geste vit dans le
+                // portage (`politiques.js`, `acces-sftp.js`).
+                'message' => "Ce geste n'est plus disponible depuis l'ancien portail : la "
+                           . "re-authentification 2FA n'y est plus assuree. Utilisez le "
+                           . "nouveau portail pour deployer, retirer ou annuler une "
+                           . "politique sudo/SFTP.",
                 'step_up_required' => true,
                 'action' => 'policy_action',
             ]);
