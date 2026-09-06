@@ -80,6 +80,11 @@ return [
     'eff_aide' => 'Your personal data is erased: name, address, company, SSH key, second factor. The account is deactivated and no password can open it again.',
     'eff_prevenu' => 'The audit log is kept, without your identity. It is sealed by a verification chain: removing rows would make every following row unverifiable. This action is irreversible and signs you out immediately.',
     'eff_confirmation_label' => 'To confirm, type your account name: :nom',
+    /* Two controls, two scopes — see fr. The retyped name guards against an
+     * ACCIDENTAL action (it is displayed just above); the code guards against a
+     * STOLEN session, and is the only one an intruder cannot supply. */
+    'eff_code_label' => 'Code from your authenticator app (six digits)',
+    'eff_code_aide'  => "The retyped name guards against an accidental action — it is written just above. This code guards against a stolen session: it is the only one of the two an intruder cannot supply. The same action on someone else's account already requires it.",
     'eff_bouton' => 'Permanently erase my account',
     'eff_err_confirmation' => 'The name you typed does not match the account name. Nothing was erased.',
     'eff_fait' => 'Your account has been erased. Personal data was removed and the audit log kept without your identity.',

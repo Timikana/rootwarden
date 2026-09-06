@@ -253,11 +253,70 @@
             @endif
             <form method="POST" action="{{ route('profil.effacement') }}" data-rw="profil-eff-form">
                 @csrf
-                <label class="rw-champ">
-                    <span>{{ __('profil.eff_confirmation_label', ['nom' => $compte['name'] ?? '']) }}</span>
-                    <input type="text" name="confirmation" autocomplete="off" required
-                           data-rw="profil-eff-champ">
-                </label>
+                {{--
+                    ⚠ `<div class="rw-champ">` + `<label class="rw-etiquette">`, ET
+                    PAS `<label class="rw-champ">` — vu a l'image.
+
+                    `.rw-champ` ne pose que `margin-bottom` (`rw.css:146`), et un
+                    `<label>` est INLINE par defaut : les deux champs de ce
+                    formulaire se rendaient **sur une seule ligne**, collés, le
+                    second ayant l'air d'un ajout. `.rw-etiquette`, elle, est en
+                    `display: block` — c'est le motif employe partout ailleurs
+                    dans le portage, et celui-ci ne le suivait pas.
+
+                    *Le champ du nom est corrige avec celui du code : en laisser
+                    un des deux inline garderait le defaut a moitie, pour une
+                    paire qui se lit ensemble.*
+                --}}
+                <div class="rw-champ">
+                    <label class="rw-etiquette" for="eff-confirmation">
+                        {{ __('profil.eff_confirmation_label', ['nom' => $compte['name'] ?? '']) }}
+                    </label>
+                    <input class="rw-saisie" id="eff-confirmation" type="text" name="confirmation"
+                           autocomplete="off" required data-rw="profil-eff-champ">
+                </div>
+                {{--
+                    ⚠ LE SECOND FACTEUR EST DANS LE MEME FORMULAIRE, pas dans une
+                    modale. Les trois autres gestes gardés du portage rendent
+                    `step_up_required` en JSON a une modale branchee sur `fetch` ;
+                    celui-ci est un `<form method="POST">`. **Un second ecran
+                    ajouterait un etat a perdre entre deux soumissions**, pour un
+                    geste qui doit en avoir le moins possible.
+
+                    Et les DEUX controles ne protegent pas de la meme chose : le
+                    nom retape protege du geste ACCIDENTEL — il est affiche juste
+                    au-dessus — et le code protege d'une session VOLEE. `eff_code_aide`
+                    le dit a l'ecran, parce que rien ne les distingue a l'oeil.
+                --}}
+                <div class="rw-champ">
+                    <label class="rw-etiquette" for="eff-code">{{ __('profil.eff_code_label') }}</label>
+                    {{-- `inputmode` et `pattern` sont des gardes du NAVIGATEUR :
+                         ils evitent une frappe malheureuse, ils ne controlent
+                         rien. `StepUp::verifie()` tranche, et lui seul.
+
+                         ⚠ ET `required` EST GARDE ALORS QUE LE SERVEUR PEUT
+                         S'EN PASSER — releve par la QA, et la raison est mesuree.
+
+                         Le controleur court-circuite `verifie()` quand une marque
+                         fraiche existe : ce code-la n'est alors pas lu. Mais
+                         **cette marque ne survit presque jamais a une requete** —
+                         `verifie()` est le seul a la poser, et le geste aboutit
+                         dans la foulee (le compte est anonymise, la session
+                         detruite). Elle ne subsiste que si `anonymise()` echoue
+                         APRES un step-up reussi.
+
+                         `required` sert donc le seul chemin qui se produise
+                         reellement, et son cout dans l'autre est de retaper un
+                         code apres un echec d'ecriture. *L'incoherence est reelle
+                         et elle est ecrite : sans cette note, un lecteur conclurait
+                         que le code est TOUJOURS exige, ce qui est faux cote
+                         serveur.* --}}
+                    <input class="rw-saisie" id="eff-code" type="text" name="code_2fa"
+                           autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]{6}"
+                           maxlength="6" required data-rw="profil-eff-code">
+                </div>
+                <p class="rw-aide rw-prose" data-rw="profil-eff-code-aide">{{ __('profil.eff_code_aide') }}</p>
+
                 <div class="rw-actions">
                     <button type="submit" class="rw-bouton rw-bouton--danger"
                             data-rw="profil-eff-bouton">{{ __('profil.eff_bouton') }}</button>

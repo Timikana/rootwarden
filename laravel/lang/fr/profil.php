@@ -89,6 +89,17 @@ return [
     'eff_aide' => 'Vos données personnelles sont effacées : nom, adresse, société, clé SSH, second facteur. Le compte est désactivé et aucun mot de passe ne permet plus d\'y entrer.',
     'eff_prevenu' => 'Le journal d\'audit est conservé, sans votre identité. Il est scellé par une chaîne de vérification : en retirer des lignes rendrait invérifiables toutes les suivantes. Ce geste est irréversible et vous déconnecte immédiatement.',
     'eff_confirmation_label' => 'Pour confirmer, saisissez le nom de votre compte : :nom',
+    /*
+     * ⚠ DEUX CONTROLES, DEUX PORTEES — et le libelle le DIT, parce que la page
+     * en montre deux et que rien ne distingue leur objet a l'oeil.
+     *
+     *   retaper le nom     protege du geste ACCIDENTEL, et rien de plus : le
+     *                      nom est AFFICHE juste au-dessus du champ.
+     *   le second facteur  protege d'une session VOLEE — le seul des deux qui
+     *                      exige quelque chose que le voleur n'a pas.
+     */
+    'eff_code_label' => 'Code de votre application d\'authentification (six chiffres)',
+    'eff_code_aide'  => "Le nom retapé protège d'un geste accidentel — il est écrit juste au-dessus. Ce code-ci protège d'une session volée : c'est le seul des deux qu'un intrus ne peut pas fournir. Le même geste sur le compte de quelqu'un d'autre l'exige déjà.",
     'eff_bouton' => 'Effacer définitivement mon compte',
     'eff_err_confirmation' => 'Le nom saisi ne correspond pas à celui du compte. Rien n\'a été effacé.',
     'eff_fait' => 'Votre compte a été effacé. Les données personnelles ont été retirées et le journal d\'audit conservé sans votre identité.',

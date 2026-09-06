@@ -34,6 +34,7 @@ class PortailController extends Controller
         private readonly SessionsActives $sessions,
         private readonly Onboarding $onboarding,
         private readonly JournalAudit $journal,
+        private readonly StepUp $stepUp,
     ) {
     }
 
@@ -145,6 +146,62 @@ class PortailController extends Controller
          */
         if ((int) $compte['role_id'] === 3 && $this->comptes->superadminsActifs() <= 1) {
             return redirect()->route('profil')->with('effacement_erreur', __('comptes.err_dernier_sa'));
+        }
+
+        /*
+         * ══ LA RE-AUTHENTIFICATION, ET ELLE COMBLE UNE ASYMETRIE ═════════
+         *
+         *     ComptesController:479   anonymiser le compte d'AUTRUI  -> step-up EXIGE
+         *     ici                     anonymiser le SIEN             -> rien
+         *
+         * Le meme geste, gardé d'un cote et pas de l'autre. **Ce n'est pas une
+         * capacite qu'on ajoute, c'est un motif deja etabli dans le depot que
+         * cette route n'avait pas suivi.**
+         *
+         * ⚠ ET LES DEUX CONTROLES NE PROTEGENT PAS DE LA MEME CHOSE — le dire
+         * ici, sinon le prochain lecteur verra deux gardes et conclura qu'il y
+         * en a deux du meme genre :
+         *
+         *     retaper le nom   protege du geste ACCIDENTEL. Rien de plus : le
+         *                      nom est AFFICHE sur la page qui le demande.
+         *     le second facteur protege d'une session VOLEE — c'est le seul des
+         *                      deux qui exige quelque chose que le voleur n'a pas.
+         *
+         * ⚠ ET LE CODE EST DANS LE MEME FORMULAIRE, pas dans une modale. Les
+         * trois consommateurs existants rendent `step_up_required` en JSON a une
+         * modale branchee sur `fetch` ; celui-ci est un `<form method="POST">`.
+         * *Un second ecran ajouterait un etat a perdre entre les deux
+         * soumissions, pour un geste qui doit en avoir le moins possible.*
+         *
+         * `verifie()` porte la liste fermee, le quota, l'anti-rejeu et la pose de
+         * la marque. On ne reimplemente rien — la marque posee ici ne sert a
+         * personne d'autre, mais passer par le service garde UNE seule mecanique.
+         */
+        /*
+         * ⚠ LA MARQUE D'ABORD, LE CODE ENSUITE — c'est le motif des trois autres
+         * consommateurs, et mon premier jet ne l'avait pas.
+         *
+         * J'exigeais le code a CHAQUE fois. C'est plus strict, et c'etait le
+         * mauvais arbitrage : **une garde qui refuse une re-authentification
+         * qu'on vient de faire n'est pas plus sure, elle est plus penible** — et
+         * la penibilite d'un geste de sortie se paie en personnes qui renoncent
+         * a exercer un droit.
+         *
+         * La marque est cherchee pour CETTE action seule. Une marque obtenue
+         * pour anonymiser le compte d'autrui n'ouvre pas celle-ci : c'est le
+         * defaut du legacy que `StepUp` corrige deja (`:68`, `:156` — il pose
+         * `_step_up_<ce que le client envoie>`, si bien qu'un step-up consenti
+         * pour annuler une politique autorisait un deploiement).
+         */
+        if (! $this->stepUp->valide($idCompte, 'profil_effacement')) {
+            $verdict = $this->stepUp->verifie(
+                $idCompte,
+                'profil_effacement',
+                (string) ($requete->input('code_2fa') ?? ''),
+            );
+            if ($verdict !== StepUp::OK) {
+                return redirect()->route('profil')->with('effacement_erreur', __($verdict));
+            }
         }
 
         $this->journal->ajoute($idCompte, 'profil: effacement demande par le sujet (anonymisation)');

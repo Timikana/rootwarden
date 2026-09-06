@@ -21119,3 +21119,83 @@ règle fondée sur « le préfixe jusqu'au dernier `/` » ne peut le voir.*
 > *J'ai affirmé qu'un chemin existait sans le vérifier, puis lu son absence comme
 > une panne de sonde.* **Un témoin se vérifie avant de servir de preuve — sinon il
 > transforme une erreur d'hypothèse en accusation d'instrument.**
+
+---
+
+## E-449 (portage) — le step-up sur `POST /profil/effacement` : **un motif établi qu'une route avait sauté**
+
+    ComptesController:479   anonymiser le compte d'AUTRUI  ->  step-up EXIGE
+    PortailController       anonymiser le SIEN             ->  aucun
+
+**Le même geste, sur le même compte, gardé d'un côté et pas de l'autre.** *Il n'y avait donc
+pas une capacité à porter : il y avait un motif déjà établi dans le dépôt qu'une route n'avait
+pas suivi.*
+
+### Une action NEUVE, et pourquoi surtout pas `compte_anonymiser`
+
+Les marques de step-up sont posées **par action** (`StepUp::valide`, `cleMarque`). Réutiliser
+`compte_anonymiser` ferait qu'**une re-authentification donnée pour anonymiser le compte
+d'autrui ouvrirait aussi l'effacement du sien**, pendant quinze minutes, sans que personne
+l'ait demandé.
+
+*Ce n'est pas une hypothèse : c'est le défaut du legacy que `StepUp` corrige déjà (`:68`,
+`:156`) — il pose `_step_up_<ce que le client envoie>`, si bien qu'un step-up consenti pour
+annuler une politique autorisait un déploiement.* **Quatrième entrée de `ACTIONS_PORTAGE`,
+avec son motif écrit comme les trois autres — la liste est fermée pour cette raison.**
+
+### Le code dans le MÊME formulaire, pas dans une modale
+
+Les trois consommateurs existants rendent `step_up_required` en JSON à une modale branchée sur
+`fetch` ; `/profil/effacement` est un `<form method="POST">`. **Un second écran ajouterait un
+état à perdre entre deux soumissions**, pour un geste qui doit en avoir le moins possible.
+
+*Et cela ferme par construction le raccord que la QA annonçait ne pas pouvoir attester : il n'y
+a pas de raccord — mesuré au navigateur, aucune modale de step-up sur cette page.*
+
+### ⚠ DEUX CONTRÔLES, DEUX PORTÉES — et la phrase est à l'ÉCRAN, pas seulement dans le code
+
+    retaper le nom     protege du geste ACCIDENTEL, et rien de plus :
+                       le nom est AFFICHE juste au-dessus du champ
+    le second facteur  protege d'une session VOLEE — le seul des deux qui exige
+                       quelque chose que le voleur n'a pas
+
+*Sans cette phrase, un lecteur voit deux contrôles et conclut qu'il y en a deux du même genre.*
+**`eff_code_aide` le dit à l'utilisateur, parce que rien ne les distingue à l'œil non plus.**
+
+### Le coût en accès est NUL, et le relevé qui dirait le contraire compte autre chose
+
+Atteindre la route exige une session ; avoir une session exige d'avoir franchi la connexion ;
+`ConnexionController` force l'enrôlement quand `totp_secret` est vide. **Quiconque atteint la
+route dispose donc d'un second facteur.**
+
+*Les comptes sans secret n'ont pas « zéro accès à ce geste » : ils ont **zéro connexion**. Un
+compte dormant et un compte vulnérable ont la même ligne dans un relevé qui ne compte que les
+secrets.*
+
+### Ce qui est mesuré
+
+    28 cas · 0 FAIL   la liste fermee, les marques PAR ACTION, la forme du code
+    14 cas · 0 FAIL   C1..C4 sur le CHEMIN DU CONTROLEUR, en transaction annulee
+    11 cas · 0 FAIL   le parcours A L'ECRAN, sans rien soumettre
+
+**C1 asserte l'ÉTAT DU COMPTE, pas le message** — *un refus qui affiche une erreur et anonymise
+quand même serait vert sur la réponse.* Et **C2 est son témoin** : le même harnais observe une
+anonymisation quand elle a lieu, donc « compte intact » n'est pas vacant.
+
+> **C1 sans C2 est un déni de service qui a l'air d'une sécurité** — la formule est de la QA, et
+> c'est la forme d'erreur la plus facile à livrer en croyant bien faire.
+
+**⛔ Aucun compte n'est effacé par aucun de ces harnais** : ce qui écrit vit dans une
+transaction annulée, l'état est vérifié après l'annulation, et le formulaire n'est jamais
+soumis au navigateur.
+
+### Deux corrections venues de la relecture, avant toute livraison
+
+- **mon premier jet exigeait le code À CHAQUE FOIS** et n'honorait aucune marque. Plus strict,
+  et le mauvais arbitrage : *une garde qui refuse une re-authentification qu'on vient de faire
+  n'est pas plus sûre, elle est plus pénible* — et la pénibilité d'un geste de sortie se paie
+  en personnes qui renoncent à exercer un droit ;
+- **les deux champs se rendaient sur une SEULE LIGNE** — vu à l'image. `.rw-champ` ne pose que
+  `margin-bottom` et un `<label>` est inline par défaut. *Le champ du nom est corrigé avec celui
+  du code : en laisser un des deux garderait le défaut à moitié, pour une paire qui se lit
+  ensemble.*
