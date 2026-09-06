@@ -101,4 +101,12 @@ return [
      * annoncee apres coup, c'est une excuse.
      */
     'gestes_jamais_exerces' => "Ces trois gestes n'ont encore jamais été exercés depuis cette interface. Ils sont câblés et confirmés par un panneau, mais leur bon fonctionnement n'a pas été observé sur une machine — l'ancien portail reste la seule voie éprouvée.",
+
+    /* Retrait d'UNE cle SSH precise (2026-09-06). Le champ `force` du backend
+       n'est jamais construit : voir public/js/distants-cles.js. */
+    'col_action' => 'Action',
+    'cle_retirer' => 'Retirer',
+    'cle_confirme' => 'Retirer définitivement la clé :empreinte de ce compte ? Elle est effacée du fichier authorized_keys sur la machine : elle n\'ouvrira plus de session.',
+    'cle_retiree' => 'Clé retirée de la machine.',
+    'cle_echec' => 'Le retrait a échoué. La clé est toujours en place.',
 ];

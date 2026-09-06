@@ -5,6 +5,61 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [2.0.97] - 2026-09-06
+
+### Portage - le retrait d'UNE cle SSH precise sur un compte distant
+
+**Le portail avait garde le geste BRUTAL et perdu le geste PRECIS.**
+
+    /remove_user_keys        efface TOUTES les cles d'un compte   PORTE et cable
+    /server_user_remove_key  efface UNE cle precise               0 appelant vivant
+
+**Mesure** : `server_user_remove_key` n'apparaissait que dans `lang/*/plateforme.php`,
+`RoutesBackend.php`, `api_proxy.php` et deux fichiers `_deprecated` — aucun appelant.
+*Temoin : `remove_user_keys` EST appele par `comptes-distants.js`.*
+
+**Aucun pouvoir neuf** : les deux routes portent la MEME garde backend
+(`@require_api_key` · `@require_role(2)` · `@require_machine_access`). Porter la
+fine donne une version **moins destructrice** d'un pouvoir deja offert a l'ecran.
+
+#### ⚠ `force` N'EST PAS CONSTRUIT, et c'est le point de ce portage
+
+Le contrat de la route porte quatre champs — `machine_id`, `username`,
+`fingerprint_sha256`, et **`force`**. *`force: true` autorise le retrait de la CLE
+PLATEFORME, celle par laquelle RootWarden atteint la machine ; le backend la
+protege (`ssh.py:2474`, « ne pas se locker hors du serveur ») et ne cede qu'a ce
+champ.*
+
+**Le corps envoye en porte TROIS. Pas un `force: false` — pas de champ du tout.**
+
+> **Un `false` explicite se retourne d'un caractere ; une absence de champ demande
+> d'ECRIRE une ligne, et cette ligne se voit en relecture.** *Meme forme que la
+> liste fermee de `wazuh.js` : rendre inexprimable plutot que surveiller.*
+
+**Et le bouton n'est pas rendu du tout sur la ligne de la cle plateforme.**
+*Le rendre produirait un 400 a chaque clic — et un bouton qui echoue toujours au
+meme endroit apprend a l'operateur que les echecs sont normaux.* L'inexprimable
+devient ainsi visible a l'ecran, pas seulement vrai dans le corps.
+
+#### Ce qui n'a PAS ete ecrit, et pourquoi
+
+- **aucune route Laravel** : les autres ecritures du module appellent la passerelle
+  depuis le navigateur, et la garde est sur la PAGE
+  (`role:2` + `perm:can_manage_remote_users`, verifiee identique a ses quatre
+  soeurs). *Ajouter un controleur qui appelle le backend aurait duplique les
+  en-tetes que `PasserelleController` compose deja — la quatrieme copie du meme
+  probleme signale ailleurs sur `JournalAudit`* ;
+- **aucun exercice du geste** : il reecrit un `authorized_keys` distant en root.
+  *Aucune suite ne doit le soumettre.*
+
+**Verifie** : `php -l` sur le controleur et les deux catalogues · `node --check`
+sur le JS, **temoin negatif rendu** · parite FR/EN par `require` + `array_diff`
+(**83 = 83**, aucune absente, temoin negatif rendu) · `route:list` · directives
+Blade equilibrees.
+
+**Autorise nominalement par l'exploitant**, conception `force` inexprimable
+comprise. Arbitrage : `DOSSIER-36`.
+
 ## [2.0.96] - 2026-09-06
 
 ### Extinction - E-459 : deux routes `/policy/` orphelines retirees, la troisieme NE L'EST PAS
