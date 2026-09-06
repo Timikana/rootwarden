@@ -14,8 +14,12 @@ services:
     security_opt:
       - no-new-privileges:true
     ports:
-      - "${HTTP_PORT:-8080}:80"
-      - "${HTTPS_PORT:-8443}:443"
+      # ══ 2026-09-06 : ces ports sont ceux que le PORTAGE occupait jusqu'ici.
+      #    Le legacy les reprend, le portage passe sur 8080/8443 (bloc `laravel`).
+      #    Le portail historique n'est plus a l'adresse que tout le monde connait :
+      #    c'est le but, et il faut le dire aux utilisateurs avant, pas apres.
+      - "${HTTP_PORT:-8444}:80"
+      - "${HTTPS_PORT:-8446}:443"
     volumes:
       - php_sessions:/var/www/sessions
       - ./legacy:/var/www/html
@@ -73,17 +77,37 @@ services:
     security_opt:
       - no-new-privileges:true
     ports:
-      # 8444 -> 80 : ne sert plus de contenu, redirige vers HTTPS. Conserve parce
-      # que `LARAVEL_URL` et 87 suites le visent — l'echange des ports est un
-      # geste SEPARE, il ne se fait pas dans le meme lot que le TLS.
-      - "${LARAVEL_PORT:-8444}:80"
+      # ══ ECHANGE DES PORTS, 2026-09-06 — le geste SEPARE annonce ci-dessous a eu
+      #    lieu. Le PORTAGE prend les ports du portail historique (8080/8443) et le
+      #    legacy part sur ceux que le portage abandonne (8444/8446).
+      #    Demande de l'exploitant : « les memes ports qu'avant, et on degage les
+      #    ports du legacy sur une autre plage ». Echange PUR : aucun port neuf a
+      #    ouvrir, et les deux valeurs sont deja connues de l'outillage.
+      #
+      # ⚠ UNE TRACE DE `8444` DANS UN DOCUMENT ANTERIEUR AU 2026-09-06 DESIGNE LE
+      #    PORTAGE ; APRES, ELLE DESIGNE LE LEGACY. C'est le cout accepte de
+      #    l'echange pur. Dater avant d'interpreter.
+      #
+      # 8080 -> 80 : ne sert plus de contenu, redirige vers HTTPS.
+      - "${LARAVEL_PORT:-8080}:80"
       # ⚠ AJOUTE LE 2026-09-06 : le portage servait l'authentification EN CLAIR.
       # Mesure : seul 8444->80 etait publie, `https://…:8444` rendait 000, et le
       # formulaire postait sur `http://`. Mot de passe et code TOTP transitaient
       # en clair, alors que le legacy qu'on remplace a du TLS depuis toujours.
       # Le defaut doit rester EGAL a celui de l'entrypoint, qui construit la
       # redirection HTTP -> HTTPS avec ce port.
-      - "${LARAVEL_HTTPS_PORT:-8446}:443"
+      #
+      # ⚠⚠ AU 2026-09-06 CETTE EGALITE EST ROMPUE, ET LE RATTRAPER EST UN PREALABLE
+      #    A LA RECREATION. `laravel/docker-entrypoint.sh:86` porte encore
+      #    `LARAVEL_HTTPS_PORT="${LARAVEL_HTTPS_PORT:-8446}"`. Le fichier est sous
+      #    GEL (LOT 4 en cours) : le correctif est prepare, pas applique.
+      #
+      #    Ce que l'oubli produirait n'est PAS une panne : un conteneur demarre
+      #    sans la variable batirait sa redirection HTTP -> HTTPS vers `:8446` —
+      #    port que le LEGACY occupe desormais. **Un operateur se connectant au
+      #    portage serait silencieusement depose sur l'ANCIEN portail**, qui
+      #    fonctionne et qui accepte ses identifiants. Aucun message d'erreur.
+      - "${LARAVEL_HTTPS_PORT:-8443}:443"
     volumes:
       - ./laravel:/var/www/html
       # Certificats : MEME volume que le service `php`, donc meme certificat pour

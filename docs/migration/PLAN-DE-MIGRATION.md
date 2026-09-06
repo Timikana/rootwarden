@@ -140,28 +140,74 @@ sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 
 ---
 
-## 2 ter. LES PORTS DES DEUX PORTAILS — **celui qu'on écrit de mémoire est le mauvais**
+## 2 ter. LES PORTS DES DEUX PORTAILS — **ÉCHANGÉS le 2026-09-06, PAS ENCORE APPLIQUÉS**
 
-*Ce paragraphe existe parce que ce fait a coûté un faux constat à **deux sessions en une heure**, le
-2026-09-06, sur les deux portails différents. Aucun port n'était écrit nulle part dans ce plan.*
+**Décision de l'exploitant** : *« je voulais les mêmes ports qu'avant, et on dégage les ports du legacy sur
+une autre plage »*. **Le portage prend les ports du portail historique ; le legacy prend ceux que le portage
+abandonne.** Échange PUR — aucun port neuf à ouvrir, les deux valeurs sont déjà connues de l'outillage.
 
-| | HTTP | HTTPS | ce qu'il faut employer |
+| | avant | **après** | |
 |---|---|---|---|
-| legacy | `:8080` | **`:8443`** | `https://localhost:8443` |
-| portage | `:8444` | **`:8446`** | `https://localhost:8446` |
+| **portage** (`rootwarden_laravel`) | `8444` / `8446` | **`8080` / `8443`** | l'adresse que tout le monde connaît |
+| **legacy** (`rootwarden_php`) | `8080` / `8443` | **`8444` / `8446`** | relégué |
 
-    curl https://localhost:8444/…   ->  000        <- se lit comme « le service est a terre »
-    curl http://localhost:8444/…    ->  301 vers https://localhost:8446
+*Le second de chaque paire est le HTTPS, et c'est celui qu'il faut employer.*
 
-⚠ **`:8444` est le port qu'on retient, et c'est le HTTP.** En HTTPS il rend `000` — *indiscernable d'un
-conteneur arrêté*. Une session en a conclu que le portage ne répondait plus ; une autre, mesurant `:8443` en
-croyant viser le portage, en a conclu qu'un durcissement Apache avait pris effet. **Les deux constats
-étaient faux et aucun des deux ne se signalait.**
+### ⚠ ÉTAT AU MOMENT OÙ CECI EST ÉCRIT : PRÉPARÉ, **NON APPLIQUÉ**
 
-⚠⚠ **ET `:8444` NE DISCRIMINE PLUS RIEN DEPUIS 13:08** : il rend `301` sur **tout**, chemin inexistant
-compris. *Un contrôle qui y cherche un `404` est aveugle.* `:8446` discrimine encore — `404` sur un chemin
-absurde, `302` sur `/profil`. **Poser le témoin absurde avant tout constat fondé sur un code HTTP**, sur le
-port qu'on mesure et pas sur celui qu'on croit mesurer.
+Le LOT 4 tourne depuis 16:35 sur le portage. **Recréer le conteneur maintenant tuerait une mesure de
+plusieurs heures qui n'a jamais été faite en entier** — l'exploitant a tranché : à la fermeture du lot.
+**Tant que `docker compose up -d` n'a pas été rejoué, les conteneurs écoutent les ANCIENS ports.**
+
+    ecrit          docker-compose.yml (defauts) · srv-docker.env.example · srv-docker.env
+    prepare        docs/migration/patchs-en-attente/05-echange-des-ports-entrypoint.patch
+    NON fait       docker compose up -d
+    reste a faire  les replis en dur des suites (tests/e2e/, gele — session 7)
+
+### Trois pièges mesurés, chacun payé une fois
+
+1. **`env_file:` N'ALIMENTE PAS l'interpolation `${...}` du compose.** Le port publié vient du **défaut du
+   fichier compose** (ou de `.env`, absent ici) — *pas* de `srv-docker.env`, qui ne vaut qu'à l'intérieur
+   des conteneurs. Les deux ont dû être changés, pour deux raisons différentes.
+2. **`env-merge.sh` n'AJOUTE que les clés manquantes.** Modifier `srv-docker.env.example` seul n'aurait
+   **rien changé** : le fichier vivant portait déjà les valeurs perdantes. *Le faux remède se lit comme une
+   précaution.*
+3. ⚠ **`LARAVEL_URL` et `LEGACY_URL` avaient DIVERGÉ de l'exemple** : dérivées dans le modèle, **codées en
+   dur** dans le fichier vivant (`https://192.168.0.245:8446` et `:8443`). **L'échange les avait donc
+   INVERSÉES — chacune pointant sur l'autre portail.** Corrigées ; l'hôte n'a pas été touché, remettre la
+   forme dérivée aurait substitué `localhost` et cassé tout lien vu depuis une autre machine.
+
+### ⚠⚠ LE RISQUE QUI NE SE SIGNALE PAS
+
+`laravel/docker-entrypoint.sh:86` porte encore `LARAVEL_HTTPS_PORT="${LARAVEL_HTTPS_PORT:-8446}"`, et son
+propre commentaire exige qu'il **reste égal au défaut du compose**. Un conteneur démarré **sans** la variable
+bâtirait sa redirection HTTP → HTTPS vers `:8446` — **port que le legacy occupe désormais**.
+
+> **Ce n'est pas une panne : c'est un opérateur silencieusement déposé sur l'ANCIEN portail**, qui
+> fonctionne et qui accepte ses identifiants. *Aucun message d'erreur, et l'écran ressemble à celui qu'il
+> attendait.* Le patch `05` est prêt et `git apply --check` passe.
+
+### La marche à suivre, à la fermeture du LOT 4
+
+```bash
+git apply docs/migration/patchs-en-attente/05-echange-des-ports-entrypoint.patch
+sudo -n docker compose up -d                      # recreation, PAS un restart
+# controle : les QUATRE ports, avec le temoin absurde sur chacun
+curl -sk -o /dev/null -w '%{http_code}\n' https://localhost:8443/connexion   # portage  -> 200 ou 302
+curl -sk -o /dev/null -w '%{http_code}\n' https://localhost:8443/zzz         # portage  -> 404 (discrimine)
+curl -sk -o /dev/null -w '%{http_code}\n' https://localhost:8446/auth/login.php  # legacy -> 200
+curl -s  -o /dev/null -w '%{http_code} %{redirect_url}\n' http://localhost:8080/  # -> 301 vers :8443
+```
+
+⚠ **Le témoin absurde est obligatoire** : `:8444` rendait `301` sur *tout*, chemin inexistant compris, et un
+contrôle qui y cherchait un `404` était aveugle. *Un port qui répond n'est pas un port qui route.*
+
+### ⚠ DATER AVANT D'INTERPRÉTER
+
+**Une trace de `8444` dans un document antérieur au 2026-09-06 désigne le PORTAGE ; après, elle désigne le
+LEGACY.** C'est le coût accepté de l'échange pur, et il est réel : `8443` apparaît dans **141 fichiers**,
+`8444` dans **124**. *Aucune de ces occurrences n'est fausse — elles datent.* Les archives de `docs/` ne
+sont pas réécrites : un relevé daté vaut par sa date.
 
 ---
 
