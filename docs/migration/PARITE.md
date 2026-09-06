@@ -21403,3 +21403,59 @@ contrat de sortie **comparé avant/après** sur les quatre cas — `0 · 0 · 0 
 donc lisait le code de `head` et rendait `0` pour les quatre cas — dont celui qui vaut `2`. **Quatre valeurs
 plausibles, toutes fausses, et rien dans la sortie ne le signalait.** Remesuré sans tube. *C'est le piège
 déjà inscrit à `feedback_find_bfs_newermt`, et je l'ai refait en le connaissant.*
+
+---
+
+## E-453 — ⚠⚠ LA PAGE EXIGE UNE PERMISSION QUE LA PASSERELLE ET LE BACKEND N'EXIGENT PAS. **LE SEUL COMPTE `role 2` DU PARC NE L'A PAS.**
+
+**Signalé par la session 8** en vérifiant mon portage `7f2c736` ; **la chaîne et le fait décisif sont ma
+mesure.** Quatrième occurrence du motif déjà inscrit trois fois — *la garde est sur la PAGE, pas sur la
+REQUÊTE*.
+
+| maillon | ce qu'il exige | un `role 2` sans `can_manage_remote_users` |
+|---|---|---|
+| la **PAGE** (`web.php:1112`) | `role:2` **+** `perm:can_manage_remote_users` | **403** |
+| la **PASSERELLE** (`PasserelleController.php:69`) | `roleId < 2 && reserveeAdmin($chemin)` → 403 | **passe** |
+| le **BACKEND** (`ssh.py`, ancré au `def`) | `@require_api_key` `@require_role(2)` `@require_machine_access` | **passe** |
+
+`ExigePermission.php:39` est **fail-closed** — `(…[$permission] ?? false)` puis `abort(403)` — donc la page
+refuse réellement ; ce n'est pas une garde décorative. *Et `:35` court-circuite à `role_id >= 3`, conforme à
+E-296.*
+
+### Le fait décisif, qui manquait au signalement
+
+    comptes role 2 dans le parc               1
+    dont can_manage_remote_users              0
+    role 2 SANS la permission                 1     <- 100 % des comptes concernes
+
+> **L'écart n'est pas théorique.** *Le seul compte que la page refuse est aussi le seul qui puisse forger la
+> requête et obtenir le geste.* Témoins posés : la colonne existe, une colonne inventée est absente.
+
+### Trois gestes, le même régime — et mon portage HÉRITE l'écart, il ne le crée pas
+
+`/server_user_remove_key`, `/remove_user_keys`, `/delete_remote_user` : **les trois** portent exactement
+`@require_role(2)` sans aucun `@require_permission`, et les trois sont dans `ADMIN_SEULEMENT`
+(`RoutesBackend.php:131` et `:139`) — groupe que la passerelle applique en `role >= 2` **seul**. Les deux
+premiers sont en service depuis longtemps. *Ce portage ajoute une troisième porte au même couloir.*
+
+⚠ **`ssh.py` contient un raisonnement qui semble justifier ce choix — il ne concerne PAS ces routes.** Le
+paragraphe *« POURQUOI `role(2)` ET PAS `@require_permission` »* est à la ligne 422 ; ancré par le `def` qui
+le suit, il appartient à **`stream_logs`, route `/logs`**. Nos trois `def` sont à `:2200` et au-delà.
+*Le transférer aurait donné à mes routes une justification écrite pour une autre.* Et
+`grep -c '@require_permission' ssh.py` rend **1** : cette unique occurrence **est ce commentaire**, donc
+**zéro décorateur réel** dans tout le fichier. *Un compte de motif aurait lu une garde là où il n'y a
+qu'une phrase.*
+
+### ⟶ CORRECTION DE MON PROPRE COMMIT
+
+Le CHANGELOG de `7f2c736` dit que je n'ai pas écrit de route Laravel **parce que** *« la garde est sur la
+PAGE (`role:2` + `perm:can_manage_remote_users`, vérifiée identique à ses quatre sœurs) »*. **Les deux
+moitiés sont vraies et la conclusion ne suit pas** : identique à ses sœurs, oui — et les cinq sont
+franchissables par le même compte. **Ma justification reposait sur une garde que la requête ne traverse
+pas.** *Je porte cette classe d'erreur en mémoire depuis trois occurrences, et je l'ai écrite quand même.*
+
+**Arbitrage, non tranché** : poser la route Laravel manquante ferait de ce geste **le seul des trois gardé
+correctement** — argument POUR, pas incohérence (formulation de la session 8, que je reprends). L'autre voie
+est d'exiger la permission dans la passerelle pour ce groupe, ce qui la ferme pour les trois d'un coup et
+**modifie un contrôle d'accès en service**. *Aucune des deux ne s'écrit sans le mot de l'exploitant.*
+

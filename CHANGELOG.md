@@ -52,6 +52,15 @@ devient ainsi visible a l'ecran, pas seulement vrai dans le corps.
 - **aucun exercice du geste** : il reecrit un `authorized_keys` distant en root.
   *Aucune suite ne doit le soumettre.*
 
+> ⚠ **CORRECTION DU 2026-09-06 — la premiere raison ci-dessus est HOLEE (E-453).** La garde de la page est
+> bien `role:2` + `perm:can_manage_remote_users`, et bien identique a celle de ses quatre soeurs. **Mais la
+> requete ne traverse pas la page** : la passerelle n'exige que `role >= 2`
+> (`PasserelleController.php:69`) et le backend non plus (`@require_role(2)`, aucun `@require_permission`).
+> **Mesure : le parc compte 1 seul `role 2`, et il n'a PAS cette permission** — donc le seul compte que la
+> page refuse est le seul qui puisse forger la requete. *L'ecart est HERITE des deux gestes voisins, pas
+> cree ici ; c'est la RAISON ecrite ci-dessus qui etait fausse.* Signale par la session 8, chaine mesuree
+> et inscrite en E-453. Arbitrage ouvert.
+
 **Verifie** : `php -l` sur le controleur et les deux catalogues · `node --check`
 sur le JS, **temoin negatif rendu** · parite FR/EN par `require` + `array_diff`
 (**83 = 83**, aucune absente, temoin negatif rendu) · `route:list` · directives
