@@ -119,11 +119,13 @@ dit "Verification"
 #    l'ETAT — `/up` rend 200 sur le portage, 404 sur le legacy — au lieu d'ecrire
 #    un numero a cote d'un nom. Une valeur se perime, un etat se mesure.
 fais "ssh -i '$VM_CLE' '$VM_USER@$VM_HOTE' \
-      'for p in 8080 8443 8444 8446; do \
-         u=\$(curl -sk -o /dev/null -w %{http_code} --max-time 5 https://localhost:\$p/up 2>/dev/null || echo 000); \
-         [ \"\$u\" = 200 ] && echo \"   portage https://localhost:\$p\"; \
-         [ \"\$u\" = 404 ] && echo \"   legacy  https://localhost:\$p\"; \
-       done'"
+      'n=0; for p in 8080 8443 8444 8446; do \
+         u=\$(curl -sk -o /dev/null -w %{http_code} --max-time 5 https://localhost:\$p/up 2>/dev/null || true); \
+         [ \"\$u\" = 200 ] && { echo \"   portage https://localhost:\$p\"; n=\$((n+1)); }; \
+         [ \"\$u\" = 404 ] && { echo \"   legacy  https://localhost:\$p\"; n=\$((n+1)); }; \
+       done; \
+       [ \"\$n\" -eq 0 ] && echo \"   ⚠ AUCUN portail n a repondu sur les quatre ports balayes.\"; \
+       true'"
 
 dit "Termine"
 cat <<'FIN'
