@@ -1,6 +1,6 @@
 --- a/scripts/rejouer-lot.sh
 +++ b/scripts/rejouer-lot.sh
-@@ -90,8 +90,56 @@
+@@ -90,8 +90,74 @@
  E2E="$RACINE/tests/e2e"
  JOURNAUX="${LOT_JOURNAUX:-$(mktemp -d -t rw-lot-XXXXXX)}"
  
@@ -56,10 +56,28 @@
 +    fi
 +    return 0
 +}
++
++# Variante pour une base CODEE EN DUR par une suite. `verifiePortail` avorte sur
++# tout code autre que 200/404, ce qui est juste pour la base du RUNNER — elle
++# DOIT servir un portail. Ce n'est pas juste ici : trois suites codent
++# `https://localhost:5000`, qui vise le BACKEND (port meme pas publie sur
++# l'hote, donc `000`). Les avorter serait un faux positif.
++#
++# La regle reste NON DATEE : on ne liste aucun port. Si `/up` ne rend ni 200 ni
++# 404, la base n'est pas un portail — donc hors du champ de ce controle.
++verifieBaseDeSuite() {   # $1 = cible ; $2 = base ; $3 = nom de la suite
++    local code
++    code=$(curl -sk -o /dev/null -w '%{http_code}' --max-time 10 "$2/up" 2>&1) || code=000
++    case "$code" in
++        200|404) verifiePortail "$1" "$2" ;;
++        *) echo "  · $3 vise une base NON-PORTAIL ($2, /up rend $code) — hors du champ."
++           return 0 ;;
++    esac
++}
  
  # ── Les chiffres de reference ────────────────────────────────────────────────
  #
-@@ -1324,6 +1372,32 @@
+@@ -1324,6 +1390,32 @@
    if [ "$cible" = legacy ]; then export E2E_BASE="$BASE_LEGACY" ; export E2E_CIBLE=legacy
    else                            export E2E_BASE="$BASE_LARAVEL" ; export E2E_CIBLE=laravel ; fi
  
@@ -85,14 +103,14 @@
 +    if printf '%s' "$_nu" | grep -qE 'localhost:[0-9]{4}'        && ! printf '%s' "$_nu" | grep -qE 'process\.env\.[A-Z0-9_]*(BASE|URL)'; then
 +      _base=$(printf '%s' "$_nu" | grep -oE 'https?://localhost:[0-9]{4}' | head -1)
 +      echo "  ⚠ $suite code sa base EN DUR ($_base) et ignore E2E_BASE."
-+      verifiePortail "$cible" "$_base" || exit 3
++      verifieBaseDeSuite "$cible" "$_base" "$suite" || exit 3
 +    fi
 +  fi
 +
    # Prealable 6 : le cas particulier de vague 0.
    if [ "$suite" = go-vague0-legacy ]; then
      export E2E_USER=rw-test-super
-@@ -1521,6 +1595,7 @@
+@@ -1521,6 +1613,7 @@
  
  echo "journaux : $JOURNAUX"
  ecarts=0 ; premiere=1 ; jouees=0 ; LOT_ABATTU='' ; LOT_REMEDE=''
