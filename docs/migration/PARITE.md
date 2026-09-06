@@ -21634,6 +21634,43 @@ C'est pourquoi cet écart est mesuré sur **deux objets** — l'arbre et le rés
 *Un contrôle d'archivage fondé sur un `404` attesterait aussi bien d'une page jamais écrite, d'une faute de
 frappe dans son propre chemin, ou d'un service à terre.*
 
+### ⟶ TRANCHÉ PAR L'EXÉCUTION — prédiction juste sur A, **aveugle sur B**, et **le `13` n'est pas faux**
+
+Données du lot 3 de la session 7, suite jouée le **2026-09-06 à 00:40** sur la cible legacy. Les cinq FAIL,
+tels quels :
+
+    A. sans session, /index.php renvoie vers la connexion            statut=404
+    A. sans session, /adm/admin_page.php renvoie vers la connexion   statut=404
+    B. rw-test-user  : entre mot de passe et second facteur, /index.php reste refuse
+    B. rw-test-admin : idem
+    B. rw-test-super : idem
+
+    PASS=8   FAIL=5   reference legacy 13   ->   8 + 5 = 13 ✓
+
+**Les deux du bloc A sont exactement celles que je prédisais, sur les deux chemins que je nommais.** Les
+trois autres, non : **le bloc B rejoue `/index.php` pour CHACUN des trois comptes** — la boucle est sur les
+comptes, pas sur les chemins.
+
+> **Compter les chemins ne donne pas le nombre d'assertions.** *Un chemin archivé, cité une seule fois dans
+> la table, produit trois échecs ailleurs dans le fichier.* Même famille que « un instrument qui nomme une
+> FAMILLE de routes ne peut pas inventorier des GESTES ».
+
+**Et mon doute sur le `13` était mal placé.** J'avais écrit : *« soit ma prédiction est fausse, soit le `13`
+l'est »*, en raisonnant que si 2 assertions ne peuvent plus passer, la référence legacy devrait être 2 sous
+celle du portage. **Ce raisonnement suppose que les références ont été posées APRÈS l'archivage. Elles ne
+l'ont pas été** — `13` est le score de la suite du temps où `/index.php` et `/adm/admin_page.php` étaient
+servis.
+
+> **L'écart `14 / 13` ne mesure rien de l'archivage : il mesure une différence entre les deux portails
+> d'AVANT.** *Les deux chiffres sont justes et ne parlent pas du même monde.* **Une valeur de référence
+> enregistrée avant un changement d'environnement ne vieillit pas seulement — elle change de SENS**, et rien
+> dans le nombre ne le signale.
+
+⚠ **L'erreur n'était donc ni dans ma prédiction ni dans le `13`, mais dans le LIEN que je traçais entre
+eux.** *J'avais eu raison d'annoncer laquelle des deux valeurs était la moins éprouvée — et tort sur
+laquelle : c'était la relation, que je n'avais pas pensée comme une mesure.* Formulation de la session 7,
+sur ses propres données.
+
 ### Ce que ça dit du chantier, et qui dépasse cette suite
 
 **Le legacy est démonté pendant que les suites continuent de le nommer.** Chaque archivage transforme
