@@ -151,13 +151,63 @@ correctement.*
 | faux positif — forme 4 | **s'agrandit de 2** (`/server_users_inventory`, `/admin/notification_prefs`) |
 | **jamais câblée** | **VIDE** — la catégorie perd ses deux seuls membres |
 | trou asymétrique | **devient un trou franc, et il est PORTABLE** |
-| les 18 autres | **inchangées** |
+| **retenue par ARBITRAGE (K4)** | **passe de 3 routes à UNE** |
+| les 16 autres | inchangées |
 
-⚠ **Je n'ai PAS remesuré les 18 autres avec un instrument corrigé.** *Mon
-relevé les couvre, et aucune ne change de verdict — mais elles ne sont pas
-l'objet de ce dossier, et je ne les revendique pas comme rejugées.*
+## ⚠ CORRECTION DU 2026-09-06 15:00 — j'avais écrit « les 18 autres inchangées »
 
-### L'instrument, pour la prochaine mesure
+**C'était faux, et la réfutation était dans MA PROPRE SORTIE de mesure, deux
+lignes au-dessus de la phrase.**
+
+```
+/logs              4 appels   ClesSshController.php · cles-ssh.blade.php · …
+/preflight_check   2 appels   ClesSshController.php · go-page-ssh-preflight.mjs
+```
+
+*Je les avais relevés à 14:44. J'ai écrit « inchangées » à 14:46.* **Mon
+instrument a rendu la vérité et je ne l'ai pas lue** — la faute exacte que je
+venais de reprocher à la sonde du tri, commise sur une sortie que j'avais sous
+les yeux.
+
+**Les deux sont APPELÉES par le portail :**
+
+```
+ClesSshController.php:99    'url_preflight' => url('/api/gateway/preflight_check')
+                            -> cles-ssh.js:224   await fetch(L.url_preflight, …)
+ClesSshController.php:106   'url_journal'   => url('/api/gateway/logs')
+                            -> cles-ssh.js:390   await fetch(L.url_journal, …)
+```
+
+> ⛔ **CONSÉQUENCE, ET ELLE DÉPASSE CE DOSSIER : le sous-lot K4 se réduit à
+> `/deploy` SEUL.** *`/logs` et `/preflight_check` n'ont jamais été bloquées sur
+> `NOPASSWD: ALL` — elles sont portées.* **Partout où trois routes sont
+> annoncées bloquées, il n'y en a qu'une.**
+
+⚠ **Et la réfutation était dans l'arbre depuis le 2026-09-03 11:54** (`f759662`),
+en clair, dans le docblock de `ClesSshController.php:29-31` — *qui énonce
+exactement les trois lignes ci-dessus.* **Trois jours avant le tri, le dépôt
+disait déjà que K4 se réduit à `/deploy`.**
+
+*Relevé conjointement par la session 5, qui a trouvé deux autres récupérations
+au même endroit (`/admin/temp_permissions`, à DOUBLE RÉGIME : lue par
+`DB::table`, écrite par la passerelle — la retirer casserait l'octroi de
+permission). Son §9, `729b1d3`.*
+
+**Les 16 restantes ne sont pas revendiquées comme rejugées.**
+
+### L'instrument — ⚠ à moitié corrigé, et il faut le dire ainsi
+
+⛔ **L'ancre corrigée ne voit TOUJOURS PAS la forme 4.** *Sur
+`/admin/notification_prefs` : `0` avant, `0` après.* **Je ne l'ai pas trouvée
+avec le motif — je l'ai trouvée en raisonnant sur la TABLE.**
+
+> **Deux défauts distincts ont été corrigés aujourd'hui ; un seul l'a été par
+> l'instrument.** *Écrire « instrument corrigé, trois témoins » couvre le premier
+> et laisse croire que le second l'est aussi.*
+
+**Un motif sur les CHEMINS ne peut pas, par construction, voir une capacité
+réimplémentée en base.** *Il faut la sonde par TABLE, et les deux ne se
+remplacent pas.* **Correction due à la session 5.**
 
 ```
 GAUCHE = (?:['"`(\s]|/api/gateway|PASSERELLE\s*\+\s*['"`])
