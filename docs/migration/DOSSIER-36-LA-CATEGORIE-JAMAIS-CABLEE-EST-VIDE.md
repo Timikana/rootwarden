@@ -323,3 +323,74 @@ de tri, un portage décidé, un câblage refusé.*
 si `/server_user_remove_key` doit être ÉPROUVÉ contre une machine, c'est la 3
 (`192.168.0.2`) et sur votre parole. **Le porter ne le demande pas ; l'exercer,
 si.**
+
+
+---
+
+## ⑦ APRÈS LIVRAISON — ce que la vérification du geste porté a rendu
+
+**`7f2c736` (session 4f) porte le retrait d'une clé, `1b3f7ed` corrige l'écart
+E-226 à côté. Vérifié ici, et l'essentiel tient :**
+
+```
+force dans le JS livré, commentaires DEPOUILLES   0      <- garde par construction
+  TEMOIN fingerprint_sha256                        1      OK
+  TEMOIN machine_id                                1      OK
+bouton supprimé sur la clé plateforme             distants-cles.blade.php:46  @unless is_platform_key
+garde passerelle                                  LISTE_BLANCHE + ADMIN_SEULEMENT
+  TEMOIN la jumelle /remove_user_keys              MEMES deux listes
+```
+
+**La garde est celle de sa jumelle déjà en service, ni plus faible ni plus
+forte.** *C'est ce que l'arbitrage demandait.*
+
+⚠ **Aucune route Laravel n'a été ajoutée** — l'écriture part par la passerelle,
+contrairement à la forme annoncée avant écriture (`POST
+/comptes-distants/{machine}/cles/{username}/retirer`). **Le résultat est
+acceptable ; la divergence est notée parce que la garde n'est alors PAS celle de
+la page.**
+
+### ⑦.1 DÉCISION — la passerelle est UNE garde plus faible que la page, sur TROIS gestes
+
+```
+la PAGE      role:2  +  perm:can_manage_remote_users     (web.php, 4 routes soeurs)
+la PASSERELLE ADMIN_SEULEMENT  =  role >= 2 seul         PAS de permission
+```
+
+**Concerne `/server_user_remove_key`, `/remove_user_keys` et
+`/delete_remote_user`.** *Un compte de rôle 2 SANS `can_manage_remote_users`
+n'obtient pas la page et peut forger la requête.*
+
+⚠ **Ce n'est PAS introduit par ce portage** — les deux autres sont en service
+depuis longtemps sous ce régime. **Le portage hérite l'écart, il ne le crée
+pas**, et c'est pour ça qu'il n'est pas un motif de refus.
+
+> **DÉCISION : la passerelle doit exiger la MÊME permission que la page pour ces
+> trois gestes.** *C'est l'écart « la garde est sur la PAGE, pas sur la REQUÊTE »,
+> quatrième occurrence mesurée sur ce dépôt.*
+
+**Aucun n'exige de step-up** (`MOTIFS_STEP_UP` = 2 motifs, tous deux `/policy/`).
+*Je ne le demande PAS pour le geste fin — il est le moins destructeur des trois.
+Pour `/delete_remote_user`, c'est une question ouverte que je n'instruis pas
+ici.*
+
+### ⑦.2 ⚠ MA DÉCISION ⑷ DE `DOSSIER-35` N'A ÉTÉ EXÉCUTÉE QU'À MOITIÉ
+
+**J'avais écrit : « les retirer, ET retirer leur entrée de step-up avec ».**
+
+```
+80c2057   backend/routes/policies.py   -136 lignes   la route est RETIREE
+RoutesBackend.php  MOTIFS_STEP_UP      '#^/policy/rollback$#'   TOUJOURS LA
+
+confrontation aux 7 routes reellement declarees dans policies.py :
+  #^/policy/(sudo|sftp)/(deploy|remove)$#   -> 4 routes vivantes    garde ACTIVE
+  #^/policy/rollback$#                      -> 0 route vivante      MOTIF MORT
+```
+
+**Un motif de step-up qui ne vise aucune route est inerte, donc sans danger — et
+il se lit comme une protection.** *C'est une garde morte, pas un trou : à
+retirer par hygiène, pas en urgence.*
+
+⚠ **Je ne l'ai pas vu parce que j'ai vérifié que la route était partie, pas que
+ma décision était finie.** *Une décision en deux membres se contrôle sur les
+deux.*
