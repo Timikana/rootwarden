@@ -5852,6 +5852,11 @@ passerelle n'exige que `role >= 2` (`PasserelleController.php:69`), le backend n
   qu'il ignore les titres de niveau 3 et les suffixes de lettre. *Les deux sont justes pour ce qu'ils
   comptent ; c'est celle du plan qui fait autorité, et mes trois derniers messages de commit citaient
   l'autre.* **Ne pas rapprocher un 398 d'un 400 : ils ne comptent pas la même chose.**
+- ⚠ **RÉTRACTATION — E-452 n'existe pas.** J'avais écrit ici que 53 exécutions sur 167 tournaient sans
+  référence. **Il y en a 0** : `85 refs / 85 suites` laravel, `82 / 82` legacy, zéro orpheline. Mon `awk`
+  n'imprimait que **la première clé de chaque ligne**, alors qu'elles en portent plusieurs. *Même défaut
+  qu'E-420, le même jour, rendant le même nombre — 58.* Mesuré par `bash` sourçant les tableaux, recoupé
+  par `grep -o` et par différences d'ensembles.
 - **le LOT est appairé, `pare-feu` compris** — ma tâche en attente « appairer `pare-feu` » était **périmée** :
   mesuré `1 · 1`, laravel et legacy. Les six suites sans jumelle sont `go-socle-{fixtures,i18n,navigation,passerelle}`
   (socle propre au portage), `go-page-mot-de-passe` et `go-fail2ban-f7`. **85 laravel / 82 legacy = 167

@@ -21395,6 +21395,47 @@ protège plus : il empêche »* — un LOT rouge à 53 titres serait illisible e
 seconde est que **le contrat de sortie appartient au banc (session 7)**, pas au registre : le durcir
 unilatéralement casserait chaque LOT du jour. *Question posée, pas tranchée.*
 
+### ⟶ ⚠⚠ RÉTRACTATION DU 2026-09-06 — **E-452 N'EXISTE PAS. LES 53 SONT UN ARTEFACT DE MON MOTIF.**
+
+**Aucune suite ne tourne sans référence, ni d'un côté ni de l'autre.** Mesuré en demandant à **bash** ce que
+contiennent les tableaux — les quatre blocs extraits dans un fichier d'affectations pures (`bash -n` propre,
+zéro `$(` hors commentaire), sourcé sous `set -u` :
+
+    SUITES_LARAVEL  85   REF_LARAVEL  85      jouee sans ref 0   orpheline 0
+    SUITES_LEGACY   82   REF_LEGACY   82      jouee sans ref 0   orpheline 0
+
+**Trois méthodes indépendantes concordent** : `${#REF_LARAVEL[@]}`, un `grep -o '\[[a-z0-9-]+\]='` sur le
+bloc borné, et les différences d'ensembles. Témoins dans les deux sens.
+
+**La cause.** Les lignes de référence portent **plusieurs clés chacune** —
+`[go-socle-navigation]=75 [go-socle-i18n]=23 [go-socle-passerelle]=10 [go-socle-auth]=14` — et mon `awk`
+faisait `match($0, /^[ \t]*\[[a-z0-9-]+\]=/)`, **qui n'imprime que la première de chaque ligne**. 58 au lieu
+de 85, 56 au lieu de 82 ; l'écart `85-58` et `82-56` **est** mon « 53 ».
+
+> ⚠ **C'est E-420 rejoué à l'identique, le même jour, et il rend LE MÊME NOMBRE : 58.** Là c'était un motif
+> de parité i18n exigeant un espace unique avant `=>`, rendant « 58 = 58 » sur un catalogue de 63. *Et
+> j'avais écrit le matin même, à la session 8, qu'il faut **demander au langage ce qu'il contient plutôt
+> qu'inférer d'un motif** — puis j'ai inféré d'un motif, sur le fichier d'à côté.*
+
+**Ce qui reste vrai de l'entrée ci-dessus, et ce qui tombe :**
+
+| affirmation | état |
+|---|---|
+| `joue()` rend `0` pour `(pas de reference)`, donc l'appelant ne le compte pas | **vrai**, mécanisme mesuré |
+| l'alerte `NEUVE` est sous `if [ ${#NOMMEES[@]} -gt 0 ]`, éteinte en LOT complet | **vrai** |
+| **53 exécutions sur 167 étaient absoutes** | ⛔ **FAUX — il y en a 0** |
+| « `LOT conforme` s'imprimait sur des exécutions non comparées » | ⛔ **FAUX**, jamais arrivé |
+
+**Le garde ajouté en `d94d75f` est CONSERVÉ** — non pour sauver la face de cette entrée, mais parce qu'il
+est correct et coûte une comparaison : il attrapera une suite ajoutée sans référence. *Dans l'état actuel il
+ne se déclenchera jamais.* **Décision remise à la session 7**, qui tient le banc : si elle préfère retirer un
+garde dont le commit raconte un défaut inexistant, je le retire.
+
+**Et le désaccord est ce qui a trouvé, pas l'instrument.** La session 7 rapportait 2 orphelines laravel et 1
+legacy là où j'avais 0 ; **ses chiffres sont faux aussi** (la vérité est 0 aux quatre coins), et son
+instrument était cassé de son propre aveu. *Mais un zéro est exactement ce qu'un pair ne rattrape jamais —
+sans sa contradiction, je n'aurais pas audité un dédouanement qui m'arrangeait.*
+
 **Vérifié** : `bash -n` propre, **témoin négatif rendu** (un `if [ x` inachevé lève bien une erreur) · les
 quatre branches du verdict éprouvées sur le texte **extrait du fichier**, pas sur une copie retapée · et le
 contrat de sortie **comparé avant/après** sur les quatre cas — `0 · 0 · 0 · 2`, identique.
