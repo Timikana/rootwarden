@@ -462,8 +462,43 @@ try {
     // ══ 4. IL PEUT SORTIR ════════════════════════════════════════════════
     await etape('la deconnexion sort, elle ne renvoie pas au profil', async () => {
         await page.goto(`${BASE}${C.profil}`, { waitUntil: 'networkidle2' });
+        /*
+         * ══ LE GESTE A DEPLACE : IL FAUT OUVRIR LA PASTILLE D'ABORD ═══════
+         *
+         * Jusqu'au 2026-09-06, le formulaire de deconnexion vivait a plat dans
+         * `layouts/portail.blade.php`. `06e384b` l'a deplace dans
+         * `composants/profil.blade.php`, sous un `<details data-rw="profil">`
+         * FERME par defaut — le compte est devenu une pastille.
+         *
+         * **`page.$()` le trouve toujours : il est dans le DOM.** Mais il n'est
+         * pas atteignable, et juste au-dessus de lui, a deux lignes, vit
+         * `<a data-rw="profil-lien" href="/profil">`. Le clic partait sur le
+         * lien du profil, et la suite concluait « le compte marque ne peut pas
+         * sortir » — c'est-a-dire un DEFAUT D'AUTHENTIFICATION la ou il n'y
+         * avait qu'un menu ferme.
+         *
+         * PRESENT DANS LE DOM N'EST PAS ATTEIGNABLE, et c'est la seule chose que
+         * ce test verifiait. On ouvre donc la pastille comme le ferait un
+         * utilisateur, puis on mesure que le bouton est VISIBLE avant de cliquer.
+         */
+        const pastille = await page.$('[data-rw="profil-pastille"]');
+        if (pastille) {
+            await pastille.click();
+            await dors(300);
+        }
         const bouton = await page.$(C.deconnexion);
-        constate('bouton de deconnexion du bandeau', bouton ? 'present (POST)' : '(absent)');
+        const atteignable = bouton ? await bouton.evaluate((e) => {
+            const r = e.getBoundingClientRect();
+            const st = getComputedStyle(e);
+            return r.height > 0 && r.width > 0 && st.visibility !== 'hidden' && st.display !== 'none';
+        }) : false;
+        constate('bouton de deconnexion',
+            bouton ? (atteignable ? 'present ET atteignable (POST)'
+                                  : 'present mais NON ATTEIGNABLE — pastille non ouverte ?')
+                   : '(absent du DOM)');
+        verifie('le bouton de deconnexion est ATTEIGNABLE, pas seulement present',
+            atteignable,
+            bouton ? 'il est dans le DOM et ne peut pas etre clique' : 'absent du DOM');
         if (! bouton) {
             verifie('le compte marque peut se deconnecter', false,
                 'aucun bouton de deconnexion dans le bandeau — le compte est enferme');

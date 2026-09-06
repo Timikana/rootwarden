@@ -102,3 +102,13 @@ module passait — **seul `ruff` l'a vu** (`F821 Undefined name 'logger'`).
 *C'est la démonstration de la condition posée par le DSI : « `git apply` puis relis le résultat —
 `--check` dit que ça s'applique, pas que c'est juste. » Ici il fallait aller au-delà de la relecture :
 un nom absent ne se voit pas à l'œil dans un diff de 35 lignes.*
+
+## ✅ 05 et 06 — APPLIQUÉS le 2026-09-06 à 19:39 (échange des ports)
+
+**Ne pas les rejouer.** `git apply --check --reverse` passe sur les deux : la preuve qu'ils sont dans
+l'arbre. Conservés ici comme trace de la manœuvre, pas comme travail en attente.
+
+    05  laravel/docker-entrypoint.sh   repli LARAVEL_HTTPS_PORT  8446 -> 8443
+    06  scripts/rejouer-lot.sh         les deux bases + le controle d'ETAT du portail
+
+*Appliqués dans `fa1a409`, avec la recréation des conteneurs et le contrôle des quatre ports.*

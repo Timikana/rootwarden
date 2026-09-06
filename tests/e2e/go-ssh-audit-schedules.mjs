@@ -1,4 +1,5 @@
 /**
+ * HORS-LOT: CREE puis supprime de vraies lignes dans `ssh_audit_schedules`. Portee et cible corrigees, mais l'ordonnanceur prend toute ligne dont `next_run` est echu.
  * go-ssh-audit-schedules.mjs - E2E sur la planification des audits SSH.
  *
  * Couvre la nouvelle UI multi-select admin+ ajoutee en v1.16.x :

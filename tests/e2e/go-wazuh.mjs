@@ -1,4 +1,5 @@
 /**
+ * HORS-LOT: Ecrit la configuration Wazuh et envoie des charges d'injection pour verifier qu'elles sont refusees. Cible la machine d'essai depuis le 2026-09-06.
  * go-wazuh.mjs - Tests E2E module Wazuh.
  * Flux : login, config save, options save, rules CRUD (incl. xmllint).
  */

@@ -145,8 +145,19 @@ class ComptesDistantsController extends Controller
     public function cles(int $machine, string $username): View
     {
         return view('composants.distants-cles', [
+            'machine' => $machine,
             'username' => $username,
             'cles' => $this->comptes->cles($machine, $username),
+            /*
+             * Les libelles du retrait d'UNE cle. La page appelle la passerelle
+             * directement, comme les autres ecritures du module — on ne duplique
+             * pas ici les en-tetes que `PasserelleController` compose deja.
+             */
+            'libellesCles' => [
+                'confirme' => __('distants.cle_confirme'),
+                'retiree'  => __('distants.cle_retiree'),
+                'echec'    => __('distants.cle_echec'),
+            ],
         ]);
     }
 

@@ -1,0 +1,116 @@
+# =============================================================================
+# apache-ssl.conf.tmpl - VirtualHost HTTPS du frontend Laravel (RootWarden v2.0)
+# =============================================================================
+#
+# TEMPLATE : Apache ne le lit jamais tel quel. `docker-entrypoint.sh` le passe a
+# `envsubst` au demarrage et produit /etc/apache2/sites-available/000-default.conf.
+#
+# Variables substituees par l'ENTRYPOINT (envsubst) :
+#   ${SERVER_NAME}          nom ou adresse publique du serveur
+#   ${SERVER_ADMIN}         adresse affichee par les pages d'erreur Apache
+#   ${SSL_CERT_PATH}        chemin absolu du certificat (.crt)
+#   ${SSL_KEY_PATH}         chemin absolu de la cle privee (.pem)
+#   ${LARAVEL_HTTPS_PORT}   port HTTPS **PUBLIE PAR L'HOTE** — voir plus bas
+#
+# Variables NON substituees, resolues par APACHE lui-meme — ne jamais les
+# ajouter a la liste d'envsubst, il les remplacerait par du vide :
+#   ${APACHE_LOG_DIR}       vient de /etc/apache2/envvars
+#   ${APACHE_DOCUMENT_ROOT} posee par ENV dans le Dockerfile
+# =============================================================================
+
+
+# ── VirtualHost HTTP (port 80) : REDIRECTION SEULE, aucun contenu en clair ───
+<VirtualHost *:80>
+    ServerName ${SERVER_NAME}
+    ServerAdmin ${SERVER_ADMIN}
+    DocumentRoot ${APACHE_DOCUMENT_ROOT}
+
+    # ⚠ POURQUOI PAS `https://%{HTTP_HOST}/$1`, LA FORME DU LEGACY.
+    #
+    # `%{HTTP_HOST}` porte le port de la requete. Le conteneur ecoute 80 et 443,
+    # mais l'hote PUBLIE ces ports ailleurs. La forme du legacy renvoie donc vers
+    # un port qui n'a pas de TLS — mesure du 2026-09-06 sur le legacy lui-meme :
+    #
+    #     http://localhost:8080/auth/login.php -> 301 https://localhost:8080/...
+    #     https://localhost:8080/...           -> 000  (rien n'ecoute en TLS la)
+    #
+    # **Sa redirection HTTPS mene dans le vide, et personne ne l'avait vu.** On ne
+    # la recopie pas : on garde l'hote TEL QUE LE VISITEUR L'A ECRIT (donc son
+    # adresse IP s'il est passe par l'IP, et non le `ServerName` du conteneur) et
+    # on remplace le port par celui que l'hote publie reellement.
+    RewriteEngine On
+    RewriteCond %{HTTPS} !=on
+    # %1 = l'hote sans son port, capture par la condition ci-dessous.
+    RewriteCond %{HTTP_HOST} ^([^:]+)
+    RewriteRule ^/?(.*) https://%1:${LARAVEL_HTTPS_PORT}/$1 [R=301,L]
+
+    ErrorLog ${APACHE_LOG_DIR}/error.log
+    CustomLog ${APACHE_LOG_DIR}/access.log combined
+</VirtualHost>
+
+
+# ── VirtualHost HTTPS (port 443) : le seul qui sert l'application ────────────
+<VirtualHost *:443>
+    ServerName ${SERVER_NAME}
+    ServerAdmin ${SERVER_ADMIN}
+    # Front controller Laravel : la racine est public/, jamais la racine du depot.
+    DocumentRoot ${APACHE_DOCUMENT_ROOT}
+
+    SSLEngine on
+    SSLCertificateFile    ${SSL_CERT_PATH}
+    SSLCertificateKeyFile ${SSL_KEY_PATH}
+
+    # Durcissement TLS, repris du legacy : TLS 1.0/1.1 sont obsoletes, ECDHE pour
+    # la confidentialite persistante, compression desactivee (CRIME/BREACH).
+    SSLProtocol -all +TLSv1.2 +TLSv1.3
+    SSLCipherSuite ECDHE+AESGCM:ECDHE+CHACHA20:DHE+AESGCM:DHE+CHACHA20:!aNULL:!MD5:!DSS
+    SSLHonorCipherOrder on
+    SSLCompression off
+
+    # ⚠ NI HSTS NI CSP ICI, ET C'EST DELIBERE — une absence sans raison ecrite
+    # est indiscernable d'un oubli.
+    #
+    # HSTS : pas d'en-tete ici. Porte a SENS UNIQUE mise en cache un an, sur un
+    # certificat auto-signe : cela se pose apres que le TLS est verifie au reseau,
+    # et sur decision — pas dans le meme geste.
+    #
+    # ⚠ CORRECTION DU 2026-09-06, ET ELLE VA CONTRE CE QUE J'AVAIS ECRIT ICI.
+    # J'avais affirme qu'un navigateur ayant ouvert `https://localhost:8443` force
+    # ensuite `https://` sur `http://localhost:8444`, rendant le portage
+    # inatteignable. **Mesure sur profil Chrome PERSISTANT, deux processus : aucun
+    # surclassement. `http://localhost:8444/connexion` rend 200, servi en clair.**
+    #
+    # ⚠ CE QUI EST ETABLI, ET CE QUI NE L'EST PAS — la difference compte ici.
+    #
+    # ETABLI, par lecture DIRECTE du magasin HSTS de Chrome
+    # (`<profil>/Default/TransportSecurity`) apres visite du legacy en TLS :
+    # **aucune entree pour `localhost`, ni pour un nom hors-localhost teste par
+    # `--host-resolver-rules`.** L'en-tete est envoye et il n'est pas enregistre.
+    # Le fichier EST lisible et contient bien une entree (semee a la creation du
+    # profil, vue sur un profil n'ayant visite que `about:blank`) : l'absence
+    # constatee n'est donc pas celle d'un instrument muet.
+    #
+    # PAS ETABLI : la CAUSE. RFC 6797 §8.1 (pas de traitement de l'en-tete sur une
+    # connexion a erreur de certificat) est l'explication plausible — le legacy
+    # sert un auto-signe — mais elle n'est pas isolee. Le temoin POSITIF manque :
+    # le gTLD `.dev`, precharge dans Chrome, n'est pas surclasse non plus par ce
+    # navigateur, avec ou sans `--ignore-certificate-errors`. **Tant qu'aucun
+    # surclassement n'a ete OBSERVE, « je n'en vois pas » et « je ne sais pas en
+    # voir » restent indiscernables sur le comportement.**
+    #
+    # ⚠ CONSEQUENCE PRATIQUE, ET C'EST ELLE QUI COMPTE : si la cause est bien le
+    # certificat, alors **installer un certificat APPROUVE fait revenir le
+    # probleme en entier**. C'est la trajectoire prevue de ce portail. Ne pas
+    # traiter ce constat comme une exculpation durable.
+    #
+    # Ce qui reste vrai : HSTS est lie a l'HOTE et ignore le PORT, et les
+    # navigateurs ne l'appliquent pas a une adresse IP litterale. La reserve ne
+    # vaut donc que pour qui a AJOUTE ce certificat a son magasin de confiance.
+    #
+    # CSP : le legacy en porte une, le portage n'en a aucune — ecart reel, signale.
+    # `/connexion` sert du script inline ; une politique mal calibree casserait la
+    # page. Cela se mesure a l'ecran, pas dans le meme lot que le TLS.
+
+    ErrorLog ${APACHE_LOG_DIR}/error.log
+    CustomLog ${APACHE_LOG_DIR}/access.log combined
+</VirtualHost>

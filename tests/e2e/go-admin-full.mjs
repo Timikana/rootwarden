@@ -21,7 +21,44 @@ import puppeteer from 'puppeteer';
 import { createHmac } from 'crypto';
 import { mkdir } from 'fs/promises';
 
-const BASE = 'https://localhost:8443';
+/*
+ * ══ LA BASE NE PEUT PLUS ETRE DEVINEE — ELLE SE DECLARE ═══════════════════
+ *
+ * Cette suite codait `https://localhost:8443` en dur. **Le 2026-09-06 a 19:39,
+ * les deux portails ont echange leurs ports** : `:8443` sert desormais le
+ * PORTAGE, et le legacy est passe sur `:8446`.
+ *
+ * Une suite ecrite pour le legacy y aurait trouve des ancres, des formulaires,
+ * une session — le portage accepte les MEMES identifiants et rend des pages qui
+ * RESSEMBLENT. **Elle n'aurait pas echoue : elle aurait rendu du vert sur le
+ * mauvais objet.** C'est la forme la plus couteuse d'un defaut de banc, parce
+ * qu'aucun signal ne la distingue d'une mesure juste.
+ *
+ * ⚠ ET UN REPLI CORRIGE SE REPERIMERAIT AU PROCHAIN ECHANGE. Ecrire
+ * `:8446` ici ne ferait que deplacer la date de peremption. **La base cesse donc
+ * d'etre exprimable autrement que declaree** : pas de valeur par defaut, pas de
+ * repli, une erreur au chargement.
+ *
+ * C'est plus severe que l'annonce bruyante retenue pour les suites qui LISENT
+ * l'environnement, et c'est voulu : celles-la ont un repli qu'un runner
+ * surcharge, celle-ci n'en avait aucun. **Rendre le champ inexprimable plutot
+ * que sa valeur inoffensive** — quand c'est possible, c'est la garde la plus
+ * forte.
+ */
+const BASE = (() => {
+    const declaree = process.env.E2E_BASE;
+    if (! declaree) {
+        throw new Error(
+            'E2E_BASE n\'est pas declaree, et cette suite n\'a plus de base par defaut.\n'
+            + '  Les deux portails ont ECHANGE leurs ports le 2026-09-06 : une valeur\n'
+            + '  ecrite en dur mesurerait l\'AUTRE portail en rendant du vert.\n'
+            + '  Verifiez lequel repond avant de choisir — l\'ETAT, jamais le numero :\n'
+            + '    curl -sk https://<hote>:<port>/up   200 = portage · 404 = legacy\n'
+            + '  puis :  E2E_BASE=https://<hote>:<port> node tests/e2e/<suite>.mjs');
+    }
+
+    return declaree;
+})();
 const USER = 'superadmin';
 const PASS = 'RootWarden@2026-Sec!';
 const SHOTS = './screenshots/admin';

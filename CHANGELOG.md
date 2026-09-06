@@ -5,6 +5,198 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [2.0.98] - 2026-09-06
+
+### Extinction du legacy - bloc 2 : `profile.php` et `privacy.php` archives
+
+**Deux FEUILLES : aucun fichier du legacy ne les charge.** *Mesure du graphe
+d'inclusion avant de bouger quoi que ce soit.*
+
+    controle AVANT le git mv — le GESTE, pas le nom du fichier
+
+      profile.php   changer son mot de passe   ->  /profil/mot-de-passe    1
+                    changer son courriel       ->  /profil/courriel        1
+                    poser sa cle SSH           ->  /profil/cle-ssh         1
+                    revoquer ses sessions      ->  /profil/sessions        1
+                    export RGPD                ->  ExportRgpdController    3
+      privacy.php   effacement de son compte   ->  /profil/effacement      1
+
+      TEMOIN  /profil/zzz-inexistant                                       0
+
+    etat au RESEAU, avant et apres
+
+      /profile.php   302 -> 404        /privacy.php   302 -> 404
+      TEMOIN archive   /adm/admin_page.php   404 (inchange)
+      TEMOIN vivant    /auth/login.php       200 (inchange)
+
+**⚠ UN ECART SUBSISTE, et il est dit plutot que tu :** `privacy.php` supprimait
+la ligne `temporary_permissions` du compte ; `Comptes::anonymise()` ne la
+nettoie pas. *Le portage nettoie en revanche `password_history` et
+`notification_preferences`, que le legacy laissait.*
+
+**Et la difference de GESTE est deliberee, pas une perte** : le legacy
+SUPPRIME la ligne `users`, le portage l'ANONYMISE — pour preserver la chaine
+d'audit de `user_logs`, dont chaque ligne est chainee a la precedente
+(PARITE E-116 et E-117).
+
+---
+
+## [2.0.97] - 2026-09-06
+
+### Portage - le retrait d'UNE cle SSH precise sur un compte distant
+
+**Le portail avait garde le geste BRUTAL et perdu le geste PRECIS.**
+
+    /remove_user_keys        efface TOUTES les cles d'un compte   PORTE et cable
+    /server_user_remove_key  efface UNE cle precise               0 appelant vivant
+
+**Mesure** : `server_user_remove_key` n'apparaissait que dans `lang/*/plateforme.php`,
+`RoutesBackend.php`, `api_proxy.php` et deux fichiers `_deprecated` — aucun appelant.
+*Temoin : `remove_user_keys` EST appele par `comptes-distants.js`.*
+
+**Aucun pouvoir neuf** : les deux routes portent la MEME garde backend
+(`@require_api_key` · `@require_role(2)` · `@require_machine_access`). Porter la
+fine donne une version **moins destructrice** d'un pouvoir deja offert a l'ecran.
+
+#### ⚠ `force` N'EST PAS CONSTRUIT, et c'est le point de ce portage
+
+Le contrat de la route porte quatre champs — `machine_id`, `username`,
+`fingerprint_sha256`, et **`force`**. *`force: true` autorise le retrait de la CLE
+PLATEFORME, celle par laquelle RootWarden atteint la machine ; le backend la
+protege (`ssh.py:2474`, « ne pas se locker hors du serveur ») et ne cede qu'a ce
+champ.*
+
+**Le corps envoye en porte TROIS. Pas un `force: false` — pas de champ du tout.**
+
+> **Un `false` explicite se retourne d'un caractere ; une absence de champ demande
+> d'ECRIRE une ligne, et cette ligne se voit en relecture.** *Meme forme que la
+> liste fermee de `wazuh.js` : rendre inexprimable plutot que surveiller.*
+
+**Et le bouton n'est pas rendu du tout sur la ligne de la cle plateforme.**
+*Le rendre produirait un 400 a chaque clic — et un bouton qui echoue toujours au
+meme endroit apprend a l'operateur que les echecs sont normaux.* L'inexprimable
+devient ainsi visible a l'ecran, pas seulement vrai dans le corps.
+
+#### Ce qui n'a PAS ete ecrit, et pourquoi
+
+- **aucune route Laravel** : les autres ecritures du module appellent la passerelle
+  depuis le navigateur, et la garde est sur la PAGE
+  (`role:2` + `perm:can_manage_remote_users`, verifiee identique a ses quatre
+  soeurs). *Ajouter un controleur qui appelle le backend aurait duplique les
+  en-tetes que `PasserelleController` compose deja — la quatrieme copie du meme
+  probleme signale ailleurs sur `JournalAudit`* ;
+- **aucun exercice du geste** : il reecrit un `authorized_keys` distant en root.
+  *Aucune suite ne doit le soumettre.*
+
+> ⚠ **CORRECTION DU 2026-09-06 — la premiere raison ci-dessus est HOLEE (E-453).** La garde de la page est
+> bien `role:2` + `perm:can_manage_remote_users`, et bien identique a celle de ses quatre soeurs. **Mais la
+> requete ne traverse pas la page** : la passerelle n'exige que `role >= 2`
+> (`PasserelleController.php:69`) et le backend non plus (`@require_role(2)`, aucun `@require_permission`).
+> **Mesure : le parc compte 1 seul `role 2`, et il n'a PAS cette permission** — donc le seul compte que la
+> page refuse est le seul qui puisse forger la requete. *L'ecart est HERITE des deux gestes voisins, pas
+> cree ici ; c'est la RAISON ecrite ci-dessus qui etait fausse.* Signale par la session 8, chaine mesuree
+> et inscrite en E-453. Arbitrage ouvert.
+
+**Verifie** : `php -l` sur le controleur et les deux catalogues · `node --check`
+sur le JS, **temoin negatif rendu** · parite FR/EN par `require` + `array_diff`
+(**83 = 83**, aucune absente, temoin negatif rendu) · `route:list` · directives
+Blade equilibrees.
+
+**Autorise nominalement par l'exploitant**, conception `force` inexprimable
+comprise. Arbitrage : `DOSSIER-36`.
+
+## [2.0.96] - 2026-09-06
+
+### Extinction - E-459 : deux routes `/policy/` orphelines retirees, la troisieme NE L'EST PAS
+
+**Retirees de `backend/routes/policies.py` :**
+
+| route | ce qu'elle faisait | appelants |
+|---|---|---|
+| `POST /policy/rollback` | **ouvrait une session SSH et ecrivait sur les machines** (86 lignes) | 0 |
+| `GET /policy/deployments` | lecture (50 lignes) | 0 |
+
+**Motivation.** Une route destructrice qu'aucune interface n'atteint, gardee par
+une regle qui passe ses tests, est une porte dont personne ne sait qu'elle
+existe — *et son refus dependrait d'un accident d'archivage plutot que d'un
+choix.* Les deux portaient `@require_role(3)` : le retrait ne change aucune
+autorisation, il supprime la surface.
+
+**⛔ `GET /policy/list` N'EST PAS RETIREE — elle n'est pas orpheline.**
+
+    tests/e2e/go-policies.mjs:118-124
+      fetch('/api_proxy.php/policy/list')
+      check('GET /policy/list = 200', ...)
+      check('Reponse contient sudo_policies + sftp_policies', ...)
+
+**Deux assertions vivantes.** *Et le portage n'a PAS d'equivalent : il ne compose
+que `/policy/{sudo,sftp}/{geste,audit}` — cette route est donc une capacite de
+LECTURE non portee, pas un residu.* **Le fichier appartient au banc, qui y ecrit
+aujourd'hui : arbitrage et croisement requis avant tout retrait.**
+
+**⚠ La consigne annoncait « 0 appelant chacune ». Sa commande de remesure ne
+balayait que `laravel/public/js` et `laravel/resources`** — ni `tests/`, ni
+`legacy/`, ni l'OpenAPI. *Un instrument borne a deux repertoires rend un zero
+qui ressemble a une absence.*
+
+### Le motif de step-up de `rollback` est retire avec elle
+
+`legacy/api_proxy.php` : `'#^/policy/rollback$#'` supprime. **Un garde dont la
+cible n'existe plus se lit comme une protection alors qu'il ne protege rien.**
+
+**⚠ Et le nom d'action `policy_action` n'est PAS libere** — il reste employe par
+`/policy/{sudo,sftp}/{deploy,remove}`, qui restent. *La crainte d'un « nom libre
+dans une liste fermee » ne s'applique donc pas ici.*
+
+**⛔ Aucune entree de `StepUp` n'a ete retiree : il n'y en avait pas.** Le portage
+**DERIVE** le nom depuis le chemin (`StepUp.php:41` : `/policy/sudo/deploy` ->
+`policy_sudo_deploy`), precisement pour eviter le nom partage du legacy.
+`ACTIONS_PORTAGE` porte **quatre** entrees — `compte_supprimer`,
+`compte_anonymiser`, `permission_definir`, `profil_effacement` — **comptees en
+LISANT** : la quatrieme suit un bloc `/* */` de 27 lignes qui se ferme avant
+elle. *Aucune ne concerne les politiques.* **Et `laravel/` n'est pas dans ce
+perimetre : rien n'y a ete touche.**
+
+### 🔴 Contre-epreuve : ce backend ne peut PAS rendre 404
+
+La condition d'acceptation demandee etait « la route rend 404 et non 500 ».
+**Mesure au reseau, sans identifiants** (aucun corps n'est traite, `require_api_key`
+refuse avant) :
+
+    POST /policy/rollback      -> 401   route PRESENTE (processus non redemarre)
+    POST /policy/sudo/deploy   -> 401   TEMOIN : route vivante, refusee au garde
+    GET  /policy/list          -> 401   presente
+    POST /policy/nexistepas    -> 405
+    GET  /nexistepas_du_tout   -> 405   ⚠ TEMOIN D'INEXISTENCE
+
+**`backend/server.py:142` declare `@app.route('/<path:path>', methods=['OPTIONS'])`
+— une route ATTRAPE-TOUT.** Une regle existe donc pour tout chemin, et Flask ne
+rend jamais 404 : il rend **405**.
+
+> **Le discriminant d'existence de ce backend est `401` contre `405`, jamais
+> `404`.** *Toute assertion de la forme « la route est retiree si elle rend 404 »
+> mesure un code que ce service ne peut pas produire — elle passerait a vide.*
+
+**Apres redemarrage**, `POST /policy/rollback` doit passer de **401 a 405**. *Non
+verifiable maintenant : `backend/**.py` est lu au demarrage, et le redemarrage
+appartient a l'exploitant.*
+
+### Signale, non corrige
+
+`policies.py` porte **deux imports morts** — `logging` (`:26`) et
+`server_decrypt_password` (`:33`). **Verifie : ils l'etaient DEJA avant ce
+retrait** (1 occurrence chacun a `HEAD`), je ne les ai pas orphelins. *Laisses
+pour ne pas melanger les sujets — mais un linter les aurait rendus, ce qui
+suggere que `ruff` ne couvre pas ce fichier.* ⚠ **Et `ruff` a DISPARU du
+conteneur** (`/opt/venv/bin/ruff` ce matin, introuvable maintenant) : les
+controles de ce commit sont l'import REEL du module et la suite complete.
+
+**Tests.** Import reel OK, **667 passed, 5 skipped, 2 xfailed, 0 FAILED**.
+`php -l` vert sur `api_proxy.php`. Balayage AST apres retrait : 7 routes
+subsistent, toutes `/policy/{sudo,sftp}/*` plus `/policy/list`.
+
+---
+
 ## [2.0.82] - 2026-09-06
 
 > ## ⚠ LA SEQUENCE SAUTE ICI — 1.54.2 devient 2.0.82 (E-458)

@@ -140,6 +140,175 @@ sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 
 ---
 
+## 2 ter. LES PORTS DES DEUX PORTAILS — **ÉCHANGÉS le 2026-09-06, PAS ENCORE APPLIQUÉS**
+
+**Décision de l'exploitant** : *« je voulais les mêmes ports qu'avant, et on dégage les ports du legacy sur
+une autre plage »*. **Le portage prend les ports du portail historique ; le legacy prend ceux que le portage
+abandonne.** Échange PUR — aucun port neuf à ouvrir, les deux valeurs sont déjà connues de l'outillage.
+
+| | avant | **après** | |
+|---|---|---|---|
+| **portage** (`rootwarden_laravel`) | `8444` / `8446` | **`8080` / `8443`** | l'adresse que tout le monde connaît |
+| **legacy** (`rootwarden_php`) | `8080` / `8443` | **`8444` / `8446`** | relégué |
+
+*Le second de chaque paire est le HTTPS, et c'est celui qu'il faut employer.*
+
+### ⚠ ÉTAT AU MOMENT OÙ CECI EST ÉCRIT : PRÉPARÉ, **NON APPLIQUÉ**
+
+Le LOT 4 tourne depuis 16:35 sur le portage. **Recréer le conteneur maintenant tuerait une mesure de
+plusieurs heures qui n'a jamais été faite en entier** — l'exploitant a tranché : à la fermeture du lot.
+**Tant que `docker compose up -d` n'a pas été rejoué, les conteneurs écoutent les ANCIENS ports.**
+
+    ecrit          docker-compose.yml (defauts) · srv-docker.env.example · srv-docker.env
+    prepare        patchs-en-attente/05-echange-des-ports-entrypoint.patch   (laravel/, gele)
+    prepare        patchs-en-attente/06-echange-des-ports-runner.patch       (scripts/, gele)
+    NON fait       docker compose up -d
+    reste a faire  les replis en dur des suites (tests/e2e/, gele — session 7)
+
+### Trois pièges mesurés, chacun payé une fois
+
+1. **`env_file:` N'ALIMENTE PAS l'interpolation `${...}` du compose.** Le port publié vient du **défaut du
+   fichier compose** (ou de `.env`, absent ici) — *pas* de `srv-docker.env`, qui ne vaut qu'à l'intérieur
+   des conteneurs. Les deux ont dû être changés, pour deux raisons différentes.
+2. **`env-merge.sh` n'AJOUTE que les clés manquantes.** Modifier `srv-docker.env.example` seul n'aurait
+   **rien changé** : le fichier vivant portait déjà les valeurs perdantes. *Le faux remède se lit comme une
+   précaution.*
+3. ⚠ **`LARAVEL_URL` et `LEGACY_URL` avaient DIVERGÉ de l'exemple** : dérivées dans le modèle, **codées en
+   dur** dans le fichier vivant (`https://192.168.0.245:8446` et `:8443`). **L'échange les avait donc
+   INVERSÉES — chacune pointant sur l'autre portail.** Corrigées ; l'hôte n'a pas été touché, remettre la
+   forme dérivée aurait substitué `localhost` et cassé tout lien vu depuis une autre machine.
+
+### ⚠⚠ LE RISQUE QUI NE SE SIGNALE PAS
+
+`laravel/docker-entrypoint.sh:86` porte encore `LARAVEL_HTTPS_PORT="${LARAVEL_HTTPS_PORT:-8446}"`, et son
+propre commentaire exige qu'il **reste égal au défaut du compose**. Un conteneur démarré **sans** la variable
+bâtirait sa redirection HTTP → HTTPS vers `:8446` — **port que le legacy occupe désormais**.
+
+> **Ce n'est pas une panne : c'est un opérateur silencieusement déposé sur l'ANCIEN portail**, qui
+> fonctionne et qui accepte ses identifiants. *Aucun message d'erreur, et l'écran ressemble à celui qu'il
+> attendait.* Le patch `05` est prêt et `git apply --check` passe.
+
+### ⚠⚠ DEUXIÈME PRÉALABLE : LE RUNNER PORTAIT LES DEUX PORTS EN DUR
+
+Relevé par la session 8, **vérifié dans mon propre fichier** :
+
+    scripts/rejouer-lot.sh:93   BASE_LEGACY="${E2E_LEGACY_BASE:-https://localhost:8443}"
+    scripts/rejouer-lot.sh:94   BASE_LARAVEL="${E2E_LARAVEL_BASE:-http://localhost:8444}"
+
+**Après l'échange, ces deux défauts sont inversés** : un lot lancé sans `E2E_LEGACY_BASE` /
+`E2E_LARAVEL_BASE` jouerait **chaque moitié contre le mauvais portail**.
+
+**Et échanger les défauts ne suffit pas** — un défaut juste se repérime au prochain échange. Rien ne
+comparait la cible DÉCLARÉE à ce que la base SERT :
+
+    E2E_CIBLE=legacy          vient de $cible        -> l'INTENTION
+    E2E_BASE=https://…:8443   vient de $BASE_LEGACY  -> une VALEUR
+
+> **Deux prédicats indépendants qui ne se contredisent JAMAIS.** *La suite déclare `legacy`, mesure le
+> portage, et rend du vert sur le mauvais objet — pas un échec, un succès qui porte sur autre chose.*
+> C'est « le filet et le verdict doivent être le MÊME prédicat », vu du côté où les deux sont d'accord.
+
+`06` fait les deux : il échange les défauts **et** contrôle l'ÉTAT avant de jouer. Discriminant mesuré —
+`/up` rend **200** sur le portage, **404** sur le legacy, et `/zzz` sur le portage rend 404 *(donc `/up`
+n'est pas un fourre-tout)*. Fail-closed : tout autre code avorte.
+
+**Éprouvé, les cinq cas** — la fonction extraite de la copie modifiée, exercée contre les portails réels :
+
+| cible déclarée | base | code |
+|---|---|---|
+| `laravel` | `:8446` (portage aujourd'hui) | **0** |
+| `legacy` | `:8443` (legacy aujourd'hui) | **0** |
+| `legacy` | `:8446` | **1** — « BASE INCOHÉRENTE » |
+| `laravel` | `:8443` | **1** — « BASE INCOHÉRENTE » |
+| `laravel` | `:9999` | **1** — « portail INDÉTERMINABLE » |
+
+*Deux qui passent, trois qui mordent : la sonde rend le positif et le négatif.*
+
+### ⚠ UN TROU DANS MON PROPRE PATCH, trouvé par le balayage de la session 8
+
+`verifiePortail` contrôle la base que **le runner exporte**. **Une suite qui code sa base en dur ne lit
+jamais `E2E_BASE` et passe dessous.** Mesuré :
+
+    10 fichiers de tests/e2e codent leur base en dur ET ne lisent aucune variable
+     1 seul est JOUE par le LOT :  go-vague0-legacy   (en dur sur :8443)
+
+*Après l'échange, `:8443` sert le PORTAGE.* Cette suite legacy frapperait donc le portage en se déclarant
+legacy — **et mon contrôle serait passé, puisque la base du runner, elle, est juste.**
+
+`06` couvre désormais le cas : pour toute suite jouée qui code sa base en dur, il **annonce** la base
+trouvée et applique **le même prédicat** — `verifiePortail` — à cette base-là.
+
+**Éprouvé, quatre cas :** `go-vague0-legacy`/legacy → **0** (juste aujourd'hui) · `go-vague0-legacy`/laravel
+→ **3, avorte** · `go-socle-auth`/legacy → 0 sans annonce *(elle lit l'environnement)* · `archive`/legacy →
+0 sans annonce *(son `:8444` est en PROSE)*.
+
+**Réconciliation, faite en trois passes et la mienne était la plus mauvaise** :
+
+    predicat « base en dur ET aucune lecture d'environnement », sur les 138 .mjs
+      13  fichiers correspondent
+      -3  visent `https://localhost:5000` : le BACKEND, pas un portail  -> hors sujet
+      10  visent un PORTAIL                                             <- le compte utile
+       1  de ces 10 est JOUE par le LOT : go-vague0-legacy
+
+*Le 9 de la session 7 est ce 10 moins `go.mjs`* — son filtre est `go-*.mjs`, qui ne matche pas `go.mjs`.
+*Mon 11 comptait `archive.mjs`, dont le port est dans un docblock* — l'ancre d'une sonde doit être une
+déclaration, jamais une prose.
+
+⚠ **Et mon « 10 » n'était juste que par chance.** Je n'avais **jamais passé le détecteur sur le
+répertoire** : je l'avais appliqué à une liste de candidats produite par un `grep` plus faible, puis rendu
+la taille de cette liste comme réponse. **Ma population était fausse dans les deux sens** — elle manquait
+trois fichiers, qui se trouvaient être hors sujet. *J'ai validé un instrument sur l'échantillon d'un autre
+instrument, et publié le compte de l'échantillon.* J'avais écrit à la session 8 « ton 10 est le bon » sur
+cette base.
+
+### ⚠ ET CES TROIS FICHIERS ONT RÉVÉLÉ UN FAUX POSITIF DANS `06`
+
+`07-maintenance.test`, `08-approvals.test`, `09-docker-idor.test` codent `https://localhost:5000` — **le
+backend, dont le port n'est même pas publié sur l'hôte**. Mon contrôle aurait obtenu `000`, conclu
+« portail INDÉTERMINABLE » et **avorté à tort**. Aucun n'est joué par le LOT aujourd'hui : *le défaut était
+dormant, pas absent.*
+
+`06` distingue désormais les deux usages, **sans lister aucun port** :
+
+| base contrôlée | règle |
+|---|---|
+| celle que le **runner** exporte | elle **DOIT** servir un portail — tout autre code avorte |
+| celle qu'une **suite** code en dur | si `/up` ne rend ni 200 ni 404, **ce n'est pas un portail, donc hors du champ** |
+
+*La règle reste non datée : c'est l'état qui décide, jamais une liste de ports.* Éprouvé, cinq cas :
+`go-vague0-legacy`/legacy → 0 · `/laravel` → **3, avorte** · `go-socle-auth` → 0 sans annonce ·
+`archive` → 0 sans annonce · `09-docker-idor.test` → **0, annoncé mais NON avorté**.
+
+⚠ **Deux défauts de mon propre détecteur, payés en l'écrivant** : `sed 's#//.*##'` **détruit `https://`** —
+le `//` d'un schéma n'est pas un commentaire — et la sonde a rendu **0 partout, témoins compris**, donc
+*« la mesure n'a pas eu lieu »*. Puis la backreference `\1` est devenue un **octet de contrôle `0x01`**,
+mangée par l'échappement du heredoc. *Les deux rendaient une sortie plausible.*
+
+### La marche à suivre, à la fermeture du LOT 4
+
+```bash
+git apply docs/migration/patchs-en-attente/05-echange-des-ports-entrypoint.patch
+git apply docs/migration/patchs-en-attente/06-echange-des-ports-runner.patch
+sudo -n docker compose up -d                      # recreation, PAS un restart
+# controle : les QUATRE ports, avec le temoin absurde sur chacun
+curl -sk -o /dev/null -w '%{http_code}\n' https://localhost:8443/connexion   # portage  -> 200 ou 302
+curl -sk -o /dev/null -w '%{http_code}\n' https://localhost:8443/zzz         # portage  -> 404 (discrimine)
+curl -sk -o /dev/null -w '%{http_code}\n' https://localhost:8446/auth/login.php  # legacy -> 200
+curl -s  -o /dev/null -w '%{http_code} %{redirect_url}\n' http://localhost:8080/  # -> 301 vers :8443
+```
+
+⚠ **Le témoin absurde est obligatoire** : `:8444` rendait `301` sur *tout*, chemin inexistant compris, et un
+contrôle qui y cherchait un `404` était aveugle. *Un port qui répond n'est pas un port qui route.*
+
+### ⚠ DATER AVANT D'INTERPRÉTER
+
+**Une trace de `8444` dans un document antérieur au 2026-09-06 désigne le PORTAGE ; après, elle désigne le
+LEGACY.** C'est le coût accepté de l'échange pur, et il est réel : `8443` apparaît dans **141 fichiers**,
+`8444` dans **124**. *Aucune de ces occurrences n'est fausse — elles datent.* Les archives de `docs/` ne
+sont pas réécrites : un relevé daté vaut par sa date.
+
+---
+
 ## 2 bis. LES SIX ENTRÉES RESTANTES — ce qui bloque CHACUNE, mesuré le 2026-09-02 à 01:10 CEST
 
 > **Ce tableau n'existait pas, et c'est ce qui m'empêchait de mesurer où en est le chantier.** Les
@@ -5812,3 +5981,54 @@ plus juste.*
 **Et son corollaire, que le DSI a nommé** : *le marquage sauve ce que la mesure n'a pas
 couvert.* Une déduction transmise **étiquetée « déduction »** reste évaluable ; sans ce mot,
 elle devient une règle.
+
+---
+
+## §7 — UN OBJET DE PLUS, **SANS ORDINAL** : la permission que la passerelle n'exige pas (E-453)
+
+**Je ne lui donne pas de numéro, et c'est délibéré.** Les deux dernières tentatives d'ordinal se sont mal
+terminées : le « douzième » a dû être corrigé, et le « treizième » **n'en était pas un** — `DOSSIER-00` le
+portait depuis 08:56. *Un ordinal se dérive par différence d'ensembles ; les blocs de §7 sont du récit, et
+je ne peux pas les énumérer de façon fiable.* Compter à voix haute ici ferait un troisième faux compte.
+
+**L'objet, lui, est mesuré.** La page des clés distantes exige `role:2` **+** `perm:can_manage_remote_users`
+(`web.php:1112`, et `ExigePermission.php:39` est fail-closed). La requête ne passe pas par la page : la
+passerelle n'exige que `role >= 2` (`PasserelleController.php:69`), le backend non plus (`@require_role(2)`,
+**zéro** `@require_permission` réel dans `ssh.py`).
+
+    comptes role 2 dans le parc     1
+    dont can_manage_remote_users    0
+    role 2 SANS la permission       1     <- 100 % des comptes concernes
+
+> **Le seul compte que la page refuse est le seul qui puisse forger la requête.** *Ce n'est pas un écart en
+> attente d'un compte hypothétique.*
+
+**Trois gestes sous le même régime** — `/server_user_remove_key` (porté aujourd'hui), `/remove_user_keys` et
+`/delete_remote_user` (en service de longue date). **Les deux voies, aucune écrite :**
+
+| voie | ce qu'elle ferme | ce qu'elle coûte |
+|---|---|---|
+| poser la route Laravel manquante | **ce geste seul** — il deviendrait le seul des trois gardé correctement | rien en service ; un contrôleur de plus |
+| exiger la permission dans la passerelle pour `ADMIN_SEULEMENT` | **les trois d'un coup** | ⚠ **modifie un contrôle d'accès EN SERVICE** |
+
+*Signalé par la session 8 (`DOSSIER-36 §7.1`, `18b9314`) ; la chaîne et le fait décisif sont ma mesure.*
+**Je représente cet arbitrage, je ne le tranche pas.**
+
+### Deux chiffres remesurés au passage, dont un qui me contredit
+
+- **le registre a DEUX métriques, et la mienne n'est pas celle du plan.** La commande de remesure de §2
+  (`^#{1,6} +(E-\d+[a-z]*)`) rend **400 écarts, max E-453** ; mon `^## E-` dédupliqué en rend **398**, parce
+  qu'il ignore les titres de niveau 3 et les suffixes de lettre. *Les deux sont justes pour ce qu'ils
+  comptent ; c'est celle du plan qui fait autorité, et mes trois derniers messages de commit citaient
+  l'autre.* **Ne pas rapprocher un 398 d'un 400 : ils ne comptent pas la même chose.**
+- ⚠ **RÉTRACTATION — E-452 n'existe pas.** J'avais écrit ici que 53 exécutions sur 167 tournaient sans
+  référence. **Il y en a 0** : `85 refs / 85 suites` laravel, `82 / 82` legacy, zéro orpheline. Mon `awk`
+  n'imprimait que **la première clé de chaque ligne**, alors qu'elles en portent plusieurs. *Même défaut
+  qu'E-420, le même jour, rendant le même nombre — 58.* Mesuré par `bash` sourçant les tableaux, recoupé
+  par `grep -o` et par différences d'ensembles.
+- **le LOT est appairé, `pare-feu` compris** — ma tâche en attente « appairer `pare-feu` » était **périmée** :
+  mesuré `1 · 1`, laravel et legacy. Les six suites sans jumelle sont `go-socle-{fixtures,i18n,navigation,passerelle}`
+  (socle propre au portage), `go-page-mot-de-passe` et `go-fail2ban-f7`. **85 laravel / 82 legacy = 167
+  exécutions**, ce qui recoupe exactement la ligne de base tirée des journaux — *et réfute au passage le
+  « 172 » d'une extraction de jetons, la même classe d'erreur que j'ai commise deux fois en la remesurant.*
+

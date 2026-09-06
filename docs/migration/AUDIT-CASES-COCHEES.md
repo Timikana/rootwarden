@@ -368,3 +368,178 @@ sur `/cles-ssh` et `/serveurs`, **que je sais portés**. Elle les rend « absent
 — *parce qu'elle ne voit que les chemins **backend**, les routes du portage étant
 appelées par `route('nom')`.* **Sans ces deux contrôles, j'aurais lu « absent »
 comme « inexistant » sur les cinq dernières.**
+
+---
+
+## 9. ⚠ LE TRI ÉTAIT FAUX SUR QUATRE ROUTES — reprise du 2026-09-06, 11:40 CEST
+
+**Le DSI a trouvé un faux NÉGATIF dans ma sonde du §6.1. Je l'ai vérifié, il est
+réel, et il est plus large que ce qu'il en disait : quatre routes, pas une.**
+
+### 9.1 Le défaut : l'ancre de GAUCHE contre un chemin COMPOSÉ
+
+Mon motif exigeait un délimiteur **juste avant** le chemin :
+
+```
+GAUCHE = ['"`( ]        ->  '/server_users_inventory'   vu
+                            '/api/gateway/server_users_inventory'   MANQUÉ
+                                         ^ le caractère précédent est `y`
+```
+
+*Sur un chemin construit avec le préfixe de passerelle, le caractère qui précède
+est une lettre.* **L'ancre qui me protégeait de la sous-chaîne m'aveuglait sur la
+composition.**
+
+    GAUCHE corrigée = (?:['"`(\s]|/api/gateway)
+    DROITE          = (['"`)?,\s]|$)
+
+**Témoins, dont un NÉGATIF — c'est ce qui manquait au §6.1 :**
+
+| témoin | attendu | obtenu |
+|---|---|---|
+| `/machines/credential-status` | > 0 | **6** |
+| `/remove_user_keys` | > 0 | **4** |
+| `/zzz_inexistante` | **== 0** | **0** |
+
+**Et la contre-épreuve qui justifie de RESTREINDRE plutôt que de RETIRER l'ancre :**
+sans elle, `/deploy` passe de **5 à 19** en attrapant `/supervision/zabbix/deploy`.
+*Trop large et trop exact échouent tous les deux.*
+
+### 9.2 ⚠⚠ MON DÉTECTEUR DE FAUX NÉGATIFS ÉTAIT LUI-MÊME MORT
+
+**J'ai d'abord rejoué les 22 en signalant les routes où `strict == 0` et
+`corrigée > 0`. Il en est sorti : « (aucun) ». J'ai failli le publier.**
+
+> *Ces routes sont discutées dans des dizaines de commentaires : `strict` n'est
+> presque JAMAIS à zéro.* **Mon prédicat ne pouvait donc se déclencher que sur
+> une route dont personne ne parle — c'est-à-dire jamais.**
+
+**C'est le zéro artefact de son propre motif, dans sa forme la plus coûteuse :
+un instrument de contrôle qui DÉDOUANE.** *Le bon prédicat n'est pas un écart de
+COMPTE, c'est la différence des ENSEMBLES de lignes.* **Sur ce prédicat-là :
+4 lignes récupérées, et les 4 sont du CODE, aucune n'est un commentaire.**
+
+### 9.3 Les quatre lignes, et ce qu'elles changent
+
+| route | ligne manquée | appelée depuis |
+|---|---|---|
+| `/server_users_inventory` | `ComptesDistantsController.php:73` | `comptes-distants.js:233` |
+| `/preflight_check` | `ClesSshController.php:99` | `cles-ssh.js:224` |
+| `/logs` | `ClesSshController.php:106` | `cles-ssh.js:390` |
+| `/admin/temp_permissions` | — | `permissions.js:211` (`fetch` direct) |
+
+**Trois verdicts du §8.2 tombent, et un quatrième garde sa conclusion en perdant
+son fondement :**
+
+- **`/logs` et `/preflight_check` n'étaient PAS « retenues par arbitrage K4 ».**
+  *Elles sont appelées par le portage.* **K4 se réduit à `/deploy` SEUL.**
+- **`/server_users_inventory` n'est PAS « jamais câblée ».** *Elle est appelée.*
+- **`/admin/temp_permissions` reste « rien à faire », pour une AUTRE raison.**
+  *Ce n'est pas que le portage la réimplémente : c'est un **double régime** — il
+  LIT par `DB::table('temporary_permissions')` (`Permissions.php:193,212,220`) et
+  ÉCRIT par `POST /api/gateway/admin/temp_permissions`.* ⚠ **Ma table laissait
+  croire que la route backend était inutilisée : la retirer casserait l'octroi.**
+
+### 9.4 ⚠ LA CINQUIÈME CATÉGORIE N'A PLUS AUCUN MEMBRE
+
+**`/server_users_inventory` est appelée. `/admin/notification_prefs` est de la
+forme 4** — `Notifications.php:181` lit, `:210` écrit
+`DB::table('notification_preferences')->updateOrInsert()`, et `web.php:697` **et
+`:699`** exposent la lecture ET l'écriture.
+
+> **« Jamais câblée » était une catégorie fondée sur deux faux négatifs.** *Le
+> mécanisme que je décrivais — écrite, gardée, documentée, jamais appelée — reste
+> concevable. **Il n'a aucun exemple ici, et je n'aurais pas dû l'ériger en
+> catégorie sur deux cas que mon propre instrument m'avait fabriqués.***
+
+### 9.5 ⛔ ET LA CORRECTION DU DSI NE FERME PAS L'ANGLE MORT PRINCIPAL
+
+**L'ancre corrigée ne voit toujours pas la forme 4** : sur
+`/admin/notification_prefs`, elle rend **0 avant et 0 après**. *Le DSI ne l'a pas
+trouvée avec le motif corrigé — il l'a trouvée en raisonnant sur la TABLE.*
+
+> **Deux défauts distincts ont été corrigés le même jour, et un seul l'a été par
+> l'instrument.** *Dire « instrument corrigé, trois témoins » couvre le premier
+> et laisse croire que le second l'est aussi.* **Un motif sur les chemins de
+> routes ne peut pas, par construction, voir une capacité réimplémentée en base :
+> il faut la sonde par TABLE du §7, et les deux ne se remplacent pas.**
+
+### 9.6 Ce qui m'indicte le plus
+
+**La réfutation était dans l'arbre, datée du 2026-09-03, dans un docblock :**
+
+```
+ClesSshController.php:29-31
+    /preflight_check   appelee   (`url_preflight`, `cles-ssh.js:224`)
+    /logs              appelee   (`url_journal`,   `cles-ssh.js:390`)
+    /deploy            NON appelee
+```
+
+*Trois jours avant mon tri, le portage disait déjà que K4 se réduit à `/deploy`.*
+**Mon ancre m'a rendue incapable de lire ce que le dépôt affirmait en clair — et
+j'ai publié un arbitrage bloquant sur deux routes qui ne l'étaient pas.**
+
+⚠ **Et ce docblock porte, deux lignes plus haut, la note d'une session qui
+corrigeait un commentaire « affirmant une propriété que le fichier n'avait
+plus ». J'ai reproduit la même faute dans l'autre sens** : *affirmer un blocage
+que le fichier n'avait plus.*
+
+### 9.7 État du tri après reprise — 22 sur 22
+
+| verdict | routes |
+|---|---|
+| **appelée — faux positif de ma sonde** | `/server_users_inventory` · `/preflight_check` · `/logs` |
+| **faux positif — forme 4** | `/admin/user_inventory/classify{,_bulk}` · `/server_user_keys` · `/list_machines` · `/admin/notification_prefs` |
+| **double régime — lit en base, écrit par la passerelle** | `/admin/temp_permissions` |
+| **pas une capacité** | `/update_security_exec` · `/update_zabbix` · `/test` |
+| **supplantée** | `/schedule_update` · `/apt_update` · `/update-logs` |
+| **retenue par ARBITRAGE — K4** | **`/deploy` SEUL** (`NOPASSWD: ALL`) |
+| **trou par dépendance** | `/cve_trends` |
+| **trou asymétrique** | `/server_user_remove_key` |
+| **candidates, touchent une MACHINE** | `/custom_update` · `/apt_check_lock` · `/exclude_user` |
+| **jamais câblée** | *(catégorie vide)* |
+
+**La conclusion du §8.3 ne bouge pas — aucune des 22 n'est portable sans
+arbitrage.** *Mais elle tenait pour partie sur des motifs faux, et un verdict
+juste par accident ne vaut pas un verdict fondé.*
+
+### 9.8 ⚠ MA FAUTE ÉTAIT PIRE QUE « TROIS AU LIEU D'UNE » — et son origine est lisible
+
+**Le dédouanement du DSI — « la version fausse n'a pas voyagé » — je l'ai vérifié
+sur un AXE différent du sien** : *chercher la PROPOSITION (« bloqué », « retenu »,
+« non porté ») au voisinage des deux chemins, sans exiger ni le terme `K4` ni
+`preflight_check`.* **Trois occurrences dans tout le dépôt, dont deux sont les
+corrections. La seule porteuse est ma ligne 325. Confirmé.**
+
+**Mais la faute n'était pas un sur-comptage. `MODULE-SSH.md:139-141` :**
+
+```
+K2 ✔ | le constat avant deploiement | POST /preflight_check | PORTE le 2026-08-21
+K3 ✔ | la lecture du flux           | GET  /logs            | PORTE le 2026-08-21
+K4   | le deploiement               | POST /deploy          | le seul restant
+```
+
+> **Ces deux routes ne sont pas « K4 sur-compté » : elles ne sont pas K4 du tout.
+> Elles sont K2 et K3, portées depuis seize jours.** *J'ai franchi une frontière
+> de sous-lots qui avait été tracée précisément pour que ces deux-là puissent
+> partir sans attendre l'arbitrage du troisième.*
+
+**Et l'origine se lit à `MODULE-SSH.md:45`** :
+
+> *« Un seul bouton (`index.php:152`, `onclick="deploySSH()"`) déclenche les
+> trois routes en cascade, sans reprise de main. »*
+
+**C'est VRAI — du legacy.** *Là-bas, déployer EST une cascade de trois routes.*
+**Le découpage K2/K3/K4 existe justement pour défaire cette cascade.**
+
+> **J'ai porté un énoncé vrai du système SOURCE sur la décomposition du système
+> CIBLE, avec les mêmes mots.** *« Le déploiement, c'est trois routes » est exact
+> côté legacy et faux côté portage — et rien dans la phrase ne dit de quel côté
+> elle parle.* **C'est la même classe que « arbre ou service » : une affirmation
+> sans son régime est invérifiable, et ici le régime est le SYSTÈME.**
+
+**⛔ Une limite du dédouanement, que je dois dire** : *ma sonde couvre les
+FICHIERS.* **Elle ne voit pas ce qui a circulé entre sessions — et j'ai moi-même
+relayé mon §8.2 au DSI par message aujourd'hui.** *« N'a pas voyagé » est donc
+prouvé pour le dépôt et indémontrable pour la conversation.* **Le seul vecteur
+réel a été nos deux messages, et ils ont été rectifiés dans le même canal.**

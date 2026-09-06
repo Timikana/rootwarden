@@ -11208,6 +11208,39 @@ relu — jamais « le premier bouton », jamais un balayage.*
 **Dédouanement** : l'en-tête de ce fichier est **honnête**, conforme au code — après quatre en-têtes menteurs
 dans les modules voisins.
 
+
+### ⟶ CORRECTION DU 2026-09-06 — `server_user_remove_key` A MAINTENANT UNE INTERFACE. **E-226 N'EST PAS FERMÉ.**
+
+Cet écart dit, dans son tableau : *« `server_user_remove_key` — **aucune interface de parc** »*, et conclut
+*« celui qui en approche le plus n'a pas d'interface »*. **La première moitié de cette phrase a changé
+aujourd'hui, la seconde non — et c'est la seconde qui portait l'écart.**
+
+Le geste est porté (`7f2c736`, v2.0.97) : un bouton par ligne de clé sur `/comptes-distants/{machine}/cles/{user}`.
+
+    AVANT   route vivante, zero appelant       ->  le geste existait sans main pour l'atteindre
+    APRES   une cle, un compte, une machine    ->  une main, et elle atteint UN cran
+
+**Ce que le portage NE donne PAS, et qui EST E-226** :
+
+| ce que l'écart réclame | état au 2026-09-06 |
+|---|---|
+| révoquer une clé compromise **sur tout le parc** | **toujours absent** — il faut ouvrir chaque machine, chaque compte |
+| que `regenerate_platform_key` révoque l'ancienne | **inchangé** — elle reste autorisée partout (le cœur de l'écart) |
+| que le panneau de P4 cesse d'annoncer une réponse à compromission | **inchangé** — le texte faux est toujours à l'écran |
+
+> **Un geste unitaire porté ne répond pas à un écart de PORTÉE.** *Retirer une clé compromise de quarante
+> machines par quarante visites d'écran n'est pas une révocation : c'est la même absence, avec un bouton.*
+
+⚠ **Ne pas relayer « E-226 est adressé » sur la foi de ce portage.** Il déplace exactement une ligne du
+tableau ci-dessus, et le CHANGELOG de `7f2c736` — qui parle du geste et pas de l'écart — se lit facilement
+comme s'il en disait plus. *C'est moi qui ai écrit les deux : le risque de sur-lecture est le mien.*
+
+**Et le portage a ajouté sa propre réserve** : `force` n'est pas construit, donc **la clé PLATEFORME reste
+inatteignable depuis l'écran**. Délibéré (arbitrage `DOSSIER-36`, autorisé nominalement) — mais si la clé
+compromise EST la clé plateforme, l'interface neuve ne sert à rien, et c'est `regenerate_platform_key` qui
+reprend la main, avec le défaut décrit par cet écart. **Le trou le plus grave d'E-226 est celui que le
+portage d'aujourd'hui ne pouvait pas toucher.**
+
 ---
 
 ## E-227 — ⚠⚠⚠ OUVRIR LA PAGE DE DIAGNOSTIC DÉPLOIE UN `NOPASSWD: ALL` SUR LA PRODUCTION
@@ -21309,3 +21342,406 @@ voisin, où la parade retenue fut une interface à liste fermée.
 > garde.*
 
 **Non porté. La liste reste à quatre entrées.**
+
+---
+
+## E-452 — ⚠ « LOT conforme » S'IMPRIMAIT SUR 53 EXÉCUTIONS QUI N'AVAIENT AUCUNE RÉFÉRENCE
+
+**Symétrie exacte du défaut du 2026-08-28**, qui est corrigé dans ce même fichier et dont le commentaire dit :
+*« sans mesure, pas de référence ; sans référence, pas de mesure »*. Ce garde-là traque **une référence
+jamais jouée**. Personne n'avait regardé **l'autre sens** : une suite jouée **sans référence**.
+
+Mesuré le 2026-09-06 sur `scripts/rejouer-lot.sh`, croisement des listes jouées et des tables de référence :
+
+    SUITES_LARAVEL  85 jouees    REF_LARAVEL  58 references   ->  27 sans reference
+    SUITES_LEGACY   82 jouees    REF_LEGACY   56 references   ->  26 sans reference
+                   167 executions                                 53 SANS REFERENCE
+
+*Et l'autre sens est propre : **zéro** référence orpheline, sur les deux cibles.*
+
+**Le mécanisme, pas l'énumération.** `joue()` calcule un verdict, puis rend `1` pour quatre valeurs
+(`ECHEC`, `ECART…`, `FENETRE SALE`, `GARDE INDISPO`) et **`0` pour tout le reste** — dont
+`(pas de reference)`. Or l'appelant fait `joue … || ecarts=$((ecarts + 1))`. Donc :
+
+| verdict | code | compte comme écart |
+|---|---|---|
+| `ECART attendu=23` | 1 | oui |
+| `(pas de reference)` | **0** | **non** |
+
+**Mesure isolée de la condition** (témoin positif à côté, pour que le zéro soit un constat et pas une
+non-mesure) : `(pas de reference)` → `0` ; `ECART attendu=23` → `1`. *L'instrument distingue bien ; c'est
+la table de vérité qui absout.*
+
+Conséquence : `$ecarts` restait à 0 et le runner imprimait **`LOT conforme — 167 execution(s).`**
+
+> **« Conforme » est une affirmation sur une COMPARAISON. 53 fois sur 167, aucune comparaison n'avait eu
+> lieu** — le compte n'était rapproché de rien. *Ce n'est pas « conforme », c'est « rien ne s'est cassé »,
+> et les deux phrases ne protègent pas la même chose.*
+
+### Le garde-fou existant ne couvrait pas le cas, et pour une raison précise
+
+Le runner sait dire `NEUVE  <cible>/<suite> — aucune reference : elle TOURNE, son compte est a inscrire.`
+**Mais ce bloc est sous `if [ ${#NOMMEES[@]} -gt 0 ]`** : il ne s'exécute que lorsque des suites sont
+**nommées en ligne de commande**. Un LOT complet ne nomme rien. *L'avertissement existait, et il était
+éteint exactement dans le mode où la phrase trompeuse s'imprime.*
+
+### Ce qui a été corrigé, et ce qui a été DÉLIBÉRÉMENT laissé
+
+**Corrigé : la PHRASE.** Elle nomme désormais le compte et liste les exécutions concernées avec leur PASS
+observé, prêtes à inscrire. **Non corrigé : le CODE DE SORTIE**, qui reste `0`.
+
+Deux raisons, et la première est la maxime de ce fichier : *« un garde-fou qui se déclenche à tort ne
+protège plus : il empêche »* — un LOT rouge à 53 titres serait illisible et ferait ignorer la ligne. La
+seconde est que **le contrat de sortie appartient au banc (session 7)**, pas au registre : le durcir
+unilatéralement casserait chaque LOT du jour. *Question posée, pas tranchée.*
+
+### ⟶ ⚠⚠ RÉTRACTATION DU 2026-09-06 — **E-452 N'EXISTE PAS. LES 53 SONT UN ARTEFACT DE MON MOTIF.**
+
+**Aucune suite ne tourne sans référence, ni d'un côté ni de l'autre.** Mesuré en demandant à **bash** ce que
+contiennent les tableaux — les quatre blocs extraits dans un fichier d'affectations pures (`bash -n` propre,
+zéro `$(` hors commentaire), sourcé sous `set -u` :
+
+    SUITES_LARAVEL  85   REF_LARAVEL  85      jouee sans ref 0   orpheline 0
+    SUITES_LEGACY   82   REF_LEGACY   82      jouee sans ref 0   orpheline 0
+
+**Trois méthodes indépendantes concordent** : `${#REF_LARAVEL[@]}`, un `grep -o '\[[a-z0-9-]+\]='` sur le
+bloc borné, et les différences d'ensembles. Témoins dans les deux sens.
+
+**La cause.** Les lignes de référence portent **plusieurs clés chacune** —
+`[go-socle-navigation]=75 [go-socle-i18n]=23 [go-socle-passerelle]=10 [go-socle-auth]=14` — et mon `awk`
+faisait `match($0, /^[ \t]*\[[a-z0-9-]+\]=/)`, **qui n'imprime que la première de chaque ligne**. 58 au lieu
+de 85, 56 au lieu de 82 ; l'écart `85-58` et `82-56` **est** mon « 53 ».
+
+> ⚠ **C'est E-420 rejoué à l'identique, le même jour, et il rend LE MÊME NOMBRE : 58.** Là c'était un motif
+> de parité i18n exigeant un espace unique avant `=>`, rendant « 58 = 58 » sur un catalogue de 63. *Et
+> j'avais écrit le matin même, à la session 8, qu'il faut **demander au langage ce qu'il contient plutôt
+> qu'inférer d'un motif** — puis j'ai inféré d'un motif, sur le fichier d'à côté.*
+
+**Ce qui reste vrai de l'entrée ci-dessus, et ce qui tombe :**
+
+| affirmation | état |
+|---|---|
+| `joue()` rend `0` pour `(pas de reference)`, donc l'appelant ne le compte pas | **vrai**, mécanisme mesuré |
+| l'alerte `NEUVE` est sous `if [ ${#NOMMEES[@]} -gt 0 ]`, éteinte en LOT complet | **vrai** |
+| **53 exécutions sur 167 étaient absoutes** | ⛔ **FAUX — il y en a 0** |
+| « `LOT conforme` s'imprimait sur des exécutions non comparées » | ⛔ **FAUX**, jamais arrivé |
+
+**Le garde ajouté en `d94d75f` est CONSERVÉ** — non pour sauver la face de cette entrée, mais parce qu'il
+est correct et coûte une comparaison : il attrapera une suite ajoutée sans référence. *Dans l'état actuel il
+ne se déclenchera jamais.* **Décision remise à la session 7**, qui tient le banc : si elle préfère retirer un
+garde dont le commit raconte un défaut inexistant, je le retire.
+
+### ⟶ LE GARDE MORD — éprouvé le 2026-09-06, **sans lancer aucune suite**
+
+*Objection de la session 7, et elle est juste* : **« un garde qui ne peut pas mordre est
+indiscernable d'un garde cassé »**. Celui-ci naît muet — `sans_ref` reste à 0 par construction tant que les
+quatre tableaux concordent. *Elle avait payé le matin même trois exécutions de `go-socle-i18n.mjs` pour
+prouver qu'un refus mordait ; il ne mordait pas, le fichier ne portait pas le code. Trois sorties
+plausibles, zéro observation.*
+
+Éprouvé sur la **chaîne réelle extraite du fichier** — les tableaux sourcés par bash, le bloc de verdict et
+le bloc de résumé chargés tels quels, aucune suite jouée, aucun LOT lancé :
+
+| entrée | verdict rendu | `sans_ref` |
+|---|---|---|
+| suite **absente** des références | `(pas de reference)` | **1** |
+| `go-page-pare-feu`, `pass=23` (sa référence) | `conforme` | 0 |
+| `go-page-pare-feu`, `pass=99` | `ECART attendu=23` | 0 |
+
+Et la ligne finale, imprimée par le bloc réel :
+
+    LOT SANS ECART — 167 execution(s), dont 1 SANS REFERENCE.
+      ⚠ Elles n'ont echoue nulle part, et leur compte n'a ete compare a rien.
+        [...]  laravel/go-page-zzz-jamais-referencee=42
+
+**Contre-épreuve, l'état d'aujourd'hui** : `sans_ref=0` → `LOT conforme — 167 execution(s), toutes
+referencees.` *La sonde rend le positif ET le négatif : la mesure a eu lieu.*
+
+**Un défaut d'affichage corrigé au passage** : la ligne disait `Ces 1 execution(s)`. Le compte est déjà sur
+la ligne au-dessus, et **un accord qui boite se lit pendant un incident** — repris par un pronom, éprouvé au
+singulier et au pluriel.
+
+**Et le désaccord est ce qui a trouvé, pas l'instrument.** La session 7 rapportait 2 orphelines laravel et 1
+legacy là où j'avais 0 ; **ses chiffres sont faux aussi** (la vérité est 0 aux quatre coins), et son
+instrument était cassé de son propre aveu. *Mais un zéro est exactement ce qu'un pair ne rattrape jamais —
+sans sa contradiction, je n'aurais pas audité un dédouanement qui m'arrangeait.*
+
+**Vérifié** : `bash -n` propre, **témoin négatif rendu** (un `if [ x` inachevé lève bien une erreur) · les
+quatre branches du verdict éprouvées sur le texte **extrait du fichier**, pas sur une copie retapée · et le
+contrat de sortie **comparé avant/après** sur les quatre cas — `0 · 0 · 0 · 2`, identique.
+
+⚠ **Réserve sur ma propre vérification** : ma première lecture des codes de sortie passait par un `| head`,
+donc lisait le code de `head` et rendait `0` pour les quatre cas — dont celui qui vaut `2`. **Quatre valeurs
+plausibles, toutes fausses, et rien dans la sortie ne le signalait.** Remesuré sans tube. *C'est le piège
+déjà inscrit à `feedback_find_bfs_newermt`, et je l'ai refait en le connaissant.*
+
+---
+
+## E-453 — ⚠⚠ LA PAGE EXIGE UNE PERMISSION QUE LA PASSERELLE ET LE BACKEND N'EXIGENT PAS. **LE SEUL COMPTE `role 2` DU PARC NE L'A PAS.**
+
+**Signalé par la session 8** en vérifiant mon portage `7f2c736` ; **la chaîne et le fait décisif sont ma
+mesure.** Quatrième occurrence du motif déjà inscrit trois fois — *la garde est sur la PAGE, pas sur la
+REQUÊTE*.
+
+| maillon | ce qu'il exige | un `role 2` sans `can_manage_remote_users` |
+|---|---|---|
+| la **PAGE** (`web.php:1112`) | `role:2` **+** `perm:can_manage_remote_users` | **403** |
+| la **PASSERELLE** (`PasserelleController.php:69`) | `roleId < 2 && reserveeAdmin($chemin)` → 403 | **passe** |
+| le **BACKEND** (`ssh.py`, ancré au `def`) | `@require_api_key` `@require_role(2)` `@require_machine_access` | **passe** |
+
+`ExigePermission.php:39` est **fail-closed** — `(…[$permission] ?? false)` puis `abort(403)` — donc la page
+refuse réellement ; ce n'est pas une garde décorative. *Et `:35` court-circuite à `role_id >= 3`, conforme à
+E-296.*
+
+### Le fait décisif, qui manquait au signalement
+
+    comptes role 2 dans le parc               1
+    dont can_manage_remote_users              0
+    role 2 SANS la permission                 1     <- 100 % des comptes concernes
+
+> **L'écart n'est pas théorique.** *Le seul compte que la page refuse est aussi le seul qui puisse forger la
+> requête et obtenir le geste.* Témoins posés : la colonne existe, une colonne inventée est absente.
+
+### ⟶ PLUS TRANCHANT QUE CE QUE J'AVAIS ÉCRIT — **la permission ne gouverne rien**
+
+Corroboré par la session 8 sur un objet différent du mien (`go-adm-comptes-distants.mjs:46` :
+*« un seul compte la porte — `superadmin`, role 3 »*) puis remesuré en base, agrégé :
+
+    role 1 : 7 comptes, dont 0 avec can_manage_remote_users
+    role 2 : 1 compte,  dont 0
+    role 3 : 2 comptes, dont 1        <- le seul porteur, et role 3 court-circuite ExigePermission:35
+
+**Le seul détenteur de la permission passerait la page de toute façon, par son rôle.** Et `role 1` est
+refusé par `role:2` avant que la permission soit consultée. **Il ne reste donc qu'une population sur
+laquelle `perm:can_manage_remote_users` produit un effet : le compte `role 2` — celui qui la contourne par
+la passerelle.**
+
+> **La permission ne gouverne aujourd'hui exactement personne.** *Elle refuse un seul compte, et ce compte
+> obtient le geste par l'autre porte.* Ce n'est pas « une garde plus faible en aval » : c'est une garde dont
+> la seule application vivante est annulée.
+
+*Cela ne change pas les deux voies de l'arbitrage — cela dit ce que coûte l'inaction : le contrôle affiché
+sur la page est, en l'état, sans effet pour tout le monde.* **Et il redeviendra effectif au premier octroi de
+`can_manage_remote_users` à un `role 2`** — un défaut DORMANT au sens d'E-«hors champ du critère», qui
+s'arme par une action d'administration ordinaire.
+
+⚠ **Un défaut MIROIR, relevé par la session 7 sur le même écran, à ne pas confondre avec celui-ci** : la
+page est plus LARGE que ses requêtes — un `role 1` porteur de la permission verrait tous les boutons et
+recevrait `401` sur six. Latent (0 porteur `role 1`). *Les deux défauts sont opposés et coexistent sur la
+même page.*
+
+### Trois gestes, le même régime — et mon portage HÉRITE l'écart, il ne le crée pas
+
+`/server_user_remove_key`, `/remove_user_keys`, `/delete_remote_user` : **les trois** portent exactement
+`@require_role(2)` sans aucun `@require_permission`, et les trois sont dans `ADMIN_SEULEMENT`
+(`RoutesBackend.php:131` et `:139`) — groupe que la passerelle applique en `role >= 2` **seul**. Les deux
+premiers sont en service depuis longtemps. *Ce portage ajoute une troisième porte au même couloir.*
+
+⚠ **`ssh.py` contient un raisonnement qui semble justifier ce choix — il ne concerne PAS ces routes.** Le
+paragraphe *« POURQUOI `role(2)` ET PAS `@require_permission` »* est à la ligne 422 ; ancré par le `def` qui
+le suit, il appartient à **`stream_logs`, route `/logs`**. Nos trois `def` sont à `:2200` et au-delà.
+*Le transférer aurait donné à mes routes une justification écrite pour une autre.* Et
+`grep -c '@require_permission' ssh.py` rend **1** : cette unique occurrence **est ce commentaire**, donc
+**zéro décorateur réel** dans tout le fichier. *Un compte de motif aurait lu une garde là où il n'y a
+qu'une phrase.*
+
+### ⟶ CORRECTION DE MON PROPRE COMMIT
+
+Le CHANGELOG de `7f2c736` dit que je n'ai pas écrit de route Laravel **parce que** *« la garde est sur la
+PAGE (`role:2` + `perm:can_manage_remote_users`, vérifiée identique à ses quatre sœurs) »*. **Les deux
+moitiés sont vraies et la conclusion ne suit pas** : identique à ses sœurs, oui — et les cinq sont
+franchissables par le même compte. **Ma justification reposait sur une garde que la requête ne traverse
+pas.** *Je porte cette classe d'erreur en mémoire depuis trois occurrences, et je l'ai écrite quand même.*
+
+**Arbitrage, non tranché** : poser la route Laravel manquante ferait de ce geste **le seul des trois gardé
+correctement** — argument POUR, pas incohérence (formulation de la session 8, que je reprends). L'autre voie
+est d'exiger la permission dans la passerelle pour ce groupe, ce qui la ferme pour les trois d'un coup et
+**modifie un contrôle d'accès en service**. *Aucune des deux ne s'écrit sans le mot de l'exploitant.*
+
+---
+
+## E-454 — ⚠ LE LEGACY EST ARCHIVÉ SOUS LES SUITES : 28 dossiers partis, et les suites nomment toujours leurs chemins
+
+**Généralisation d'une trouvaille de la session 7**, qui a découvert que son témoin de refus
+(`/adm/admin_page.php`, employé pour prouver qu'un 403 était bien un refus de permission) **était mort**.
+J'ai balayé, et le cas est plus large que son témoin — **avec deux formes opposées**.
+
+### L'état du legacy, mesuré à l'arbre ET au réseau
+
+    legacy/_deprecated/          28 dossiers archives
+    legacy/adm/                  existe, 0 fichier .php     <- coquille vide
+    GET :8443/index.php          404      <- la page d'ACCUEIL du portail
+    GET :8443/adm/admin_page.php 404
+    GET :8443/supervision/…      404      GET :8443/tickets/…  404
+    GET :8443/profile.php        302 -> /auth/login.php       <- vivant
+    TEMOIN chemin absurde        404      TEMOIN /auth/login.php  200
+
+**30 fichiers de `tests/e2e/` nomment un chemin `adm/*.php`.**
+
+### Les deux formes, et la seconde est la mienne
+
+| forme | ce que la mort du chemin produit | trouvée par |
+|---|---|---|
+| le chemin est un **TÉMOIN** | l'assertion passe **à vide** — un refus qu'on ne peut plus distinguer d'une absence | session 7 |
+| le chemin est le **SUJET** | l'assertion **ÉCHOUE**, et accuse la garde alors que la page est archivée | ici |
+
+> **La seconde est plus bruyante et plus trompeuse.** *Un `FAIL` sur « sans session, `/index.php` renvoie
+> vers la connexion » envoie chercher un défaut dans l'authentification. La garde va bien : la page n'existe
+> plus.*
+
+### `go-socle-auth`, suite du SOCLE, jouée à chaque LOT
+
+`PAGES_PROTEGEES = ['/index.php', '/profile.php', '/adm/admin_page.php']` (`:39`), et son commentaire pose
+la prémisse : *« les chemins du legacy sont conservés : la cible Laravel les redirige vers ses propres
+routes, ce qui permet au MÊME test de viser les deux sans réécriture »*.
+
+**La prémisse tient sur le portage et a cédé sur le legacy** — mesuré sur les deux cibles, non authentifié
+(⚠ le HTTPS du portage est **`:8446`**, `:8444` étant le HTTP qui y redirige) :
+
+    chemin                 legacy :8443                portage :8446
+    /index.php             404                         302 -> /accueil
+    /profile.php           302 -> /auth/login.php      302 -> /profil
+    /adm/admin_page.php    404                         302 -> /accueil
+
+Le prédicat est `ECRAN_CONNEXION = /login\.php|\/connexion/i` **appliqué à l'URL finale** (`:234`). Éprouvé
+en isolation sur les URL réellement rendues : `/index.php` et `/adm/admin_page.php` **ne matchent pas**,
+`/auth/login.php?lang=fr` et `/connexion` matchent. *Un 404 est une réponse, pas une redirection : l'URL ne
+bouge pas.*
+
+⚠ **PRÉDICTION, PAS OBSERVATION — je n'ai pas joué la suite.** Sur la cible legacy, **deux des trois
+assertions du bloc A ne peuvent pas passer**. Or les références portent `14` côté portage et `13` côté
+legacy : **un écart d'une seule assertion là où j'en prédis deux.** *Soit ma prédiction est fausse, soit le
+`13` l'est.* La suite appartient au banc (session 7) ; c'est à l'exécution de trancher, pas à moi.
+
+### ⟶ CONTRÔLE DES TÉMOINS, 2026-09-06 après l'alerte de la session 8 — **ils tiennent, et une limite à dire**
+
+La session 8 a relayé que **`:8444` rend `301` sur TOUT depuis 13:08, chemin inexistant compris** : un
+contrôle qui y cherche un `404` est aveugle. **E-454 ne s'appuie sur `:8444` nulle part** — la colonne
+« portage » a été mesurée sur `:8446`. Revérifié :
+
+    :8444  /zzz_nexiste_pas  301      /profil  301     <- aveugle, ne discrimine plus rien
+    :8446  /zzz_nexiste_pas  404      /profil  302     <- discrimine
+    :8443  /zzz_nexiste_pas  404      /auth/login.php  200
+
+⚠ **MAIS UNE LIMITE DE MON PROPRE TÉMOIN, qu'il faut dire.** Sur le legacy, **un chemin absurde et une page
+archivée rendent le MÊME `404`**. Le témoin prouve donc *« rien ne sert ce chemin »* — **il ne prouve pas
+« cette page a été archivée »**, ni qu'elle a jamais existé.
+
+> **Un `404` ne distingue pas l'archivage de l'inexistence.** *Le fait d'archivage vient de l'ARBRE
+> (`legacy/_deprecated/adm` existe, `legacy/adm/` porte 0 fichier `.php`), jamais du réseau.*
+
+C'est pourquoi cet écart est mesuré sur **deux objets** — l'arbre et le réseau — et non sur le `404` seul.
+*Un contrôle d'archivage fondé sur un `404` attesterait aussi bien d'une page jamais écrite, d'une faute de
+frappe dans son propre chemin, ou d'un service à terre.*
+
+### ⟶ TRANCHÉ PAR L'EXÉCUTION — prédiction juste sur A, **aveugle sur B**, et **le `13` n'est pas faux**
+
+Données du lot 3 de la session 7, suite jouée le **2026-09-06 à 00:40** sur la cible legacy. Les cinq FAIL,
+tels quels :
+
+    A. sans session, /index.php renvoie vers la connexion            statut=404
+    A. sans session, /adm/admin_page.php renvoie vers la connexion   statut=404
+    B. rw-test-user  : entre mot de passe et second facteur, /index.php reste refuse
+    B. rw-test-admin : idem
+    B. rw-test-super : idem
+
+    PASS=8   FAIL=5   reference legacy 13   ->   8 + 5 = 13 ✓
+
+**Les deux du bloc A sont exactement celles que je prédisais, sur les deux chemins que je nommais.** Les
+trois autres, non : **le bloc B rejoue `/index.php` pour CHACUN des trois comptes** — la boucle est sur les
+comptes, pas sur les chemins.
+
+> **Compter les chemins ne donne pas le nombre d'assertions.** *Un chemin archivé, cité une seule fois dans
+> la table, produit trois échecs ailleurs dans le fichier.* Même famille que « un instrument qui nomme une
+> FAMILLE de routes ne peut pas inventorier des GESTES ».
+
+**Et mon doute sur le `13` était mal placé.** J'avais écrit : *« soit ma prédiction est fausse, soit le `13`
+l'est »*, en raisonnant que si 2 assertions ne peuvent plus passer, la référence legacy devrait être 2 sous
+celle du portage. **Ce raisonnement suppose que les références ont été posées APRÈS l'archivage. Elles ne
+l'ont pas été** — `13` est le score de la suite du temps où `/index.php` et `/adm/admin_page.php` étaient
+servis.
+
+> **L'écart `14 / 13` ne mesure rien de l'archivage : il mesure une différence entre les deux portails
+> d'AVANT.** *Les deux chiffres sont justes et ne parlent pas du même monde.* **Une valeur de référence
+> enregistrée avant un changement d'environnement ne vieillit pas seulement — elle change de SENS**, et rien
+> dans le nombre ne le signale.
+
+⚠ **L'erreur n'était donc ni dans ma prédiction ni dans le `13`, mais dans le LIEN que je traçais entre
+eux.** *J'avais eu raison d'annoncer laquelle des deux valeurs était la moins éprouvée — et tort sur
+laquelle : c'était la relation, que je n'avais pas pensée comme une mesure.* Formulation de la session 7,
+sur ses propres données.
+
+### ⟶ LE MÉCANISME, QUATRE INSTANCES EN UNE JOURNÉE : **une valeur lue sans sa DATE**
+
+Cet écart en est la première forme. Le 2026-09-06 en a produit trois autres, sur des objets sans rapport,
+et c'est le même mécanisme à chaque fois.
+
+| # | ce qui a été lu | le verdict faux qu'il a produit |
+|---|---|---|
+| 1 | des suites nommant des chemins `adm/` **archivés depuis** | un `FAIL` qui accuse l'authentification |
+| 2 | `REF_LEGACY[go-socle-auth]=13`, posé **avant** l'archivage | *« soit ma prédiction est fausse, soit le 13 l'est »* — les deux étaient justes |
+| 3 | `8444` dans 124 fichiers, **avant** l'échange des ports | le port désignait le portage ; il désigne le legacy |
+| 4 | les défauts du compose, lus **après** un échange déjà commité | un travail fait signalé comme restant à faire (session 8) |
+
+> **Un relevé qui ne DATE pas ce qu'il lit rend des faits justes et des verdicts faux.** *Formulation de la
+> session 8, sur sa propre erreur.* **Aucune des quatre lectures n'était fausse** — chacune décrivait
+> exactement l'état d'un monde, et c'est la conclusion tirée qui traversait une frontière temporelle sans
+> le dire.
+
+**Et les quatre échouent en silence** : rien dans un nombre, un chemin ou une valeur par défaut ne porte sa
+date. *C'est pourquoi les gardes de cette manœuvre contrôlent un ÉTAT — `/up` rend 200 sur le portage, 404
+sur le legacy — et jamais une valeur.* **Un état se mesure au moment où l'on s'en sert ; une valeur ne dit
+jamais de quand elle parle.**
+
+### Ce que ça dit du chantier, et qui dépasse cette suite
+
+**Le legacy est démonté pendant que les suites continuent de le nommer.** Chaque archivage transforme
+silencieusement une assertion en l'une des deux formes ci-dessus, **et aucune des deux ne se signale comme
+un problème de suite** : l'une passe, l'autre accuse un tiers. *C'est le mécanisme, pas l'énumération, qui
+doit servir ici — inventorier les 30 fichiers aujourd'hui ne protège pas du 29ᵉ dossier archivé demain.*
+
+---
+
+## E-455 — LA REDIRECTION HTTP→HTTPS DU LEGACY MÈNE DANS LE VIDE, et le portage porte déjà le diagnostic
+
+**Découvert en contrôlant l'échange des ports du 2026-09-06 ; le défaut est ANTÉRIEUR et mon échange n'en a
+changé que le numéro affiché.**
+
+    legacy   RewriteRule ^/?(.*) https://%{HTTP_HOST}/$1     <- HTTP_HOST PORTE LE PORT
+    portage  RewriteCond %{HTTP_HOST} ^([^:]+)
+             RewriteRule ^/?(.*) https://%1:8443/$1          <- hote SANS port + port HTTPS explicite
+
+**La règle du legacy ne nomme aucun port : elle recopie celui de la requête.** Donc le HTTP du legacy
+renvoie vers le *même* port en `https://`, où rien n'écoute en TLS.
+
+    mesure    http://localhost:8444/  ->  301  https://localhost:8444/
+              8444 est son port HTTP ; son HTTPS est 8446
+
+*Avant l'échange, le legacy était en `8080`/`8443` : la même règle renvoyait `http://…:8080` vers
+`https://…:8080`.* **Le défaut ne vient pas de l'échange — il vient de la forme de la règle, qui est
+indépendante de tout port.**
+
+### Ce qui rend cet écart particulier : il était DÉJÀ ÉCRIT, en face
+
+Le fichier Apache du **portage** porte, dans le commentaire de sa propre correction :
+
+    http://localhost:8080/auth/login.php -> 301 https://localhost:8080/...
+    https://localhost:8080/...           -> 000  (rien n'ecoute en TLS la)
+    **Sa redirection HTTPS mene dans le vide, et personne ne l'avait vu.**
+
+> **Quelqu'un a vu ce défaut sur le legacy, l'a mesuré, l'a écrit — et n'a corrigé que son propre côté.**
+> *Le diagnostic du legacy vit dans la configuration du portage, à l'endroit où personne ne le cherchera.*
+> C'est la forme inverse du défaut habituel : non pas un commentaire qui promet plus que le code, mais un
+> **commentaire juste rangé chez le voisin**.
+
+### Non corrigé, et pourquoi
+
+La règle est dans `/etc/apache2/sites-available/000-default.conf` **du conteneur `rootwarden_php`**, pas
+dans un fichier de l'arbre — la corriger demande de reconstruire ou recréer ce conteneur, **donc un
+redémarrage de plus**. Le legacy est en fin de vie et vient d'être relégué sur `8444`/`8446`. *Le coût est
+une interruption, le gain est une redirection sur un portail qu'on démonte.* **Arbitrage de l'exploitant,
+non tranché ; le correctif est deux lignes, celles du portage.**
+
+⚠ **Effet pratique en attendant** : quiconque tape `http://<hote>:8444` obtient un 301 vers une adresse
+morte. **`https://<hote>:8446` fonctionne** et c'est la seule adresse du legacy à diffuser.
+

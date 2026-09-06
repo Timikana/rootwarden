@@ -91,4 +91,12 @@ return [
     // it is an excuse. Said on the PAGE because the person about to click is
     // the one who needs it — and they do not read the changelog.
     'gestes_jamais_exerces' => "These three actions have never yet been performed from this interface. They are wired and confirmed by a panel, but their correct behaviour has not been observed on a machine — the old portal remains the only proven route.",
+
+    /* Retrait d'UNE cle SSH precise (2026-09-06). Le champ `force` du backend
+       n'est jamais construit : voir public/js/distants-cles.js. */
+    'col_action' => 'Action',
+    'cle_retirer' => 'Remove',
+    'cle_confirme' => 'Permanently remove key :empreinte from this account? It is deleted from authorized_keys on the machine: it will no longer open a session.',
+    'cle_retiree' => 'Key removed from the machine.',
+    'cle_echec' => 'Removal failed. The key is still in place.',
 ];

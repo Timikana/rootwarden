@@ -1,4 +1,5 @@
 /**
+ * HORS-LOT: Deroule le parcours des politiques sudo/SFTP et POSTe vers `/policy/sudo/deploy` pour verifier le step-up. Cible la machine d'essai depuis E-457, mais le geste reste un deploiement.
  * go-policies.mjs - Test E2E des politiques sudo + SFTP par utilisateur (v1.22.0)
  *
  * Couvre :
@@ -19,7 +20,68 @@
 import puppeteer from 'puppeteer';
 import { createHmac } from 'crypto';
 
-const BASE = 'https://localhost:8443';
+/*
+ * ══ E-457 — CE POST VISAIT LA PRODUCTION ═════════════════════════════════
+ *
+ * `machine_id: 1` est `srv-zabbix`, 192.168.0.244. L'assertion qui suit exige
+ * un 403 `step_up_required` : elle verifie que le deploiement sudo est garde
+ * par un second facteur. **L'intention est juste, la cible ne l'etait pas.**
+ *
+ * Pour tester une garde il faut envoyer la requete qu'elle refuse — donc **si la
+ * garde manque, la requete ABOUTIT**. Ici elle aboutissait sur un deploiement
+ * sudo en production. La propriete mesuree (« ce geste exige un step-up ») ne
+ * depend d'AUCUNE machine en particulier : viser la production n'ajoutait rien a
+ * la mesure et portait tout le risque.
+ *
+ * ⚠ ET CE QUI LA REFUSE AUJOURD'HUI N'EST PAS UNE GARDE, C'ETAIT UN ETAT.
+ * Le 2026-09-06 au matin, l'unique appelant de `stepUpMark()` etait archive :
+ * le refus etait INCONDITIONNEL par effet de l'archivage, pas par decision.
+ * `d01e236` l'a depuis rendu deliberé. **Mais cette suite est hors lot — elle ne
+ * rougit jamais — et trois modules archives sont deja revenus en vingt-quatre
+ * heures.** Une surete qui repose sur l'etat transitoire d'un archivage n'est pas
+ * une surete.
+ */
+const MACHINE_ESSAI = 2;
+const PRODUCTION = 1;
+
+/*
+ * ══ LA BASE NE PEUT PLUS ETRE DEVINEE — ELLE SE DECLARE ═══════════════════
+ *
+ * Cette suite codait `https://localhost:8443` en dur. **Le 2026-09-06 a 19:39,
+ * les deux portails ont echange leurs ports** : `:8443` sert desormais le
+ * PORTAGE, et le legacy est passe sur `:8446`.
+ *
+ * Une suite ecrite pour le legacy y aurait trouve des ancres, des formulaires,
+ * une session — le portage accepte les MEMES identifiants et rend des pages qui
+ * RESSEMBLENT. **Elle n'aurait pas echoue : elle aurait rendu du vert sur le
+ * mauvais objet.** C'est la forme la plus couteuse d'un defaut de banc, parce
+ * qu'aucun signal ne la distingue d'une mesure juste.
+ *
+ * ⚠ ET UN REPLI CORRIGE SE REPERIMERAIT AU PROCHAIN ECHANGE. Ecrire
+ * `:8446` ici ne ferait que deplacer la date de peremption. **La base cesse donc
+ * d'etre exprimable autrement que declaree** : pas de valeur par defaut, pas de
+ * repli, une erreur au chargement.
+ *
+ * C'est plus severe que l'annonce bruyante retenue pour les suites qui LISENT
+ * l'environnement, et c'est voulu : celles-la ont un repli qu'un runner
+ * surcharge, celle-ci n'en avait aucun. **Rendre le champ inexprimable plutot
+ * que sa valeur inoffensive** — quand c'est possible, c'est la garde la plus
+ * forte.
+ */
+const BASE = (() => {
+    const declaree = process.env.E2E_BASE;
+    if (! declaree) {
+        throw new Error(
+            'E2E_BASE n\'est pas declaree, et cette suite n\'a plus de base par defaut.\n'
+            + '  Les deux portails ont ECHANGE leurs ports le 2026-09-06 : une valeur\n'
+            + '  ecrite en dur mesurerait l\'AUTRE portail en rendant du vert.\n'
+            + '  Verifiez lequel repond avant de choisir — l\'ETAT, jamais le numero :\n'
+            + '    curl -sk https://<hote>:<port>/up   200 = portage · 404 = legacy\n'
+            + '  puis :  E2E_BASE=https://<hote>:<port> node tests/e2e/<suite>.mjs');
+    }
+
+    return declaree;
+})();
 const USER = process.env.E2E_USER || 'superadmin';
 const PASS = process.env.E2E_PASS || 'RootWarden@2026-Sec!';
 const SECRET = process.env.E2E_TOTP_SECRET || ''; // audit v1.23 : secret 2FA via env, plus de secret en dur
@@ -125,7 +187,7 @@ check('Reponse contient sudo_policies + sftp_policies',
 // 6. Step-up 2FA : tentative deploy doit declencher 403 + step_up_required
 // (XHR direct pour bypasser le wrapper fetch global qui ouvrirait le modal step-up)
 console.log('\n6) Step-up 2FA sur deploy (sans valider TOTP)');
-const deployResp = await page.evaluate(() => new Promise((resolve) => {
+const deployResp = await page.evaluate((MACHINE_ESSAI) => new Promise((resolve) => {
     const csrfMeta = document.querySelector('meta[name="csrf-token"]');
     const xhr = new XMLHttpRequest();
     xhr.open('POST', '/api_proxy.php/policy/sudo/deploy', true);
@@ -135,8 +197,8 @@ const deployResp = await page.evaluate(() => new Promise((resolve) => {
     xhr.onload = () => { let b = null; try { b = JSON.parse(xhr.responseText); } catch {} resolve({ status: xhr.status, body: b }); };
     xhr.onerror = () => resolve({ status: 0, body: null });
     xhr.ontimeout = () => resolve({ status: -1, body: null });
-    xhr.send(JSON.stringify({ machine_id: 1, server_user_id: 0, preset: 'apt_only' }));
-}));
+    xhr.send(JSON.stringify({ machine_id: MACHINE_ESSAI, server_user_id: 0, preset: 'apt_only' }));
+}), MACHINE_ESSAI);
 check('POST /policy/sudo/deploy = 403 (step_up_required)', deployResp.status === 403, 'status=' + deployResp.status);
 check('Reponse step_up_required=true', deployResp.body && deployResp.body.step_up_required === true,
     JSON.stringify(deployResp.body));
