@@ -121,7 +121,24 @@ sleep 15
 docker ps --format '{{.Names}}\t{{.Status}}' | sort
 
 titre "les deux portails repondent-ils ?"
-curl -s  -o /dev/null -w "   laravel http=%{http_code}\n" http://localhost:8444/connexion || true
-curl -sk -o /dev/null -w "   legacy  http=%{http_code}\n" https://localhost:8443/auth/login.php || true
+# ⚠ ON N'ECRIT PLUS UN NUMERO DE PORT A COTE D'UN NOM DE PORTAIL.
+#    Ces deux lignes disaient « laravel » devant :8444 et « legacy » devant
+#    :8443. L'echange des ports du 2026-09-06 les a rendues FAUSSES sans que le
+#    fichier bouge : chaque portail y portait le nom de l'autre, dans un rapport
+#    qui s'affiche pendant une INSTALLATION — exactement quand on s'y fie.
+#
+#    On BALAIE les quatre ports et on laisse chacun se NOMMER par son etat :
+#    `/up` existe sur le portage (Laravel) et rend 404 sur le legacy. Le balayage
+#    vaut avant comme apres n'importe quel echange futur.
+for _p in 8080 8443 8444 8446; do
+    _up=$(curl -sk -o /dev/null -w '%{http_code}' --max-time 5 "https://localhost:$_p/up" 2>/dev/null || echo 000)
+    case "$_up" in
+        200) _nom='portage' ; _chemin='/connexion' ;;
+        404) _nom='legacy ' ; _chemin='/auth/login.php' ;;
+        *)   continue ;;
+    esac
+    _code=$(curl -sk -o /dev/null -w '%{http_code}' --max-time 5 "https://localhost:$_p$_chemin" 2>/dev/null || echo 000)
+    printf '   %s  https://localhost:%s%s  http=%s\n' "$_nom" "$_p" "$_chemin" "$_code"
+done
 
 titre "termine"

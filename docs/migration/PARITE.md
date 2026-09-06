@@ -21789,3 +21789,48 @@ d'agir : **un seul conteneur recréé**, les trois autres intacts. Éprouvée ap
 conteneur : `/up` → **exit 0**, `/zzz-invente` → **exit 22**. *La sonde rend le positif ET le négatif : elle
 mesure.* Et l'échange des ports a survécu — `:8443` portage, `:8446` legacy, témoin absurde à 404.
 
+---
+
+## E-457 — DEUX SCRIPTS DE DÉPLOIEMENT NOMMAIENT CHAQUE PORTAIL PAR L'AUTRE
+
+**Relevé par la session 8 le 2026-09-06 à 22:38, corrigé dans l'heure. Seul point FAUX de la journée plutôt
+que latent** — les autres retombées de l'échange étaient des replis qui ne s'armaient pas.
+
+    installer-sur-vm.sh:124   « laravel http= »   http://localhost:8444/connexion       -> le LEGACY
+    installer-sur-vm.sh:125   « legacy  http= »   https://localhost:8443/auth/login.php -> le PORTAGE
+    migrer-vers-vm.sh:118-119  les deux memes lignes
+
+**Ce ne sont pas des replis** : des étiquettes en dur, ne dépendant d'aucune variable, que rien ne corrige
+au démarrage. **L'échange des ports les a rendues fausses sans que le fichier bouge** — huitième instance du
+mécanisme d'E-454.
+
+> **Et le moment est le pire possible** : ces lignes s'affichent pendant une **INSTALLATION** ou une
+> **MIGRATION VERS UNE VM**. *Deux lignes d'état plausibles et inversées, exactement quand on s'y fie et
+> qu'on n'a rien d'autre pour se repérer.*
+
+### Le remède : ne pas échanger deux numéros
+
+*Les échanger les aurait re-périmées au prochain échange* — et cette journée en a produit un. **On balaie
+les quatre ports et on laisse chacun se nommer par son ÉTAT** : `/up` rend `200` sur le portage, `404` sur
+le legacy. Le balayage vaut avant comme après n'importe quel échange futur, et n'exige aucune variable
+d'environnement — ce qui compte pour `migrer-vers-vm.sh`, dont le contrôle part par SSH sans le fichier
+d'env.
+
+**Éprouvé en exécutant le bloc extrait du fichier**, pas une transcription :
+
+    portage  https://localhost:8443/connexion        http=200
+    legacy   https://localhost:8446/auth/login.php   http=200
+
+*C'est la forme du patch `06` appliquée à un second endroit : l'état décide, jamais une valeur.*
+
+### ⟶ Et la dernière sonde non reprise depuis le TLS est SAINE
+
+La session 8 avait éprouvé trois des quatre `healthcheck` du compose et laissé celle du backend, injoignable
+depuis l'hôte. **Mesurée depuis SON conteneur** :
+
+    curl -fsk https://localhost:5000/test           exit 0    HTTP 200
+    curl -fsk https://localhost:5000/zzz-invente    exit 22   HTTP 405
+
+**Elle mord.** *Les quatre sondes du fichier distinguent désormais leur objet d'un chemin inventé* — trois
+l'ont toujours fait, la quatrième (E-456) vient d'être corrigée.
+
