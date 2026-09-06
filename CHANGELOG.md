@@ -5,6 +5,42 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [2.0.98] - 2026-09-06
+
+### Extinction du legacy - bloc 2 : `profile.php` et `privacy.php` archives
+
+**Deux FEUILLES : aucun fichier du legacy ne les charge.** *Mesure du graphe
+d'inclusion avant de bouger quoi que ce soit.*
+
+    controle AVANT le git mv — le GESTE, pas le nom du fichier
+
+      profile.php   changer son mot de passe   ->  /profil/mot-de-passe    1
+                    changer son courriel       ->  /profil/courriel        1
+                    poser sa cle SSH           ->  /profil/cle-ssh         1
+                    revoquer ses sessions      ->  /profil/sessions        1
+                    export RGPD                ->  ExportRgpdController    3
+      privacy.php   effacement de son compte   ->  /profil/effacement      1
+
+      TEMOIN  /profil/zzz-inexistant                                       0
+
+    etat au RESEAU, avant et apres
+
+      /profile.php   302 -> 404        /privacy.php   302 -> 404
+      TEMOIN archive   /adm/admin_page.php   404 (inchange)
+      TEMOIN vivant    /auth/login.php       200 (inchange)
+
+**⚠ UN ECART SUBSISTE, et il est dit plutot que tu :** `privacy.php` supprimait
+la ligne `temporary_permissions` du compte ; `Comptes::anonymise()` ne la
+nettoie pas. *Le portage nettoie en revanche `password_history` et
+`notification_preferences`, que le legacy laissait.*
+
+**Et la difference de GESTE est deliberee, pas une perte** : le legacy
+SUPPRIME la ligne `users`, le portage l'ANONYMISE — pour preserver la chaine
+d'audit de `user_logs`, dont chaque ligne est chainee a la precedente
+(PARITE E-116 et E-117).
+
+---
+
 ## [2.0.97] - 2026-09-06
 
 ### Portage - le retrait d'UNE cle SSH precise sur un compte distant
