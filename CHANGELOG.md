@@ -5,6 +5,98 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [2.0.96] - 2026-09-06
+
+### Extinction - E-459 : deux routes `/policy/` orphelines retirees, la troisieme NE L'EST PAS
+
+**Retirees de `backend/routes/policies.py` :**
+
+| route | ce qu'elle faisait | appelants |
+|---|---|---|
+| `POST /policy/rollback` | **ouvrait une session SSH et ecrivait sur les machines** (86 lignes) | 0 |
+| `GET /policy/deployments` | lecture (50 lignes) | 0 |
+
+**Motivation.** Une route destructrice qu'aucune interface n'atteint, gardee par
+une regle qui passe ses tests, est une porte dont personne ne sait qu'elle
+existe — *et son refus dependrait d'un accident d'archivage plutot que d'un
+choix.* Les deux portaient `@require_role(3)` : le retrait ne change aucune
+autorisation, il supprime la surface.
+
+**⛔ `GET /policy/list` N'EST PAS RETIREE — elle n'est pas orpheline.**
+
+    tests/e2e/go-policies.mjs:118-124
+      fetch('/api_proxy.php/policy/list')
+      check('GET /policy/list = 200', ...)
+      check('Reponse contient sudo_policies + sftp_policies', ...)
+
+**Deux assertions vivantes.** *Et le portage n'a PAS d'equivalent : il ne compose
+que `/policy/{sudo,sftp}/{geste,audit}` — cette route est donc une capacite de
+LECTURE non portee, pas un residu.* **Le fichier appartient au banc, qui y ecrit
+aujourd'hui : arbitrage et croisement requis avant tout retrait.**
+
+**⚠ La consigne annoncait « 0 appelant chacune ». Sa commande de remesure ne
+balayait que `laravel/public/js` et `laravel/resources`** — ni `tests/`, ni
+`legacy/`, ni l'OpenAPI. *Un instrument borne a deux repertoires rend un zero
+qui ressemble a une absence.*
+
+### Le motif de step-up de `rollback` est retire avec elle
+
+`legacy/api_proxy.php` : `'#^/policy/rollback$#'` supprime. **Un garde dont la
+cible n'existe plus se lit comme une protection alors qu'il ne protege rien.**
+
+**⚠ Et le nom d'action `policy_action` n'est PAS libere** — il reste employe par
+`/policy/{sudo,sftp}/{deploy,remove}`, qui restent. *La crainte d'un « nom libre
+dans une liste fermee » ne s'applique donc pas ici.*
+
+**⛔ Aucune entree de `StepUp` n'a ete retiree : il n'y en avait pas.** Le portage
+**DERIVE** le nom depuis le chemin (`StepUp.php:41` : `/policy/sudo/deploy` ->
+`policy_sudo_deploy`), precisement pour eviter le nom partage du legacy.
+`ACTIONS_PORTAGE` porte **quatre** entrees — `compte_supprimer`,
+`compte_anonymiser`, `permission_definir`, `profil_effacement` — **comptees en
+LISANT** : la quatrieme suit un bloc `/* */` de 27 lignes qui se ferme avant
+elle. *Aucune ne concerne les politiques.* **Et `laravel/` n'est pas dans ce
+perimetre : rien n'y a ete touche.**
+
+### 🔴 Contre-epreuve : ce backend ne peut PAS rendre 404
+
+La condition d'acceptation demandee etait « la route rend 404 et non 500 ».
+**Mesure au reseau, sans identifiants** (aucun corps n'est traite, `require_api_key`
+refuse avant) :
+
+    POST /policy/rollback      -> 401   route PRESENTE (processus non redemarre)
+    POST /policy/sudo/deploy   -> 401   TEMOIN : route vivante, refusee au garde
+    GET  /policy/list          -> 401   presente
+    POST /policy/nexistepas    -> 405
+    GET  /nexistepas_du_tout   -> 405   ⚠ TEMOIN D'INEXISTENCE
+
+**`backend/server.py:142` declare `@app.route('/<path:path>', methods=['OPTIONS'])`
+— une route ATTRAPE-TOUT.** Une regle existe donc pour tout chemin, et Flask ne
+rend jamais 404 : il rend **405**.
+
+> **Le discriminant d'existence de ce backend est `401` contre `405`, jamais
+> `404`.** *Toute assertion de la forme « la route est retiree si elle rend 404 »
+> mesure un code que ce service ne peut pas produire — elle passerait a vide.*
+
+**Apres redemarrage**, `POST /policy/rollback` doit passer de **401 a 405**. *Non
+verifiable maintenant : `backend/**.py` est lu au demarrage, et le redemarrage
+appartient a l'exploitant.*
+
+### Signale, non corrige
+
+`policies.py` porte **deux imports morts** — `logging` (`:26`) et
+`server_decrypt_password` (`:33`). **Verifie : ils l'etaient DEJA avant ce
+retrait** (1 occurrence chacun a `HEAD`), je ne les ai pas orphelins. *Laisses
+pour ne pas melanger les sujets — mais un linter les aurait rendus, ce qui
+suggere que `ruff` ne couvre pas ce fichier.* ⚠ **Et `ruff` a DISPARU du
+conteneur** (`/opt/venv/bin/ruff` ce matin, introuvable maintenant) : les
+controles de ce commit sont l'import REEL du module et la suite complete.
+
+**Tests.** Import reel OK, **667 passed, 5 skipped, 2 xfailed, 0 FAILED**.
+`php -l` vert sur `api_proxy.php`. Balayage AST apres retrait : 7 routes
+subsistent, toutes `/policy/{sudo,sftp}/*` plus `/policy/list`.
+
+---
+
 ## [2.0.82] - 2026-09-06
 
 > ## ⚠ LA SEQUENCE SAUTE ICI — 1.54.2 devient 2.0.82 (E-458)
