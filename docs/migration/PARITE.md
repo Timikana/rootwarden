@@ -21745,3 +21745,47 @@ non tranché ; le correctif est deux lignes, celles du portage.**
 ⚠ **Effet pratique en attendant** : quiconque tape `http://<hote>:8444` obtient un 301 vers une adresse
 morte. **`https://<hote>:8446` fonctionne** et c'est la seule adresse du legacy à diffuser.
 
+---
+
+## E-456 — LA SONDE DE VIE DU PORTAGE CERTIFIAIT QU'APACHE REDIRIGE, PAS QUE L'APPLICATION RÉPOND
+
+**Relevée par la session 8, témoin du chemin inventé par la session 7, mesurée ici dans la condition réelle
+— *dans* le conteneur, sur `localhost:80`, et non depuis l'hôte.** Corrigée et appliquée le 2026-09-06.
+
+    curl -fs  http://localhost:80/up               exit 0    HTTP 301
+    curl -fs  http://localhost:80/zzz-invente      exit 0    HTTP 301   <- le temoin
+    curl -fsk https://localhost:443/up             exit 0    HTTP 200
+    curl -fsk https://localhost:443/zzz-invente    exit 22   HTTP 404   <- il discrimine
+
+**`curl -f` échoue sur `>= 400`, PAS sur une 301, et sans `-L` il ne suit rien.** Le conteneur se serait
+donc déclaré **sain avec le portail mort** : la sonde ne franchissait jamais la redirection.
+
+### Ce qui rend cet écart instructif : **elle était JUSTE, et elle est devenue vide sans qu'on y touche**
+
+`8862849`, le 2026-09-06 à **12:47** — *« TLS sur le portage : l'authentification était servie EN CLAIR »* —
+a transformé le vhost `:80` en **redirection seule, aucun contenu en clair**. *Avant ce commit, `:80`
+servait l'application et cette sonde mesurait exactement ce qu'elle annonçait.*
+
+> **Une correction de sécurité a vidé une sonde de vie, à distance, sans la toucher.** *Rien dans la ligne
+> du `healthcheck` n'a changé ; c'est ce qu'elle interrogeait qui a changé sous elle.* Septième instance du
+> mécanisme d'E-454 — **une valeur lue sans sa date** — et la première où la « valeur » est une sonde.
+
+**Et le silence était double** : `docker ps` affichait `healthy`, et **`docker-compose.prod.yml` ne
+redéfinit pas ce `healthcheck`** — *la production en héritait*. La session 8 avait d'abord annoncé le
+contraire, ayant compté les occurrences dans le seul fichier de surcharge : **un zéro d'héritage lu comme un
+zéro d'existence**.
+
+### Ce qui bornait la casse, et pourquoi ce n'était pas une chance
+
+**Aucun service n'attend le portage en `service_healthy`** — les quatre dépendances de santé sont
+`php→db`, `php→python`, `laravel→db`, `python→db`. Aucun ordre de démarrage n'était cassé. *L'effet était un
+`docker ps` menteur, et toute supervision qui lit ce statut.*
+
+### Appliqué, et éprouvé APRÈS
+
+`docker-compose.yml:145` porte désormais la forme des trois autres services :
+`["CMD","curl","-fsk","https://localhost:443/up","-o","/dev/null"]`. Coût mesuré par `--dry-run` **avant**
+d'agir : **un seul conteneur recréé**, les trois autres intacts. Éprouvée après recréation, dans le
+conteneur : `/up` → **exit 0**, `/zzz-invente` → **exit 22**. *La sonde rend le positif ET le négatif : elle
+mesure.* Et l'échange des ports a survécu — `:8443` portage, `:8446` legacy, témoin absurde à 404.
+
