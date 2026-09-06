@@ -21558,3 +21558,65 @@ correctement** — argument POUR, pas incohérence (formulation de la session 8,
 est d'exiger la permission dans la passerelle pour ce groupe, ce qui la ferme pour les trois d'un coup et
 **modifie un contrôle d'accès en service**. *Aucune des deux ne s'écrit sans le mot de l'exploitant.*
 
+---
+
+## E-454 — ⚠ LE LEGACY EST ARCHIVÉ SOUS LES SUITES : 28 dossiers partis, et les suites nomment toujours leurs chemins
+
+**Généralisation d'une trouvaille de la session 7**, qui a découvert que son témoin de refus
+(`/adm/admin_page.php`, employé pour prouver qu'un 403 était bien un refus de permission) **était mort**.
+J'ai balayé, et le cas est plus large que son témoin — **avec deux formes opposées**.
+
+### L'état du legacy, mesuré à l'arbre ET au réseau
+
+    legacy/_deprecated/          28 dossiers archives
+    legacy/adm/                  existe, 0 fichier .php     <- coquille vide
+    GET :8443/index.php          404      <- la page d'ACCUEIL du portail
+    GET :8443/adm/admin_page.php 404
+    GET :8443/supervision/…      404      GET :8443/tickets/…  404
+    GET :8443/profile.php        302 -> /auth/login.php       <- vivant
+    TEMOIN chemin absurde        404      TEMOIN /auth/login.php  200
+
+**30 fichiers de `tests/e2e/` nomment un chemin `adm/*.php`.**
+
+### Les deux formes, et la seconde est la mienne
+
+| forme | ce que la mort du chemin produit | trouvée par |
+|---|---|---|
+| le chemin est un **TÉMOIN** | l'assertion passe **à vide** — un refus qu'on ne peut plus distinguer d'une absence | session 7 |
+| le chemin est le **SUJET** | l'assertion **ÉCHOUE**, et accuse la garde alors que la page est archivée | ici |
+
+> **La seconde est plus bruyante et plus trompeuse.** *Un `FAIL` sur « sans session, `/index.php` renvoie
+> vers la connexion » envoie chercher un défaut dans l'authentification. La garde va bien : la page n'existe
+> plus.*
+
+### `go-socle-auth`, suite du SOCLE, jouée à chaque LOT
+
+`PAGES_PROTEGEES = ['/index.php', '/profile.php', '/adm/admin_page.php']` (`:39`), et son commentaire pose
+la prémisse : *« les chemins du legacy sont conservés : la cible Laravel les redirige vers ses propres
+routes, ce qui permet au MÊME test de viser les deux sans réécriture »*.
+
+**La prémisse tient sur le portage et a cédé sur le legacy** — mesuré sur les deux cibles, non authentifié
+(⚠ le HTTPS du portage est **`:8446`**, `:8444` étant le HTTP qui y redirige) :
+
+    chemin                 legacy :8443                portage :8446
+    /index.php             404                         302 -> /accueil
+    /profile.php           302 -> /auth/login.php      302 -> /profil
+    /adm/admin_page.php    404                         302 -> /accueil
+
+Le prédicat est `ECRAN_CONNEXION = /login\.php|\/connexion/i` **appliqué à l'URL finale** (`:234`). Éprouvé
+en isolation sur les URL réellement rendues : `/index.php` et `/adm/admin_page.php` **ne matchent pas**,
+`/auth/login.php?lang=fr` et `/connexion` matchent. *Un 404 est une réponse, pas une redirection : l'URL ne
+bouge pas.*
+
+⚠ **PRÉDICTION, PAS OBSERVATION — je n'ai pas joué la suite.** Sur la cible legacy, **deux des trois
+assertions du bloc A ne peuvent pas passer**. Or les références portent `14` côté portage et `13` côté
+legacy : **un écart d'une seule assertion là où j'en prédis deux.** *Soit ma prédiction est fausse, soit le
+`13` l'est.* La suite appartient au banc (session 7) ; c'est à l'exécution de trancher, pas à moi.
+
+### Ce que ça dit du chantier, et qui dépasse cette suite
+
+**Le legacy est démonté pendant que les suites continuent de le nommer.** Chaque archivage transforme
+silencieusement une assertion en l'une des deux formes ci-dessus, **et aucune des deux ne se signale comme
+un problème de suite** : l'une passe, l'autre accuse un tiers. *C'est le mécanisme, pas l'énumération, qui
+doit servir ici — inventorier les 30 fichiers aujourd'hui ne protège pas du 29ᵉ dossier archivé demain.*
+
