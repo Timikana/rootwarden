@@ -218,3 +218,80 @@ il ne tranche pas.*
 *Beaucoup de références de test peut signifier « étalon de mesure » — la
 quatrième catégorie — ou simplement « capacité bien testée ».* **Le nombre ne
 distingue pas les deux.**
+
+---
+
+## 7. LES 17 REPRISES — 2026-09-06, 09:03 CEST
+
+**La méthode de tri par TABLE fonctionne**, et elle referme l'angle mort du §3.
+*Pour chaque route : quelles tables touche-t-elle, et un service Laravel
+touche-t-il les mêmes ?* **7 classées de plus. Il en reste 10.**
+
+### 7.1 Trois de plus sont des FAUX POSITIFS — forme 4 confirmée par la route portée
+
+| route backend | portée par | preuve |
+|---|---|---|
+| `/admin/user_inventory/classify` | `POST /comptes-distants/{machine}/classer` | `ComptesDistants.php:141` **écrit** `server_user_inventory` |
+| `/admin/user_inventory/classify_bulk` | `POST /comptes-distants/{machine}/classer-en-attente` | idem |
+| `/server_user_keys` | `GET /comptes-distants/{machine}/cles/{username}` | `:113` **lit** `server_user_ssh_keys` |
+
+> **Toucher une table n'est pas implémenter le geste** — c'est pourquoi j'ai lu
+> les routes portées et non seulement les services. *Le croisement par table
+> DÉSIGNE le candidat ; la route portée le CONFIRME.*
+
+### 7.2 Deux candidates isolées, et leurs natures diffèrent
+
+**`/exclude_user`** — `user_exclusions` : **0 fichier Laravel**, et **0 ligne en
+base**. *Ni portée, ni jamais employée.*
+
+**`/server_user_remove_key`** — écrit `server_user_ssh_keys` + `audit_chain`.
+**Le portage LIT cette table** (`/comptes-distants/…/cles/…`) **mais n'offre
+aucune route de RETRAIT.** *La lecture est portée, l'écriture ne l'est pas.*
+
+> **C'est un trou ASYMÉTRIQUE : un module dont on a porté la consultation sans le
+> geste.** *Distinct des cinq mécanismes — ici le sous-lot n'est ni déclaré
+> complet ni retenu : **la moitié lisible a été portée, et la moitié qui écrit
+> attend.*** **À vérifier contre le découpage du module avant de conclure.**
+
+### 7.3 ⑥ LA SIXIÈME QUESTION DU DSI — et elle change le remède, pas le constat
+
+> *Avant de classer une route « trou à combler », demander si la câbler
+> produirait quelque chose.*
+
+Mesuré sur les trois tables discriminantes (témoin : `machines` = 3 lignes, la
+base répond) :
+
+```
+server_user_inventory   72 lignes    -> de quoi montrer
+server_user_ssh_keys    20 lignes    -> de quoi montrer
+user_exclusions          0 ligne     -> RIEN
+```
+
+**Et le cas du DSI sur `/ssh-audit/trends`** : `ssh_audit_results` porte **1
+ligne**, 0 sur 30 jours. *La route calcule une tendance sur trente jours et il n'y
+a rien à montrer — parce que le scan récurrent qui la nourrirait est **sous
+arbitrage**.*
+
+> **Une case cochée par OUBLI se comble. Une case cochée par DÉPENDANCE se
+> DATE.** *La sixième question ne change pas le constat — le trou est réel dans
+> les deux cas — **elle change le remède et son moment**.*
+
+**Et elle a une limite qu'il faut dire** : *une table vide ne prouve pas qu'une
+route est inutile.* `user_exclusions` est vide **parce que personne n'a jamais
+exclu d'utilisateur**, pas parce que la capacité serait sans objet. **Sur une
+route qui ÉCRIT, la table vide mesure l'usage passé, pas l'utilité future.**
+
+### 7.4 État du tri — 12 sur 22
+
+| verdict | routes |
+|---|---|
+| **faux positif — forme 4** | `/admin/temp_permissions` ×2 · `/admin/user_inventory/classify{,_bulk}` · `/server_user_keys` |
+| **jamais câblée** | `/server_users_inventory` · `/admin/notification_prefs` |
+| **trou, par dépendance** | `/cve_trends` |
+| **candidates à trancher** | `/exclude_user` · `/server_user_remove_key` |
+| **NON TRANCHÉES — 10** | `/apt_check_lock` · `/apt_update` · `/custom_update` · `/schedule_update` · `/update-logs` · `/update_security_exec` · `/update_zabbix` · `/deploy` · `/logs` · `/preflight_check` · `/list_machines` · `/test` |
+
+**⚠ Trois des non tranchées ne touchent AUCUNE table** — `/logs`, `/test`,
+`/update-logs`. *Le tri par table ne peut rien en dire : ce sont des flux ou des
+sondes de vie, et il faut les lire.* **La méthode a une seconde limite, et c'est
+celle-là.**
