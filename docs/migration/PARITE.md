@@ -21700,3 +21700,48 @@ silencieusement une assertion en l'une des deux formes ci-dessus, **et aucune de
 un problème de suite** : l'une passe, l'autre accuse un tiers. *C'est le mécanisme, pas l'énumération, qui
 doit servir ici — inventorier les 30 fichiers aujourd'hui ne protège pas du 29ᵉ dossier archivé demain.*
 
+---
+
+## E-455 — LA REDIRECTION HTTP→HTTPS DU LEGACY MÈNE DANS LE VIDE, et le portage porte déjà le diagnostic
+
+**Découvert en contrôlant l'échange des ports du 2026-09-06 ; le défaut est ANTÉRIEUR et mon échange n'en a
+changé que le numéro affiché.**
+
+    legacy   RewriteRule ^/?(.*) https://%{HTTP_HOST}/$1     <- HTTP_HOST PORTE LE PORT
+    portage  RewriteCond %{HTTP_HOST} ^([^:]+)
+             RewriteRule ^/?(.*) https://%1:8443/$1          <- hote SANS port + port HTTPS explicite
+
+**La règle du legacy ne nomme aucun port : elle recopie celui de la requête.** Donc le HTTP du legacy
+renvoie vers le *même* port en `https://`, où rien n'écoute en TLS.
+
+    mesure    http://localhost:8444/  ->  301  https://localhost:8444/
+              8444 est son port HTTP ; son HTTPS est 8446
+
+*Avant l'échange, le legacy était en `8080`/`8443` : la même règle renvoyait `http://…:8080` vers
+`https://…:8080`.* **Le défaut ne vient pas de l'échange — il vient de la forme de la règle, qui est
+indépendante de tout port.**
+
+### Ce qui rend cet écart particulier : il était DÉJÀ ÉCRIT, en face
+
+Le fichier Apache du **portage** porte, dans le commentaire de sa propre correction :
+
+    http://localhost:8080/auth/login.php -> 301 https://localhost:8080/...
+    https://localhost:8080/...           -> 000  (rien n'ecoute en TLS la)
+    **Sa redirection HTTPS mene dans le vide, et personne ne l'avait vu.**
+
+> **Quelqu'un a vu ce défaut sur le legacy, l'a mesuré, l'a écrit — et n'a corrigé que son propre côté.**
+> *Le diagnostic du legacy vit dans la configuration du portage, à l'endroit où personne ne le cherchera.*
+> C'est la forme inverse du défaut habituel : non pas un commentaire qui promet plus que le code, mais un
+> **commentaire juste rangé chez le voisin**.
+
+### Non corrigé, et pourquoi
+
+La règle est dans `/etc/apache2/sites-available/000-default.conf` **du conteneur `rootwarden_php`**, pas
+dans un fichier de l'arbre — la corriger demande de reconstruire ou recréer ce conteneur, **donc un
+redémarrage de plus**. Le legacy est en fin de vie et vient d'être relégué sur `8444`/`8446`. *Le coût est
+une interruption, le gain est une redirection sur un portail qu'on démonte.* **Arbitrage de l'exploitant,
+non tranché ; le correctif est deux lignes, celles du portage.**
+
+⚠ **Effet pratique en attendant** : quiconque tape `http://<hote>:8444` obtient un 301 vers une adresse
+morte. **`https://<hote>:8446` fonctionne** et c'est la seule adresse du legacy à diffuser.
+

@@ -80,10 +80,10 @@ CERT_DIR="/var/www/certs"
 # Apache leve `AH00111` sur une variable inconnue et s'arrete. Une installation
 # dont le `srv-docker.env` n'aurait pas encore recu `LARAVEL_HTTPS_PORT` verrait
 # donc le portail entier tomber. Le defaut ici garantit la definition.
-# Il doit rester EGAL au defaut du compose (`${LARAVEL_HTTPS_PORT:-8446}`) : ce
+# Il doit rester EGAL au defaut du compose (`${LARAVEL_HTTPS_PORT:-8443}`) : ce
 # port n'est pas celui qu'Apache ecoute (443), c'est celui que l'HOTE PUBLIE, et
 # il ne sert qu'a construire la redirection HTTP -> HTTPS.
-LARAVEL_HTTPS_PORT="${LARAVEL_HTTPS_PORT:-8446}"
+LARAVEL_HTTPS_PORT="${LARAVEL_HTTPS_PORT:-8443}"
 
 if [ "$SSL_MODE" = "disabled" ]; then
     # Choix EXPLICITE, pour un deploiement derriere un frontal qui termine le TLS.
