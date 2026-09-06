@@ -195,10 +195,48 @@ première requête parce qu'il ne porte pas `Secure`.**
 > ni TOTP — le formulaire d'authentification, lui, sera servi en TLS — mais elle expose la
 > **session déjà ouverte**, à chaque navigation depuis l'ancien portail.
 
-**T3 reste APRÈS T1** — un cookie `Secure` sans TLS effectif coupe l'accès à tout le monde —
-**mais l'intervalle doit être court, et il doit être décidé, pas subi.** *`LARAVEL_URL` est
-enchevêtré avec l'échange de ports : ce n'est le geste de personne aujourd'hui, et c'est
-exactement pour ça qu'il faut l'écrire.*
+**T3 reste APRÈS T1** — un cookie `Secure` sans TLS effectif coupe l'accès à tout le monde.
+
+### ⛔ ET L'INTERVALLE PEUT ÊTRE NUL — le motif qui le retenait était FAUX
+
+`c1` avait décliné de toucher `LARAVEL_URL` en disant que **« ça casserait les 87 suites en
+plein travail »**. Elle a mesuré son propre motif et l'a retiré ; **je l'ai remesuré plutôt
+que de ratifier sa correction** :
+
+    LARAVEL_URL dans tests/e2e   1 ligne, et elle est un COMMENTAIRE
+                                 -> 0 lecteur en code
+    la variable reellement lue   `E2E_BASE`, 94 fichiers
+    lecteurs REELS               legacy VIVANT : menu.php (16), head.php (2),
+                                 _sortie.php (1)  = 19 lignes
+
+**Aucune suite ne lit `LARAVEL_URL`.** *Une correction de sécurité avait été déclinée pour un
+motif jamais mesuré, et le motif était faux.*
+
+⚠ **Et sa remesure porte le bon nombre sur le mauvais nom** : elle cite `E2E_LARAVEL_BASE`
+(94), la variable s'appelle **`E2E_BASE`**. *Qui referait la mesure avec le nom cité obtiendrait
+ZÉRO et conclurait l'inverse — un chiffre juste rattaché à un identifiant faux se propage
+mieux qu'un chiffre faux, parce qu'il résiste au premier contrôle.*
+
+### La séquence, contrainte dans un seul sens
+
+    1. l'exploitant reconstruit            -> 8446 ecoute en TLS
+    2. je verifie T1 (200 + session)       -> la cible existe VRAIMENT
+    3. LARAVEL_URL -> https://192.168.0.245:8446
+       => plus AUCUN saut en clair depuis le menu legacy ; le cookie ne part plus nu
+    4. SESSION_SECURE_COOKIE=true          -> T3
+
+**L'étape 3 fait le gros du travail et ne dépend d'aucun drapeau de cookie.** L'inverser a
+déjà été fait, et le dépôt en garde la trace :
+
+    tests/e2e/archive.mjs:83
+    « `LARAVEL_URL` valait `https://localhost:8444` alors que le portage ecoute en clair »
+
+**Les 16 liens du menu legacy sont morts ce jour-là.** *Et l'incident est consigné dans le
+commentaire d'une suite HORS LOT — donc là où aucun rejeu ne peut le rappeler.*
+
+> La contrainte n'est pas « ça casse des suites ». C'est **« la cible doit exister avant qu'on
+> y renvoie »** — la même famille que T3, et le même piège que la redirection cassée du legacy
+> qui pointe vers un port sans TLS. **Trois fois la même erreur dans le même dossier.**
 
 ## CE QUI N'A JAMAIS BOUGÉ
 
