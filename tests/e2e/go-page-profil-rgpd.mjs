@@ -1,4 +1,5 @@
 /*
+ * HORS-LOT: Suite neuve, jamais soumise a un lot complet. A enroler apres une execution de reference sur les deux cibles.
  * ═══ L'EXPORT RGPD DU PROFIL — `a48df2c` (v1.39.2) ════════════════════════
  *
  * Ce que cette suite prouve, et pourquoi chaque assertion existe.

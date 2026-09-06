@@ -89,7 +89,20 @@ function listesDuRunner() {
     return noms;
 }
 
-/** Le code, sans les commentaires : ma propre prose cite les motifs qu'elle decrit. */
+/*
+ * Le code, sans les commentaires : ma propre prose cite les motifs qu'elle decrit.
+ *
+ * ⚠ LIMITE NOMMEE PLUTOT QUE MAL CORRIGEE : seuls les commentaires en DEBUT de
+ * ligne sont retires. Un `// ...` en FIN de ligne survit, et s'il cite une
+ * adresse de production il produit un faux positif — c'est arrive le 2026-09-06
+ * sur `go-policies.mjs`, par une annotation que je venais d'ecrire moi-meme.
+ *
+ * Le remede n'est PAS d'ajouter un motif : `//` apparait dans toute URL
+ * (`https://localhost`), et un depouillement naif detruirait les adresses que
+ * l'inspection doit justement lire. **On ne rend pas un instrument plus malin
+ * quand on peut rendre son entree non ambigue** — l'annotation a ete deplacee
+ * dans un bloc.
+ */
 function codeSeul(source) {
     return source
         .replace(/\/\*[\s\S]*?\*\//g, '')
@@ -153,6 +166,36 @@ if (!temoinNom) {
 }
 console.log(`temoin : ${temoinNom} porte des non-GET, l'inspection rend le positif`);
 
+/*
+ * ══ LA REGLE : ENROLEE, OU DECLAREE AVEC SA RAISON ═══════════════════════
+ *
+ * Arbitrage DOSSIER-35 ⑸ : un `go-*.mjs` est enrole dans un des deux tableaux,
+ * OU il porte la raison de son exclusion. **L'exclusion deliberee n'est pas le
+ * probleme ; l'oubli silencieux l'est.**
+ *
+ * ⚠ ON EXIGE UN MARQUEUR, ON NE RECONNAIT PAS UNE PROSE. Mon premier jet
+ * cherchait des tournures — `hors lot`, `aucune liste`, `NE PAS AJOUTER AU LOT`.
+ * Il a rate `go-ssh-audit-scanall`, qui declare pourtant son exclusion sur
+ * quinze lignes encadrees. **Troisieme fois de la journee qu'un motif rate sa
+ * cible en croyant lire une intention.**
+ *
+ * Un marqueur ne s'interprete pas : il est la ou il n'y est pas.
+ *
+ *     HORS-LOT: <la raison, en clair, sur la meme ligne>
+ */
+const MARQUEUR = /^\s*\*?\s*HORS-LOT:\s*(\S.*)$/m;
+
+function declaration(fichier) {
+    const m = readFileSync(E2E + fichier, 'utf8').slice(0, 8000).match(MARQUEUR);
+
+    return m ? m[1].trim() : null;
+}
+
+const sansRaison = [];
+for (const s of horsListe) {
+    if (declaration(`${s}.mjs`) === null) sansRaison.push(s);
+}
+
 const armees = [];
 console.log('');
 /*
@@ -187,8 +230,22 @@ for (const s of horsListe) {
 }
 
 console.log('');
+if (sansRaison.length) {
+    console.log(`⛔ ${sansRaison.length} suite(s) hors lot SANS RAISON DECLAREE :`);
+    for (const s of sansRaison) console.log(`     ${s}`);
+    console.log('');
+    console.log('DEUX FACONS DE LE RESOUDRE, et le choix appartient a qui connait la suite :');
+    console.log('  1. l\'ENROLER  — l\'ajouter a SUITES_LARAVEL ou SUITES_LEGACY');
+    console.log('  2. la DECLARER — ajouter dans son en-tete, sur une ligne :');
+    console.log('       HORS-LOT: <pourquoi elle ne doit pas etre jouee par un lot>');
+    console.log('');
+    console.log('Une exclusion DELIBEREE n\'est pas le probleme. L\'oubli SILENCIEUX l\'est :');
+    console.log('une suite hors lot ne rougit jamais, et garde ses effets de bord intacts.');
+    process.exit(1);
+}
+
 if (armees.length === 0) {
-    console.log('AUCUNE suite hors liste ne porte de geste non-GET.');
+    console.log('Chaque suite hors lot porte sa raison, et aucune ne montre de geste non-GET.');
     process.exit(0);
 }
 console.log(`${armees.length} suite(s) hors liste portent un geste non-GET.`);

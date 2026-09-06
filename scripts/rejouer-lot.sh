@@ -90,8 +90,74 @@ fi
 E2E="$RACINE/tests/e2e"
 JOURNAUX="${LOT_JOURNAUX:-$(mktemp -d -t rw-lot-XXXXXX)}"
 
-BASE_LEGACY="${E2E_LEGACY_BASE:-https://localhost:8443}"
-BASE_LARAVEL="${E2E_LARAVEL_BASE:-http://localhost:8444}"
+# ══ ECHANGE DES PORTS DU 2026-09-06 ════════════════════════════════════════
+#
+# Le PORTAGE a pris 8080/8443, le LEGACY est passe sur 8444/8446. Ces deux
+# defauts portaient l'ancienne repartition : sans cet echange, un lot lance
+# SANS `E2E_LEGACY_BASE`/`E2E_LARAVEL_BASE` aurait joue CHAQUE MOITIE contre le
+# mauvais portail. Releve par la session 8.
+#
+# Les deux visent le HTTPS DIRECT : passer par le HTTP ferait traverser une 301,
+# et `:8444` rendait 301 sur TOUT — chemin inexistant compris.
+BASE_LEGACY="${E2E_LEGACY_BASE:-https://localhost:8446}"
+BASE_LARAVEL="${E2E_LARAVEL_BASE:-https://localhost:8443}"
+
+# ══ ET ECHANGER LES DEFAUTS NE SUFFIT PAS ══════════════════════════════════
+#
+# Un defaut juste se REPERIME au prochain echange, et rien ici ne comparait la
+# cible DECLAREE a ce que la base SERT reellement :
+#
+#     E2E_CIBLE=legacy          vient de $cible       -> l'INTENTION
+#     E2E_BASE=https://…:8443   vient de $BASE_LEGACY -> une VALEUR
+#
+# Deux predicats independants qui ne se contredisent JAMAIS : apres un echange,
+# la suite DECLARE legacy, MESURE le portage, et rend du vert sur le mauvais
+# objet. *Pas un echec — un succes qui porte sur autre chose*, et c'est la forme
+# la plus couteuse parce qu'aucun signal ne l'accompagne.
+#
+# On controle donc l'ETAT, pas la valeur. Discriminant mesure le 2026-09-06 :
+#
+#     /up   portage 200   ·   legacy 404   ·   /zzz sur le portage 404
+#
+# (le dernier temoin dit que `/up` n'est pas un fourre-tout qui rendrait 200
+# sur n'importe quoi). Fail-closed : tout code autre que 200/404 avorte.
+verifiePortail() {   # $1 = cible declaree ; $2 = base
+    local code vu
+    code=$(curl -sk -o /dev/null -w '%{http_code}' --max-time 10 "$2/up" 2>&1) || code=000
+    case "$code" in
+        200) vu=laravel ;;
+        404) vu=legacy  ;;
+        *)   echo "  ⛔ $2/up rend $code — ni 200 ni 404, le portail est INDETERMINABLE." >&2
+             echo "     On n'enchaine pas : une mesure sur un portail inconnu ne vaut rien." >&2
+             return 1 ;;
+    esac
+    if [ "$vu" != "$1" ]; then
+        echo "  ⛔ BASE INCOHERENTE — $2 sert le portail « $vu », cible declaree « $1 »." >&2
+        echo "     Les deux portails ont ECHANGE leurs ports le 2026-09-06 :" >&2
+        echo "       portage 8080/8443   ·   legacy 8444/8446" >&2
+        echo "     Pose E2E_LEGACY_BASE et E2E_LARAVEL_BASE, ou mets a jour ce script." >&2
+        return 1
+    fi
+    return 0
+}
+
+# Variante pour une base CODEE EN DUR par une suite. `verifiePortail` avorte sur
+# tout code autre que 200/404, ce qui est juste pour la base du RUNNER — elle
+# DOIT servir un portail. Ce n'est pas juste ici : trois suites codent
+# `https://localhost:5000`, qui vise le BACKEND (port meme pas publie sur
+# l'hote, donc `000`). Les avorter serait un faux positif.
+#
+# La regle reste NON DATEE : on ne liste aucun port. Si `/up` ne rend ni 200 ni
+# 404, la base n'est pas un portail — donc hors du champ de ce controle.
+verifieBaseDeSuite() {   # $1 = cible ; $2 = base ; $3 = nom de la suite
+    local code
+    code=$(curl -sk -o /dev/null -w '%{http_code}' --max-time 10 "$2/up" 2>&1) || code=000
+    case "$code" in
+        200|404) verifiePortail "$1" "$2" ;;
+        *) echo "  · $3 vise une base NON-PORTAIL ($2, /up rend $code) — hors du champ."
+           return 0 ;;
+    esac
+}
 
 # ── Les chiffres de reference ────────────────────────────────────────────────
 #
@@ -1324,6 +1390,32 @@ joue() {
   if [ "$cible" = legacy ]; then export E2E_BASE="$BASE_LEGACY" ; export E2E_CIBLE=legacy
   else                            export E2E_BASE="$BASE_LARAVEL" ; export E2E_CIBLE=laravel ; fi
 
+  # Une fois par portail, avant de jouer quoi que ce soit : ce que la base SERT
+  # doit etre le portail qu'on DECLARE. Un port n'identifie plus un portail.
+  case " $PORTAILS_VERIFIES " in
+    *" $cible "*) ;;
+    *) verifiePortail "$cible" "$E2E_BASE" || exit 3
+       PORTAILS_VERIFIES="$PORTAILS_VERIFIES $cible" ;;
+  esac
+
+  # ⚠ ET UNE SUITE PEUT IGNORER `E2E_BASE`. Le controle ci-dessus porte sur la
+  # base que LE RUNNER exporte ; une suite qui code sa base en dur ne la lit
+  # jamais, et passerait dessous. Mesure du 2026-09-06 : 10 fichiers de
+  # `tests/e2e/` sont dans ce cas, dont UN SEUL est joue par le LOT
+  # (`go-vague0-legacy`, code en dur sur `:8443` — qui sert le PORTAGE apres
+  # l'echange). On verifie donc la base QU'ELLE PORTE, avec le meme predicat.
+  _f="$E2E/$suite.mjs"
+  if [ -f "$_f" ]; then
+    # `s#//.*##` DETRUIRAIT `https://` : le `//` d'un schema n'est pas un
+    # commentaire. Le motif exige un caractere non-`:` devant.
+    _nu=$(sed -E -e 's#([^:])//.*#\1#' -e '/^[[:space:]]*\*/d' -e '/^[[:space:]]*\/\*/d' "$_f")
+    if printf '%s' "$_nu" | grep -qE 'localhost:[0-9]{4}'        && ! printf '%s' "$_nu" | grep -qE 'process\.env\.[A-Z0-9_]*(BASE|URL)'; then
+      _base=$(printf '%s' "$_nu" | grep -oE 'https?://localhost:[0-9]{4}' | head -1)
+      echo "  ⚠ $suite code sa base EN DUR ($_base) et ignore E2E_BASE."
+      verifieBaseDeSuite "$cible" "$_base" "$suite" || exit 3
+    fi
+  fi
+
   # Prealable 6 : le cas particulier de vague 0.
   if [ "$suite" = go-vague0-legacy ]; then
     export E2E_USER=rw-test-super
@@ -1484,6 +1576,22 @@ joue() {
   affiche_fail="$fail"
   if [ "$fail" -eq 0 ] && [ "$code" -ne 0 ]; then affiche_fail='?'; fi
 
+  # ── Une suite JOUEE SANS REFERENCE est la symetrie exacte du defaut de 2026-08-28
+  #    corrige plus bas : une reference jamais jouee est une couverture apparente,
+  #    et une suite jouee sans reference EN EST UNE AUSSI. `joue` rend 0 pour le
+  #    verdict « (pas de reference) » — donc elle ne compte pas comme ecart, donc
+  #    « LOT conforme » s'imprime en l'englobant. Mesure du 2026-09-06 :
+  #    **53 des 167 executions du LOT n'ont AUCUNE reference** (27 laravel, 26 legacy).
+  #
+  #    « LOT conforme » affirme alors une conformite sur des comptes qui n'ont ete
+  #    compares a RIEN. On ne le corrige PAS en les comptant comme ecarts : la
+  #    maxime de ce fichier — « un garde-fou qui se declenche a tort ne protege plus :
+  #    il empeche » — vaut ici, un LOT rouge a 53 titres serait illisible et le
+  #    contrat de sortie appartient au banc (session 7). **On corrige la PHRASE.**
+  if [ "$verdict" = "(pas de reference)" ]; then
+    sans_ref=$((sans_ref + 1))
+    SANS_REF+=("$cible/$suite=$pass")
+  fi
   printf '%-24s %-8s PASS=%-4s FAIL=%-3s %4ss  %s\n' \
     "$suite" "$cible" "$pass" "$affiche_fail" "$((t1-t0))" "$verdict"
   [ "$verdict" = "ECHEC" ] || [ "${verdict:0:5}" = "ECART" ] \
@@ -1505,6 +1613,8 @@ done
 
 echo "journaux : $JOURNAUX"
 ecarts=0 ; premiere=1 ; jouees=0 ; LOT_ABATTU='' ; LOT_REMEDE=''
+PORTAILS_VERIFIES=''
+sans_ref=0 ; SANS_REF=()
 for cible in "${CIBLES[@]}"; do
   if [ ${#NOMMEES[@]} -gt 0 ]; then
     suites=("${NOMMEES[@]}")
@@ -1597,8 +1707,21 @@ if [ "$jouees" -eq 0 ]; then
   echo "Toutes les suites nommees ont ete ignorees. Verifie leur nom, ou leur"
   echo "presence dans SUITES_LARAVEL / SUITES_LEGACY."
   exit 2
+elif [ "$ecarts" -eq 0 ] && [ "$sans_ref" -gt 0 ]; then
+  # ⚠ PAS « conforme ». Voir le commentaire dans joue() : ces executions ont tourne
+  # et n'ont echoue nulle part, mais leur compte n'a ete compare a AUCUNE reference.
+  # Le dire est tout l'objet de ce bloc — le code de sortie reste 0 A DESSEIN.
+  echo "LOT SANS ECART — $jouees execution(s), dont $sans_ref SANS REFERENCE."
+  echo
+  # « Ces 1 execution(s) » : le compte est deja sur la ligne du dessus, et un
+  # accord qui boite se lit pendant un incident. On reprend par un pronom.
+  echo "  ⚠ Elles n'ont echoue nulle part, et leur compte n'a ete compare a rien."
+  echo "    Ce n'est PAS « conforme » : c'est « rien ne s'est casse »."
+  echo "    Une reference s'inscrit depuis un compte MESURE, pas suppose — les voici"
+  echo "    avec le PASS observe, pretes a inscrire dans REF_LARAVEL / REF_LEGACY :"
+  printf '      %s\n' "${SANS_REF[@]}"
 elif [ "$ecarts" -eq 0 ]; then
-  echo "LOT conforme — $jouees execution(s)."
+  echo "LOT conforme — $jouees execution(s), toutes referencees."
 else
   echo "$ecarts ecart(s). Les journaux sont dans $JOURNAUX — LIRE LE LOG, pas seulement"
   echo "le code de sortie : une suite qui echoue A L'APPEL ne dit pas ce qu'elle ne"
