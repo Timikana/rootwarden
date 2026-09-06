@@ -5812,3 +5812,49 @@ plus juste.*
 **Et son corollaire, que le DSI a nommé** : *le marquage sauve ce que la mesure n'a pas
 couvert.* Une déduction transmise **étiquetée « déduction »** reste évaluable ; sans ce mot,
 elle devient une règle.
+
+---
+
+## §7 — UN OBJET DE PLUS, **SANS ORDINAL** : la permission que la passerelle n'exige pas (E-453)
+
+**Je ne lui donne pas de numéro, et c'est délibéré.** Les deux dernières tentatives d'ordinal se sont mal
+terminées : le « douzième » a dû être corrigé, et le « treizième » **n'en était pas un** — `DOSSIER-00` le
+portait depuis 08:56. *Un ordinal se dérive par différence d'ensembles ; les blocs de §7 sont du récit, et
+je ne peux pas les énumérer de façon fiable.* Compter à voix haute ici ferait un troisième faux compte.
+
+**L'objet, lui, est mesuré.** La page des clés distantes exige `role:2` **+** `perm:can_manage_remote_users`
+(`web.php:1112`, et `ExigePermission.php:39` est fail-closed). La requête ne passe pas par la page : la
+passerelle n'exige que `role >= 2` (`PasserelleController.php:69`), le backend non plus (`@require_role(2)`,
+**zéro** `@require_permission` réel dans `ssh.py`).
+
+    comptes role 2 dans le parc     1
+    dont can_manage_remote_users    0
+    role 2 SANS la permission       1     <- 100 % des comptes concernes
+
+> **Le seul compte que la page refuse est le seul qui puisse forger la requête.** *Ce n'est pas un écart en
+> attente d'un compte hypothétique.*
+
+**Trois gestes sous le même régime** — `/server_user_remove_key` (porté aujourd'hui), `/remove_user_keys` et
+`/delete_remote_user` (en service de longue date). **Les deux voies, aucune écrite :**
+
+| voie | ce qu'elle ferme | ce qu'elle coûte |
+|---|---|---|
+| poser la route Laravel manquante | **ce geste seul** — il deviendrait le seul des trois gardé correctement | rien en service ; un contrôleur de plus |
+| exiger la permission dans la passerelle pour `ADMIN_SEULEMENT` | **les trois d'un coup** | ⚠ **modifie un contrôle d'accès EN SERVICE** |
+
+*Signalé par la session 8 (`DOSSIER-36 §7.1`, `18b9314`) ; la chaîne et le fait décisif sont ma mesure.*
+**Je représente cet arbitrage, je ne le tranche pas.**
+
+### Deux chiffres remesurés au passage, dont un qui me contredit
+
+- **le registre a DEUX métriques, et la mienne n'est pas celle du plan.** La commande de remesure de §2
+  (`^#{1,6} +(E-\d+[a-z]*)`) rend **400 écarts, max E-453** ; mon `^## E-` dédupliqué en rend **398**, parce
+  qu'il ignore les titres de niveau 3 et les suffixes de lettre. *Les deux sont justes pour ce qu'ils
+  comptent ; c'est celle du plan qui fait autorité, et mes trois derniers messages de commit citaient
+  l'autre.* **Ne pas rapprocher un 398 d'un 400 : ils ne comptent pas la même chose.**
+- **le LOT est appairé, `pare-feu` compris** — ma tâche en attente « appairer `pare-feu` » était **périmée** :
+  mesuré `1 · 1`, laravel et legacy. Les six suites sans jumelle sont `go-socle-{fixtures,i18n,navigation,passerelle}`
+  (socle propre au portage), `go-page-mot-de-passe` et `go-fail2ban-f7`. **85 laravel / 82 legacy = 167
+  exécutions**, ce qui recoupe exactement la ligne de base tirée des journaux — *et réfute au passage le
+  « 172 » d'une extraction de jetons, la même classe d'erreur que j'ai commise deux fois en la remesurant.*
+
