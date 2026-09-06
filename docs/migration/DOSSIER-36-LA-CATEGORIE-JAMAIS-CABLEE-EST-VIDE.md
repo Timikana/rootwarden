@@ -394,3 +394,81 @@ retirer par hygiène, pas en urgence.*
 ⚠ **Je ne l'ai pas vu parce que j'ai vérifié que la route était partie, pas que
 ma décision était finie.** *Une décision en deux membres se contrôle sur les
 deux.*
+
+
+---
+
+## ⑧ E-453 — L'ÉCART DE GARDE EST VIVANT, ET LE REMÈDE EST MESURÉ SÛR
+
+**Instruit après coup, avec la session 4f. Ce qui suit remplace la
+recommandation du §7.1, qui était juste et non instrumentée.**
+
+### ⑧.1 La chaîne entière, et la garde ne mord qu'au premier maillon
+
+```
+la PAGE         web.php:1112               role:2 + perm:can_manage_remote_users  -> 403
+la PASSERELLE   PasserelleController:69    if ($roleId < 2 && reserveeAdmin(...))  -> role SEUL
+le BACKEND      ssh.py, ancre au `def`     @require_role(2), zero permission       -> passe
+```
+
+⚠ **`@require_permission` n'existe pas dans `ssh.py`** : 1 occurrence brute,
+**0 hors commentaires et docstrings**, témoin `@require_role` = **14**. *L'unique
+occurrence est une PHRASE.* **Un compte de motif y aurait lu une garde.**
+
+*Piège signalé par 4f, qui a failli transférer à ses routes un paragraphe
+« POURQUOI `role(2)` ET PAS `@require_permission` » appartenant en fait à
+`stream_logs` — ancré par le `def` qui le suit.*
+
+### ⑧.2 L'écart est VIVANT, et deux mesures indépendantes le disent
+
+```
+mesure de 4f, en BASE (je ne peux pas la reproduire, docker.sock refuse) :
+    comptes role 2 dans le parc        1
+    dont can_manage_remote_users       0
+    -> 100 % des comptes concernes
+
+corroboration INDEPENDANTE, dans un docblock de suite
+(tests/e2e/go-adm-comptes-distants.mjs:46-48) :
+    « can_manage_remote_users est creable et basculable, mais un SEUL compte
+      la porte — superadmin, role 3 »
+```
+
+> **Le seul compte que la page refuse est le seul qui puisse forger la requête.**
+> *Ce n'est pas un écart en attente d'un compte hypothétique.*
+
+**Les deux mesures viennent d'objets différents — la base et une suite — et
+concordent.** *C'est ce qui me permet de la relayer sans l'avoir reproduite.*
+
+### ⑧.3 ⚠ ET LE DÉFAUT MIROIR, dans la même page
+
+**`go-adm-comptes-distants.mjs:40-44`** — *« la page ne distingue aucun rôle dans
+son rendu. Un rôle 1 porteur de `can_manage_remote_users` verrait tous les
+boutons et recevrait 401 sur six d'entre eux. »*
+
+> **Ici la page est plus LARGE que ses requêtes** — l'inverse du défaut habituel
+> du dépôt. **Les deux sens coexistent sur le MÊME écran.**
+
+### ⑧.4 DÉCISION — la voie (b), et elle est mesurée sûre
+
+| voie | portée | ce qu'elle coûte |
+|---|---|---|
+| **(a)** poser la route Laravel pour le geste neuf | **1 des 3** | rien, mais laisse deux gestes ouverts et fait du plus RÉCENT le seul gardé |
+| **(b)** exiger la permission DANS la passerelle | **3 sur 3** | modifie un contrôle d'accès EN SERVICE |
+
+**JE RECOMMANDE (b), et voici ce qui la rend sûre plutôt que courageuse :**
+
+```
+laravel/app/Http/Middleware/ExigePermission.php:35
+    if ($roleId >= 3) { return $suite($requete); }     <- le role 3 CONTOURNE
+
+les suites se connectent en          E2E_USER || 'superadmin'   (role 3)
+-> le controle ajoute ne mordrait sur AUCUNE suite
+```
+
+**Et personne ne perd un accès légitime** : *la page exige déjà cette permission.
+Quiconque utilise l'écran la porte, ou est rôle 3.* **Ce que (b) casse est
+exactement ce qu'on veut casser — l'appel qui contourne la page.**
+
+⛔ **Ce n'est PAS à moi de l'écrire, ni à 4f** : *modifier un contrôle d'accès en
+service appartient à l'exploitant.* **4f l'a refusé pour cette raison et a
+raison. Les deux voies sont posées ; il manque un mot, pas une mesure.**
