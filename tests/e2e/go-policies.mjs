@@ -19,6 +19,30 @@
 import puppeteer from 'puppeteer';
 import { createHmac } from 'crypto';
 
+/*
+ * ══ E-457 — CE POST VISAIT LA PRODUCTION ═════════════════════════════════
+ *
+ * `machine_id: 1` est `srv-zabbix`, 192.168.0.244. L'assertion qui suit exige
+ * un 403 `step_up_required` : elle verifie que le deploiement sudo est garde
+ * par un second facteur. **L'intention est juste, la cible ne l'etait pas.**
+ *
+ * Pour tester une garde il faut envoyer la requete qu'elle refuse — donc **si la
+ * garde manque, la requete ABOUTIT**. Ici elle aboutissait sur un deploiement
+ * sudo en production. La propriete mesuree (« ce geste exige un step-up ») ne
+ * depend d'AUCUNE machine en particulier : viser la production n'ajoutait rien a
+ * la mesure et portait tout le risque.
+ *
+ * ⚠ ET CE QUI LA REFUSE AUJOURD'HUI N'EST PAS UNE GARDE, C'ETAIT UN ETAT.
+ * Le 2026-09-06 au matin, l'unique appelant de `stepUpMark()` etait archive :
+ * le refus etait INCONDITIONNEL par effet de l'archivage, pas par decision.
+ * `d01e236` l'a depuis rendu deliberé. **Mais cette suite est hors lot — elle ne
+ * rougit jamais — et trois modules archives sont deja revenus en vingt-quatre
+ * heures.** Une surete qui repose sur l'etat transitoire d'un archivage n'est pas
+ * une surete.
+ */
+const MACHINE_ESSAI = 2;   // Test-Server-Debian
+const PRODUCTION = 1;      // srv-zabbix, 192.168.0.244 — jamais dans un corps de requete
+
 const BASE = 'https://localhost:8443';
 const USER = process.env.E2E_USER || 'superadmin';
 const PASS = process.env.E2E_PASS || 'RootWarden@2026-Sec!';
@@ -125,7 +149,7 @@ check('Reponse contient sudo_policies + sftp_policies',
 // 6. Step-up 2FA : tentative deploy doit declencher 403 + step_up_required
 // (XHR direct pour bypasser le wrapper fetch global qui ouvrirait le modal step-up)
 console.log('\n6) Step-up 2FA sur deploy (sans valider TOTP)');
-const deployResp = await page.evaluate(() => new Promise((resolve) => {
+const deployResp = await page.evaluate((MACHINE_ESSAI) => new Promise((resolve) => {
     const csrfMeta = document.querySelector('meta[name="csrf-token"]');
     const xhr = new XMLHttpRequest();
     xhr.open('POST', '/api_proxy.php/policy/sudo/deploy', true);
@@ -135,8 +159,8 @@ const deployResp = await page.evaluate(() => new Promise((resolve) => {
     xhr.onload = () => { let b = null; try { b = JSON.parse(xhr.responseText); } catch {} resolve({ status: xhr.status, body: b }); };
     xhr.onerror = () => resolve({ status: 0, body: null });
     xhr.ontimeout = () => resolve({ status: -1, body: null });
-    xhr.send(JSON.stringify({ machine_id: 1, server_user_id: 0, preset: 'apt_only' }));
-}));
+    xhr.send(JSON.stringify({ machine_id: MACHINE_ESSAI, server_user_id: 0, preset: 'apt_only' }));
+}), MACHINE_ESSAI);
 check('POST /policy/sudo/deploy = 403 (step_up_required)', deployResp.status === 403, 'status=' + deployResp.status);
 check('Reponse step_up_required=true', deployResp.body && deployResp.body.step_up_required === true,
     JSON.stringify(deployResp.body));
