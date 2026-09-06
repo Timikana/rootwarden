@@ -84,3 +84,57 @@ dégrade sans que la barre d'adresse le dise.*
   Un développeur bloqué devra le purger lui-même ; aucune mesure d'ici ne le dira.
 - **Le comportement après l'échange de ports.** Ce sont deux gestes ; les certifier ensemble
   ferait qu'un vert de l'un couvrirait un rouge de l'autre.
+
+
+---
+
+# ANNEXE — ajoutée le 2026-09-06 après lecture de `8862849`
+
+⚠ **Cette annexe n'AJOUTE aucun critère et n'en assouplit aucun : elle RESTREINT ce que je
+m'autoriserai à conclure.** Une addition qui ne fait que rétrécir la portée d'une attestation
+est sans danger pour le scellement ; une qui l'élargirait ne le serait pas. *Je le dis parce
+que « j'ai complété mes critères après avoir lu le code » est, en général, exactement ce que
+le scellement existe pour empêcher.*
+
+## T2 sera VERT alors que des navigateurs resteront CASSÉS
+
+Mesuré sur l'artefact commité, sans rien appliquer :
+
+    apres reconstruction   8444 -> 80    (HTTP, redirige vers https://<hote>:8446)
+                           8446 -> 443   (TLS)
+
+    un navigateur empoisonne par le HSTS du legacy reecrit
+      http://localhost:8444   ->   https://localhost:8444   AVANT d'envoyer
+    or 8444 restera du 80 en clair                          ->   000  (mesure)
+
+> **Le 301 que `c1` a construit ne s'exécutera jamais pour ces navigateurs : la requête ne
+> part pas en HTTP.** Le correctif TLS ne restaure donc pas leur accès.
+
+**Et `curl` n'a pas d'état HSTS** : ma mesure de T2 exercera la redirection du *serveur*, qui
+sera correcte. **Un T2 vert ne voudra pas dire « on peut atteindre le portail par HTTP » —
+seulement « le serveur redirige correctement ceux qui l'atteignent ».**
+
+*C'est le retournement exact de ce que j'écrivais en T4 : l'amnésie du client rend la
+redirection mesurable, et c'est la même amnésie qui empêche de voir qui reste bloqué.*
+**L'instrument qui permet la mesure est celui qui cache le défaut.**
+
+### Ce que j'attesterai donc, mot pour mot
+
+- ✅ « le serveur redirige HTTP vers HTTPS, et la cible répond »
+- ⛔ **PAS** « le portail est joignable depuis n'importe quel navigateur »
+
+**Remède, hors du dépôt** : aller directement sur `https://…:8446`, ou purger l'état HSTS du
+navigateur. *Aucune mesure d'ici ne le dira, et aucun correctif d'ici ne le fera* — l'état vit
+dans le poste. Ça ne concerne que `localhost` (HSTS n'est pas appliqué aux adresses IP), donc
+les postes de développement et non les utilisateurs.
+
+## T2, moitié STATIQUE — déjà mesurée sur `8862849`
+
+    laravel/apache-ssl.conf.tmpl:44   RewriteCond %{HTTP_HOST} ^([^:]+)
+    laravel/apache-ssl.conf.tmpl:45   RewriteRule ^/?(.*) https://%1:${LARAVEL_HTTPS_PORT}/$1 [R=301,L]
+
+`%1` est l'hôte **sans son port**, le port vient de la configuration et non de la requête. La
+moitié structurelle de T2 est **satisfaite** ; la moitié réseau attend la reconstruction.
+
+*Et le motif du refus de `%{HTTP_HOST}` est écrit dans le fichier, aux lignes 28-30 — un
+lecteur qui trouve la forme trouve aussi pourquoi l'autre a été écartée.*
