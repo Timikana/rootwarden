@@ -12266,3 +12266,71 @@ inaperçue parce que les ROUGE, eux, s'affichaient.*
 
 > **Zéro vert ET zéro rouge veut dire que la mesure n'a pas eu lieu — et ici le zéro rouge était
 > accompagné d'un compteur VIDE qu'il fallait lire en premier.**
+
+---
+
+## E-451
+
+### Il n'y a plus de travail de PORTAGE débloqué. Le dire vaut mieux que d'en inventer.
+
+**Mesure de production sur la dernière heure : ZÉRO commit de code, 1 document, 2 suites.**
+
+*Et la cause n'est pas de la paresse. La liste des onze a été réfutée dix fois ; ce qui la
+remplace — la chasse aux cases cochées — produit de l'ENQUÊTE, pas du code.*
+
+### ⚠ Et une mesure que je ne m'étais jamais imposée
+
+    ecritures dans docs/migration/ depuis 20:00
+      DECISIONS-DSI.md + DOSSIER-*  (moi)     18
+      autres documents  (six sessions)        21
+
+> **J'ai produit près de la moitié de la documentation de la flotte.** *Le point qui détecte
+> « l'équipe écrit sur ses mesures au lieu de porter » me désignait, et je ne l'avais jamais
+> retourné vers moi.*
+
+### Ce que j'ai failli assigner, et pourquoi je ne l'ai pas fait
+
+**`/ssh-audit/trends` semblait le candidat parfait** : *lecture pure, `role:2`, aucune session
+SSH, trou connu dans le sous-lot A1 déclaré complet, et promise par `openapi.yaml`.*
+
+**Coût mesuré AVANT d'assigner — la leçon d'E-450 :**
+
+    ssh_audit_results   lignes au total          1
+                        lignes sur 30 jours      0
+                        jours DISTINCTS          0
+    TEMOIN              15 colonnes lues, la table repond
+
+**La route calcule une tendance sur trente jours à partir d'une table qui porte UNE ligne, zéro
+dans la fenêtre.** *La porter livrerait un graphique vide.*
+
+> **Elle n'est pas orpheline parce qu'on a oublié de la câbler. Elle est orpheline parce qu'il
+> n'y a rien à montrer.**
+
+### Ce que ça ajoute à la taxonomie
+
+**Le mécanisme est en aval, pas dans le module** : *`trends` n'a pas de données parce que le
+scan récurrent est sous arbitrage — et le scan récurrent est sous arbitrage parce qu'il ouvre
+des sessions SSH sur le parc.*
+
+    case cochee          A1 declare complet, `trends` dans son perimetre   -> vrai
+    MAIS la cause        ce n'est pas un oubli de cablage : c'est une
+                         capacite AVAL qui attend une decision AMONT
+
+**Le remède n'est donc pas « finir A1 ».** *C'est d'écrire dans la déclaration d'A1 que son
+périmètre incluait une capacité non livrable en l'état, et pourquoi.* **Une case cochée par
+oubli se comble ; une case cochée par dépendance se DATE.**
+
+### DÉCISION — aucune relance de portage ce tour
+
+**Tout ce qui est identifié est soit arbitré vers l'exploitant, soit bloqué sur des données,
+soit programmé :**
+
+    /ssh-audit/backups + A3   arbitre : partent ENSEMBLE (E-443)      -> exploitant
+    les 3 orphelines /policy/  arbitrage ouvert (E-434)               -> exploitant
+    /ssh-audit/trends          bloquee sur l'absence de donnees        -> amont
+    le step-up sur l'effacement  cout mesure, a PROGRAMMER (E-450)    -> planifie
+    23 candidates non tranchees  exigent une LECTURE, pas un comptage -> en cours
+
+> **Assigner un portage inventé coûte plus cher que de constater qu'il n'y en a pas.** *Une
+> tâche mal dimensionnée est exécutée mal ou refusée — j'ai déjà eu les deux ce soir, et le
+> refus était la bonne issue.*
