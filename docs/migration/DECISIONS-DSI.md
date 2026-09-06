@@ -12559,3 +12559,77 @@ geste destructeur serait répéter, en connaissance de cause, ce qu'on vient de 
 qu'au niveau du contrôleur, avec un dépôt doublé.** *Le faire pour de vrai exigerait d'effacer
 un compte réel.* **Et l'absence du même manque sur d'autres routes n'est pas attestée non
 plus.**
+
+---
+
+## E-456
+
+### ⛔ LA MODALE DE STEP-UP DU LEGACY EST CASSÉE, EN SERVICE, POUR TOUS SES UTILISATEURS
+
+**Trouvé par une session, vérifié par une autre, remesuré par moi AU RÉSEAU.**
+
+    legacy/js/utils.js:123        POSTe sur /auth/step_up_verify.php
+    legacy/auth/step_up_verify.php   ABSENT de l'arbre servi
+    legacy/_deprecated/auth/…        archive le 20/08
+
+    POST /auth/step_up_verify.php   404
+    TEMOIN /auth/login.php          200      <- l'instrument voit
+
+> **Tout utilisateur du legacy qui déclenche un step-up reçoit un 404 et ne peut pas achever
+> son geste.**
+
+**Le sens de la panne est FERMÉ** — *les gestes destructeurs sont refusés, pas autorisés.* **Ce
+n'est donc pas un trou de sécurité : c'est une CAPACITÉ PERDUE que personne n'a déclarée, et
+elle est en service.** *Le portage a son propre chemin de step-up et n'est pas concerné.*
+
+**C'est la sixième catégorie de la taxonomie appliquée au LEGACY** : *l'archivage a emporté la
+moitié écrivante d'un couple, et la moitié appelante est restée servie.*
+
+---
+
+## E-457
+
+### ⛔ UNE SUITE HORS LOT POSTE UN DÉPLOIEMENT SUDO SUR `srv-zabbix`
+
+    tests/e2e/go-policies.mjs:131   POST /api_proxy.php/policy/sudo/deploy
+                                    { machine_id: 1, preset: 'apt_only' }
+    machines id=1                   srv-zabbix   192.168.0.244   ⛔ PRODUCTION
+    enrolement                      dans AUCUN des deux tableaux du runner
+
+**Les DEUX propriétés de `go-ssh-audit-schedules`, à nouveau** : *un geste destructeur visant la
+production, et l'invisibilité qui empêche tout lot de le révéler.*
+
+**La suite ATTEND un 403 — elle ne cherche pas à déployer.** *Mais la requête PART, et ce qui la
+rend inoffensive n'est pas son intention : c'est ce qui la refuse à l'autre bout.*
+
+### ⚠ Et ce qui la refuse aujourd'hui n'est PAS une garde
+
+    stepUpMark()   defini dans legacy/auth/step_up.php:44   VIVANT
+    appels         1 seul, et il est ARCHIVE
+
+**Plus aucun code vivant ne peut poser la marque, donc le déploiement est refusé
+INCONDITIONNELLEMENT — par un EFFET DE L'ARCHIVAGE, pas par une décision.**
+
+> **Le jour où le poseur revient porté, le POST redevient vivant et rien ne le dira.**
+
+*Et `preset: 'apt_only'` autorise `apt` en root, donc l'installation d'un paquet arbitraire —
+root en pratique, mesuré plus tôt cette nuit.*
+
+### ⚠ ET UN COUPLE DE CHIFFRES QUI NE SE REFERMAIT PAS
+
+**La session a corrigé son propre compte avant que quiconque le lui demande :**
+
+    annonce   26 absentes sur 116, avec 89 citees
+    116 - 89 = 27                    <- LE COUPLE NE SE REFERME PAS
+    juste     88 en tableau, 28 absentes
+
+*Cause : un `grep` sur TOUT le fichier, prose comprise — et le runner NOMME
+`go-adm-import-csv` et `go-bashrc-b4` pour les déclarer EXCLUES, donc un relevé par motif les
+compte comme enrôlées.* **Un fichier qui documente pourquoi il n'enrôle pas une suite contient
+le nom de cette suite — piège n°15, appliqué à un compte.**
+
+> **Un couple de chiffres qui ne se referme pas sur lui-même est faux AVANT même d'être
+> confronté à quoi que ce soit.** *C'est la seule vérification qui ne demande aucune source
+> extérieure.*
+
+**Et son chiffre corrigé — 28 — concorde avec le mien (E-446), mesuré par une autre voie.**
