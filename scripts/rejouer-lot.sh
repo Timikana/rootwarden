@@ -1484,6 +1484,22 @@ joue() {
   affiche_fail="$fail"
   if [ "$fail" -eq 0 ] && [ "$code" -ne 0 ]; then affiche_fail='?'; fi
 
+  # ── Une suite JOUEE SANS REFERENCE est la symetrie exacte du defaut de 2026-08-28
+  #    corrige plus bas : une reference jamais jouee est une couverture apparente,
+  #    et une suite jouee sans reference EN EST UNE AUSSI. `joue` rend 0 pour le
+  #    verdict « (pas de reference) » — donc elle ne compte pas comme ecart, donc
+  #    « LOT conforme » s'imprime en l'englobant. Mesure du 2026-09-06 :
+  #    **53 des 167 executions du LOT n'ont AUCUNE reference** (27 laravel, 26 legacy).
+  #
+  #    « LOT conforme » affirme alors une conformite sur des comptes qui n'ont ete
+  #    compares a RIEN. On ne le corrige PAS en les comptant comme ecarts : la
+  #    maxime de ce fichier — « un garde-fou qui se declenche a tort ne protege plus :
+  #    il empeche » — vaut ici, un LOT rouge a 53 titres serait illisible et le
+  #    contrat de sortie appartient au banc (session 7). **On corrige la PHRASE.**
+  if [ "$verdict" = "(pas de reference)" ]; then
+    sans_ref=$((sans_ref + 1))
+    SANS_REF+=("$cible/$suite=$pass")
+  fi
   printf '%-24s %-8s PASS=%-4s FAIL=%-3s %4ss  %s\n' \
     "$suite" "$cible" "$pass" "$affiche_fail" "$((t1-t0))" "$verdict"
   [ "$verdict" = "ECHEC" ] || [ "${verdict:0:5}" = "ECART" ] \
@@ -1505,6 +1521,7 @@ done
 
 echo "journaux : $JOURNAUX"
 ecarts=0 ; premiere=1 ; jouees=0 ; LOT_ABATTU='' ; LOT_REMEDE=''
+sans_ref=0 ; SANS_REF=()
 for cible in "${CIBLES[@]}"; do
   if [ ${#NOMMEES[@]} -gt 0 ]; then
     suites=("${NOMMEES[@]}")
@@ -1597,8 +1614,19 @@ if [ "$jouees" -eq 0 ]; then
   echo "Toutes les suites nommees ont ete ignorees. Verifie leur nom, ou leur"
   echo "presence dans SUITES_LARAVEL / SUITES_LEGACY."
   exit 2
+elif [ "$ecarts" -eq 0 ] && [ "$sans_ref" -gt 0 ]; then
+  # ⚠ PAS « conforme ». Voir le commentaire dans joue() : ces executions ont tourne
+  # et n'ont echoue nulle part, mais leur compte n'a ete compare a AUCUNE reference.
+  # Le dire est tout l'objet de ce bloc — le code de sortie reste 0 A DESSEIN.
+  echo "LOT SANS ECART — $jouees execution(s), dont $sans_ref SANS REFERENCE."
+  echo
+  echo "  ⚠ Ces $sans_ref execution(s) n'ont echoue nulle part, et leur compte n'a ete"
+  echo "    compare a rien. Ce n'est PAS « conforme » : c'est « rien ne s'est casse »."
+  echo "    Une reference s'inscrit depuis un compte MESURE, pas suppose — les voici"
+  echo "    avec le PASS observe, pretes a inscrire dans REF_LARAVEL / REF_LEGACY :"
+  printf '      %s\n' "${SANS_REF[@]}"
 elif [ "$ecarts" -eq 0 ]; then
-  echo "LOT conforme — $jouees execution(s)."
+  echo "LOT conforme — $jouees execution(s), toutes referencees."
 else
   echo "$ecarts ecart(s). Les journaux sont dans $JOURNAUX — LIRE LE LOG, pas seulement"
   echo "le code de sortie : une suite qui echoue A L'APPEL ne dit pas ce qu'elle ne"

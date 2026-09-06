@@ -21342,3 +21342,64 @@ voisin, où la parade retenue fut une interface à liste fermée.
 > garde.*
 
 **Non porté. La liste reste à quatre entrées.**
+
+---
+
+## E-452 — ⚠ « LOT conforme » S'IMPRIMAIT SUR 53 EXÉCUTIONS QUI N'AVAIENT AUCUNE RÉFÉRENCE
+
+**Symétrie exacte du défaut du 2026-08-28**, qui est corrigé dans ce même fichier et dont le commentaire dit :
+*« sans mesure, pas de référence ; sans référence, pas de mesure »*. Ce garde-là traque **une référence
+jamais jouée**. Personne n'avait regardé **l'autre sens** : une suite jouée **sans référence**.
+
+Mesuré le 2026-09-06 sur `scripts/rejouer-lot.sh`, croisement des listes jouées et des tables de référence :
+
+    SUITES_LARAVEL  85 jouees    REF_LARAVEL  58 references   ->  27 sans reference
+    SUITES_LEGACY   82 jouees    REF_LEGACY   56 references   ->  26 sans reference
+                   167 executions                                 53 SANS REFERENCE
+
+*Et l'autre sens est propre : **zéro** référence orpheline, sur les deux cibles.*
+
+**Le mécanisme, pas l'énumération.** `joue()` calcule un verdict, puis rend `1` pour quatre valeurs
+(`ECHEC`, `ECART…`, `FENETRE SALE`, `GARDE INDISPO`) et **`0` pour tout le reste** — dont
+`(pas de reference)`. Or l'appelant fait `joue … || ecarts=$((ecarts + 1))`. Donc :
+
+| verdict | code | compte comme écart |
+|---|---|---|
+| `ECART attendu=23` | 1 | oui |
+| `(pas de reference)` | **0** | **non** |
+
+**Mesure isolée de la condition** (témoin positif à côté, pour que le zéro soit un constat et pas une
+non-mesure) : `(pas de reference)` → `0` ; `ECART attendu=23` → `1`. *L'instrument distingue bien ; c'est
+la table de vérité qui absout.*
+
+Conséquence : `$ecarts` restait à 0 et le runner imprimait **`LOT conforme — 167 execution(s).`**
+
+> **« Conforme » est une affirmation sur une COMPARAISON. 53 fois sur 167, aucune comparaison n'avait eu
+> lieu** — le compte n'était rapproché de rien. *Ce n'est pas « conforme », c'est « rien ne s'est cassé »,
+> et les deux phrases ne protègent pas la même chose.*
+
+### Le garde-fou existant ne couvrait pas le cas, et pour une raison précise
+
+Le runner sait dire `NEUVE  <cible>/<suite> — aucune reference : elle TOURNE, son compte est a inscrire.`
+**Mais ce bloc est sous `if [ ${#NOMMEES[@]} -gt 0 ]`** : il ne s'exécute que lorsque des suites sont
+**nommées en ligne de commande**. Un LOT complet ne nomme rien. *L'avertissement existait, et il était
+éteint exactement dans le mode où la phrase trompeuse s'imprime.*
+
+### Ce qui a été corrigé, et ce qui a été DÉLIBÉRÉMENT laissé
+
+**Corrigé : la PHRASE.** Elle nomme désormais le compte et liste les exécutions concernées avec leur PASS
+observé, prêtes à inscrire. **Non corrigé : le CODE DE SORTIE**, qui reste `0`.
+
+Deux raisons, et la première est la maxime de ce fichier : *« un garde-fou qui se déclenche à tort ne
+protège plus : il empêche »* — un LOT rouge à 53 titres serait illisible et ferait ignorer la ligne. La
+seconde est que **le contrat de sortie appartient au banc (session 7)**, pas au registre : le durcir
+unilatéralement casserait chaque LOT du jour. *Question posée, pas tranchée.*
+
+**Vérifié** : `bash -n` propre, **témoin négatif rendu** (un `if [ x` inachevé lève bien une erreur) · les
+quatre branches du verdict éprouvées sur le texte **extrait du fichier**, pas sur une copie retapée · et le
+contrat de sortie **comparé avant/après** sur les quatre cas — `0 · 0 · 0 · 2`, identique.
+
+⚠ **Réserve sur ma propre vérification** : ma première lecture des codes de sortie passait par un `| head`,
+donc lisait le code de `head` et rendait `0` pour les quatre cas — dont celui qui vaut `2`. **Quatre valeurs
+plausibles, toutes fausses, et rien dans la sortie ne le signalait.** Remesuré sans tube. *C'est le piège
+déjà inscrit à `feedback_find_bfs_newermt`, et je l'ai refait en le connaissant.*
