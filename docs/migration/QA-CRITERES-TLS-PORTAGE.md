@@ -1,5 +1,10 @@
 # Critères d'attestation — TLS sur le portage
 
+> ✅ **ATTESTÉ le 2026-09-06 à 13:11 — T1 à T5 verts, mesurés au réseau après reconstruction.**
+> Voir le commit d'attestation pour le détail et pour les quatre points **non** attestés.
+
+
+
 **Écrits AVANT toute lecture de la configuration de `gestion-ssh-key-c1`.** État de départ
 mesuré à l'instant de la rédaction, indépendamment de son relevé :
 
