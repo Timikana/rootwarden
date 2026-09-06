@@ -157,9 +157,48 @@ problème en entier** — et c'est la trajectoire prévue de ce portail.
 **Donc ceci n'est pas un acquis durable, et la borne doit dire quand elle expire :**
 
 > « Aucun état HSTS n'a été enregistré pour ces hôtes **tant que le certificat n'est pas
-> approuvé** — magasin inspecté, témoin positif présent, cause non isolée. »
+> approuvé** — magasin inspecté, empreintes calculées et absentes, **témoin positif sur
+> l'inspection du magasin**. Le contrôle **comportemental**, lui, **échoue** : ce navigateur ne
+> surclasse rien, même sur un domaine préchargé. Cause non isolée. »
 
 *Une exculpation sans date d'expiration se relit comme une garantie.*
+
+⚠ **Et ma première rédaction disait « témoin positif présent » — vrai d'UN instrument sur
+deux.** Deux contrôles, un seul a son témoin :
+
+    lecture du MAGASIN          temoin POSITIF (l'entree `accounts.google.com` est vue)
+                                -> « localhost absent » est une vraie mesure
+    COMPORTEMENT du navigateur  temoin positif ECHOUE (.dev non surclasse)
+                                -> aucune mesure comportementale ne vaut
+
+**Un lecteur de l'attestation n'a aucun moyen de savoir lequel** — il lira la formule courte,
+pas les deux heures qui la précèdent. *C'est la forme dont on se fait avoir depuis ce matin :
+le fait est juste, l'emballage laisse conclure plus large.* La formule longue est moins
+élégante et elle dit **lequel**. *(Précision demandée par `c1` ; elle a raison.)*
+
+## ⚠ T3 GAGNE UNE URGENCE : LE COOKIE DE SESSION TRAVERSE LE PREMIER SAUT
+
+Mesuré aujourd'hui sur le portage servi :
+
+    Set-Cookie: rootwarden-session=…   HttpOnly=OUI   Secure=⛔ NON
+    Set-Cookie: XSRF-TOKEN=…           HttpOnly=NON   Secure=⛔ NON
+
+Et `LARAVEL_URL=http://192.168.0.245:8444` — **en HTTP** — est lu par **19 sites du legacy
+VIVANT**, surtout le menu latéral (`legacy/menu.php`), avec un repli `http://localhost:8444`.
+
+Après reconstruction, chaque clic du menu legacy vers le portage part donc en **clair**, puis
+prend le 301 vers `:8446`. `c1` écrit « aucun identifiant ne circule sur ce premier saut » :
+**c'est inexact, et de peu — le cookie de session EST un identifiant, et il est joint à cette
+première requête parce qu'il ne porte pas `Secure`.**
+
+> **La fenêtre entre la reconstruction et T3 n'est pas neutre.** Elle n'expose ni mot de passe
+> ni TOTP — le formulaire d'authentification, lui, sera servi en TLS — mais elle expose la
+> **session déjà ouverte**, à chaque navigation depuis l'ancien portail.
+
+**T3 reste APRÈS T1** — un cookie `Secure` sans TLS effectif coupe l'accès à tout le monde —
+**mais l'intervalle doit être court, et il doit être décidé, pas subi.** *`LARAVEL_URL` est
+enchevêtré avec l'échange de ports : ce n'est le geste de personne aujourd'hui, et c'est
+exactement pour ça qu'il faut l'écrire.*
 
 ## CE QUI N'A JAMAIS BOUGÉ
 
