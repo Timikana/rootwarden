@@ -85,6 +85,38 @@ dégrade sans que la barre d'adresse le dise.*
   déclaré, et son absence dans ce lot ne vaut pas certification.**
 - **La validité du certificat.** Auto-signé : je mesure que le TLS répond, pas qu'il est de
   confiance.
+
+  ⚠ **ET CETTE RÉSERVE EN CACHE UNE SECONDE, QUI PIÉGERA LE CORRECTIF.** Mesuré le
+  2026-09-06, sur les deux ports :
+
+      openssl x509 -ext subjectAltName   ->   « No extensions in certificate »
+      subject / issuer                        CN=localhost, auto-signe
+      empreinte SHA-256                       IDENTIQUE sur 8443 et 8446
+                                              -> UN SEUL certificat pour les DEUX portails
+
+  **Il n'a aucun SAN — aucune extension du tout.** L'erreur d'autorité
+  (`ERR_CERT_AUTHORITY_INVALID`) se déclenche AVANT toute vérification de nom : *le premier
+  défaut masque entièrement le second.*
+
+  **Conséquence : le remède évident — ajouter ce certificat au magasin de confiance — ne
+  suffira pas.** Les navigateurs modernes ne se replient plus sur le `CN` pour vérifier le
+  nom ; sans SAN, la vérification échoue même sur un certificat approuvé. *Quelqu'un fera le
+  geste, verra l'erreur CHANGER sans DISPARAÎTRE, et n'aura aucune raison de soupçonner un
+  deuxième défaut derrière le premier.*
+
+  ⚠ **Limite de ce que j'affirme** : l'absence de SAN et l'ordre des erreurs sont **mesurés**.
+  Le comportement des navigateurs sur un `CN` sans SAN est un **fait documenté que je n'ai pas
+  mesuré ici** — il faudrait approuver le certificat, ce que je n'ai pas fait. *Signalé par
+  `c1`, qui marque la même limite.*
+
+  **Et `LARAVEL_URL` pointe désormais sur `192.168.0.245`** — que `CN=localhost` ne couvrirait
+  de toute façon jamais. *L'étape 3 a fermé l'exposition en clair et déplacé toutes les
+  entrées du menu vers une adresse que ce certificat ne peut pas certifier.*
+
+  **Ce qu'il faut donc, si la confiance est visée** : un certificat neuf portant des SAN pour
+  `localhost`, `192.168.0.245` **et** tout nom d'hôte servi — une adresse IP exigeant une
+  entrée de type `IP:` et non `DNS:`, subtilité qui mordra celui qui le régénérera. Pour les
+  **deux** portails, puisqu'ils partagent le même fichier.
 - **L'état HSTS des navigateurs déjà empoisonnés.** Il vit dans le poste, pas dans le dépôt.
   Un développeur bloqué devra le purger lui-même ; aucune mesure d'ici ne le dira.
 - **Le comportement après l'échange de ports.** Ce sont deux gestes ; les certifier ensemble
