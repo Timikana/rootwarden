@@ -21823,6 +21823,33 @@ d'env.
 
 *C'est la forme du patch `06` appliquée à un second endroit : l'état décide, jamais une valeur.*
 
+### ⟶ DEUX DÉFAUTS DU CORRECTIF LUI-MÊME, relevés par la session 8 — et le remède évident cassait le script
+
+**① Le saut était SILENCIEUX.** `*) continue ;;` sur les ports qui ne répondent pas : si **aucun** portail ne
+répond, la section s'imprime **vide**. *Un balayage sans objet et deux portails à terre rendent la même
+sortie* — dans un rapport qui s'affiche pendant une **installation**, quand personne n'a d'autre repère.
+C'est « zéro sur la sonde ET zéro sur le témoin » appliqué à une sortie destinée à un humain. **Corrigé** :
+on compte les portails nommés et on DIT le zéro.
+
+**② `|| echo 000` s'AJOUTE au lieu de remplacer.** Sur un port mort, `curl -w '%{http_code}'` **écrit déjà
+« 000 »** puis sort en 7 — le repli imprime une seconde fois et la variable vaut **`000000`**. Inoffensif
+dans le `case`, faux le jour où quelqu'un testera l'égalité à `000`.
+
+> ⚠ **MAIS LE REMÈDE ÉVIDENT — retirer le repli — AVORTE LE SCRIPT.** Ces deux fichiers sont en
+> `set -euo pipefail`, et **une affectation dont la substitution de commande échoue fait sortir**. Mesuré,
+> les trois formes :
+>
+>     sans repli        ->  ⛔ SCRIPT AVORTE
+>     || echo 000       ->  survit, « 000000 » (6 car.)
+>     || true           ->  survit, « 000 »    (3 car.)     <- retenue
+>
+> *Le `|| echo 000` faisait DEUX choses : il dupliquait la valeur, et il protégeait du `set -e`. On ne
+> voyait que la première.* **Un défaut réel dont la correction naïve casse plus qu'il ne coûtait.**
+
+Et le message final est un **bloc `if`**, pas un `[ … ] && echo` : sous `set -e`, un test faux en fin de bloc
+fait sortir. **Éprouvé sur trois cas, code de sortie `0` partout** — nominal (deux portails nommés), zéro
+(*« ce n'est PAS "rien à signaler" : c'est une mesure sans résultat »*), et un seul portail.
+
 ### ⟶ Et la dernière sonde non reprise depuis le TLS est SAINE
 
 La session 8 avait éprouvé trois des quatre `healthcheck` du compose et laissé celle du backend, injoignable

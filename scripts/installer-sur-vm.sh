@@ -130,15 +130,34 @@ titre "les deux portails repondent-ils ?"
 #    On BALAIE les quatre ports et on laisse chacun se NOMMER par son etat :
 #    `/up` existe sur le portage (Laravel) et rend 404 sur le legacy. Le balayage
 #    vaut avant comme apres n'importe quel echange futur.
+# ⚠ `|| true`, PAS `|| echo 000` : sur un port mort `curl` ECRIT DEJA « 000 » sur
+#    sa sortie et sort en 7. Le repli s'AJOUTE donc au lieu de remplacer, et la
+#    variable vaut « 000000 » — inoffensif dans le `case` ci-dessous, faux le jour
+#    ou quelqu'un testera l'egalite a « 000 ». Et l'omettre n'est pas une option :
+#    ce script est en `set -euo pipefail`, une affectation dont la substitution
+#    echoue AVORTE le script. Mesure : sans repli -> avorte · `|| echo 000` ->
+#    « 000000 » · `|| true` -> « 000 ».
+_vus=0
 for _p in 8080 8443 8444 8446; do
-    _up=$(curl -sk -o /dev/null -w '%{http_code}' --max-time 5 "https://localhost:$_p/up" 2>/dev/null || echo 000)
-    case "$_up" in
+    _up=$(curl -sk -o /dev/null -w '%{http_code}' --max-time 5 "https://localhost:$_p/up" 2>/dev/null || true)
+    case "${_up:-000}" in
         200) _nom='portage' ; _chemin='/connexion' ;;
         404) _nom='legacy ' ; _chemin='/auth/login.php' ;;
         *)   continue ;;
     esac
-    _code=$(curl -sk -o /dev/null -w '%{http_code}' --max-time 5 "https://localhost:$_p$_chemin" 2>/dev/null || echo 000)
-    printf '   %s  https://localhost:%s%s  http=%s\n' "$_nom" "$_p" "$_chemin" "$_code"
+    _code=$(curl -sk -o /dev/null -w '%{http_code}' --max-time 5 "https://localhost:$_p$_chemin" 2>/dev/null || true)
+    printf '   %s  https://localhost:%s%s  http=%s\n' "$_nom" "$_p" "$_chemin" "${_code:-000}"
+    _vus=$((_vus + 1))
 done
+# ⚠ UN BALAYAGE SANS OBJET ET DEUX PORTAILS A TERRE RENDENT LA MEME SORTIE : rien.
+#    Cette section s'affiche pendant une INSTALLATION, quand personne n'a d'autre
+#    repere. On DIT le zero. (`if` et non `[ ] && echo` : sous `set -e`, un test
+#    faux en fin de bloc fait sortir.)
+if [ "$_vus" -eq 0 ]; then
+    echo "   ⚠ AUCUN portail n'a repondu sur les quatre ports balayes (8080 8443 8444 8446)."
+    echo "     Ce n'est PAS « rien a signaler » : c'est une mesure sans resultat."
+elif [ "$_vus" -eq 1 ]; then
+    echo "   ⚠ UN SEUL portail sur deux a repondu."
+fi
 
 titre "termine"
