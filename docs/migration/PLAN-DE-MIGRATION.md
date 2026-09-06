@@ -140,6 +140,31 @@ sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 
 ---
 
+## 2 ter. LES PORTS DES DEUX PORTAILS — **celui qu'on écrit de mémoire est le mauvais**
+
+*Ce paragraphe existe parce que ce fait a coûté un faux constat à **deux sessions en une heure**, le
+2026-09-06, sur les deux portails différents. Aucun port n'était écrit nulle part dans ce plan.*
+
+| | HTTP | HTTPS | ce qu'il faut employer |
+|---|---|---|---|
+| legacy | `:8080` | **`:8443`** | `https://localhost:8443` |
+| portage | `:8444` | **`:8446`** | `https://localhost:8446` |
+
+    curl https://localhost:8444/…   ->  000        <- se lit comme « le service est a terre »
+    curl http://localhost:8444/…    ->  301 vers https://localhost:8446
+
+⚠ **`:8444` est le port qu'on retient, et c'est le HTTP.** En HTTPS il rend `000` — *indiscernable d'un
+conteneur arrêté*. Une session en a conclu que le portage ne répondait plus ; une autre, mesurant `:8443` en
+croyant viser le portage, en a conclu qu'un durcissement Apache avait pris effet. **Les deux constats
+étaient faux et aucun des deux ne se signalait.**
+
+⚠⚠ **ET `:8444` NE DISCRIMINE PLUS RIEN DEPUIS 13:08** : il rend `301` sur **tout**, chemin inexistant
+compris. *Un contrôle qui y cherche un `404` est aveugle.* `:8446` discrimine encore — `404` sur un chemin
+absurde, `302` sur `/profil`. **Poser le témoin absurde avant tout constat fondé sur un code HTTP**, sur le
+port qu'on mesure et pas sur celui qu'on croit mesurer.
+
+---
+
 ## 2 bis. LES SIX ENTRÉES RESTANTES — ce qui bloque CHACUNE, mesuré le 2026-09-02 à 01:10 CEST
 
 > **Ce tableau n'existait pas, et c'est ce qui m'empêchait de mesurer où en est le chantier.** Les
