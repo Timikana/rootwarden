@@ -114,9 +114,16 @@ fais "ssh -i '$VM_CLE' '$VM_USER@$VM_HOTE'         CIBLE='$VM_CIBLE' ATELIER=/tm
 # ── 4. Verifier ─────────────────────────────────────────────────────────────
 dit "Verification"
 
+# ⚠ Meme correction qu'a `installer-sur-vm.sh` : ces deux lignes nommaient chaque
+#    portail par l'autre depuis l'echange des ports du 2026-09-06. On interroge
+#    l'ETAT — `/up` rend 200 sur le portage, 404 sur le legacy — au lieu d'ecrire
+#    un numero a cote d'un nom. Une valeur se perime, un etat se mesure.
 fais "ssh -i '$VM_CLE' '$VM_USER@$VM_HOTE' \
-      'curl -s -o /dev/null -w \"laravel http=%{http_code}\\n\" http://localhost:8444/connexion; \
-       curl -sk -o /dev/null -w \"legacy  http=%{http_code}\\n\" https://localhost:8443/auth/login.php'"
+      'for p in 8080 8443 8444 8446; do \
+         u=\$(curl -sk -o /dev/null -w %{http_code} --max-time 5 https://localhost:\$p/up 2>/dev/null || echo 000); \
+         [ \"\$u\" = 200 ] && echo \"   portage https://localhost:\$p\"; \
+         [ \"\$u\" = 404 ] && echo \"   legacy  https://localhost:\$p\"; \
+       done'"
 
 dit "Termine"
 cat <<'FIN'
