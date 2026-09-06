@@ -62,7 +62,7 @@
 
         <section class="rw-cgu__section">
             <h2 class="rw-cgu__titre">{{ __('cgu.s1_title') }}</h2>
-            <p>{{ __('cgu.s1_p1') }}</p>
+            <p>{{ __('cgu.s1_p1', ['nom' => config('app.name')]) }}</p>
             <p>{{ __('cgu.s1_p2') }}</p>
         </section>
         <section class="rw-cgu__section">
@@ -131,7 +131,7 @@
             <span class="rw-cgu__soutien-icone" aria-hidden="true">&#9749;</span>
             <div>
                 <p class="rw-cgu__soutien-titre">{{ __('cgu.support_title') }}</p>
-                <p class="rw-cgu__soutien-texte">{{ __('cgu.support_desc') }}</p>
+                <p class="rw-cgu__soutien-texte">{{ __('cgu.support_desc', ['nom' => config('app.name')]) }}</p>
                 <a class="rw-cgu__cafe" href="https://buymeacoffee.com/timikana"
                    target="_blank" rel="noopener" data-rw="cgu-cafe">Buy me a coffee</a>
             </div>
