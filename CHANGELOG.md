@@ -5,7 +5,39 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
-## [1.54.2] - 2026-09-06
+## [2.0.82] - 2026-09-06
+
+> ## ⚠ LA SEQUENCE SAUTE ICI — 1.54.2 devient 2.0.82 (E-458)
+>
+> **Ce journal tenait un numero A LA MAIN pendant que le produit DERIVAIT le
+> sien.** Les deux ont diverge le 2026-09-05 a 22:16 (`fe797fc`), quand
+> `VERSION-JALON` est passe a `2.0` : a partir de la, le portail affichait une
+> valeur derivee que ce fichier ne suivait plus.
+>
+>     produit   `scripts/version.sh` -> jalon + `rev-list --count --first-parent <ancre>..HEAD`
+>               ancre = dernier commit touchant `VERSION-JALON` = `fe797fc`
+>     journal   une suite tenue a la main, arrivee a `1.54.1`
+>
+> **Le CHANGELOG adopte le numero DERIVE a partir de cette entree.**
+>
+> **⛔ Les entrees anterieures restent en `1.x` et ne seront PAS renumerotees** :
+> elles nomment ce qui a ete livre sous ce nom-la. *Renumeroter le passe
+> mentirait sur ce qui a ete livre sous quel nom, et casserait tout renvoi
+> exterieur.* **La discontinuite s'ecrit donc a l'endroit exact ou elle se
+> produit, plutot que d'etre lissee.**
+>
+> **`2.0.82` est la version du commit qui a LIVRE ce correctif** (`d01e236`), pas
+> celle du commit qui renumerote cette entete. *Un numero derive ne peut etre
+> connu qu'une fois le commit existant — l'entete d'une entree porte donc la
+> version de la LIVRAISON, pas celle de la reecriture.*
+>
+> **⚠ Et l'arbitrage qui a demande ce changement citait `2.0.11`.** Recalcule au
+> moment d'ecrire : `2.0.82` a `d01e236`, `2.0.83` a HEAD. **Le nombre avait
+> bouge de 71 commits entre l'arbitrage et son application** — une nuit a huit
+> sessions. *C'est le defaut que cette entree corrige, en train de se produire
+> sur le message qui la commande.*
+
+
 
 ### Extinction - E-456 : la modale de step-up POSTait vers un fichier archive
 
