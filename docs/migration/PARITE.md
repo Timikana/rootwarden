@@ -21502,6 +21502,34 @@ E-296.*
 > **L'écart n'est pas théorique.** *Le seul compte que la page refuse est aussi le seul qui puisse forger la
 > requête et obtenir le geste.* Témoins posés : la colonne existe, une colonne inventée est absente.
 
+### ⟶ PLUS TRANCHANT QUE CE QUE J'AVAIS ÉCRIT — **la permission ne gouverne rien**
+
+Corroboré par la session 8 sur un objet différent du mien (`go-adm-comptes-distants.mjs:46` :
+*« un seul compte la porte — `superadmin`, role 3 »*) puis remesuré en base, agrégé :
+
+    role 1 : 7 comptes, dont 0 avec can_manage_remote_users
+    role 2 : 1 compte,  dont 0
+    role 3 : 2 comptes, dont 1        <- le seul porteur, et role 3 court-circuite ExigePermission:35
+
+**Le seul détenteur de la permission passerait la page de toute façon, par son rôle.** Et `role 1` est
+refusé par `role:2` avant que la permission soit consultée. **Il ne reste donc qu'une population sur
+laquelle `perm:can_manage_remote_users` produit un effet : le compte `role 2` — celui qui la contourne par
+la passerelle.**
+
+> **La permission ne gouverne aujourd'hui exactement personne.** *Elle refuse un seul compte, et ce compte
+> obtient le geste par l'autre porte.* Ce n'est pas « une garde plus faible en aval » : c'est une garde dont
+> la seule application vivante est annulée.
+
+*Cela ne change pas les deux voies de l'arbitrage — cela dit ce que coûte l'inaction : le contrôle affiché
+sur la page est, en l'état, sans effet pour tout le monde.* **Et il redeviendra effectif au premier octroi de
+`can_manage_remote_users` à un `role 2`** — un défaut DORMANT au sens d'E-«hors champ du critère», qui
+s'arme par une action d'administration ordinaire.
+
+⚠ **Un défaut MIROIR, relevé par la session 7 sur le même écran, à ne pas confondre avec celui-ci** : la
+page est plus LARGE que ses requêtes — un `role 1` porteur de la permission verrait tous les boutons et
+recevrait `401` sur six. Latent (0 porteur `role 1`). *Les deux défauts sont opposés et coexistent sur la
+même page.*
+
 ### Trois gestes, le même régime — et mon portage HÉRITE l'écart, il ne le crée pas
 
 `/server_user_remove_key`, `/remove_user_keys`, `/delete_remote_user` : **les trois** portent exactement
