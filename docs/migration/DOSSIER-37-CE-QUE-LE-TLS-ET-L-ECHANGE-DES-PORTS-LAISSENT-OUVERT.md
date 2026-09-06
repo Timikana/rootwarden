@@ -190,3 +190,93 @@ deux dues à des correctifs du matin.**
 des deux ÉCART. *Je relaie une mesure faite par la session 7, avec sa méthode et
 son horodatage ; je n'ai reproduit que la fermeture du lot (trois façons) et
 l'état des ports.*
+
+
+---
+
+## ⑥ L'ÉCHANGE EST APPLIQUÉ — 19:39, sur le mot de l'exploitant
+
+**Mesuré ici par ce que chaque port SERT, avec un chemin absurde en témoin sur
+chacun :**
+
+```
+:8443   /connexion=200   /auth/login.php=302   /zzz-<epoch>=404   ->  PORTAGE
+:8446   /connexion=404   /auth/login.php=200   /zzz-<epoch>=404   ->  LEGACY
+```
+
+*Le témoin absurde rend 404 des deux côtés : aucun des deux n'est un
+fourre-tout, donc les deux verdicts ci-dessus portent.*
+
+**Les quatre conteneurs ont été recréés, pas les deux attendus** — le fichier
+d'environnement est partagé. *Base intacte : 10 comptes, 3 machines, 63 tables.*
+
+### ✅ Le repli de `_sortie.php` ne s'arme pas — vérifié DANS le conteneur
+
+```
+rootwarden_php   LARAVEL_URL=https://192.168.0.245:8443    <- le PORTAGE, juste
+                 LEGACY_URL=https://192.168.0.245:8446     <- le LEGACY, juste
+```
+
+**La variable est définie, donc `?: 'http://localhost:8444'` ne joue pas.**
+*L'écart entre le fichier et le service s'est refermé par la recréation, comme
+annoncé au §③.* **Le correctif reste utile pour une installation qui n'aurait
+pas la variable ; rien n'est armé ici.**
+
+---
+
+## ⑦ 🔴 E-455 — LA REDIRECTION DU LEGACY MÈNE DANS LE VIDE, ET C'EST ANTÉRIEUR
+
+```
+http://<hote>:8444/   ->  301 vers  https://<hote>:8444/    <- rien n'ecoute en TLS la
+http://<hote>:8080/   ->  301 vers  https://<hote>:8443/    <- correct, c'est le portage
+```
+
+**La règle du legacy est `RewriteRule ^/?(.*) https://%{HTTP_HOST}/$1`, et
+`HTTP_HOST` porte le PORT.** *Elle renvoie donc vers son propre port en TLS, où
+rien n'écoute.*
+
+⚠ **LE DÉFAUT EST ANTÉRIEUR À L'ÉCHANGE** : *avant, la même règle renvoyait
+`:8080` vers `:8080`.* **L'échange n'en a changé que le numéro affiché.**
+
+> **À DIFFUSER : `https://<hôte>:8446` est la SEULE adresse du legacy.** *Un
+> `http://…:8444` rend un 301 vers le vide.*
+
+**NON CORRIGÉ, et c'est un arbitrage plutôt qu'un oubli** : la règle vit dans le
+conteneur, pas dans l'arbre — la corriger demande **un redémarrage de plus, sur
+un portail qu'on démonte.**
+
+### ⚠ ⑦.1 CE QUI M'INCRIMINE, et je ne l'ai trouvé qu'en le cherchant
+
+**Ce défaut, je le connaissais.** *Il figure dans ce que je porte d'un tour à
+l'autre depuis ce matin : « la redirection HTTPS du legacy mène à un port sans
+TLS ».*
+
+```
+mes dossiers citant ce defaut   0
+TEMOIN — citant le TLS du portage   4
+```
+
+**Je l'ai su et je ne l'ai jamais écrit là où l'exploitant le lit.** *La session
+4f l'a retrouvé seule, en contrôlant sa propre manœuvre.*
+
+**Et elle a trouvé mieux : le diagnostic était DÉJÀ ÉCRIT, dans le fichier Apache
+du PORTAGE**, en commentaire de sa propre correction —
+
+> *« Sa redirection HTTPS mène dans le vide, et personne ne l'avait vu. »*
+
+> **Quelqu'un l'a vu sur le legacy, l'a mesuré, l'a écrit — et n'a corrigé que
+> son propre côté, en rangeant l'observation chez le voisin.**
+
+*C'est le pendant de « une rectification fausse voyage avec l'autorité de la
+correction » :* **ici une observation JUSTE ne voyage pas du tout, faute de
+destinataire.** *Deux personnes l'ont sue, aucune ne l'a mise où on la
+chercherait.*
+
+### ⑦.2 ⚠ UN PIÈGE DE RELEVÉ QUE CE DÉFAUT FABRIQUE
+
+> **`000` se lit comme « le service est à terre », jamais comme « la redirection
+> est fausse ».**
+
+*Deux sessions ont conclu à tort sur un `000` aujourd'hui.* **Un `000` au bout
+d'une redirection ne dit rien de la santé de la cible : il dit que la cible
+n'existe pas à cette adresse-là.**
