@@ -242,11 +242,42 @@ trouvée et applique **le même prédicat** — `verifiePortail` — à cette ba
 → **3, avorte** · `go-socle-auth`/legacy → 0 sans annonce *(elle lit l'environnement)* · `archive`/legacy →
 0 sans annonce *(son `:8444` est en PROSE)*.
 
-**Réconciliation de trois comptes** — 10 (session 8) · 11 (mon premier relevé) · 12 (session 7) :
+**Réconciliation, faite en trois passes et la mienne était la plus mauvaise** :
 
-> **Mon 11 était faux : il comptait `archive.mjs`, dont le port est dans un docblock.** *L'ancre d'une sonde
-> doit être une déclaration, jamais une prose.* **Le 10 de la session 8 est le bon.** Le 12 reste à recouper
-> avec elle ; `tests/pw/` n'existe pas, ce n'est donc pas là.
+    predicat « base en dur ET aucune lecture d'environnement », sur les 138 .mjs
+      13  fichiers correspondent
+      -3  visent `https://localhost:5000` : le BACKEND, pas un portail  -> hors sujet
+      10  visent un PORTAIL                                             <- le compte utile
+       1  de ces 10 est JOUE par le LOT : go-vague0-legacy
+
+*Le 9 de la session 7 est ce 10 moins `go.mjs`* — son filtre est `go-*.mjs`, qui ne matche pas `go.mjs`.
+*Mon 11 comptait `archive.mjs`, dont le port est dans un docblock* — l'ancre d'une sonde doit être une
+déclaration, jamais une prose.
+
+⚠ **Et mon « 10 » n'était juste que par chance.** Je n'avais **jamais passé le détecteur sur le
+répertoire** : je l'avais appliqué à une liste de candidats produite par un `grep` plus faible, puis rendu
+la taille de cette liste comme réponse. **Ma population était fausse dans les deux sens** — elle manquait
+trois fichiers, qui se trouvaient être hors sujet. *J'ai validé un instrument sur l'échantillon d'un autre
+instrument, et publié le compte de l'échantillon.* J'avais écrit à la session 8 « ton 10 est le bon » sur
+cette base.
+
+### ⚠ ET CES TROIS FICHIERS ONT RÉVÉLÉ UN FAUX POSITIF DANS `06`
+
+`07-maintenance.test`, `08-approvals.test`, `09-docker-idor.test` codent `https://localhost:5000` — **le
+backend, dont le port n'est même pas publié sur l'hôte**. Mon contrôle aurait obtenu `000`, conclu
+« portail INDÉTERMINABLE » et **avorté à tort**. Aucun n'est joué par le LOT aujourd'hui : *le défaut était
+dormant, pas absent.*
+
+`06` distingue désormais les deux usages, **sans lister aucun port** :
+
+| base contrôlée | règle |
+|---|---|
+| celle que le **runner** exporte | elle **DOIT** servir un portail — tout autre code avorte |
+| celle qu'une **suite** code en dur | si `/up` ne rend ni 200 ni 404, **ce n'est pas un portail, donc hors du champ** |
+
+*La règle reste non datée : c'est l'état qui décide, jamais une liste de ports.* Éprouvé, cinq cas :
+`go-vague0-legacy`/legacy → 0 · `/laravel` → **3, avorte** · `go-socle-auth` → 0 sans annonce ·
+`archive` → 0 sans annonce · `09-docker-idor.test` → **0, annoncé mais NON avorté**.
 
 ⚠ **Deux défauts de mon propre détecteur, payés en l'écrivant** : `sed 's#//.*##'` **détruit `https://`** —
 le `//` d'un schéma n'est pas un commentaire — et la sonde a rendu **0 partout, témoins compris**, donc
