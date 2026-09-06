@@ -12409,3 +12409,64 @@ figure pas.* **Un chiffre sans sa commande n'est pas une mesure, c'est une citat
 
 *Même famille que le « 82 exécutions, 1158 assertions » d'une session qui datait de trois
 semaines, et que le `1484` que j'ai figé en dur.*
+
+---
+
+## E-454
+
+### ⚠ Ma « sixième question » a une LIMITE, et sans elle on supprime des capacités légitimes
+
+**J'avais posé (E-451) : *avant de classer une route « trou à combler », demande si la câbler
+produirait quelque chose*.** *Le cas qui l'a fait naître : `/ssh-audit/trends` calcule une
+tendance sur trente jours à partir d'une table qui porte une ligne.*
+
+**La limite, mesurée et rendue par une session :**
+
+    server_user_inventory   72 lignes   -> de quoi montrer
+    server_user_ssh_keys    20 lignes   -> de quoi montrer
+    user_exclusions          0 ligne    -> RIEN
+    TEMOIN machines          3 lignes   -> la base repond
+
+> **Sur une route qui LIT, une table vide mesure CE QU'IL Y A À MONTRER. Sur une route qui
+> ÉCRIT, elle mesure l'USAGE PASSÉ — pas l'utilité future.**
+
+**`user_exclusions` est vide parce que personne n'a jamais exclu d'utilisateur, pas parce que la
+capacité serait sans objet.** *Appliquer ma question sans distinguer les deux ferait supprimer
+des capacités jamais employées et parfaitement légitimes.*
+
+**La règle corrigée** : *la question ne vaut que sur une route de LECTURE. Sur une écriture,
+une table vide ne prouve rien.*
+
+### Et le croisement par TABLE demande DEUX temps, pas un
+
+    /admin/user_inventory/classify       -> POST /comptes-distants/{machine}/classer
+    /admin/user_inventory/classify_bulk  -> POST /comptes-distants/{machine}/classer-en-attente
+    /server_user_keys                    -> GET  /comptes-distants/{machine}/cles/{username}
+
+> **Toucher une table n'est pas implémenter le geste.** *Le croisement par table DÉSIGNE le
+> candidat ; la route portée le CONFIRME.*
+
+**Sans ce second temps, un service qui lit `server_user_inventory` aurait « prouvé » n'importe
+quel geste sur cette table.** *Trois faux positifs de plus évités par la lecture, pas par le
+comptage.*
+
+### ⚠ Une SIXIÈME nature possible : la moitié portée
+
+**`/server_user_remove_key`** : *le portage LIT `server_user_ssh_keys` et n'offre AUCUNE route
+de RETRAIT.*
+
+> **La consultation est portée, le geste qui ÉCRIT ne l'est pas.** *Ce n'est aucun des cinq : le
+> sous-lot n'est ni déclaré complet, ni retenu par arbitrage, ni orphelin par dépréciation, ni
+> jamais câblé.*
+
+**Non classée définitivement, et c'est le bon réflexe** : *il faut la confronter au découpage du
+module, qui a peut-être séparé lecture et écriture À DESSEIN.* **Une asymétrie voulue et une
+moitié oubliée ont la même forme dans un relevé.**
+
+### Et une seconde limite du tri par table, déclarée plutôt que contournée
+
+**Trois routes non tranchées ne touchent AUCUNE table** — `/logs`, `/test`, `/update-logs`. *Ce
+sont des flux ou des sondes de vie.* **Le tri par table ne peut rien en dire, et elles sont
+laissées non classées plutôt que rangées au jugé.**
+
+**État du tri : 12 sur 22 classées, 10 non tranchées.**
