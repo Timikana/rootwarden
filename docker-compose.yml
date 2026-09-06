@@ -32,7 +32,16 @@ services:
       python:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-fsk", "https://localhost:443/", "-o", "/dev/null"]
+      # ⚠ LA SONDE VISAIT LA RACINE, ET L'EXTINCTION L'A EMPORTEE.
+      # `legacy/index.php` est archive depuis `de9669c` (2026-09-05 12:46, vague 1).
+      # La racine rend donc 403 — plus d'index, et le listage est interdit — et
+      # `curl -f` traite un 403 comme une erreur : code 22, cinq echecs consecutifs,
+      # conteneur UNHEALTHY depuis VINGT-ET-UNE HEURES pendant qu'il servait
+      # parfaitement (`/auth/login.php` rend 200).
+      # Une sonde de vie doit viser une page VIVANTE, pas une page dont on a
+      # decide le retrait. Elle est desormais liee a l'ecran de connexion, qui
+      # vit exactement aussi longtemps que ce conteneur a une raison d'exister.
+      test: ["CMD", "curl", "-fsk", "https://localhost:443/auth/login.php", "-o", "/dev/null"]
       interval: 30s
       timeout: 5s
       retries: 5
