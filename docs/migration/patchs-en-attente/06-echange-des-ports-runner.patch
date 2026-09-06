@@ -59,7 +59,7 @@
  
  # ── Les chiffres de reference ────────────────────────────────────────────────
  #
-@@ -1324,6 +1372,14 @@
+@@ -1324,6 +1372,32 @@
    if [ "$cible" = legacy ]; then export E2E_BASE="$BASE_LEGACY" ; export E2E_CIBLE=legacy
    else                            export E2E_BASE="$BASE_LARAVEL" ; export E2E_CIBLE=laravel ; fi
  
@@ -71,10 +71,28 @@
 +       PORTAILS_VERIFIES="$PORTAILS_VERIFIES $cible" ;;
 +  esac
 +
++  # ⚠ ET UNE SUITE PEUT IGNORER `E2E_BASE`. Le controle ci-dessus porte sur la
++  # base que LE RUNNER exporte ; une suite qui code sa base en dur ne la lit
++  # jamais, et passerait dessous. Mesure du 2026-09-06 : 10 fichiers de
++  # `tests/e2e/` sont dans ce cas, dont UN SEUL est joue par le LOT
++  # (`go-vague0-legacy`, code en dur sur `:8443` — qui sert le PORTAGE apres
++  # l'echange). On verifie donc la base QU'ELLE PORTE, avec le meme predicat.
++  _f="$E2E/$suite.mjs"
++  if [ -f "$_f" ]; then
++    # `s#//.*##` DETRUIRAIT `https://` : le `//` d'un schema n'est pas un
++    # commentaire. Le motif exige un caractere non-`:` devant.
++    _nu=$(sed -E -e 's#([^:])//.*#\1#' -e '/^[[:space:]]*\*/d' -e '/^[[:space:]]*\/\*/d' "$_f")
++    if printf '%s' "$_nu" | grep -qE 'localhost:[0-9]{4}'        && ! printf '%s' "$_nu" | grep -qE 'process\.env\.[A-Z0-9_]*(BASE|URL)'; then
++      _base=$(printf '%s' "$_nu" | grep -oE 'https?://localhost:[0-9]{4}' | head -1)
++      echo "  ⚠ $suite code sa base EN DUR ($_base) et ignore E2E_BASE."
++      verifiePortail "$cible" "$_base" || exit 3
++    fi
++  fi
++
    # Prealable 6 : le cas particulier de vague 0.
    if [ "$suite" = go-vague0-legacy ]; then
      export E2E_USER=rw-test-super
-@@ -1521,6 +1577,7 @@
+@@ -1521,6 +1595,7 @@
  
  echo "journaux : $JOURNAUX"
  ecarts=0 ; premiere=1 ; jouees=0 ; LOT_ABATTU='' ; LOT_REMEDE=''

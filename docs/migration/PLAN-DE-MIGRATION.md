@@ -224,6 +224,35 @@ n'est pas un fourre-tout)*. Fail-closed : tout autre code avorte.
 
 *Deux qui passent, trois qui mordent : la sonde rend le positif et le négatif.*
 
+### ⚠ UN TROU DANS MON PROPRE PATCH, trouvé par le balayage de la session 8
+
+`verifiePortail` contrôle la base que **le runner exporte**. **Une suite qui code sa base en dur ne lit
+jamais `E2E_BASE` et passe dessous.** Mesuré :
+
+    10 fichiers de tests/e2e codent leur base en dur ET ne lisent aucune variable
+     1 seul est JOUE par le LOT :  go-vague0-legacy   (en dur sur :8443)
+
+*Après l'échange, `:8443` sert le PORTAGE.* Cette suite legacy frapperait donc le portage en se déclarant
+legacy — **et mon contrôle serait passé, puisque la base du runner, elle, est juste.**
+
+`06` couvre désormais le cas : pour toute suite jouée qui code sa base en dur, il **annonce** la base
+trouvée et applique **le même prédicat** — `verifiePortail` — à cette base-là.
+
+**Éprouvé, quatre cas :** `go-vague0-legacy`/legacy → **0** (juste aujourd'hui) · `go-vague0-legacy`/laravel
+→ **3, avorte** · `go-socle-auth`/legacy → 0 sans annonce *(elle lit l'environnement)* · `archive`/legacy →
+0 sans annonce *(son `:8444` est en PROSE)*.
+
+**Réconciliation de trois comptes** — 10 (session 8) · 11 (mon premier relevé) · 12 (session 7) :
+
+> **Mon 11 était faux : il comptait `archive.mjs`, dont le port est dans un docblock.** *L'ancre d'une sonde
+> doit être une déclaration, jamais une prose.* **Le 10 de la session 8 est le bon.** Le 12 reste à recouper
+> avec elle ; `tests/pw/` n'existe pas, ce n'est donc pas là.
+
+⚠ **Deux défauts de mon propre détecteur, payés en l'écrivant** : `sed 's#//.*##'` **détruit `https://`** —
+le `//` d'un schéma n'est pas un commentaire — et la sonde a rendu **0 partout, témoins compris**, donc
+*« la mesure n'a pas eu lieu »*. Puis la backreference `\1` est devenue un **octet de contrôle `0x01`**,
+mangée par l'échappement du heredoc. *Les deux rendaient une sortie plausible.*
+
 ### La marche à suivre, à la fermeture du LOT 4
 
 ```bash
