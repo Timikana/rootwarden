@@ -472,3 +472,62 @@ exactement ce qu'on veut casser — l'appel qui contourne la page.**
 ⛔ **Ce n'est PAS à moi de l'écrire, ni à 4f** : *modifier un contrôle d'accès en
 service appartient à l'exploitant.* **4f l'a refusé pour cette raison et a
 raison. Les deux voies sont posées ; il manque un mot, pas une mesure.**
+
+
+---
+
+## ⑨ E-453 REQUALIFIÉ — ce n'est pas une garde plus faible, c'est une garde SANS EFFET
+
+**Le §8 disait « la passerelle est UNE garde plus faible que la page ». C'est
+vrai et c'est en dessous du fait.** *Affiné par 4f (`a79199e`), et la propriété
+qui suit est vérifiée ICI, dans le code seul — elle ne dépend d'aucun
+recensement.*
+
+### ⑨.1 Par CONSTRUCTION, cette permission ne peut gouverner que le rôle 2
+
+```
+web.php:1103-1112   ->middleware(['role:2', 'perm:can_manage_remote_users'])
+                    l'ordre compte : ExigeRole:23 `abort` AVANT que perm: ne tourne
+ExigePermission:35  if ($roleId >= 3) { return $suite($requete); }
+
+  role 1   permission JAMAIS consultée — `role:2` refuse avant
+  role 2   CONSULTÉE            <- unique population où elle mord
+  role 3   JAMAIS consultée — court-circuitée
+```
+
+**Et `PasserelleController:69` contrôle le rôle SEUL.**
+
+> **La seule population que `can_manage_remote_users` peut gouverner est
+> exactement celle qui la contourne par la passerelle.** *Ce n'est pas une garde
+> affaiblie en aval : c'est un contrôle dont l'unique application possible est
+> annulée.*
+
+**Cette phrase est vraie quel que soit le parc** — elle se déduit de l'ordre des
+middlewares et d'un court-circuit, pas d'un compte de lignes.
+
+### ⑨.2 Le recensement ajoute l'état du jour, et je ne l'ai PAS reproduit
+
+```
+mesure de 4f, en base (docker.sock me refuse — NON REPRODUITE ICI) :
+    role 1 : 7 comptes, 0 porteur
+    role 2 : 1 compte,  0 porteur
+    role 3 : 2 comptes, 1 porteur   <- le seul, et il est court-circuité
+```
+
+**Donc aujourd'hui le contrôle affiché sur cette page ne gouverne personne.**
+*Il redevient effectif au PREMIER octroi de `can_manage_remote_users` à un
+compte de rôle 2* — **par une action d'administration ordinaire, pas par un
+incident.**
+
+⚠ **Ce qui n'est PAS mesuré ici** : le recensement ci-dessus, et l'existence
+d'autres consommateurs de la passerelle pour ces trois chemins hors suites.
+
+### ⑨.3 Ce que ça change pour la décision — rien sur les voies, tout sur le coût
+
+**Les deux voies du §8.4 sont inchangées, et (b) reste recommandée.** *Ce qui
+change est le coût de l'inaction : il ne s'agit pas de « fermer un écart en
+aval », il s'agit de rendre effectif un contrôle qui, en l'état, n'en a aucun.*
+
+**Et le défaut miroir reste ouvert à côté** (§8.3) : la page est plus LARGE que
+ses requêtes pour un rôle 1 porteur. *Latent — zéro porteur.* **Deux défauts
+opposés sur le même écran, et il ne faut pas les confondre.**
