@@ -21199,3 +21199,60 @@ soumis au navigateur.
   `margin-bottom` et un `<label>` est inline par défaut. *Le champ du nom est corrigé avec celui
   du code : en laisser un des deux garderait le défaut à moitié, pour une paire qui se lit
   ensemble.*
+
+
+## E-450 — les 12 renvois `lienLegacy` : ZÉRO est vivant, et l'autre mécanisme n'envoie personne non plus
+
+**Relevé refait directement le 2026-09-06 11:05**, l'index fourni étant décalé.
+
+### Les 12 occurrences, énumérées
+
+    4 controleurs   AuditSsh · Groupes · Wazuh · Documentation
+                    -> `'lienLegacy' => null`, SANS CONDITION
+    8 lignes de vue wazuh · documentation · groupes · audit-ssh
+                    -> toutes dans un `@if ($lienLegacy)` donc JAMAIS RENDUES
+
+**Et les quatre portent leur raison** : *« ⛔ NUL DEPUIS LE 2026-09-05 : la cible
+est ARCHIVÉE et rend 404. Offrir un lien vers une page retirée est le défaut que
+ce chantier a corrigé deux fois ailleurs. La vue garde le nul et n'affiche plus le
+renvoi. »*
+
+> **Le balisage reste, le lien n'atteint pas l'utilisateur.** *« Le commentaire le
+> dit et le lien reste » est vrai du CODE et faux de l'ÉCRAN.*
+
+### L'autre mécanisme — le seul vivant — n'envoie personne au legacy non plus
+
+`LiensLegacy::resoudre()` est appelé de deux endroits (`notifications.blade.php:100`,
+`RechercheController:30`). Tout chemin absent de `REMPLACEMENTS` (18 entrées)
+tombe vers l'ancien portail.
+
+    liens ecrits en dur par le backend   5
+    tombant vers le legacy               0
+
+**Parce que `normalise()` retire `/index.php`** : `/tickets/index.php` → `/tickets/`,
+qui EST dans la table. Idem `/update/index.php`. *Et les trois cibles concernées
+sont archivées — si l'un était tombé, c'était un 404.*
+
+> **La prémisse « le portage envoie encore chercher sur l'ancien portail à douze
+> endroits » est fausse. Il n'y envoie personne, par aucun des deux mécanismes.**
+
+### ⚠ Onzième variante du piège : comparer des clés NON NORMALISÉES
+
+**Mon premier relevé annonçait trois liens tombant vers le legacy.** *J'avais
+comparé les chaînes brutes à une table dont l'accès passe par `normalise()`.*
+**Une table qui normalise ses clés ne se compare pas par égalité de chaînes** —
+et comme les dix précédentes, l'erreur allait vers « c'est cassé ».
+
+### Le panneau « non porté » de `wazuh` est EXACT
+
+    detect · group · install · install_all · restart · uninstall
+    emis par le portage : 0 fichier CHACUNE
+    `/wazuh/install` n'apparait qu'UNE fois — dans un COMMENTAIRE (`wazuh.js:15`)
+
+**Les six que le panneau annonce sont bien les six absentes.** *Un panneau
+d'auto-déclaration exact, ce qui est assez rare pour être mesuré et dit.*
+
+**Et l'une des six est une LECTURE** : `/wazuh/detect` — *« Détecte un agent Wazuh
+déjà installé sur le serveur »*, POST, 2 mentions SSH, aucune écriture. **Portable
+sans arbitrage**, comme `/ssh-audit/backups`. Les cinq autres installent,
+désinstallent, redémarrent ou changent le groupe : arbitrage.
