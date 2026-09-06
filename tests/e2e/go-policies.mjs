@@ -1,4 +1,5 @@
 /**
+ * HORS-LOT: Deroule le parcours des politiques sudo/SFTP et POSTe vers `/policy/sudo/deploy` pour verifier le step-up. Cible la machine d'essai depuis E-457, mais le geste reste un deploiement.
  * go-policies.mjs - Test E2E des politiques sudo + SFTP par utilisateur (v1.22.0)
  *
  * Couvre :
@@ -40,8 +41,8 @@ import { createHmac } from 'crypto';
  * heures.** Une surete qui repose sur l'etat transitoire d'un archivage n'est pas
  * une surete.
  */
-const MACHINE_ESSAI = 2;   // Test-Server-Debian
-const PRODUCTION = 1;      // srv-zabbix, 192.168.0.244 — jamais dans un corps de requete
+const MACHINE_ESSAI = 2;
+const PRODUCTION = 1;
 
 const BASE = 'https://localhost:8443';
 const USER = process.env.E2E_USER || 'superadmin';

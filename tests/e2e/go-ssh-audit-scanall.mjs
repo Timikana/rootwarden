@@ -1,4 +1,5 @@
 /**
+ * HORS-LOT: JOINT LA PRODUCTION. « Tout scanner » porte sur le parc entier ; `srv-zabbix` (machine 1) est jointe par SSH a chaque execution. Un LOT la rejouerait a chaque passage.
  * go-ssh-audit-scanall.mjs - Regression v1.37.13 : "Tout scanner" (SSH Audit)
  * doit repondre IMMEDIATEMENT (tache de fond + centre de taches) au lieu de
  * garder la requete HTTP ouverte pendant tout le scan du parc (504 des proxys,

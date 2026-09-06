@@ -1,4 +1,5 @@
 /**
+ * HORS-LOT: Sonde CSRF, authentification, role et echappement XSS en FORGEANT des requetes, dont trois creations de planification de scan CVE. Portee ramenee a un tag sans machine, mais les gestes restent des ecritures.
  * go-security.mjs - Tests E2E des controles securite (NE PAS REGRESSER).
  *
  * Codifie les invariants ajoutes par l'audit v1.17.0 :

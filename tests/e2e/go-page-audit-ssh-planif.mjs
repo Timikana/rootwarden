@@ -1,4 +1,5 @@
 /*
+ * HORS-LOT: Suite neuve, jamais soumise a un lot complet. A enroler apres une execution de reference sur les deux cibles.
  * ═══ LE FORMULAIRE DE PLANIFICATION SSH — ET AUCUNE PLANIFICATION POSEE ═══
  *
  * ══ CE QUE CETTE SUITE NE FERA JAMAIS, ET POURQUOI C'EST LA PREMIERE LIGNE ═
