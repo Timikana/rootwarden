@@ -1,9 +1,13 @@
 /**
  * bashrc.js - Deploiement du `.bashrc` standardise, sous-lot B1.
  *
- * B1 ne porte que la page : la bascule des trois onglets, et le compteur de
- * selection. Les gestes qui joignent une machine sont B2 et B4 — ce fichier
- * n'emet AUCUNE requete.
+ * ⚠ CETTE PHRASE ETAIT « ce fichier n'emet AUCUNE requete ». Elle etait vraie a
+ * B1 et FAUSSE depuis B2 : le fichier appelle `/bashrc/preview`, `/bashrc/users`
+ * et `/bashrc/template`. **Un docblock qui decrit l'etat d'hier se lit comme une
+ * garantie d'aujourd'hui** — corrige le 2026-09-07 en portant B4.
+ *
+ * Ce fichier porte : la bascule des onglets et le compteur (B1), les lectures
+ * (B2), et les DEUX ECRITURES de B4 — `/bashrc/deploy` et `/bashrc/restore`.
  *
  * DEUX CORRECTIONS DE PRESENTATION, toutes deux vues a l'image du legacy.
  *
@@ -105,6 +109,10 @@
             .catch(function () { return null; });
     }
 
+    var boutonDeployer = document.querySelector('[data-rw="bashrc-deployer"]');
+    var etatEcriture   = document.querySelector('[data-rw="bashrc-ecriture-etat"]');
+    var avertFiglet    = document.querySelector('[data-rw="bashrc-figlet-absent"]');
+
     function videComptes(message) {
         blocComptes.hidden = true;
         corpsComptes.innerHTML = '';
@@ -174,7 +182,25 @@
             tdFichier.appendChild(perso);
         }
 
-        [tdCase, tdNom, tdUid, tdHome, tdFichier].forEach(function (t) { tr.appendChild(t); });
+        // ── B4 : la restauration, PAR COMPTE (le backend lit `user` au singulier).
+        //
+        // Le bouton est rendu pour chaque compte, y compris ceux dont aucune
+        // sauvegarde n'existe : `/bashrc/users` ne dit pas si un `.bashrc.bak.*`
+        // est present, et INVENTER ce signal serait pire que l'absence. Le
+        // backend repond « aucune sauvegarde » et la ligne d'etat le dit — c'est
+        // un echec INFORMATIF, pas un refus de garde comme le 400 qu'aurait
+        // rendu un bouton sur une cle plateforme.
+        var tdAction = document.createElement('td');
+        var boutonRestaurer = document.createElement('button');
+        boutonRestaurer.type = 'button';
+        boutonRestaurer.className = 'rw-bouton rw-bouton--discret rw-bouton--minuscule';
+        boutonRestaurer.setAttribute('data-rw', 'bashrc-restaurer-' + u.name);
+        boutonRestaurer.setAttribute('data-compte', u.name);
+        boutonRestaurer.title = textes.restore_aide || '';
+        boutonRestaurer.textContent = textes.restore || '';
+        tdAction.appendChild(boutonRestaurer);
+
+        [tdCase, tdNom, tdUid, tdHome, tdFichier, tdAction].forEach(function (t) { tr.appendChild(t); });
         if (estRoot) { tr.className = 'rw-ligne-sensible'; }
 
         return tr;
@@ -198,6 +224,13 @@
             etatComptes.textContent = '';
             blocComptes.hidden = false;
             if (toutCocher) { toutCocher.checked = false; }
+            // `figlet_present` ARRIVE DEJA DANS CETTE REPONSE et le legacy s'en
+            // sert pour offrir l'installation. Ce bouton n'est pas porte : on
+            // garde donc le SIGNAL sans le geste — la page dit ce qui manque, et
+            // l'operateur installe le paquet par le canal qu'il juge bon.
+            if (avertFiglet) {
+                avertFiglet.hidden = (d.figlet_present !== false);
+            }
         });
     }
 
@@ -210,6 +243,103 @@
             });
         });
     }
+
+    /* ═══ B4 — LES DEUX ECRITURES ══════════════════════════════════════════
+     *
+     * ⚠⚠ `mode` EST TOUJOURS ENVOYE, ET C'EST LE POINT DE CE BLOC.
+     *
+     * Le backend fait `mode = data.get('mode', 'overwrite')` : **la valeur
+     * DESTRUCTRICE est le defaut**. `overwrite` recrit le `.bashrc` sans migrer
+     * le bloc personnalise vers `~/.bashrc.local` ; `merge` le migre. Omettre le
+     * champ, ici, ne serait pas une abstention — ce serait choisir la pire des
+     * deux sans l'ecrire.
+     *
+     * Et `merge` est la valeur que L'APERCU emploie deja. Deployer dans un autre
+     * mode que celui qu'on vient de montrer rendrait l'apercu menteur, ce que le
+     * commentaire de `/bashrc/preview` interdit explicitement.
+     *
+     * **`overwrite` n'est donc pas construit** : aucun bouton, aucun champ,
+     * aucune bascule. Meme forme que `force` sur le retrait de cle SSH — rendre
+     * inexprimable plutot que surveiller.
+     *
+     * ⚠ `/bashrc/prerequisites` N'EST PAS PORTE, sur decision de l'exploitant.
+     * Il lance `apt-get update && apt-get install figlet` en root sur la machine
+     * choisie. Ce qu'on perd est cosmetique — figlet ne change que la banniere —
+     * et la page AVERTIT desormais de son absence (voir `figlet_present`).
+     */
+    function annonce(cible, texte, echec) {
+        if (! cible) { return; }
+        cible.textContent = texte || '';
+        cible.className = echec ? 'rw-aide rw-aide--alerte' : 'rw-aide';
+    }
+
+    function comptesCoches() {
+        return [].slice.call(corpsComptes.querySelectorAll('input[type="checkbox"]'))
+            .filter(function (b) { return b.checked; })
+            .map(function (b) { return b.value; });
+    }
+
+    if (boutonDeployer) {
+        boutonDeployer.addEventListener('click', function () {
+            var mid = machineUnique();
+            var comptes = comptesCoches();
+            if (! mid || comptes.length === 0) {
+                annonce(etatEcriture, textes.deploy_sans_cible || '', true);
+
+                return;
+            }
+            // La confirmation NOMME les comptes et dit ce qui est preserve : un
+            // « etes-vous sur ? » sans objet n'informe personne.
+            var question = (textes.deploy_confirme || '')
+                .replace(':comptes', comptes.join(', '))
+                .replace(':nombre', String(comptes.length));
+            if (! window.confirm(question)) { return; }
+
+            boutonDeployer.disabled = true;
+            annonce(etatEcriture, textes.deploy_en_cours || '', false);
+            lit('/bashrc/deploy', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ machine_id: mid, users: comptes, mode: 'merge' }),
+            }).then(function (d) {
+                boutonDeployer.disabled = false;
+                if (! d) { annonce(etatEcriture, textes.deploy_echec || '', true); return; }
+                annonce(etatEcriture, textes.deploy_fait || '', false);
+                chargeComptes();
+            });
+        });
+    }
+
+    /* La restauration est PAR COMPTE, parce que le contrat l'est : le backend lit
+     * `user` au singulier, pas une liste. Un bouton « restaurer la selection »
+     * aurait suggere une atomicite que la route n'offre pas. */
+    corpsComptes.addEventListener('click', function (evenement) {
+        var bouton = evenement.target && evenement.target.closest
+            ? evenement.target.closest('[data-rw^="bashrc-restaurer-"]') : null;
+        if (! bouton) { return; }
+        var mid = machineUnique();
+        var nom = bouton.getAttribute('data-compte') || '';
+        if (! mid || ! nom) { return; }
+        var question = (textes.restore_confirme || '').replace(':compte', nom);
+        if (! window.confirm(question)) { return; }
+
+        bouton.disabled = true;
+        annonce(etatEcriture, (textes.restore_en_cours || '').replace(':compte', nom), false);
+        lit('/bashrc/restore', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ machine_id: mid, user: nom }),
+        }).then(function (d) {
+            bouton.disabled = false;
+            if (! d) {
+                annonce(etatEcriture, (textes.restore_echec || '').replace(':compte', nom), true);
+
+                return;
+            }
+            annonce(etatEcriture, (textes.restore_fait || '').replace(':compte', nom), false);
+            chargeComptes();
+        });
+    });
 
     if (boutonApercu) {
         boutonApercu.addEventListener('click', function () {
@@ -248,13 +378,15 @@
             contenuApercu.textContent = textes.apercu_chargement || '';
             boutonApercu.disabled = true;
 
-            // `mode` PART TOUJOURS, et vaut `merge` — le defaut du legacy.
-            // Le selecteur de mode appartient au DEPLOIEMENT (B4) ; tant qu'il
-            // n'est pas porte, l'apercu montre ce que montrerait le legacy sans
-            // qu'on ait touche a son selecteur. A relier au selecteur des qu'il
-            // existe, sans quoi l'apercu montrerait un autre mode que celui qui
-            // sera deploye — et un apercu qui ne correspond pas au geste est
-            // pire que pas d'apercu.
+            // `mode` PART TOUJOURS, et vaut `merge`.
+            //
+            // ⚠ CE COMMENTAIRE DISAIT « a relier au selecteur des qu'il
+            // existe ». Il n'existera pas : B4 est porte, et `overwrite` est
+            // DELIBEREMENT inexprimable — le deploiement envoie `merge` lui
+            // aussi. L'apercu et le geste montrent donc le meme mode par
+            // CONSTRUCTION, et non parce qu'on aura pense a les relier.
+            // *Une garde par construction ne se perime pas ; un rappel de
+            // les relier, si.*
             lit('/bashrc/preview', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
