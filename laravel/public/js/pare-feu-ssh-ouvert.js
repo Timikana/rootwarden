@@ -129,6 +129,72 @@
     }
 
     /**
+     * Que devient notre port dans cette chaine PERSONNALISEE ?
+     *
+     * @return {string|null}  'ferme'    elle le bloque categoriquement
+     *                        'peut-etre' elle peut le bloquer (source/interface)
+     *                        'traverse'  le trafic en ressort et continue
+     *                        null        chaine inconnue, ou trop imbriquee
+     *
+     * ══ POURQUOI SUIVRE LA CHAINE PLUTOT QUE RENDRE `null` ═══════════════
+     *
+     * Un jeu `fail2ban` ORDINAIRE saute vers `f2b-sshd` sur le port SSH, et
+     * cette chaine est DECLAREE ET DEFINIE dans le meme fichier : elle rejette
+     * les adresses bannies puis `RETURN`, donc le trafic ressort et atteint
+     * l'`ACCEPT` qui suit.
+     *
+     * Sans ce suivi, le predicat rendait `null` sur **toute machine faisant
+     * tourner fail2ban** — et RootWarden GERE fail2ban. Or :
+     *
+     *     un garde qui refuse parfois    est un garde
+     *     un garde qui refuse TOUJOURS   est un obstacle, et il se contourne
+     *
+     * C'est un argument de SURETE, pas de confort. (Releve en 6e revue.)
+     */
+    function analyseChaine(nom, port, chaines, profondeur) {
+        // Une seule imbrication. Au-dela, on ne pretend pas suivre.
+        if (profondeur > 1) { return null; }
+        var regles = chaines[nom];
+        if (! regles) { return null; }
+
+        var peutEtre = false;
+
+        for (var i = 0; i < regles.length; i++) {
+            var l = regles[i];
+            var brute = l.match(/-j\s+([\w.-]+)/);
+            brute = brute ? brute[1] : '';
+            var cible = brute.toUpperCase();
+
+            if (cible === 'RETURN' || cible === '') { continue; }
+
+            if (cible !== 'ACCEPT' && cible !== 'DROP' && cible !== 'REJECT') {
+                var sous = analyseChaine(brute, port, chaines, profondeur + 1);
+                if (sous === null) { return null; }
+                if (sous === 'ferme') { return 'ferme'; }
+                if (sous === 'peut-etre') { peutEtre = true; }
+                continue;
+            }
+
+            var couvert = couvreLePort(l, port);
+            if (couvert === false) { continue; }
+
+            if (cible === 'ACCEPT') {
+                // Un ACCEPT dans la chaine ne nous renseigne pas sur la suite
+                // du chemin INPUT : on le laisse a l'appelant.
+                continue;
+            }
+
+            // DROP / REJECT. Restreint par source ou interface : il ne frappe
+            // pas forcement NOTRE chemin — c'est le cas des bannissements.
+            if (/(?:^|\s)!?\s*-[is]\s+\S+/.test(l)) { peutEtre = true; continue; }
+
+            return 'ferme';
+        }
+
+        return peutEtre ? 'peut-etre' : 'traverse';
+    }
+
+    /**
      * @param  {string} texte  un jeu de regles au format `iptables-save`
      * @param  {number} port   le port SSH DE CETTE MACHINE, lu en base
      * @return {boolean|null}  true = ouvert · false = coupe · null = indecidable
@@ -152,8 +218,15 @@
          * le chemin d'un `return` anterieur n'est pas une garde** — c'est la
          * meme faute que celle qu'elle devait attraper, d'un cran plus haut.
          */
+        var chaines = {};
         for (var k = 0; k < lignes.length; k++) {
-            if (/^\s*-I\s+INPUT\b/.test(lignes[k])) { return null; }
+            var ligneK = lignes[k].trim();
+            if (/^-I\s+INPUT\b/.test(ligneK)) { return null; }
+            // Les definitions des chaines PERSONNALISEES, pour pouvoir les suivre.
+            var def = ligneK.match(/^-A\s+(\w[\w.-]*)\s/);
+            if (def && def[1] !== 'INPUT') {
+                (chaines[def[1]] = chaines[def[1]] || []).push(ligneK);
+            }
         }
 
         var politique = null;
@@ -170,14 +243,32 @@
             if (! /^-A\s+INPUT\b/.test(l)) { continue; }
             vuUneRegle = true;
 
-            var cible = l.match(/-j\s+(\w+)/);
-            cible = cible ? cible[1].toUpperCase() : '';
+            /*
+             * ⚠ LE NOM BRUT ET LE NOM MAJUSCULE SONT DEUX CHOSES.
+             *
+             * Les cibles integrees se comparent en majuscules (`-j accept` est
+             * accepte par iptables). Mais les NOMS DE CHAINES sont SENSIBLES A
+             * LA CASSE : chercher `F2B-SSHD` dans un fichier qui declare
+             * `f2b-sshd` ne trouve rien — et le suivi de chaine ne s'exercait
+             * pas du tout, en rendant `null` comme s'il avait echoue.
+             */
+            var cibleBrute = l.match(/-j\s+([\w.-]+)/);
+            cibleBrute = cibleBrute ? cibleBrute[1] : '';
+            var cible = cibleBrute.toUpperCase();
 
             /*
-             * Un saut vers une CHAINE PERSONNALISEE : le sort du paquet se joue
-             * ailleurs, et on ne sait pas le suivre. On ne tranche pas.
+             * Un saut vers une CHAINE PERSONNALISEE. On la SUIT si elle est
+             * definie dans le meme fichier — c'est le cas ordinaire de
+             * `fail2ban`. Sinon on ne tranche pas.
              */
-            if (cible !== '' && ! REGLEMENTAIRES[cible]) { return null; }
+            if (cible !== '' && ! REGLEMENTAIRES[cible]) {
+                if (couvreLePort(l, port) === false) { continue; }
+                var sort = analyseChaine(cibleBrute, port, chaines, 0);
+                if (sort === null) { return null; }
+                if (sort === 'ferme') { return indecidable ? null : false; }
+                if (sort === 'peut-etre') { indecidable = true; }
+                continue;   // 'traverse' : le trafic ressort, on continue de lire
+            }
 
             // Une cible non terminale (LOG, MARK…) ne decide pas du sort du
             // paquet : la regle suivante continue de s'appliquer.
