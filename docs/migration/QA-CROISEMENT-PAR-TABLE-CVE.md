@@ -29,7 +29,7 @@ par le croisement — je l'ai trouvé en lisant les noms de méthodes.**
 | `/cve_remediation` POST | écrit `cve_remediation` | `SuiviCve::definirStatut()` (écrit) | **PORTÉ** |
 | `/cve_schedules` GET | `cve_scan_schedules` | `PlanificationsCve::liste()` | **PORTÉ** |
 | `/cve_schedules` POST | écrit `cve_scan_schedules` | `creer/modifier/supprimer` (écrit) | **PORTÉ** |
-| `/cve_whitelist` GET·POST·DELETE | `cve_whitelist` | **AUCUN** | ⛔ **NON PORTÉ** |
+| `/cve_whitelist` GET·POST·DELETE | `cve_whitelist` | **AUCUN** | ⛔ **NON RÉIMPLÉMENTÉ — mais ATTEIGNABLE** ⚠ |
 
     tables cve_* en base                    5
     tables cve_* touchees par le portage    4
@@ -54,7 +54,27 @@ par exemple « avant/après une campagne de correctifs d'il y a trois mois » �
 ou simplification assumée est un arbitrage produit, pas une mesure. **Je le qualifie et je le
 transmets.**
 
-## ⛔ LE SEUL NON PORTÉ — `/cve_whitelist`, instruit pour l'arbitrage
+## ⛔ CORRECTION — « NON PORTÉ » ÉTAIT TROP FORT
+
+**Première rédaction : « NON PORTÉ ».** Mesuré ensuite, et ça change la nature du constat :
+
+    RoutesBackend.php:35   la liste blanche porte le PREFIXE '/cve_'
+    RoutesBackend::autorisee('/cve_whitelist')      OUI
+    RoutesBackend::reserveeAdmin('/cve_whitelist')  non
+    TEMOIN  autorisee('/zzz_temoin')                non   (l'instrument discrimine)
+
+**Le geste passe la passerelle du portage.** Il n'est pas réimplémenté — aucun service, aucun
+écran — **mais il reste appelable** par `/api/gateway/cve_whitelist`, et la garde
+`@require_role(2)` du backend s'applique toujours (la passerelle, elle, ne le réserve pas).
+
+> **« Non porté » dit *capacité perdue*. La mesure dit *capacité sans interface*.** Ce n'est
+> pas la même décision : l'une demande de réécrire, l'autre de choisir entre lui rendre un
+> écran, la retirer de la liste blanche, ou la laisser orpheline.
+
+*Je l'ai trouvé en suivant un commentaire de `web.php:598` plutôt qu'en m'arrêtant à ma propre
+conclusion — laquelle était déjà écrite et commitée.*
+
+## `/cve_whitelist`, instruit pour l'arbitrage
 
     GET     /cve_whitelist                      24 lignes  @require_role(2)
     POST    /cve_whitelist                      31 lignes  @require_role(2)   ECRIT (upsert)
