@@ -120,8 +120,8 @@ return [
      * sa place et son bouton disent. Un encart « ce qui manque » n'enonce que
      * des manques ; le present, la page le MONTRE.
      */
-    'non_porte_titre' => 'Deux gestes restent sur l\'ancien portail',
-    'non_porte_texte' => 'Le deploiement et la restauration sont portes ici. Restent sur l\'ancien portail : l\'installation du paquet figlet, qui ecrit sur la machine en root, et la liste des sauvegardes existantes.'
+    'non_porte_titre' => 'Un geste reste hors du portail',
+    'non_porte_texte' => 'Le deploiement, la restauration et la liste des sauvegardes sont portes ici. L\'installation du paquet figlet ne l\'est pas : elle ecrit sur la machine en root pour un utilitaire d\'affichage. Elle se fait par SSH, une fois par machine.'
                          . 'd\'une version anterieure et la liste des sauvegardes se font pour '
                          . 'l\'instant depuis l\'ancien portail.',
     'non_porte_lien'  => 'Ouvrir bashrc dans l\'ancien portail',
@@ -137,9 +137,13 @@ return [
     'deploy_sans_cible' => 'Choisis une machine et au moins un compte avant de déployer.',
     'restore' => 'Restaurer',
     'restore_aide' => 'Restaure la sauvegarde la plus récente du .bashrc de ce compte.',
-    'restore_confirme' => 'Restaurer la sauvegarde la plus récente du .bashrc de :compte ?\\n\\nLe .bashrc actuel de ce compte sera remplacé.',
+    'restore_confirme' => 'Restaurer :sauvegarde pour :compte ?\\n\\nDatee du :date, :taille octets. Il existe :nombre sauvegarde(s) pour ce compte ; c\'est la plus recente qui sera restauree.\\n\\nLe .bashrc actuel de :compte sera remplace.',
     'restore_en_cours' => 'Restauration de :compte…',
     'restore_fait' => 'Sauvegarde restaurée pour :compte.',
     'restore_echec' => 'La restauration de :compte a échoué — il n\'existe peut-être aucune sauvegarde.',
     'figlet_absent' => 'figlet n\'est pas installé sur cette machine : la bannière du .bashrc ne s\'affichera pas. Le reste du fichier fonctionne. L\'installation du paquet n\'est pas offerte ici.',
+
+    /* La liste des sauvegardes, lue AVANT la confirmation de restauration. */
+    'restore_lecture' => 'Lecture des sauvegardes de :compte…',
+    'restore_aucune' => 'Aucune sauvegarde pour :compte — il n\'y a rien a restaurer. Une sauvegarde est creee a chaque deploiement.',
 ];
