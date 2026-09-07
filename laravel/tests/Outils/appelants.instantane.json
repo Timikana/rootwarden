@@ -3,28 +3,28 @@
   "dossier": "laravel/public/js",
   "totaux": {
     "fichiers": 37,
-    "appels": 73,
+    "appels": 74,
     "verifie": 31,
     "flux": 7,
     "delegue": 30,
     "delegue_sans_lecteur": 3,
-    "ignore": 2,
+    "ignore": 3,
     "illisible": 0
   },
   "empreintes": {
     "acces-sftp.js": "69eb38cae7e53aba",
     "approbations.js": "874aa42ba41121f0",
     "audit-ssh.js": "9ce35fcc6b40922d",
-    "bashrc.js": "e8155851ab3541b3",
+    "bashrc.js": "99b323e06049316c",
     "chatops.js": "607141666c99b287",
     "cle-plateforme.js": "847da8fc8e2f3f9c",
-    "cles-ssh.js": "de7d0a5777ba4594",
+    "cles-ssh.js": "c216fadc962238f9",
     "comptes-distants.js": "9520ed9b433918f4",
     "comptes.js": "d0669354a1cfd409",
     "derive-config.js": "d9d473c325b78901",
     "distants-cles.js": "e3ef5aa6131077c5",
     "docker.js": "9dd84e29d334ce14",
-    "fail2ban.js": "7b61fb71c08ed9df",
+    "fail2ban.js": "db153604433f1473",
     "graylog.js": "068cf30f0033ad59",
     "groupes.js": "eb529d80d9d4e39c",
     "journal-audit.js": "b6605a328e06b3d8",
@@ -51,6 +51,19 @@
     "wazuh.js": "150c5e47c0f94c5f"
   },
   "a_examiner": [
+    {
+      "fichier": "cles-ssh.js",
+      "ligne": 491,
+      "fonction": "declenche",
+      "cible": "L.url_deployer",
+      "success": false,
+      "ok": true,
+      "verdict": "ignore",
+      "chemins_appelants": [],
+      "origine": null,
+      "prefixe": null,
+      "fichier_consulte_success": true
+    },
     {
       "fichier": "journal-audit.js",
       "ligne": 73,
