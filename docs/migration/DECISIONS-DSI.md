@@ -13786,3 +13786,80 @@ sous le même mot.
 **Rien.** *Q1 et Q2 sont écrites et éprouvées, leur destination est décidée, et les deux
 attendent le même verrou que le reste : le port SSH.*
 
+---
+
+## ⛔ E-473 — « TOUT LE LEGACY TIENT À UNE PAGE » EST FAUX. IL EN TIENT DIX-NEUF.
+
+**Je l'ai affirmé à l'exploitant à chaque tour depuis quatre heures. Mesuré ce soir, de bout
+en bout, pour la première fois — et c'est faux.**
+
+### La mesure
+
+*Graphe des dépendances sur les 103 fichiers legacy vifs, avec les DEUX espèces d'arête —
+`require`/`include` résolus depuis `__DIR__`, et les chemins cités dans un contexte d'appel
+ou de lien.*
+
+```
+retirer legacy/iptables/index.php  ->  0 fichier libere
+```
+
+**Zéro.** *Parce que 19 des 26 fichiers métier sont ATTEIGNABLES DIRECTEMENT par un
+navigateur* — les `.htaccess` ne dénient que `legacy/includes/`, `legacy/lang/` et quatre
+fichiers de `legacy/auth/`.
+
+```
+racines reellement servies : 19
+  _sortie.php · adm/api/notifications.php · adm/includes/audit_log.php
+  adm/includes/crypto.php · api_proxy.php · auth/forgot_password.php
+  auth/login.php · auth/logout.php · auth/reset_password.php · auth/step_up.php
+  auth/verify.php · auth/verify_2fa.php · db.php · footer.php · head.php
+  iptables/index.php · lang/en.php · lang/fr.php · menu.php
+```
+
+### ⚠ Ce que ça veut dire, et je ne l'avais pas vu
+
+> **Le legacy n'est pas un arbre suspendu à une page de pare-feu. C'est un jeu PLAT de
+> fichiers servis — et il offre encore une PAGE DE CONNEXION.**
+
+*`legacy/auth/login.php` a été mesuré à `200` par une autre session ce soir, avec son témoin
+(`/auth/zzz-inexistant.php` → `404`).* **La connexion legacy est vivante, sur le port 8446,
+adossée à la même base que le portage.**
+
+**Donc archiver `iptables/index.php` le jour où I5 sera porté ne fera pas tomber le socle.**
+*Il ne fera tomber que lui-même.*
+
+### Comment je me suis trompée, trois fois de suite dans la même mesure
+
+```
+1er jet   graphe des `require` seuls        -> 5 liberes    l'arete menu->notifications
+                                                            est un appel HTTP, invisible
+2e jet    + les aretes HTTP, 3 racines      -> 0 liberes    mais `notifications.php` n'est
+                                                            pas une racine : c'est une API
+                                                            appelee DEPUIS une page
+3e jet    racines = ce qu'un navigateur
+          atteint, .htaccess a l'appui      -> 0 liberes    et la VRAIE raison apparait :
+                                                            19 racines, pas une
+```
+
+**La première erreur est celle que je cite aux autres depuis deux jours** — *un graphe
+d'`include` ne voit qu'une espèce de dépendance sur cinq* — **et je l'ai commise dans
+l'instrument que j'écrivais pour prouver ma propre affirmation.**
+
+*La troisième est la plus instructive : mes deux premières mesures rendaient un résultat
+COHÉRENT avec ce que je croyais (« une page tient tout »), et c'est la correction du modèle
+de racines qui a renversé la conclusion — pas un chiffre.*
+
+### Ce que ça change pour l'exploitant
+
+**Le port SSH reste le verrou d'I5.** *Mais « I5 libère le legacy » était faux : il libère
+`iptables/index.php`, et rien d'autre.*
+
+⛔ **La vraie question, que je n'avais jamais posée : que fait-on de la chaîne
+d'authentification legacy ?** *Elle est servie, elle est complète — `login`, `logout`,
+`verify`, `verify_2fa`, `step_up`, `forgot_password`, `reset_password` — et elle partage la
+base du portage.* **Une seconde porte d'entrée vivante sur un second port n'est pas un
+résidu de migration : c'est une surface.**
+
+*Ce n'est pas un arbitrage que je rends ce soir. C'est une question que je devais poser il y
+a quatre heures et que ma mesure fausse m'a empêchée de voir.*
+
