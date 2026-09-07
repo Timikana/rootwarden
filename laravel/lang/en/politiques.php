@@ -110,7 +110,11 @@ return [
     'derniere'          => 'Last write',
     'jamais'            => 'never deployed',
     'rollback_titre' => 'Restore an earlier version',
-    'rollback_texte' => 'Rolling a deployment back is not ported yet. It rewrites a sudoers file on the machine, and is done from the legacy portal for now.',
+    'rollback_texte' => 'Restores the exact sudoers from before this deployment. The content is what was saved, not a reconstruction. Re-authentication is required.',
     'rollback_lien' => 'Roll this deployment back in the legacy portal',
     'resultat'          => 'Result',
+
+    /* L'annulation d'un deploiement, rouverte le 2026-09-07. */
+    'rollback' => 'Roll back',
+    'rollback_confirme' => 'Roll this deployment back and restore the previous sudoers?\\n\\nThe exact earlier content is rewritten on the machine — not retyped rules, the saved bytes. Re-authentication will be requested.',
 ];

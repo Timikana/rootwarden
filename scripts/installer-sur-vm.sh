@@ -121,7 +121,43 @@ sleep 15
 docker ps --format '{{.Names}}\t{{.Status}}' | sort
 
 titre "les deux portails repondent-ils ?"
-curl -s  -o /dev/null -w "   laravel http=%{http_code}\n" http://localhost:8444/connexion || true
-curl -sk -o /dev/null -w "   legacy  http=%{http_code}\n" https://localhost:8443/auth/login.php || true
+# ⚠ ON N'ECRIT PLUS UN NUMERO DE PORT A COTE D'UN NOM DE PORTAIL.
+#    Ces deux lignes disaient « laravel » devant :8444 et « legacy » devant
+#    :8443. L'echange des ports du 2026-09-06 les a rendues FAUSSES sans que le
+#    fichier bouge : chaque portail y portait le nom de l'autre, dans un rapport
+#    qui s'affiche pendant une INSTALLATION — exactement quand on s'y fie.
+#
+#    On BALAIE les quatre ports et on laisse chacun se NOMMER par son etat :
+#    `/up` existe sur le portage (Laravel) et rend 404 sur le legacy. Le balayage
+#    vaut avant comme apres n'importe quel echange futur.
+# ⚠ `|| true`, PAS `|| echo 000` : sur un port mort `curl` ECRIT DEJA « 000 » sur
+#    sa sortie et sort en 7. Le repli s'AJOUTE donc au lieu de remplacer, et la
+#    variable vaut « 000000 » — inoffensif dans le `case` ci-dessous, faux le jour
+#    ou quelqu'un testera l'egalite a « 000 ». Et l'omettre n'est pas une option :
+#    ce script est en `set -euo pipefail`, une affectation dont la substitution
+#    echoue AVORTE le script. Mesure : sans repli -> avorte · `|| echo 000` ->
+#    « 000000 » · `|| true` -> « 000 ».
+_vus=0
+for _p in 8080 8443 8444 8446; do
+    _up=$(curl -sk -o /dev/null -w '%{http_code}' --max-time 5 "https://localhost:$_p/up" 2>/dev/null || true)
+    case "${_up:-000}" in
+        200) _nom='portage' ; _chemin='/connexion' ;;
+        404) _nom='legacy ' ; _chemin='/auth/login.php' ;;
+        *)   continue ;;
+    esac
+    _code=$(curl -sk -o /dev/null -w '%{http_code}' --max-time 5 "https://localhost:$_p$_chemin" 2>/dev/null || true)
+    printf '   %s  https://localhost:%s%s  http=%s\n' "$_nom" "$_p" "$_chemin" "${_code:-000}"
+    _vus=$((_vus + 1))
+done
+# ⚠ UN BALAYAGE SANS OBJET ET DEUX PORTAILS A TERRE RENDENT LA MEME SORTIE : rien.
+#    Cette section s'affiche pendant une INSTALLATION, quand personne n'a d'autre
+#    repere. On DIT le zero. (`if` et non `[ ] && echo` : sous `set -e`, un test
+#    faux en fin de bloc fait sortir.)
+if [ "$_vus" -eq 0 ]; then
+    echo "   ⚠ AUCUN portail n'a repondu sur les quatre ports balayes (8080 8443 8444 8446)."
+    echo "     Ce n'est PAS « rien a signaler » : c'est une mesure sans resultat."
+elif [ "$_vus" -eq 1 ]; then
+    echo "   ⚠ UN SEUL portail sur deux a repondu."
+fi
 
 titre "termine"

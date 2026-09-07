@@ -98,9 +98,30 @@ return [
      * `backend/routes/bashrc.py`. Called by this page: `users`, `preview`,
      * `template`. Called by nobody, hence absent: `deploy`, `prerequisites`
      * (POST -- it INSTALLS), `restore`, `backups`. */
-    'non_porte_titre' => 'The deployment gestures are not ported yet',
-    'non_porte_texte' => 'Deploying itself, installing the prerequisites, restoring an earlier '
+    'non_porte_titre' => 'One gesture stays outside the portal',
+    'non_porte_texte' => 'Deployment, restore and the backup list are ported here. Installing the figlet package is not: it writes to the machine as root for a display utility. Do it over SSH, once per machine.'
                          . 'version and listing the backups are done from the legacy portal for '
                          . 'now.',
-    'non_porte_lien'  => 'Open deployment in the legacy portal',
+    'non_porte_lien'  => 'Open bashrc on the legacy portal',
+    /* B4 — les deux ecritures (2026-09-07). `overwrite` et
+       `/bashrc/prerequisites` ne sont PAS construits : voir public/js/bashrc.js. */
+    'col_action' => 'Action',
+    'deploy' => 'Deploy',
+    'deploy_aide' => 'Writes the standardised .bashrc to the selected accounts. Existing custom content is moved to ~/.bashrc.local, and a timestamped backup is created.',
+    'deploy_confirme' => 'Deploy the standardised .bashrc to :nombre account(s) — :comptes?\\n\\nA timestamped backup is created and custom content is moved to ~/.bashrc.local: nothing is lost.',
+    'deploy_en_cours' => 'Deploying…',
+    'deploy_fait' => 'Deployment complete. The account list has been reloaded.',
+    'deploy_echec' => 'Deployment failed. The remote .bashrc was not replaced.',
+    'deploy_sans_cible' => 'Pick a machine and at least one account before deploying.',
+    'restore' => 'Restore',
+    'restore_aide' => 'Restores the most recent backup of this account\'s .bashrc.',
+    'restore_confirme' => 'Restore :sauvegarde for :compte?\\n\\nDated :date, :taille bytes. There are :nombre backup(s) for this account; the most recent one will be restored.\\n\\nThe current .bashrc of :compte will be replaced.',
+    'restore_en_cours' => 'Restoring :compte…',
+    'restore_fait' => 'Backup restored for :compte.',
+    'restore_echec' => 'Restoring :compte failed — there may be no backup.',
+    'figlet_absent' => 'figlet is not installed on this machine: the .bashrc banner will not render. The rest of the file works. Installing the package is not offered here.',
+
+    /* La liste des sauvegardes, lue AVANT la confirmation de restauration. */
+    'restore_lecture' => 'Reading backups for :compte…',
+    'restore_aucune' => 'No backup for :compte — there is nothing to restore. A backup is created on every deployment.',
 ];

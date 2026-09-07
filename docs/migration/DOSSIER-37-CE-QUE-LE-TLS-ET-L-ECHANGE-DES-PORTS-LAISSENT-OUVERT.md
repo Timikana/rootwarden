@@ -280,3 +280,40 @@ chercherait.*
 *Deux sessions ont conclu à tort sur un `000` aujourd'hui.* **Un `000` au bout
 d'une redirection ne dit rien de la santé de la cible : il dit que la cible
 n'existe pas à cette adresse-là.**
+
+
+---
+
+## ⑧ APRÈS L'ÉCHANGE — deux scripts nomment chaque portail par le nom de l'autre
+
+**Trouvé en appliquant la règle du §⑦.2 : après un changement d'infrastructure,
+les sondes qu'on n'a PAS touchées sont celles qu'il faut ré-éprouver.**
+
+```
+scripts/installer-sur-vm.sh:124   « laravel http=%{http_code} »  http://localhost:8444/connexion
+scripts/installer-sur-vm.sh:125   « legacy  http=%{http_code} »  https://localhost:8443/auth/login.php
+scripts/migrer-vers-vm.sh:118-119  les deux mêmes lignes
+
+mesuré à 22:38, par ce que les ports SERVENT :
+  :8444 sert le LEGACY    -> la ligne « laravel » interroge le legacy    INVERSÉ
+  :8443 sert le PORTAGE   -> la ligne « legacy »  interroge le portage   INVERSÉ
+```
+
+> **Un exploitant qui lance l'un de ces scripts lit un rapport où chaque portail
+> porte le nom de l'autre.** *Ce n'est pas une panne : c'est une ligne d'état
+> plausible et fausse — et elle apparaît pendant une INSTALLATION ou une
+> BASCULE, exactement quand on s'y fie.*
+
+**Ce sont des étiquettes en dur, pas des replis** : *elles ne dépendent d'aucune
+variable, donc rien ne les corrige au démarrage.* **C'est le seul point de ce
+dossier qui soit FAUX aujourd'hui plutôt que latent.**
+
+### Remède, et il est de la même forme que celui de `rejouer-lot.sh`
+
+*Ne pas échanger les deux numéros — ils se re-périmeraient au prochain échange.*
+**Dériver du couple `(LARAVEL_URL, LEGACY_URL)` de `srv-docker.env`, qui porte
+déjà les bonnes valeurs**, ou contrôler l'ÉTAT avant d'étiqueter : `/connexion`
+répond 200 sur le portage, `/auth/login.php` sur le legacy.
+
+⛔ **Hors de mon périmètre d'écriture** (`scripts/`). *Signalé à la session qui a
+mené l'échange.*

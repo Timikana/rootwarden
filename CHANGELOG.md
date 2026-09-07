@@ -5,6 +5,200 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [2.0.102] - 2026-09-07
+
+### Extinction du legacy - bloc 4 : `bashrc/` archive, apres B4 et un arbitrage RENDU
+
+**Deux gestes manquaient. L'un a ete PORTE, l'autre est une perte ASSUMEE.**
+
+    /bashrc/backups        LECTURE PURE — GET, 0 ecriture, aucune commande
+                           systeme, un `ls -la` en SSH, meme garde que ses
+                           soeurs.  PORTE (2c017bb, appel reel bashrc.js:348)
+
+    /bashrc/prerequisites  installe `figlet` — un dessinateur de bannieres
+                           ASCII.  PERTE ACCEPTEE : un utilitaire cosmetique
+                           ne vaut pas de maintenir une page de l'ancien
+                           portail en service.  `apt install figlet`, une fois.
+
+**LE SIGNAL RESTE, LA PORTE PART.** *`figlet_present` arrive deja dans
+`/bashrc/users` : la page nomme ce qui manque et dit comment le faire, sans
+renvoyer nulle part.*
+
+> **Un renvoi maintient en vie ce vers quoi il renvoie.**
+
+    controle 1  graphe d'inclusion            0 appelant -> FEUILLE
+    controle 2  liens VIVANTS du portage vers /bashrc/ du legacy
+                (commentaires Blade retires)  0
+    controle 3  `bashrc/js` en code            1 seule reference, depuis la
+                                               page elle-meme -> le JS suit
+
+    au reseau, avant -> apres
+      /bashrc/              302 -> 404       /bashrc/js/bashrc.js  200 -> 404
+      TEMOIN vivant  /auth/login.php  200 inchange
+      le PORTAGE     /bashrc          302, repond
+
+**25 fichiers legacy servis.** *Trois arbitrages restent a l'exploitant, et les
+trois portent un geste a effet reel :* **I5** (le port SSH pour
+`iptables-restore`), **K4** (`NOPASSWD: ALL`), **S7b** (le scan qui aboutit —
+il envoie un courriel reel).
+
+---
+
+## [2.0.101] - 2026-09-07
+
+### `bashrc` — la liste des sauvegardes, et le lien qui maintenait le legacy en vie
+
+**Deux gestes, autorises nominalement par l'exploitant, qui closent le module.**
+
+#### ⑴ `/bashrc/backups` porte — et l'information va AU POINT DE DECISION
+
+*Le premier jet de B4, livre une heure plus tot, offrait « restaurer la sauvegarde la plus recente » sans
+montrer laquelle.* **L'ecran proposait l'annulation sans dire ce qu'elle annulerait.**
+
+    GET · 0 ecriture · une seule commande distante : `ls -la` sur les .bashrc.bak.*
+    meme chaine de garde que les trois autres, permission comprise
+
+**Un panneau separe aurait deplace le defaut, pas corrige** : l'information aurait ete a un endroit et la
+decision a un autre. La liste est donc lue **avant la confirmation**, et la question NOMME la sauvegarde,
+la date, la pese et dit combien il en existe. La route rend la liste triee par date decroissante, donc
+`backups[0]` **est** celle que `restore` restaurera.
+
+> **Et si la liste est vide, on ne demande rien et on n'envoie rien** : le bouton cesse d'etre une porte
+> vers un echec. *C'etait la reserve que j'avais inscrite en le livrant, faute de signal ; le signal
+> existait, dans une route que je n'avais pas portee.*
+
+#### ⑵ Le lien vers l'ancien portail est RETIRE. La mention reste.
+
+`/bashrc/prerequisites` n'est pas porte — il installe `figlet` en root pour un utilitaire d'affichage.
+**Mais l'encart qui l'annoncait renvoyait vers `legacy/bashrc/`, et ce renvoi etait le dernier motif de
+garder cette page EN SERVICE.**
+
+> **Un renvoi maintient en vie ce vers quoi il renvoie.** *Un encart doit pointer quelque part, donc la
+> page devait vivre — pour un dessin de banniere.*
+
+La page dit desormais ce qui manque **et comment le faire** (`apt install figlet`, par SSH, une fois par
+machine), sans porte. *Nommer un manque sans offrir de porte est plus honnete qu'une porte vers un portail
+qu'on demonte, et dont l'adresse a change la veille.*
+
+#### ⚠ ET LE MOTIF A TROIS AUTRES OCCURRENCES, VIVANTES
+
+Le meme controle applique aux sept liens `url_legacy` du portage :
+
+    fail2ban.blade.php    /fail2ban/               -> 404   ⛔ archive ce matin
+    acces-sftp.blade.php  /adm/server_user_sftp    -> 404   ⛔ `adm/` archive
+    politiques.blade.php  /adm/server_user_sudo    -> 404   ⛔ `adm/` archive
+    cles-ssh.blade.php    /ssh/                    -> 302   vivant
+    pare-feu.blade.php    /iptables/               -> 302   vivant
+
+**Trois boutons du portail NEUF envoient sur un 404 de l'ancien.** *Et un 404 se lit comme « l'ancien
+portail est tombe », pas comme « cette page a ete archivee ».* Inscrit `E-459`, non corrige : trois vues,
+et chacune demande de decider si la capacite est desormais portee ou perdue.
+
+**Verifie** : `node --check` · `php -l` ×3 · parite FR/EN **87 = 87** · les trois ensembles croises, aucune
+cle non transmise · **les cinq jetons du libelle de confirmation presents dans le catalogue ET remplaces
+par le JS** · temoin negatif sur une cle inventee · `route:list`.
+
+**Aucun exercice du geste.**
+
+## [2.0.100] - 2026-09-07
+
+### Portage — B4, les deux ecritures de `bashrc` (et les deux qu'on ne porte PAS)
+
+**Ce que le portage gagne** : deployer le `.bashrc` standardise, et restaurer la sauvegarde la plus
+recente. **Ce qu'il ne gagne pas, et c'est decide** : installer le paquet `figlet`.
+
+    /bashrc/deploy   PORTE     sauvegarde .bashrc.bak.<ts> chmod 600
+                               bloc personnalise migre vers ~/.bashrc.local
+                               validation `bash -n` apres ecriture
+    /bashrc/restore  PORTE     la sauvegarde la plus recente, PAR COMPTE
+    /bashrc/prerequisites  NON — `apt-get install figlet` en root
+    /bashrc/backups        non porte (lecture, reste a faire)
+
+**Pourquoi porter plutot qu'archiver** : *la valeur de `deploy` EST dans ses garde-fous.* Refaire ces
+gestes a la main, c'est les refaire sans la sauvegarde horodatee, sans la migration du contenu existant et
+sans le `bash -n` — et **un `.bashrc` casse retire le shell de connexion, ce qui ne se rattrape pas par le
+meme canal.**
+
+#### ⚠⚠ `mode` EST TOUJOURS ENVOYE, PARCE QUE LE DEFAUT EST LE PIRE DES DEUX
+
+Le backend fait `mode = data.get('mode', 'overwrite')`. **`overwrite` recrit le fichier sans migrer le bloc
+personnalise ; `merge` le migre.** Omettre le champ ne serait donc pas une abstention :
+
+> **Ce serait choisir la pire des deux valeurs sans l'ecrire.** *C'est l'inverse exact du champ `force` du
+> retrait de cle SSH, ou l'absence etait la prudence — ici l'absence est le danger.*
+
+Et `merge` est la valeur que **l'apercu** emploie deja : deployer dans un autre mode que celui qu'on vient
+de montrer rendrait l'apercu menteur. **`overwrite` n'est pas construit** — aucun bouton, aucun champ,
+aucune bascule. Verifie sur le code **depouille de ses commentaires** : `0` occurrence de `'overwrite'`,
+`0` de `prerequisites`, `0` de `dry_run`.
+
+#### Ce que la page DIT faute de pouvoir le faire
+
+`figlet_present` arrive **deja** dans la reponse de `/bashrc/users`. Le bouton d'installation n'etant pas
+porte, on garde le signal sans le geste : **la page nomme ce qui manque** et laisse l'operateur installer le
+paquet par le canal qu'il juge bon. *Ce qu'on perd est cosmetique — figlet ne change que la banniere.*
+
+#### Trois affirmations perimees, corrigees en passant
+
+- le docblock du JS disait *« ce fichier n'emet AUCUNE requete »* — **faux depuis B2** ;
+- un commentaire disait *« a relier au selecteur de mode des qu'il existe »* — **il n'existera pas**, la
+  garde est par construction ;
+- l'encart annoncait *« le deploiement n'est pas porte »* et renvoyait a l'ancien portail. **Un panneau qui
+  annonce une absence comblee envoie l'operateur ailleurs pour un geste qui est sous ses yeux.** Reformule
+  sur les deux qui restent ; son lien suit `app.url_legacy`, donc l'echange des ports l'a mis a jour seul.
+- et le controleur disait **« six routes »** : `bashrc.py` en declare **sept**.
+
+**Verifie** : `node --check` avec temoin negatif · `php -l` sur les trois fichiers PHP · parite FR/EN par
+`require` + `array_diff` (**85 = 85**, temoin negatif rendu) · **les trois ensembles croises** — catalogue,
+blob du controleur, cles lues par le JS : *onze cles manquaient au blob au premier jet et auraient rendu du
+VIDE* · colonnes du tableau **6 = 6** · `route:list`.
+
+**Aucun exercice du geste** : il ecrit dans un `$HOME` distant en root. *Aucune suite ne doit le soumettre.*
+
+## [2.0.99] - 2026-09-07
+
+### Extinction du legacy - bloc 3 : `fail2ban/` archive, sur un arbitrage RENDU
+
+**Ce bloc etait range chez l'exploitant. Il ne devait pas y etre.**
+
+*Je confondais « exercer un geste qui installe » — interdit sans son mot — avec
+« decider si on garde ce geste en v2.0 », qui est un arbitrage produit.* **Les
+deux questions n'ont pas le meme destinataire, et elles ont ete traitees comme
+une seule pendant deux jours.**
+
+    16 gestes appeles par legacy/fail2ban/js/main.js
+    14 portes  ·  2 absents  ·  TEMOIN /fail2ban/zzz-inexistant = 0
+
+      /fail2ban/install    26 lignes, 4 appels SSH  ->  `apt install fail2ban`
+      /fail2ban/restart    24 lignes, 4 appels SSH  ->  `systemctl restart fail2ban`
+
+**Deux enveloppes MINCES.** *Et `install_all` EST porte : installer fail2ban
+n'est pas perdu comme capacite, seule sa forme serveur-par-serveur l'est.*
+
+**PERTE ACCEPTEE, et dite** : installer fail2ban sur UN serveur, et le
+redemarrer, depuis l'interface. Deux commandes SSH.
+
+    la page              0 ecriture, 0 formulaire, sur 245 lignes
+    graphe d'inclusion   0 appelant -> FEUILLE
+    le JS orphelin       6 mentions de `fail2ban/js`, les 6 en COMMENTAIRE
+                         TEMOIN : `apiFetch` en code = 29 -> le zero est reel
+
+    au reseau, avant -> apres
+      /fail2ban/index.php    302 -> 404
+      /fail2ban/js/main.js   200 -> 404
+      TEMOIN archive  /adm/admin_page.php   404 inchange
+      TEMOIN vivant   /auth/login.php       200 inchange
+      le PORTAGE      /fail2ban             302 (repond)
+
+**26 fichiers legacy servis.** *Quatre arbitrages restent a l'exploitant, et
+leur raison n'est plus « ça touche une machine » :* **I5, K4, S7b portent un
+geste a effet sortant ou destructeur ; `bashrc/deploy` fait 143 lignes de
+sauvegarde horodatee, migration du contenu personnalise et validation `bash -n`
+avant de rendre la main — le refaire a la main est comment on casse le shell de
+connexion sur un parc.**
+
+---
+
 ## [2.0.98] - 2026-09-06
 
 ### Extinction du legacy - bloc 2 : `profile.php` et `privacy.php` archives

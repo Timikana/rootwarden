@@ -497,6 +497,117 @@ def sftp_remove():
 
 
 
+# ══ /policy/rollback — ROUVERTE le 2026-09-07 ═══════════════════════════════
+#
+# Retiree par `80c2057` au motif qu'elle etait ORPHELINE. Le critere employe
+# etait « aucun appelant dans le portage » — or son appelant etait un LIEN VERS
+# LE LEGACY, dans `acces-sftp.blade.php` et `politiques.blade.php`. **Une
+# troisieme espece de dependance qu'une sonde du portage seul ne voit pas.**
+#
+# La capacite etait morte AVANT ce retrait : les deux pages `adm/` qui la
+# servaient avaient deja ete archivees. Le geste etait donc juste en effet et
+# faux en raisonnement — et c'est le raisonnement qu'on reutilise.
+#
+# ⚠ POURQUOI ON NE L'ARCHIVE PAS COMME `figlet` : c'est le FILET du geste le
+# plus dangereux de ces pages. Un `sudoers` malforme retire `sudo` sur la
+# machine, et cela ne se rattrape PAS par le meme canal. La table garde
+# `previous_file_content`, donc le contenu exact existe ; sans cette route il
+# faut le RETAPER dans un formulaire, ce qui remplace un filet par une saisie.
+#
+# La garde est celle de ses soeurs, verifiee decorateur par decorateur :
+# `@require_api_key` + `@require_role(3)` + `@require_machine_access`. Et le
+# motif de step-up `#^/policy/rollback$#` existe DEJA dans
+# `RoutesBackend.php:321`, il est APPLIQUE (`:404`) et un test vivant l'exerce
+# — la route rouverte est donc derriere le step-up par construction, pas par
+# une intention qu'il faudrait se rappeler.
+
+@bp.route('/policy/rollback', methods=['POST'])
+@require_api_key
+@require_role(3)
+@require_machine_access
+@threaded_route
+def rollback():
+    """Restaure le contenu d'un deployment passé.
+
+    Body JSON : { machine_id, deployment_id, reason }
+    """
+    data = request.get_json(silent=True) or {}
+    ip, port, user, ssh_pass, root_pass, svc, mid, err = _resolve_ssh_creds(data)
+    if err:
+        return jsonify({'success': False, 'message': err}), 400
+
+    deployment_id = data.get('deployment_id')
+    if not deployment_id:
+        return jsonify({'success': False, 'message': 'deployment_id requis'}), 400
+    reason = (data.get('reason') or '').strip()[:500]
+
+    # Lookup le deployment cible
+    try:
+        with get_db_connection() as conn:
+            cur = conn.cursor(dictionary=True)
+            cur.execute(
+                "SELECT id, machine_id, server_user_id, policy_type, "
+                "previous_file_content, target_path, status FROM policy_deployments WHERE id = %s",
+                (int(deployment_id),))
+            dep = cur.fetchone()
+    except Exception as e:
+        # Patch A09 : pas de detail SQL au client.
+        logger.error("Erreur BDD rollback lookup: %s", e)
+        return jsonify({'success': False, 'message': 'Erreur BDD'}), 500
+
+    if not dep:
+        return jsonify({'success': False, 'message': 'deployment introuvable'}), 404
+    if int(dep['machine_id']) != int(mid):
+        return jsonify({'success': False, 'message': 'deployment_id ne correspond pas a machine_id'}), 400
+
+    username = _get_username_from_server_user_id(dep['server_user_id'], mid)
+    if not username:
+        return jsonify({'success': False, 'message': 'server_user introuvable'}), 404
+
+    previous = dep['previous_file_content'] or ''
+    policy_type = dep['policy_type']
+    manager = sudo_manager if policy_type == 'sudo' else sftp_manager
+
+    try:
+        with ssh_session(ip, port, user, ssh_pass, logger=logger, service_account=svc) as client:
+            result = manager.rollback_policy(client, root_pass, username, previous)
+    except Exception as e:
+        logger.error("[policy/rollback] %s", e)
+        return jsonify({'success': False, 'message': 'Erreur SSH'}), 500
+    # Mark original deployment as rolled_back
+    if result.get('success'):
+        try:
+            conn = get_db_connection()
+            cur = conn.cursor()
+            cur.execute(
+                "UPDATE policy_deployments SET status = 'rolled_back', "
+                "rolled_back_by = %s, rolled_back_at = NOW(), rollback_reason = %s "
+                "WHERE id = %s",
+                (_actor_id() or None, reason or None, int(deployment_id)))
+            conn.commit()
+            conn.close()
+        except Exception:
+            pass
+
+    # Record le rollback comme nouvelle entree applied
+    _mark_supersede_previous(mid, dep['server_user_id'], policy_type)
+    new_deployment_id = _record_deployment(
+        mid, dep['server_user_id'], policy_type,
+        {'rollback_of': int(deployment_id), 'reason': reason},
+        result, _actor_id(), 'applied' if result.get('success') else 'failed'
+    )
+
+    _audit_log(_actor_id(),
+        f"rollback type={policy_type} machine_id={mid} server_user_id={dep['server_user_id']} from_deployment={deployment_id}",
+        f"reason={reason or '-'} success={result.get('success')}")
+
+    return jsonify({
+        **result,
+        'rolled_back_deployment_id': int(deployment_id),
+        'new_deployment_id': new_deployment_id,
+    }), (200 if result.get('success') else 400)
+
+
 @bp.route('/policy/list', methods=['GET'])
 @require_api_key
 @require_role(3)

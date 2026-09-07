@@ -144,6 +144,16 @@
     <p class="rw-aide" role="status" aria-live="polite"
        data-rw="bashrc-comptes-etat">{{ __('bashrc.comptes_choisir') }}</p>
 
+    {{--
+        `figlet_present` arrive dans la reponse de `/bashrc/users`. Le legacy s'en
+        sert pour offrir l'installation ; ce bouton n'est pas porte, donc on garde
+        le SIGNAL sans le geste : la page nomme ce qui manque et laisse
+        l'operateur installer le paquet par le canal qu'il juge bon.
+    --}}
+    <div class="rw-avertissement" data-rw="bashrc-figlet-absent" hidden>
+        {{ __('bashrc.figlet_absent') }}
+    </div>
+
     <div data-rw="bashrc-comptes" hidden>
         <label class="rw-champ rw-champ--case">
             <input type="checkbox" class="rw-case" data-rw="bashrc-comptes-tout">
@@ -171,17 +181,35 @@
                         <th>{{ __('bashrc.col_uid') }}</th>
                         <th>{{ __('bashrc.col_home') }}</th>
                         <th>{{ __('bashrc.col_bashrc') }}</th>
+                        <th>{{ __('bashrc.col_action') }}</th>
                     </tr>
                 </thead>
                 <tbody data-rw="bashrc-comptes-corps"></tbody>
             </table>
         </div>
 
+        {{--
+            ── B4, LES ECRITURES ────────────────────────────────────────────
+            `overwrite` N'EST PAS OFFERT. Le backend le prend par DEFAUT quand
+            `mode` est absent, et il recrit le `.bashrc` sans migrer le bloc
+            personnalise. Le JS envoie donc toujours `merge` — la valeur que
+            l'apercu ci-dessous emploie deja, pour que le geste corresponde a
+            ce qu'on vient de montrer.
+
+            `/bashrc/prerequisites` n'est pas porte non plus : il installe un
+            paquet en root. L'avertissement figlet ci-dessus dit ce qui manque.
+        --}}
         <div class="rw-actions">
             <button type="button" class="rw-bouton rw-bouton--discret"
                     data-rw="bashrc-apercu"
                     title="{{ __('bashrc.apercu_aide') }}">{{ __('bashrc.apercu') }}</button>
+            <button type="button" class="rw-bouton rw-bouton--danger"
+                    data-rw="bashrc-deployer"
+                    title="{{ __('bashrc.deploy_aide') }}">{{ __('bashrc.deploy') }}</button>
         </div>
+
+        {{-- Un geste distant n'a pas d'autre retour que cette ligne. --}}
+        <p class="rw-aide" role="status" aria-live="polite" data-rw="bashrc-ecriture-etat"></p>
     </div>
 
     {{--
@@ -197,15 +225,34 @@
     {{--
         Une capacite non portee n'est pas un bouton inerte : le panneau dit ce
         que le geste engage, et son action principale est un lien MARQUE vers
-        l'ancien portail. Le DEPLOIEMENT lui-meme est B4 — B2 ne porte que les
-        deux lectures.
+        l'ancien portail.
+
+        ⚠ CE PANNEAU DISAIT « le deploiement n'est pas porte ». C'est FAUX depuis
+        B4 (2026-09-07) : `deploy` et `restore` sont ici. Il ne reste que DEUX
+        routes non appelees, mesurees sur le code depouille de ses commentaires :
+
+            /bashrc/prerequisites   installe figlet en root  — NON porte, decide
+            /bashrc/backups         liste les sauvegardes    — non porte
+
+        **Un panneau qui annonce une absence comblee envoie l'operateur ailleurs
+        pour un geste qui est sous ses yeux.** Le lien reste utile pour les deux
+        qui manquent — et il suit `app.url_legacy`, donc l'echange des ports du
+        2026-09-06 l'a mis a jour tout seul (`https://…:8446`).
     --}}
     <div class="rw-encart" data-rw="bashrc-non-porte">
         <p class="rw-sous-titre-fort">{{ __('bashrc.non_porte_titre') }}</p>
         <p class="rw-prose">{{ __('bashrc.non_porte_texte') }}</p>
-        <a class="rw-bouton" data-rw="bashrc-lien-legacy"
-           href="{{ rtrim(config('app.url_legacy'), '/') }}/bashrc/"
-           target="_blank" rel="noopener">{{ __('bashrc.non_porte_lien') }} ↗</a>
+        {{--
+            ⚠ LE LIEN VERS L'ANCIEN PORTAIL EST RETIRE (2026-09-07, decision de
+            l'exploitant). Il etait le dernier motif de garder `legacy/bashrc/`
+            EN SERVICE : un encart doit renvoyer quelque part, donc la page
+            devait vivre. **Un renvoi maintient en vie ce vers quoi il renvoie.**
+
+            La MENTION reste, et elle dit comment faire — `apt install figlet`,
+            par SSH, une fois par machine. Nommer un manque sans offrir de porte
+            est plus honnete qu'une porte vers un portail qu'on demonte, et dont
+            l'adresse a change hier (`:8443` -> `:8446`).
+        --}}
     </div>
 </section>
 

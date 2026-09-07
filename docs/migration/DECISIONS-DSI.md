@@ -1,5 +1,57 @@
 # Décisions du DSI délégué — session 8
 
+---
+
+## ⚠⚠ AVERTISSEMENT DE NUMÉROTATION — un numéro `E-` ne suffit pas à désigner un écart
+
+**Mesuré le 2026-09-07 à 15:40 CEST, après signalement de la session 4f
+(`c53e589`).** *Ce registre et `PARITE.md` allouent tous deux des `E-nnn`, sans
+espace de noms commun.*
+
+```
+PARITE.md          404 numeros definis par un titre `##`, max E-459
+DECISIONS-DSI.md    54 numeros definis par un titre `##`, max E-462
+definis des DEUX cotes                                    21
+
+  280 · 288 · 421 422 423 424 425 426 427 428
+  449 450 451 452 453 454 455 456 457 458 459
+
+TEMOIN POSITIF   E-280 : defini ici (:2552) ET dans PARITE (:14547)
+TEMOIN NEGATIF   E-100 · E-200 · E-300 : PARITE seul, aucune collision
+```
+
+**Exemple de l'ambiguïté, et il n'est pas théorique :**
+
+| numéro | ici | dans `PARITE.md` |
+|---|---|---|
+| `E-455` | *« E-449 est livré et attesté »* | *« la redirection HTTP→HTTPS du legacy mène dans le vide »* |
+| `E-453` | *« mes prompts récitent des chiffres que rien n'oblige à remesurer »* | *« la page exige une permission que la passerelle n'exige pas »* |
+
+> **J'ai rapporté `E-453` et `E-455` à l'exploitant en citant le sens de
+> `PARITE`, avec des numéros que CE registre emploie pour autre chose.**
+
+### ⚠ 21 est une BORNE HAUTE, pas un compte
+
+*Mon critère est « défini par un titre `##` des deux côtés ». Il ne distingue pas
+ALLOUER de CITER* — mon `E-280` s'intitule *« E-280 / E-281 — le départage »*,
+ce qui renvoie à l'écart de `PARITE` plutôt que d'en créer un. **La session 4f en
+compte 8 par un critère plus étroit. Le vrai nombre est entre 8 et 21, et le
+départager exige de lire les 21 entrées — non fait.**
+
+### RÈGLE, à partir de maintenant
+
+1. **Ce registre n'alloue plus au-dessus de `E-462`.** *La plage libre des deux
+   côtés commence à `E-463`* — mais un numéro nu restera ambigu, donc :
+2. **Toute citation nomme son registre** : « `PARITE` E-455 » ou
+   « `DECISIONS-DSI` E-455 », jamais « E-455 » seul.
+3. **Les 21 numéros ci-dessus ne sont PAS renumérotés.** *Des références
+   existent déjà dans les dossiers, les messages et les commits ; les renuméroter
+   casserait tout ce qui pointe dessus sans supprimer l'ambiguïté des copies
+   déjà parties.* **On borne la casse, on ne la réécrit pas.**
+
+---
+
+
 **Ouvert le 2026-08-28.** Charte au **§7.0 de `PLAN-DE-MIGRATION.md`**. Ce document porte les
 **sept arbitrages délégués**, tranchés, **plus un huitième né d'une mesure**. Les huit qui ne peuvent
 pas l'être vivent dans les `DOSSIER-*.md`, une page chacun.
