@@ -192,3 +192,46 @@ ouvre », et c'est le bon prix — un clic contre un déplacement.*
 *Le prédicat rend déjà `null` pour `-I` et les chaînes custom. **Ce cas-ci rend
 `false` alors qu'il relève du second message** — c'est le dernier écart, et il
 est dans le LIBELLÉ, plus dans la logique.*
+
+---
+
+## 8. TROISIÈME PASSE (`95892e7a`) — 19/20, et l'écart est le cas le plus ORDINAIRE
+
+**La logique à trois valeurs tient : `null` distingue bien « je ne peux pas
+prouver » de `false` « ces règles ferment ». Vingt cas forgés, dont huit contre
+le drapeau « peut-être » lui-même. Zéro fail-open.**
+
+**Un écart, et c'est celui qui compte :**
+
+```
+:INPUT DROP
+-A INPUT -i eth0 -p tcp --dport 22 -j ACCEPT     <- « peut-etre » (drapeau arme)
+-A INPUT -j DROP                                  <- DROP couvrant
+
+attendu  null    obtenu  false
+```
+
+> **Sur une machine dont SSH arrive par `eth0`, ce jeu garde l'accès OUVERT — la
+> première règle l'accepte.** *Le prédicat annonce « ces règles ferment le port ».*
+> ⛔ **C'est l'accusation fausse que le §7.1 avait fait corriger, sur le seul
+> agencement où elle survit : le drapeau « peut-être » ne franchit pas un `DROP`
+> couvrant placé plus bas.**
+
+**Et ce n'est pas un cas de laboratoire.** *`-A INPUT -j DROP` en dernière ligne
+est la clôture habituelle d'un pare-feu durci ; « un `ACCEPT` qualifié par
+interface, puis un `DROP` fourre-tout » est un jeu de règles parfaitement
+ordinaire.* **C'est donc la forme la PLUS PROBABLE de la fausse accusation, et
+c'est celle qui reste.**
+
+**La règle attendue** : *une fois qu'un `ACCEPT` « peut-être » a couvert le port,
+aucune règle postérieure ne peut plus conclure `false` — elle peut au mieux
+laisser `null`.* **Le drapeau doit dominer la suite du balayage, pas seulement
+la fin de fichier.**
+
+*Les huit autres cas du même lot passent, y compris les deux qui vérifient que le
+drapeau ne rend pas le prédicat inutilement muet* :
+
+```
+peut-etre PUIS preuve explicite   -> true    (la preuve l'emporte : correct)
+DROP certain AVANT peut-etre      -> false   (le DROP decide d'abord : correct)
+```
