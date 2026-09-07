@@ -306,3 +306,71 @@ dont les quinze plus banals que j'aie su écrire.** *Je la considère livrée.*
 **Ce qui reste ouvert n'est pas un défaut de code : c'est une question de
 produit — que fait l'écran quand la garde ne peut pas conclure, sur une
 configuration que le parc porte massivement.**
+
+---
+
+## 10. SEPTIÈME RONDE (`958bc4eb`, suivi de chaînes) — la même asymétrie, un cran plus bas
+
+**Le suivi de chaînes est une CAPACITÉ NOUVELLE sur une garde de sécurité : je
+l'ai éprouvée au lieu d'accepter « garde livrée ».** *Priorité donnée au risque
+propre au suivi — les boucles.*
+
+```
+FAIL-OPEN = 0        boucles = 0        aucun cas > 1 ms
+```
+
+**Le garde de boucle tient** : *chaîne qui s'appelle elle-même* et *boucle
+`A → B → A`* rendent `null` instantanément. **C'était le risque principal de
+cette addition, et il est fermé.**
+
+**Trois écarts, tous fail-closed, tous la MÊME cause :**
+
+```
+:INPUT DROP
+:OK - [0:0]
+-A INPUT -p tcp --dport 22 -j OK       <- le saut couvre le port
+-A INPUT -j DROP
+-A OK -j ACCEPT                        <- la chaine ACCEPTE sans condition
+
+attendu  true      obtenu  false
+```
+
+```
+chaine DECLAREE mais VIDE (RETURN immediat)     attendu true    obtenu null
+imbrication a 2 niveaux (A -> B -> ACCEPT)      attendu null    obtenu false
+```
+
+### 10.1 La cause : le correctif des rondes 3 à 5 n'a pas été appliqué au scan de CHAÎNE
+
+> **Quand le suivi ne peut pas conclure « ouvert », il retombe sur `false` — une
+> accusation — au lieu de `null` — un aveu.** *C'est exactement l'asymétrie que
+> les §7 à §9 ont fait corriger sur le balayage `INPUT`, reproduite un niveau
+> plus bas, dans le code écrit ensuite.*
+
+**Et pour le premier cas c'est pire qu'un aveu manqué : un `ACCEPT` inconditionnel
+dans une chaîne suivie OUVRE réellement le port, et le prédicat annonce
+« fermé ».** *Ce n'est pas « je ne sais pas » rendu trop prudemment : c'est un
+verdict FAUX.*
+
+### 10.2 Ce que ça coûte à l'addition elle-même
+
+**Le suivi de chaînes a été ajouté pour RÉDUIRE les refus sur le parc.** *Sur ces
+trois formes — chaîne qui accepte, chaîne vide, deux niveaux — il produit encore
+un refus, et sur la première il produit une accusation fausse.*
+
+> **Une capacité ajoutée pour supprimer des faux refus doit être mesurée sur les
+> faux refus qu'elle laisse.** *« Mon cas `fail2ban` passe maintenant » est vrai
+> et ne mesure qu'un jeu.*
+
+**La règle attendue, et c'est la même qu'aux §8 et §9 :**
+
+    la chaine prouve l'ouverture         -> true
+    la chaine ferme categoriquement      -> false
+    tout le reste — vide, trop profonde,
+    non definie, restreinte              -> null, JAMAIS false
+
+### 10.3 Ce qui reste acquis
+
+**Zéro fail-open sur 48 jeux forgés en cinq rondes.** *La garde n'a jamais laissé
+passer un jeu qui coupe. Les défauts restants sont tous du côté qui refuse — et
+c'est le bon côté pour un défaut.*
