@@ -13722,3 +13722,67 @@ d'édition neuve — que le portage a délibérément refusée — ou directemen
 qui exige de redéfinir ce que « la copie » veut dire. **Les deux sont des arbitrages, et ils
 appartiennent à I5.**
 
+---
+
+## ✅ E-472 — OÙ VA UN GABARIT : PAS DANS LA COPIE, ET LA RAISON EST UN NOM
+
+*Arbitrage laissé ouvert par `E-471` : le gabarit attend une destination, et la choisir
+m'appartient. Je la rends plutôt que de la reporter à I5.*
+
+### La mesure, d'abord
+
+```
+iptables_rules   ECRIT par   Iptables.php:246   <- I2, un RELEVE de la machine
+                 LU par      routes/iptables.py:296  -> /iptables-restore, qui APPLIQUE
+libelle          « Le portail peut garder une COPIE DES REGLES D'UNE MACHINE,
+                   pour les retrouver plus tard »
+message rendu    « Regles restaurees. »
+```
+
+**Un seul écrivain, et c'est un relevé.** *La table est donc, aujourd'hui, un INSTANTANÉ —
+et `restore` a le droit de dire « restaurées » parce que ce qu'il applique a réellement été
+sur la machine.*
+
+### ⛔ Ce que j'écarte : verser le gabarit dans la copie
+
+**Ce serait le seul endroit techniquement disponible, et c'est ce qui le rend tentant.** Mais
+un gabarit n'a jamais été sur la machine. **Le jour où la table en contient un, deux phrases
+deviennent fausses en même temps** :
+
+```
+« une COPIE DES REGLES D'UNE MACHINE »   -> ce n'en est pas une
+« Regles RESTAUREES »                     -> on n'en restaure aucune, on en pose
+```
+
+> **C'est la faute que j'ai déjà tranchée cette nuit sur `rollback` : un geste dont le nom
+> promet ce qu'il ne fait pas.** *Là c'était « réversible » et ça ne l'était pas ; ici ce
+> serait « restaurer » pour poser du neuf.* **Et l'opérateur clique parce que le nom le
+> rassure.**
+
+*Le coût n'est pas théorique : `restore` applique. Un gabarit versé dans la copie devient
+applicable par un bouton qui annonce une restauration.*
+
+### ✅ CE QUE JE RETIENS : la destination du gabarit est le chemin d'APPLICATION, donc I5
+
+**Le gabarit est une PROPOSITION. Sa place est là où l'on propose puis confirme — pas là où
+l'on conserve.**
+
+```
+I2 / I4        conservent et verifient CE QUI A ETE          <- le gabarit n'y entre pas
+I5             pose CE QUI SERA, avec Q2 en garde            <- sa destination
+```
+
+**Et ça referme `E-471` par une raison plutôt que par un report** : *le gabarit n'attendait
+pas « qu'on ait le temps », il attendait qu'un chemin existe où poser une proposition sans
+mentir sur ce qu'elle est.*
+
+⚠ **Corollaire, à tenir quand I5 s'écrira** : `iptables_rules` reste un instantané. **Si un
+jour une proposition doit y vivre, elle a besoin d'une colonne qui la distingue** — sans quoi
+`restore` appliquera indifféremment ce que la machine avait et ce que quelqu'un a proposé,
+sous le même mot.
+
+### Ce que ça laisse ouvert, et qui n'est pas de moi
+
+**Rien.** *Q1 et Q2 sont écrites et éprouvées, leur destination est décidée, et les deux
+attendent le même verrou que le reste : le port SSH.*
+
