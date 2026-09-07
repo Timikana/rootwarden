@@ -461,5 +461,69 @@
         if (panneau) panneau.hidden = true;
     });
 
+    /*
+     * ══ K4 — LE DECLENCHEMENT ════════════════════════════════════════════════
+     *
+     * ⚠ CE GESTE ECRIT EN ROOT SUR CHAQUE MACHINE COCHEE ET PEUT REVOQUER DES
+     * ACCES. Il n'enchaine rien tout seul : il est atteignable depuis le panneau
+     * de decision, qui nomme les machines, et de nulle part ailleurs.
+     *
+     * IL NE VISE PAS LA PASSERELLE. `L.url_deployer` est une route DU PORTAGE,
+     * qui appelle le preflight cote serveur et refuse de relayer si une seule
+     * machine echoue. Viser `/api/gateway/deploy` d'ici rendrait ce garde
+     * contournable d'un clic — c'est exactement ce que fait le legacy.
+     *
+     * LE VERBE EST EXIGE, PAS DEFAUTE : une omission ferait retomber `fetch` sur
+     * GET, et la route n'existe qu'en POST — le refus serait un 405 muet plutot
+     * qu'un deploiement, mais le motif reste le meme : une omission ne doit pas
+     * etre reinterpretee.
+     */
+    async function declenche() {
+        const bouton = document.querySelector('[data-rw="ssh-confirmer"]');
+        const zone = document.getElementById('journal-flux');
+        const cibles = selection().map((m) => Number(m.id));
+
+        if (cibles.length === 0) { return; }
+        if (bouton) { bouton.disabled = true; }
+
+        let r = { ok: false, d: {} };
+        try {
+            const rep = await fetch(L.url_deployer, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') || {}).content || '',
+                },
+                body: JSON.stringify({ machines: cibles }),
+            });
+            r = { ok: rep.ok, d: await rep.json().catch(() => ({})) };
+        } catch {
+            r = { ok: false, d: {} };
+        }
+
+        /*
+         * LE MESSAGE DU SERVEUR EST RENDU TEL QUEL, et il dit TOUJOURS ce qui n'a
+         * PAS ete fait. Un refus qui ne nomme pas son effet laisse l'operateur
+         * decider s'il relance — et relancer a l'aveugle peut revoquer des acces.
+         */
+        if (zone) {
+            zone.hidden = false;
+            zone.textContent = String(r.d.message || L.err_reseau || '');
+        }
+
+        if (r.ok) {
+            const panneau = document.getElementById('deploy-panneau');
+            if (panneau) panneau.hidden = true;
+            ouvreJournal();
+        } else if (bouton) {
+            // Le bouton REDEVIENT actif sur un refus : le geste n'a pas eu lieu,
+            // et l'operateur doit pouvoir corriger puis reessayer.
+            bouton.disabled = false;
+        }
+    }
+
+    document.querySelector('[data-rw="ssh-confirmer"]')?.addEventListener('click', declenche);
+
     annonceSelection();
 })();

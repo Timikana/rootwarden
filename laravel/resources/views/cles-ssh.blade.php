@@ -150,10 +150,11 @@
                         <strong>{{ __('ssh.confirmer_titre') }}</strong>
                         <p class="rw-aide" id="deploy-cibles"></p>
                         <p class="rw-aide">{{ __('ssh.confirmer_avertissement') }}</p>
-                        {{-- K4 N'EST PAS PORTE : le declenchement reste sur l'ancien
-                             portail, et la page le DIT plutot que d'offrir un bouton
-                             qui ne fait rien. --}}
-                        <p class="rw-aide">{{ __('ssh.non_porte') }}</p>
+                        {{-- K4 EST PORTE depuis le 2026-09-07. Le declenchement passe par
+                             `POST /cles-ssh/deployer`, qui EXIGE le preflight cote serveur
+                             avant de relayer : le legacy le gardait dans un `.then()` de
+                             navigateur, et un garde cote client ne garde que ceux qui
+                             passent par le client. Voir `App\Services\DeploiementCles`. --}}
                     </div>
                     {{-- Action principale a DROITE, secondaire a gauche. Un panneau
                          dont la seule action serait « Annuler » ne serait pas une
@@ -163,10 +164,12 @@
                     <div class="rw-panneau-decision__actions">
                         <button type="button" class="rw-bouton rw-bouton--discret"
                                 data-rw="ssh-annuler">{{ __('ssh.annuler') }}</button>
-                        <a class="rw-bouton" data-rw="ssh-vers-legacy"
-                           href="{{ config('app.url_legacy') }}/ssh/"
-                           target="_blank" rel="noopener"
-                           title="{{ __('ssh.non_porte') }}">{{ __('ssh.non_porte_lien') }} ↗</a>
+                        {{-- L'ACTION PRINCIPALE, et elle est DANGEREUSE : elle ecrit en
+                             root sur chaque machine nommee ci-dessus et peut REVOQUER des
+                             acces. Elle n'est atteignable qu'apres avoir ouvert ce panneau,
+                             qui nomme les machines — le legacy deployait au premier clic. --}}
+                        <button type="button" class="rw-bouton rw-bouton--danger"
+                                data-rw="ssh-confirmer">{{ __('ssh.deployer') }}</button>
                     </div>
                 </div>
             @endif
