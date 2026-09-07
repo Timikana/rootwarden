@@ -170,6 +170,7 @@
             if (cible !== 'ACCEPT' && cible !== 'DROP' && cible !== 'REJECT') {
                 var sous = analyseChaine(brute, port, chaines, profondeur + 1);
                 if (sous === null) { return null; }
+                if (sous === 'ouvre') { return 'ouvre'; }
                 if (sous === 'ferme') { return 'ferme'; }
                 if (sous === 'peut-etre') { peutEtre = true; }
                 continue;
@@ -179,8 +180,19 @@
             if (couvert === false) { continue; }
 
             if (cible === 'ACCEPT') {
-                // Un ACCEPT dans la chaine ne nous renseigne pas sur la suite
-                // du chemin INPUT : on le laisse a l'appelant.
+                /*
+                 * ⚠ IL PEUT PROUVER L'OUVERTURE, et je l'ignorais.
+                 *
+                 *     -A OK -j ACCEPT      <- accepte sans condition
+                 *
+                 * Un tel `ACCEPT` OUVRE reellement le port pour qui entre dans
+                 * la chaine. Le passer sous silence faisait retomber le
+                 * balayage sur le `DROP` de cloture d'INPUT, donc sur `false` —
+                 * **un verdict FAUX, pas seulement un aveu manque.**
+                 */
+                var ouvreIci = ouvreLePort(l, couvert === null ? true : couvert);
+                if (ouvreIci === true) { return 'ouvre'; }
+                if (ouvreIci === null) { peutEtre = true; }
                 continue;
             }
 
@@ -223,6 +235,13 @@
             var ligneK = lignes[k].trim();
             if (/^-I\s+INPUT\b/.test(ligneK)) { return null; }
             // Les definitions des chaines PERSONNALISEES, pour pouvoir les suivre.
+            // ⚠ UNE CHAINE DECLAREE MAIS VIDE EXISTE : elle `RETURN` aussitot,
+            // le trafic la traverse. La ranger avec les inconnues faisait rendre
+            // `null` la ou la reponse etait connue.
+            var decl = ligneK.match(/^:([\w.-]+)\s/);
+            if (decl && decl[1] !== 'INPUT') {
+                chaines[decl[1]] = chaines[decl[1]] || [];
+            }
             var def = ligneK.match(/^-A\s+(\w[\w.-]*)\s/);
             if (def && def[1] !== 'INPUT') {
                 (chaines[def[1]] = chaines[def[1]] || []).push(ligneK);
@@ -265,6 +284,7 @@
                 if (couvreLePort(l, port) === false) { continue; }
                 var sort = analyseChaine(cibleBrute, port, chaines, 0);
                 if (sort === null) { return null; }
+                if (sort === 'ouvre') { return true; }
                 if (sort === 'ferme') { return indecidable ? null : false; }
                 if (sort === 'peut-etre') { indecidable = true; }
                 continue;   // 'traverse' : le trafic ressort, on continue de lire

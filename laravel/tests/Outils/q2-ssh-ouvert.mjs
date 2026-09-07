@@ -166,6 +166,27 @@ const CAS = [
     ['CHAINE — imbriquee de deux niveaux : on ne pretend pas suivre',
      ':INPUT DROP\n:a - [0:0]\n:b - [0:0]\n-A INPUT -p tcp --dport 22 -j a\n-A INPUT -p tcp --dport 22 -j ACCEPT\n-A a -j b\n-A b -j c\n-A c -j RETURN', 22, null],
 
+    /* ══ LE SUIVI CONCLUT « OUVERT », ET NE RETOMBE PLUS SUR `false` ══════
+     * Ecarts de la 7e revue : quand le suivi ne pouvait pas conclure, il
+     * laissait le balayage retomber sur le DROP de cloture — donc sur une
+     * ACCUSATION. C'est l'asymetrie des rondes 3 a 5, reproduite un cran plus
+     * bas, DANS LE CODE ECRIT ENSUITE.
+     */
+    ['CHAINE — elle ACCEPTE sans condition : elle OUVRE',
+     ':INPUT DROP\n:OK - [0:0]\n-A INPUT -p tcp --dport 22 -j OK\n-A INPUT -j DROP\n-A OK -j ACCEPT', 22, true],
+
+    ['CHAINE — declaree mais VIDE : elle RETURN, le trafic traverse',
+     ':INPUT DROP\n:OK - [0:0]\n-A INPUT -p tcp --dport 22 -j OK\n-A INPUT -p tcp --dport 22 -j ACCEPT\n-A INPUT -j DROP', 22, true],
+
+    ['CHAINE — imbrication A->B->ACCEPT : suivie et conclue',
+     ':INPUT DROP\n:A - [0:0]\n:B - [0:0]\n-A INPUT -p tcp --dport 22 -j A\n-A INPUT -j DROP\n-A A -j B\n-A B -j ACCEPT', 22, true],
+
+    ['BOUCLE — A->B->A : la garde de profondeur ferme',
+     ':INPUT DROP\n:A - [0:0]\n:B - [0:0]\n-A INPUT -p tcp --dport 22 -j A\n-A A -j B\n-A B -j A', 22, null],
+
+    ['BOUCLE — une chaine qui s\'appelle ELLE-MEME',
+     ':INPUT DROP\n:A - [0:0]\n-A INPUT -p tcp --dport 22 -j A\n-A A -j A', 22, null],
+
     ['REEL — pare-feu durci complet, et il est SUR',
      ':INPUT DROP\n-A INPUT -i lo -j ACCEPT\n-A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT\n-A INPUT -p tcp --dport 22 -j ACCEPT', 22, true],
 ];
