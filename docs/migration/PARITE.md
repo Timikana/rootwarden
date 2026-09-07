@@ -22143,8 +22143,8 @@ a **`fail2ban`**, pas au pare-feu. Le `<select>` du legacy porte **cinq** gabari
 
     laravel/public/js/pare-feu-gabarits.js   charge par 0 vue
     pare-feu.blade.php                        aucun <select> de gabarit
-    laravel/lang/{fr,en}/pare-feu.php         0 cle 
-    legacy/lang/{fr,en}/iptables.php          13 cles , dont les 5 libelles
+    laravel/lang/{fr,en}/pare-feu.php         0 cle `tpl_*`
+    legacy/lang/{fr,en}/iptables.php          13 cles `tpl_*`, dont les 5 libelles
     legacy/iptables/index.php:312             <select onchange="loadTemplate(...)">
 
 *Temoin : `choisir` rend 1 dans le catalogue du portage — la sonde lit bien.*
