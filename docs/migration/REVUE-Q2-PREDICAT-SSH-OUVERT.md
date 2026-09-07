@@ -235,3 +235,74 @@ drapeau ne rend pas le prédicat inutilement muet* :
 peut-etre PUIS preuve explicite   -> true    (la preuve l'emporte : correct)
 DROP certain AVANT peut-etre      -> false   (le DROP decide d'abord : correct)
 ```
+
+---
+
+## 9. SIXIÈME RONDE (`2397bde1`) — aucun défaut, mais une CONSÉQUENCE opérationnelle
+
+**Quinze jeux, choisis en appliquant ma propre consigne : partir du plus BANAL.
+Machine nue, durci canonique, `fail2ban`, SSH sur un port non standard, CRLF,
+`-j RETURN`, port hors bornes.**
+
+```
+FAIL-OPEN = 0        ecarts = 2 / 15      (les deux fail-CLOSED)
+```
+
+**Le drapeau survit désormais au `DROP` postérieur : le cas de la §8 rend `null`.**
+*Et les trois cas de la famille Q1 — SSH sur 2222 — se comportent correctement,
+y compris la plage `2000:3000`.*
+
+### 9.1 ⚠ MES DEUX ATTENTES ÉTAIENT LES OPTIMISTES, PAS LE CODE
+
+```
+:INPUT DROP
+-A INPUT -p tcp -m multiport --dports 22 -j f2b-sshd    <- saut de chaine, COUVRE le port
+-A INPUT -i lo -j ACCEPT
+-A INPUT -p tcp --dport 22 -j ACCEPT
+-A INPUT -j DROP
+
+j'attendais true      le predicat rend null
+```
+
+**J'avais tort.** *`f2b-sshd` contient d'ordinaire des bannissements puis un
+`RETURN` — donc le trafic ressort et atteint l'`ACCEPT`. **Mais elle POURRAIT
+tout `DROP`**, et rien dans le fichier ne le dit.* **`null` est la réponse juste ;
+mon `true` était l'hypothèse confortable.**
+
+> **Deuxième fois dans ce fil qu'une de mes attentes penche du côté permissif,
+> face à un code qui penche du bon côté.** *C'est le rappel que le relecteur n'est
+> pas structurellement mieux placé que l'auteur — il est seulement AILLEURS.*
+
+### 9.2 ⛔ MAIS LA CONSÉQUENCE OPÉRATIONNELLE DOIT ÊTRE DITE
+
+**Ce jeu est celui de toute machine qui fait tourner `fail2ban` — et RootWarden
+GÈRE `fail2ban`.**
+
+> **Sur une part importante du parc, le prédicat rendra `null` : « je ne peux pas
+> prouver que ces règles laissent le port ouvert ».** *Refus systématique, sur des
+> jeux parfaitement sains.*
+
+**Ce n'est pas un défaut du prédicat : c'est le prix exact de « seule une preuve
+d'ouverture ouvre », rencontré sur la configuration la plus répandue du parc.**
+
+    un garde qui refuse parfois        est un garde
+    un garde qui refuse TOUJOURS       est un obstacle, et il se contourne
+
+**Ce que ça exige de l'écran — et c'est pour qui écrira le geste, pas pour le
+prédicat :**
+
+- le message `null` doit être **actionnable**, pas seulement honnête : *dire
+  QUELLE règle empêche de conclure* (`-j f2b-sshd`, ligne N) ;
+- et il doit exister **une issue** pour l'opérateur qui sait que son jeu est bon.
+  ⚠ *Laquelle — confirmation explicite, contournement tracé, ou rien — est un
+  arbitrage, pas une décision d'implémentation.* **Il appartient à l'exploitant,
+  au même titre que le port SSH.**
+
+### 9.3 Verdict de la revue
+
+**La garde est SAINE. Zéro fail-open sur 35 jeux forgés en quatre rondes,
+dont les quinze plus banals que j'aie su écrire.** *Je la considère livrée.*
+
+**Ce qui reste ouvert n'est pas un défaut de code : c'est une question de
+produit — que fait l'écran quand la garde ne peut pas conclure, sur une
+configuration que le parc porte massivement.**
