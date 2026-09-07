@@ -5,6 +5,45 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [2.0.102] - 2026-09-07
+
+### Extinction du legacy - bloc 4 : `bashrc/` archive, apres B4 et un arbitrage RENDU
+
+**Deux gestes manquaient. L'un a ete PORTE, l'autre est une perte ASSUMEE.**
+
+    /bashrc/backups        LECTURE PURE — GET, 0 ecriture, aucune commande
+                           systeme, un `ls -la` en SSH, meme garde que ses
+                           soeurs.  PORTE (2c017bb, appel reel bashrc.js:348)
+
+    /bashrc/prerequisites  installe `figlet` — un dessinateur de bannieres
+                           ASCII.  PERTE ACCEPTEE : un utilitaire cosmetique
+                           ne vaut pas de maintenir une page de l'ancien
+                           portail en service.  `apt install figlet`, une fois.
+
+**LE SIGNAL RESTE, LA PORTE PART.** *`figlet_present` arrive deja dans
+`/bashrc/users` : la page nomme ce qui manque et dit comment le faire, sans
+renvoyer nulle part.*
+
+> **Un renvoi maintient en vie ce vers quoi il renvoie.**
+
+    controle 1  graphe d'inclusion            0 appelant -> FEUILLE
+    controle 2  liens VIVANTS du portage vers /bashrc/ du legacy
+                (commentaires Blade retires)  0
+    controle 3  `bashrc/js` en code            1 seule reference, depuis la
+                                               page elle-meme -> le JS suit
+
+    au reseau, avant -> apres
+      /bashrc/              302 -> 404       /bashrc/js/bashrc.js  200 -> 404
+      TEMOIN vivant  /auth/login.php  200 inchange
+      le PORTAGE     /bashrc          302, repond
+
+**25 fichiers legacy servis.** *Trois arbitrages restent a l'exploitant, et les
+trois portent un geste a effet reel :* **I5** (le port SSH pour
+`iptables-restore`), **K4** (`NOPASSWD: ALL`), **S7b** (le scan qui aboutit —
+il envoie un courriel reel).
+
+---
+
 ## [2.0.101] - 2026-09-07
 
 ### `bashrc` — la liste des sauvegardes, et le lien qui maintenait le legacy en vie
