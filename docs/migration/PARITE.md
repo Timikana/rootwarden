@@ -22074,6 +22074,39 @@ l'ouvrait pas, il l'accordait par accident.*
    les deux suites qui couvrent `add_to_sudoers`. *Leurs 17 verts ne disaient rien du chemin corrige* — la
    preuve ci-dessus est une sonde ecrite pour l'occasion, pas un test du depot.
 
+### ⟶ LE TEST DE NON-REGRESSION, et la preuve qu'il MORD
+
+`backend/tests/test_sudo_fail_closed.py`, 5 tests. **Routage : la session 8 l'avait adresse a la session 7,
+qui a refuse sur le perimetre — `backend/tests/` n'est pas le sien — et elle avait raison.** *« La question
+n'est ni faut-il ce test, ni faut-il l'exercer, mais QUI L'ECRIT. Le perimetre ne se deplace pas parce que
+la cause est bonne. »*
+
+**Quatre proprietes, dont deux ne viennent pas de moi :**
+
+1. sur le chemin du rendu en echec, la fonction n'envoie **aucune** commande ;
+2. l'assertion porte sur **« RIEN n'est ecrit »**, pas sur « pas de `NOPASSWD ALL` » — *la seconde passerait
+   a vide si le repli revenait avec un autre contenu* (session 8) ;
+3. ⚠ un **TEMOIN POSITIF** exige que le chemin nominal ecrive : *sans lui, « 0 commande » passerait aussi
+   sur une fonction morte* (session 7, qui dit avoir pose un garde muet le matin meme) ;
+4. ⚠ le chemin `elif sudo:` **doit continuer d'ecrire** — pour que la question ouverte ne soit pas tranchee
+   depuis un test plutot que par une decision.
+
+**Prediction scellee avant de muter, puis mesuree — une mesure PAR PROCESSUS :**
+
+| version | chemin | commandes | verdict du test |
+|---|---|---|---|
+| servie | rendu en echec | **0** | `== []` vert |
+| servie | nominal | **4** | temoin vert |
+| **mutation A** — le `policy = None` d'avant | rendu en echec | **4** | `== []` **ROUGE** |
+| **mutation B** — fonction morte | nominal | **0** | temoin **ROUGE** |
+
+*Chaque mutation rougit dans un test different : le fail-closed et le temoin ne se recouvrent pas.*
+
+⚠ **Et ma premiere tentative de preuve etait fausse** : j'avais remplace `sys.modules['sudo_manager']` par
+un faux, puis fait `import sudo_manager as vrai` — **qui rend le faux**. Le temoin rendait donc `0` sur la
+version SERVIE, la ou pytest le voit passer. *Zero sur la sonde et zero sur le temoin : la mesure n'avait pas
+eu lieu.* Refaite avec **un processus par mesure**, plus rien a demeler.
+
 **Aucun redemarrage** : `add_to_sudoers` n'est appele que depuis `configure_servers.py`, lance en
 sous-processus neuf a chaque deploiement. *Verifie : `routes/ssh.py` n'importe de ce module que deux
 helpers de validation, et la seule autre mention de la fonction est un commentaire.*
