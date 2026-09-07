@@ -5,6 +5,80 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [2.0.103] - 2026-09-07
+
+### Extinction du legacy - bloc 5 : `security/` archive, et **S7b etait DEJA PORTE**
+
+**Le blocage que je portais depuis des jours n'existait pas.** *`S7b — le scan
+qui ABOUTIT` etait rangé comme « non porté, bloqué par une autorisation ».
+Mesuré :*
+
+```
+ScanCveController.php:164   'url_scan' => url('/api/gateway/cve_scan')
+public/js/scan-cve.js:488   async function lanceScan(mid)
+public/js/groupes.js:540    l'action groupee ENVOIE DE VRAIS COURRIELS, un par machine
+```
+
+> **Le portage l'atteint déjà, depuis DEUX écrans.** *Le blocage portait sur
+> l'EXERCER sur le banc, pas sur le porter — et les deux avaient été confondus.*
+
+### ⚠ MA LISTE DE GESTES ÉTAIT TRONQUÉE, et c'est ce qui cachait S7b
+
+*Le JS construit `` `${API_URL}/cve_${endpoint}` `` — une variable AU MILIEU du
+chemin.* **Mon extraction s'arrêtait au `${`.** *Résolu par ses sites d'appel :*
+
+```
+runScan(endpoint, ...)  appele 2 fois, les DEUX avec le litteral "scan"
+   ->  /cve_scan, et RIEN D'AUTRE
+   (confirme independamment a l'AST par la session 5f, 03f2e6e)
+```
+
+**NEUVIÈME instance de cette famille, et la première où le défaut portait sur le
+DOMAINE et non sur la mesure.** *Formulation de 5f, reprise : « une liste reçue
+ne porte pas sa propre complétude ».*
+
+### Le croisement des dix gestes — AUCUN n'est perdu
+
+```
+7 reimplementes en Laravel (forme 4, croises par TABLE)
+2 exceptions passerelle PAR DECISION   /tickets · /cve_reprioritize
+                                       toutes deux vers des services EXTERNES
+1 sans interface                       /cve_whitelist
+```
+
+### DÉCISION — `/cve_whitelist` : **PERTE ACCEPTÉE**
+
+| pour garder | contre |
+|---|---|
+| `reason`, `whitelisted_by`, `expires_at` — trois colonnes qui n'existent que pour rendre l'oubli impossible | **0 ligne en base** sur toute la vie du produit |
+| une liste blanche sans expiration est une dette | aucun écran nulle part, dans aucun des deux portails |
+
+> **Un garde-fou jamais employé ne protège de rien**, et laisser une capacité
+> *atteignable mais invisible* est la pire des trois voies. *(cadrage de 5f)*
+
+**Réversible** : *les trois routes backend existent toujours ; le jour où
+quelqu'un en a besoin, l'écran est un petit portage.* **Ce qui reste à faire est
+de les retirer de la portée du préfixe `/cve_` de la liste blanche** — sinon la
+capacité reste atteignable sans interface, ce qu'on vient de refuser.
+
+```
+controle 1  graphe d'inclusion                    0 appelant -> FEUILLE
+controle 2  liens VIVANTS du portage vers /security/  0
+controle 3  ecran de liste blanche CVE dans le portage  0
+            (les 2 vues qui disent « liste blanche » parlent de la PASSERELLE)
+controle 4  `security/js` en code   1 reference, depuis la page elle-meme
+
+au reseau, avant -> apres
+  /security/  302 -> 404    ·    /security/js/main.js  200 -> 404
+  TEMOIN vivant /auth/login.php  200 inchange
+  le PORTAGE    /scan-cve        302, repond
+```
+
+**24 fichiers legacy servis.** *Il ne reste que `iptables/` et `ssh/`, tous deux
+DÉCIDÉS À PORTER (`DOSSIER-40`, `DOSSIER-41`).*
+
+---
+
 ## [2.0.102] - 2026-09-07
 
 ### Extinction du legacy - bloc 4 : `bashrc/` archive, apres B4 et un arbitrage RENDU
