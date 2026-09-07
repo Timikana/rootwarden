@@ -77,6 +77,101 @@ qui double celle qui existe.* Corrigé avec sa remesure datée.
                     `fail2ban.js` — deux fichiers d'une AUTRE session. Non rafraichi
                     ici : le faire masquerait leur signal.
 
+## [2.0.106] - 2026-09-07
+
+### `legacy/ssh/` est ARCHIVE — il ne reste qu'UNE page servie
+
+**K4 porte, donc le module s'eteint.** *Contrôle avant le `git mv`, geste par geste,
+avec témoin négatif :*
+
+```
+/preflight_check   3 sites EN CODE dans laravel/   PORTE
+                   ClesSshController:120 · DeploiementCles:75 · RoutesBackend:36
+/deploy            2 sites EN CODE dans laravel/   PORTE
+                   DeploiementCles:132 · RoutesBackend:36
+TEMOIN /zzz-temoin 0 site                          ABSENT — l'instrument discrimine
+```
+
+⚠ **`scripts/geste-porte.py` rend `ABSENT` sur `/deploy`, et c'est un artefact de
+DOMAINE.** *Il mesure « ce chemin de passerelle est-il appelé par le JS du portage » ;
+or K4 ne vise PAS la passerelle depuis le navigateur — `cles-ssh.js` poste sur
+`POST /cles-ssh/deployer`, une route du portage, qui appelle le preflight côté serveur
+et relaie ensuite depuis PHP (`DeploiementCles:132`).*
+
+> **Un instrument juste appliqué à un objet hors de son domaine rend un verdict sans
+> valeur — et celui-ci rendait un verdict FAVORABLE au refus d'archiver.** *Nommer
+> l'outil ne suffit pas : il faut nommer son domaine.*
+
+### ⛔ RECTIFICATION — `fd54c99` NE CONTIENT PAS ce que son message décrit
+
+*Inscrit ici parce qu'un message de commit faux ne se corrige pas en le réécrivant.*
+
+```
+fd54c99  ce que le message annonce   les 3 liens reecrits · le CHANGELOG · le controle
+         ce qu'il CONTIENT           2 fichiers, 0 insertion, 0 suppression
+                                     — les deux renommages, et RIEN d'autre
+```
+
+**La cause : `git add -A … legacy/ssh …` sur un chemin que le `git mv` venait de faire
+disparaître.** *`git` répond `fatal: le chemin … ne correspond à aucun fichier` **et abandonne
+l'add entier** — pas seulement le mauvais chemin.* **Et j'avais mis `2>/dev/null` dessus.**
+
+Le commit a réussi quand même : les renommages étaient déjà dans l'index, posés par
+`git mv`. **Un commit qui réussit avec un `add` qui a échoué est indiscernable d'un commit
+complet** — c'est `git status` qui le disait, avec un espace devant le `M`, et je ne l'ai
+pas lu.
+
+**Les trois liens réécrits ont finalement été commités dans `c236dd1`**, qui parle d'autre
+chose. *Ce jalon décrit donc un travail réparti sur deux commits dont aucun ne le dit
+correctement.*
+
+> **`2>/dev/null` sur une commande dont l'échec est ce qu'on doit détecter.** *Dixième fois
+> dans ce dépôt, et la première où il masque une faute d'ÉCRITURE et non de mesure : les
+> neuf autres rendaient un faux zéro, celui-ci a rendu un faux commit.*
+
+### Trois liens du socle réécrits AVANT le retrait, pas après
+
+*`MODULE-ARCHIVAGE-RESTANT.md:119` laissait deux voies : attendre K4, ou réécrire le
+lien au moment du `git mv`. K4 étant porté, les deux étaient ouvertes — j'ai fait les
+deux.*
+
+```
+menu.php:73    $sideLink('/ssh/', …)      -> LARAVEL_URL . '/cles-ssh'
+menu.php:234   <a href="/ssh/">           -> <a href="<?= LARAVEL_URL ?>/cles-ssh">
+head.php:208   raccourci clavier S        -> LARAVEL_URL . '/cles-ssh'
+```
+
+**L'idiome n'est pas de moi : il est employé 16 fois dans `menu.php`** pour les modules
+déjà portés (`mises-a-jour`, `services`, `supervision`, `docker`, `taches`,
+`maintenance`). *Copier une forme qui marche dans le même fichier vaut mieux
+qu'écrire la sienne.*
+
+**Sans cette réécriture, l'archivage aurait ajouté TROIS liens morts aux onze que le
+socle porte déjà** — et les liens morts du socle s'affichent sur *chaque* page legacy,
+puisque `menu.php` et `head.php` sont inclus partout.
+
+### ⚠ Ce que l'archivage EMPORTE, et que je nomme plutôt que de le corriger
+
+**Cinq suites E2E référencent `/ssh/` dans leur branche `CIBLE === 'legacy'`** :
+`go-page-ssh-flux`, `go-page-ssh-parc`, `go-page-ssh-preflight`, `go-sec-v1.23`,
+`go.mjs`. *Leur cible legacy n'existe plus ; leur cible `laravel` est intacte.* **C'est
+`tests/e2e/` — je le signale, je n'y touche pas.**
+
+### Le décompte
+
+```
+.php suivis sous legacy/     178
+  archives                    78   (+1 module : ssh/)
+  vifs                       100
+    catalogues lang           74
+    >>> LE NOMBRE QUI DECIDE  26   (etait 27)
+```
+
+**Et sur ces 26, UNE SEULE est une page servie : `legacy/iptables/index.php`.** *Les
+25 autres sont le socle, qui tombe d'un bloc derrière elle.*
+
+---
+
 ## [2.0.105] - 2026-09-07
 
 ### Iso-perimetre — `/bashrc/prerequisites` est PORTE (ma 3e dette, la derniere)
