@@ -143,6 +143,38 @@ class LiensLegacy
          */
         '/adm/admin_page.php/' => 'comptes',
         '/security/'           => 'scan-cve',
+
+        /*
+         * ⚠ `/ssh-audit/` : la SEULE valeur emise par le backend qui tombait
+         * dans le repli, et le repli menait a un 404.
+         *
+         *     backend/routes/ssh_audit.py:156 et :164   link='/ssh-audit/'
+         *     legacy/ssh-audit/                          ARCHIVE (2 fichiers
+         *                                                dans _deprecated/)
+         *
+         * Le repli construisait `url_legacy . '/ssh-audit/'`, c'est-a-dire
+         * l'ancien portail, ou le repertoire n'existe plus. **Une notification
+         * du planificateur d'audit SSH menait dans le vide.**
+         *
+         * Et le portage avait DEJA tout ce qu'il fallait : la page
+         * (`->name('audit-ssh')`, web.php:301) et meme la redirection
+         * (`web.php:1202`, `GET /ssh-audit/` -> `audit-ssh`). Mais cette
+         * redirection attrape `/ssh-audit/` sur LE PORTAGE, alors que le lien
+         * emis pointait sur LE LEGACY. **La cible existait, la redirection
+         * existait, et le lien passait a cote des deux — parce qu'il n'etait
+         * pas sur le meme hote.**
+         *
+         * ══ ET LA DONNEE NE POUVAIT PAS LE DIRE ═══════════════════════════
+         *
+         * La table `notifications` ne porte aujourd'hui qu'UNE valeur distincte,
+         * `/security/`, qui est couverte. **Mesurer la DONNEE aurait rendu
+         * « rien d'expose, rien a faire ».** C'est en croisant les valeurs que
+         * le CODE peut composer contre cette table que le defaut apparait.
+         *
+         * > **Une table qui ne contient pas encore le cas dangereux ne dit rien
+         * > de ce que le code peut y mettre.**
+         */
+        '/ssh-audit/'          => 'audit-ssh',
         '/profile.php/'        => 'profil',
         '/'                    => 'accueil',
     ];
