@@ -223,3 +223,74 @@ WHERE u.role_id >= 3 OR p.user_id IS NOT NULL;
 
 **Tant qu'elle n'a pas ete passee, « le pouvoir est atteignable » est etabli et
 « quelqu'un l'occupe » ne l'est pas.**
+
+---
+
+## 7. ⛔ POURQUOI JE NE PORTE PAS — et ce n'est pas mon périmètre qui le dit
+
+**On m'a écrit que le portage de ces gestes « n'attend pas l'exploitant », que
+son mot concerne *« l'exercice d'un geste, pas son portage »*, et qu'un pair
+l'avait décidé. J'ai vérifié. Le document qui gouverne ce sous-lot dit le
+contraire, en toutes lettres.**
+
+`docs/migration/MODULE-FILTRAGE.md:268-269` :
+
+> *« `I5` application et retour arrière — **ne se porte pas avant que la décision
+> sur le port SSH soit tranchée**. »*
+
+**« Ne se porte pas » est une condition sur le PORTAGE, pas sur l'exercice.**
+*La distinction proposée est réelle en général ; elle ne s'applique pas ici,
+parce que la condition écrite porte explicitement sur le geste d'écrire.*
+
+### 7.1 Et l'arbitrage n'a pas été rendu — le dossier des arbitrages RENDUS le dit
+
+    DOSSIER-35 (« arbitrages RENDUS »):133   le port SSH d'`iptables` — « joint des
+                                             machines de son infrastructure »
+    DOSSIER-38:16                            I5 · iptables/index.php · le port SSH
+                                             pour iptables-restore   -> EN ATTENTE
+    DOSSIER-34:53                            bloqué sur l'arbitrage du PORT SSH
+
+> **Le dossier qui recense ce qui A été tranché range celui-ci parmi ce qui ne
+> l'a pas été, et pour un motif nommé : il touche l'infrastructure de
+> l'exploitant.** *Une décision prise depuis par un pair ne referme pas un
+> arbitrage qui avait été mis de côté précisément parce qu'il ne lui appartenait
+> pas.*
+
+**`/iptables-apply`, `/iptables-restore` et `/iptables-rollback` SONT I5.**
+Les porter, c'est porter I5.
+
+### 7.2 ⚠ ET LE QUATRIÈME NE DOIT PAS ÊTRE PORTÉ DU TOUT
+
+`MODULE-FILTRAGE.md:272-275`, **hors lot** :
+
+> *« `/iptables-logs` — le flux **diffuse un fichier que personne n'écrit**.
+> `/app/logs/iptables.log` est créé vide au démarrage et aucun writer n'existe.
+> L'utilisateur voit un flux qui n'émet que des pings pendant dix minutes.
+> **Ne pas le porter**, ou le brancher sur ce qui écrit réellement. »*
+
+**Vérifié :**
+
+```
+backend/Dockerfile:63   touch /app/logs/iptables.log        <- créé vide
+backend/server.py:231   for _lf in [... 'iptables.log' ...]  <- créé vide
+open(... 'iptables.log' ... , 'w'|'a')                       <- 0 occurrence
+```
+
+> ⚠ **Ma propre §2 disait : « `/iptables-logs`, 39 lignes, n'écrit rien, sa
+> valeur est dans sa borne de 600 s ».** *C'est exact et ça passe à côté :
+> j'ai mesuré la qualité du garde-fou d'un flux qui n'a rien à diffuser.*
+> **C'est la sixième question — « le câbler produirait-il quelque chose ? » —
+> que j'avais appliquée à `/cve_trends` et pas à celui-ci.**
+
+### 7.3 Ce qui reste vrai, et qui ne dépend d'aucun arbitrage
+
+**Les deux constats qui commandent l'écriture tiennent entiers, et ils sont vrais
+AUJOURD'HUI, indépendamment de l'extinction :**
+
+1. **le contrôle d'accès de `/iptables-rollback` vit dans le CORPS** — invisible
+   à tout inventaire par décorateurs ; à porter AVEC le geste, jamais après ;
+2. **les deux chemins d'application sont inversés** — `/iptables` `action:apply`
+   applique sans archiver, et il est déjà porté et déjà en liste blanche.
+
+**Le second est un défaut de trace du portage ACTUEL. Il ne demande ni I5 ni
+l'extinction : il demande une décision sur `action: "apply"`.**
