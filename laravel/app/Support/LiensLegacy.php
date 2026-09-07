@@ -175,6 +175,39 @@ class LiensLegacy
          * > de ce que le code peut y mettre.**
          */
         '/ssh-audit/'          => 'audit-ssh',
+
+        /*
+         * ══ ONZE ENTREES MANQUANTES, MESUREES LE 2026-09-08 ══════════════════
+         *
+         * `legacy/menu.php` porte 18 liens vers le legacy. DIX-SEPT visent une
+         * cible ARCHIVEE ; seul `/iptables/` est encore vivant. Et DOUZE de ces
+         * dix-sept n'avaient AUCUNE entree ici — alors que le portage porte la
+         * page correspondante, verifiee par son nom de route.
+         *
+         * **La table qui existe pour rediriger les chemins legacy etait donc
+         * muette sur exactement les chemins qu'un utilisateur clique.** Son
+         * repli construisait `url_legacy . <chemin>`, c'est-a-dire une adresse
+         * archivee : un 404 rendu par une table dont c'est le role de l'eviter.
+         *
+         * ⛔ ET LA DOUZIEME N'EST PAS ICI, DELIBEREMENT. `/api/docs.php` est la
+         * console d'API : `E-234` a decide qu'elle NE SE PORTE PAS, et
+         * `DOSSIER-10` le dit — « le portage n'a pas de console ». La mapper
+         * vers `cles-api` enverrait qui cherche une console vers une page de
+         * CLES : deux choses differentes, et le lecteur croirait avoir trouve.
+         * **Une capacite refusee n'a pas d'equivalent ; lui en inventer un est
+         * pire que le lien mort.**
+         */
+        '/fail2ban/'           => 'fail2ban',
+        '/bashrc/'             => 'bashrc',
+        '/graylog/'            => 'graylog',
+        '/wazuh/'              => 'wazuh',
+        '/groups/'             => 'groupes',
+        '/adm/server_users.php/'      => 'comptes-distants',
+        '/adm/platform_keys.php/'     => 'cle-plateforme',
+        '/adm/server_user_sudo.php/'  => 'politiques',
+        '/adm/server_user_sftp.php/'  => 'acces-sftp',
+        '/security/compliance_report.php/' => 'rapport-conformite',
+        '/documentation.php/'  => 'documentation',
         '/profile.php/'        => 'profil',
         '/'                    => 'accueil',
     ];
