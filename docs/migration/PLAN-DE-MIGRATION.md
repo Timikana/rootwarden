@@ -133,6 +133,14 @@ print(len(r),'portees /',len(e),'  legacy',len(g),'  recoupe:',len(r)+len(g)==le
 grep -cE "^\s*\['cle'" laravel/app/Support/Navigation.php   # 33 : le total, mesure independante
 ls legacy/_deprecated/                                   # parties archivees
 # ecarts = identifiants DEDUPLIQUES, toutes profondeurs de titre (E-278 : `grep -c '^## E-'` comptait des TITRES)
+  # ⚠ CETTE COMMANDE NE LIT QU'UN REGISTRE, ET C'EST INSUFFISANT POUR ALLOUER.
+  #    `DECISIONS-DSI.md` alloue dans LA MEME SEQUENCE : le 2026-09-07, huit
+  #    numeros (E-452..E-459) designaient deux ecarts DIFFERENTS. Pour COMPTER
+  #    les ecarts de parite, la ligne ci-dessous est juste ; pour ALLOUER un
+  #    numero neuf, prendre le maximum des DEUX (vrai max au 2026-09-07 : 462) :
+  #      cat <(grep -ohE '^#{1,6} +E-[0-9]+' docs/migration/PARITE.md) \
+  #          <(grep -ohE '^#{1,6} +E-[0-9]+' docs/migration/DECISIONS-DSI.md) \
+  #        | grep -oE '[0-9]+' | sort -n | tail -1
 python3 -c "import re;t=re.findall(r'^#{1,6} +(E-\\d+[a-z]*)',open('docs/migration/PARITE.md').read(),re.M);n=sorted({int(re.match(r'E-(\\d+)',x).group(1)) for x in t});print(len(set(t)),'ecarts, max E-%d'%n[-1],'jamais servis:',[x for x in range(n[0],n[-1]+1) if x not in set(n)])"
 git fetch origin && git rev-list --left-right --count @{u}...HEAD
 sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
