@@ -112,3 +112,83 @@ tous tenus, directement ou transitivement, par les cinq survivants.
 - **et un artefact de ma propre partition, corrigé** : la sonde 1 seule libérait
   `lang/en.php`, `auth/login.php`, `logout.php` et `verify_2fa.php`. Les quatre sont
   retenus. *Un graphe d'`include` n'a jamais vu qu'une espèce sur cinq.*
+
+---
+
+## 6. ⚠ L'AXE SORTANT — ajouté le **2026-09-07 21:55 CEST**, et ma carte ne l'avait pas
+
+Le §1 à §5 mesure les arêtes **entrantes** : *qui tient ce fichier en vie.* Il ne
+mesurait pas les **sortantes** : *qui ce fichier tient en vie.* Un pair l'a établi sur
+`menu.php`, et le contrôle exhaustif le confirme et l'élargit.
+
+### 6.1 Trois contraintes d'ORDRE
+
+    menu.php:179 :343 :366 :380   ->  adm/api/notifications.php   (4 sites)
+    menu.php:204 :255             ->  auth/logout.php
+    auth/login.php:389            ->  auth/forgot_password.php
+    + (mesure d'un pair)  auth/login.php:19  require_once  adm/includes/audit_log.php
+
+**`menu.php` est inclus par TOUTES les pages legacy vivantes.** La cloche de
+notifications est donc un lien entrant **permanent** vers son API : l'archiver rendrait
+404 sur chaque page, pour quatre gestes.
+
+> **Un fichier de socle n'est pas seulement APPELÉ : il peut être APPELANT, et
+> retarder la mort de fichiers que personne ne classait comme dépendants de lui.**
+
+### 6.2 ⚠ ONZE LIENS MORTS — le socle pointe déjà vers des pages archivées
+
+    menu.php     9 liens morts : /index.php x2 · /notifications.php · /profile.php x2
+                 /adm/admin_page.php · /adm/server_users.php · /adm/platform_keys.php
+                 /security/compliance_report.php · /documentation.php
+                 /adm/api/global_search.php
+    head.php     1 : /profile.php
+    footer.php   1 : /terms.php et /privacy.php
+    verify.php   1 : /index.php
+
+**Chaque page legacy encore servie rend un menu et un pied de page pleins de 404.**
+Et `auth/verify.php:364` est le cas le plus net : sur l'écran « accès refusé » (403),
+le bouton **« retour au tableau de bord »** mène à `/index.php`, archivé. *Ce n'est
+pas une panne — c'est une impasse, et c'est exactement ce que `_sortie.php` a été
+écrit pour rattraper.*
+
+**Je le signale, je ne le corrige pas** : ces liens sont dans du code que je ne touche
+pas, et leur sort dépend de l'ordre d'extinction ci-dessous.
+
+---
+
+## 7. L'ORDRE D'EXTINCTION
+
+    ┌─ ETAGE 0 ─ attend UN MOT DE L'EXPLOITANT, deux fois ────────────────┐
+    │  legacy/iptables/index.php     DOSSIER-40 (la variante qui TRACE)   │
+    │  legacy/ssh/index.php          K4 (arbitrage)                       │
+    └────────────────────────────────────────────────────────────────────┘
+                            │ tant qu'une des deux vit, TOUT ce qui suit vit
+                            ▼
+    ┌─ ETAGE 1 ─ les trois autres survivants, deja confies ──────────────┐
+    │  api_proxy.php · adm/api/notifications.php · adm/includes/audit_log │
+    └────────────────────────────────────────────────────────────────────┘
+                            ▼
+    ┌─ ETAGE 2 ─ le socle, D'UN BLOC — avec TROIS contraintes internes ──┐
+    │  menu.php        AVANT  notifications.php  et  auth/logout.php     │
+    │  auth/login.php  AVANT  forgot_password.php  et  audit_log.php     │
+    │  head.php · footer.php · db.php · includes/* · crypto · lang/*     │
+    └────────────────────────────────────────────────────────────────────┘
+                            ▼
+    ┌─ ETAGE 3 ─ EN DERNIER, et pas par du code ─────────────────────────┐
+    │  _sortie.php   `ErrorDocument 404` — il sert le 404 de TOUT ce qui  │
+    │                est deja archive. Il part avec le VHOST, pas avant.  │
+    └────────────────────────────────────────────────────────────────────┘
+
+**Ce que l'exploitant a besoin de lire n'est donc pas « il reste 27 ».** C'est :
+**il reste DEUX mots à donner** — l'un sur `iptables/`, l'autre sur `ssh/` — et tout
+le reste tombe derrière, dans l'ordre ci-dessus, sans autre arbitrage.
+
+### 7.1 ⚠ Une inversion à ne pas commettre
+
+`adm/api/notifications.php` et `adm/includes/audit_log.php` **paraissent** archivables
+— leurs gestes sont portés, l'appariement est complet. **Ils ne le sont pas**, et pour
+la même raison dans les deux cas : *le socle les tient*. `menu.php` appelle le
+premier, `auth/login.php` requiert le second.
+
+> **Deux refus de la même soirée, une seule cause : on avait mesuré les GESTES et pas
+> les APPELANTS.** Un appariement complet et favorable ne dit rien de l'archivabilité.
