@@ -863,6 +863,53 @@ complet.
 
 ---
 
+## ⚠⚠ AVERTISSEMENT DE NUMEROTATION — **HUIT NUMEROS DESIGNENT DEUX CHOSES** (2026-09-07)
+
+**`E-452` a `E-459` existent DANS LES DEUX REGISTRES, avec des sujets differents.** Mesure :
+
+    PARITE.md          432 entrees, E-01  -> E-459
+    DECISIONS-DSI.md    63 entrees, E-209 -> E-462
+    numeros communs     26
+
+*Les 18 plus anciens sont des CITATIONS : le registre DSI renvoie a un ecart d'ici par son numero, ce qui est
+legitime.* **Les huit derniers sont des COLLISIONS** — deux entrees distinctes, ecrites le meme jour, sous le
+meme numero :
+
+| n° | ici | chez la DSI |
+|---|---|---|
+| 452 | « LOT conforme » sur 53 executions | des criteres scelles avant lecture |
+| 453 | la page exige une permission que la passerelle n'exige pas | des chiffres recites dans ses prompts |
+| 454 | le legacy archive sous les suites | la limite de sa « sixieme question » |
+| 455 | la redirection HTTP→HTTPS du legacy | E-449 livre et atteste |
+| 456 | la sonde de vie du portage | la modale de step-up du legacy cassee |
+| 457 | deux scripts nommant chaque portail par l'autre | une suite hors lot postant un deploiement sudo |
+| 458 | B4 porte, le defaut de `mode` | **« deux numerotations pour un meme produit »** |
+| 459 | trois boutons vers un 404 | « ou vit la cible » |
+
+> **La cause est mienne et elle est simple : ma commande de remesure ne lit que CE fichier.** *« max E-459 »
+> etait juste pour `PARITE.md` et faux pour le chantier* — le vrai maximum etait **E-462**. J'ai alloue huit
+> numeros en croyant mesurer, et je les ai cites dans une dizaine de messages.
+
+### La regle, a partir de maintenant
+
+1. **CITER LE REGISTRE** : `PARITE/E-459` ou `DSI/E-459`. Un `E-459` nu est ambigu pour ces huit-la.
+2. **ALLOUER sur le maximum des DEUX** :
+
+```bash
+cat <(grep -ohE '^#{1,6} +E-[0-9]+' docs/migration/PARITE.md) \
+    <(grep -ohE '^#{1,6} +E-[0-9]+' docs/migration/DECISIONS-DSI.md) \
+  | grep -oE '[0-9]+' | sort -n | tail -1        # le prochain est celui-ci + 1
+```
+
+3. **NE PAS RENUMEROTER.** *Les huit sont cites dans des commits et des messages des deux cotes ; renumeroter
+briserait chaque citation et transformerait une ambiguite CONNUE en confusion silencieuse.* L'ambiguite est
+donc **declaree**, pas effacee.
+
+⚠ **Et la coincidence merite d'etre dite** : le `DSI/E-458` s'intitule *« DEUX NUMEROTATIONS POUR UN MEME
+PRODUIT »*. **Nous ecrivions sur un probleme de numerotation en train d'en creer un.**
+
+---
+
 ## E-01 — Le rejeu d'un code TOTP doit etre refuse
 
 **Cible legacy : accepte (defaut). Cible Laravel : REFUSE — corrige le 2026-08-17.**
@@ -21744,4 +21791,231 @@ non tranché ; le correctif est deux lignes, celles du portage.**
 
 ⚠ **Effet pratique en attendant** : quiconque tape `http://<hote>:8444` obtient un 301 vers une adresse
 morte. **`https://<hote>:8446` fonctionne** et c'est la seule adresse du legacy à diffuser.
+
+---
+
+## E-456 — LA SONDE DE VIE DU PORTAGE CERTIFIAIT QU'APACHE REDIRIGE, PAS QUE L'APPLICATION RÉPOND
+
+**Relevée par la session 8, témoin du chemin inventé par la session 7, mesurée ici dans la condition réelle
+— *dans* le conteneur, sur `localhost:80`, et non depuis l'hôte.** Corrigée et appliquée le 2026-09-06.
+
+    curl -fs  http://localhost:80/up               exit 0    HTTP 301
+    curl -fs  http://localhost:80/zzz-invente      exit 0    HTTP 301   <- le temoin
+    curl -fsk https://localhost:443/up             exit 0    HTTP 200
+    curl -fsk https://localhost:443/zzz-invente    exit 22   HTTP 404   <- il discrimine
+
+**`curl -f` échoue sur `>= 400`, PAS sur une 301, et sans `-L` il ne suit rien.** Le conteneur se serait
+donc déclaré **sain avec le portail mort** : la sonde ne franchissait jamais la redirection.
+
+### Ce qui rend cet écart instructif : **elle était JUSTE, et elle est devenue vide sans qu'on y touche**
+
+`8862849`, le 2026-09-06 à **12:47** — *« TLS sur le portage : l'authentification était servie EN CLAIR »* —
+a transformé le vhost `:80` en **redirection seule, aucun contenu en clair**. *Avant ce commit, `:80`
+servait l'application et cette sonde mesurait exactement ce qu'elle annonçait.*
+
+> **Une correction de sécurité a vidé une sonde de vie, à distance, sans la toucher.** *Rien dans la ligne
+> du `healthcheck` n'a changé ; c'est ce qu'elle interrogeait qui a changé sous elle.* Septième instance du
+> mécanisme d'E-454 — **une valeur lue sans sa date** — et la première où la « valeur » est une sonde.
+
+**Et le silence était double** : `docker ps` affichait `healthy`, et **`docker-compose.prod.yml` ne
+redéfinit pas ce `healthcheck`** — *la production en héritait*. La session 8 avait d'abord annoncé le
+contraire, ayant compté les occurrences dans le seul fichier de surcharge : **un zéro d'héritage lu comme un
+zéro d'existence**.
+
+### Ce qui bornait la casse, et pourquoi ce n'était pas une chance
+
+**Aucun service n'attend le portage en `service_healthy`** — les quatre dépendances de santé sont
+`php→db`, `php→python`, `laravel→db`, `python→db`. Aucun ordre de démarrage n'était cassé. *L'effet était un
+`docker ps` menteur, et toute supervision qui lit ce statut.*
+
+### Appliqué, et éprouvé APRÈS
+
+`docker-compose.yml:145` porte désormais la forme des trois autres services :
+`["CMD","curl","-fsk","https://localhost:443/up","-o","/dev/null"]`. Coût mesuré par `--dry-run` **avant**
+d'agir : **un seul conteneur recréé**, les trois autres intacts. Éprouvée après recréation, dans le
+conteneur : `/up` → **exit 0**, `/zzz-invente` → **exit 22**. *La sonde rend le positif ET le négatif : elle
+mesure.* Et l'échange des ports a survécu — `:8443` portage, `:8446` legacy, témoin absurde à 404.
+
+---
+
+## E-457 — DEUX SCRIPTS DE DÉPLOIEMENT NOMMAIENT CHAQUE PORTAIL PAR L'AUTRE
+
+**Relevé par la session 8 le 2026-09-06 à 22:38, corrigé dans l'heure. Seul point FAUX de la journée plutôt
+que latent** — les autres retombées de l'échange étaient des replis qui ne s'armaient pas.
+
+    installer-sur-vm.sh:124   « laravel http= »   http://localhost:8444/connexion       -> le LEGACY
+    installer-sur-vm.sh:125   « legacy  http= »   https://localhost:8443/auth/login.php -> le PORTAGE
+    migrer-vers-vm.sh:118-119  les deux memes lignes
+
+**Ce ne sont pas des replis** : des étiquettes en dur, ne dépendant d'aucune variable, que rien ne corrige
+au démarrage. **L'échange des ports les a rendues fausses sans que le fichier bouge** — huitième instance du
+mécanisme d'E-454.
+
+> **Et le moment est le pire possible** : ces lignes s'affichent pendant une **INSTALLATION** ou une
+> **MIGRATION VERS UNE VM**. *Deux lignes d'état plausibles et inversées, exactement quand on s'y fie et
+> qu'on n'a rien d'autre pour se repérer.*
+
+### Le remède : ne pas échanger deux numéros
+
+*Les échanger les aurait re-périmées au prochain échange* — et cette journée en a produit un. **On balaie
+les quatre ports et on laisse chacun se nommer par son ÉTAT** : `/up` rend `200` sur le portage, `404` sur
+le legacy. Le balayage vaut avant comme après n'importe quel échange futur, et n'exige aucune variable
+d'environnement — ce qui compte pour `migrer-vers-vm.sh`, dont le contrôle part par SSH sans le fichier
+d'env.
+
+**Éprouvé en exécutant le bloc extrait du fichier**, pas une transcription :
+
+    portage  https://localhost:8443/connexion        http=200
+    legacy   https://localhost:8446/auth/login.php   http=200
+
+*C'est la forme du patch `06` appliquée à un second endroit : l'état décide, jamais une valeur.*
+
+### ⟶ DEUX DÉFAUTS DU CORRECTIF LUI-MÊME, relevés par la session 8 — et le remède évident cassait le script
+
+**① Le saut était SILENCIEUX.** `*) continue ;;` sur les ports qui ne répondent pas : si **aucun** portail ne
+répond, la section s'imprime **vide**. *Un balayage sans objet et deux portails à terre rendent la même
+sortie* — dans un rapport qui s'affiche pendant une **installation**, quand personne n'a d'autre repère.
+C'est « zéro sur la sonde ET zéro sur le témoin » appliqué à une sortie destinée à un humain. **Corrigé** :
+on compte les portails nommés et on DIT le zéro.
+
+**② `|| echo 000` s'AJOUTE au lieu de remplacer.** Sur un port mort, `curl -w '%{http_code}'` **écrit déjà
+« 000 »** puis sort en 7 — le repli imprime une seconde fois et la variable vaut **`000000`**. Inoffensif
+dans le `case`, faux le jour où quelqu'un testera l'égalité à `000`.
+
+> ⚠ **MAIS LE REMÈDE ÉVIDENT — retirer le repli — AVORTE LE SCRIPT.** Ces deux fichiers sont en
+> `set -euo pipefail`, et **une affectation dont la substitution de commande échoue fait sortir**. Mesuré,
+> les trois formes :
+>
+>     sans repli        ->  ⛔ SCRIPT AVORTE
+>     || echo 000       ->  survit, « 000000 » (6 car.)
+>     || true           ->  survit, « 000 »    (3 car.)     <- retenue
+>
+> *Le `|| echo 000` faisait DEUX choses : il dupliquait la valeur, et il protégeait du `set -e`. On ne
+> voyait que la première.* **Un défaut réel dont la correction naïve casse plus qu'il ne coûtait.**
+
+Et le message final est un **bloc `if`**, pas un `[ … ] && echo` : sous `set -e`, un test faux en fin de bloc
+fait sortir. **Éprouvé sur trois cas, code de sortie `0` partout** — nominal (deux portails nommés), zéro
+(*« ce n'est PAS "rien à signaler" : c'est une mesure sans résultat »*), et un seul portail.
+
+### ⟶ Et la dernière sonde non reprise depuis le TLS est SAINE
+
+La session 8 avait éprouvé trois des quatre `healthcheck` du compose et laissé celle du backend, injoignable
+depuis l'hôte. **Mesurée depuis SON conteneur** :
+
+    curl -fsk https://localhost:5000/test           exit 0    HTTP 200
+    curl -fsk https://localhost:5000/zzz-invente    exit 22   HTTP 405
+
+**Elle mord.** *Les quatre sondes du fichier distinguent désormais leur objet d'un chemin inventé* — trois
+l'ont toujours fait, la quatrième (E-456) vient d'être corrigée.
+
+---
+
+## E-458 — B4 PORTÉ, et **le défaut du champ `mode` est le pire des deux**
+
+**Demandé par la session 8, autorisé nominalement par l'exploitant** — `deploy` et `restore` portés,
+`prerequisites` **inexprimable**. Livré le 2026-09-07 (`48262a5`, v2.0.100).
+
+### La symétrie inverse de `force`
+
+| | `/server_user_remove_key` | `/bashrc/deploy` |
+|---|---|---|
+| champ sensible | `force` | `mode` |
+| défaut du backend | `false` — **prudent** | `'overwrite'` — **destructeur** |
+| ne pas envoyer le champ, c'est | **s'abstenir** | **choisir le pire sans l'écrire** |
+
+> **Le même geste — omettre un champ — protège dans un cas et détruit dans l'autre.** *La prudence n'est
+> donc pas « en envoyer le moins possible » : c'est lire ce que le défaut vaut.* `overwrite` recrit le
+> `.bashrc` sans migrer le bloc personnalisé vers `~/.bashrc.local` ; `merge` le migre.
+
+Et `merge` est la valeur que **l'aperçu** emploie déjà : déployer dans un autre mode rendrait l'aperçu
+menteur, ce que le commentaire de `/bashrc/preview` interdit explicitement. **`overwrite` n'est pas
+construit** — vérifié sur le code **dépouillé de ses commentaires de bloc** : `0` occurrence, comme
+`prerequisites` et `dry_run`. *Le compte brut en rendait 1 chacun : mes propres commentaires expliquant leur
+absence.*
+
+### Ce que la page DIT faute de pouvoir le faire
+
+`figlet_present` arrive **déjà** dans `/bashrc/users`. Le bouton d'installation n'étant pas porté, on garde
+le **signal sans le geste** : la page nomme ce qui manque. *La capacité perdue est cosmétique — figlet ne
+change que la bannière.*
+
+### ⟶ QUATRE AFFIRMATIONS PÉRIMÉES, trouvées en portant
+
+1. le docblock du JS : *« ce fichier n'émet AUCUNE requête »* — **faux depuis B2** ;
+2. un commentaire : *« à relier au sélecteur de mode dès qu'il existe »* — **il n'existera pas**, la garde
+   est par construction. *Une garde par construction ne se périme pas ; un rappel de la relier, si* ;
+3. l'encart *« le déploiement n'est pas porté »*, avec un lien vers l'ancien portail. **Un panneau qui
+   annonce une absence comblée envoie l'opérateur ailleurs pour un geste qui est sous ses yeux** ;
+4. le contrôleur disait **« six routes »** : `bashrc.py` en déclare **sept**. *L'inventaire de la session 8
+   n'en citait que trois manquantes ; `/bashrc/backups` s'y ajoute.*
+
+### La garde ne reproduit PAS E-453
+
+| maillon | exige |
+|---|---|
+| la page `/bashrc` | `role:2` + `perm:can_manage_bashrc` (`ExigePermission` fail-closed) |
+| la passerelle | `role >= 2` seul |
+| le backend, **les trois routes** | `@require_role(2)` **+** `@require_permission('can_manage_bashrc')` |
+
+**Le backend exige ici la permission** — 8 occurrences dans `bashrc.py`, `0` en commentaire. *Un `role 2`
+sans la permission qui forgerait la requête serait arrêté au backend.* **Porter B4 n'hérite d'aucun trou de
+garde**, contrairement aux trois gestes de `comptes-distants`.
+
+⚠ **Et une note de mon registre était fausse** : j'ai affirmé que la colonne `can_manage_bashrc` n'existait
+pas. **Elle existe** (témoin : une colonne inventée est absente). La phrase venait de `rejouer-lot.sh`, où
+elle dit qu'un *COMPTE DE TEST* ne la porte pas — **j'avais gardé le prédicat et perdu le sujet**, et je
+l'avais attribuée à mon registre. *Un compte, pas une colonne.*
+
+**Vérifié** : `node --check` + témoin négatif · `php -l` ×3 · parité FR/EN **85 = 85** par `require` +
+`array_diff` · **les TROIS ensembles croisés** (catalogue · blob du contrôleur · clés lues par le JS) —
+**onze clés manquaient au blob au premier jet** et auraient rendu du vide, *le vide ne ressemblant pas à un
+défaut de traduction* · colonnes **6 = 6** · `route:list`.
+
+**Aucun exercice du geste** : il écrit dans un `$HOME` distant en root. *Aucune suite ne doit le soumettre.*
+
+---
+
+## E-459 — ⚠ TROIS BOUTONS DU PORTAIL NEUF ENVOIENT SUR UN 404 DE L'ANCIEN
+
+**Découvert le 2026-09-07 en retirant le lien de `bashrc`** — un contrôle qui devait porter sur une seule
+vue en a trouvé trois autres. Les sept liens `url_legacy` du portage, éprouvés au réseau :
+
+    fail2ban.blade.php    /fail2ban/               ->  404   ⛔  archive le 2026-09-07
+    acces-sftp.blade.php  /adm/server_user_sftp    ->  404   ⛔  `adm/` archive
+    politiques.blade.php  /adm/server_user_sudo    ->  404   ⛔  `adm/` archive
+    cles-ssh.blade.php    /ssh/                    ->  302   vivant
+    pare-feu.blade.php    /iptables/               ->  302   vivant
+
+*Témoins sur la même cible : `/auth/login.php` → 200, `/zzz` → 404 — le portail répond et discrimine.*
+
+> **Un `404` se lit comme « l'ancien portail est tombé », pas comme « cette page a été archivée ».**
+> *L'opérateur qui clique cherchera une panne là où il y a eu une décision.*
+
+### C'est le mécanisme d'E-454, à sa forme la plus coûteuse
+
+Ni le bouton ni son libellé n'ont changé : **c'est ce vers quoi ils pointent qui a disparu sous eux.**
+Chaque archivage du legacy transforme silencieusement un renvoi du portage en cul-de-sac, et **rien dans la
+vue ne le signale** — le lien reste noir sur blanc, dans un encart dont le texte promet une capacité
+disponible ailleurs.
+
+**Et la réciproque est le piège inverse**, celui que je viens d'éviter sur `bashrc` :
+
+> **Un renvoi maintient en vie ce vers quoi il renvoie.** *Tant que l'encart de `bashrc` pointait vers
+> `legacy/bashrc/`, cette page devait rester en service — pour un dessin de bannière.* Retirer le lien en
+> gardant la mention est ce qui a permis à la session 8 de l'archiver.
+
+Les deux formes se tiennent : **archiver sans retirer le lien produit un 404 ; retirer le lien sans nommer
+ce qui manque produit une capacité perdue en silence.** Il faut les deux gestes, dans cet ordre.
+
+### Non corrigé, et pourquoi
+
+**Trois vues, et chacune demande une décision de produit, pas une correction de lien** : la capacité est-elle
+désormais portée (donc l'encart entier est faux), ou perdue (donc il faut le texte sans la porte, comme
+`bashrc`) ? Pour `fail2ban`, la session 8 a tranché « perte acceptée » ce matin — le geste manquant est
+exactement celui que je viens de faire pour `bashrc`. Pour `adm/server_user_sftp` et
+`adm/server_user_sudo`, je ne sais pas et je ne tranche pas.
+
+⚠ **Le contrôle est reproductible et vaut d'être posé au banc** : *pour chaque lien `url_legacy` du
+portage, la cible doit répondre autre chose qu'un `404`.* Trois lignes, et il mord aujourd'hui sur trois
+vues.
 

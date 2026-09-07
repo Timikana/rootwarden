@@ -127,7 +127,22 @@ services:
       db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-fs", "http://localhost:80/up", "-o", "/dev/null"]
+      # ⚠ CETTE SONDE A CERTIFIE UNE APPLICATION MORTE, et elle est devenue vide
+      #    SANS QUE PERSONNE N'Y TOUCHE. Elle etait juste jusqu'au 2026-09-06 12:47
+      #    (`8862849`, TLS sur le portage) : `:80` servait l'application. Depuis, ce
+      #    vhost est une REDIRECTION SEULE — et `curl -f` echoue sur >= 400, PAS sur
+      #    une 301, et sans `-L` il ne suit rien.
+      #
+      #    Mesure dans le conteneur, temoin au chemin invente :
+      #      curl -fs http://localhost:80/up               exit 0   (HTTP 301)
+      #      curl -fs http://localhost:80/zzz-invente      exit 0   (HTTP 301)  <-
+      #      curl -fsk https://localhost:443/up            exit 0   (HTTP 200)
+      #      curl -fsk https://localhost:443/zzz-invente   exit 22  (HTTP 404)  <-
+      #
+      #    La sonde certifiait qu'Apache REDIRIGE, jamais que l'application REPOND.
+      #    `docker-compose.prod.yml` ne la redefinit pas : la production en herite.
+      #    Releve par la session 8, temoin du chemin invente par la session 7.
+      test: ["CMD", "curl", "-fsk", "https://localhost:443/up", "-o", "/dev/null"]
       interval: 30s
       # 20 s et non 5 s : sur un hôte Windows, le bind mount est ~258× plus lent
       # que le système de fichiers du conteneur (mesuré le 2026-08-17 : 9 300 ms

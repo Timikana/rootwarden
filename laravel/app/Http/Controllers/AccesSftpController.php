@@ -58,6 +58,8 @@ class AccesSftpController extends Controller
             'confirmer_titre', 'confirmer_intro', 'confirmer_valider', 'confirmer_ouvre',
             'retirer_titre', 'retirer_intro', 'retirer_valider', 'reauth',
             'confirmer_machine', 'confirmer_compte', 'confirmer_effet', 'aucun_reglage_ouvert',
+                // L'annulation d'un deploiement, rouverte le 2026-09-07.
+                'rollback_confirme',
         ] as $cle) {
             $libelles[$cle] = __('sftp.' . $cle);
         }
