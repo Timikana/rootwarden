@@ -13224,3 +13224,62 @@ déclenche l'émission**. La question de l'interrupteur se pose AVANT le portage
 > **Énoncer une règle ne protège pas de l'enfreindre : on l'applique en LISANT, jamais en
 > ÉCRIVANT.** *Le contradicteur a fait ce que ma propre phrase n'a pas fait, dans le même
 > message.*
+
+### ⛔ CORRECTION DE E-464 LUI-MEME : mes DEUX « restantes » n'en etaient pas
+
+*Publie a 22:41, corrige a 22:52. La correction est de deux sessions, pas de moi.*
+
+```
+/drift_scan               je l'ai sonde COMME UN CHEMIN
+                          la verite : groupes.js:521
+                          ecris('/groups/' + id + '/run', { action: 'drift_scan' })
+                          -> un VERBE DANS UN CORPS, pas un chemin.  PORTE.
+/server_test_connection    aucun objet de ce nom nulle part ; le seul voisin est
+                          `/cve_test_connection`, qui est autre chose.
+                          -> j'ai sonde un NOM que j'avais suppose.
+```
+
+**Et le document qui tient la liste le disait déjà**, `MODULE-CAPACITES-RESTANTES.md:592`,
+depuis le 2026-09-05 :
+
+> **« Onze sur onze : rien à porter dans cette liste. »**
+
+**La mission `PROMPT-FINIR-LES-CAPACITES.md` est donc TERMINEE**, et elle l'était avant ce
+tour. *Ce qui reste n'est pas du portage : ce sont des arbitrages.*
+
+### Le compte des occurrences, parce qu'il est le fait le plus utile de ce tour
+
+```
+« s'appreter a porter ce qui existe »   8e fois   (releve par un pair, 05/09)
+ma relance sur ssh-audit/schedules      9e
+ma relance sur groups R2                10e — et c'est la 15e occurrence
+                                             de l'erreur d'instrument sous-jacente
+mon /drift_scan sonde comme chemin      11e
+mon /server_test_connection suppose     12e
+```
+
+**Cinq de ces occurrences sont de ce tour, et quatre sont de moi.** *J'ai ouvert le tour en
+imposant à l'équipe une règle — « remesurer plutôt que reconduire » — et j'ai reconduit
+quatre fois en une heure, dont deux APRES avoir écrit la règle.*
+
+> **La forme constante : un instrument correct, appliqué à un objet qu'il ne mesure pas,
+> rend une sortie qui RESSEMBLE à une réponse.** *Un chemin sondé comme chemin quand le
+> geste est un verbe · un nom supposé depuis une phrase de mission · une route Laravel
+> cherchée quand le geste passe par la passerelle.*
+
+**Et ce que ça coûte n'est pas le temps perdu : c'est qu'une session obéissante aurait
+écrit un SECOND chemin de création.** *« Je n'écris pas un second chemin : deux chemins
+pour un même geste divergent, et c'est le défaut que ce portage refuse partout »* — la
+réponse est meilleure que ma consigne, et c'est exactement le défaut que `DOSSIER-47`
+tranche par ailleurs.
+
+### Ce qui reste, et rien n'est du portage
+
+```
+⛔ I5 iptables — le PORT SSH             la derniere page legacy servie
+⛔ le repli NOPASSWD: ALL en v2.0        n'empeche rien, question ouverte
+⛔ import_csv — TROIS arbitrages         il ecrit dans QUATRE tables
+⛔ l'interrupteur *_ENABLED de la geolocalisation `fail2ban`
+⛔ la portee de cle `^/iptables`, seule des treize sans separateur
+✅ DOSSIER-47 : converger les deux portes d'application — decide, a ecrire
+```
