@@ -192,3 +192,78 @@ premier, `auth/login.php` requiert le second.
 
 > **Deux refus de la même soirée, une seule cause : on avait mesuré les GESTES et pas
 > les APPELANTS.** Un appariement complet et favorable ne dit rien de l'archivabilité.
+
+---
+
+## 8. Ce que le portage doit au legacy — **2026-09-07 22:01 CEST**
+
+Question posée : *le portage LIT-il encore le legacy, ou se contente-t-il de le
+DÉCRIRE ?* Un relevé fidèle d'un fichier qui n'existera plus est un relevé de rien.
+
+### 8.1 Aucune dépendance d'EXÉCUTION — les trois espèces rendent zéro
+
+    appel HTTP sortant vers le legacy (fetch/Http::/curl/file_get_contents)   0
+    lecture d'un FICHIER du legacy (require/include/realpath)                 0
+    mecanisme de SESSION partage                                              0
+      (`active_sessions` est une TABLE, et la base survit ; le portage
+       l'ecrit lui-meme via `SessionsActives`)
+
+**Le portage ne lit pas le legacy.** Quand l'étage 2 tombera, rien ne cessera de
+fonctionner côté serveur.
+
+### 8.2 La dépendance réelle est dans les LIENS RENDUS — trois espèces, une seule vivante
+
+| # | ce qui compose un lien legacy | état |
+|---|---|---|
+| 1 | `cles-ssh.blade.php:167` → `/ssh/` · `pare-feu.blade.php:199` → `/iptables/` | **2 liens durs vers l'étage 0** — ils meurent à la seconde où l'exploitant donne ses deux mots |
+| 2 | `accueil.blade.php:349`, `entrees-menu.blade.php:32`, `PortailController:310` `:354` → `$entree['legacy']` | **branche INATTEIGNABLE** — `Navigation` porte 32 entrées, toutes avec `route`, **zéro** `legacy` |
+| 3 | **`LiensLegacy::resoudre()` — le REPLI** (`:184-186`) | ⚠ **non borné par construction** : tout chemin absent de la table est rendu tel quel vers le legacy |
+
+### 8.3 ⛔ LE REPLI PRODUIT DÉJÀ UN LIEN MORT — mesuré, pas déduit
+
+J'ai croisé **ce que le backend PEUT émettre** (la source, pas la donnée) contre les
+18 entrées de la table :
+
+    valeurs litterales de `link` emises par backend/ : 10
+    couvertes par LiensLegacy apres normalisation    :  9
+    ⚠ TOMBANT DANS LE REPLI                          :  1   ->  `/ssh-audit/`
+
+    backend/routes/ssh_audit.py:156 et :164   link='/ssh-audit/'
+    legacy/ssh-audit/                          ARCHIVE
+    LiensLegacy                                aucune entree `/ssh-audit/`
+    -> le repli construit  url_legacy . '/ssh-audit/'  ->  404
+
+**Et la redirection existe — sur le MAUVAIS HÔTE.** `web.php:1202` porte
+`Route::get('/ssh-audit/', fn () => redirect()->route('audit-ssh'))` : elle attrape
+`/ssh-audit/` sur **le portage**. Le lien, lui, pointe sur **le legacy**.
+
+> **Le portage a la page, a la redirection, et envoie quand même sur un 404.** Une
+> notification émise par le planificateur d'audit SSH mène aujourd'hui dans le vide.
+> **Le correctif est d'une ligne — `'/ssh-audit/' => 'audit-ssh'` dans la table — et
+> il n'est pas de mon périmètre.**
+
+*Méthode* : la table `notifications` ne porte aujourd'hui qu'**une** valeur distincte
+(`/security/`, 2 lignes), couverte. **Mesurer la donnée aurait rendu « rien
+d'exposé ».** C'est en mesurant la SOURCE — ce que le backend compose — que le défaut
+apparaît.
+
+⚠ **Régime de cet énoncé** : la normalisation a été **RÉPLIQUÉE en Python** d'après
+`LiensLegacy::normalise():154-160`, **pas exécutée** dans le conteneur. Deux témoins
+vérifient la réplication : `/tickets/index.php` → `/tickets/` et
+`/adm/admin_page.php#permissions` → `/adm/admin_page.php/`.
+
+### 8.4 Le jour où l'étage 2 tombe
+
+**Rien ne casse côté serveur.** Ce qui casse est ce que l'utilisateur CLIQUE :
+
+    les 2 liens durs (`/ssh/`, `/iptables/`)   meurent AVEC leur cible, etage 0
+    le repli de `LiensLegacy`                  survit et continue de fabriquer des
+                                               URL vers un portail qui n'existe plus
+    `_sortie.php`                              ne les rattrape plus — il est parti
+                                               a l'etage 3, avec le vhost
+
+> **Le repli est la seule chose du portage qui ait besoin d'une décision avant le jour
+> J.** Aujourd'hui il envoie vers un portail vivant qui rend un 404 poli ; après, il
+> enverra vers un hôte qui ne répond plus du tout. *Ce n'est pas une régression le jour
+> J : c'est un changement de la nature de l'échec, de « page déménagée » à « serveur
+> injoignable ».*
