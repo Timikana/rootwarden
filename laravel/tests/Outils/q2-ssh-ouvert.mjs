@@ -145,6 +145,27 @@ const CAS = [
     ['ACCUSATION VRAIE — aucun peut-etre, DROP de cloture',
      ':INPUT DROP\n-A INPUT -p tcp --dport 80 -j ACCEPT\n-A INPUT -j DROP', 22, false],
 
+    /* ══ LE SUIVI DE CHAINE — le cas du PARC ═══════════════════════════════
+     * `fail2ban` saute vers `f2b-sshd` sur le port SSH. Sans suivre la chaine,
+     * le predicat rendait `null` sur TOUTE machine faisant tourner fail2ban —
+     * et RootWarden gere fail2ban. Un garde qui refuse toujours se contourne :
+     * c'est un argument de SURETE, pas de confort.
+     */
+    ['PARC — fail2ban ordinaire : la chaine RETURN, l\'ACCEPT suit',
+     '*filter\n:INPUT DROP [0:0]\n:f2b-sshd - [0:0]\n-A INPUT -p tcp -m multiport --dports 22 -j f2b-sshd\n-A INPUT -i lo -j ACCEPT\n-A INPUT -p tcp --dport 22 -j ACCEPT\n-A INPUT -j DROP\n-A f2b-sshd -s 203.0.113.7 -j REJECT\n-A f2b-sshd -j RETURN\nCOMMIT', 22, true],
+
+    ['CHAINE — elle bloque tout le monde : accusation VRAIE',
+     '*filter\n:INPUT DROP\n:mur - [0:0]\n-A INPUT -p tcp --dport 22 -j mur\n-A INPUT -p tcp --dport 22 -j ACCEPT\n-A mur -j DROP\nCOMMIT', 22, false],
+
+    ['CHAINE — non definie dans le fichier : indecidable',
+     ':INPUT DROP\n-A INPUT -p tcp --dport 22 -j inconnue\n-A INPUT -p tcp --dport 22 -j ACCEPT', 22, null],
+
+    ['CHAINE — elle ne concerne pas notre port',
+     ':INPUT DROP\n:web - [0:0]\n-A INPUT -p tcp --dport 80 -j web\n-A INPUT -p tcp --dport 22 -j ACCEPT\n-A web -j DROP', 22, true],
+
+    ['CHAINE — imbriquee de deux niveaux : on ne pretend pas suivre',
+     ':INPUT DROP\n:a - [0:0]\n:b - [0:0]\n-A INPUT -p tcp --dport 22 -j a\n-A INPUT -p tcp --dport 22 -j ACCEPT\n-A a -j b\n-A b -j c\n-A c -j RETURN', 22, null],
+
     ['REEL — pare-feu durci complet, et il est SUR',
      ':INPUT DROP\n-A INPUT -i lo -j ACCEPT\n-A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT\n-A INPUT -p tcp --dport 22 -j ACCEPT', 22, true],
 ];
