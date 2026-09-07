@@ -79,10 +79,40 @@ def _archive_puis_applique(client, root_password, data, mid,
     if rules_v4 is None:
         rules_v4 = data.get('rules_v4')
         rules_v6 = data.get('rules_v6')
-        if not rules_v4:
-            return jsonify({"success": False, "message": "Regles IPv4 manquantes."}), 400
+
+    # ⚠ LA GARDE EST EN AVAL, HORS DU `if` — et c'est tout son interet.
+    #
+    # Elle vivait SOUS la lecture par defaut, donc elle ne gardait que les deux
+    # portes `apply`. `restore` et `rollback` controlent en amont (`:262`,
+    # `:350`), donc l'angle mort etait DORMANT — mais sur par CONVENTION : une
+    # cinquieme porte n'aurait ete forcee par rien.
+    #
+    # **Deux gardes en amont valent moins qu'une garde en aval : il faut les
+    # repeter, et on ne repete pas ce qu'on ne voit pas.**
+    if not (rules_v4 or '').strip():
+        return jsonify({"success": False, "message": "Regles IPv4 manquantes."}), 400
 
     # Save history before apply
+    # ⚠ CE QUE LA REPONSE DOIT DIRE, ET NE DISAIT PAS.
+    #
+    # Base injoignable -> l'archivage echoue -> l'application A LIEU quand meme
+    # -> la reponse etait OCTET POUR OCTET celle du succes. Aucun champ ne la
+    # distinguait, aucun test ne l'exercait.
+    #
+    # *Ce fichier dit lui-meme qu'une archive avec un trou est plus dangereuse
+    # qu'une archive absente, parce que le trou se lit comme une continuite.* Le
+    # chemin d'exception en fabriquait un, EN SILENCE — et c'est sur `rollback`
+    # que ca coute le plus, la route dont tout l'argument est la reversibilite.
+    #
+    # ON NE BLOQUE PAS, ET CE N'EST PAS UN COMPROMIS : l'archive sert la
+    # tracabilite, l'application sert la DISPONIBILITE. Rendre un pare-feu
+    # inmodifiable parce qu'une table de journal est injoignable ferait de la
+    # garde la chose qui empeche de se retablir — et sur `rollback`, bloquer
+    # enfermerait l'operateur dans l'etat casse qu'il cherche a quitter.
+    #
+    # Mais que l'appelant ne puisse pas le SAVOIR n'est defendable en rien.
+    archive = False
+    archive_motif = None
     try:
         old_rules = get_iptables_rules(client, root_password)
         # L'AUTEUR NE VIENT PLUS DU CORPS DE LA REQUETE. Un client
@@ -124,19 +154,31 @@ def _archive_puis_applique(client, root_password, data, mid,
                     (machine_pk, ancien_v4, ancien_v6, changed_by, change_reason)
                 )
                 hist_conn.commit()
+                archive = True
             else:
+                # Pas un ECHEC : il n'y avait rien a archiver. Mais l'appelant
+                # doit le savoir tout autant — dans les deux cas, aucune version
+                # ne le ramenera ici.
+                archive_motif = "etat_precedent_vide"
                 logger.warning(
                     "[iptables:apply] machine_id=%s : fichier de regles vide, aucune version archivee",
                     machine_pk
                 )
     except Exception as hist_err:
+        archive_motif = "echec_archivage"
         logger.warning("Iptables history save failed: %s", hist_err)
     # L'ARCHIVE ENREGISTRE L'ETAT QUITTE, JAMAIS L'ETAT RESTAURE. Enregistrer
     # l'etat vers lequel on va dupliquerait une entree deja presente et rendrait
     # la chaine illisible : on ne saurait plus distinguer « voici ou j'etais » de
     # « voici ou je vais ».
     apply_iptables_rules(client, root_password, rules_v4, rules_v6)
-    return jsonify({"success": True, "message": message})
+
+    # LA REPONSE DIT SI L'ARCHIVE A EU LIEU. Un `success: true` seul etait
+    # indiscernable entre « archive puis applique » et « applique sans trace ».
+    reponse = {"success": True, "message": message, "archive": archive}
+    if not archive:
+        reponse["archive_motif"] = archive_motif
+    return jsonify(reponse)
 
 
 

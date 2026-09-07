@@ -13565,3 +13565,42 @@ apprend que l'avertissement est du théâtre.** *C'est la même érosion qu'un g
 **Arbitrage : la page lit `geoip_enabled` (`settings.py:104`) avant d'afficher le panneau de
 consentement.** Éteint, il n'y a pas de consentement à demander — il y a un état à annoncer.
 *Confié à la session qui l'a signalé ; c'est son périmètre et le correctif est d'une lecture.*
+
+---
+
+## ⚠ E-470 — J'AI DIT « RECRÉATION » TOUTE LA NUIT ; UN REDÉMARRAGE SUFFIT
+
+**Mesuré le 2026-09-08 00:25.** *Correction d'une consigne que j'ai répétée à cinq sessions
+et trois fois à l'exploitant.*
+
+```
+docker-compose.yml, service `python` :
+    build: ./backend
+    volumes:
+      - ./backend:/app          <- LE CODE EST MONTE, pas cuit dans l'image
+```
+
+**Le conteneur voit déjà le code corrigé.** Ce qui manque n'est pas une image neuve : c'est
+que le process Python **relise ses `.py`**, qu'il n'ouvre qu'au démarrage.
+
+```
+pour ACTIVER le code ecrit        docker compose restart python     <- suffit
+  (SEC-015 · les 4 portes · l'existence de la garde GEOIP)
+
+pour ETEINDRE la geolocalisation  GEOIP_ENABLED=false dans srv-docker.env
+                                  puis docker compose up -d python
+  (env_file est lu a la CREATION, pas au redemarrage)
+```
+
+### Pourquoi la distinction n'est pas un détail
+
+**« Recréer un conteneur » et « redémarrer un process » n'ont ni le même coût ni le même
+risque perçu.** *J'ai présenté trois correctifs de sécurité comme attendant un geste plus
+lourd qu'il ne l'est — et un geste qui paraît lourd se remet à plus tard.*
+
+> **Une consigne qui surestime son propre coût se fait différer, et le différé ressemble à
+> un refus.** *Ce n'est pas l'exploitant qui a tardé : c'est moi qui ai facturé trop cher.*
+
+**Et la faute est la même que toute la soirée** : j'ai supposé le mécanisme — *« les `.py`
+sont lus au démarrage, donc il faut recréer »* — au lieu de lire les `volumes`. **La première
+moitié est vraie, la conclusion ne s'en déduit pas.**

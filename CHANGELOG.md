@@ -5,6 +5,73 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## iptables — la réponse dit enfin si l'archive a eu lieu, et la garde passe en aval
+
+**Addendum 2 de `DOSSIER-47`**, sur deux points qu'une attestation indépendante a ouverts.
+
+### ⛔ Le défaut que ce correctif existait pour fermer, recréé par un hoquet de la base
+
+    except Exception as hist_err:  logger.warning(...)
+    apply_iptables_rules(...)
+    return jsonify({"success": True, "message": message})
+
+**Base injoignable → l'archivage échoue → l'application a lieu → la réponse était octet pour
+octet celle du succès.** Aucun champ ne la distinguait, aucun test ne l'exerçait.
+
+*Ce fichier dit lui-même qu'une archive avec un trou est plus dangereuse qu'une archive
+absente, parce que le trou se lit comme une continuité.* **Le chemin d'exception en fabriquait
+un, en silence** — et c'est sur `rollback` que ça coûte le plus, la route dont tout l'argument
+est la réversibilité.
+
+**On ne bloque pas, et ce n'est pas un compromis** : l'archive sert la traçabilité,
+l'application sert la **disponibilité**. Rendre un pare-feu inmodifiable parce qu'une table de
+journal est injoignable ferait de la garde la chose qui empêche de se rétablir — et sur
+`rollback`, bloquer enfermerait l'opérateur dans l'état cassé qu'il cherche à quitter.
+
+**Mais que l'appelant ne puisse pas le savoir n'est défendable en rien.**
+
+    reponse   {"success": true, "message": …, "archive": true}
+              {"success": true, …, "archive": false, "archive_motif": "echec_archivage"}
+              {"success": true, …, "archive": false, "archive_motif": "etat_precedent_vide"}
+
+*Deux non-archives, deux motifs : « rien à archiver » n'est pas « ça a raté ».*
+
+⚠ **Ce champ doit être LU côté portage.** Un `archive: false` qu'aucun écran n'affiche laisse le
+défaut entier — la moitié écran reste à faire.
+
+### La garde de vacuité passe EN AVAL
+
+Le contrôle vivait **sous** la lecture par défaut : il ne gardait que les deux routes
+`action="apply"`. `restore` et `rollback` contrôlent en amont — l'angle mort était **dormant**,
+mais sûr par **convention**, et une cinquième porte n'aurait été forcée par rien.
+
+> **Deux gardes en amont valent moins qu'une garde en aval : il faut les répéter, et on ne
+> répète pas ce qu'on ne voit pas.**
+
+### Les tests commencent par le cas qui MARCHE
+
+Six tests ajoutés. Le premier est le **témoin positif** — sans lui, `archive: false` ne
+prouverait pas que le champ sait dire `true`. Puis la base est cassée et l'on vérifie que la
+réponse **change**, que l'application a **quand même** eu lieu, et que le motif distingue les
+deux non-archives. Trois de plus mesurent que des règles vides sont refusées avant toute
+application.
+
+    backend   683 passed · 5 skipped · 2 xfailed
+
+### Ce que ce cycle a montré
+
+**Les quatre propriétés arbitrées portaient sur ce que le code FAIT quand tout va bien. Aucune
+ne demandait ce qu'il DIT quand une partie échoue.** Le cinquième point est venu d'une session
+qui n'avait écrit ni le code ni les propriétés — *la boucle écrire / attester / arbitrer a
+trouvé le défaut le plus grave au troisième passage, pas au premier.*
+
+⛔ **Inerte jusqu'à la recréation du conteneur.** L'attestation s'est bornée elle-même sur ce
+point : elle atteste que le code **sur le disque** porte les propriétés ; *aucune lecture ne
+peut attester que le service les exécute.* Le process a démarré à 14:53, ces commits sont de
+23:44 et après.
+
+⛔ **Rien n'a été exercé** : aucune règle appliquée, aucune machine jointe, aucune requête.
+
 ## E-467 — éteint, il n'y a pas de consentement à demander : il y a un état à annoncer
 
 `geo_conf_texte` prévient que l'adresse « sera transmise à ip-api.com **EN CLAIR** ».
