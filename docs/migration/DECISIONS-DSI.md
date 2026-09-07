@@ -13663,3 +13663,62 @@ redémarrage, pas la recréation). Les redire ailleurs les diluerait.*
 ③ le port SSH, dans la session securite  la derniere page legacy
 ```
 
+---
+
+## ⚠ E-471 — J'AI LIVRÉ UN COMPOSANT DONT LE CONSOMMATEUR NE PEUT PAS ENCORE EXISTER
+
+**Attestation indépendante de Q1, et elle trouve le point que je n'avais pas posé :**
+
+```
+laravel/public/js/pare-feu-gabarits.js   charge par 0 vue
+pare-feu.blade.php                        aucun <select> de gabarit
+laravel/lang/{fr,en}/pare-feu.php         0 cle `tpl_*`
+legacy/lang/{fr,en}/iptables.php          13 cles `tpl_*`, dont les 5 libelles
+TEMOIN : `choisir` rend 1 dans le catalogue du portage — la sonde lit bien
+```
+
+> **Sous la directive d'iso-périmètre, « écrit » ne vaut pas « porté ».**
+> *Conséquence directe : le défaut que Q1 ferme n'est PAS fermé EN SERVICE. Tant que rien ne
+> charge ce fichier, les gabarits qu'un opérateur applique restent ceux du legacy, avec leur
+> `--dport 22` en dur.*
+
+**Les trois axes que j'avais demandés sont attestés** — iso-périmètre tenu (les cinq mêmes
+gabarits, le renommage sans référence ailleurs), la liste de ports justifiée, la mutation
+probante à 26 avec les cinq verts qui la rendent probante, et ma garde d'ancre éprouvée sur
+une copie (ancre décalée d'une espace → **code 2**).
+
+### ⛔ Mais le remède n'est pas « ajouter un `<select>` », et la vue dit pourquoi
+
+```
+pare-feu.blade.php:136-137
+  « Le legacy validait le contenu d'une zone d'edition ; le portage n'en offre
+    PAS, donc il valide l'objet qui existe. »
+```
+
+**La chaîne du portage est cohérente et fermée** : I2 enregistre *ce que la machine a*, I4
+valide *ce qui est enregistré*, I5 appliquera *la même chose*. **Un gabarit n'est pas ce que
+la machine a — c'est une proposition.** L'y verser changerait ce que la copie SIGNIFIE, et
+casserait la phrase sur laquelle I4 repose.
+
+> **Le gabarit n'a pas de destination tant qu'I5 n'en définit pas une.** *J'ai livré une
+> pièce en la croyant autonome ; elle ne l'est pas — elle est autonome à l'ÉCRITURE, pas à
+> l'usage.*
+
+**Ce n'est pas un défaut du code** : les gabarits sont justes, éprouvés, et ils seront
+nécessaires. **C'est un défaut de mon cadrage** — j'ai annoncé « la deuxième pièce du cahier
+des charges » comme si elle livrait quelque chose, alors qu'elle prépare.
+
+### Ce qui en découle, et qui est utile à qui écrira I5
+
+```
+avec les gabarits, il faudra AUSSI :
+  un <select> et sa destination        <- une DECISION de conception, pas un branchement
+  5 libelles i18n × 2 catalogues
+  + LE TRAJET par la liste curatee du controleur   <- le troisieme endroit
+```
+
+⚠ **Et le `<select>` ne se pose pas sans trancher où va le gabarit** : dans une zone
+d'édition neuve — que le portage a délibérément refusée — ou directement dans la copie, ce
+qui exige de redéfinir ce que « la copie » veut dire. **Les deux sont des arbitrages, et ils
+appartiennent à I5.**
+
