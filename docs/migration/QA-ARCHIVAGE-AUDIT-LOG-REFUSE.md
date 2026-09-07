@@ -37,7 +37,67 @@ Et le compte concorde avec `backend/audit_chain.py` : douze écrivains nus, huit
 
 ---
 
-## ⚠ ET UNE TROISIÈME RAISON, QUI DÉPASSE L'ARCHIVAGE
+## ⛔ MA TROISIÈME RAISON ÉTAIT FAUSSE — rectifiée le 2026-09-07 au soir
+
+**J'avais écrit** : *« le legacy porte le seul chemin d'insertion scellée
+(`audit_log.php:107-116`) ; le portage a une méthode du même nom qui rend un refus
+constant. »* **La première moitié est fausse.**
+
+Le portage a son propre chemin d'insertion scellée, et ce n'est pas `scelle()` — c'est
+`ajoute()`. Remesuré sur le code dépouillé :
+
+    JournalAudit::ajoute()      DB::transaction  OUI
+                                lockForUpdate    OUI
+                                whereNotNull     OUI   (la tete saute les lignes nues)
+                                prev_hash        OUI   (chaine a la tete)
+                                self_hash        OUI   (empreinte du ts qu'on vient de poser)
+                                ->insert(        OUI
+
+    appelants en CODE : 9       ComptesController:93 · PermissionsController:70
+                                ServeursController:141 · MotDePasse:591
+                                ExigePermission:114 · PortailController:64/91/207
+                                ExportRgpdController:64
+
+**Ce sont deux opérations différentes, et c'est là que je me suis trompée :**
+
+    ajoute()   sceller A L'INSERTION       PORTE
+    scelle()   sceller RETROACTIVEMENT     impossible PAR CONSTRUCTION — et c'est JUSTE
+
+Remettre les lignes nues dans la chaîne exigerait de réécrire le `prev_hash` de toutes les
+scellées, c'est-à-dire **de détruire la seule propriété que la chaîne apporte**. Donc
+`scellement_possible => false` **déclare une impossibilité vraie, pas une lacune.**
+
+> J'avais écrit : *« la signature n'est pas davantage une mesure que le docblock »*. Le cran
+> d'après est celui qui m'a eue : **une VALEUR DE RETOUR n'est pas davantage une mesure qu'une
+> signature.** `false` peut vouloir dire « pas porté » **ou** « impossible, et c'est correct » —
+> la même ambiguïté qu'une clé i18n absente, au niveau de la méthode.
+
+*Signalé par le DSI, vérifié ici plutôt que ratifié.*
+
+### ⚠ Deux pièges d'instrument rencontrés dans cette rectification
+
+**1. Chercher `self_hash` pour trouver un écrivain trouve le récit de sa disparition.**
+
+    ComptesController · PermissionsController · ServeursController
+      `self_hash` brut = 1   ·   en CODE = 0   ·   INSERT `user_logs` = 0
+
+La mention unique est de la **prose de docblock décrivant ce qu'ils faisaient avant**. *Un
+faux positif qui ALARME* — il faut compter les `insert`, pas les mentions.
+
+**2. Et « 11 sites » en vaut 9.** Le relevé transmis annonçait onze appels et en listait neuf.
+Onze est le compte de `->ajoute(` ; **deux d'entre eux sont un homonyme** —
+`ServeursController:77` (`$this->serveurs->ajoute`) et `Serveurs.php:457`, qui ajoutent un
+SERVEUR. *Un couple qui ne se referme pas sur lui-même — le nombre et la liste se
+contredisaient.*
+
+## ⚠ CE QUI RESTE VRAI DE LA TROISIÈME RAISON
+
+Rien pour l'archivage : elle est retirée des motifs. **Un seul verrou subsiste**, et c'est le
+`require_once` de `login.php`.
+
+---
+
+## ~~ET UNE TROISIÈME RAISON~~ — texte d'origine, conservé pour la trace
 
 La question posée était : *« `JournalAudit` porte-t-il toujours `verifie()` ET `scelle()` ? »*
 Les deux méthodes sont déclarées, hors commentaire. **Mais une méthode présente n'est pas une
