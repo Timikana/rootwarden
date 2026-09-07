@@ -5,6 +5,50 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [2.0.99] - 2026-09-07
+
+### Extinction du legacy - bloc 3 : `fail2ban/` archive, sur un arbitrage RENDU
+
+**Ce bloc etait range chez l'exploitant. Il ne devait pas y etre.**
+
+*Je confondais « exercer un geste qui installe » — interdit sans son mot — avec
+« decider si on garde ce geste en v2.0 », qui est un arbitrage produit.* **Les
+deux questions n'ont pas le meme destinataire, et elles ont ete traitees comme
+une seule pendant deux jours.**
+
+    16 gestes appeles par legacy/fail2ban/js/main.js
+    14 portes  ·  2 absents  ·  TEMOIN /fail2ban/zzz-inexistant = 0
+
+      /fail2ban/install    26 lignes, 4 appels SSH  ->  `apt install fail2ban`
+      /fail2ban/restart    24 lignes, 4 appels SSH  ->  `systemctl restart fail2ban`
+
+**Deux enveloppes MINCES.** *Et `install_all` EST porte : installer fail2ban
+n'est pas perdu comme capacite, seule sa forme serveur-par-serveur l'est.*
+
+**PERTE ACCEPTEE, et dite** : installer fail2ban sur UN serveur, et le
+redemarrer, depuis l'interface. Deux commandes SSH.
+
+    la page              0 ecriture, 0 formulaire, sur 245 lignes
+    graphe d'inclusion   0 appelant -> FEUILLE
+    le JS orphelin       6 mentions de `fail2ban/js`, les 6 en COMMENTAIRE
+                         TEMOIN : `apiFetch` en code = 29 -> le zero est reel
+
+    au reseau, avant -> apres
+      /fail2ban/index.php    302 -> 404
+      /fail2ban/js/main.js   200 -> 404
+      TEMOIN archive  /adm/admin_page.php   404 inchange
+      TEMOIN vivant   /auth/login.php       200 inchange
+      le PORTAGE      /fail2ban             302 (repond)
+
+**26 fichiers legacy servis.** *Quatre arbitrages restent a l'exploitant, et
+leur raison n'est plus « ça touche une machine » :* **I5, K4, S7b portent un
+geste a effet sortant ou destructeur ; `bashrc/deploy` fait 143 lignes de
+sauvegarde horodatee, migration du contenu personnalise et validation `bash -n`
+avant de rendre la main — le refaire a la main est comment on casse le shell de
+connexion sur un parc.**
+
+---
+
 ## [2.0.98] - 2026-09-06
 
 ### Extinction du legacy - bloc 2 : `profile.php` et `privacy.php` archives
