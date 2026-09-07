@@ -55,13 +55,12 @@ if (!$path) {
 // niveau de criticite que delete_user / regen platform key.
 $_stepupPatterns = [
     '#^/policy/(sudo|sftp)/(deploy|remove)$#',
-    // E-459 : `/policy/rollback` a ete RETIREE du backend (route orpheline qui
-    // ouvrait une session SSH et ecrivait sur les machines, zero appelant). Son
-    // motif de step-up est donc retire avec elle : un garde dont la cible
-    // n'existe plus se lit comme une protection alors qu'il ne protege rien.
-    // ⚠ Le nom d'action `policy_action` n'est PAS libere pour autant : il reste
-    // employe par les deux motifs ci-dessus (`/policy/{sudo,sftp}/{deploy,remove}`),
-    // qui eux sont portes et appeles.
+    // ⚠ E-459 avait retire ce motif en meme temps que la route `/policy/rollback`.
+    // La route a ete ROUVERTE (`ea9916f` : l'annulation d'un deploiement est
+    // portee, elle n'etait pas orpheline), et le motif est donc RESTAURE : sans
+    // lui, un rollback passant par cette passerelle ne serait plus garde par un
+    // step-up, alors que c'est un geste qui donne de facto root sur la cible.
+    '#^/policy/rollback$#',
 ];
 foreach ($_stepupPatterns as $_pat) {
     if (preg_match($_pat, parse_url($path, PHP_URL_PATH) ?: '')) {
