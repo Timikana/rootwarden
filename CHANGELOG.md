@@ -5,6 +5,102 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [2.0.105] - 2026-09-07
+
+### Iso-perimetre — `/bashrc/prerequisites` est PORTE (ma 3e dette, la derniere)
+
+*Le legacy offrait d'installer `figlet` quand il manquait. Le portage AFFICHAIT
+qu'il manque et n'offrait rien : il avait garde le signal et perdu le geste.*
+
+```
+/bashrc/prerequisites  ->  laravel/public/js/bashrc.js:262
+TEMOIN /bashrc/zzz-temoin   ABSENT
+mesure : scripts/geste-porte.py, l'outil calibre du depot
+i18n   : fr 92 = en 92, 0 cle orpheline de part et d'autre
+```
+
+**Le bouton est POSE DANS L'AVERTISSEMENT**, pas a cote. *Un bouton
+« installer figlet » visible en permanence serait offert 99 fois sur 100 a des
+machines qui l'ont deja. Il n'a de sens que dans l'etat que l'avertissement
+decrit, donc il vit dedans et disparait avec lui.*
+
+**ET C'EST LE RELEVE QUI LE FERME, JAMAIS LA REPONSE DE L'INSTALLATEUR.** *Le
+geste reussi rappelle `chargeComptes()`, qui relit `/bashrc/users` et sa cle
+`figlet_present`. « Installe » annonce par celui qui installe n'est pas une
+reussite verifiee — c'est une intention.*
+
+**Les 4 phrases composees par le JS voyagent par le blob du controleur.** *Sans
+ce voyage la confirmation s'ouvrirait VIDE, et un vide ne ressemble pas a un
+defaut de traduction : il ressemble a une fenetre de confirmation normale.*
+
+⛔ **Aucune suite n'exerce ce chemin** : il passe par le gestionnaire de paquets
+d'une machine reelle. Le chemin est ecrit, il n'est pas declenche.
+
+### ⚠ Le compteur de cibles etait MORT depuis qu'il existe — deux `annonce`
+
+*Trouve en ecrivant dans ce scope, pas en le relisant.*
+
+```
+bashrc.js:58   function annonce()                     <- le compteur
+bashrc.js:325  function annonce(cible, texte, echec)  <- les etats de geste
+             MEME scope (l'IIFE de :23 ne se referme qu'a la fin du fichier)
+```
+
+**Deux `function nom()` dans un meme scope ne se relaient pas selon la position
+de l'appel : la DERNIERE gagne partout, du premier caractere au dernier.** Donc
+`annonce()` de `:78` appelait la version a trois arguments avec
+`cible === undefined`, laquelle commence par `if (! cible) { return; }` ; et
+l'ecouteur de `:77` lui passait l'Event comme `cible`, posant `textContent` sur
+un objet Event.
+
+    compteur au chargement   jamais ecrit
+    compteur au `change`     jamais ecrit
+    erreur levee             aucune
+    trace                    aucune
+
+*La ligne restait telle que le gabarit l'avait rendue — c'est-a-dire plausible.*
+**La premiere capacite que l'en-tete de ce fichier declare — « le compteur
+s'ENONCE », le `0` et l'alerte quand une machine de production est cochee —
+etait donc morte, et le fichier lui-meme affirmait le contraire.**
+
+Mesure avec temoin positif :
+
+```
+AVEC collision (etat livre)     compteur=(jamais ecrit) | etat=EN COURS
+SANS collision (apres renommage) compteur=AUCUNE CIBLE   | etat=EN COURS
+```
+
+*La seconde ligne montre que l'instrument SAIT rendre un compteur ecrit : le
+« jamais ecrit » de la premiere n'est pas un artefact de la mesure.*
+
+Correctif entier : `annonce` de `:58` devient `enonceCompteur`. **Sonde passee
+sur les 35 fichiers JS du portage — c'etait la seule collision**, et la sonde
+mord encore sur un fichier ou l'on reforge la collision expres.
+
+> **Un `hidden` faux se voit ; une fonction qui rend la main sans rien faire ne
+> se voit pas.** *Ce defaut n'a pas ete trouve par relecture — il a ete trouve
+> parce que j'ecrivais un appel dans ce scope et que j'ai verifie QUELLE
+> declaration mon appel allait atteindre.*
+
+### ⚠ TROIS numeros de version, et aucun ne coincide
+
+*Constat de bord, non corrige dans ce jalon — l'arbitrage suit.*
+
+```
+pied de page (legacy/version.txt)   2.0.11    ecrit le 2026-09-05, 167 commits en arriere
+en-tete de ce journal               2.0.104   assigne a la main, jalon apres jalon
+scripts/version.sh (la regle)       2.0.178   epreuve verte, 9 proprietes sur 9
+```
+
+**`scripts/version.sh --ecrire` n'a AUCUN appelant** — ni `start.sh`, ni
+`maj.sh`, ni `docker-entrypoint.sh`, ni la CI. *L'instrument existe, son epreuve
+passe, la CI s'en sert pour etiqueter — et le fichier que le portail LIT n'est
+ecrit par personne.* La decision etait pourtant deja prise
+(`DECISIONS-DSI.md:12718`). **Une decision qui n'est cablee a rien est une
+intention**, et c'est ainsi qu'un numero derive redevient un numero assigne.
+
+---
+
 ## [2.0.104] - 2026-09-07
 
 ### Iso-perimetre — les deux gestes `fail2ban` par machine sont PORTES

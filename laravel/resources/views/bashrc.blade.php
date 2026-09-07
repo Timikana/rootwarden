@@ -145,13 +145,21 @@
        data-rw="bashrc-comptes-etat">{{ __('bashrc.comptes_choisir') }}</p>
 
     {{--
-        `figlet_present` arrive dans la reponse de `/bashrc/users`. Le legacy s'en
-        sert pour offrir l'installation ; ce bouton n'est pas porte, donc on garde
-        le SIGNAL sans le geste : la page nomme ce qui manque et laisse
-        l'operateur installer le paquet par le canal qu'il juge bon.
+        `figlet_present` arrive dans la reponse de `/bashrc/users`, et le geste
+        d'installation est ICI depuis l'iso-perimetre : le SIGNAL portait deja
+        ce qui manquait, il ne portait pas encore le remede.
+
+        LE BOUTON VIT DANS L'AVERTISSEMENT, pas ailleurs. Il n'a de sens que
+        dans l'etat que l'avertissement decrit — et il disparait avec lui, sur
+        un RELEVE et non sur la reponse du geste : `chargeComptes()` relit
+        `/bashrc/users`, donc c'est la machine qui dit si figlet est la.
     --}}
     <div class="rw-avertissement" data-rw="bashrc-figlet-absent" hidden>
         {{ __('bashrc.figlet_absent') }}
+        <div class="rw-actions">
+            <button type="button" class="rw-bouton rw-bouton--discret"
+                    data-rw="bashrc-figlet-installer">{{ __('bashrc.figlet_installer') }}</button>
+        </div>
     </div>
 
     <div data-rw="bashrc-comptes" hidden>
@@ -231,7 +239,7 @@
         B4 (2026-09-07) : `deploy` et `restore` sont ici. Il ne reste que DEUX
         routes non appelees, mesurees sur le code depouille de ses commentaires :
 
-            /bashrc/prerequisites   installe figlet en root  — NON porte, decide
+            /bashrc/prerequisites   PORTE depuis l'iso-perimetre (bouton dans
             /bashrc/backups         liste les sauvegardes    — non porte
 
         **Un panneau qui annonce une absence comblee envoie l'operateur ailleurs

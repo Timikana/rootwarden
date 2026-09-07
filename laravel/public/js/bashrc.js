@@ -55,7 +55,25 @@
         if (bloc) { textes = JSON.parse(bloc.textContent || '{}'); }
     } catch (e) { textes = {}; }
 
-    function annonce() {
+    /*
+     * ⚠ CETTE FONCTION S'APPELAIT `annonce`, COMME CELLE DE :325.
+     *
+     * Deux `function nom()` dans le MEME scope ne se shadowent pas l'une
+     * l'autre selon la position de l'appel : la DERNIERE gagne pour tout le
+     * scope, du premier caractere au dernier. `annonce()` ci-dessous appelait
+     * donc la version a trois arguments avec `cible === undefined`, laquelle
+     * commence par `if (! cible) { return; }`.
+     *
+     * Consequence mesuree : le compteur n'etait JAMAIS ecrit — ni au
+     * chargement, ni au `change`, ou l'ecouteur recevait l'Event comme
+     * `cible` et posait `textContent` sur l'objet Event. Aucune erreur, aucune
+     * trace : la ligne restait simplement telle que le gabarit l'avait rendue.
+     *
+     * C'est-a-dire que la premiere capacite que l'en-tete de ce fichier
+     * declare — « le compteur s'ENONCE », le `0` et l'alerte de production —
+     * etait morte. Le renommage est le correctif entier.
+     */
+    function enonceCompteur() {
         var choisies = cases.filter(function (c) { return c.checked; });
         var prod = choisies.filter(function (c) { return c.dataset.sensible === '1'; }).length;
 
@@ -74,8 +92,8 @@
         compteur.classList.toggle('rw-erreur', prod > 0);
     }
 
-    cases.forEach(function (c) { c.addEventListener('change', annonce); });
-    annonce();
+    cases.forEach(function (c) { c.addEventListener('change', enonceCompteur); });
+    enonceCompteur();
 
     /* ═══ B2 : LES DEUX LECTURES DISTANTES ════════════════════════════════ */
 
@@ -112,6 +130,7 @@
     var boutonDeployer = document.querySelector('[data-rw="bashrc-deployer"]');
     var etatEcriture   = document.querySelector('[data-rw="bashrc-ecriture-etat"]');
     var avertFiglet    = document.querySelector('[data-rw="bashrc-figlet-absent"]');
+    var boutonFiglet   = document.querySelector('[data-rw="bashrc-figlet-installer"]');
 
     function videComptes(message) {
         blocComptes.hidden = true;
@@ -224,13 +243,57 @@
             etatComptes.textContent = '';
             blocComptes.hidden = false;
             if (toutCocher) { toutCocher.checked = false; }
-            // `figlet_present` ARRIVE DEJA DANS CETTE REPONSE et le legacy s'en
-            // sert pour offrir l'installation. Ce bouton n'est pas porte : on
-            // garde donc le SIGNAL sans le geste — la page dit ce qui manque, et
-            // l'operateur installe le paquet par le canal qu'il juge bon.
+            // `figlet_present` ARRIVE DEJA DANS CETTE REPONSE, et depuis
+            // l'iso-perimetre le geste d'installation est offert dans
+            // l'avertissement lui-meme. C'est donc la MACHINE qui decide si le
+            // bouton disparait : cette relecture est le seul chemin par lequel
+            // l'avertissement se ferme, jamais la reponse de l'installateur.
             if (avertFiglet) {
                 avertFiglet.hidden = (d.figlet_present !== false);
             }
+        });
+    }
+
+    /*
+     * ══ INSTALLER figlet — ISO-PERIMETRE ═════════════════════════════════
+     *
+     * Le legacy l'offrait, un arbitrage l'avait perdue, l'exploitant a annule
+     * cet arbitrage. Le SIGNAL existait deja ; ce qui manquait etait le geste.
+     *
+     * LE CHEMIN EST ECRIT ICI, EN LITTERAL. Passe en argument d'un helper, il
+     * devient invisible a `scripts/geste-porte.py` — mesure sur le portage de
+     * `fail2ban` le meme soir : l'outil rendait ABSENT pour du code qui
+     * marchait, parce qu'il derive UN saut de helper et qu'il y en avait DEUX.
+     *
+     * ⚠ AUCUNE SUITE NE DOIT LE DECLENCHER : il passe par le gestionnaire de
+     * paquets de la machine. Si un banc doit le toucher, c'est la machine
+     * d'essai et sur le mot de l'exploitant.
+     */
+    if (boutonFiglet) {
+        boutonFiglet.addEventListener('click', function () {
+            var mid = machineUnique();
+            if (mid === null) { return; }
+            if (! window.confirm(textes.figlet_confirme || '')) { return; }
+
+            boutonFiglet.disabled = true;
+            annonce(etatComptes, textes.figlet_en_cours || '', false);
+            lit('/bashrc/prerequisites', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ machine_id: mid }),
+            }).then(function (d) {
+                boutonFiglet.disabled = false;
+                if (! d || d.success !== true) {
+                    annonce(etatComptes, textes.figlet_echec || '', true);
+
+                    return;
+                }
+                annonce(etatComptes, textes.figlet_fait || '', false);
+                // C'est CE releve qui ferme l'avertissement, pas la reponse
+                // ci-dessus : « installe » annonce par l'installateur n'est pas
+                // une reussite verifiee.
+                chargeComptes();
+            });
         });
     }
 
