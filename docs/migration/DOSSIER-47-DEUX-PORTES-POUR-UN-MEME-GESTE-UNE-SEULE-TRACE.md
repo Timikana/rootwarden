@@ -344,3 +344,89 @@ a attesté, et il vaut les quatre autres réunis.**
 disque** porte les quatre propriétés. *Qu'aucune lecture ne peut attester : que le service
 les exécute.* **Le process backend a démarré à 14:53 ; ces commits sont de 23:44 et après.**
 
+---
+
+# ⛔ ADDENDUM 3 — LA MOITIÉ ÉCRAN N'A PAS D'OBJET, ET LE MOTIF EST PIRE QUE PRÉVU
+
+**J'avais demandé au portage d'afficher `archive: false`. Le portage ne reçoit jamais cette
+réponse.** *Refus mesuré, et il est juste :*
+
+```
+pare-feu.js, tous les sites d'appel :
+  :307  /iptables action=get      LECTURE
+  :710  /iptables-validate        essai a blanc
+  :395 :475 :548                  trois routes DU PORTAGE
+TEMOIN  -apply · -restore · -rollback  ABSENTS du portage · /zzz-temoin ABSENT
+```
+
+**Les quatre routes qui appliquent ne sont appelées que par le legacy.** *Ce n'est pas un
+oubli d'affichage : c'est un geste qui n'est pas porté.* **J'ai assigné du travail sans
+mesurer qu'il avait un objet — la faute d'`E-464`, refaite.**
+
+## ⚠ Et la prémisse du refus est fausse, dans le sens qui aggrave
+
+*L'argument avancé était : « I5 est en cours d'écriture, ce code serait jeté dans les heures
+qui viennent ».* **Mesuré :**
+
+```
+derniers commits touchant `pare-feu` : 5, tous de Q2, tous a moi
+/iptables-apply · -restore · -rollback cote portage : ABSENTS
+```
+
+**I5 n'est pas en cours d'écriture. Il est bloqué sur l'arbitrage du port SSH.** *La fenêtre
+n'est donc pas « quelques heures » : elle est ouverte sans terme.*
+
+## ✅ L'ARBITRAGE : ne PAS réparer le legacy — et le motif n'est pas celui qu'on croit
+
+**Ce n'est pas « il meurt bientôt » : il ne meurt pas bientôt.** C'est ceci :
+
+```
+legacy/iptables/js/main.js  ·  12 appels a showNotification
+la cible `#notifications`   ·  0 occurrence dans les QUATRE fichiers servis
+                               (iptables/index.php · head.php · menu.php · footer.php)
+=> les 12 appels levent une TypeError, `catch` compris
+```
+
+> **L'écran legacy ne dit NI le succès, NI l'erreur, NI la trace manquante. Il ne dit rien
+> déjà.** *Y brancher `archive: false` demanderait d'abord de réparer `showNotification` —
+> c'est-à-dire de réparer correctement un module condamné, pour rendre lisible un geste
+> irréversible sur une page que personne ne devrait employer pour ça.*
+
+**Le remède serait plus gros que la fenêtre qu'il couvre, et il laisserait le vrai défaut
+intact.**
+
+## ⛔ CE QUE ÇA REND À L'EXPLOITANT, ET C'EST L'ARGUMENT QUE JE N'AVAIS PAS FORMULÉ
+
+**Aujourd'hui, la seule interface qui applique des règles de pare-feu est une page qui ne
+rend aucun compte.** *Elle est atteignable : `menu.php:83` et le raccourci clavier de
+`head.php:209` l'offrent depuis n'importe quelle page legacy.*
+
+```
+appliquer des regles   ->  l'ecran ne dit rien
+l'archivage echoue     ->  l'ecran ne dit rien
+la commande echoue     ->  l'ecran ne dit rien
+```
+
+> **L'argument pour I5 n'est pas l'archive : c'est que l'interface actuelle est MUETTE sur
+> un geste qui peut couper l'accès à une machine.** *Q3 — « tout retour produit un message
+> visible » — n'était pas une exigence de confort dans le cahier des charges. C'était la
+> réparation du défaut principal, et je l'avais rangée troisième.*
+
+## Les cinq critères pour I5, à reprendre tels quels
+
+*Écrits par la session qui a refusé, mes deux exigences comprises. Ce sont des propriétés,
+pas une implémentation.*
+
+```
+A1  le champ se voit QUAND LE GESTE REUSSIT — succes, ecran vert, trace manquante.
+    Un avertissement replie, un badge d'onglet, un console.warn ne satisfont pas A1.
+A2  les deux motifs se disent DIFFEREMMENT — `etat_precedent_vide` est une
+    information, `echec_archivage` un incident, et les reactions sont opposees.
+A3  le message dit CE QUI MANQUE : « l'etat que vous venez de quitter n'est plus
+    archive — un retour en avant n'est plus possible ».
+A4  la mesure ne depend pas du service : construire les trois reponses soi-meme.
+    Un test qui exige un service redemarre n'est pas un test, c'est une attente.
+A5  TEMOIN POSITIF EN PREMIER : sans lui, « le message ne s'affiche pas » et
+    « l'ecran ne sait pas l'afficher » sont la meme sortie.
+```
+
