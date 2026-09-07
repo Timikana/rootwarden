@@ -153,3 +153,68 @@ REFUS et l'ABSENCE DE REQUÊTE — jamais l'effet distant.** *Aucun
   `AUDIT-IPTABLES-CINQ-GESTES.md`).
 - **Je n'ai pas mesuré** si un compte occupe ce chemin aujourd'hui : les quatre
   voies d'accès à la base me sont fermées.
+
+---
+
+## 6. CONTRAINTE DE PROCÉDURE — le filtre réseau ne se retouche pas
+
+**Ce n'est pas un conseil. C'est la seule règle de cette spec qui porte sur la
+CONDUITE de la mesure, parce que le défaut qu'elle prévient se produit APRÈS que
+la sonde est écrite.**
+
+    1. la liste des points d'application se fixe AVANT d'ecrire la sonde,
+       en URL RESOLUE et en toutes lettres :
+           .../api/gateway/iptables-apply
+           .../api/gateway/iptables-restore
+    2. elle est ECRITE dans la suite comme une constante nommee
+    3. ⛔ elle NE SE MODIFIE PAS pour faire passer un test.
+       Un ECHEC sur ce filtre est un resultat, pas un reglage.
+
+> **Une épingle qui meurt par réflexe.** *La sonde rend un faux ÉCHEC parce
+> qu'elle attrape `/iptables-validate` (I4, légitime) ; on élargit ou on
+> restreint le filtre jusqu'au vert ; et on termine avec un filtre qui ne
+> capture plus rien — c'est-à-dire une suite qui ne peut plus jamais échouer.*
+
+**Si le filtre doit changer, le changement se justifie DANS la suite, à côté de
+la constante, et la contre-épreuve du §2.3 est rejouée.**
+
+---
+
+## 7. Le comptage de `showNotification` — décomposé, parce que trois relevés le donnaient différent
+
+**Trois chiffres circulaient : 8, 12, 13. Deux sont justes et mesurent des objets
+différents ; un est faux.**
+
+```
+legacy/iptables/js/main.js
+  APPELS       12   :148 :150 :154 · :182 :185 :189 · :225 :227 :231 · :273 :276 :280
+  DECLARATION   1   :290  function showNotification(message, type = 'success')
+  ─────────────────
+  lignes        13   <- mon chiffre : le JETON, declaration comprise
+```
+
+**Le « 12 » compte les APPELS. Mon « 13 » comptait les LIGNES PORTANT LE JETON.
+Les deux sont exacts ; ils ne répondent pas à la même question.** *Le chiffre qui
+fonde la conséquence est **12** — c'est le nombre de sites qui lèvent.*
+
+**Le « 8 » vient de `AUDIT-PRERELECTURE-IPTABLES.md:135` et n'a pas de référent.**
+⚠ *Il a voyagé d'un document vers une consigne sans être remesuré, dans un
+message qui demandait précisément de mesurer.*
+
+### 7.1 ⚠ Et la cible EXISTE — dans un fichier déprécié
+
+    #notifications dans le legacy SERVI                    0
+      (index.php, et ses includes REELS : ../head.php, ../menu.php, ../footer.php)
+    #notifications ailleurs
+      legacy/_deprecated/adm/includes/manage_roles.php:273
+        <div id="notifications" class="fixed bottom-4 right-4 z-50"></div>
+
+> **La conclusion tient — chacun des 12 appels lève — mais l'origine n'est pas
+> « personne n'a jamais écrit le conteneur ».** *C'est que `showNotification` a
+> été écrite pour une page qui l'avait, et qu'elle a voyagé sans lui.* **Le
+> module qui le portait est déprécié ; la fonction lui a survécu.**
+
+*Note de méthode : le relevé qui nommait `legacy/includes/head.php`,
+`menu.php`, `footer.php` visait des chemins qui n'existent pas — les includes
+réels sont `legacy/head.php`, `menu.php`, `footer.php`. **Le résultat était
+juste et la mesure ne mesurait pas ce qu'elle annonçait.***
