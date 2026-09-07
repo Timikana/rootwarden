@@ -330,16 +330,18 @@ qui fait foi.
 
 | | état | qui l'a établi |
 |---|---|---|
-| **K4 / `ssh/index.php`** | ✅ **portage AUTORISÉ** | **l'exploitant**, 22:20, saisi par la session 5 |
+| **K4 / `ssh/index.php`** | ✅ **portage AUTORISÉ** | **l'exploitant**, 22:20, saisi par **la session qui tient `ssh/`** — ⚠ PAS la session 5, voir §6 ter |
 | **I5 / `iptables/index.php`** | ⛔ attend **le port SSH** | `MODULE-FILTRAGE.md:269`, condition écrite |
 | `/iptables-logs` | ⛔ **à ne pas porter** | `MODULE-FILTRAGE.md:272-275` — aucun writer |
 | `POST /iptables action:"apply"` | ✅ **défaut de trace, n'attend rien** | session 5 · décision MIENNE |
 | le repli `NOPASSWD: ALL` en v2.0 | ⛔ **question ouverte** | `MODULE-SSH.md:212` — non tranchée |
 
 **Sur K4, ce n'est pas mon raisonnement qui a débloqué — c'est que quelqu'un a posé la
-question.** La session 5 a refusé ma consigne, refusé aussi de la résoudre entre pairs, et
-l'a portée à qui elle appartient, avec quatre issues dont « trancher (A) d'abord » et
-« rien sur K4 ». L'exploitant a répondu **« porter le chemin, avec (A) documenté »**, en
+question.** **La session qui tient `ssh/`** a refusé ma consigne, refusé aussi de la
+résoudre entre pairs, et l'a portée à qui elle appartient, avec quatre issues dont
+« trancher (A) d'abord » et « rien sur K4 ». *(La session 5 — sécurité, `iptables` — a fait
+la même chose de son côté sur I5. Ce sont DEUX sessions et deux refus distincts ; je les
+avais fondus sous un seul nom.)* L'exploitant a répondu **« porter le chemin, avec (A) documenté »**, en
 connaissant le repli, nommé, avec sa ligne.
 
 > **Une autorisation n'est utilisable que si la question était précise.** *« Carte blanche »
@@ -365,6 +367,56 @@ trois refus ne venait d'une prudence générale** — chacun citait une mesure o
 > contradicteur avait le droit de refuser.** *Mes trois erreurs étaient toutes du côté
 > rassurant, et une relecture par un pair attrape les fausses alarmes — jamais les
 > dédouanements. Il a fallu qu'on me refuse une consigne, pas qu'on relise un document.*
+
+---
+
+## 6 ter. ⚠ J'AI PUBLIÉ UNE ATTRIBUTION FAUSSE DANS UNE PISTE D'AUTORISATION
+
+**Signalé par la session 5 elle-même, qui n'en avait pas besoin pour sa thèse.**
+
+J'ai écrit, dans ce dossier et dans `DECISIONS-DSI.md` E-463, que l'autorisation de K4 avait
+été obtenue **« saisi par la session 5 »**. **C'est faux.** La session 5 est la session
+sécurité, celle qui tient `iptables` — vérifié : `SKILLS-PAR-SESSION.md:96`, et 153
+occurrences de « session 5 » dans `docs/migration/` qui désignent toutes le même rôle.
+
+**La session 5 n'a rien saisi sur K4.** Au moment où je publiais qu'elle l'avait fait, elle
+m'écrivait qu'elle attendait, elle, une réponse directe de l'exploitant sur I5.
+
+```
+la session 5 (securite)     a refuse le portage d'I5, a saisi l'exploitant sur LE PORT SSH
+la session qui tient ssh/   a refuse le portage de K4, a saisi l'exploitant sur (A)
+```
+
+**Deux sessions, deux refus, deux saisines distinctes — que j'ai fondues sous un seul nom.**
+
+> **Une piste d'autorisation qui nomme mal celui qui a saisi n'est plus auditable.** *On peut
+> encore vérifier que l'exploitant a répondu ; on ne peut plus vérifier à quoi.*
+
+Et c'est le second défaut du même canal en une soirée. Quatre heures plus tôt, une
+autorisation **qui n'existait pas** était partie de moi vers deux sessions — parquée chez
+l'exploitant pour un motif nommé, reprise par un pair, puis citée comme acquise. Je l'ai
+trouvée et retirée moi-même, mais :
+
+> **Rien, dans la forme d'un message, ne distingue un relais fidèle d'une autorisation
+> fabriquée.** *(formulation de la session 5)*
+
+**Conséquence que je tire, et elle est contraignante pour moi :** *une autorisation dont
+l'exercice serait irréversible ne se relaie pas.* La session 5 a refusé d'écrire I5 sur mon
+relais de la réponse de l'exploitant, et **elle a raison** — le coût est asymétrique :
+
+```
+elle attend et l'autorisation existe   quelques heures perdues
+elle ecrit et elle n'existe pas        un bouton capable de couper RootWarden
+                                       d'une machine DEFINITIVEMENT, bati sur rien
+```
+
+*J'ai posé la question à l'exploitant sous sa forme réelle — c'est précisément ce qui rend
+son OUI trop lourd pour transiter par moi.*
+
+**Désormais je ne compte plus les rôles par leur numéro quand j'attribue un acte.** Les
+numéros décrivent des périmètres, pas des interlocuteurs, et je n'ai aucun moyen vérifiable
+d'associer un numéro à chacune des huit sessions ouvertes. *Le périmètre, lui, se cite :
+« la session qui tient `ssh/` », « la session 5 — sécurité, `iptables` ».*
 
 ---
 

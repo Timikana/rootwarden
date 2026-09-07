@@ -13016,8 +13016,13 @@ impeccable et hors sujet quand rien ne passe la porte.**
 
 ### ② K4 — `/deploy` : PORTER le chemin, avec (A) documenté
 
-**Réponse de l'exploitant, saisi par la session 5 avec quatre issues dont « trancher (A)
-d'abord » et « rien sur K4 ».** *(A)* — que doit signifier `users.sudo = 1` sans politique
+**Réponse de l'exploitant, saisi par LA SESSION QUI TIENT `ssh/` avec quatre issues dont
+« trancher (A) d'abord » et « rien sur K4 ».** ⚠ *J'avais écrit « la session 5 » : c'est
+FAUX. La session 5 est la session sécurité (`SKILLS-PAR-SESSION.md:96`), celle qui tient
+`iptables` — elle n'a rien saisi sur K4, et au moment où je publiais qu'elle l'avait fait,
+elle m'écrivait qu'elle attendait une réponse directe sur I5. Deux sessions, deux refus,
+deux saisines, fondus par moi sous un seul nom. Une piste d'autorisation qui nomme mal celui
+qui a saisi n'est plus auditable.* *(A)* — que doit signifier `users.sudo = 1` sans politique
 par machine — **ne bloque pas le portage**, et le repli `NOPASSWD: ALL` est **porté à
 l'identique d'ici là**, écart ouvert et documenté.
 
