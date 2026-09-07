@@ -5,6 +5,87 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## E-460 (queue portage) — `GEOIP_ENABLED` : « désactivée » ne doit pas se lire « en panne »
+
+Le backend (`f73e28a5`) a posé l'interrupteur du **seul effet sortant qui n'en avait pas** :
+`geoip_lookup` interroge `ip-api.com` **en HTTP clair** (le tier gratuit n'autorise pas HTTPS,
+le code le dit et l'assume). Huit autres effets sortants ont leur `*_ENABLED` ; celui-là non.
+
+Éteint, il rend `{'country': 'Desactive', 'countryCode': 'OFF'}`. **Cette entrée-ci est la
+moitié portage : afficher cet état pour ce qu'il est.**
+
+### Pourquoi un code NEUF, et surtout pas `??`
+
+Le portage traduit la géolocalisation **par code**, jamais par nom de pays :
+
+    fail2ban.js   'LO'  -> geo_locale     « adresse locale, aucune requete n'est partie »
+                  '??'  -> geo_inconnu    « le service n'a pas su repondre »
+                  'OFF' -> geo_desactivee  ← AJOUTE ICI
+
+**Réutiliser `??` aurait fait passer un réglage délibéré pour une panne du tiers** : on aurait
+cherché une panne inexistante, ou rallumé l'interrupteur en croyant réparer. La branche `OFF`
+est donc placée **à côté de `LO`** — les deux cas où *rien n'est parti* — et non à côté de `??`,
+qui dit l'inverse : une requête a bien été émise.
+
+### La clé devait aller dans TROIS endroits, pas deux
+
+    laravel/lang/fr/fail2ban.php        le libelle
+    laravel/lang/en/fail2ban.php        sa parite, meme commit
+    Fail2banController                  la LISTE des cles transmises au JS
+
+`$textes` est une liste **curatée** de 127 clés, pas le catalogue entier. **Une clé présente
+dans les deux catalogues mais absente de cette liste rend du VIDE au navigateur, sans aucune
+erreur** — et un vide se lit exactement comme « la géolocalisation est cassée », c'est-à-dire
+le contraire de ce que la clé existe pour dire. Mesuré : la clé voyage jusqu'au navigateur.
+
+### Le libellé NOMME la variable
+
+Sur un portail d'administration, savoir **quoi changer** fait la différence entre un état subi
+et un état choisi. Le texte nie aussi la panne explicitement (« ce n'est pas une panne du
+service »), parce que c'est la confusion que ce geste corrige.
+
+### ⚠ LE BACKEND EST INERTE JUSQU'À LA RECRÉATION DU CONTENEUR
+
+Les `.py` sont lus au **démarrage** du process. Mesuré, pas supposé :
+
+    process rootwarden_python demarre   2026-09-07 14:53:00 CEST
+    correctif f73e28a5 ecrit            2026-09-07 23:40:30 CEST
+    -> le process porte le code d'AVANT : la garde ne s'execute pas encore
+
+**Conséquence pour qui testerait maintenant** : le service rendra une géolocalisation réelle ou
+`??`, jamais `OFF`. *On mesurerait la branche `geo_inconnu` en croyant mesurer `OFF`, et le vert
+serait indiscernable du vrai.* **La moitié portage, elle, est servie immédiatement** — le JS et
+le catalogue sont montés depuis l'hôte, aucune recréation n'est nécessaire de ce côté.
+
+### Mesure — 12 assertions, 0 échec, aucun appel sortant
+
+La charge `#f2b-textes` réellement servie au navigateur est lue, puis le **même ternaire** que
+`fail2ban.js` est évalué dessus. La mesure **ne dépend donc pas du service**, qui ne peut pas
+encore rendre `OFF`.
+
+    la cle geo_desactivee VOYAGE jusqu'au navigateur
+    OFF rend un texte non vide, qui dit « desactivee », « aucune requete n'est partie »
+        et NIE la panne
+    TEMOINS POSITIFS   OFF != '??'   OFF != 'LO'   un vrai pays rend son resultat
+                       un code INCONNU tombe dans le cas general
+    FILET RESEAU       0 requete vers ip-api.com (interception, abort si tentative)
+
+*Les témoins ne sont pas décoratifs : sans eux, « OFF rend geo_desactivee » serait vrai à vide
+si le ternaire captait tout. Le code inconnu prouve qu'il ne capte pas tout.*
+
+### Ce que cette entrée NE couvre pas
+
+Le chemin de **clic** complet — bouton « Géolocaliser », panneau de confirmation, réponse du
+backend — n'est pas exercé : il exige une machine avec des adresses bannies **et** un backend
+recréé. Déclaré plutôt que sous-entendu.
+
+**Et un défaut voisin, signalé et non corrigé** : `geo_conf_texte` prévient que l'adresse « sera
+transmise à ip-api.com EN CLAIR ». **Quand l'interrupteur est éteint, cet avertissement est
+faux** — la requête ne part pas. Le corriger demanderait que la page lise `geoip_enabled`
+(exposé par `backend/routes/settings.py:104`) avant d'afficher le panneau. Hors de ce geste.
+
+---
+
 ## iptables — les deux portes d'application convergent, l'archive redevient contiguë
 
 **Arbitrage `DOSSIER-47`.** `backend/routes/iptables.py` portait **deux routes qui appliquent

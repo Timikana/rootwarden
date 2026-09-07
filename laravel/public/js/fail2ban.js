@@ -1109,7 +1109,14 @@ window.RW_FAIL2BAN = true;
                     return;
                 }
                 var code = String(d.countryCode || '??');
+                /*
+                 * `OFF` est place a cote de `LO` et non de `??` : ce sont les deux
+                 * cas ou RIEN N'EST PARTI. `??` dit l'inverse — une requete a ete
+                 * emise et le tiers n'a pas su repondre. Les ranger ensemble ferait
+                 * lire un reglage comme une panne.
+                 */
                 var detail = code === 'LO' ? (textes.geo_locale || '')
+                    : code === 'OFF' ? (textes.geo_desactivee || '')
                     : code === '??' ? (textes.geo_inconnu || '')
                     : remplit('geo_resultat', { pays: String(d.country || ''), code: code });
                 if (hotePays) { hotePays.textContent = detail; hotePays.hidden = false; }
