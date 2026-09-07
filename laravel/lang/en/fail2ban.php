@@ -80,6 +80,14 @@ return [
      * means "the service could not answer"). Naming the variable is deliberate. */
     'geo_desactivee' => "geolocation is disabled on this portal (GEOIP_ENABLED); "
         . "no request was sent — this is not a service failure.",
+    /* Disabled, there is no consent to ask for — there is a state to state.
+     * `geo_conf_texte` would otherwise promise a transmission that will not
+     * happen, and a warning that cries wolf spends the credibility of every
+     * other warning, not just its own. */
+    'geo_off_titre' => 'Geolocation disabled',
+    'geo_off_texte' => "This portal will not query ip-api.com: geolocation is disabled "
+        . "(GEOIP_ENABLED). There is nothing to authorise — no address will be sent. "
+        . "To re-enable it, change that setting on the server.",
     'geo_journal'    => ':ip — :detail',
     'geo_echec'      => 'Geolocation failed. :message',
 

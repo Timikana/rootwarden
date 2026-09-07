@@ -1083,7 +1083,46 @@ window.RW_FAIL2BAN = true;
      * ce que nous bloquons. Une reserve fausse recopiee devient une
      * justification.
      */
+    /*
+     * ══ ON LIT LE DRAPEAU AVANT D'OUVRIR LE PANNEAU ═══════════════════════════
+     *
+     * `geo_conf_texte` annonce que l'adresse « sera transmise a ip-api.com EN
+     * CLAIR ». Interrupteur eteint, cette phrase est FAUSSE. **Eteint, il n'y a pas
+     * de consentement a demander : il y a un etat a annoncer.**
+     *
+     * ⚠ LA SOURCE EST `/settings/announceable`, PAS `env()`. Le conteneur du
+     * portage NE PORTE PAS `GEOIP_ENABLED` (mesure : `printenv` vide), donc un
+     * `env('GEOIP_ENABLED', true)` rendrait TOUJOURS `true` et mentirait des que
+     * l'exploitant l'eteint. La route rend la valeur EFFECTIVE du process qui
+     * execute la garde — donc aussi la bonne reponse quand le backend n'a pas
+     * encore ete recree.
+     *
+     * ⚠ LECTURE AU MOMENT DU CLIC, jamais mise en cache au chargement. Un drapeau
+     * lu une fois puis garde pourrait annoncer « desactivee » alors que le reglage
+     * a ete rallume entre-temps — donc promettre que rien ne part pendant que des
+     * requetes sortent. L'inverse (annoncer la transmission alors qu'elle est
+     * eteinte) ne fait qu'avertir de trop.
+     *
+     * ⚠ ET L'INCONNU SE COMPORTE COMME ALLUME. On ne supprime le consentement que
+     * si le drapeau vaut EXPLICITEMENT `false`. `litGet` rend `null` en cas
+     * d'echec, et le backend distingue « ce reglage vaut faux » de « je n'ai pas su
+     * le lire » (`non_resolus`) : dans le doute, c'est l'avertissement qui est
+     * honnete, parce que la requete peut tres bien partir. **Un repli inverse
+     * dirait « rien ne part » pendant qu'une adresse sort.**
+     */
     function demandeGeo(adresse, hotePays) {
+        litGet('/settings/announceable').then(function (d) {
+            var reglages = (d && d.settings) || {};
+            if (reglages.geoip_enabled === false) {
+                demande('geo_off_titre', 'geo_off_texte', {}, null, { bloque: true });
+
+                return;
+            }
+            demandeGeoConsentement(adresse, hotePays);
+        });
+    }
+
+    function demandeGeoConsentement(adresse, hotePays) {
         demande('geo_conf_titre', 'geo_conf_texte', { ip: adresse }, function () {
             ferme();
             if (hotePays) {
