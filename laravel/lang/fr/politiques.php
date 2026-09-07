@@ -111,7 +111,11 @@ return [
     'derniere'          => 'Derniere ecriture',
     'jamais'            => 'jamais deployee',
     'rollback_titre' => 'Restaurer une version anterieure',
-    'rollback_texte' => 'L\'annulation d\'un deploiement n\'est pas encore portee. Elle reecrit un fichier sudoers sur la machine, et se fait pour l\'instant depuis l\'ancien portail.',
+    'rollback_texte' => 'Restaure le sudoers exact d\'avant ce deploiement. Le contenu est celui qui a ete sauvegarde, pas une reconstitution. Une re-authentification est exigee.',
     'rollback_lien' => 'Annuler ce deploiement dans l\'ancien portail',
     'resultat'          => 'Resultat',
+
+    /* L'annulation d'un deploiement, rouverte le 2026-09-07. */
+    'rollback' => 'Annuler',
+    'rollback_confirme' => 'Annuler ce deploiement et restaurer le sudoers precedent ?\\n\\nLe contenu exact d\'avant est reecrit sur la machine — ce ne sont pas des regles retapees, ce sont les octets sauvegardes. Une re-authentification sera demandee.',
 ];

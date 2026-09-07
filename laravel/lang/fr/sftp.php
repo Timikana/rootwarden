@@ -108,7 +108,10 @@ return [
     'jamais'           => 'jamais deploye',
     'resultat'         => 'Resultat',
     'rollback_titre'   => 'Restaurer une version anterieure',
-    'rollback_texte'   => 'L\'annulation d\'un deploiement n\'est pas encore portee. Elle reecrit un '
-                          . 'bloc SSH sur la machine, et se fait pour l\'instant depuis l\'ancien portail.',
+    'rollback_texte'   => 'Restaure le bloc SSH exact d\'avant ce deploiement. Le contenu est celui qui a ete sauvegarde, pas une reconstitution. Une re-authentification est exigee.',
     'rollback_lien'    => 'Annuler ce deploiement dans l\'ancien portail',
+
+    /* L'annulation d'un deploiement, rouverte le 2026-09-07. */
+    'rollback' => 'Annuler',
+    'rollback_confirme' => 'Annuler ce deploiement et restaurer le bloc SSH precedent ?\\n\\nLe contenu exact d\'avant est reecrit sur la machine — ce n\'est pas une reconstitution, ce sont les octets sauvegardes. Une re-authentification sera demandee.',
 ];
