@@ -5,6 +5,80 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## iptables — les deux portes d'application convergent, l'archive redevient contiguë
+
+**Arbitrage `DOSSIER-47`.** `backend/routes/iptables.py` portait **deux routes qui appliquent
+des règles de pare-feu**, mêmes gardes à la ligne près, même effet distant — **une seule
+archivait**.
+
+    POST /iptables         action="apply"   ->  appliquait SANS archiver
+    POST /iptables-apply   action="apply"   ->  archivait puis appliquait
+
+### Ce que le trou coûtait, et ce n'est pas « on ne sait pas qui »
+
+    etat 0 --/iptables--------> etat 1   rien n'est archive : l'etat 0 est PERDU
+    etat 1 --/iptables-apply--> etat 2   l'etat 1 est archive
+    rollback depuis l'etat 2             restaure l'etat 1, PAS l'etat 0
+
+**L'archive devenait non contiguë, et rien ne le disait.** *Une archive avec un trou est plus
+dangereuse qu'une archive absente : l'absence se voit, le trou se lit comme une continuité.*
+Et `/iptables-rollback` **applique** ce qu'il restaure — le trou était actionnable.
+
+### Délégation, jamais duplication
+
+Le verbe **n'est pas retiré** : `ClesApi.php:60` donne aux clés d'API une portée à préfixe sur
+`^/iptables`, et cette liste ne s'énumère pas. *« Le backend l'expose aujourd'hui » fonde une
+obligation de compatibilité, là où « le legacy l'expose déjà » n'en fonde aucune.*
+
+Le bloc d'archivage a été **déplacé** dans `_archive_puis_applique()` — pas recopié. Les deux
+routes l'appellent.
+
+    appels a `_archive_puis_applique`        2 (+ sa definition)
+    controles « Regles IPv4 manquantes »     1
+
+> **La trace manquante était le symptôme ; deux implémentations du même geste irréversible
+> était la cause.** Une seconde copie du bloc aurait divergé en silence, les deux portes
+> continuant de « marcher ».
+
+### ⛔ CE QUE CE LOT NE FERME PAS
+
+**Deux des quatre portes qui appliquent restent sans archive** :
+
+    /iptables            ✅ archive
+    /iptables-apply      ✅ archive
+    /iptables-restore    ⛔ APPLIQUE SANS ARCHIVER
+    /iptables-rollback   ⛔ APPLIQUE SANS ARCHIVER
+
+*L'archive reste donc non contiguë à travers ces deux-là.* Hors du périmètre arbitré : signalé,
+pas corrigé.
+
+**Et le correctif est INERTE jusqu'à la recréation du conteneur** — les `.py` sont lus au
+démarrage. Le service exécute encore l'ancien code ; `pytest` lit le disque, donc la mesure
+ci-dessous porte sur le fichier, pas sur le service.
+
+### ⚠ MON REFACTOR ÉTAIT CASSÉ, ET MON PROPRE TEST L'A ATTRAPÉ
+
+Le premier jet du helper comptait sur `rules_v4` défini dans la route appelante : **les deux
+portes levaient `NameError`**. La suite de 672 tests est restée **verte** — parce qu'**aucun
+n'exerçait la branche `apply`** avec des règles valides.
+
+*Une suite qui couvre les gardes et les paramètres absents peut être verte sur une route dont
+le chemin nominal ne s'exécute pas.*
+
+Trois tests ajoutés, qui mesurent **l'effet et non le message** : un `INSERT` dans
+`iptables_history` a-t-il eu lieu, pour **chacune** des deux portes ; et une version vide
+n'est pas archivée — elle rendrait le rollback destructeur. Avec témoin positif : le harnais
+sait voir une application, donc « zéro insert » n'est pas « zéro mesure ».
+
+    backend   675 passed · 5 skipped · 2 xfailed
+
+⚠ **Ces tests sont la vérification de l'auteur, pas une certification.** Celui qui écrit un
+correctif ne devrait pas être celui qui atteste qu'il est là — une attestation indépendante
+reste due.
+
+⛔ **Rien n'a été exercé** : aucune règle appliquée, aucune machine jointe, aucune requête vers
+`/iptables` ni `/iptables-apply`. Mesure entièrement statique et harnais entièrement doublé.
+
 ## K4 — le déploiement des clés SSH : le chemin est écrit, le garde a changé d'étage
 
 **Autorisation de l'exploitant, 2026-09-07** : porter le chemin, `(A)` documenté, **jamais

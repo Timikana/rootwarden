@@ -24,6 +24,109 @@ from iptables_manager import get_iptables_rules, apply_iptables_rules
 bp = Blueprint('iptables', __name__)
 
 
+def _archive_puis_applique(client, root_password, data, mid):
+    """Archive l'etat courant PUIS applique les regles. Le SEUL chemin d'application.
+
+    ══ POURQUOI CETTE FONCTION EXISTE ═══════════════════════════════════════
+
+    Ce fichier portait DEUX routes qui appliquent des regles de pare-feu sur une
+    machine, memes gardes a la ligne pres, meme effet distant :
+
+        POST /iptables         action="apply"   ->  appliquait SANS archiver
+        POST /iptables-apply   action="apply"   ->  archivait puis appliquait
+
+    ⚠ LA TRACE MANQUANTE ETAIT LE SYMPTOME ; DEUX IMPLEMENTATIONS DU MEME GESTE
+    IRREVERSIBLE ETAIT LA CAUSE. Le remede n'est donc pas d'ajouter un archivage
+    a la premiere route — ce serait une seconde copie, qui divergerait EN SILENCE
+    pendant que les deux portes continueraient de « marcher ». Ce depot a deja
+    paye trois copies du garde SSRF et trois compteurs 2FA.
+
+    ══ CE QUE L'ABSENCE D'ARCHIVE COUTAIT ═══════════════════════════════════
+
+        etat 0 --/iptables--------> etat 1   rien n'est archive : l'etat 0 est PERDU
+        etat 1 --/iptables-apply--> etat 2   l'etat 1 est archive
+        rollback depuis l'etat 2             restaure l'etat 1, PAS l'etat 0
+
+    L'archive devenait NON CONTIGUE, et rien ne le disait. *Une archive avec un
+    trou est plus dangereuse qu'une archive absente : l'absence se voit, le trou
+    se lit comme une continuite.* Et `/iptables-rollback` APPLIQUE ce qu'il
+    restaure — le trou etait actionnable.
+
+    ══ POURQUOI LE VERBE N'A PAS ETE RETIRE ═════════════════════════════════
+
+    `laravel/app/Services/ClesApi.php:60` donne aux cles d'API une portee a
+    PREFIXE sur `^/iptables` : un consommateur legitime peut appeler
+    `POST /iptables` aujourd'hui, et cette liste ne s'enumere pas.
+
+    « Le backend l'expose aujourd'hui » fonde une obligation de compatibilite, la
+    ou « le legacy l'expose deja » n'en fonde aucune : le legacy meurt, le backend
+    reste.
+
+    La capacite est donc INCHANGEE, aucun consommateur ne casse, et la trace est
+    acquise pour les deux portes.
+    """
+    # LES REGLES SONT LUES ICI, et non heritees d'un local de l'appelant. Le
+    # premier jet de cette fonction comptait sur `rules_v4` defini dans la route
+    # appelante : les deux portes levaient `NameError`, et la suite de 672 tests
+    # ne l'a pas vu parce qu'AUCUN n'exercait la branche `apply`.
+    rules_v4 = data.get('rules_v4')
+    rules_v6 = data.get('rules_v6')
+    if not rules_v4:
+        return jsonify({"success": False, "message": "Regles IPv4 manquantes."}), 400
+
+    # Save history before apply
+    try:
+        old_rules = get_iptables_rules(client, root_password)
+        # L'AUTEUR NE VIENT PLUS DU CORPS DE LA REQUETE. Un client
+        # pouvait signer une modification de pare-feu au nom de
+        # n'importe qui ; et comme aucun frontend n'envoyait ce
+        # champ, TOUTES les lignes d'historique valaient
+        # litteralement « admin » — l'historique attribuait donc
+        # chaque changement a un compte qui ne l'avait pas fait.
+        # L'identite retenue est celle que get_current_user()
+        # recharge EN BASE a partir de X-User-ID.
+        user_id, _role_id = get_current_user()
+        change_reason = data.get('change_reason', '')
+        # get_iptables_rules rend `file_rules_v4` / `file_rules_v6`
+        # (le CONTENU du fichier persistant), jamais `rules_v4`. Lire
+        # la mauvaise cle enregistrait TOUTES les versions vides —
+        # et un rollback ecrasait alors /etc/iptables/rules.v4 par du
+        # vide. C'est le fichier persistant qu'il faut archiver, pas
+        # la sortie de `iptables -L` qui n'est pas rejouable.
+        ancien_v4 = old_rules.get('file_rules_v4', '') or ''
+        ancien_v6 = old_rules.get('file_rules_v6', '') or ''
+        # La machine est celle DEJA RESOLUE par machine_id en tete de
+        # requete. La retrouver par son adresse designait la mauvaise
+        # ligne des que deux machines partagent une IP (NAT, ports
+        # SSH differents) : l'historique d'un serveur recevait alors
+        # les regles d'un autre.
+        machine_pk = mid  # valeur RESOLUE, pas re-lue du client (source unique)
+        with get_db_connection() as hist_conn:
+            hist_cur = hist_conn.cursor()
+            hist_cur.execute("SELECT name FROM users WHERE id = %s", (user_id,))
+            u_row = hist_cur.fetchone()
+            # Un identifiant numerique vaut mieux qu'un nom emprunte
+            # quand le compte n'est plus la : il reste rattachable.
+            changed_by = (u_row[0] if u_row else None) or "#%s" % user_id
+            # Une version vide n'archive rien et rend le rollback
+            # destructeur : on ne l'enregistre pas.
+            if ancien_v4.strip():
+                hist_cur.execute(
+                    "INSERT INTO iptables_history (server_id, rules_v4, rules_v6, changed_by, change_reason) VALUES (%s, %s, %s, %s, %s)",
+                    (machine_pk, ancien_v4, ancien_v6, changed_by, change_reason)
+                )
+                hist_conn.commit()
+            else:
+                logger.warning(
+                    "[iptables:apply] machine_id=%s : fichier de regles vide, aucune version archivee",
+                    machine_pk
+                )
+    except Exception as hist_err:
+        logger.warning("Iptables history save failed: %s", hist_err)
+    apply_iptables_rules(client, root_password, rules_v4, rules_v6)
+    return jsonify({"success": True, "message": "Regles appliquees."})
+
+
 
 
 @bp.route('/iptables', methods=['POST'])
@@ -45,12 +148,11 @@ def manage_iptables():
                 rules = get_iptables_rules(client, root_password)
                 return jsonify({"success": True, **{k: rules.get(k) for k in ('current_rules_v4','current_rules_v6','file_rules_v4','file_rules_v6')}})
             elif action == "apply":
-                rules_v4 = data.get('rules_v4')
-                rules_v6 = data.get('rules_v6')
-                if not rules_v4:
-                    return jsonify({"success": False, "message": "Regles IPv4 manquantes."}), 400
-                apply_iptables_rules(client, root_password, rules_v4, rules_v6)
-                return jsonify({"success": True, "message": "Regles appliquees."})
+                # DELEGATION, JAMAIS DUPLICATION. Cette route appliquait SANS
+                # archiver ; elle passe desormais par le SEUL chemin
+                # d'application. Voir `_archive_puis_applique` pour ce que le
+                # trou d'archive coutait au rollback.
+                return _archive_puis_applique(client, root_password, data, mid)
             else:
                 return jsonify({"success": False, "message": "Action non reconnue."}), 400
     except Exception as e:
@@ -103,61 +205,15 @@ def manage_iptables_apply():
             return jsonify({"success": False, "message": "Action manquante."}), 400
         with ssh_session(server_ip, server_port, ssh_user, ssh_password, service_account=svc_account) as client:
             if action == "apply":
-                rules_v4 = data.get('rules_v4')
-                rules_v6 = data.get('rules_v6')
-                if not rules_v4:
-                    return jsonify({"success": False, "message": "Regles IPv4 manquantes."}), 400
-                # Save history before apply
-                try:
-                    old_rules = get_iptables_rules(client, root_password)
-                    # L'AUTEUR NE VIENT PLUS DU CORPS DE LA REQUETE. Un client
-                    # pouvait signer une modification de pare-feu au nom de
-                    # n'importe qui ; et comme aucun frontend n'envoyait ce
-                    # champ, TOUTES les lignes d'historique valaient
-                    # litteralement « admin » — l'historique attribuait donc
-                    # chaque changement a un compte qui ne l'avait pas fait.
-                    # L'identite retenue est celle que get_current_user()
-                    # recharge EN BASE a partir de X-User-ID.
-                    user_id, _role_id = get_current_user()
-                    change_reason = data.get('change_reason', '')
-                    # get_iptables_rules rend `file_rules_v4` / `file_rules_v6`
-                    # (le CONTENU du fichier persistant), jamais `rules_v4`. Lire
-                    # la mauvaise cle enregistrait TOUTES les versions vides —
-                    # et un rollback ecrasait alors /etc/iptables/rules.v4 par du
-                    # vide. C'est le fichier persistant qu'il faut archiver, pas
-                    # la sortie de `iptables -L` qui n'est pas rejouable.
-                    ancien_v4 = old_rules.get('file_rules_v4', '') or ''
-                    ancien_v6 = old_rules.get('file_rules_v6', '') or ''
-                    # La machine est celle DEJA RESOLUE par machine_id en tete de
-                    # requete. La retrouver par son adresse designait la mauvaise
-                    # ligne des que deux machines partagent une IP (NAT, ports
-                    # SSH differents) : l'historique d'un serveur recevait alors
-                    # les regles d'un autre.
-                    machine_pk = mid  # valeur RESOLUE, pas re-lue du client (source unique)
-                    with get_db_connection() as hist_conn:
-                        hist_cur = hist_conn.cursor()
-                        hist_cur.execute("SELECT name FROM users WHERE id = %s", (user_id,))
-                        u_row = hist_cur.fetchone()
-                        # Un identifiant numerique vaut mieux qu'un nom emprunte
-                        # quand le compte n'est plus la : il reste rattachable.
-                        changed_by = (u_row[0] if u_row else None) or "#%s" % user_id
-                        # Une version vide n'archive rien et rend le rollback
-                        # destructeur : on ne l'enregistre pas.
-                        if ancien_v4.strip():
-                            hist_cur.execute(
-                                "INSERT INTO iptables_history (server_id, rules_v4, rules_v6, changed_by, change_reason) VALUES (%s, %s, %s, %s, %s)",
-                                (machine_pk, ancien_v4, ancien_v6, changed_by, change_reason)
-                            )
-                            hist_conn.commit()
-                        else:
-                            logger.warning(
-                                "[iptables-apply] machine_id=%s : fichier de regles vide, aucune version archivee",
-                                machine_pk
-                            )
-                except Exception as hist_err:
-                    logger.warning("Iptables history save failed: %s", hist_err)
-                apply_iptables_rules(client, root_password, rules_v4, rules_v6)
-                return jsonify({"success": True, "message": "Regles appliquees."})
+                # LE MEME CHEMIN QUE `/iptables`. Le bloc qui vivait ici a ete
+                # DEPLACE dans `_archive_puis_applique` — pas recopie : deux
+                # implementations d'un geste irreversible etaient la CAUSE du
+                # defaut, la trace manquante n'en etait que le symptome.
+                #
+                # La validation des regles vit dans le helper, pas ici : une
+                # seconde copie du controle « rules_v4 manquantes » divergerait
+                # comme le reste.
+                return _archive_puis_applique(client, root_password, data, mid)
             else:
                 return jsonify({"success": False, "message": "Action non reconnue."}), 400
     except Exception as e:

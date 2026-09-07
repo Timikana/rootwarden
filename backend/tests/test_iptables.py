@@ -105,3 +105,105 @@ class TestIptablesLogs:
     def test_logs_no_api_key(self, client):
         resp = client.get('/iptables-logs')
         assert resp.status_code == 401
+
+
+class TestLesDeuxPortesArchivent:
+    """Les DEUX routes qui appliquent passent par le MEME chemin, et il archive.
+
+    ⚠ CE QUI MANQUAIT AVANT CE FICHIER. Les tests ci-dessus exercent les gardes et
+    les parametres absents ; AUCUN n'exerçait la branche `action="apply"` avec des
+    regles valides. La suite pouvait donc etre verte pendant que `/iptables`
+    appliquait sans rien archiver — et elle l'a ete.
+
+    Le defaut ferme : `POST /iptables` appliquait SANS archiver, `POST
+    /iptables-apply` archivait. L'archive devenait NON CONTIGUE, et
+    `/iptables-rollback` APPLIQUE ce qu'il restaure — le trou etait actionnable.
+
+    La propriete mesuree ici n'est pas « la route repond 200 » mais
+    **« un INSERT dans `iptables_history` a eu lieu »** : c'est l'effet, pas le
+    message.
+    """
+
+    CORPS = {
+        'server_ip': '10.0.0.1', 'server_port': 22, 'ssh_user': 'admin',
+        'ssh_password': 'enc', 'root_password': 'enc', 'machine_id': 3,
+        'action': 'apply', 'rules_v4': '*filter\nCOMMIT\n', 'rules_v6': '',
+    }
+
+    def _harnais(self, monkeypatch):
+        """Double tout ce qui SORT : aucune machine n'est jointe, rien n'est applique."""
+        import routes.iptables as ipt
+
+        inserts = []
+
+        class _Curseur:
+            def execute(self, sql, params=None):
+                if 'INSERT INTO iptables_history' in sql:
+                    inserts.append(params)
+                self._sql = sql
+
+            def fetchone(self):
+                return ('rw-test-admin',) if 'FROM users' in getattr(self, '_sql', '') else None
+
+        class _Conn:
+            def cursor(self):
+                return _Curseur()
+
+            def commit(self):
+                pass
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+        class _Session:
+            def __enter__(self):
+                return MagicMock()
+
+            def __exit__(self, *a):
+                return False
+
+        appliques = []
+        monkeypatch.setattr(ipt, 'ssh_session', lambda *a, **k: _Session())
+        monkeypatch.setattr(ipt, 'get_iptables_rules', lambda *a, **k: {
+            'file_rules_v4': '*filter\n-A INPUT -j ACCEPT\nCOMMIT\n', 'file_rules_v6': '',
+        })
+        monkeypatch.setattr(ipt, 'apply_iptables_rules',
+                            lambda *a, **k: appliques.append(a[2] if len(a) > 2 else None))
+        monkeypatch.setattr(ipt, 'get_current_user', lambda: (14, 3))
+        monkeypatch.setattr(ipt, 'get_db_connection', lambda *a, **k: _Conn())
+        monkeypatch.setattr(ipt, '_resolve_ssh_creds',
+                            lambda d: ('10.0.0.1', 22, 'admin', 'p', 'rp', None, 3, None))
+        return inserts, appliques
+
+    @pytest.mark.parametrize('chemin', ['/iptables', '/iptables-apply'])
+    def test_les_deux_portes_ARCHIVENT_avant_d_appliquer(self, client, admin_headers,
+                                                         mock_db, monkeypatch, chemin):
+        inserts, appliques = self._harnais(monkeypatch)
+
+        resp = client.post(chemin, headers=admin_headers, json=dict(self.CORPS))
+
+        assert resp.status_code == 200, resp.get_data(as_text=True)[:200]
+        # TEMOIN POSITIF : le harnais SAIT voir une application. Sans lui, zero
+        # insert et zero application seraient la meme sortie qu'une route muette.
+        assert len(appliques) == 1, "le harnais n'a vu aucune application"
+        assert len(inserts) == 1, (
+            "%s a applique SANS archiver — l'archive redevient non contigue, et "
+            "`/iptables-rollback` applique ce qu'il restaure" % chemin
+        )
+
+    def test_une_version_VIDE_n_est_pas_archivee(self, client, admin_headers, mock_db, monkeypatch):
+        """Une version vide n'archive rien et rendrait le rollback DESTRUCTEUR."""
+        import routes.iptables as ipt
+        inserts, appliques = self._harnais(monkeypatch)
+        monkeypatch.setattr(ipt, 'get_iptables_rules', lambda *a, **k: {
+            'file_rules_v4': '   ', 'file_rules_v6': '',
+        })
+
+        resp = client.post('/iptables', headers=admin_headers, json=dict(self.CORPS))
+
+        assert resp.status_code == 200
+        assert len(appliques) == 1, "l'application doit avoir lieu malgre tout"
+        assert inserts == [], "une version vide a ete archivee : le rollback l'ecraserait par du vide"
