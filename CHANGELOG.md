@@ -99,9 +99,23 @@ appliquee neuf fois et manquante une.*
 
 **⚠ Defaut `'true'` : ISO-COMPORTEMENT**, on ne change pas le produit sous les
 pieds de qui met a jour. *Contrairement a ce qu'annoncait la consigne, les
-defauts ne sont PAS tous `'true'` : CHATOPS, TICKETING et MAIL sont a `'false'`
-— parce qu'ils exigent une configuration pour fonctionner. La geolocalisation
-marche sans reglage, donc `'true'` est l'iso.*
+defauts ne sont PAS tous `'true'`.* **Releve complet, tous fichiers du backend :**
+
+    'true'  (5)  WAZUH · GEOIP · NVD_ENRICHMENT · CVE_ENRICH · APPROVAL
+    'false' (4)  CHATOPS · TICKETING · MAIL · WEBHOOK
+
+**Ceux a `'false'` exigent une CONFIGURATION pour fonctionner** — sans reglage ils
+ne peuvent rien. **La geolocalisation marche sans reglage : `'true'` est donc
+l'iso pour celui-ci, pour cette raison et non par uniformite.**
+
+**⚠ Correction de cette entree (posee a 2.0.233, corrigee ici) : j'avais ecrit
+TROIS drapeaux a `'false'`. Il y en a QUATRE.** `WEBHOOK_ENABLED` vit dans
+`webhooks.py`, pas dans `config.py` — et ma sonde ne balayait que `config.py`.
+*Meme faute que deux commits plus tot, ou ma population etait « les routes du
+backend » alors qu'un `fetch` relatif vise Laravel : une MOITIE de la population,
+rapportee comme le tout.* **Et `routes/settings.py:99` porte
+`_depuis_module('webhooks', 'WEBHOOK_ENABLED', bool)` — je l'avais lu une
+commande plus tot, dans cette meme session.**
 
 **⚠ LE PLACEMENT DE LA GARDE N'EST PAS INDIFFERENT.** Elle vient **apres** le
 controle d'adresse privee, qui rend `Local`/`LO` **sans aucun trafic** : c'est
