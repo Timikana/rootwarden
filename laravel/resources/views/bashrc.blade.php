@@ -242,9 +242,17 @@
     <div class="rw-encart" data-rw="bashrc-non-porte">
         <p class="rw-sous-titre-fort">{{ __('bashrc.non_porte_titre') }}</p>
         <p class="rw-prose">{{ __('bashrc.non_porte_texte') }}</p>
-        <a class="rw-bouton" data-rw="bashrc-lien-legacy"
-           href="{{ rtrim(config('app.url_legacy'), '/') }}/bashrc/"
-           target="_blank" rel="noopener">{{ __('bashrc.non_porte_lien') }} ↗</a>
+        {{--
+            ⚠ LE LIEN VERS L'ANCIEN PORTAIL EST RETIRE (2026-09-07, decision de
+            l'exploitant). Il etait le dernier motif de garder `legacy/bashrc/`
+            EN SERVICE : un encart doit renvoyer quelque part, donc la page
+            devait vivre. **Un renvoi maintient en vie ce vers quoi il renvoie.**
+
+            La MENTION reste, et elle dit comment faire — `apt install figlet`,
+            par SSH, une fois par machine. Nommer un manque sans offrir de porte
+            est plus honnete qu'une porte vers un portail qu'on demonte, et dont
+            l'adresse a change hier (`:8443` -> `:8446`).
+        --}}
     </div>
 </section>
 

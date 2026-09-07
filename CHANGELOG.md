@@ -5,6 +5,62 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [2.0.101] - 2026-09-07
+
+### `bashrc` — la liste des sauvegardes, et le lien qui maintenait le legacy en vie
+
+**Deux gestes, autorises nominalement par l'exploitant, qui closent le module.**
+
+#### ⑴ `/bashrc/backups` porte — et l'information va AU POINT DE DECISION
+
+*Le premier jet de B4, livre une heure plus tot, offrait « restaurer la sauvegarde la plus recente » sans
+montrer laquelle.* **L'ecran proposait l'annulation sans dire ce qu'elle annulerait.**
+
+    GET · 0 ecriture · une seule commande distante : `ls -la` sur les .bashrc.bak.*
+    meme chaine de garde que les trois autres, permission comprise
+
+**Un panneau separe aurait deplace le defaut, pas corrige** : l'information aurait ete a un endroit et la
+decision a un autre. La liste est donc lue **avant la confirmation**, et la question NOMME la sauvegarde,
+la date, la pese et dit combien il en existe. La route rend la liste triee par date decroissante, donc
+`backups[0]` **est** celle que `restore` restaurera.
+
+> **Et si la liste est vide, on ne demande rien et on n'envoie rien** : le bouton cesse d'etre une porte
+> vers un echec. *C'etait la reserve que j'avais inscrite en le livrant, faute de signal ; le signal
+> existait, dans une route que je n'avais pas portee.*
+
+#### ⑵ Le lien vers l'ancien portail est RETIRE. La mention reste.
+
+`/bashrc/prerequisites` n'est pas porte — il installe `figlet` en root pour un utilitaire d'affichage.
+**Mais l'encart qui l'annoncait renvoyait vers `legacy/bashrc/`, et ce renvoi etait le dernier motif de
+garder cette page EN SERVICE.**
+
+> **Un renvoi maintient en vie ce vers quoi il renvoie.** *Un encart doit pointer quelque part, donc la
+> page devait vivre — pour un dessin de banniere.*
+
+La page dit desormais ce qui manque **et comment le faire** (`apt install figlet`, par SSH, une fois par
+machine), sans porte. *Nommer un manque sans offrir de porte est plus honnete qu'une porte vers un portail
+qu'on demonte, et dont l'adresse a change la veille.*
+
+#### ⚠ ET LE MOTIF A TROIS AUTRES OCCURRENCES, VIVANTES
+
+Le meme controle applique aux sept liens `url_legacy` du portage :
+
+    fail2ban.blade.php    /fail2ban/               -> 404   ⛔ archive ce matin
+    acces-sftp.blade.php  /adm/server_user_sftp    -> 404   ⛔ `adm/` archive
+    politiques.blade.php  /adm/server_user_sudo    -> 404   ⛔ `adm/` archive
+    cles-ssh.blade.php    /ssh/                    -> 302   vivant
+    pare-feu.blade.php    /iptables/               -> 302   vivant
+
+**Trois boutons du portail NEUF envoient sur un 404 de l'ancien.** *Et un 404 se lit comme « l'ancien
+portail est tombe », pas comme « cette page a ete archivee ».* Inscrit `E-459`, non corrige : trois vues,
+et chacune demande de decider si la capacite est desormais portee ou perdue.
+
+**Verifie** : `node --check` · `php -l` ×3 · parite FR/EN **87 = 87** · les trois ensembles croises, aucune
+cle non transmise · **les cinq jetons du libelle de confirmation presents dans le catalogue ET remplaces
+par le JS** · temoin negatif sur une cle inventee · `route:list`.
+
+**Aucun exercice du geste.**
+
 ## [2.0.100] - 2026-09-07
 
 ### Portage — B4, les deux ecritures de `bashrc` (et les deux qu'on ne porte PAS)

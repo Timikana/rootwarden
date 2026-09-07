@@ -116,6 +116,8 @@ class BashrcController extends Controller
             'restore_en_cours'  => __('bashrc.restore_en_cours'),
             'restore_fait'      => __('bashrc.restore_fait'),
             'restore_echec'     => __('bashrc.restore_echec'),
+            'restore_lecture'   => __('bashrc.restore_lecture'),
+            'restore_aucune'    => __('bashrc.restore_aucune'),
             'motifs'        => Bashrc::MOTIFS_DANGEREUX,
         ];
 

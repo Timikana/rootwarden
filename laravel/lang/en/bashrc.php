@@ -98,8 +98,8 @@ return [
      * `backend/routes/bashrc.py`. Called by this page: `users`, `preview`,
      * `template`. Called by nobody, hence absent: `deploy`, `prerequisites`
      * (POST -- it INSTALLS), `restore`, `backups`. */
-    'non_porte_titre' => 'Two gestures remain on the legacy portal',
-    'non_porte_texte' => 'Deployment and restore are ported here. Still on the legacy portal: installing the figlet package, which writes to the machine as root, and listing existing backups.'
+    'non_porte_titre' => 'One gesture stays outside the portal',
+    'non_porte_texte' => 'Deployment, restore and the backup list are ported here. Installing the figlet package is not: it writes to the machine as root for a display utility. Do it over SSH, once per machine.'
                          . 'version and listing the backups are done from the legacy portal for '
                          . 'now.',
     'non_porte_lien'  => 'Open bashrc on the legacy portal',
@@ -115,9 +115,13 @@ return [
     'deploy_sans_cible' => 'Pick a machine and at least one account before deploying.',
     'restore' => 'Restore',
     'restore_aide' => 'Restores the most recent backup of this account\'s .bashrc.',
-    'restore_confirme' => 'Restore the most recent .bashrc backup for :compte?\\n\\nThis account\'s current .bashrc will be replaced.',
+    'restore_confirme' => 'Restore :sauvegarde for :compte?\\n\\nDated :date, :taille bytes. There are :nombre backup(s) for this account; the most recent one will be restored.\\n\\nThe current .bashrc of :compte will be replaced.',
     'restore_en_cours' => 'Restoring :compte…',
     'restore_fait' => 'Backup restored for :compte.',
     'restore_echec' => 'Restoring :compte failed — there may be no backup.',
     'figlet_absent' => 'figlet is not installed on this machine: the .bashrc banner will not render. The rest of the file works. Installing the package is not offered here.',
+
+    /* La liste des sauvegardes, lue AVANT la confirmation de restauration. */
+    'restore_lecture' => 'Reading backups for :compte…',
+    'restore_aucune' => 'No backup for :compte — there is nothing to restore. A backup is created on every deployment.',
 ];

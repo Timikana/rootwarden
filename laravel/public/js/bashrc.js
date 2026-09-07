@@ -267,6 +267,16 @@
      * choisie. Ce qu'on perd est cosmetique — figlet ne change que la banniere —
      * et la page AVERTIT desormais de son absence (voir `figlet_present`).
      */
+    /* Le backend rend `mtime` en SECONDES (`ls --time-style=+%s`) ; `Date` attend
+     * des MILLISECONDES. Multiplier est indispensable — sans quoi toute date
+     * tomberait en 1970, ce qui est PLAUSIBLE a l'ecran et faux. */
+    function horodate(secondes) {
+        var n = parseInt(secondes, 10);
+        if (! n) { return '—'; }
+
+        return new Date(n * 1000).toLocaleString();
+    }
+
     function annonce(cible, texte, echec) {
         if (! cible) { return; }
         cible.textContent = texte || '';
@@ -320,16 +330,55 @@
         var mid = machineUnique();
         var nom = bouton.getAttribute('data-compte') || '';
         if (! mid || ! nom) { return; }
-        var question = (textes.restore_confirme || '').replace(':compte', nom);
-        if (! window.confirm(question)) { return; }
-
+        // ⚠ ON LIT LES SAUVEGARDES AVANT DE DEMANDER CONFIRMATION.
+        //
+        // Le premier jet de B4 offrait « restaurer la sauvegarde la plus recente »
+        // SANS montrer laquelle : **l'ecran proposait l'annulation sans dire ce
+        // qu'elle annulerait.** Un panneau separe aurait affiche l'information
+        // ailleurs que la ou la decision se prend — le meme defaut deplace.
+        //
+        // `/bashrc/backups` rend la liste TRIEE par date decroissante, donc
+        // `backups[0]` EST celle que `/bashrc/restore` restaurera. La question
+        // la nomme, la date et la pese, et dit combien il en existe.
+        //
+        // Et si la liste est VIDE, on ne demande rien et on n'envoie rien : le
+        // bouton cesse d'etre une porte vers un echec.
         bouton.disabled = true;
-        annonce(etatEcriture, (textes.restore_en_cours || '').replace(':compte', nom), false);
-        lit('/bashrc/restore', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ machine_id: mid, user: nom }),
-        }).then(function (d) {
+        annonce(etatEcriture, (textes.restore_lecture || '').replace(':compte', nom), false);
+        lit('/bashrc/backups?machine_id=' + mid + '&user=' + encodeURIComponent(nom))
+        .then(function (liste) {
+            if (! liste || ! Array.isArray(liste.backups)) {
+                bouton.disabled = false;
+                annonce(etatEcriture, (textes.restore_echec || '').replace(':compte', nom), true);
+
+                return null;
+            }
+            if (liste.backups.length === 0) {
+                bouton.disabled = false;
+                annonce(etatEcriture, (textes.restore_aucune || '').replace(':compte', nom), true);
+
+                return null;
+            }
+
+            var recente = liste.backups[0];
+            var question = (textes.restore_confirme || '')
+                .replace(':compte', nom)
+                .replace(':sauvegarde', recente.name || '')
+                .replace(':date', horodate(recente.mtime))
+                .replace(':taille', String(recente.size || 0))
+                .replace(':nombre', String(liste.backups.length));
+            if (! window.confirm(question)) { bouton.disabled = false; return null; }
+
+            annonce(etatEcriture, (textes.restore_en_cours || '').replace(':compte', nom), false);
+
+            return lit('/bashrc/restore', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ machine_id: mid, user: nom }),
+            });
+        })
+        .then(function (d) {
+            if (d === null) { return; }   // deja traite au-dessus
             bouton.disabled = false;
             if (! d) {
                 annonce(etatEcriture, (textes.restore_echec || '').replace(':compte', nom), true);
