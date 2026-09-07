@@ -25,14 +25,14 @@ function chargeLePredicat(mutation) {
     let code = readFileSync(SOURCE, 'utf8');
 
     if (mutation) {
-        // MUTATION : on retire le `return` qui fait decider la PREMIERE regle
-        // applicable, et on laisse la boucle continuer. Le predicat devient
-        // « le texte contient-il un ACCEPT sur le port ? » — l'erreur meme que
-        // ce fichier existe pour ne pas commettre.
+        // MUTATION : on retire L'ASYMETRIE — un `ACCEPT` redevient decisif des
+        // qu'il ne s'agit pas d'un autre port, comme un `DROP`. C'est
+        // exactement l'etat du 2026-09-07 avant la revue, celui qui declarait
+        // OUVERTS les deux premieres lignes de tout pare-feu durci.
         const avant = code;
         code = code.replace(
-            "            return cible === 'ACCEPT';   // LA PREMIERE QUI PEUT S'APPLIQUER DECIDE",
-            "            if (cible === 'ACCEPT') { return true; }   // MUTATION"
+            "                if (prouveLOuverture(l, portCouvert)) { return true; }\n                continue;",
+            "                if (portCouvert !== false) { return true; }   // MUTATION\n                continue;"
         );
         if (code === avant) {
             console.error("  ⛔ la mutation n'a rien remplace — l'ancre a bouge, l'epreuve ne prouve RIEN");
@@ -85,6 +85,32 @@ const CAS = [
     ['FAIL-CLOSED — texte vide',                '', 22, null],
     ['FAIL-CLOSED — port invalide',             ':INPUT ACCEPT', 0, null],
     ['FAIL-CLOSED — regles sans politique',     '-A INPUT -p tcp --dport 80 -j ACCEPT', 22, false],
+
+    /* ══ LES DIX DE LA REVUE — cinq d'entre eux etaient FAIL-OPEN ══════════
+     * Releves par une seconde session sur le fichier que je venais d'ecrire.
+     * Les deux premiers sont les DEUX PREMIERES LIGNES de presque tout
+     * pare-feu durci reel : c'est ce qui rend le defaut grave et non theorique.
+     */
+    ['⚠ FAIL-OPEN 1/5 — `-i lo` ACCEPT seul',
+     ':INPUT DROP\n-A INPUT -i lo -j ACCEPT', 22, false],
+
+    ['⚠ FAIL-OPEN 2/5 — ESTABLISHED seul (le pire : tue les session SUIVANTES)',
+     ':INPUT DROP\n-A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT', 22, false],
+
+    ['⚠ FAIL-OPEN 3/5 — source restreinte',
+     ':INPUT DROP\n-A INPUT -s 10.0.0.5 -j ACCEPT', 22, false],
+
+    ['⚠ FAIL-OPEN 4/5 — UDP 22, pas TCP',
+     ':INPUT DROP\n-A INPUT -p udp --dport 22 -j ACCEPT', 22, false],
+
+    ['⚠ FAIL-OPEN 5/5 — `-I` insere en TETE : l\'ordre du fichier ment',
+     ':INPUT ACCEPT\n-A INPUT --dport 22 -j ACCEPT\n-I INPUT -j DROP', 22, null],
+
+    ['saut vers une chaine personnalisee — indecidable',
+     ':INPUT DROP\n-A INPUT -j MACHAINE', 22, null],
+
+    ['REEL — pare-feu durci complet, et il est SUR',
+     ':INPUT DROP\n-A INPUT -i lo -j ACCEPT\n-A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT\n-A INPUT -p tcp --dport 22 -j ACCEPT', 22, true],
 ];
 
 const mutation = process.argv.includes('--mutation');
@@ -123,7 +149,25 @@ if (mutation) {
      * Si un troisieme cas d'ordre est ajoute plus tard, ce nombre doit monter a
      * 3 — et s'il ne monte pas, c'est le cas neuf qui est mal ecrit.
      */
-    const attendu = 2;
+    /*
+     * ══ PREDICTION MISE A JOUR APRES LA REVUE : 4 ═══════════════════════════
+     *
+     * La mutation retire desormais L'ASYMETRIE. Elle doit faire rougir les
+     * QUATRE cas ou un `ACCEPT` ne prouve pas son ouverture :
+     *
+     *     `-i lo` seul · ESTABLISHED seul · source restreinte · UDP 22
+     *
+     * **Et PAS le cinquieme (`-I` en tete)** : celui-la est attrape par le
+     * PRE-BALAYAGE, que cette mutation ne touche pas. *Deux defauts de la meme
+     * revue, deux mecanismes differents — une seule mutation ne peut pas les
+     * exercer tous les deux, et le dire evite de croire qu'elle le fait.*
+     *
+     * Historique de cette valeur, garde volontairement :
+     *     1  scelle avant la 1re mutation — FAUX, j'avais deux cas d'ORDRE
+     *     2  corrige apres mesure
+     *     4  apres la revue, qui a ajoute quatre cas d'ASYMETRIE
+     */
+    const attendu = 4;
     console.log(`  MUTATION : ${echecs} cas ROUGE (prediction scellee : ${attendu})`);
     if (echecs === attendu) {
         console.log('  ✅ l\'epreuve MORD, et elle mord a l\'endroit prevu');

@@ -62,6 +62,59 @@
         return port >= bas && port <= haut;
     }
 
+    /** Les cibles integrees. Tout autre nom est une chaine personnalisee. */
+    var REGLEMENTAIRES = {
+        ACCEPT: 1, DROP: 1, REJECT: 1, LOG: 1, RETURN: 1,
+        MARK: 1, DNAT: 1, SNAT: 1, MASQUERADE: 1, REDIRECT: 1, TCPMSS: 1
+    };
+
+    /**
+     * La regle porte-t-elle une contrainte de port, et couvre-t-elle le notre ?
+     * @return {boolean|null}  true = couvre · false = exclut · null = AUCUNE
+     *                         contrainte de port (elle matche tous les ports)
+     */
+    function couvreLePort(l, port) {
+        if (/!\s*--dports?\s/.test(l)) { return false; }
+
+        var un = l.match(/(?:^|\s)--dport\s+(\S+)/);
+        if (un) { return couvre(un[1], port); }
+
+        var plusieurs = l.match(/(?:^|\s)--dports\s+(\S+)/);
+        if (plusieurs) {
+            return plusieurs[1].split(',').some(function (p) {
+                return couvre(p, port);
+            });
+        }
+
+        return null;
+    }
+
+    /**
+     * Cet `ACCEPT` PROUVE-T-IL qu'il ouvre le port a une connexion NEUVE ?
+     *
+     * Il faut TOUT : le port nomme et couvert · TCP (ou aucun protocole dit) ·
+     * aucune restriction d'interface ni de source · et si un etat est exige,
+     * qu'il admette `NEW`.
+     *
+     * **Chacune de ces conditions, prise seule, a produit un fail-open mesure.**
+     */
+    function prouveLOuverture(l, portCouvert) {
+        if (portCouvert !== true) { return false; }
+
+        var proto = l.match(/(?:^|\s)-p\s+(\S+)/);
+        if (proto && proto[1].toLowerCase() !== 'tcp') { return false; }
+
+        // `-i eth0` ou `-s 10.0.0.5` : l'ouverture est peut-etre reelle, mais on
+        // ne peut pas prouver qu'elle vaut pour NOTRE chemin d'acces.
+        if (/(?:^|\s)!?\s*-i\s+\S+/.test(l)) { return false; }
+        if (/(?:^|\s)!?\s*-s\s+\S+/.test(l)) { return false; }
+
+        var etats = l.match(/--(?:c)?state\s+(\S+)/);
+        if (etats && ! /\bNEW\b/i.test(etats[1])) { return false; }
+
+        return true;
+    }
+
     /**
      * @param  {string} texte  un jeu de regles au format `iptables-save`
      * @param  {number} port   le port SSH DE CETTE MACHINE, lu en base
@@ -73,6 +126,23 @@
         }
 
         var lignes = String(texte || '').split('\n');
+
+        /*
+         * ⛔ PRE-BALAYAGE : `-I` INSERE EN TETE.
+         *
+         * L'ordre du FICHIER n'est alors plus l'ordre d'EVALUATION, et tout le
+         * fichier devient illisible pour nous — pas seulement ce qui suit.
+         *
+         * ⚠ CE CONTROLE ETAIT D'ABORD DANS LA BOUCLE, ET IL N'A RIEN GARDE :
+         * un `-A … --dport 22 -j ACCEPT` place AVANT le `-I` decidait `true` et
+         * rendait la main avant que le `-I` ne soit lu. **Une garde placee sur
+         * le chemin d'un `return` anterieur n'est pas une garde** — c'est la
+         * meme faute que celle qu'elle devait attraper, d'un cran plus haut.
+         */
+        for (var k = 0; k < lignes.length; k++) {
+            if (/^\s*-I\s+INPUT\b/.test(lignes[k])) { return null; }
+        }
+
         var politique = null;
         var vuUneRegle = false;
 
@@ -83,40 +153,54 @@
             var pol = l.match(/^:INPUT\s+(\w+)/);
             if (pol) { politique = pol[1].toUpperCase(); continue; }
 
-            if (! /^-[AI]\s+INPUT\b/.test(l)) { continue; }
+            if (! /^-A\s+INPUT\b/.test(l)) { continue; }
             vuUneRegle = true;
 
             var cible = l.match(/-j\s+(\w+)/);
             cible = cible ? cible[1].toUpperCase() : '';
+
+            /*
+             * Un saut vers une CHAINE PERSONNALISEE : le sort du paquet se joue
+             * ailleurs, et on ne sait pas le suivre. On ne tranche pas.
+             */
+            if (cible !== '' && ! REGLEMENTAIRES[cible]) { return null; }
+
             // Une cible non terminale (LOG, MARK…) ne decide pas du sort du
             // paquet : la regle suivante continue de s'appliquer.
             if (cible !== 'ACCEPT' && cible !== 'DROP' && cible !== 'REJECT') {
                 continue;
             }
 
-            var dport = l.match(/(?:^|\s)--dport\s+(\S+)/);
-            var dports = l.match(/(?:^|\s)--dports\s+(\S+)/);
-            var concerne;
+            var portCouvert = couvreLePort(l, port);
 
-            if (/!\s*--dports?\s/.test(l)) {
-                // `! --dport 22` matche tout SAUF 22 : la regle ne decide pas
-                // du sort de notre port.
-                concerne = false;
-            } else if (dport) {
-                concerne = couvre(dport[1], port);
-            } else if (dports) {
-                concerne = dports[1].split(',').some(function (p) {
-                    return couvre(p, port);
-                });
-            } else {
-                // AUCUNE contrainte de port : la regle matche tout, donc aussi
-                // le notre. C'est le cas du `-A INPUT -j DROP` place trop haut.
-                concerne = true;
+            /*
+             * ══ L'ASYMETRIE, ET C'EST LE CŒUR DE CE FICHIER ══════════════════
+             *
+             * Le repli « aucune contrainte de port => la regle matche tout »
+             * est CONSERVATEUR pour un DROP et PERMISSIF pour un ACCEPT. Les
+             * traiter pareil est un fail-OPEN, sur le seul chemin du produit
+             * dont l'erreur coute un deplacement physique.
+             *
+             * Revue du 2026-09-07 : cinq jeux forges passaient pour OUVERTS,
+             * dont les DEUX PREMIERES LIGNES de presque tout pare-feu durci —
+             *
+             *     -A INPUT -i lo -j ACCEPT
+             *     -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+             *
+             * La seconde est la pire : elle laisse vivre la session EN COURS et
+             * tue toutes les suivantes. L'operateur lit « applique, tout va
+             * bien » et le decouvre au prochain acces.
+             */
+            if (cible === 'ACCEPT') {
+                // SEULE UNE PREUVE D'OUVERTURE OUVRE. A defaut, cette regle ne
+                // decide pas — on continue de lire.
+                if (prouveLOuverture(l, portCouvert)) { return true; }
+                continue;
             }
 
-            if (! concerne) { continue; }
-
-            return cible === 'ACCEPT';   // LA PREMIERE QUI PEUT S'APPLIQUER DECIDE
+            // DROP / REJECT : conservateur. Sans contrainte de port, la regle
+            // attrape tout, donc aussi le notre.
+            if (portCouvert !== false) { return false; }
         }
 
         if (politique === 'DROP' || politique === 'REJECT') { return false; }
