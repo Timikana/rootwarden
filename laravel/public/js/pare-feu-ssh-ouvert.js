@@ -215,9 +215,33 @@
                 continue;
             }
 
-            // DROP / REJECT : conservateur. Sans contrainte de port, la regle
-            // attrape tout, donc aussi le notre.
-            if (portCouvert !== false) { return false; }
+            /*
+             * DROP / REJECT : conservateur. Sans contrainte de port, la regle
+             * attrape tout, donc aussi le notre.
+             *
+             * ⚠ MAIS LE DRAPEAU « PEUT-ETRE » DOMINE LA SUITE DU BALAYAGE.
+             *
+             * Une fois qu'un `ACCEPT` indecidable a couvert le port, aucune
+             * regle POSTERIEURE ne peut plus conclure `false` : au mieux `null`.
+             *
+             *     :INPUT DROP
+             *     -A INPUT -i eth0 -p tcp --dport 22 -j ACCEPT   <- peut-etre
+             *     -A INPUT -j DROP                                <- fourre-tout
+             *
+             * Sur une machine dont SSH arrive par eth0, ce jeu laisse l'acces
+             * OUVERT — la premiere regle l'accepte. Annoncer « ces regles
+             * ferment » serait la fausse accusation, sur **la forme la plus
+             * ORDINAIRE d'un pare-feu durci** : un ACCEPT qualifie, puis un
+             * DROP de cloture.
+             *
+             * ⚠ C'est la TROISIEME fois dans ce fichier qu'une garde juste est
+             * contournee par un `return` qui la precede — apres le garde `-I`
+             * pose dans la boucle. **Une garde ne vaut que si elle domine tous
+             * les chemins de sortie qui la suivent, pas seulement le dernier.**
+             */
+            if (portCouvert !== false) {
+                return indecidable ? null : false;
+            }
         }
 
         /*

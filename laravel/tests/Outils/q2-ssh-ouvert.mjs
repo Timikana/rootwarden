@@ -123,6 +123,28 @@ const CAS = [
     ['ACCUSATION VRAIE — ESTABLISHED sur le bon port : on SAIT qu il n ouvre pas',
      ':INPUT DROP\n-A INPUT -m state --state ESTABLISHED --dport 22 -j ACCEPT', 22, false],
 
+    /* ══ LA FORME LA PLUS ORDINAIRE, ET C'EST ELLE QUI RESTAIT FAUSSE ═════
+     * « Un ACCEPT qualifie, puis un DROP de cloture » est la forme canonique
+     * d'un pare-feu durci. Mes cas forges etaient exotiques ; celui-ci est le
+     * cas reel, et il a survecu a trois rondes de correction.
+     *
+     * > Quand on forge des cas, partir du jeu de regles le plus BANAL qu'on
+     * > puisse ecrire, pas du plus retors. Un correctif qui traite le cas
+     * > d'ecole avant le cas reel a une couverture inversee par rapport a la
+     * > frequence.                                    (formulation de la revue)
+     */
+    ['LE CAS REEL — ACCEPT qualifie puis DROP de cloture',
+     ':INPUT DROP\n-A INPUT -i eth0 -p tcp --dport 22 -j ACCEPT\n-A INPUT -j DROP', 22, null],
+
+    ['BORNE — un peut-etre PUIS une preuve : la preuve l\'emporte',
+     ':INPUT DROP\n-A INPUT -i eth0 -p tcp --dport 22 -j ACCEPT\n-A INPUT -p tcp --dport 22 -j ACCEPT', 22, true],
+
+    ['BORNE — un DROP certain AVANT le peut-etre : le DROP decide',
+     ':INPUT ACCEPT\n-A INPUT -j DROP\n-A INPUT -i eth0 -p tcp --dport 22 -j ACCEPT', 22, false],
+
+    ['ACCUSATION VRAIE — aucun peut-etre, DROP de cloture',
+     ':INPUT DROP\n-A INPUT -p tcp --dport 80 -j ACCEPT\n-A INPUT -j DROP', 22, false],
+
     ['REEL — pare-feu durci complet, et il est SUR',
      ':INPUT DROP\n-A INPUT -i lo -j ACCEPT\n-A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT\n-A INPUT -p tcp --dport 22 -j ACCEPT', 22, true],
 ];
@@ -182,6 +204,9 @@ if (mutation) {
      *     4  apres la 1re revue, qui a ajoute quatre cas d'ASYMETRIE
      *     7  apres la 2e revue : les quatre ci-dessus PLUS les trois cas
      *        « aveu contre accusation », qui exercent la meme branche
+     *     8  apres la 3e revue : + « LE CAS REEL ». Les trois autres cas
+     *        ajoutes n'en sont pas — deux BORNES qui restent justes sous la
+     *        mutation, et une accusation vraie sans drapeau arme.
      *
      * PREDICTION SCELLEE pour 7, ecrite avant de jouer : les quatre cas ou un
      * ACCEPT sans contrainte de port ne prouve rien (`-i lo`, ESTABLISHED,
@@ -190,7 +215,7 @@ if (mutation) {
      * passent par le pre-balayage et par la garde de cible, que la mutation ne
      * touche ni l'un ni l'autre.
      */
-    const attendu = 7;
+    const attendu = 8;
     console.log(`  MUTATION : ${echecs} cas ROUGE (prediction scellee : ${attendu})`);
     if (echecs === attendu) {
         console.log('  ✅ l\'epreuve MORD, et elle mord a l\'endroit prevu');
