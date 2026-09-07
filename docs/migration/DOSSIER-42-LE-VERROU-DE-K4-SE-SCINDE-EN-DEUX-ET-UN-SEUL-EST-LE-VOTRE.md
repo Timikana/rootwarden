@@ -63,11 +63,57 @@ backend/sudo_manager.py:160   'all_nopasswd': render_preset_all_nopasswd,
 > rend donc aucun pouvoir accessible qui ne le serait pas — il l'accorde **par
 > accident**.*
 
-### DÉCISION — l'échec doit ÉCHOUER
+### DÉCISION — l'échec doit ÉCHOUER, **et le SITE compte**
 
 **Un rendu de politique en échec doit `return` sans écrire, exactement comme le
 username invalide le fait déjà quinze lignes plus haut.** *Aucune capacité n'est
 perdue : qui veut `NOPASSWD: ALL` le choisit par son preset.*
+
+#### ⚠ CORRECTION — ma première formulation décidait (A) EN SILENCE
+
+**Relevé par la session 4f. Le repli de `:379` est atteint par DEUX chemins :**
+
+```
+chemin 1   :1051 AVEC policy, dont le rendu ECHOUE
+           -> `policy = None` posé à :376, puis :379 devient vrai
+chemin 2   :1056 appelé SANS l'argument policy  (`elif sudo:`)
+           -> :379 est vrai d'emblée, aucun rendu n'a eu lieu
+```
+
+> **Le chemin 2 EST le (A) que je refuse de trancher.** *Ma phrase, appliquée à
+> la CONDITION de `:379`, aurait fait cesser tout octroi aux comptes en
+> `users.sudo = 1` — donc tranché (A) sans le dire.*
+
+**LE SITE EST LE `except` DE `:373` : y mettre un `return` au lieu de
+`policy = None`.** *Cela tue le chemin 1 seul, laisse (A) exactement où je l'ai
+laissé, et rend l'asymétrie littérale — un échec rend la main, comme `:354`.*
+
+#### Trois vérifications, toutes favorables
+
+**① L'ordre des opérations est sûr — un `return` ne RÉVOQUE pas.** *C'était le
+risque sérieux : si la fonction retirait le fichier avant de rendre, s'abstenir
+laisserait le compte sans sudoers, soit une révocation déguisée en abstention.*
+
+```
+:357  remove_from_sudoers        <- SEUL retrait avant le rendu…
+:358  return                     <- …et il est suivi d'un `return` immédiat
+:372  content = render_policy(…)
+:389  execute_command_as_root    <- l'écriture RÉELLE, tout à la fin
+```
+
+**Rien n'est retiré avant le rendu : un `return` laisse le fichier existant
+intact.**
+
+**② `content` reste défini sur tous les chemins survivants** — `:372` quand le
+rendu réussit, `:380` quand il n'y a pas de preset. *Aucun `UnboundLocalError`
+introduit.*
+
+**③ L'`except` est étroit — `(ValueError, ImportError)` — mais sa portée
+pratique est complète** : *`sudo_manager` ne lève QUE des `ValueError`* (7
+occurrences sur 7 : username, runas, services vide, service invalide,
+`custom_rules` vide, preset inconnu). **Le remède couvre donc 100 % des échecs
+CONÇUS.** *Un `TypeError` ou `KeyError` non voulu s'échapperait encore — c'est
+préexistant, et le remède ne l'aggrave pas.*
 
 **C'est un arbitrage produit et je le rends : je n'ai pas besoin de votre mot
 pour décider qu'un échec ne doit pas élargir un privilège.** *Le GESTE d'écrire
