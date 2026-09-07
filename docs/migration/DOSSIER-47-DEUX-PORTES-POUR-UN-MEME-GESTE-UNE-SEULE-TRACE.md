@@ -98,6 +98,51 @@ survit à la migration, et sa surface n'est pas un objet de portage.
 > l'expose aujourd'hui » fonde une obligation de compatibilité.** *Ce ne sont pas les
 > mêmes objets : le legacy meurt, le backend reste.*
 
+### ⚠ AMENDEMENT 22:50 — ma prémisse était vraie et trop forte, et un second garde la borne
+
+*Vérifié par la session sécurité, qui a cherché à se contredire.* **« Les clés d'API ont une
+portée à préfixe sur `^/iptables` » se relit trop facilement en « une clé d'API peut
+appliquer des règles ». Ce n'est pas vrai.**
+
+```
+get_current_user()   lit X-User-ID, puis RECHARGE role_id EN BASE
+                     echoue en FERMETURE : en-tete absent · compte inactif
+                     · base injoignable  ->  (0, 0)
+=> require_permission('can_manage_iptables') refuse : 403
+```
+
+**La portée de clé est un SECOND filtre trop large, pas un chemin indépendant.** *Il faut
+encore fournir un `X-User-ID` nommant un compte ACTIF porteur de la permission.* Le
+docblock de la fonction documente la faille qui a produit cette conception : le backend
+lisait `X-User-Role` **en en-tête**, et tout porteur de clé pouvait forger `role=3`.
+Refermé.
+
+**Mon arbitrage ne bouge pas** — converger plutôt que retirer reste juste, et pour la même
+raison : *un consommateur légitime, porteur d'une clé ET d'un compte habilité, appelle
+`POST /iptables` aujourd'hui sans que je puisse l'énumérer.*
+
+### ⚠ Et une exception de convention, que la vérification a mise au jour
+
+```
+portees de type espace-de-noms, toutes terminees par un SEPARATEUR :
+  ^/fail2ban/  ^/services/  ^/ssh-audit/  ^/supervision/  ^/bashrc/
+  ^/graylog/   ^/wazuh/     ^/admin/      ^/cve_  ^/apt_  ^/schedule_  ^/server_user_
+l'exception :
+  ^/iptables        ni `$`, ni separateur — couvre les SEPT routes du module
+```
+
+**La convention est suivie douze fois et manquante sur le seul module qui contient un geste
+capable de couper RootWarden d'une machine définitivement.**
+
+*Ce n'est pas une faille — le second garde tient. C'est une portée qui **ne sait pas dire
+« lecture seule »** là où ça vaudrait le plus la peine : une clé destinée à lire le
+pare-feu porte aussi `apply`, `restore` et `rollback` dans sa portée, alors que la
+granularité existe douze fois ailleurs dans la même table.*
+
+> **Même classe que l'interrupteur `*_ENABLED` manquant sur la géolocalisation : le
+> mécanisme existe dans le dépôt, et il manque à l'endroit qui compte.** *Une convention
+> tenue partout sauf au point sensible n'est pas une convention — c'est une habitude.*
+
 ### ✅ CE QUE JE RETIENS : faire converger les deux portes
 
 **`action="apply"` sur `/iptables` doit archiver, en DÉLÉGUANT au chemin de
