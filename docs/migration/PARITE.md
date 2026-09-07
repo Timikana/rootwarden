@@ -21861,3 +21861,68 @@ depuis l'hôte. **Mesurée depuis SON conteneur** :
 **Elle mord.** *Les quatre sondes du fichier distinguent désormais leur objet d'un chemin inventé* — trois
 l'ont toujours fait, la quatrième (E-456) vient d'être corrigée.
 
+---
+
+## E-458 — B4 PORTÉ, et **le défaut du champ `mode` est le pire des deux**
+
+**Demandé par la session 8, autorisé nominalement par l'exploitant** — `deploy` et `restore` portés,
+`prerequisites` **inexprimable**. Livré le 2026-09-07 (`48262a5`, v2.0.100).
+
+### La symétrie inverse de `force`
+
+| | `/server_user_remove_key` | `/bashrc/deploy` |
+|---|---|---|
+| champ sensible | `force` | `mode` |
+| défaut du backend | `false` — **prudent** | `'overwrite'` — **destructeur** |
+| ne pas envoyer le champ, c'est | **s'abstenir** | **choisir le pire sans l'écrire** |
+
+> **Le même geste — omettre un champ — protège dans un cas et détruit dans l'autre.** *La prudence n'est
+> donc pas « en envoyer le moins possible » : c'est lire ce que le défaut vaut.* `overwrite` recrit le
+> `.bashrc` sans migrer le bloc personnalisé vers `~/.bashrc.local` ; `merge` le migre.
+
+Et `merge` est la valeur que **l'aperçu** emploie déjà : déployer dans un autre mode rendrait l'aperçu
+menteur, ce que le commentaire de `/bashrc/preview` interdit explicitement. **`overwrite` n'est pas
+construit** — vérifié sur le code **dépouillé de ses commentaires de bloc** : `0` occurrence, comme
+`prerequisites` et `dry_run`. *Le compte brut en rendait 1 chacun : mes propres commentaires expliquant leur
+absence.*
+
+### Ce que la page DIT faute de pouvoir le faire
+
+`figlet_present` arrive **déjà** dans `/bashrc/users`. Le bouton d'installation n'étant pas porté, on garde
+le **signal sans le geste** : la page nomme ce qui manque. *La capacité perdue est cosmétique — figlet ne
+change que la bannière.*
+
+### ⟶ QUATRE AFFIRMATIONS PÉRIMÉES, trouvées en portant
+
+1. le docblock du JS : *« ce fichier n'émet AUCUNE requête »* — **faux depuis B2** ;
+2. un commentaire : *« à relier au sélecteur de mode dès qu'il existe »* — **il n'existera pas**, la garde
+   est par construction. *Une garde par construction ne se périme pas ; un rappel de la relier, si* ;
+3. l'encart *« le déploiement n'est pas porté »*, avec un lien vers l'ancien portail. **Un panneau qui
+   annonce une absence comblée envoie l'opérateur ailleurs pour un geste qui est sous ses yeux** ;
+4. le contrôleur disait **« six routes »** : `bashrc.py` en déclare **sept**. *L'inventaire de la session 8
+   n'en citait que trois manquantes ; `/bashrc/backups` s'y ajoute.*
+
+### La garde ne reproduit PAS E-453
+
+| maillon | exige |
+|---|---|
+| la page `/bashrc` | `role:2` + `perm:can_manage_bashrc` (`ExigePermission` fail-closed) |
+| la passerelle | `role >= 2` seul |
+| le backend, **les trois routes** | `@require_role(2)` **+** `@require_permission('can_manage_bashrc')` |
+
+**Le backend exige ici la permission** — 8 occurrences dans `bashrc.py`, `0` en commentaire. *Un `role 2`
+sans la permission qui forgerait la requête serait arrêté au backend.* **Porter B4 n'hérite d'aucun trou de
+garde**, contrairement aux trois gestes de `comptes-distants`.
+
+⚠ **Et une note de mon registre était fausse** : j'ai affirmé que la colonne `can_manage_bashrc` n'existait
+pas. **Elle existe** (témoin : une colonne inventée est absente). La phrase venait de `rejouer-lot.sh`, où
+elle dit qu'un *COMPTE DE TEST* ne la porte pas — **j'avais gardé le prédicat et perdu le sujet**, et je
+l'avais attribuée à mon registre. *Un compte, pas une colonne.*
+
+**Vérifié** : `node --check` + témoin négatif · `php -l` ×3 · parité FR/EN **85 = 85** par `require` +
+`array_diff` · **les TROIS ensembles croisés** (catalogue · blob du contrôleur · clés lues par le JS) —
+**onze clés manquaient au blob au premier jet** et auraient rendu du vide, *le vide ne ressemblant pas à un
+défaut de traduction* · colonnes **6 = 6** · `route:list`.
+
+**Aucun exercice du geste** : il écrit dans un `$HOME` distant en root. *Aucune suite ne doit le soumettre.*
+
