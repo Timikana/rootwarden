@@ -22019,3 +22019,62 @@ exactement celui que je viens de faire pour `bashrc`. Pour `adm/server_user_sftp
 portage, la cible doit répondre autre chose qu'un `404`.* Trois lignes, et il mord aujourd'hui sur trois
 vues.
 
+---
+
+## E-463 — UN ECHEC DE RENDU DE POLITIQUE SUDO ECRIVAIT `NOPASSWD: ALL`
+
+**Releve et tranche par la session 8 (`DOSSIER-42`) ; le site d'implementation, la mesure avant/apres et la
+reserve sont d'ici.** Corrige le 2026-09-07 sur autorisation de l'exploitant.
+
+> **Plus l'intention etait etroite, plus le resultat etait large — et precisement quand quelque chose venait
+> de mal se passer.** *Quelqu'un demande une politique PRECISE, le rendu echoue, le produit accorde root sans
+> mot de passe sans restriction.*
+
+### L'asymetrie etait dans la meme fonction
+
+    username invalide  ->  return, RIEN n'est ecrit
+    policy   invalide  ->  `NOPASSWD: ALL` etait ECRIT
+
+**Mesure executee sur les DEUX versions**, `render_policy` forcee a lever, `execute_command_as_root`
+instrumentee :
+
+    AVANT   rendu en echec -> 3 commande(s)
+            CONTENU ECRIT : john ALL=(ALL:ALL) NOPASSWD: ALL
+    APRES   rendu en echec -> 0 commande(s)
+
+*Le defaut est donc mesure, pas deduit du code.*
+
+### ⚠ LE SITE COMPTE, ET L'AUTRE SITE DECIDAIT UNE QUESTION OUVERTE
+
+Le repli est atteint par **deux** chemins :
+
+    1. `:1051` avec une policy dont le rendu ECHOUE   -> `policy = None`, puis le repli
+    2. `:1056` appele SANS argument `policy`          -> le repli d'emblee
+       (branche `elif sudo:`, le booleen `users.sudo = 1`)
+
+**Le chemin 2 est une question distincte, laissee ouverte a dessein** — toute reponse autre que « tout »
+retire du sudo a des comptes qui en ont aujourd'hui. *Corriger la CONDITION du repli aurait tranche cette
+question sans le dire.* Le correctif est donc dans le `except`, **au site de l'echec, pas sur la condition
+qu'il partage**. Verifie : le chemin 2 envoie toujours ses 3 commandes.
+
+### Ce que le repli ne protegeait pas
+
+C'etait la question a poser avant d'ecrire — *un construct fautif protege souvent quelque chose qu'on ne
+voit pas.* Ici, non : **l'ecriture reelle n'a lieu qu'apres**, par `tmp` + `visudo -cf` + `mv` atomique.
+Rendre la main laisse donc le fichier existant **INTACT** — ce n'est pas une revocation deguisee en
+abstention. *Et aucune capacite n'est perdue : `all_nopasswd` est un PRESET qu'on choisit ; le repli ne
+l'ouvrait pas, il l'accordait par accident.*
+
+### ⚠ Deux reserves inscrites avec le correctif
+
+1. **l'`except` reste ETROIT** — `(ValueError, ImportError)`. Un `TypeError` ou un `KeyError` de
+   `render_policy` s'echappe toujours. « Un echec n'elargit jamais » vaut pour ces deux types ; la remontee
+   reste le sort des autres.
+2. **aucun test existant n'exerçait ce chemin** : `grep -cE 'ValueError|side_effect|raise'` rend **0** sur
+   les deux suites qui couvrent `add_to_sudoers`. *Leurs 17 verts ne disaient rien du chemin corrige* — la
+   preuve ci-dessus est une sonde ecrite pour l'occasion, pas un test du depot.
+
+**Aucun redemarrage** : `add_to_sudoers` n'est appele que depuis `configure_servers.py`, lance en
+sous-processus neuf a chaque deploiement. *Verifie : `routes/ssh.py` n'importe de ce module que deux
+helpers de validation, et la seule autre mention de la fonction est un commentaire.*
+
