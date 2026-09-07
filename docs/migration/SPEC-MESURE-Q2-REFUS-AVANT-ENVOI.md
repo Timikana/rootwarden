@@ -214,7 +214,36 @@ message qui demandait précisément de mesurer.*
 > été écrite pour une page qui l'avait, et qu'elle a voyagé sans lui.* **Le
 > module qui le portait est déprécié ; la fonction lui a survécu.**
 
-*Note de méthode : le relevé qui nommait `legacy/includes/head.php`,
-`menu.php`, `footer.php` visait des chemins qui n'existent pas — les includes
-réels sont `legacy/head.php`, `menu.php`, `footer.php`. **Le résultat était
-juste et la mesure ne mesurait pas ce qu'elle annonçait.***
+### 7.2 ⛔ RETRAIT — ma note de méthode était une FAUSSE ALARME, et je la remplace
+
+**J'avais inscrit ici que le relevé d'en face visait `legacy/includes/head.php`,
+`menu.php`, `footer.php`, chemins qui n'existent pas, et qu'un `grep` sur un
+fichier absent rend un `0` indiscernable d'une absence de motif.**
+
+**Le raisonnement est juste. Il ne s'applique pas, et l'erreur est la mienne.**
+
+    ce qui m'avait ete transmis   « head.php, menu.php, footer.php »  — SANS prefixe
+    ce que J'AI sonde             legacy/includes/head.php            — prefixe INVENTE par moi
+    les chemins reels             legacy/head.php · menu.php · footer.php   (index.php:233,239,368)
+
+> ⚠ **J'ai choisi un chemin, obtenu `ABSENT`, et attribué ce chemin à l'autre
+> relevé.** *J'ai confondu **l'entrée de MON instrument** avec **l'entrée de
+> l'instrument que j'auditais**, et publié la confusion comme une correction.*
+
+**Et la sonde que j'accusais distinguait les deux cas** — elle imprime `ABSENT`
+quand le fichier manque, `0` quand il est lu sans le motif. *C'est précisément la
+garde dont je lui reprochais l'absence.*
+
+> ⛔ **Une note de méthode fausse voyage plus loin qu'une mesure fausse : elle a
+> l'autorité de la correction.** *Elle aurait appris à se méfier d'un instrument
+> qui, lui, discriminait.* **Je la laisse inscrite plutôt que de l'effacer —
+> l'effacer perdrait la leçon, qui est à moi.**
+
+**La forme CORRECTE de la règle, celle qui reste vraie :**
+
+> *Une sonde de fichier doit distinguer « lu, motif absent » de « fichier
+> introuvable ». Un `grep` seul ne le fait pas ; il rend `0` dans les deux cas.*
+
+⚠ **Et la circonstance mérite d'être nommée** : *j'avais corrigé trois relevés de
+suite, tous justes.* **Un auditeur qui vient d'avoir raison trois fois est
+exactement celui qui cesse de se vérifier — y compris lui-même.**
