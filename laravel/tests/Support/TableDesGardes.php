@@ -75,6 +75,12 @@ class TableDesGardes
             ['POST', 'cles-api', ['role:3', 'perm:can_manage_api_keys']],
             ['POST', 'cles-api/{id}/revoquer', ['role:3', 'perm:can_manage_api_keys']],
             ['GET', 'cles-ssh', ['role:1', 'perm:can_deploy_keys']],
+            /*
+             * K4 — LE DECLENCHEMENT (2026-09-07). `role:2` ET NON `role:1` comme
+             * la page : le backend pose `@require_role(2)` sur `/deploy` depuis
+             * E-191. Offrir le declencheur au role 1 produirait un 403 systematique.
+             */
+            ['POST', 'cles-ssh/deployer', ['role:2', 'perm:can_deploy_keys']],
             ['GET', 'comptes', ['role:2', 'perm:can_admin_portal']],
             ['POST', 'comptes', ['role:2', 'perm:can_admin_portal']],
             ['GET', 'comptes-distants', ['role:2', 'perm:can_manage_remote_users']],

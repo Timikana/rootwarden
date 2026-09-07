@@ -87,4 +87,21 @@ return [
     'journal_fin' => '— fin du journal —',
     'journal_refus' => 'Le journal a ete refuse par le serveur (code :statut)',
     'journal_interrompu' => "Le flux s'est interrompu avant la fin du journal : ce qui precede est incomplet",
+
+
+    /*
+     * ── K4 — LE DECLENCHEMENT DU DEPLOIEMENT ────────────────────────────────
+     *
+     * Les messages d'echec disent TOUS ce qui n'a PAS ete fait. Un refus qui ne
+     * nomme pas son effet laisse l'operateur decider s'il relance — et ici
+     * relancer a l'aveugle peut REVOQUER des acces.
+     */
+    "deployer" => "Deployer les cles",
+    "deploiement_confirmation" => "Deployer les cles SSH sur les machines cochees ?",
+    "deploiement_lance" => "Deploiement lance. Le journal suit ci-dessous.",
+    "err_aucune_machine" => "Aucune machine selectionnee.",
+    "err_backend_injoignable" => "Le service de deploiement est injoignable. Rien n'a ete deploye.",
+    "err_preflight_refuse" => "La verification pre-deploiement a ete refusee. Rien n'a ete deploye.",
+    "err_preflight_sans_resultat" => "La verification pre-deploiement n'a rendu aucun resultat : elle n'a pas eu lieu. Rien n'a ete deploye.",
+    "err_preflight_echoue" => "Verification pre-deploiement en echec pour : :machines. RIEN n'a ete deploye — corrigez ces machines ou decochez-les.",
 ];

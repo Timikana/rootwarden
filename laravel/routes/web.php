@@ -4,6 +4,7 @@ use App\Http\Controllers\ApprobationsController;
 use App\Http\Controllers\ChatopsController;
 use App\Http\Controllers\ClesApiController;
 use App\Http\Controllers\ClePlateformeController;
+use App\Http\Controllers\DeploiementClesController;
 use App\Http\Controllers\ClesSshController;
 use App\Http\Controllers\ExportRgpdController;
 use App\Http\Controllers\ComparaisonCveController;
@@ -367,8 +368,26 @@ Route::middleware(['memorisation', 'session.authentifiee', 'session.revoquee', '
      * K1 n'appelle AUCUNE route du backend.
      */
     Route::get('/cles-ssh', ClesSshController::class)
+
         ->middleware(['role:1', 'perm:can_deploy_keys'])
         ->name('cles-ssh');
+
+    /*
+     * K4 — LE DECLENCHEMENT DU DEPLOIEMENT DES CLES SSH.
+     *
+     * ⛔ Ce chemin ECRIT EN ROOT sur les machines transmises et peut REVOQUER
+     * des acces. Il est ecrit, il n'a jamais ete exerce.
+     *
+     * `role:2` ET NON `role:1` COMME LA PAGE, et c'est mesure : le backend pose
+     * `@require_role(2)` sur `/deploy` depuis E-191 (`backend/routes/ssh.py:393`).
+     * Offrir le declencheur au role 1 reproduirait la lettre du legacy en
+     * produisant un 403 systematique. La page reste ouverte au role 1 — il voit
+     * le parc et le preflight — le declenchement ne l'est pas.
+     *
+     * `perm:can_deploy_keys` reprend la permission de la page (`ssh/index.php:35`).
+     */
+    Route::post('/cles-ssh/deployer', DeploiementClesController::class)
+        ->middleware(['role:2', 'perm:can_deploy_keys'])->name('cles-ssh.deployer');
 
     /*
      * Supervision — module `supervision/`, sous-lot V1 : la page et ses quatre

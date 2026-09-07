@@ -12,14 +12,35 @@ use Illuminate\View\View;
  * La garde vit DANS LA ROUTE et nulle part ailleurs : `role:1` +
  * `perm:can_deploy_keys`, REPRISE TELLE QUELLE du legacy (`ssh/index.php:34-35`).
  *
- * ECART DECLARE, non tranche ici : l'en-tete du fichier legacy annonce depuis
- * toujours « Acces refuse pour les utilisateurs standards (role_id = 1) », ce que
- * son `checkAuth` n'applique pas. Meme nature que E-36, avec une consequence plus
- * lourde : un role 1 habilite pourrait declencher le deploiement (`POST /deploy`
- * n'a ni role ni permission) et ne pourrait pas en lire le resultat (`GET /logs`
- * est `@require_role(2)`). Restreindre serait un CHANGEMENT DE DROITS : c'est une
- * decision de l'exploitant, a prendre avec D-1 pour ne pas laisser deux pages en
- * desaccord. Voir `PARITE.md`.
+ * ⚠ CE PARAGRAPHE AFFIRMAIT UN TROU QUI N'EXISTE PLUS — REMESURE LE 2026-09-07.
+ *
+ * Il disait : « un role 1 habilite pourrait declencher le deploiement (`POST
+ * /deploy` n'a ni role ni permission) et ne pourrait pas en lire le resultat ».
+ * Mesure sur `backend/routes/ssh.py:393` :
+ *
+ *     POST /deploy   @require_api_key, @require_role(2), @require_machine_access
+ *     GET  /logs     @require_api_key, @require_role(2)
+ *
+ * `/deploy` est garde `role:2` depuis E-191. **L'asymetrie decrite n'existe
+ * plus** : un role 1 ne declenche rien, et il ne lit rien non plus. Les deux
+ * gestes sont au meme niveau.
+ *
+ * *Un docbloc qui annonce une faille COMBLEE est plus couteux qu'un docbloc
+ * perime ordinaire : il envoie refaire le travail, ou — pire — ecrire une garde
+ * de rattrapage qui double celle qui existe deja.*
+ *
+ * CE QUI RESTE VRAI, et n'est toujours pas tranche : l'en-tete du fichier legacy
+ * annonce « Acces refuse pour les utilisateurs standards (role_id = 1) », ce que
+ * son `checkAuth` n'applique pas. La PAGE reste donc ouverte au role 1 des deux
+ * cotes. Restreindre serait un CHANGEMENT DE DROITS, decision de l'exploitant.
+ *
+ * ⛔ ET UN DEFAUT MESURE EN CHEMIN, NON CORRIGE ICI : la ligne ci-dessous lit
+ * `user_id`, une cle que **rien ne pose en session** — `SecondFacteurController:289`
+ * pose `utilisateur_id`, et c'est la cle que lisent 27 autres endroits du portage.
+ * `$idCompte` vaut donc TOUJOURS 0, et `machinesVisibles(0, 1)` ne rend aucune
+ * machine a un role 1. Deux autres controleurs sont dans le meme cas
+ * (`MisesAJourController:33`, `SupervisionController:285`). Le corriger change ce
+ * qu'un role 1 VOIT : c'est un geste a part, avec sa propre mesure.
  *
  * ⚠ CE COMMENTAIRE PORTAIT LA MEME ERREUR QUE LE LIBELLE, EN PLUS LARGE.
  *
@@ -97,6 +118,16 @@ class ClesSshController extends Controller
             'a_revoquer' => __('ssh.a_revoquer'),
             'inventaire' => __('ssh.inventaire', ['nombre' => '{nombre}']),
             'url_preflight' => url('/api/gateway/preflight_check'),
+            /*
+             * K4 — LE DECLENCHEUR. Chemin en LITTERAL et non derive : `geste-porte.py`
+             * ne suit qu'UN saut de helper, et un chemin construit a deux sauts se
+             * relit comme ABSENT sur du code qui marche.
+             *
+             * ⚠ IL NE VISE PAS `/api/gateway/deploy`. Le portage passe par SA PROPRE
+             * route, qui exige le preflight avant de relayer — voir `DeploiementCles`.
+             * Viser la passerelle ici rendrait le garde contournable d'un clic.
+             */
+            'url_deployer' => url('/cles-ssh/deployer'),
             // ── Le journal du deploiement (sous-lot K3) ───────────────────
             'journal_ouverture' => __('ssh.journal_ouverture'),
             'journal_vide' => __('ssh.journal_vide'),
