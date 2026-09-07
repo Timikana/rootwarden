@@ -63,7 +63,7 @@ return [
      * backend, pas deduits : `install`, `restart` et `geoip` ne sont appeles
      * par aucun script du portage.
      */
-    'non_porte_titre' => "Ce que cet onglet ne fait pas encore",
+    'non_porte_titre' => "Ce que cet onglet ne fait pas",
     /*
      * ⚠ L'ENUMERATION PERD UN ELEMENT, ET C'EST TOUT CE QU'ELLE PERD.
      *
@@ -73,7 +73,7 @@ return [
      * gestes » ne se corrige pas en « trois », il se remplace par
      * l'enumeration, qui est la seule source.
      */
-    'non_porte_texte' => "Installer Fail2ban sur UNE machine et redémarrer le service se font encore depuis l'ancien portail. Tout le reste est ici.",
+    'non_porte_texte' => "Installer Fail2ban sur UNE machine et redémarrer le service ne sont pas dans le portail : ces deux gestes se font en SSH (`apt install fail2ban`, `systemctl restart fail2ban`). L'installation sur tout le parc, elle, est ici.",
 
     // ══ F8 — LA GEOLOCALISATION D'UNE ADRESSE BANNIE ══════════════════════
     //
@@ -120,8 +120,6 @@ return [
     'geo_inconnu'    => 'le service n\'a pas su répondre.',
     'geo_journal'    => ':ip — :detail',
     'geo_echec'      => "La géolocalisation a échoué. :message",
-
-    'non_porte_lien' => 'Ouvrir Fail2ban dans l\'ancien portail',
 
     // ── Sous-lot F2 : historique et frise ────────────────────────────────
     'histo_titre' => 'Historique des bans',

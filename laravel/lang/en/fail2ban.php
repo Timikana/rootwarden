@@ -54,10 +54,10 @@ return [
     'vide_action' => 'Open servers',
     // The count is REMOVED, not reduced — see fr. The three remaining are
     // appaired one by one against the backend's 19 routes.
-    'non_porte_titre' => "What this tab cannot do yet",
+    'non_porte_titre' => "What this tab does not do",
     // F8 removes ONE item from the enumeration and only that one — see the
     // note in `lang/fr/fail2ban.php`.
-    'non_porte_texte' => 'Installing Fail2ban on ONE machine and restarting the service still go through the legacy portal. Everything else is here.',
+    'non_porte_texte' => "Installing Fail2ban on ONE machine and restarting the service are not in the portal: both are done over SSH (`apt install fail2ban`, `systemctl restart fail2ban`). Installing across the whole fleet is here.",
 
     // F8 — geolocating a banned address. THIS IS AN OUTGOING CALL TO A THIRD
     // PARTY, IN CLEAR. The panel names the third party AND the absence of
@@ -80,8 +80,6 @@ return [
     'geo_inconnu'    => 'the service could not answer.',
     'geo_journal'    => ':ip — :detail',
     'geo_echec'      => 'Geolocation failed. :message',
-
-    'non_porte_lien' => 'Open Fail2ban in the legacy portal',
 
     // ── Sub-lot F2: history and timeline ─────────────────────────────────
     'histo_titre' => 'Ban history',

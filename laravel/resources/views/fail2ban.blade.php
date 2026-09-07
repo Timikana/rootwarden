@@ -524,12 +524,19 @@
     @endif
 </div>
 
+{{-- ⚠ LE LIEN VERS L'ANCIEN PORTAIL EST RETIRE, ET LE TEXTE RESTE.
+     `legacy/fail2ban/` est archive depuis le 2026-09-07 : le lien rendait un
+     404, et un 404 se lit « l'ancien portail est tombe », pas « cette page a
+     ete archivee » — l'operateur cherchait une panne la ou il y a eu une
+     decision.
+     Les deux formes se tiennent : archiver sans retirer le lien laisse un 404,
+     retirer le lien sans nommer perd une capacite en silence. Il faut les DEUX
+     gestes, dans cet ordre. Le texte dit donc ce qui manque ET comment le
+     faire, sans renvoyer nulle part — un renvoi maintient en vie ce vers quoi
+     il renvoie. --}}
 <div class="rw-encart" data-rw="f2b-non-porte">
     <p class="rw-sous-titre-fort">{{ __('fail2ban.non_porte_titre') }}</p>
     <p class="rw-prose">{{ __('fail2ban.non_porte_texte') }}</p>
-    <a class="rw-bouton" data-rw="f2b-lien-legacy"
-       href="{{ rtrim(config('app.url_legacy'), '/') }}/fail2ban/"
-       target="_blank" rel="noopener">{{ __('fail2ban.non_porte_lien') }} ↗</a>
 </div>
 @endif
 
