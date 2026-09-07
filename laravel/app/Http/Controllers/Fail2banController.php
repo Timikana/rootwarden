@@ -96,6 +96,12 @@ class Fail2banController extends Controller
             'conf_titre_debannir', 'conf_texte_debannir',
             'conf_titre_tout', 'conf_texte_tout',
             'geste_reussi', 'geste_echoue', 'ban_invalide',
+            // Les deux gestes par machine — leurs LIBELLES sont rendus par
+            // Blade, mais leurs textes de CONFIRMATION sont composes a
+            // l'execution par le JS : sans ce voyage, le panneau s'ouvrirait
+            // VIDE, et un vide ne ressemble pas a un defaut de traduction.
+            'conf_titre_install', 'conf_texte_install',
+            'conf_titre_restart', 'conf_texte_restart',
             // F5
             'blanche_lue', 'blanche_supposee_titre', 'blanche_supposee',
             'blanche_vide_titre', 'blanche_vide', 'blanche_retirer',

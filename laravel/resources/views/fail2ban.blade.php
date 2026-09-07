@@ -61,6 +61,21 @@
                     data-rw="f2b-voir-config" hidden>{{ __('fail2ban.voir_config') }}</button>
             <button type="button" class="rw-bouton rw-bouton--discret"
                     data-rw="f2b-voir-logs" hidden>{{ __('fail2ban.voir_logs') }}</button>
+            {{--
+                ── LES DEUX GESTES PAR MACHINE, EN EXCLUSION MUTUELLE ─────────
+
+                `install_all` etait deja porte : le geste le plus LARGE existait,
+                le plus ETROIT manquait — l'inverse de l'ordre de risque.
+
+                Chacun ne s'affiche que dans l'etat qui le rend sensé :
+                « installer » quand le service est ABSENT, « redemarrer » quand
+                il est present. Proposer d'installer ce qui est deja la, ou de
+                redemarrer ce qui n'existe pas, serait offrir un echec.
+            --}}
+            <button type="button" class="rw-bouton rw-bouton--discret"
+                    data-rw="f2b-installer" hidden>{{ __('fail2ban.installer') }}</button>
+            <button type="button" class="rw-bouton rw-bouton--discret"
+                    data-rw="f2b-redemarrer" hidden>{{ __('fail2ban.redemarrer') }}</button>
         </div>
         <button type="button" class="rw-bouton" data-rw="f2b-relever"
                 disabled>{{ __('fail2ban.relever') }}</button>
@@ -524,20 +539,16 @@
     @endif
 </div>
 
-{{-- ⚠ LE LIEN VERS L'ANCIEN PORTAIL EST RETIRE, ET LE TEXTE RESTE.
-     `legacy/fail2ban/` est archive depuis le 2026-09-07 : le lien rendait un
-     404, et un 404 se lit « l'ancien portail est tombe », pas « cette page a
-     ete archivee » — l'operateur cherchait une panne la ou il y a eu une
-     decision.
-     Les deux formes se tiennent : archiver sans retirer le lien laisse un 404,
-     retirer le lien sans nommer perd une capacite en silence. Il faut les DEUX
-     gestes, dans cet ordre. Le texte dit donc ce qui manque ET comment le
-     faire, sans renvoyer nulle part — un renvoi maintient en vie ce vers quoi
-     il renvoie. --}}
-<div class="rw-encart" data-rw="f2b-non-porte">
-    <p class="rw-sous-titre-fort">{{ __('fail2ban.non_porte_titre') }}</p>
-    <p class="rw-prose">{{ __('fail2ban.non_porte_texte') }}</p>
-</div>
+{{-- ── L'ENCART « CE QUE CET ONGLET NE FAIT PAS » EST RETIRE ──────────
+
+     Il annonçait `/fail2ban/install` et `/fail2ban/restart` comme absents du
+     portail. C'etait VRAI jusqu'a ce commit et c'est FAUX depuis : les deux
+     gestes sont ci-dessus, en exclusion mutuelle selon l'etat du service.
+
+     Un encart qui annonce une absence comblee envoie l'operateur ailleurs pour
+     un geste qui est sous ses yeux. Les cles `non_porte_titre` et
+     `non_porte_texte` sont retirees des DEUX catalogues dans le meme commit. --}}
+
 @endif
 
     <script id="f2b-textes" type="application/json">@json($textes)</script>
