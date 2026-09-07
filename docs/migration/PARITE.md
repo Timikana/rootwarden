@@ -22157,6 +22157,34 @@ a **`fail2ban`**, pas au pare-feu. Le `<select>` du legacy porte **cinq** gabari
 sous la directive d'ISO-PERIMETRE posee par l'exploitant le 2026-09-07, « ecrit » ne vaut pas « porte » :
 la mesure d'un portage cherche l'ARTEFACT ATTEIGNABLE, pas le fichier.*
 
+### ⟶ CORRECTION DU 2026-09-08 — **MA PRESCRIPTION ETAIT FAUSSE. LE CONSTAT TIENT.**
+
+*« Il manque un `<select>`, cinq libelles, et le chargement du fichier. »* **Cette phrase est a retirer, et
+c'est la session 8 qui l'a relevee.** Le constat — la capacite n'est pas atteignable — reste exact ; **le
+remede que j'en tirais casserait I4.**
+
+    pare-feu.blade.php:134-137, verbatim
+      « Elle porte sur LA COPIE EN BASE, et c'est la chaine coherente : I2
+        enregistre, I4 valide ce qui est enregistre, I5 appliquera la meme chose.
+        Le legacy validait le contenu d'une zone d'edition ; le portage n'en
+        offre pas, donc il valide l'objet qui existe. »
+
+> **Un gabarit n'est pas ce que la machine A — c'est une PROPOSITION.** *Le verser dans « la copie »
+> changerait ce que « la copie » signifie, et la phrase sur laquelle I4 repose cesserait d'etre vraie.*
+
+**Poser le `<select>` exigerait donc de trancher** : une zone d'edition neuve — que le portage a
+DELIBEREMENT refusee — ou bien redefinir la copie. **Les deux sont des arbitrages, et ils appartiennent a
+I5**, qui donnera au gabarit sa destination. *Tant qu'I5 n'existe pas, le gabarit n'en a pas.*
+
+⚠ **ET C'EST MA PROPRE REGLE, ENFREINTE DANS L'ATTESTATION OU JE L'APPLIQUAIS.** J'ai etabli le matin meme
+qu'**il faut mesurer le REMEDE et pas seulement le DEFAUT**, et la session 8 l'avait adoptee. J'ai mesure le
+defaut — le fichier n'a aucun consommateur, c'est juste — et **prescrit un remede que je n'avais pas
+mesure**. *Si personne ne m'avait reprise, quelqu'un aurait pose ce `<select>` et casse I4 en croyant finir
+Q1.*
+
+**Ce qui reste vrai, sans le remede** : la capacite n'est pas atteignable, « ecrit » ne vaut pas « porte »
+sous l'iso-perimetre, et le gabarit attend une destination — pas un selecteur.
+
 ⚠ **Et le defaut que Q1 ferme n'est pas encore ferme EN SERVICE** : tant que rien ne charge ce fichier, les
 gabarits que l'operateur peut appliquer restent ceux du legacy, avec leur `--dport 22` en dur.
 
