@@ -22111,3 +22111,52 @@ eu lieu.* Refaite avec **un processus par mesure**, plus rien a demeler.
 sous-processus neuf a chaque deploiement. *Verifie : `routes/ssh.py` n'importe de ce module que deux
 helpers de validation, et la seule autre mention de la fonction est un commentaire.*
 
+---
+
+## E-468 — Q1 : LES CINQ GABARITS SONT JUSTES, ET AUCUNE VUE NE LES CHARGE
+
+**Attestation independante du travail de la session 8 (`85b5809f`), qui ne pouvait pas se certifier
+elle-meme.** *La regle vaut contre l'ecrivain quel qu'il soit.*
+
+### Ce qui TIENT — verifie, pas ratifie
+
+| ce qu'elle affirme | mesure |
+|---|---|
+| 5 gabarits, port DERIVE au lieu de `22` en dur | ✅ `web` `db` `ssh_seul` `tout_fermer` `docker` |
+| l'epreuve rend 35 cas verts | ✅ 35 ok · 0 FAIL, 2 temoins negatifs + 1 positif |
+| la mutation rend **26** rouges | ✅ **26 pour 26 predits**, prediction scellee |
+| les 5 cas `port = 22` restent verts | ✅ *et c'est la preuve que la liste de ports contient le cas ou le legacy est juste PAR COINCIDENCE* |
+| les temoins tournent sur du code PROPRE | ✅ le juge (`pare-feu-ssh-ouvert.js`) est charge **hors** du bloc de mutation |
+
+⚠ **Et sa garde d'ancre MORD** — eprouvee sur une copie, l'ancre decalee d'une espace :
+*« la mutation n'a rien remplace — l'epreuve ne prouve RIEN »*, **code 2**. *Une mutation qui ne s'applique
+pas rendrait toute la course sans objet ; celle-ci refuse de rendre un verdict.*
+
+**Le renommage est SANS DANGER** : `ssh_only` → `ssh_seul` et `deny_all` → `tout_fermer`. Les anciens noms
+ne subsistent que dans **deux commentaires** qui decrivent le defaut du legacy — aucun code ne les
+reference.
+
+**Fausse piste refermee** : les cles `tpl_strict`/`moderate`/`permissive`/`custom` du legacy appartiennent
+a **`fail2ban`**, pas au pare-feu. Le `<select>` du legacy porte **cinq** gabarits, exactement les siens.
+
+### ⛔ CE QUI NE TIENT PAS : LA CAPACITE N'EST PAS ATTEIGNABLE
+
+    laravel/public/js/pare-feu-gabarits.js   charge par 0 vue
+    pare-feu.blade.php                        aucun <select> de gabarit
+    laravel/lang/{fr,en}/pare-feu.php         0 cle 
+    legacy/lang/{fr,en}/iptables.php          13 cles , dont les 5 libelles
+    legacy/iptables/index.php:312             <select onchange="loadTemplate(...)">
+
+*Temoin : `choisir` rend 1 dans le catalogue du portage — la sonde lit bien.*
+
+> **Les cinq gabarits sont portes comme CODE, pas comme CAPACITE.** *Le legacy offre cinq gabarits
+> selectionnables ; le portage n'en offre aucun.* Il manque un `<select>`, cinq libelles, et le chargement
+> du fichier.
+
+**Ce n'est pas un defaut de son travail** — le geste demande etait de deriver le port, et il est juste. *Mais
+sous la directive d'ISO-PERIMETRE posee par l'exploitant le 2026-09-07, « ecrit » ne vaut pas « porte » :
+la mesure d'un portage cherche l'ARTEFACT ATTEIGNABLE, pas le fichier.*
+
+⚠ **Et le defaut que Q1 ferme n'est pas encore ferme EN SERVICE** : tant que rien ne charge ce fichier, les
+gabarits que l'operateur peut appliquer restent ceux du legacy, avec leur `--dport 22` en dur.
+
