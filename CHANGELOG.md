@@ -5,6 +5,78 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## K4 — le déploiement des clés SSH : le chemin est écrit, le garde a changé d'étage
+
+**Autorisation de l'exploitant, 2026-09-07** : porter le chemin, `(A)` documenté, **jamais
+l'exercer**. Rien n'a été déclenché — aucune suite, aucun `curl`, aucun banc.
+
+### Le garde n'est pas ajouté, il est DÉPLACÉ
+
+Le legacy enchaîne `/preflight_check` puis `/deploy` dans la **même chaîne `fetch`**
+(`legacy/ssh/js/main.js:110` puis `:194`). Mesure sur `backend/routes/ssh.py` :
+
+    /deploy, 93 lignes de code
+      « preflight »        ABSENT
+      « users_with_keys »  ABSENT
+      « scan_required »    ABSENT
+
+**Le backend ne vérifie rien.** Le garde qui empêche une révocation générale est un `.then()`
+de navigateur — et `MODULE-SSH.md:280` dit ce qu'il empêche : sans lui, un déploiement
+**révoquerait les clés de toutes les machines cochées**.
+
+> **La capacité existe dans le legacy ; c'est son EMPLACEMENT qui ne tient pas.** Un garde côté
+> client ne garde que ceux qui passent par le client. *L'iso-périmètre porte des capacités, pas
+> des implémentations* — porter le bouton avec son `.then()` aurait offert un chemin de
+> révocation que la page du legacy n'offre pas.
+
+`App\Services\DeploiementCles` appelle donc le preflight **côté serveur** et vérifie
+`ssh_ok` **et** `users_with_keys > 0` pour chaque machine.
+
+### La garde est par CONSTRUCTION
+
+`deploie()` n'accepte pas une liste de machines : elle accepte un `PreflightConcluant`, que
+seul `preflight()` fabrique, et seulement si **toutes** les machines passent. *Il n'existe
+aucun chemin d'appel qui déploie sans preflight — pas parce qu'on y pense, parce que c'est
+inexprimable.*
+
+Trois refus supplémentaires, chacun mesuré : liste de résultats **vide** traitée comme une
+mesure qui n'a pas eu lieu ; **tout ou rien** avec la machine fautive nommée (comportement du
+legacy, `main.js:186-191`) ; et `role:2` sur la route, parce que le backend l'exige depuis
+E-191 — offrir le déclencheur au rôle 1 produirait un 403 systématique.
+
+### ⛔ CE QUE CE LOT NE FERME PAS
+
+- **`/deploy` reste joignable directement avec une clé d'API.** Ce trou existe aujourd'hui, ce
+  portage ne le creuse pas et ne le referme pas : le refermer demande une garde **dans
+  `ssh.py`**, décision sur le backend, hors de ce lot.
+- **Le déclencheur n'est pas câblé à l'écran.** La vue porte déjà le bouton né `disabled` et le
+  panneau de décision ; sa dernière action est encore un lien vers l'ancien portail. Le
+  remplacer demande **une ligne dans une vue Blade existante**, que la consigne interdit.
+  *Mesuré : 8 compilés sur 62 appartiennent à root, et `cles-ssh` n'en a AUCUN — le danger
+  invoqué ne s'applique pas à cette vue.* Signalé, pas contourné.
+- **Le panneau de décision** exigé par `MODULE-SSH.md:159` **existe déjà** (K2) : nommer les
+  machines, annoncer la révocation, naître `disabled`. Rien à ajouter.
+
+### ⚠ UN DÉFAUT MESURÉ EN CHEMIN, NON CORRIGÉ
+
+`ClesSshController:52` lit `user_id`, **une clé que rien ne pose en session** —
+`SecondFacteurController:289` pose `utilisateur_id`, lue par 27 autres endroits. `$idCompte`
+vaut donc **toujours 0**, et `machinesVisibles(0, 1)` ne rend aucune machine à un rôle 1.
+`MisesAJourController:33` et `SupervisionController:285` sont dans le même cas. *Le corriger
+change ce qu'un rôle 1 VOIT : geste à part, avec sa propre mesure.*
+
+### Et un docbloc qui annonçait une faille COMBLÉE
+
+`ClesSshController:18` affirmait que `POST /deploy` n'a « ni rôle ni permission ». Mesuré :
+`@require_api_key`, `@require_role(2)`, `@require_machine_access` depuis E-191. *Un docbloc qui
+annonce un trou refermé envoie refaire le travail — ou, pire, écrire une garde de rattrapage
+qui double celle qui existe.* Corrigé avec sa remesure datée.
+
+    suite entiere   406 tests · 1412 assertions · 1 echec
+                    le rouge est l'instantane des appelants JS, pour `bashrc.js` et
+                    `fail2ban.js` — deux fichiers d'une AUTRE session. Non rafraichi
+                    ici : le faire masquerait leur signal.
+
 ## [2.0.105] - 2026-09-07
 
 ### Iso-perimetre — `/bashrc/prerequisites` est PORTE (ma 3e dette, la derniere)

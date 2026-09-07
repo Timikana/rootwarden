@@ -66,4 +66,21 @@ return [
     'journal_fin' => '— end of log —',
     'journal_refus' => 'The log was refused by the server (code :statut)',
     'journal_interrompu' => 'The stream ended before the log did: what precedes is incomplete',
+
+
+    /*
+     * ── K4 — LE DECLENCHEMENT DU DEPLOIEMENT ────────────────────────────────
+     *
+     * Les messages d'echec disent TOUS ce qui n'a PAS ete fait. Un refus qui ne
+     * nomme pas son effet laisse l'operateur decider s'il relance — et ici
+     * relancer a l'aveugle peut REVOQUER des acces.
+     */
+    "deployer" => "Deploy keys",
+    "deploiement_confirmation" => "Deploy SSH keys to the selected machines?",
+    "deploiement_lance" => "Deployment started. The log follows below.",
+    "err_aucune_machine" => "No machine selected.",
+    "err_backend_injoignable" => "The deployment service is unreachable. Nothing was deployed.",
+    "err_preflight_refuse" => "The pre-deployment check was refused. Nothing was deployed.",
+    "err_preflight_sans_resultat" => "The pre-deployment check returned no result: it did not take place. Nothing was deployed.",
+    "err_preflight_echoue" => "Pre-deployment check failed for: :machines. NOTHING was deployed — fix those machines or unselect them.",
 ];
