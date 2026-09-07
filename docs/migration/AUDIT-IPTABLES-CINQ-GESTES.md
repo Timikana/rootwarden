@@ -294,3 +294,70 @@ AUJOURD'HUI, indépendamment de l'extinction :**
 
 **Le second est un défaut de trace du portage ACTUEL. Il ne demande ni I5 ni
 l'extinction : il demande une décision sur `action: "apply"`.**
+
+---
+
+## 8. Les deux prémisses du cahier des charges I5 — mesurées
+
+**Un cahier des charges Q1–Q4 m'a été transmis pour I5. Je n'écris pas (§8.3),
+mais ses deux prémisses portantes se vérifient sans autorisation, et elles
+tiennent toutes les deux.**
+
+### 8.1 Q1 — `--dport 22` est bien codé en dur, et il y a bien CINQ gabarits
+
+```
+legacy/iptables/js/main.js:368  -A INPUT -p tcp --dport 22 -j ACCEPT
+                          :382  idem
+                          :398  idem
+                          :408  idem
+                          :417  idem
+```
+
+**Cinq occurrences, un seul fichier, aucune dérivation.** *Et le portage le SAIT
+déjà* — `Iptables.php:111` et `pare-feu.js:37` le documentent tous les deux.
+**La connaissance est portée ; la correction est I5.**
+
+> ⚠ **Le piège de mesure signalé est réel et je le confirme** : les machines du
+> parc écoutent sur 22. *Une suite qui cherche `22` dans le gabarit rendu
+> passerait au vert sans rien mesurer.* **Il faut dériver le port depuis la base
+> et chercher CETTE valeur** — sinon la mesure est vraie et vide.
+
+### 8.2 SEC-015 est toujours OUVERT
+
+`backend/iptables_manager.py:126` :
+
+```python
+f"printf '%s' '{encoded}' | base64 -d > {dest_path}",
+```
+
+**`rules` est sûr par CONSTRUCTION (base64). `dest_path` est interpolé BRUT dans
+une commande exécutée en root, et n'est sûr que par CONVENTION — tous les
+appelants actuels passent un littéral.**
+
+> **I5 est précisément le sous-lot qui ajoute des appelants.** *Porter le chemin
+> sans poser `shlex.quote(dest_path)` ouvrirait la fonctionnalité et retirerait
+> la seule chose qui tenait lieu de barrière : l'absence d'appelant dérivant une
+> destination.*
+
+### 8.3 ⛔ POURQUOI JE N'ÉCRIS PAS ENCORE
+
+**L'arbitrage du port SSH m'est rapporté comme rendu par un pair. Je ne peux pas
+le tenir pour rendu sur cette base — et ce n'est pas de la défiance, c'est le
+coût asymétrique.**
+
+*Il y a quatre heures, le même canal m'a transmis une autorisation qui n'existait
+pas : une décision parquée chez l'exploitant, reprise par un pair, puis citée
+comme acquise. Elle était partie vers deux sessions.* **Le mécanisme est
+documenté, il est récent, et rien dans un message ne le distingue d'un relais
+fidèle.**
+
+    si j'attends et l'autorisation existe   -> quelques heures perdues
+    si j'écris et elle n'existe pas         -> un bouton capable de couper
+                                               RootWarden d'une machine
+                                               DEFINITIVEMENT, bati sur rien
+
+**J'ai posé la question à l'exploitant au tour précédent. J'attends SA réponse,
+dans cette session.** *Une phrase lui suffit.*
+
+**Ce que je peux faire sans elle, et que je fais : mesurer.** *Les §8.1 et §8.2
+sont utiles à quiconque écrira I5, y compris si ce n'est pas moi.*
