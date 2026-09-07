@@ -335,3 +335,158 @@ class TestRestoreEtRollbackArchivent:
             "en avant, alors que le nom promet le contraire"
         )
         assert inserts[0][1] == self.ETAT_COURANT, "l'archive porte l'etat RESTAURE"
+
+
+class TestLaReponseDitSiLArchiveAEuLieu:
+    """Un `success: true` seul etait indiscernable entre deux etats tres differents.
+
+    ⛔ LE DEFAUT FERME. Base injoignable -> l'archivage echoue -> l'application A
+    LIEU quand meme -> la reponse etait OCTET POUR OCTET celle du succes. Aucun
+    champ ne la distinguait, aucun test ne l'exercait.
+
+    *Ce fichier dit lui-meme qu'une archive avec un trou est plus dangereuse
+    qu'une archive absente, parce que le trou se lit comme une continuite.* Le
+    chemin d'exception en fabriquait un, en silence.
+
+    ⚠ LA METHODE : commencer par le cas qui MARCHE, puis casser la base et
+    verifier que la reponse CHANGE. Sans le premier, « archive: false » ne
+    prouverait pas que le champ sait dire `true`.
+    """
+
+    CORPS = {
+        'server_ip': '10.0.0.1', 'server_port': 22, 'ssh_user': 'admin',
+        'ssh_password': 'enc', 'root_password': 'enc', 'machine_id': 3,
+        'action': 'apply', 'rules_v4': '*filter\nCOMMIT\n', 'rules_v6': '',
+    }
+
+    def _harnais(self, monkeypatch, base_ko=False, etat_precedent='*filter\n-A INPUT -j DROP\nCOMMIT\n'):
+        import routes.iptables as ipt
+        appliques = []
+
+        class _Curseur:
+            def execute(self, sql, params=None):
+                self._sql = sql
+
+            def fetchone(self):
+                return ('rw-test-admin',) if 'FROM users' in getattr(self, '_sql', '') else None
+
+        class _Conn:
+            def cursor(self):
+                return _Curseur()
+
+            def commit(self):
+                pass
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+        class _Session:
+            def __enter__(self):
+                return MagicMock()
+
+            def __exit__(self, *a):
+                return False
+
+        def _base():
+            if base_ko:
+                raise RuntimeError("Can't connect to MySQL server")
+            return _Conn()
+
+        monkeypatch.setattr(ipt, 'ssh_session', lambda *a, **k: _Session())
+        monkeypatch.setattr(ipt, 'get_iptables_rules', lambda *a, **k: {
+            'file_rules_v4': etat_precedent, 'file_rules_v6': '',
+        })
+        monkeypatch.setattr(ipt, 'apply_iptables_rules', lambda *a, **k: appliques.append(True))
+        monkeypatch.setattr(ipt, 'get_current_user', lambda: (14, 3))
+        monkeypatch.setattr(ipt, 'get_db_connection', lambda *a, **k: _base())
+        monkeypatch.setattr(ipt, '_resolve_ssh_creds',
+                            lambda d: ('10.0.0.1', 22, 'admin', 'p', 'rp', None, 3, None))
+        return appliques
+
+    def test_le_cas_qui_MARCHE_rend_archive_true(self, client, admin_headers, mock_db, monkeypatch):
+        """LE TEMOIN POSITIF. Sans lui, `archive: false` ne prouve rien."""
+        appliques = self._harnais(monkeypatch)
+
+        resp = client.post('/iptables', headers=admin_headers, json=dict(self.CORPS))
+
+        assert resp.status_code == 200
+        charge = resp.get_json()
+        assert len(appliques) == 1
+        assert charge['archive'] is True, "le champ ne sait pas dire `true`"
+        assert 'archive_motif' not in charge
+
+    def test_une_base_INJOIGNABLE_rend_archive_false_et_applique_QUAND_MEME(
+            self, client, admin_headers, mock_db, monkeypatch):
+        """On ne BLOQUE pas — mais la reponse cesse d'etre celle du succes.
+
+        Bloquer ferait de la garde la chose qui empeche de se retablir : l'archive
+        sert la tracabilite, l'application sert la DISPONIBILITE. Et sur
+        `rollback`, bloquer enfermerait l'operateur dans l'etat casse qu'il
+        cherche precisement a quitter.
+        """
+        appliques = self._harnais(monkeypatch, base_ko=True)
+
+        resp = client.post('/iptables', headers=admin_headers, json=dict(self.CORPS))
+
+        assert resp.status_code == 200
+        charge = resp.get_json()
+        assert len(appliques) == 1, "l'application doit avoir lieu malgre la base KO"
+        assert charge['archive'] is False, (
+            "la reponse est indiscernable du succes : le trou d'archive est SILENCIEUX"
+        )
+        assert charge['archive_motif'] == 'echec_archivage'
+
+    def test_un_etat_precedent_VIDE_se_distingue_d_un_ECHEC(
+            self, client, admin_headers, mock_db, monkeypatch):
+        """Deux non-archives, deux motifs : « rien a archiver » n'est pas « ca a rate »."""
+        appliques = self._harnais(monkeypatch, etat_precedent='   ')
+
+        resp = client.post('/iptables', headers=admin_headers, json=dict(self.CORPS))
+
+        charge = resp.get_json()
+        assert len(appliques) == 1
+        assert charge['archive'] is False
+        assert charge['archive_motif'] == 'etat_precedent_vide'
+
+
+class TestLaGardeDeVacuiteEstEnAVAL:
+    """Des regles vides sont refusees pour les QUATRE portes, pas seulement deux.
+
+    Le controle vivait SOUS la lecture par defaut : il ne gardait que les deux
+    routes `action="apply"`. `restore` et `rollback` controlent en amont, donc
+    l'angle mort etait DORMANT — mais sur par CONVENTION, et une cinquieme porte
+    n'aurait ete forcee par rien.
+
+    *Deux gardes en amont valent moins qu'une garde en aval : il faut les
+    repeter, et on ne repete pas ce qu'on ne voit pas.*
+    """
+
+    @pytest.mark.parametrize('regles', ['', '   ', '\n\t '])
+    def test_des_regles_vides_sont_refusees(self, client, admin_headers, mock_db,
+                                            monkeypatch, regles):
+        import routes.iptables as ipt
+
+        class _Session:
+            def __enter__(self):
+                return MagicMock()
+
+            def __exit__(self, *a):
+                return False
+
+        applique = []
+        monkeypatch.setattr(ipt, 'ssh_session', lambda *a, **k: _Session())
+        monkeypatch.setattr(ipt, 'apply_iptables_rules', lambda *a, **k: applique.append(True))
+        monkeypatch.setattr(ipt, '_resolve_ssh_creds',
+                            lambda d: ('10.0.0.1', 22, 'admin', 'p', 'rp', None, 3, None))
+
+        resp = client.post('/iptables', headers=admin_headers, json={
+            'server_ip': '10.0.0.1', 'ssh_user': 'admin', 'ssh_password': 'enc',
+            'root_password': 'enc', 'machine_id': 3, 'action': 'apply',
+            'rules_v4': regles,
+        })
+
+        assert resp.status_code == 400
+        assert applique == [], "des regles vides ont ete APPLIQUEES"
