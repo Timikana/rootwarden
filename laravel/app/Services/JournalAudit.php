@@ -334,7 +334,11 @@ class JournalAudit
      *     PermissionsController  INSERT direct dans user_logs : 0   ->ajoute( : :70
      *     ServeursController     INSERT direct dans user_logs : 0   ->ajoute( : :141
      *     MotDePasse             INSERT direct dans user_logs : 0   ->ajoute( : :591
-     *     temoin : 295 fichiers .php suivis sous laravel/ lus · 11 appels a ->ajoute(
+     *     temoin : 295 fichiers .php suivis sous laravel/ lus
+     *     ecrivains du journal : 9   (le compte BRUT de `->ajoute(` est 11 ; deux
+     *     sont des HOMONYMES qui ajoutent un SERVEUR — ServeursController:77 et
+     *     Serveurs.php:457. J'avais publie « 11 » en listant les neuf bons : le
+     *     nombre et la liste se contredisaient dans le meme message.)
      *
      * Leur seule mention de `self_hash` est desormais une PROSE DE DOCBLOC qui
      * decrit ce qu'elles faisaient avant. **Un motif qui cherche `self_hash`
