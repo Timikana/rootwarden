@@ -13006,8 +13006,61 @@ Q4  avant consentement, AUCUNE requete n'est emise
     parametre de chemin n'est ni cite ni valide : injection root
 ```
 
-**Q2 est la seule propriété qui empêche le geste irréversible, et elle se mesure sans jamais
-l'émettre.** *Requête forgée + `page.on('request')`, assertion « aucune requête ne part ».*
+**Q2 se mesure sans jamais l'émettre** — requête forgée + `page.on('request')`, assertion
+« aucune requête ne part ».
+
+### ⚠ AMENDEMENT 23:05 — j'ai donné à l'exploitant une prémisse TROP FORTE
+
+**J'avais écrit, et je le lui avais dit ainsi : « Q2 est la seule propriété qui EMPÊCHE le
+geste irréversible ».** *La session 5 l'a borné dans sa spec, et la mesure lui donne
+raison :*
+
+> ⛔ **Q2 est un garde d'INTERFACE.** *Un `curl` direct vers la passerelle ne le rencontre
+> pas, et `/iptables-apply` n'inspecte pas les règles côté backend.*
+
+**Et c'est pire que ça, dans un sens qui joue POUR le portage** : le chemin est déjà ouvert.
+
+```
+RoutesBackend.php:114   '/iptables', '/iptables-'
+RoutesBackend.php:446   str_starts_with($chemin, $entree)      <- entree a PREFIXE
+=> /iptables-apply et /iptables-rollback passent DEJA la passerelle du portage,
+   aujourd'hui, sans qu'I5 soit porte
+```
+
+*Le portage le documentait déjà lui-même* — `pare-feu.js:619-622` : *« la passerelle ne
+protège PAS ce chemin en particulier … le même préfixe ouvre `/iptables-validate`,
+`/iptables-apply` et `/iptables-rollback` sans les distinguer. La fermeture reste PAR
+L'ABSENCE. »*
+
+**Porter I5 ne crée donc pas l'atteignabilité. Il crée l'ÉCRAN.** *Ce qui change est qu'un
+geste aujourd'hui atteignable seulement par une requête forgée devient un bouton — facile,
+visible, offert à tout porteur de `can_manage_iptables`.*
+
+**Cela ne renverse pas l'arbitrage, et je le dis pour qu'on ne le rouvre pas sans raison :**
+« porter avec Q1–Q4 » reste strictement meilleur que « porter tel quel », et « ne pas
+porter » **ne referme pas** le chemin de la passerelle — ça laisserait la capacité
+atteignable ET sans écran, ET sans extinction du legacy. *Les trois issues gardent leur
+ordre ; c'est la phrase qui les accompagnait qui était fausse.*
+
+> **« Q2 vert » ne veut pas dire « le geste irréversible est impossible ». Il veut dire
+> « il est rendu difficile depuis l'écran » — ce qui est déjà beaucoup, et ce n'est pas la
+> même phrase.** *(borne posée par la session 5, vérifiée ici)*
+
+### ⚠ Et un compte que j'ai relayé sans le mesurer : trois valeurs pour une seule chose
+
+```
+AUDIT-PRERELECTURE-IPTABLES.md:135   « ses HUIT points d'appel »
+la session 5, remesure               13
+ma mesure, appels seuls              12   (:148 :150 :154 :182 :185 :189
+                                            :225 :227 :231 :273 :276 :280)
+la declaration                       :290 — 13 = 12 + elle
+```
+
+**J'ai repris le « huit » du document d'audit et je l'ai relayé à la session qui allait
+mesurer.** *Le nombre ne change rien à la conclusion — la cible `#notifications` est absente
+de `iptables/index.php`, `head.php`, `menu.php` et `footer.php` (0 partout), donc chaque
+appel lève.* **Mais c'est la troisième fois cette semaine qu'un chiffre hérité d'un document
+voyage dans une consigne sans que personne ne le remesure.**
 
 ⚠ **`/iptables-logs` ne se porte PAS** — il diffuse un fichier que personne n'écrit
 (`open(…, 'w'|'a')` : 0 occurrence). *Je l'avais compté comme le quatrième geste dans
