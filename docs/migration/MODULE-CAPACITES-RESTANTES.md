@@ -630,3 +630,69 @@ passe que personne ne connaissait.
 
 *Et les lignes d'`audit-ssh.js` ont bougé entre 09:12 et 10:39.* **Sur ce dépôt, un
 relevé de plus d'une heure doit être présenté avec son heure ou refait.**
+
+---
+
+## 13. Les DEUX dernières « capacités restantes » — **elles sont portées** (2026-09-07 22:44 CEST)
+
+On m'a demandé d'apparier les deux seules capacités réputées absentes et non
+bloquées, **en mesurant d'abord qu'elles le sont**. Elles ne le sont pas.
+
+### 13.1 Les deux chemins interrogés **n'existent pas dans le produit**
+
+    interroge          verdict     ce que le backend declare REELLEMENT
+    /drift_scan        ABSENT      -> aucune route de ce nom
+    /server_test_connection ABSENT -> aucune route de ce nom
+
+    routes reelles     backend/routes/drift.py:121   /drift/scan
+                       backend/routes/drift.py:142   /drift/scan_all
+                       backend/routes/drift.py:170   /drift/results
+                       backend/routes/monitoring.py:57  /server_status
+
+### 13.2 Les quatre chemins réels sont **tous APPELÉS**
+
+| capacité | chemin | ligne du portage |
+|---|---|---|
+| dérive — une machine | `/drift/scan` | `public/js/derive-config.js:218` |
+| dérive — tout le parc | `/drift/scan_all` | `derive-config.js:238` |
+| dérive — lecture | `/drift/results` | `derive-config.js:196` |
+| dérive — par GROUPE | `/groups/{id}/run` `{action:'drift_scan'}` | `groupes.js:521` *(mesuré le 2026-09-05)* |
+| **test de connexion** | `/server_status` | `public/js/serveurs.js:114` |
+
+*Le test de connexion avait DÉJÀ été rayé de la liste des onze le 2026-09-02* —
+`PROMPT-FINIR-LES-CAPACITES.md:51` porte encore la mention « ⚠ **DÉJÀ PORTÉ** …
+Rien à porter ».
+
+> **Il ne reste ZÉRO capacité portable et non bloquée.** La liste des onze est close :
+> onze sur onze le 05/09, et les deux « dernières » ajoutées depuis sont l'une et
+> l'autre des chemins qui n'existent pas.
+
+### 13.3 ⚠ CE QUE L'OUTIL RÉPOND, ET CE QU'IL NE RÉPOND PAS
+
+`geste-porte.py` a dit **vrai** les deux fois : `/drift_scan` **est** absent — en tant
+que chemin. **Il n'a jamais existé.**
+
+> **L'outil répond « ce CHEMIN est-il appelé ? », jamais « cette CAPACITÉ est-elle
+> portée ? ».** Lui donner un chemin qui n'a jamais existé rend `ABSENT` avec une
+> exactitude parfaite, et ne veut rien dire.
+
+**La règle des trois secondes — *jouer l'outil avant d'assigner* — est bonne et
+insuffisante.** Il faut un pas de plus, et il est aussi court :
+
+    1. le chemin interroge EXISTE-t-il cote backend ?  (`@bp.route`)
+    2. seulement alors : est-il APPELE cote portage ?
+
+*Sans l'étape 1, un nom approximatif produit un `ABSENT` que rien ne distingue d'une
+capacité manquante.* **C'est le même défaut que celui qui a fait dormir
+`comptes-distants` cinq jours** — chercher le nom qu'on a en tête plutôt que
+l'artefact qui existe.
+
+### 13.4 Et une ambiguïté de MA citation, relevée par un pair
+
+J'avais écrit « `ssh_audit.py:156` ». **Deux fichiers portent ce nom de base** :
+`backend/ssh_audit.py` (0 occurrence) et `backend/routes/ssh_audit.py` (2). Mon pair
+a failli me réfuter sur le mauvais.
+
+*C'est exactement la collision de noms de base que j'avais nommée le 2026-09-04 en
+construisant le graphe d'archivage — et je l'ai commise trois jours plus tard dans une
+citation.* **Citer un chemin depuis la racine du dépôt, toujours.**
