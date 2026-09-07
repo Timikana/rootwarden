@@ -863,6 +863,53 @@ complet.
 
 ---
 
+## ⚠⚠ AVERTISSEMENT DE NUMEROTATION — **HUIT NUMEROS DESIGNENT DEUX CHOSES** (2026-09-07)
+
+**`E-452` a `E-459` existent DANS LES DEUX REGISTRES, avec des sujets differents.** Mesure :
+
+    PARITE.md          432 entrees, E-01  -> E-459
+    DECISIONS-DSI.md    63 entrees, E-209 -> E-462
+    numeros communs     26
+
+*Les 18 plus anciens sont des CITATIONS : le registre DSI renvoie a un ecart d'ici par son numero, ce qui est
+legitime.* **Les huit derniers sont des COLLISIONS** — deux entrees distinctes, ecrites le meme jour, sous le
+meme numero :
+
+| n° | ici | chez la DSI |
+|---|---|---|
+| 452 | « LOT conforme » sur 53 executions | des criteres scelles avant lecture |
+| 453 | la page exige une permission que la passerelle n'exige pas | des chiffres recites dans ses prompts |
+| 454 | le legacy archive sous les suites | la limite de sa « sixieme question » |
+| 455 | la redirection HTTP→HTTPS du legacy | E-449 livre et atteste |
+| 456 | la sonde de vie du portage | la modale de step-up du legacy cassee |
+| 457 | deux scripts nommant chaque portail par l'autre | une suite hors lot postant un deploiement sudo |
+| 458 | B4 porte, le defaut de `mode` | **« deux numerotations pour un meme produit »** |
+| 459 | trois boutons vers un 404 | « ou vit la cible » |
+
+> **La cause est mienne et elle est simple : ma commande de remesure ne lit que CE fichier.** *« max E-459 »
+> etait juste pour `PARITE.md` et faux pour le chantier* — le vrai maximum etait **E-462**. J'ai alloue huit
+> numeros en croyant mesurer, et je les ai cites dans une dizaine de messages.
+
+### La regle, a partir de maintenant
+
+1. **CITER LE REGISTRE** : `PARITE/E-459` ou `DSI/E-459`. Un `E-459` nu est ambigu pour ces huit-la.
+2. **ALLOUER sur le maximum des DEUX** :
+
+```bash
+cat <(grep -ohE '^#{1,6} +E-[0-9]+' docs/migration/PARITE.md) \
+    <(grep -ohE '^#{1,6} +E-[0-9]+' docs/migration/DECISIONS-DSI.md) \
+  | grep -oE '[0-9]+' | sort -n | tail -1        # le prochain est celui-ci + 1
+```
+
+3. **NE PAS RENUMEROTER.** *Les huit sont cites dans des commits et des messages des deux cotes ; renumeroter
+briserait chaque citation et transformerait une ambiguite CONNUE en confusion silencieuse.* L'ambiguite est
+donc **declaree**, pas effacee.
+
+⚠ **Et la coincidence merite d'etre dite** : le `DSI/E-458` s'intitule *« DEUX NUMEROTATIONS POUR UN MEME
+PRODUIT »*. **Nous ecrivions sur un probleme de numerotation en train d'en creer un.**
+
+---
+
 ## E-01 — Le rejeu d'un code TOTP doit etre refuse
 
 **Cible legacy : accepte (defaut). Cible Laravel : REFUSE — corrige le 2026-08-17.**
