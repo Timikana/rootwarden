@@ -13381,3 +13381,97 @@ j'ai relayé il y a cinq heures une autorisation qui n'existait pas.
 
 **Il lui faut une ligne, dans SA session. C'est tout ce qui reste entre le dépôt et
 l'extinction du legacy.**
+
+---
+
+## E-466 — QUAND Q2 NE PEUT PAS CONCLURE : REFUSER, ET DIRE QUOI AJOUTER
+
+**2026-09-07, 23:40.** *Arbitrage laissé ouvert par la 6e revue de Q2 : quelle issue pour
+l'opérateur qui SAIT que son jeu de règles est bon, quand le prédicat refuse ?*
+
+### La règle de l'exploitant le tranche, et pas dans le sens qu'on attendrait
+
+> **« L'arbitrage c'est iso du legacy et on améliore si on peut améliorer ! ou debug ! »**
+
+**Le legacy n'offre AUCUN garde : il applique, point.** *Donc l'iso-périmètre ne demande pas
+de garde du tout — Q2 est déjà, en entier, du « on améliore si on peut ».* **Il n'existe
+aucune capacité legacy à préserver ici, donc rien qui oblige à prévoir un contournement.**
+
+### ⛔ Ce que je NE retiens pas : un bouton « passer outre »
+
+```
+un garde qui refuse parfois    est un garde
+un garde qui refuse TOUJOURS   est un obstacle, et il se contourne
+```
+
+*L'argument de la revue est juste — et le suivi de chaînes y a répondu.* **Le cas `null`
+n'est plus fréquent** : un jeu `fail2ban` ordinaire, qui était le cas du parc, conclut
+désormais `true`. Restent la chaîne non définie, l'imbrication au-delà de deux niveaux, et
+`-i eth0` sans preuve.
+
+**Un contournement serait employé exactement quand l'opérateur est le plus confiant — donc
+le moins prudent — sur le seul geste du produit dont l'erreur coûte un déplacement
+physique.** *Et il ne se distinguerait en rien, à l'usage, du geste sans garde.*
+
+### ✅ CE QUE JE RETIENS : le refus est ACTIONNABLE, et l'action améliore le jeu
+
+**Le message doit nommer QUELLE règle empêche de conclure, avec sa ligne**, et dire la seule
+chose à faire :
+
+```
+« La regle L12  -A INPUT -i eth0 -p tcp --dport 22 -j ACCEPT  couvre le port
+  SSH mais restreint l'interface : je ne peux pas prouver qu'elle vaut pour le
+  chemin par lequel RootWarden joint cette machine.
+
+  Ajoutez avant elle :   -A INPUT -p tcp --dport 22 -j ACCEPT »
+```
+
+> **L'issue n'est pas de passer outre le garde : c'est de rendre le jeu PROUVABLE.** *Et la
+> règle qu'on demande d'ajouter n'est pas une formalité pour contenter l'outil — elle rend
+> l'accès effectivement inconditionnel, ce que l'opérateur croyait déjà avoir.*
+
+**C'est la différence entre un garde qui coûte un clic et un garde qui coûte une
+modification.** *La modification est le point : elle laisse la machine dans un état meilleur
+que celui où le refus l'a trouvée.*
+
+⚠ **Et cet arbitrage ne vaut que si le message distingue les deux verdicts.** `false`
+(« ces règles ferment ») et `null` (« je ne peux pas prouver ») se traitent tous deux en
+refus, **mais ne se disent pas pareil** — les fondre dans une seule phrase annulerait la
+correction de la 3e revue, et le comportement resterait identique, donc la faute serait
+invisible.
+
+---
+
+## Relevé de supervision — 2026-09-07 23:35
+
+```
+production 22:37 -> 23:35   22 commits · 8 de CODE · 12 de doc · 2 autres
+doc/code = 1,50             ✅ sous le seuil de 2, pour la premiere fois
+```
+
+⚠ **Mais la diversité ne suit pas la mesure** : sept des huit commits de code sont de moi,
+tous sur un seul fichier, à travers huit rondes de revue. *Un ratio sain sur une équipe dont
+une seule session écrit n'est pas une équipe saine — c'est un indicateur qui ne mesure pas
+ce qu'on veut savoir.*
+
+**La cause n'est pas l'oisiveté :** la liste des onze est close (`E-464`), une session est en
+lecture seule sur le code, une autre n'a qu'`iptables` et `iptables` est bloqué.
+
+### ✅ La vérification d'état récurrente est CLOSE
+
+*Elle était demandée à chaque tour, et `DECISIONS-DSI.md` en portait DOUZE remesures
+rédigées. Elle est désormais une assertion permanente qui MORD.*
+
+```
+tests/e2e/jetons-interdits.mjs   300 fichiers lus · temoin present dans 6 · code 0
+contre-epreuve : jeton force dans la portee -> code 1, arbre restaure
+```
+
+**La réponse à cette étape devient une ligne** — *« la suite la porte, elle est verte »* — et
+le vert tient **entre** les tours, ce qu'une remesure ne fait pas.
+
+⚠ **Et ma propre vérification de ce tour a d'abord échoué en silence** : mon témoin positif
+rendait `0` clé réelle, donc le `0` de `socle_avertissement` ne mesurait rien. *Refaite : 40
+clés, jeton forgé à 0, déclaration TENUE.* **Zéro sur la sonde ET zéro sur le témoin veut
+dire que la mesure n'a pas eu lieu — y compris quand c'est ma sonde et que le résultat me
+convient.**
