@@ -13129,3 +13129,98 @@ Et ce qui a débloqué n'est aucun de mes trois raisonnements :
 **Les deux sessions ont fait la même chose : refuser d'agir sur ma parole, ET refuser de
 résoudre la question entre pairs.** *Le second refus est le plus difficile — il aurait été
 facile de me croire, puisque j'étais d'accord avec elles sur le fond.*
+
+---
+
+## E-464 — LA LISTE DES « 11 PORTABLES » EST OBSOLETE : 6 SUR 9 SONT DEJA PORTEES
+
+**Mesuré le 2026-09-07 22:41**, `scripts/geste-porte.py`, **aux deux bornes** —
+témoin négatif `/xx_chemin_inexistant_xx` → `ABSENT`, témoin positif `/cve_scan` → trouvé.
+
+```
+/ssh-audit/schedules      ✅ APPELE   audit-ssh.js:910
+/ssh-audit/config         ✅ APPELE   audit-ssh.js:457
+/ssh-audit/scan           ✅ APPELE   audit-ssh.js:368
+/groups                   ✅ APPELE   groupes.js:773
+/fail2ban/unban           ✅ APPELE   fail2ban.js:1127
+/fail2ban/geoip           ✅ APPELE   fail2ban.js:1093
+─────────────────────────────────────────────────────
+/drift_scan               ⛔ ABSENT
+/server_test_connection   ⛔ ABSENT
+/import_csv               ⛔ ABSENT   (bloque sur TROIS arbitrages, et il ecrit
+                                       dans QUATRE tables)
+```
+
+**Il reste DEUX capacités portables et non bloquées**, pas onze.
+
+### ⚠ Ce que ça dit du ratio doc/code, et ce n'est pas ce que j'ai annoncé
+
+J'ai ouvert ce tour en constatant **3,5 documents pour 1 code** et en écrivant que
+*« l'équipe écrit sur ses propres mesures au lieu de porter »*. **La mesure est juste et
+mon diagnostic était faux.**
+
+> **Une équipe à qui l'on assigne du travail déjà fait produit des mesures, parce que la
+> mesure est la seule chose qu'il reste à produire.** *Le ratio ne mesurait pas une
+> dérive de l'équipe : il mesurait l'obsolescence de ma liste.*
+
+**C'est la huitième fois que ce chantier s'apprête à porter ce qui existe** (relevé par la
+session qui tient la carte du socle, qui l'avait déjà mesuré le 2026-09-05 : *11 sur 11
+déjà faites*). **Et je le lui ai réassigné aujourd'hui sans mesurer.**
+
+**Règle que je m'impose, et elle coûte trois secondes :** *avant d'assigner une capacité,
+jouer `geste-porte.py` dessus AVEC ses deux témoins.* Une liste héritée se remesure ; elle
+ne se relaie pas. **Un compte récité dérive ; un compte qui porte ses objets se corrige.**
+
+⚠ **Et un corollaire sur l'outil, relevé par un pair** : son témoin négatif habituel était
+`/fail2ban/install`, qui rend **maintenant** `APPELE` — je l'ai porté ce soir. *Un témoin
+négatif se périme quand le chantier avance, et un outil dont on ne vérifie plus qu'il sait
+dire « absent » ne prouve rien.* Le témoin doit être **forgé**, jamais emprunté au parc.
+
+### Les périmètres : deux de mes relances ne pouvaient pas aboutir
+
+```
+session « carte du socle »   LECTURE SEULE sur le code — mandat de l'exploitant
+session « securite »         UN perimetre ouvert : `iptables`, et il est bloque
+```
+
+**J'ai relancé les deux sur du portage.** *La première me l'avait dit il y a deux jours et
+je l'avais reconnu ; la seconde me l'a dit trois fois ce soir.* **Le remède n'est pas
+qu'elles écrivent moins de documentation : c'est que l'arbitrage tombe, ou qu'un périmètre
+s'ouvre — et ni l'un ni l'autre ne se décide entre nous.**
+
+### ⚠ ET LA FAUTE QUE J'AI COMMISE DANS LE MESSAGE MEME OU JE LA RAPPELAIS
+
+J'ai écrit à la session sécurité, en lui assignant `fail2ban` :
+
+> *« Une taxonomie sans catégorie pour le cas grave range le cas grave dans la catégorie
+> bénigne — un `fetch` vers un tiers EXTERNE aurait été classé du côté rassurant. »*
+
+**Puis, deux paragraphes plus bas, j'ai classé la géolocalisation « une lecture »**, en face
+de « désactiver une jail = écriture réversible ». Sa réponse :
+
+> **« C'est une lecture LOCALEMENT et une ÉMISSION globalement. »**
+
+```
+backend/fail2ban_manager.py:397   http://ip-api.com/json/{ip}   EN CLAIR
+  (le tier gratuit n'autorise pas HTTPS — le code le dit et l'assume)
+garde par construction            IP privee/loopback/reservee -> `Local`, AUCUN appel
+interrupteurs *_ENABLED du depot  8   NVD · CVE_ENRICH · CHATOPS · TICKETING
+                                      MAIL · WAZUH · HIBP · APPROVAL
+interrupteur pour la geolocalisation :  AUCUN
+```
+
+**Le résidu n'est pas la confidentialité de l'IP — elle est déjà publique.** *C'est qu'un
+observateur sur le chemin apprend **quelles adresses cette installation investigue** : ça
+renseigne sur l'activité du défenseur.* **Mineur, et pas rien.**
+
+**Ce qui décide n'est pas un standard importé : c'est la convention du dépôt, appliquée
+sept fois et manquante une.** *Pour un outil auto-hébergé en environnement clos, « aucun
+trafic sortant » n'est pas configurable sur ce geste.*
+
+⛔ **Donc je retire l'assignation** : porter la géolocalisation **ajoute le bouton qui
+déclenche l'émission**. La question de l'interrupteur se pose AVANT le portage, et elle est
+à l'exploitant. *Désactiver une jail, en revanche, reste portable sans arbitrage.*
+
+> **Énoncer une règle ne protège pas de l'enfreindre : on l'applique en LISANT, jamais en
+> ÉCRIVANT.** *Le contradicteur a fait ce que ma propre phrase n'a pas fait, dans le même
+> message.*
