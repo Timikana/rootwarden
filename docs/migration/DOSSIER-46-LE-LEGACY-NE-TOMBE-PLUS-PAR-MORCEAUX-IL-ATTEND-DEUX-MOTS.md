@@ -198,6 +198,84 @@ signifier `users.sudo = 1` sans politique par machine » — **mais ni l'une ni 
 tient l'extinction.** (A) décrit un comportement qui existe aujourd'hui ; le reproduire à
 iso-périmètre ne demande aucune décision.
 
+> ## ⛔⛔ SECONDE RECTIFICATION, 22:40 — LA PREMIÈRE ÉTAIT FAUSSE AUSSI
+>
+> **La rectification ci-dessus est erronée, et c'est la session 5 qui l'a arrêtée en
+> refusant d'exécuter ma consigne.** Le titre initial du dossier était juste ; c'est ma
+> correction qui était trop large. Je laisse les deux en place — un dossier qui efface son
+> erreur n'apprend rien à qui le relit.
+
+### Ce qui gouverne n'est pas ma distinction, c'est une phrase écrite
+
+```
+MODULE-FILTRAGE.md:269   « I5 … NE SE PORTE PAS AVANT que la décision sur le port SSH
+                           soit tranchée »
+MODULE-SSH.md:212        « Reste K4. AVANT LUI, l'exploitant doit trancher le repli
+                           NOPASSWD: ALL. »
+MODULE-SSH.md:354 · :370 « une fois l'arbitrage rendu » · « Décision d'exploitant, AVANT K4 »
+DOSSIER-38:16            I5 et K4 rangés parmi les ARBITRAGES en attente
+DOSSIER-35:133           le port SSH d'iptables — « joint des machines de son infrastructure »
+```
+
+> **« Ne se porte pas » est une condition sur le PORTAGE, pas sur l'exercice.**
+> *(formulation de la session 5)*
+
+Ma distinction *porter / exercer* est réelle en général. **Elle ne peut pas passer
+par-dessus une phrase qui dit explicitement « ne se porte pas avant que ».** En corrigeant
+une confusion que j'avais, je suis passée de l'autre côté d'une phrase qui, elle, n'est pas
+ambiguë.
+
+Et sur K4, mon raisonnement était : *(B) a été écrit à 20:13, donc la condition tombe.*
+
+> **Une décision prise depuis par un pair ne referme pas un arbitrage qui avait été mis de
+> côté précisément parce qu'il ne lui appartenait pas.** *(session 5)*
+
+**Je peux constater que (B) est écrit. Je ne peux pas déclarer à la place de l'exploitant
+que « trancher le repli `NOPASSWD: ALL` » est fait.** Ce sont deux gestes distincts, et le
+second ne m'appartient pas. **J'ai retiré ma consigne à la session qui allait écrire.**
+
+### Où l'erreur est réellement entrée — et ce n'est pas ce soir
+
+`DOSSIER-40 §④`, à 19:53 : *« porter les quatre gestes | décidé ici »*. **`DOSSIER-38`, de
+moi aussi, rangeait déjà I5 parmi les arbitrages en attente, pour un motif nommé.** J'ai
+décidé quelque chose que j'avais moi-même parqué chez l'exploitant, puis j'ai passé la
+soirée à me citer.
+
+*Ce n'est donc pas « j'ai relu au lieu de me souvenir » qui m'a sauvée — j'ai relu, et j'ai
+relu le mauvais document.* **Relire n'est une garde que si l'on relit celui qui gouverne.**
+
+### Et un cinquième geste que je demandais à tort de porter
+
+`MODULE-FILTRAGE.md:272-275`, hors lot : **`/iptables-logs` ne doit PAS être porté.** Il
+diffuse `/app/logs/iptables.log`, créé vide au démarrage, **et aucun writer n'existe** —
+`backend/Dockerfile:63` et `backend/server.py:231` le créent, `open(…, 'w'|'a')` sur ce
+fichier : **0 occurrence**. L'utilisateur voit un flux qui n'émet que des pings pendant dix
+minutes.
+
+J'avais écrit dans le tableau du DOSSIER-40 : *« 39 lignes, n'écrit rien, sa valeur est
+dans sa borne de 600 s »*. **Exact, et à côté.**
+
+> **La qualité d'un garde-fou est une mesure impeccable et hors sujet quand rien ne passe
+> la porte.** *La sixième question — « le câbler produirait-il quelque chose ? » — je
+> l'avais appliquée à `/cve_trends` et pas à celui-ci.*
+
+### L'état vrai, donc
+
+```
+iptables/index.php   ⛔ I5 attend LE PORT SSH             (pas « une autorisation d'écriture »)
+ssh/index.php        ⛔ K4 attend LE REPLI NOPASSWD: ALL  (l'arbitrage, pas le correctif)
+/iptables-logs                 à NE PAS porter
+POST /iptables action:"apply"  ✅ défaut de TRACE du portage ACTUEL — n'attend RIEN,
+                               déjà porté, déjà en liste blanche, et la décision est MIENNE
+```
+
+**Il y a bien deux mots à donner. Je les avais mal nommés deux fois de suite** — d'abord
+« une autorisation d'écriture » et « `NOPASSWD: ALL` », puis « aucun mot n'est nécessaire ».
+Ce sont **le port SSH** et **le repli `NOPASSWD: ALL`**, tous deux inscrits comme conditions
+de portage dans les documents des modules.
+
+---
+
 > **C'est la cinquième fois de la semaine que je confonds « faut-il EXERCER ce geste »
 > avec « faut-il le GARDER en v2.0 ».** *Et cette fois-ci l'erreur avait un coût précis :
 > j'ai envoyé l'exploitant délibérer sur deux points qui ne bloquaient rien, pendant que le
