@@ -31,8 +31,8 @@ function chargeLePredicat(mutation) {
         // OUVERTS les deux premieres lignes de tout pare-feu durci.
         const avant = code;
         code = code.replace(
-            "                if (prouveLOuverture(l, portCouvert)) { return true; }\n                continue;",
-            "                if (portCouvert !== false) { return true; }   // MUTATION\n                continue;"
+            "                if (ouvre === true) { return true; }",
+            "                if (portCouvert !== false) { return true; }   // MUTATION"
         );
         if (code === avant) {
             console.error("  ⛔ la mutation n'a rien remplace — l'ancre a bouge, l'epreuve ne prouve RIEN");
@@ -109,6 +109,20 @@ const CAS = [
     ['saut vers une chaine personnalisee — indecidable',
      ':INPUT DROP\n-A INPUT -j MACHAINE', 22, null],
 
+    /* ══ L'AVEU CONTRE L'ACCUSATION — releve en 2e revue ══════════════════
+     * `false` accuse (« ces regles ferment »), `null` avoue (« je ne peux pas
+     * prouver »). Les deux se traitent en REFUS ; seul le MESSAGE differe.
+     * Un garde qui accuse a tort s'use plus vite qu'un garde absent.
+     */
+    ['AVEU — `-i eth0` : indecidable, PAS une accusation',
+     ':INPUT DROP\n-A INPUT -i eth0 -p tcp --dport 22 -j ACCEPT', 22, null],
+
+    ['AVEU — source restreinte sur le bon port : indecidable',
+     ':INPUT DROP\n-A INPUT -s 10.0.0.5 -p tcp --dport 22 -j ACCEPT', 22, null],
+
+    ['ACCUSATION VRAIE — ESTABLISHED sur le bon port : on SAIT qu il n ouvre pas',
+     ':INPUT DROP\n-A INPUT -m state --state ESTABLISHED --dport 22 -j ACCEPT', 22, false],
+
     ['REEL — pare-feu durci complet, et il est SUR',
      ':INPUT DROP\n-A INPUT -i lo -j ACCEPT\n-A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT\n-A INPUT -p tcp --dport 22 -j ACCEPT', 22, true],
 ];
@@ -165,9 +179,18 @@ if (mutation) {
      * Historique de cette valeur, garde volontairement :
      *     1  scelle avant la 1re mutation — FAUX, j'avais deux cas d'ORDRE
      *     2  corrige apres mesure
-     *     4  apres la revue, qui a ajoute quatre cas d'ASYMETRIE
+     *     4  apres la 1re revue, qui a ajoute quatre cas d'ASYMETRIE
+     *     7  apres la 2e revue : les quatre ci-dessus PLUS les trois cas
+     *        « aveu contre accusation », qui exercent la meme branche
+     *
+     * PREDICTION SCELLEE pour 7, ecrite avant de jouer : les quatre cas ou un
+     * ACCEPT sans contrainte de port ne prouve rien (`-i lo`, ESTABLISHED,
+     * source, UDP) et les trois ou il couvre le port sans conclure (`-i eth0`,
+     * `-s` + dport, ESTABLISHED + dport). PAS `-I` ni la chaine custom : ils
+     * passent par le pre-balayage et par la garde de cible, que la mutation ne
+     * touche ni l'un ni l'autre.
      */
-    const attendu = 4;
+    const attendu = 7;
     console.log(`  MUTATION : ${echecs} cas ROUGE (prediction scellee : ${attendu})`);
     if (echecs === attendu) {
         console.log('  ✅ l\'epreuve MORD, et elle mord a l\'endroit prevu');

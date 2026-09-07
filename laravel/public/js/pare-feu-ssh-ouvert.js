@@ -90,27 +90,40 @@
     }
 
     /**
-     * Cet `ACCEPT` PROUVE-T-IL qu'il ouvre le port a une connexion NEUVE ?
+     * Cet `ACCEPT` ouvre-t-il le port a une connexion NEUVE ?
      *
-     * Il faut TOUT : le port nomme et couvert · TCP (ou aucun protocole dit) ·
-     * aucune restriction d'interface ni de source · et si un etat est exige,
-     * qu'il admette `NEW`.
+     * @return {boolean|null}  true  = il l'ouvre, prouve
+     *                         false = il ne l'ouvre PAS, prouve
+     *                         null  = INDECIDABLE d'ici
      *
-     * **Chacune de ces conditions, prise seule, a produit un fail-open mesure.**
+     * ══ POURQUOI TROIS VALEURS ET NON DEUX ═══════════════════════════════
+     *
+     * « ne prouve pas qu'il ouvre » recouvre deux choses tres differentes :
+     *
+     *     -p udp --dport 22        il n'ouvre pas SSH/TCP, et on le SAIT
+     *     --state ESTABLISHED      il n'admet pas de connexion NEUVE, on le SAIT
+     *     -i eth0 / -s 10.0.0.5    il ouvre peut-etre — pour NOTRE chemin
+     *                              d'acces, on ne peut pas le dire
+     *
+     * Les confondre faisait dire a l'ecran « ces regles ferment le port SSH »
+     * sur un jeu qui le laisse ouvert. **C'est une accusation FAUSSE, et un
+     * garde qui accuse a tort s'use plus vite qu'un garde absent** : l'operateur
+     * qui SAIT que son jeu est bon apprend que le garde se trompe, donc a passer
+     * outre. (Ecart releve en revue, 2026-09-07.)
      */
-    function prouveLOuverture(l, portCouvert) {
+    function ouvreLePort(l, portCouvert) {
         if (portCouvert !== true) { return false; }
 
         var proto = l.match(/(?:^|\s)-p\s+(\S+)/);
         if (proto && proto[1].toLowerCase() !== 'tcp') { return false; }
 
-        // `-i eth0` ou `-s 10.0.0.5` : l'ouverture est peut-etre reelle, mais on
-        // ne peut pas prouver qu'elle vaut pour NOTRE chemin d'acces.
-        if (/(?:^|\s)!?\s*-i\s+\S+/.test(l)) { return false; }
-        if (/(?:^|\s)!?\s*-s\s+\S+/.test(l)) { return false; }
-
         var etats = l.match(/--(?:c)?state\s+(\S+)/);
         if (etats && ! /\bNEW\b/i.test(etats[1])) { return false; }
+
+        // INDECIDABLE : l'ouverture est peut-etre reelle, mais rien ici ne dit
+        // si elle vaut pour le chemin par lequel RootWarden joint la machine.
+        if (/(?:^|\s)!?\s*-i\s+\S+/.test(l)) { return null; }
+        if (/(?:^|\s)!?\s*-s\s+\S+/.test(l)) { return null; }
 
         return true;
     }
@@ -145,6 +158,7 @@
 
         var politique = null;
         var vuUneRegle = false;
+        var indecidable = false;
 
         for (var i = 0; i < lignes.length; i++) {
             var l = lignes[i].trim();
@@ -192,9 +206,12 @@
              * bien » et le decouvre au prochain acces.
              */
             if (cible === 'ACCEPT') {
-                // SEULE UNE PREUVE D'OUVERTURE OUVRE. A defaut, cette regle ne
-                // decide pas — on continue de lire.
-                if (prouveLOuverture(l, portCouvert)) { return true; }
+                var ouvre = ouvreLePort(l, portCouvert);
+                // SEULE UNE PREUVE D'OUVERTURE OUVRE.
+                if (ouvre === true) { return true; }
+                // Une ouverture INDECIDABLE ne decide pas non plus — mais elle
+                // interdit de conclure « ces regles ferment » plus bas.
+                if (ouvre === null) { indecidable = true; }
                 continue;
             }
 
@@ -203,10 +220,16 @@
             if (portCouvert !== false) { return false; }
         }
 
-        if (politique === 'DROP' || politique === 'REJECT') { return false; }
+        /*
+         * ⚠ L'AVEU PLUTOT QUE L'ACCUSATION. Si un `ACCEPT` couvrait le port sans
+         * qu'on puisse trancher, on n'a pas le droit de dire « ces regles
+         * ferment » : on dit « je ne sais pas ». Les deux se traitent en REFUS
+         * cote appelant — c'est le MESSAGE qui differe, pas la decision.
+         */
         if (politique === 'ACCEPT') { return true; }
+        if (indecidable) { return null; }
+        if (politique === 'DROP' || politique === 'REJECT') { return false; }
 
-        // Des regles INPUT mais aucune politique lisible : on ne tranche pas.
         return vuUneRegle ? false : null;
     }
 
