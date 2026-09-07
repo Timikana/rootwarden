@@ -34,6 +34,7 @@ use App\Http\Controllers\NotificationsController;
 use App\Http\Controllers\PasserelleController;
 use App\Http\Controllers\PareFeuController;
 use App\Http\Controllers\PermissionsController;
+use App\Http\Controllers\ListeBlancheCveController;
 use App\Http\Controllers\PlanificationsCveController;
 use App\Http\Controllers\PortailController;
 use App\Http\Controllers\RapportConformiteController;
@@ -633,6 +634,35 @@ Route::middleware(['memorisation', 'session.authentifiee', 'session.revoquee', '
         ->middleware(['role:2', 'perm:can_scan_cve'])->whereNumber('id')->name('scan-cve.planifs.supprimer');
     Route::get('/scan-cve/apercu-cron', [PlanificationsCveController::class, 'apercu'])
         ->middleware(['role:2', 'perm:can_scan_cve'])->name('scan-cve.apercu-cron');
+
+    /*
+     * LISTE BLANCHE DES CVE — portage a ISO-PERIMETRE, decision de l'exploitant.
+     *
+     * `legacy/security/index.php` a ete archive en acceptant la perte de cette
+     * capacite. Les TROIS routes backend etaient pourtant restees vivantes et
+     * passent deja la passerelle (`RoutesBackend.php:35` autorise le prefixe
+     * `/cve_`, verifie) : la capacite n'etait pas PERDUE, elle etait SANS
+     * INTERFACE. Ces routes lui en rendent une.
+     *
+     * MEME GARDE QUE LE BACKEND, et c'est deliberé : `cve.py:641` pose
+     * `@require_role(2)` sur les trois. `perm:can_scan_cve` s'y ajoute pour la
+     * meme raison qu'en S4 — la permission garde enfin l'ecriture, la ou le
+     * legacy ne gardait que le role.
+     *
+     * ⚠ ET ELLES NE SONT PAS AJOUTEES A `ADMIN_SEULEMENT`. Ce groupe reserve a la
+     * passerelle des gestes qui touchent une MACHINE (deploiement, revocation,
+     * scan d'utilisateurs distants) ; ici trois routes ecrivent une table, sans
+     * session SSH ni commande systeme. Le backend garde deja `role:2` et c'est
+     * l'autorite ; une seconde declaration ailleurs est precisement ce qui a
+     * diverge du code plusieurs fois dans ce depot.
+     */
+    Route::get('/scan-cve/liste-blanche', [ListeBlancheCveController::class, 'index'])
+        ->middleware(['role:2', 'perm:can_scan_cve'])->name('scan-cve.liste-blanche');
+    Route::post('/scan-cve/liste-blanche', [ListeBlancheCveController::class, 'store'])
+        ->middleware(['role:2', 'perm:can_scan_cve'])->name('scan-cve.liste-blanche.poser');
+    Route::delete('/scan-cve/liste-blanche/{id}', [ListeBlancheCveController::class, 'destroy'])
+        ->middleware(['role:2', 'perm:can_scan_cve'])->whereNumber('id')
+        ->name('scan-cve.liste-blanche.retirer');
 
     /*
      * Suivi de remediation — sous-lot S5.
