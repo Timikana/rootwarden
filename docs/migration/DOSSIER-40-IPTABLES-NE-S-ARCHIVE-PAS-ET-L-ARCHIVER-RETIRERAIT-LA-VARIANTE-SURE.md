@@ -54,10 +54,47 @@ le JS du portage construit `action:'apply'`   ->   0 fois
 > **Archiver `/iptables-apply` retirerait la variante qui TRACE et laisserait
 > vivante celle qui ne trace rien.** *C'est l'inverse de l'intention.*
 
-**Ce n'est PAS un trou de contrôle d'accès** — les gardes sont identiques, et
-`require_machine_access` est présent des deux côtés. *L'exposition est bornée
-aux porteurs de `can_manage_iptables`.* **Le défaut est qu'il existe DEUX chemins
-vers le même effet, dont un seul laisse une version archivée.**
+**Ce n'est PAS un trou de contrôle d'accès** — les gardes sont identiques des
+deux côtés. **Le défaut est qu'il existe DEUX chemins vers le même effet, dont un
+seul laisse une version archivée.**
+
+### ⚠ CORRECTION DU 2026-09-07 20:3x — mon MOTIF était faux
+
+**J'avais écrit : « l'exposition est bornée aux porteurs de
+`can_manage_iptables` PARCE QUE `require_machine_access` est présent des deux
+côtés ».** *La conclusion tient ; le motif désigne le seul des deux gardes qui
+ne la produit pas.* **Relevé par la session 5, vérifié ici :**
+
+```
+backend/routes/helpers.py
+  check_machine_access(machine_id):
+      if role_id >= 2:
+          return True          <- INCONDITIONNEL
+
+  require_permission(...):
+      if role_id >= 3:
+          return func(...)     <- superadmin court-circuite
+```
+
+**L'ensemble réellement habilité :**
+
+| | |
+|---|---|
+| **rôle ≥ 3** | inconditionnel — ni permission, ni accès machine |
+| **rôle 2 + `can_manage_iptables`** | **TOUTES** les machines |
+| rôle 1 + `can_manage_iptables` | ses machines seulement |
+
+> **`require_machine_access` ne mord qu'au rôle 1.** *La borne que j'annonçais
+> vient entièrement de `require_permission` — et elle-même s'arrête au rôle 3.*
+
+*C'est « un garde présent n'est pas un garde qui garde », sur une phrase que
+j'avais écrite pour BORNER une alarme.* **La direction est celle qui rassure, et
+c'est celle où je n'ai pas de contradicteur naturel.**
+
+⚠ **Et la session 5 retire de son côté une formulation trop large** — *« tout
+compte authentifié pouvait faire appliquer un jeu de règles à n'importe quelle
+machine »* — qu'elle avait reprise **d'un docblock, sans la mesurer**. *« Cité »
+n'est pas « vérifié », sur un texte qui allait dans son sens.*
 
 ⚠ **Et la liste blanche est un PRÉFIXE** (`RoutesBackend.php:114` =
 `'/iptables', '/iptables-'`) : *les six `/iptables-*` sont déjà atteignables par
