@@ -29,7 +29,22 @@
  * `LARAVEL_URL` est la MEME source que `menu.php` (huit occurrences) : le
  * portail n'a pas deux adresses selon la page qui le nomme.
  */
-$portail = rtrim(getenv('LARAVEL_URL') ?: 'http://localhost:8444', '/');
+/*
+ * ⚠ LE REPLI NOMMAIT LE LEGACY, C'EST-A-DIRE CETTE PAGE-CI.
+ *
+ * Il valait `http://localhost:8444`. Ce port designait le PORTAGE quand la ligne
+ * a ete ecrite ; depuis l'echange pur du 2026-09-06 il designe le LEGACY
+ * (`docker-compose.yml:87` en avertit : « dater avant d'interpreter »).
+ *
+ * Consequence si `LARAVEL_URL` venait a manquer : la page dont le SEUL role est
+ * d'envoyer un visiteur vers le portage l'aurait renvoye ici. **Une boucle, sur
+ * la page ecrite pour rompre la boucle** — et silencieuse, puisque l'adresse
+ * reste valide et la page repond.
+ *
+ * Le repli vaut desormais le port HTTP du portage, qui redirige vers HTTPS.
+ * Corrige aux 21 sites servis le 2026-09-07.
+ */
+$portail = rtrim(getenv('LARAVEL_URL') ?: 'http://localhost:8080', '/');
 $portail = htmlspecialchars($portail, ENT_QUOTES, 'UTF-8');
 $nom = htmlspecialchars(getenv('APP_NAME') ?: 'RootWarden', ENT_QUOTES, 'UTF-8');
 ?>
