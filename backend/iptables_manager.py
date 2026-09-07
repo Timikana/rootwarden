@@ -20,6 +20,7 @@ Note de sécurité :
 import base64
 import logging
 import re
+import shlex
 
 from config import Config
 from encryption import Encryption
@@ -115,6 +116,27 @@ def _write_rules_safe(client, root_password: str, rules: str, dest_path: str) ->
     ne peut être interprété comme une commande shell (anti-injection).
     La commande distante décode le base64 puis redirige vers le fichier cible.
 
+    ⚠ CE QUE LE BASE64 PROTÈGE, ET CE QU'IL NE PROTÈGE PAS
+    ------------------------------------------------------
+    Il protège ``rules``. **Il n'a jamais protégé ``dest_path``**, qui était
+    interpolé BRUT dans une commande exécutée en root — et le paragraphe
+    ci-dessus se lit comme s'il couvrait toute la commande. *Un commentaire qui
+    ratifie le défaut est pire qu'un défaut sans commentaire : il fait passer la
+    relecture suivante à côté.*
+
+    ``rules``     sûr par CONSTRUCTION  (base64, aucun caractère ne survit)
+    ``dest_path`` sûr par CONVENTION    (les deux appelants passent un littéral)
+
+    **Une sûreté par convention tient tant que personne n'ajoute d'appelant.**
+    Or I5 — application et retour arrière — est précisément le sous-lot qui en
+    ajoute, et toute fonctionnalité qui *dérive* une destination (sauvegarde
+    nommée, fichier d'attente, chemin par machine) transformerait ce paramètre
+    en **injection de commande root**.
+
+    ``shlex.quote`` referme la classe AVANT que le premier appelant dérivé
+    n'existe. Sur les deux chemins littéraux actuels il ne change rien : ils ne
+    portent aucun caractère à échapper, et la commande produite est identique.
+
     Args:
         client:        Client SSH Paramiko connecté au serveur cible.
         root_password: Mot de passe root en clair pour l'élévation de privilèges.
@@ -123,7 +145,7 @@ def _write_rules_safe(client, root_password: str, rules: str, dest_path: str) ->
     """
     encoded = base64.b64encode(rules.encode('utf-8')).decode('ascii')
     execute_as_root(client,
-        f"printf '%s' '{encoded}' | base64 -d > {dest_path}",
+        f"printf '%s' '{encoded}' | base64 -d > {shlex.quote(dest_path)}",
         root_password)
 
 
