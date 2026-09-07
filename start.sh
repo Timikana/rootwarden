@@ -127,6 +127,17 @@ case "${1:-up}" in
         ${DC} --env-file "${ENV_FILE}" ${PROFILE_FLAG} logs "${@:2}"
         ;;
     *)
+        # ── LE NUMERO DE VERSION, AVANT QUE LES CONTENEURS MONTENT ───────────
+        # `legacy/version.txt` n'est plus suivi par git : il est DERIVE du
+        # depot. Deux raisons de le poser ICI et pas ailleurs :
+        #   - le montage est un montage de FICHIER ; sans fichier, Docker cree
+        #     un REPERTOIRE et le montage ne s'accroche plus jamais ;
+        #   - le pied de page des DEUX portails lit ce fichier, monte en
+        #     lecture seule dans chacun.
+        # Le script tolere son propre echec (hors depot git) : voir son en-tete.
+        echo -e "${GREEN}[RootWarden]${NC} Version..."
+        "${SCRIPT_DIR}/scripts/ecrire-version.sh" || true
+
         echo -e "${GREEN}[RootWarden]${NC} Lancement des conteneurs..."
         ${DC} --env-file "${ENV_FILE}" ${PROFILE_FLAG} up "$@"
         ;;

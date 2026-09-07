@@ -206,6 +206,13 @@ if [ "${DEBUG_MODE}" = "true" ]; then
     PROFILE_FLAG="--profile preprod"
     echo -e "  ${YELLOW}DEBUG_MODE=true${NC} -> profile preprod active"
 fi
+# ── Le numero de version, DERIVE, avant que les conteneurs se recreent ───────
+# `git pull` (etape 1) vient de changer le compte de commits : c'est donc ICI
+# que le numero devient juste, et pas avant. Le fichier n'est plus suivi par
+# git — c'est ce script qui le pose, et le montage de fichier EXIGE qu'il
+# existe avant le `up`.
+"${SCRIPT_DIR:-.}/scripts/ecrire-version.sh" || true
+
 run ${DC} --env-file "${ENV_FILE}" ${PROFILE_FLAG} up -d
 
 # ── Etape 5b : restart PHP pour vider l'OPcache ─────────────────────────────
