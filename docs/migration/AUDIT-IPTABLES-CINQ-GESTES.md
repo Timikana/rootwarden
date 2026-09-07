@@ -137,3 +137,89 @@ ecrivent des regles de pare-feu en root sur une machine reelle : se tromper y
 ferme un acces.* **Mon perimetre d'ecriture sur `iptables` tient de l'exploitant
 et ne couvre pas l'exercice d'un geste sur son infrastructure — une carte
 blanche recue par un pair ne me la transmet pas.**
+
+---
+
+## 6. ⚠ CORRECTION DE MA §2.2 — j'ai repris une surestimation, et la borne n'est pas celle qu'on croit
+
+**Le DSI a raison de borner la gravite. Mais sa borne s'appuie sur un garde qui
+ne garde pas, et ma §2.2 reprenait une phrase trop large.**
+
+### 6.1 `require_machine_access` ne borne RIEN au-dessus du role 1
+
+`backend/routes/helpers.py` :
+
+```
+check_machine_access(machine_id):
+    user_id, role_id = get_current_user()
+    if role_id >= 2:
+        return True          # <- inconditionnel
+```
+
+> **« `require_machine_access` est present des DEUX cotes, donc l'exposition est
+> bornee » est vrai de la CONCLUSION et faux du MOTIF.** *Ce decorateur ne mord
+> qu'au role 1. La borne vient entierement de `require_permission`, pas de lui.*
+
+**C'est « un garde present n'est pas un garde qui garde », applique a une phrase
+que j'aurais pu ecrire moi-meme.**
+
+### 6.2 Et `require_permission` est court-circuite au role ≥ 3
+
+```
+if role_id >= 3:
+    return func(*args, **kwargs)   # superadmin bypass, aucune permission requise
+```
+
+**L'ensemble reellement habilite sur les deux chemins d'application est donc :**
+
+    role >= 3                     inconditionnel — ni permission, ni acces machine
+    role 2  + can_manage_iptables toutes les machines (acces machine automatique)
+    role 1  + can_manage_iptables les machines de `user_machine_access` seulement
+
+### 6.3 Ma §2.2 citait le docblock sans le controler
+
+**J'ai repris : *« Tout compte authentifie pouvait faire appliquer par SSH un jeu
+de regles a n'importe quelle machine du parc »*. C'est trop large deux fois :**
+
+- il fallait **`can_manage_iptables`** (ou le role 3), pas seulement etre
+  authentifie ;
+- et le controle ajoute dans le corps **ne restreint que le role 1**, puisque
+  `check_machine_access` rend `True` des le role 2.
+
+> **Je l'ai cite comme une mesure alors que c'etait une affirmation.** *« Cite »
+> n'est pas « verifie » — ma propre regle, appliquee a un docblock qui allait
+> dans mon sens.* ⚠ **Et cette correction RETRECIT ma trouvaille : c'est la
+> categorie que personne ne corrige a ma place.**
+
+### 6.4 Ce qui ne bouge pas
+
+**Le point structurel tient entier, et c'est le seul qui commande l'arbitrage :**
+
+> **Ce garde vit dans le CORPS de la fonction, pas dans son annotation. Aucun
+> inventaire fonde sur les decorateurs ne le voit** — et le mien, hier, ne l'a
+> pas vu non plus. **L'archiver sans le porter perdrait un controle qu'aucune
+> relecture des annotations ne signalerait manquant.**
+
+*Et le defaut de TRACE des deux chemins d'application est confirme sans reserve :
+memes quatre gardes, un seul archive.*
+
+### 6.5 ⛔ « Un compte reel l'occupe-t-il » — je ne peux PAS le mesurer d'ici
+
+    client mysql          absent
+    connecteur python     absent
+    port 3306             non publie (docker-compose.yml)
+    socket docker         permission refusee
+
+**Les quatre voies sont fermees. Ce n'est pas une reserve de style : la question
+centrale de mon mandat reste SANS REPONSE sur ce module.** *La requete qui y
+repond, pour qui a l'acces :*
+
+```sql
+SELECT u.id, u.name, u.role_id
+FROM users u
+LEFT JOIN permissions p ON p.user_id = u.id AND p.can_manage_iptables = 1
+WHERE u.role_id >= 3 OR p.user_id IS NOT NULL;
+```
+
+**Tant qu'elle n'a pas ete passee, « le pouvoir est atteignable » est etabli et
+« quelqu'un l'occupe » ne l'est pas.**
