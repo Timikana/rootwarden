@@ -322,6 +322,52 @@ pourquoi il doit partir en dernier.
 porter du travail sur un fichier condamné — sauf si les deux mots tardent, auquel cas
 l'impasse du 403 mérite une ligne à elle seule.*
 
+## 6 bis. ÉTAT ARRÊTÉ à 22:45 — et j'arrête de rectifier
+
+**Ce dossier porte deux rectifications successives, dont la première était fausse.** Plutôt
+qu'une troisième, voici l'état arrêté avec la provenance de chaque ligne, et c'est celle-ci
+qui fait foi.
+
+| | état | qui l'a établi |
+|---|---|---|
+| **K4 / `ssh/index.php`** | ✅ **portage AUTORISÉ** | **l'exploitant**, 22:20, saisi par la session 5 |
+| **I5 / `iptables/index.php`** | ⛔ attend **le port SSH** | `MODULE-FILTRAGE.md:269`, condition écrite |
+| `/iptables-logs` | ⛔ **à ne pas porter** | `MODULE-FILTRAGE.md:272-275` — aucun writer |
+| `POST /iptables action:"apply"` | ✅ **défaut de trace, n'attend rien** | session 5 · décision MIENNE |
+| le repli `NOPASSWD: ALL` en v2.0 | ⛔ **question ouverte** | `MODULE-SSH.md:212` — non tranchée |
+
+**Sur K4, ce n'est pas mon raisonnement qui a débloqué — c'est que quelqu'un a posé la
+question.** La session 5 a refusé ma consigne, refusé aussi de la résoudre entre pairs, et
+l'a portée à qui elle appartient, avec quatre issues dont « trancher (A) d'abord » et
+« rien sur K4 ». L'exploitant a répondu **« porter le chemin, avec (A) documenté »**, en
+connaissant le repli, nommé, avec sa ligne.
+
+> **Une autorisation n'est utilisable que si la question était précise.** *« Carte blanche »
+> ne débloque rien ; « voici le repli, voici sa ligne, voici quatre issues » débloque.*
+
+Et la séparation qu'elle en tire est la bonne, je la reprends :
+
+```
+TRANCHÉ       (A) ne bloque pas le portage de K4
+PAS TRANCHÉ   le repli NOPASSWD: ALL doit-il rester en v2.0 ?
+```
+
+*Ce ne sont pas la même question, et la réponse à la première ne couvre pas la seconde.*
+
+### Ce que je retiens des trois refus de la soirée
+
+Trois sessions m'ont dit non ce soir : sur l'archivage de `notifications.php`, sur celui
+d'`audit_log.php`, sur le portage d'`iptables`. **Les trois avaient raison, et aucun des
+trois refus ne venait d'une prudence générale** — chacun citait une mesure ou une phrase
+écrite que je n'avais pas relue.
+
+> **Ce qui a arrêté mes fautes ce soir n'est aucune discipline de ma part : c'est qu'un
+> contradicteur avait le droit de refuser.** *Mes trois erreurs étaient toutes du côté
+> rassurant, et une relecture par un pair attrape les fausses alarmes — jamais les
+> dédouanements. Il a fallu qu'on me refuse une consigne, pas qu'on relise un document.*
+
+---
+
 ## 7. Deux constats de bord, qui ne bloquent rien
 
 **`adm/includes/crypto.php` — signalé par `0b`, borné ici.** C'est le seul fichier de
