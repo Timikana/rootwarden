@@ -13329,3 +13329,55 @@ capacites portables et non bloquees   ZERO
 *Onze sur onze le 05/09 ; les deux « dernières » que j'ai ajoutées depuis sont l'une et
 l'autre des chemins qui n'ont jamais existé. Et `PROMPT-FINIR-LES-CAPACITES.md:51` portait
 déjà « ⚠ DÉJÀ PORTÉ … Rien à porter » sur le test de connexion, depuis le 02/09.*
+
+---
+
+## E-465 — LA DOCTRINE DE L'EXPLOITANT TRANCHE QUATRE DES CINQ POINTS
+
+**2026-09-07, 22:58.** *L'exploitant, mot pour mot :*
+
+> **« l'arbitrage c'est iso du legacy et on améliore si on peut améliorer ! ou debug ! »**
+
+**Ce n'est pas une réponse à une question : c'est une règle de décision**, et elle rend
+inutile de lui poser les quatre points suivants séparément.
+
+```
+1  I5 iptables — le PORT SSH        ⛔ RESTE — le seul, et il lui faut sa session
+2  repli NOPASSWD: ALL en v2.0      ✅ ISO : porte a l'identique, ecart declare
+3  import_csv — « trois arbitrages » ✅ SANS OBJET : rendus le 04/09, ET PORTES
+4  interrupteur *_ENABLED geoloc    ✅ « on ameliore si on peut » -> a poser
+5  portee de cle `^/iptables`       ✅ « ou debug » -> a resserrer, avec precaution
+```
+
+### ⛔ Le point 3 n'était pas bloqué, et je l'ai répété tout le tour
+
+`DOSSIER-16` porte **« ✅ LES TROIS DÉCISIONS SONT RENDUES — 2026-09-04 13:55 »**. Et le
+code les honore, vérifié en deux étapes — l'objet d'abord, la mise en œuvre ensuite :
+
+```
+web.php:799-800          POST /comptes/importer  role:2 + can_admin_portal
+ComptesController:143    importer() -> comptes->importeCsv($chemin, $roleAuteur)
+Comptes.php:852-853      $sudo = ($sudoDemande && $roleAuteur >= 3) ? 1 : 0   DECISION 1
+Comptes.php:820,825,831  erreurs[] AVEC son numero de ligne                   DECISION 1
+Comptes.php:756,798      $secrets rendus a l'appelant                         DECISION 2
+Comptes.php:831          imp_err_courriel — l'adresse est exigee              DECISION 2
+```
+
+**Treizième occurrence de la même famille en une soirée, et je l'ai relayée quatre fois
+depuis un texte de mission au lieu de la mesurer.** *« Bloqué sur trois arbitrages » était
+vrai le 3 septembre. Un état se périme ; une phrase de mission, non.*
+
+### ⚠ Ce que la doctrine NE tranche pas, et pourquoi je ne l'étends pas
+
+**Le point 1.** *« Iso du legacy » dirait de porter I5 — le legacy l'a — et « on améliore
+si on peut » dirait Q1–Q4. La doctrine va donc dans le sens de ce que l'exploitant a déjà
+répondu.* **Mais la session sécurité refuse d'écrire sur mon relais**, et elle a raison :
+j'ai relayé il y a cinq heures une autorisation qui n'existait pas.
+
+> **Une règle générale ne se substitue pas à une autorisation nommée quand le geste porté
+> peut couper RootWarden d'une machine définitivement.** *« Iso du legacy » n'est pas
+> « oui pour I5 » — c'est la doctrine qui produirait ce oui, et le produire à sa place est
+> exactement le geste que j'ai déjà commis une fois ce soir.*
+
+**Il lui faut une ligne, dans SA session. C'est tout ce qui reste entre le dépôt et
+l'extinction du legacy.**
