@@ -140,3 +140,55 @@ charge, et la partie dangereuse — `apply`, `restore`, `rollback` — n'a pas �
 
 **Ce qui reste vrai : l'application, elle, attend toujours le mot de
 l'exploitant.**
+
+---
+
+## 7. RE-VÉRIFICATION du correctif (`2579070e`) — 21/21, zéro fail-open
+
+**Rejoué mes dix cas d'origine PLUS douze forgés contre le CORRECTIF lui-même** —
+parce qu'un correctif est du code neuf, et que le relire ne le mesure pas.
+
+```
+   ok  A  les 10 d'origine                       tous corrects
+   ok  B  -m tcp (le MODULE, pas le protocole)   true
+   ok  B  --state NEW,ESTABLISHED                true   (NEW inclus : ouvre)
+   ok  B  -m conntrack --ctstate ESTABLISHED     false  (autre module, meme piege)
+   ok  B  -m multiport --dports 22,80            true
+   ok  B  plage --dport 20:25                    true
+   ok  B  -j accept  /  -p TCP   (casse)         true
+   ok  B  -I INPUT 1 -j DROP  (avec position)    null
+   ok  B  entetes *filter / COMMIT               true
+   ok  B  policy ACCEPT nue · texte vide         true · null
+
+   ok=21   FAIL-OPEN=0   fail-closed=0
+```
+
+**Les cinq fail-open sont fermés, et le correctif ne s'est pas ouvert ailleurs.**
+*Les pièges voisins que j'ai forgés — `-m tcp` confondu avec `-p tcp`, `conntrack`
+au lieu de `state`, la casse, `-I` avec position — sont tous traités.*
+
+### 7.1 ⚠ LE RÉSIDU : un FALSE-CLOSED qui doit se voir dans le MESSAGE
+
+```
+:INPUT DROP
+-A INPUT -i eth0 -p tcp --dport 22 -j ACCEPT       -> predicat : COUPE
+```
+
+**Sur une machine dont SSH arrive par `eth0`, ce jeu garde l'accès ouvert. Le
+prédicat le refuse.** *C'est le prix assumé de « seule une preuve d'ouverture
+ouvre », et c'est le bon prix — un clic contre un déplacement.*
+
+> ⛔ **Mais l'écran ne doit pas dire « vos règles coupent l'accès ».** *Ce serait
+> faux, et l'opérateur qui SAIT que son jeu est bon apprendrait que le garde se
+> trompe — et à passer outre.*
+
+**Q2 exige que la raison soit NOMMÉE. Ici elle doit distinguer deux verdicts :**
+
+    false  « ces regles ferment le port SSH »            -> une accusation, vraie
+    null   « je ne peux pas PROUVER qu'elles le laissent
+            ouvert — restriction d'interface, d'etat ou
+            de source que je ne sais pas evaluer »       -> un aveu, honnete
+
+*Le prédicat rend déjà `null` pour `-I` et les chaînes custom. **Ce cas-ci rend
+`false` alors qu'il relève du second message** — c'est le dernier écart, et il
+est dans le LIBELLÉ, plus dans la logique.*
