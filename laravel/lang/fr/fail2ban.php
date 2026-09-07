@@ -129,6 +129,20 @@ return [
      */
     'geo_desactivee' => "la géolocalisation est désactivée sur ce portail (GEOIP_ENABLED), "
         . "aucune requête n'est partie — ce n'est pas une panne du service.",
+    /*
+     * ⚠ ETEINT, IL N'Y A PAS DE CONSENTEMENT A DEMANDER — IL Y A UN ETAT A DIRE.
+     * `geo_conf_texte` annonce que l'adresse « sera transmise a ip-api.com EN
+     * CLAIR ». Interrupteur eteint, cette phrase est FAUSSE : rien ne part.
+     *
+     * Et elle se trompe du cote PRUDENT, ce qui est precisement ce qui la rend
+     * nuisible : l'exploitant consent, rien ne part, et il apprend que
+     * l'avertissement est du theatre. Ce qui s'use alors n'est pas cette
+     * phrase-la, c'est la credibilite de toutes les autres.
+     */
+    'geo_off_titre' => 'Géolocalisation désactivée',
+    'geo_off_texte' => "Ce portail n'interrogera pas ip-api.com : la géolocalisation est "
+        . "désactivée (GEOIP_ENABLED). Il n'y a donc rien à autoriser — aucune adresse ne "
+        . "sera transmise. Pour la réactiver, changez ce réglage côté serveur.",
     'geo_journal'    => ':ip — :detail',
     'geo_echec'      => "La géolocalisation a échoué. :message",
 

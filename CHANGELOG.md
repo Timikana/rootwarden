@@ -5,6 +5,71 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## E-467 — éteint, il n'y a pas de consentement à demander : il y a un état à annoncer
+
+`geo_conf_texte` prévient que l'adresse « sera transmise à ip-api.com **EN CLAIR** ».
+**Interrupteur `GEOIP_ENABLED` éteint, cette phrase est fausse** : rien ne part.
+
+Et elle se trompe **du côté prudent**, ce qui la rend nuisible : l'exploitant consent, rien ne
+part, et il apprend que l'avertissement est du théâtre. *Ce qui s'use alors n'est pas cette
+phrase-là, c'est la crédibilité de toutes les autres.*
+
+### La source est `/settings/announceable`, pas `env()`
+
+    printenv GEOIP_ENABLED  dans rootwarden_laravel  ->  VIDE
+
+**Le conteneur du portage ne porte pas cette variable.** Un `env('GEOIP_ENABLED', true)`
+rendrait donc **toujours** `true` et mentirait dès que l'exploitant l'éteint — le piège que
+`config/rootwarden.php:131` documente déjà pour `HIBP_ENABLED`. La route rend la valeur
+**effective du process qui exécute la garde**, donc aussi la bonne réponse quand le backend n'a
+pas encore été recréé.
+
+### Trois décisions de sûreté, toutes dans le même sens
+
+**Lecture au moment du CLIC, jamais mise en cache.** Un drapeau gardé pourrait annoncer
+« désactivée » alors que le réglage a été rallumé — donc **promettre que rien ne part pendant
+que des requêtes sortent**. L'inverse ne fait qu'avertir de trop.
+
+**L'inconnu se comporte comme ALLUMÉ.** Le consentement n'est supprimé que si le drapeau vaut
+**explicitement** `false` ; `litGet` rend `null` en cas d'échec et le backend distingue « faux »
+de « je n'ai pas su lire » (`non_resolus`). *Dans le doute, l'avertissement est la phrase
+honnête, parce que la requête peut très bien partir.*
+
+**Éteint, on annonce — on ne se taît pas.** Le panneau s'ouvre avec `{bloque: true}` :
+confirmation désactivée, il n'y a rien à autoriser. *Un bouton qui ne fait rien sans dire
+pourquoi se lit comme une panne, la confusion même que ce geste corrige.*
+
+### La clé devait encore aller dans TROIS endroits
+
+    lang/fr/fail2ban.php · lang/en    `geo_off_titre` + `geo_off_texte`   (203 = 203)
+    Fail2banController                le TRAJET par la liste curatee
+
+### Mesure — 13 assertions, 0 échec, aucune machine jointe, aucun appel sortant
+
+**Le chemin de CLIC complet est exercé cette fois** : machine d'essai (id 3), relevé, jail,
+bouton de géolocalisation, panneau. Tous les `/fail2ban/*` sont interceptés et **stubbés — aucune
+machine n'est jointe** ; toute tentative vers `ip-api.com` est comptée puis avortée : zéro.
+
+    TEMOIN allume  un panneau s'ouvre · il AVERTIT de la transmission en clair
+                   le consentement est OFFERT (confirmer actif)
+    ETEINT         panneau ouvert · titre « desactivee » · le texte NIE la transmission
+                   il NOMME le reglage · AUCUN consentement offert
+                   AUCUN appel a /fail2ban/geoip
+    TEMOIN         les deux etats rendent des textes DIFFERENTS
+
+*Le cas allumé n'est pas décoratif : sans lui, « le panneau de consentement est absent » et « ma
+sonde ne voit pas le panneau » sont la même sortie. Et l'assertion qui compte le plus est
+l'absence d'appel à `/fail2ban/geoip` : la propriété est qu'aucune requête n'est **émise**, pas
+qu'un autre texte s'affiche.*
+
+### ⚠ Régime
+
+La garde backend reste **inerte jusqu'à la recréation du conteneur**. Tant qu'elle ne tourne pas,
+`/settings/announceable` rend `geoip_enabled: true` — donc le panneau de consentement, ce qui est
+**le comportement correct** : la requête partirait bel et bien.
+
+---
+
 ## iptables — les QUATRE portes archivent, et `rollback` cesse de promettre le faux
 
 **Addendum `DOSSIER-47`.** Le lot précédent faisait converger les deux routes portant
