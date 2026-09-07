@@ -13604,3 +13604,62 @@ lourd qu'il ne l'est — et un geste qui paraît lourd se remet à plus tard.*
 **Et la faute est la même que toute la soirée** : j'ai supposé le mécanisme — *« les `.py`
 sont lus au démarrage, donc il faut recréer »* — au lieu de lire les `volumes`. **La première
 moitié est vraie, la conclusion ne s'en déduit pas.**
+
+---
+
+## Relevé de supervision — 2026-09-08 00:35
+
+```
+production 23:35 -> 00:35   17 commits · 6 de CODE · 11 de doc
+doc/code = 1,83             ✅ sous le seuil, DEUXIEME tour de suite
+```
+
+**Et la diversité suit cette fois** : les six commits de code viennent de **trois** sessions
+(`fail2ban` ×3, `iptables` ×2, `pare-feu` ×1), là où le tour précédent en portait sept sur
+huit d'une seule. *Le ratio ne mesure pas ça — je le note parce que c'est ce que le ratio
+prétendait mesurer.*
+
+### ✅ La vérification d'état tient en une ligne
+
+```
+tests/e2e/jetons-interdits.mjs   300 fichiers lus · temoin dans 6 · code 0
+```
+
+*Douze remesures rédigées, remplacées par une assertion qui mord. Le vert tient ENTRE les
+tours, ce qu'aucune remesure ne fait.*
+
+### ⚠ Ce que le renommage des gabarits laisse à découvert
+
+*Q1 renomme `ssh_only` → `ssh_seul` et `deny_all` → `tout_fermer`. Mesuré : les anciens noms
+ne vivent QUE dans le legacy — `iptables/index.php:316-317` comme `<option value=…>` — et
+dans des commentaires. **Le renommage ne casse rien aujourd'hui**, parce que le portage n'a
+pas encore de sélecteur de gabarit.*
+
+**Mais il révèle ce qui manquera :**
+
+```
+legacy   <option value="ssh_only"><?= t('iptables.tpl_ssh_only') ?></option>
+         -> CINQ libelles i18n, un par gabarit
+portage  laravel/lang/{fr,en}/pare-feu.php : AUCUN libelle de gabarit
+```
+
+⛔ **Le jour où le sélecteur se porte, ces cinq libellés devront exister aux TROIS endroits** —
+`lang/fr`, `lang/en`, **et la liste curatée du contrôleur**. *C'est la faute que j'ai commise
+il y a deux heures en n'en nommant que deux : une clé présente dans les deux catalogues mais
+absente du blob rend du VIDE, sans erreur, et un vide se lit comme une panne.*
+
+**Je ne pose pas les libellés maintenant** : cinq clés que rien n'emploie seraient un écran
+sans capacité à l'envers — *une session qui mesurerait « les gabarits sont-ils traduits ? »
+trouverait les clés et conclurait que oui.*
+
+### Ce qui revient à l'exploitant — inchangé, et déjà écrit
+
+*Pas de dossier neuf : les trois actes vivent en `E-467` (la skill piégée) et `E-470` (le
+redémarrage, pas la recréation). Les redire ailleurs les diluerait.*
+
+```
+① docker compose restart python        un correctif de securite et trois de tracabilite
+② .claude/skills/rw-pre-commit:15      elle fait ecrire SANS TRACE dans un fichier servi
+③ le port SSH, dans la session securite  la derniere page legacy
+```
+
