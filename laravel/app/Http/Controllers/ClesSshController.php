@@ -70,7 +70,7 @@ class ClesSshController extends Controller
         // middleware qui l'a valide. Les PERMISSIONS, elles, sont relues en base
         // par `App\Services\Droits` : le legacy porte lui-meme l'avertissement de
         // ne jamais decider d'un droit sur `$_SESSION['permissions']`.
-        $idCompte = (int) $requete->session()->get('user_id', 0);
+        $idCompte = (int) $requete->session()->get('utilisateur_id', 0);
         $role     = (int) $requete->session()->get('role_id', 0);
 
         $machines = $this->parc->machinesVisibles($idCompte, $role);

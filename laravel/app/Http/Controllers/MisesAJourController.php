@@ -28,9 +28,20 @@ class MisesAJourController extends Controller
         $session = $requete->session();
 
         return view('mises-a-jour', [
+            // ⚠ `utilisateur_id`, et le nom compte. `SecondFacteurController:289`
+            // est le SEUL poseur de cle d'identite en session ; ce controleur
+            // lisait `user_id`, que rien ne pose. `$userId` valait donc 0, et
+            // `pourMisesAJour` fait `if ($roleId < 2) join uma WHERE user_id = 0`
+            // — AUCUNE machine rendue au role 1, precisement le role auquel
+            // cette page est ouverte (`web.php:563`, `role:1`).
+            //
+            // POURQUOI PERSONNE NE L'A VU : au role >= 2 la jointure est SAUTEE,
+            // donc l'identifiant n'est jamais employe. **Le defaut est invisible
+            // au role qui teste.** Corrige le 2026-09-07 avec les deux autres
+            // sites (`ClesSshController`, `SupervisionController`).
             'machines' => $machines->pourMisesAJour(
                 (int) $session->get('role_id', 0),
-                (int) $session->get('user_id', 0),
+                (int) $session->get('utilisateur_id', 0),
             ),
             'etiquettes' => $machines->etiquettes(),
         ]);
