@@ -5,6 +5,70 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## iptables — les QUATRE portes archivent, et `rollback` cesse de promettre le faux
+
+**Addendum `DOSSIER-47`.** Le lot précédent faisait converger les deux routes portant
+`action="apply"`. **Il en restait deux**, que le motif de mesure ne pouvait pas voir :
+
+    /iptables-restore    appliquait SANS archiver
+    /iptables-rollback   appliquait SANS archiver
+
+> *Le grain de la mesure doit égaler la question* : elle était « quels chemins **appliquent** »,
+> pas « quelles routes portent `action=apply` ».
+
+### `rollback` est celui qui décidait
+
+    etat courant --rollback--> etat archive N
+    l'etat courant n'est conserve NULLE PART
+    => on revient en arriere, JAMAIS EN AVANT
+
+**Une porte à sens unique habillée en porte réversible est pire qu'une porte à sens unique** —
+l'opérateur clique *parce que* le nom lui promet qu'il pourra défaire. Ce n'est pas une
+fonctionnalité manquante, c'est une **promesse fausse**.
+
+### Un seul chemin, et il archive l'état QUITTÉ
+
+Les quatre routes passent par `_archive_puis_applique()`. Les deux routes `apply` lisent leurs
+règles dans le corps ; `restore` les lit dans `iptables_rules`, `rollback` dans
+`iptables_history` — **elles les passent explicitement, le helper ne devine rien.**
+
+    /iptables            ✅ archive        /iptables-restore    ✅ archive
+    /iptables-apply      ✅ archive        /iptables-rollback   ✅ archive
+
+⚠ **L'archive enregistre l'état QUITTÉ, jamais l'état restauré.** Enregistrer l'état vers
+lequel on va dupliquerait une entrée déjà présente et rendrait la chaîne illisible : *on ne
+saurait plus distinguer « voici où j'étais » de « voici où je vais ».* Deux assertions le
+mesurent nommément.
+
+### Les tests commencent par le chemin qui MARCHE
+
+Les tests historiques de `restore` et `rollback` exercent les gardes, le `history_id` absent et
+la version introuvable — **aucun n'appliquait**. C'est exactement ce qui avait laissé passer un
+`NameError` sur les deux portes `apply` dans le lot précédent.
+
+Deux tests ajoutés qui appliquent pour de vrai, avec témoin positif et **contre-épreuve** : le
+même harnais rend `inserts == []` sur une version vide et `1` sur le chemin nominal — donc
+« zéro archive » n'est pas « zéro mesure ».
+
+    backend   677 passed · 5 skipped · 2 xfailed
+
+⚠ *Cette ligne portait « 675 » — le compte d'AVANT les deux tests de ce lot. Message composé
+dans la commande qui mesurait, pour la sixième fois. Attrapé avant le commit cette fois : la
+parade reste d'exécuter, LIRE, puis écrire dans une commande séparée.*
+
+⚠ **Un piège d'instrument rencontré en écrivant ces tests** : patcher
+`mysql.connector.connect` **globalement** cassait `get_current_user`, qui passe par la même
+fonction — la permission était refusée et le test échouait *pour une raison étrangère à ce
+qu'il mesure*. Seule la référence **du module** est remplacée.
+
+⚠ **Ces tests restent la vérification de l'auteur.** Une attestation indépendante reste due,
+sur ce lot comme sur `be5a30ef`.
+
+⛔ **Inerte jusqu'à la recréation du conteneur** — les `.py` sont lus au démarrage. Le service
+exécute encore l'ancien code ; `pytest` lit le disque.
+
+⛔ **Rien n'a été exercé** : aucune règle appliquée, aucune machine jointe, aucune requête.
+
 ## E-460 (queue portage) — `GEOIP_ENABLED` : « désactivée » ne doit pas se lire « en panne »
 
 Le backend (`f73e28a5`) a posé l'interrupteur du **seul effet sortant qui n'en avait pas** :

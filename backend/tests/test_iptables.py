@@ -207,3 +207,131 @@ class TestLesDeuxPortesArchivent:
         assert resp.status_code == 200
         assert len(appliques) == 1, "l'application doit avoir lieu malgre tout"
         assert inserts == [], "une version vide a ete archivee : le rollback l'ecraserait par du vide"
+
+
+class TestRestoreEtRollbackArchivent:
+    """`/iptables-restore` et `/iptables-rollback` archivent l'etat QUITTE.
+
+    ⚠ COMMENCER PAR LE CHEMIN QUI MARCHE. Les tests historiques de ces deux routes
+    exercent les gardes, le `history_id` absent et la version introuvable — aucun
+    n'applique reellement. C'est exactement ce qui a laisse passer un `NameError`
+    sur les deux portes `apply` : *la couverture ne manquait pas, elle regardait
+    ailleurs.*
+
+    LA PROPRIETE : `rollback` se presente comme REVERSIBLE. Sans archive de l'etat
+    courant, on revient en arriere et JAMAIS EN AVANT — une porte a sens unique
+    habillee en porte reversible.
+    """
+
+    ETAT_COURANT = '*filter\n-A INPUT -j DROP\nCOMMIT\n'
+
+    def _harnais(self, monkeypatch, ligne_historique=None):
+        import routes.iptables as ipt
+
+        inserts, appliques = [], []
+
+        class _Curseur:
+            def __init__(self, dictionary=False):
+                self._d = dictionary
+
+            def execute(self, sql, params=None):
+                self._sql = sql
+                if 'INSERT INTO iptables_history' in sql:
+                    inserts.append(params)
+
+            def fetchone(self):
+                s = getattr(self, '_sql', '')
+                if 'FROM users' in s:
+                    return {'name': 'rw-test-admin'} if self._d else ('rw-test-admin',)
+                if 'FROM iptables_rules' in s:
+                    return {'rules_v4': '*filter\nCOMMIT\n', 'rules_v6': ''}
+                if 'iptables_history h JOIN machines m' in s:
+                    return ligne_historique
+                return None
+
+        class _Conn:
+            def cursor(self, dictionary=False):
+                return _Curseur(dictionary)
+
+            def commit(self):
+                pass
+
+            def close(self):
+                pass
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+        class _Session:
+            def __enter__(self):
+                return MagicMock()
+
+            def __exit__(self, *a):
+                return False
+
+        monkeypatch.setattr(ipt, 'ssh_session', lambda *a, **k: _Session())
+        monkeypatch.setattr(ipt, 'get_iptables_rules', lambda *a, **k: {
+            'file_rules_v4': self.ETAT_COURANT, 'file_rules_v6': '',
+        })
+        monkeypatch.setattr(ipt, 'apply_iptables_rules',
+                            lambda *a, **k: appliques.append(a[2] if len(a) > 2 else None))
+        monkeypatch.setattr(ipt, 'get_current_user', lambda: (14, 3))
+        monkeypatch.setattr(ipt, 'get_db_connection', lambda *a, **k: _Conn())
+        monkeypatch.setattr(ipt, '_resolve_ssh_creds',
+                            lambda d: ('10.0.0.1', 22, 'admin', 'p', 'rp', None, 3, None))
+        # ⚠ PATCHER `mysql.connector.connect` GLOBALEMENT cassait `get_current_user`,
+        # qui passe par la meme fonction : la permission etait refusee et le test
+        # echouait pour une raison ETRANGERE a ce qu'il mesure. On ne remplace donc
+        # que la reference DU MODULE.
+        class _FauxConnector:
+            @staticmethod
+            def connect(**k):
+                return _Conn()
+
+        class _FauxMysql:
+            connector = _FauxConnector
+
+        monkeypatch.setattr(ipt, 'mysql', _FauxMysql)
+        return inserts, appliques
+
+    def test_restore_ARCHIVE_l_etat_quitte(self, client, admin_headers, mock_db, monkeypatch):
+        inserts, appliques = self._harnais(monkeypatch)
+
+        resp = client.post('/iptables-restore', headers=admin_headers, json={
+            'server_ip': '10.0.0.1', 'ssh_user': 'admin',
+            'ssh_password': 'enc', 'root_password': 'enc', 'machine_id': 3,
+        })
+
+        assert resp.status_code == 200, resp.get_data(as_text=True)[:200]
+        assert len(appliques) == 1, "le harnais n'a vu aucune application"
+        assert len(inserts) == 1, "restore a applique SANS archiver l'etat quitte"
+        # C'est bien l'etat QUITTE qui est archive, pas celui qu'on restaure.
+        assert inserts[0][1] == self.ETAT_COURANT, (
+            "l'archive porte l'etat RESTAURE : la chaine ne distingue plus « ou "
+            "j'etais » de « ou je vais »"
+        )
+
+    def test_rollback_ARCHIVE_l_etat_quitte(self, client, admin_headers, mock_db, monkeypatch):
+        ligne = {
+            'id': 7, 'server_id': 3, 'rules_v4': '*filter\nCOMMIT\n', 'rules_v6': '',
+            'ip': '10.0.0.1', 'port': 22, 'user': 'admin', 'password': 'enc',
+            'root_password': 'enc', 'service_account_deployed': 0,
+            'platform_key_deployed': 0,
+        }
+        inserts, appliques = self._harnais(monkeypatch, ligne_historique=ligne)
+        import routes.iptables as ipt
+        monkeypatch.setattr(ipt, 'server_decrypt_password', lambda v: 'clair')
+        monkeypatch.setattr(ipt, 'check_machine_access', lambda *a, **k: True)
+
+        resp = client.post('/iptables-rollback', headers=admin_headers, json={'history_id': 7})
+
+        assert resp.status_code == 200, resp.get_data(as_text=True)[:200]
+        assert len(appliques) == 1, "le harnais n'a vu aucune application"
+        assert len(inserts) == 1, (
+            "rollback a applique SANS archiver : on revient en arriere et jamais "
+            "en avant, alors que le nom promet le contraire"
+        )
+        assert inserts[0][1] == self.ETAT_COURANT, "l'archive porte l'etat RESTAURE"
