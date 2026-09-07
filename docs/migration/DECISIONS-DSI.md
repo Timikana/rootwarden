@@ -13475,3 +13475,93 @@ rendait `0` clé réelle, donc le `0` de `socle_avertissement` ne mesurait rien.
 clés, jeton forgé à 0, déclaration TENUE.* **Zéro sur la sonde ET zéro sur le témoin veut
 dire que la mesure n'a pas eu lieu — y compris quand c'est ma sonde et que le résultat me
 convient.**
+
+---
+
+## E-467 — UNE SKILL PÉRIMÉE FAIT ÉCRIRE, SANS TRACE, DANS UN FICHIER QUE LE CONTENEUR SERT
+
+**2026-09-07, 23:55.** *Signalé par la session qui l'a suivie, après avoir défait son propre
+geste. Vérifié ici.*
+
+```
+.claude/skills/rw-pre-commit/SKILL.md:15
+    « Bump `legacy/version.txt` (SemVer MAJEUR.MINEUR.PATCH). L'auto-tag CI lit ce fichier. »
+
+etat reel
+    .gitignore:162        legacy/version.txt        <- DE-SUIVI depuis aa16c9bb
+    scripts/version.sh    la version DERIVE du depot (jalon + rev-list)
+    ci.yml:486            « la version se derive, elle ne se lit plus »
+    au disque 2.0.183  ·  derive 2.0.237
+```
+
+### Pourquoi c'est un piège et pas une simple obsolescence
+
+**Le fichier est monté en lecture seule dans le conteneur** (`./legacy/version.txt:/var/www/html/version.txt:ro`). Une session qui suit la consigne :
+
+1. écrit dans un fichier **non suivi** — donc `git add` refuse, et **rien n'apparaît dans le dépôt** ;
+2. **change ce que le portail AFFICHE**, immédiatement, par le montage ;
+3. ne laisse **aucune trace** — ni commit, ni diff, ni `git status`.
+
+> **C'est exactement la dérive que `aa16c9bb` avait supprimée, et la consigne la recrée.**
+
+*La session l'a détectée parce que `git add` a refusé et qu'elle est allée lire pourquoi. **Une session qui n'aurait pas vérifié le refus aurait laissé le portail servir un numéro inventé.*** Elle a remis `2.0.183`, vérifié au disque **et dans le conteneur**.
+
+### ⛔ Ce qui revient à l'exploitant
+
+**Je ne modifie pas `.claude/skills/` :** ce n'est pas mon périmètre d'écriture, et c'est un
+fichier d'instructions partagé par huit sessions — le corriger sans mandat reviendrait à
+changer la consigne de tout le monde depuis une seule.
+
+**La correction tient en une ligne** : remplacer le bump manuel par *« la version se dérive —
+ne pas toucher `legacy/version.txt`, il est dé-suivi »*. **Tant qu'elle n'est pas faite, la
+prochaine session qui suit la checklist refera le geste**, et rien ne l'en avertira.
+
+> **Une consigne périmée est plus dangereuse qu'une consigne absente : elle est suivie.**
+
+---
+
+## ⚠ E-468 — MA CONSIGNE NOMMAIT DEUX ENDROITS, IL EN FALLAIT TROIS
+
+*Même soirée, et j'avais appliqué la règle correctement trois heures plus tôt.*
+
+```
+ce que j'ai nomme        lang/fr/fail2ban.php · lang/en/fail2ban.php
+ce qu'il fallait aussi   Fail2banController — la LISTE DES CLES TRANSMISES
+```
+
+`$textes` est une liste **curatée de 127 clés**, pas le catalogue. **Une clé présente dans
+les deux catalogues mais absente de cette liste rend du VIDE au navigateur, sans aucune
+erreur** — et un vide se lit comme « la géolocalisation est cassée », **soit le contraire
+exact de ce que la clé existe pour dire.**
+
+**Ce dépôt a déjà payé cette faute** : une clé existant dans les deux catalogues et ne
+voyageant pas, si bien que toute réussite s'écrivait en ligne vide. *Et je l'avais
+appliquée moi-même à 21:46 en portant `/bashrc/prerequisites* — j'avais écrit « sans ce
+voyage, la confirmation s'ouvrirait VIDE, et un vide ne ressemble pas à un défaut de
+traduction ».
+
+> **Je connaissais la règle, je l'avais exercée le soir même, et je ne l'ai pas transmise.**
+> *Une règle qu'on applique n'est pas une règle qu'on transmet — ce sont deux gestes, et le
+> second ne suit pas du premier.*
+
+La session l'a trouvée seule, en vérifiant le TRAJET de la clé plutôt que sa présence.
+
+---
+
+## ✅ E-469 — UN AVERTISSEMENT DE CONSENTEMENT QUI DEVIENT FAUX
+
+```
+lang/fr/fail2ban.php:98   geo_conf_texte
+  « L'adresse :ip sera transmise a ip-api.com, un service tiers, EN CLAIR »
+```
+
+**Interrupteur éteint, rien n'est transmis. L'avertissement est faux.**
+
+*Il l'est dans le sens prudent — il annonce pire que la réalité — et c'est précisément ce
+qui le rend nuisible :* **l'opérateur consent à une transmission, rien ne part, et il
+apprend que l'avertissement est du théâtre.** *C'est la même érosion qu'un garde qui accuse
+à tort : ce qui s'use n'est pas la phrase, c'est la crédibilité de toutes les autres.*
+
+**Arbitrage : la page lit `geoip_enabled` (`settings.py:104`) avant d'afficher le panneau de
+consentement.** Éteint, il n'y a pas de consentement à demander — il y a un état à annoncer.
+*Confié à la session qui l'a signalé ; c'est son périmètre et le correctif est d'une lecture.*
