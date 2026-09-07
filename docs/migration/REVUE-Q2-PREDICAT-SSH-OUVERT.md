@@ -374,3 +374,63 @@ un refus, et sur la première il produit une accusation fausse.*
 **Zéro fail-open sur 48 jeux forgés en cinq rondes.** *La garde n'a jamais laissé
 passer un jeu qui coupe. Les défauts restants sont tous du côté qui refuse — et
 c'est le bon côté pour un défaut.*
+
+---
+
+## 11. HUITIÈME RONDE (`a56fb33f`) — la divergence est SAINE, et c'est moi qui avais tort
+
+**Quinze jeux forgés pour UN objectif : trouver un fail-open À TRAVERS
+l'imbrication.** *C'était la seule question ouverte — une divergence assumée dans
+le sens permissif, sur une garde de sécurité.*
+
+```
+FAIL-OPEN = 0        ecarts = 0 / 15
+```
+
+**Le lot discrimine** — *6 attendus `true`, 5 `false`, 4 `null` : il ne peut pas
+passer par uniformité.*
+
+### 11.1 Ce que la chasse a vérifié
+
+```
+DROP avant le saut dans la chaine        -> false   la chaine ne sauve pas
+chaine interne accepte un AUTRE port     -> false
+chaine interne ACCEPT restreint SOURCE   -> null    « peut-etre » TRAVERSE
+chaine interne ACCEPT restreint -i       -> null    idem
+RETURN puis DROP dans l'appelante        -> false   le retour est suivi
+RETURN puis ACCEPT dans INPUT            -> true    idem, dans l'autre sens
+trois niveaux A -> B -> C                -> null    la garde de profondeur coupe
+chaine interne accepte en UDP            -> false
+chaine NON definie au niveau 2           -> null
+```
+
+> **Les trois sémantiques — ouvre, ferme, peut-être — se propagent correctement
+> à travers l'imbrication, et la garde coupe là où elle ne peut plus suivre.**
+
+### 11.2 ⚠ Ma prudence était une SUPPOSITION, pas une mesure
+
+**J'attendais `null` sur deux niveaux. Le prédicat rend `true`, et il a raison.**
+
+*Je n'avais pas d'argument : j'avais une réticence. « Deux niveaux, ça sent le
+piège » n'est pas un raisonnement, et l'auteur a eu raison de me demander de
+mesurer plutôt que de le croire — le résultat lui donne raison à lui.*
+
+> **Troisième fois dans ce fil qu'une de mes attentes s'écarte du code, et la
+> troisième fois c'est mon attente qui est fausse.** *Deux fois j'étais trop
+> permissive, une fois trop prudente.* **Un relecteur qui se trompe TOUJOURS dans
+> le même sens serait corrigible par un décalage ; se tromper dans les deux sens
+> veut dire qu'il n'y a pas de correction — il faut exécuter.**
+
+### 11.3 Clôture de la revue
+
+```
+huit rondes · 63 jeux forges · ZERO fail-open
+neuf defauts trouves, AUCUN par relecture
+```
+
+**La garde est saine, et sa divergence assumée est mesurée.** *Je clos.*
+
+⛔ **Et le fait qui prime sur tout ce document** : *cette garde n'est chargée par
+aucune page, et le geste qu'elle protège n'existe pas.* **Tant que le port SSH
+n'est pas arbitré, Q2 est un fichier juste qui ne garde rien — et aucune ronde de
+revue ne corrige cela.**
