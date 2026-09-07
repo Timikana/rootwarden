@@ -199,6 +199,99 @@
             </section>
         @endif
 
+    {{-- ══ LISTE BLANCHE DES CVE — portage a ISO-PERIMETRE ══════════════════
+
+         `legacy/security/index.php` a ete archive en acceptant la perte de
+         cette capacite. Ses trois routes backend etaient pourtant restees
+         VIVANTES et passent deja la passerelle : elle n'etait pas perdue,
+         elle etait SANS INTERFACE. Cette section lui en rend une.
+
+         MEME GARDE QUE LA PLANIFICATION, et pour la meme raison : le bloc
+         n'est pas rendu en dessous du role 2, donc le script ne s'initialise
+         pas et aucun appel refuse n'est emis a l'affichage. --}}
+    @if ($peutBlanchir)
+        <section class="rw-section" id="liste-blanche">
+            <div class="rw-section__entete">
+                <h2 class="rw-sous-titre-fort">{{ __('liste_blanche.titre') }}</h2>
+                <span class="rw-aide" data-rw="lb-compte"></span>
+            </div>
+            <p class="rw-aide rw-prose">{{ __('liste_blanche.description') }}</p>
+
+            <div class="rw-carte rw-carte--pleine">
+                <div class="rw-barre-filtres">
+                    <label class="rw-etiquette-champ">
+                        <span class="rw-champ__etiquette">{{ __('liste_blanche.champ_cve') }}</span>
+                        {{-- `pattern` et `maxlength` sont des gardes du NAVIGATEUR : ils
+                             evitent une frappe malheureuse, ils ne controlent rien.
+                             `ListeBlancheCve::valide()` tranche, et lui seul. --}}
+                        <input type="text" class="rw-saisie rw-saisie--compacte"
+                               placeholder="CVE-2024-1234" maxlength="20"
+                               pattern="CVE-[0-9]{4}-[0-9]{4,7}"
+                               title="{{ __('liste_blanche.champ_cve_aide') }}"
+                               data-rw="lb-cve">
+                    </label>
+                    <label class="rw-etiquette-champ">
+                        <span class="rw-champ__etiquette">{{ __('liste_blanche.champ_machine') }}</span>
+                        <select class="rw-saisie rw-saisie--compacte"
+                                title="{{ __('liste_blanche.champ_machine_aide') }}"
+                                data-rw="lb-machine">
+                            {{-- L'option GLOBALE est offerte, mais elle n'est PAS le
+                                 defaut : elle blanchit tout le parc, et un defaut a
+                                 portee maximale se choisit sans y penser. --}}
+                            @foreach ($machines as $m)
+                                <option value="{{ $m->id }}">{{ $m->name }}</option>
+                            @endforeach
+                            <option value="">{{ __('liste_blanche.machine_toutes') }}</option>
+                        </select>
+                    </label>
+                    <label class="rw-etiquette-champ">
+                        <span class="rw-champ__etiquette">{{ __('liste_blanche.champ_expiration') }}</span>
+                        <input type="date" class="rw-saisie rw-saisie--compacte"
+                               title="{{ __('liste_blanche.champ_expiration_aide') }}"
+                               data-rw="lb-expiration">
+                    </label>
+                    <label class="rw-etiquette-champ rw-etiquette-champ--case">
+                        <input type="checkbox" data-rw="lb-sans-expiration">
+                        <span class="rw-champ__etiquette">{{ __('liste_blanche.champ_sans_expiration') }}</span>
+                    </label>
+                </div>
+
+                <label class="rw-etiquette-champ rw-etiquette-champ--large">
+                    <span class="rw-champ__etiquette">{{ __('liste_blanche.champ_motif') }}</span>
+                    <input type="text" class="rw-saisie" maxlength="500"
+                           title="{{ __('liste_blanche.champ_motif_aide') }}"
+                           data-rw="lb-motif">
+                </label>
+                <p class="rw-aide">{{ __('liste_blanche.champ_motif_aide') }}</p>
+
+                <div class="rw-actions">
+                    <button type="button" class="rw-bouton rw-bouton--primaire" data-rw="lb-poser">
+                        {{ __('liste_blanche.poser') }}
+                    </button>
+                </div>
+
+                <div data-rw="lb-annonce" aria-live="polite"></div>
+
+                <div class="rw-tableau-defilant">
+                    <table class="rw-tableau">
+                        <thead>
+                            <tr>
+                                <th scope="col">{{ __('liste_blanche.col_cve') }}</th>
+                                <th scope="col">{{ __('liste_blanche.col_portee') }}</th>
+                                <th scope="col">{{ __('liste_blanche.col_motif') }}</th>
+                                <th scope="col">{{ __('liste_blanche.col_auteur') }}</th>
+                                <th scope="col">{{ __('liste_blanche.col_echeance') }}</th>
+                                <th scope="col">{{ __('liste_blanche.col_pose') }}</th>
+                                <th scope="col"><span class="rw-invisible">{{ __('liste_blanche.retirer') }}</span></th>
+                            </tr>
+                        </thead>
+                        <tbody data-rw="lb-corps"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    @endif
+
         <section class="rw-section">
             <div class="rw-section__entete">
                 <h2 class="rw-sous-titre-fort">{{ __('cve.section_serveurs') }}</h2>
@@ -470,8 +563,14 @@
     @if ($peutPlanifier)
         <script id="planif-libelles" type="application/json">@json($libellesPlanif)</script>
     @endif
+    @if ($peutBlanchir)
+        <script id="lb-libelles" type="application/json">@json($libellesListeBlanche)</script>
+    @endif
     <script src="/js/scan-cve.js?v={{ @filemtime(public_path('js/scan-cve.js')) ?: '0' }}"></script>
     @if ($peutPlanifier)
         <script src="/js/planification-cve.js?v={{ @filemtime(public_path('js/planification-cve.js')) ?: '0' }}"></script>
+    @endif
+    @if ($peutBlanchir)
+        <script src="/js/liste-blanche-cve.js?v={{ @filemtime(public_path('js/liste-blanche-cve.js')) ?: '0' }}"></script>
     @endif
 @endsection

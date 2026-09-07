@@ -198,6 +198,22 @@ class TableDesGardes
             ['GET', 'sauvegardes', ['role:2', 'perm:can_admin_portal']],
             ['GET', 'scan-cve', ['role:1', 'perm:can_scan_cve']],
             ['GET', 'scan-cve/apercu-cron', ['role:2', 'perm:can_scan_cve']],
+            /*
+             * LISTE BLANCHE DES CVE — portage a ISO-PERIMETRE (2026-09-07).
+             *
+             * `legacy/security/index.php` a ete archive en acceptant la perte de
+             * cette capacite ; l'exploitant a tranche pour un portage a
+             * iso-perimetre. Les trois routes backend etaient restees VIVANTES et
+             * passaient deja la passerelle : la capacite n'etait pas perdue, elle
+             * etait SANS INTERFACE.
+             *
+             * `role:2` reprend la garde du backend (`cve.py:641`,
+             * `@require_role(2)` sur les trois) ; `perm:can_scan_cve` s'y ajoute
+             * comme sur le reste du module — le legacy ne gardait que le role.
+             */
+            ['GET', 'scan-cve/liste-blanche', ['role:2', 'perm:can_scan_cve']],
+            ['POST', 'scan-cve/liste-blanche', ['role:2', 'perm:can_scan_cve']],
+            ['DELETE', 'scan-cve/liste-blanche/{id}', ['role:2', 'perm:can_scan_cve']],
             ['GET', 'scan-cve/comparaison', ['role:1', 'perm:can_scan_cve']],
             ['GET', 'scan-cve/planifications', ['role:2', 'perm:can_scan_cve']],
             ['POST', 'scan-cve/planifications', ['role:2', 'perm:can_scan_cve']],
