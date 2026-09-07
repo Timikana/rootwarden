@@ -9,7 +9,7 @@ Routes (toutes superadmin only - role_id=3) :
     POST /policy/sftp/audit        - Lit le bloc Match User actuel
     POST /policy/sftp/remove       - Supprime le bloc Match User
     POST /policy/rollback          - Restaure le contenu d'un deploiement passe
-    GET  /policy/deployments       - Liste l'historique pour (machine, user, type)
+    (GET /policy/deployments a ete RETIREE : zero appelant, verifie sur l'arbre entier — E-459.)
     GET  /policy/list              - Liste toutes les politiques configurees en BDD
 
 Securite (audit OWASP) :
