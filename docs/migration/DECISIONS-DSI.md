@@ -13283,3 +13283,49 @@ tranche par ailleurs.
 ⛔ la portee de cle `^/iptables`, seule des treize sans separateur
 ✅ DOSSIER-47 : converger les deux portes d'application — decide, a ecrire
 ```
+
+### ⛔ ET MA REGLE DES TROIS SECONDES ETAIT INSUFFISANTE — la correction est d'un pair
+
+*Je l'avais écrite ainsi : « jouer `geste-porte.py` avec ses deux témoins avant
+d'assigner ». **Je l'ai tenue en assignant, et j'ai eu un faux `ABSENT` quand même.***
+
+> **L'outil a dit VRAI les deux fois.** *`/drift_scan` EST absent — **en tant que chemin**.
+> Il n'a jamais existé. L'outil répond « ce CHEMIN est-il appelé ? », il ne répond JAMAIS
+> « cette CAPACITÉ est-elle portée ? ». Lui donner un chemin qui n'a jamais existé rend
+> `ABSENT` avec une exactitude parfaite, et ne veut rien dire.*
+
+**Ce n'est donc pas un défaut de discipline : c'est un défaut de la règle.** Et le pas qui
+manquait est aussi court que celui que j'avais écrit :
+
+```
+1.  le chemin interroge EXISTE-t-il cote backend ?   (@bp.route)
+2.  seulement alors : est-il APPELE cote portage ?
+```
+
+**Vérifié sur mes deux faux `ABSENT`**, avec garde-fou de population :
+
+```
+[temoin] 202 routes @bp.route relevees   (la sonde echoue si < 100)
+
+/drift_scan               etape 1 : N'EXISTE PAS  -> la question n'a pas d'objet
+/server_test_connection   etape 1 : N'EXISTE PAS  -> la question n'a pas d'objet
+/drift/scan               etape 1 : OUI, drift.py:121        <- la vraie route
+/server_status            etape 1 : OUI, monitoring.py:57     <- la vraie route
+```
+
+> **Mes deux témoins validaient que l'outil sait dire oui et non. Ils ne validaient pas
+> que la QUESTION a un objet.** *Un témoin encadre l'instrument ; il n'encadre pas
+> l'énoncé.*
+
+**Et c'est la même forme que ce qui a fait dormir `comptes-distants` cinq jours** :
+chercher le nom qu'on a en tête plutôt que l'artefact qui existe.
+
+### La mission est CLOSE
+
+```
+capacites portables et non bloquees   ZERO
+```
+
+*Onze sur onze le 05/09 ; les deux « dernières » que j'ai ajoutées depuis sont l'une et
+l'autre des chemins qui n'ont jamais existé. Et `PROMPT-FINIR-LES-CAPACITES.md:51` portait
+déjà « ⚠ DÉJÀ PORTÉ … Rien à porter » sur le test de connexion, depuis le 02/09.*
