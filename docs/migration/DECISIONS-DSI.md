@@ -13863,3 +13863,60 @@ résidu de migration : c'est une surface.**
 *Ce n'est pas un arbitrage que je rends ce soir. C'est une question que je devais poser il y
 a quatre heures et que ma mesure fausse m'a empêchée de voir.*
 
+---
+
+## Relevé de supervision — 2026-09-08 01:35
+
+```
+production 00:35 -> 01:35   7 commits · 0 de CODE · 7 de doc
+doc/code = ∞                ⚠ AU-DESSUS DU SEUIL
+```
+
+### L'attaquer, pas le décrire
+
+**La cause n'est pas du bavardage, et je le dis avec la mesure plutôt qu'en défense :**
+
+```
+4 des 7 sont de moi  E-471 · E-472 · E-473 · le releve de 00:35
+3 sont le cycle d'attestation  Q1 attestee, puis DEUX auto-corrections du relecteur
+```
+
+**`E-473` est la plus grosse correction de la session** — *ma thèse centrale, répétée à
+l'exploitant à chaque tour, était fausse* — **et elle a demandé une mesure, pas du code.**
+*Une heure qui découvre que l'heure précédente s'est trompée produit de l'analyse ; c'est le
+prix de la correction, pas son alibi.*
+
+⚠ **Mais ça n'excuse pas zéro.** *Le vrai fait est que je n'avais plus de travail de code
+identifié — et « je n'en ai pas trouvé » n'est pas « il n'y en a pas ».*
+
+### ✅ Ce que la mesure a débloqué, et c'est du code
+
+**`E-473` a désigné le seul levier qui ne dépend d'aucun arbitrage** : les 19 racines
+atteignables par un navigateur. **Deux d'entre elles peuvent tomber tout de suite.**
+
+```
+legacy/adm/includes/   AUCUN .htaccess, alors que includes/ et lang/ en ont un
+  audit_log.php   127 l · 0 sortie HTML · 4 fonctions    -> un INCLUS, pas une page
+  crypto.php      308 l · 0 sortie HTML · 12 fonctions   -> idem
+appels HTTP vers l'un ou l'autre : 0   (TEMOIN+ : 5 hx-post vers notifications.php)
+INVENTAIRE.md:200-201 : les deux rendent « 200, 0 octet »
+```
+
+**Et l'objection que j'avais opposée à ce deny il y a quatre heures est tombée** :
+`server_actions.php`, le fichier appelé par `fetch()` qui interdisait un refus global, **est
+archivé**.
+
+> **Une objection juste se périme comme un chiffre.** *Je l'avais posée, elle était fondée,
+> et je ne l'ai pas remesurée avant de la reconduire — c'est exactement ce que la consigne de
+> supervision demande d'éviter, appliqué à un argument plutôt qu'à un compte.*
+
+**Confié à la session sécurité, avec la réserve qui compte** : *si sa sonde trouve un appel
+que la mienne n'a pas vu — ma liste de formes est `fetch|hx-|href|action=|curl|XHR|$.ajax`,
+et une forme non listée lui échapperait — elle doit refuser d'écrire.*
+
+### ③ Déclaration d'état
+
+```
+tests/e2e/jetons-interdits.mjs   code 0
+```
+
