@@ -196,3 +196,77 @@ deux pour que le remède — converger plutôt que retirer — devienne visible.
 **Voir aussi** DOSSIER-40 (les quatre gestes `iptables`, et `/iptables-logs` qui ne se
 porte pas) · `E-463` (l'arbitrage I5, rendu par l'exploitant, Q1–Q4 obligatoires) ·
 `SPEC-MESURE-Q2-REFUS-AVANT-ENVOI.md` (Q2 est un garde d'INTERFACE, pas une impossibilité).
+
+---
+
+# ⚠ ADDENDUM 23:50 — ELLES SONT QUATRE, ET DEUX RESTENT SANS TRACE
+
+**La convergence est faite** (`be5a30ef`) : `_archive_puis_applique()` porte le bloc, il n'a
+pas été recopié, et il ne reste qu'**un** `INSERT INTO iptables_history` dans le fichier.
+Vérifié.
+
+**Mais mon dossier ne parlait que de deux portes. Il y en a quatre.**
+
+```
+/iptables            :132   ✅ archive
+/iptables-apply      :192   ✅ archive
+/iptables-restore    :224   ⛔ APPLIQUE SANS ARCHIVER
+/iptables-rollback   :284   ⛔ APPLIQUE SANS ARCHIVER
+```
+
+*J'ai mesuré les deux routes qui portaient le même verbe `apply` et j'ai cru avoir mesuré
+les chemins d'application.* **`restore` et `rollback` appliquent aussi — par d'autres verbes,
+donc mon motif ne les a pas vues.** C'est la forme que je corrige chez les autres depuis
+deux jours : *le grain de la mesure doit égaler la question.* La question était « quels
+chemins appliquent », pas « quelles routes portent `action=apply` ».
+
+## ✅ L'ARBITRAGE : les quatre archivent, par le MÊME chemin
+
+**Et `rollback` est le cas qui décide, parce qu'il se présente comme réversible.**
+
+```
+etat courant  --rollback--> etat archive N
+              l'etat courant n'est conserve NULLE PART
+=> on peut revenir en arriere, jamais revenir EN AVANT
+```
+
+> **Une porte à sens unique habillée en porte réversible est pire qu'une porte à sens
+> unique** — l'opérateur clique parce que le nom promet qu'il pourra défaire.
+
+*L'iso-périmètre ne l'exige pas : le legacy n'archive pas davantage sur ces deux chemins.*
+**Mais la règle de l'exploitant dit « ou debug », et c'en est un** : la capacité annonce une
+réversibilité qu'elle n'a pas. Ce n'est pas une fonctionnalité manquante, c'est une promesse
+fausse.
+
+⚠ **Contrainte de conception, à écrire avec le geste :** l'archive doit enregistrer l'état
+**QUITTÉ**, jamais l'état restauré. *Enregistrer l'état restauré dupliquerait une entrée déjà
+présente et rendrait la chaîne illisible — on ne saurait plus distinguer « voici où j'étais »
+de « voici où je vais ».*
+
+## ⚠ ET LE FAIT LE PLUS INSTRUCTIF DU LOT N'EST PAS L'ARCHIVE
+
+**Le premier jet du refactor levait `NameError` sur LES DEUX portes. La suite est restée
+entièrement verte — 672 tests.**
+
+```
+seize tests couvrent `iptables`   les gardes · les parametres absents
+le chemin nominal `apply` avec des regles valides   JOUE PAR PERSONNE
+```
+
+> **Une suite qui couvre les gardes et les paramètres absents peut être verte sur une route
+> dont le chemin nominal ne s'exécute pas.**
+
+**C'est exactement la forme du défaut `user_id` de ce soir** — invisible au rôle 2 parce que
+la jointure est sautée au-dessus. *Dans les deux cas la couverture ne manquait pas : elle
+regardait ailleurs.* **Et dans les deux cas, ce qui manquait était le cas le plus banal.**
+
+## ⛔ Ce qui reste dû
+
+**Les trois tests écrits avec ce lot sont une vérification d'AUTEUR, pas une certification.**
+*La règle de flotte vaut contre son auteur comme contre tout le monde : qui écrit un
+correctif ne certifie pas qu'il est là.* Une attestation indépendante reste due sur
+`be5a30ef`.
+
+**Et le service exécute encore l'ancien code** : `pytest` lit le disque, donc les 675 verts
+portent sur le fichier. La recréation appartient à l'exploitant.
+
