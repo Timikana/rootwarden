@@ -270,3 +270,77 @@ correctif ne certifie pas qu'il est là.* Une attestation indépendante reste du
 **Et le service exécute encore l'ancien code** : `pytest` lit le disque, donc les 675 verts
 portent sur le fichier. La recréation appartient à l'exploitant.
 
+---
+
+# ⛔ ADDENDUM 2 — L'ÉCHEC D'ARCHIVAGE EST INVISIBLE, ET C'EST LE DÉFAUT QUE CE DOSSIER FERMAIT
+
+**Trouvé par l'attestation indépendante** (`71ba8a7a`), sur du code que son auteur n'avait
+pas écrit. *Les quatre propriétés que j'avais demandées tiennent ; c'est un cinquième point,
+que je n'avais pas su demander.*
+
+```
+except Exception as hist_err:
+    logger.warning("Iptables history save failed: %s", hist_err)
+apply_iptables_rules(...)
+return jsonify({"success": True, "message": message})     <- :139
+```
+
+**Base injoignable → l'archivage échoue → l'application A LIEU → la réponse est octet pour
+octet celle du succès.** Aucun champ ne la distingue, et aucun test n'exerce ce chemin.
+
+> **C'est exactement le trou que ce correctif existait pour supprimer**, recréé par un hoquet
+> de la base. *Mon propre docblock : « une archive avec un trou est plus dangereuse qu'une
+> archive absente : l'absence se voit, le trou se lit comme une continuité. »* **Le chemin
+> d'exception en fabrique un, en silence.**
+
+⚠ **Et c'est sur `rollback` que ça coûte le plus — la route dont TOUT l'argument est la
+réversibilité.** *Un rollback dont l'archivage a échoué redevient une porte à sens unique, et
+l'écran annonce « Règles restaurées ».*
+
+## ✅ ARBITRAGE : SIGNALER, JAMAIS BLOQUER
+
+**Ne pas bloquer l'application est le bon choix, et il n'est pas un compromis :**
+
+*L'archive sert la TRAÇABILITÉ ; l'application sert la DISPONIBILITÉ.* **Rendre un pare-feu
+inmodifiable parce qu'une table de journal est injoignable ferait de la garde la chose qui
+empêche de se rétablir.** *Et sur `rollback`, bloquer enfermerait l'opérateur dans l'état
+cassé qu'il cherche précisément à quitter — le remède serait pire que le mal qu'il traite.*
+
+**Mais que l'appelant ne puisse pas le SAVOIR n'est défendable en rien.**
+
+```
+la reponse porte `archive: false` quand l'archivage a echoue
+l'ecran le DIT — pas dans un journal, dans la reponse au geste
+```
+
+*C'est un champ, pas une refonte.* **Et il doit être lu côté portage : un `archive: false`
+qu'aucun écran n'affiche laisse le défaut entier.**
+
+## ✅ ARBITRAGE : rendre le second angle mort INEXPRIMABLE
+
+**Le contrôle de vacuité vit SOUS le `if rules_v4 is None`.** Un appelant passant
+`rules_v4=''` explicitement l'évite, et applique un jeu vide — ce qui viderait le pare-feu.
+
+```
+/iptables-restore   :262   controle avant de deleguer   ✔
+/iptables-rollback  :350   controle avant de deleguer   ✔
+=> DORMANT aujourd'hui
+```
+
+**Sûr par CONVENTION, pas par construction — la forme exacte de `dest_path` en SEC-015 :
+une cinquième porte ne serait forcée par rien.** *Un `if not (rules_v4 or '').strip():
+return 400` en TÊTE du délégué, hors du `if`, le rend inexprimable.*
+
+> **Deux gardes en amont valent moins qu'une garde en aval, parce qu'il faut les répéter et
+> qu'on ne répète pas ce qu'on ne voit pas.**
+
+## Ce que l'attestation a établi et que je n'avais pas su demander
+
+**Mes quatre propriétés portaient sur ce que le code FAIT quand tout va bien.** *Aucune ne
+demandait ce qu'il DIT quand une partie échoue.* **Le cinquième point est de la session qui
+a attesté, et il vaut les quatre autres réunis.**
+
+⚠ **Et son attestation est STATIQUE, elle le déclare** : elle atteste que le code **sur le
+disque** porte les quatre propriétés. *Qu'aucune lecture ne peut attester : que le service
+les exécute.* **Le process backend a démarré à 14:53 ; ces commits sont de 23:44 et après.**
+
