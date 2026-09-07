@@ -148,14 +148,66 @@ portage.* Ici il ne le précède pas.
           il part avec le VHOST
 ```
 
-1. **Le mot qui libère `iptables/index.php`.** DOSSIER-40 : l'archiver retirerait la
-   variante qui TRACE. C'est une autorisation d'écriture, pas un portage.
-2. **Le mot qui libère `ssh/index.php`.** K4, l'arbitrage `NOPASSWD: ALL` (DOSSIER-42 :
-   le verrou se scinde en deux, un seul est le vôtre). ⚠ Rappel : un déploiement lancé
-   aujourd'hui **révoquerait des accès** — il ne « ferait pas rien ».
+> ## ⛔ RECTIFICATION DU 2026-09-07 22:25 — LES DEUX MOTS N'EN SONT PAS
+>
+> **Ce que j'ai écrit ci-dessus est faux, et le titre de ce dossier avec.** J'ai relu mes
+> propres dossiers au lieu de me souvenir de ce que je croyais y avoir écrit. Ils disent
+> l'inverse de ce que je venais de transmettre à l'exploitant.
 
-**Tout le reste tombe derrière, sans autre arbitrage.** C'est la première fois depuis le
-début du chantier que la liste des blocages tient en deux lignes.
+**DOSSIER-40 §④, sur `iptables` :**
+
+```
+porter les quatre gestes    « décidé ici »
+les deux chemins            « Indépendant de l'extinction : c'est vrai aujourd'hui »
+```
+
+Le portage est **décidé, par moi, il y a trois heures.** Ce qui attend l'exploitant est
+l'*exercice* d'un geste sur une machine — pas son portage. **Ce sont deux questions
+différentes, et c'est exactement la confusion que DOSSIER-43 m'attribuait déjà.**
+
+**DOSSIER-42 §④, sur K4 :**
+
+```
+(B)       « décidé ici. Reste à écrire : `return` au lieu du repli »
+(A)       le vôtre
+/deploy   « portable dès que (B) est écrit. (A) ne le bloque pas : il décrit un
+            comportement EXISTANT, pas une régression du portage. »
+```
+
+**Et (B) est écrit depuis 20:13 ce soir** — vérifié à l'instant :
+
+```
+5c5f0ca  fix(sudo): un echec de rendu de politique ecrivait NOPASSWD: ALL
+8ca4032  test(sudo): non-regression du fail-closed, et la preuve que le test MORD
+         backend/configure_servers.py:373   `except (ValueError, ImportError)` -> return
+         backend/tests/test_sudo_fail_closed.py   4 tests, dont le TÉMOIN POSITIF
+         prouvé par MUTATION : chaque mutation rougit dans un test DIFFÉRENT
+```
+
+### Donc : AUCUN mot de l'exploitant ne bloque « plus de legacy »
+
+```
+iptables/index.php   portage DÉCIDÉ (DOSSIER-40 §④)   -> il manque un ÉCRIVAIN
+ssh/index.php        /deploy PORTABLE, (B) écrit       -> il manque un ÉCRIVAIN
+```
+
+**Il ne reste pas deux décisions. Il reste deux portages, et ils n'attendent personne
+d'autre que nous.** Les deux questions de l'exploitant restent ouvertes et restent
+les siennes — l'autorisation d'*exercer* iptables sur une machine, et (A) « que doit
+signifier `users.sudo = 1` sans politique par machine » — **mais ni l'une ni l'autre ne
+tient l'extinction.** (A) décrit un comportement qui existe aujourd'hui ; le reproduire à
+iso-périmètre ne demande aucune décision.
+
+> **C'est la cinquième fois de la semaine que je confonds « faut-il EXERCER ce geste »
+> avec « faut-il le GARDER en v2.0 ».** *Et cette fois-ci l'erreur avait un coût précis :
+> j'ai envoyé l'exploitant délibérer sur deux points qui ne bloquaient rien, pendant que le
+> travail qui bloque réellement n'était assigné à personne.*
+>
+> **Une confusion de périmètre ne se corrige pas en la nommant — je l'avais nommée dans
+> DOSSIER-43 et je viens de la refaire.** Ce qui l'a attrapée n'est pas ma vigilance : c'est
+> d'avoir RELU mes dossiers au lieu de me citer moi-même. *Le journal n'est pas l'autorité,
+> l'artefact l'est — y compris quand l'artefact est ma propre décision d'il y a trois
+> heures.*
 
 ### ⚠ Et une partition n'est pas une séquence
 
