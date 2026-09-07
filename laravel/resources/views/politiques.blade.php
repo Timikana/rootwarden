@@ -207,20 +207,28 @@
                             --}}
                             <td><code class="rw-code">{{ $h->new_file_content }}</code></td>
                             {{--
-                                UNE CAPACITE NON PORTEE N'EST PAS UN BOUTON
-                                INERTE. L'annulation reecrit un sudoers sur la
-                                machine ; elle n'est pas portee, et le dire vaut
-                                mieux que d'offrir un bouton qui ne fait rien.
-                                Marqueur `↗` et nouvel onglet : un lien qui
-                                change de portail sans le dire trahit celui qui
-                                le suit.
+                                ── L'ANNULATION EST PORTEE (2026-09-07) ────────────────────
+                                Ce bloc offrait un LIEN vers `adm/server_user_sudo.php`, page
+                                ARCHIVEE : le bouton envoyait donc sur un 404, et un 404 se
+                                lit comme « l'ancien portail est tombe », pas comme une
+                                decision.
+
+                                La route `/policy/rollback` avait elle aussi ete retiree du
+                                backend, au motif qu'elle etait orpheline — son seul appelant
+                                etant ce lien. **Une sonde du portage ne voit pas cette espece
+                                de dependance.** Rouverte le 2026-09-07.
+
+                                ⚠ Elle reecrit un sudoers en root. Elle est derriere le
+                                step-up (`RoutesBackend::MOTIFS_STEP_UP`), et le panneau de
+                                defi de cette page s'en occupe — c'est celui des deux gestes
+                                voisins, pas une seconde implementation.
                             --}}
                             <td class="rw-tableau__actions">
                                 @if (in_array($h->status, ['applied', 'superseded'], true))
-                                    <a class="rw-lien" data-rw="politique-rollback-legacy"
-                                       href="{{ rtrim(config('app.url_legacy'), '/') }}/adm/server_user_sudo.php?server={{ $machine }}&user={{ $compte }}"
-                                       target="_blank" rel="noopener"
-                                       title="{{ __('politiques.rollback_texte') }}">{{ __('politiques.rollback_lien') }} ↗</a>
+                                    <button type="button" class="rw-bouton rw-bouton--danger rw-bouton--minuscule"
+                                            data-rw="politique-rollback"
+                                            data-deploiement="{{ $h->id }}"
+                                            title="{{ __('politiques.rollback_texte') }}">{{ __('politiques.rollback') }}</button>
                                 @endif
                             </td>
                         </tr>

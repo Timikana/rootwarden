@@ -236,6 +236,51 @@
             : corps());
     });
 
+    /* ═══ L'ANNULATION D'UN DEPLOIEMENT — ROUVERTE LE 2026-09-07 ══════════
+     *
+     * Ce geste etait un LIEN vers l'ancien portail, vers une page depuis
+     * ARCHIVEE : il envoyait sur un 404. Et la route backend avait elle aussi
+     * ete retiree, au motif qu'elle etait orpheline — **son seul appelant etant
+     * ce lien, qu'une sonde du portage ne voit pas.**
+     *
+     * ⚠ IL PASSE PAR `appelle()` ET PAR `stepUp`, comme ses deux soeurs.
+     * `/policy/rollback` figure dans `RoutesBackend::MOTIFS_STEP_UP` : le
+     * premier appel rend un `403 step_up_required`, et `intercepte` rejoue le
+     * geste APRES le defi. **Le nom de l'action n'est pas compose ici** — il est
+     * derive du chemin cote serveur, et le composer recollerait le defaut du
+     * legacy, ou un step-up consenti pour ANNULER autorisait un DEPLOIEMENT.
+     *
+     * `deployment_id` vient de la LIGNE cliquee, jamais d'un etat de page : une
+     * annulation qui viserait la ligne survolee plutot que la ligne confirmee
+     * reecrirait le mauvais bloc SSH.
+     */
+    function annule(idDeploiement, bouton) {
+        bouton.disabled = true;
+
+        return appelle('/policy/rollback', {
+            machine_id: parseInt(form.dataset.machine, 10),
+            deployment_id: idDeploiement,
+        }).then(function (verdict) {
+            bouton.disabled = false;
+            if (stepUp && stepUp.intercepte(verdict, function () {
+                annule(idDeploiement, bouton);
+            })) { return verdict; }
+            affiche(verdict);
+
+            return verdict;
+        });
+    }
+
+    document.addEventListener('click', function (evenement) {
+        var bouton = evenement.target && evenement.target.closest
+            ? evenement.target.closest('[data-rw="sftp-rollback"]') : null;
+        if (! bouton) { return; }
+        var id = parseInt(bouton.getAttribute('data-deploiement'), 10);
+        if (! id) { return; }
+        if (! window.confirm(libelles.rollback_confirme || '')) { return; }
+        annule(id, bouton);
+    });
+
     /* ═══ L'AUDIT : UNE LECTURE, DONC AUCUN PANNEAU ═══════════════════════ */
 
     form.querySelector('[data-rw="sftp-auditer"]').addEventListener('click', function () {

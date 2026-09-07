@@ -67,6 +67,8 @@ class PolitiquesController extends Controller
             'portee_inconnu', 'portee_inconnu_detail', 'confirmer_titre', 'confirmer_intro',
             'confirmer_valider', 'confirmer_root', 'retirer_titre', 'retirer_intro',
             'retirer_valider', 'reauth', 'confirmer_machine', 'confirmer_compte', 'confirmer_portee',
+                // L'annulation d'un deploiement, rouverte le 2026-09-07.
+                'rollback_confirme',
         ] as $cle) {
             $libelles[$cle] = __('politiques.' . $cle);
         }

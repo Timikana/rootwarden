@@ -108,7 +108,10 @@ return [
     'jamais'           => 'never deployed',
     'resultat'         => 'Result',
     'rollback_titre'   => 'Restore an earlier version',
-    'rollback_texte'   => 'Rolling a deployment back is not ported yet. It rewrites an SSH block on '
-                          . 'the machine, and is done from the legacy portal for now.',
+    'rollback_texte'   => 'Restores the exact SSH block from before this deployment. The content is what was saved, not a reconstruction. Re-authentication is required.',
     'rollback_lien'    => 'Roll this deployment back in the legacy portal',
+
+    /* L'annulation d'un deploiement, rouverte le 2026-09-07. */
+    'rollback' => 'Roll back',
+    'rollback_confirme' => 'Roll this deployment back and restore the previous SSH block?\\n\\nThe exact earlier content is rewritten on the machine — not a reconstruction, the saved bytes. Re-authentication will be requested.',
 ];
