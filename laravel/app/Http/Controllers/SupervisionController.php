@@ -282,7 +282,7 @@ class SupervisionController extends Controller
             $valeurs,
             // Un PSK vide veut dire « ne change rien », jamais « efface ».
             $plateforme === 'zabbix' ? (string) $requete->input('tls_psk_value', '') : null,
-            (int) $requete->session()->get('user_id', 0),
+            (int) $requete->session()->get('utilisateur_id', 0),
         );
 
         return redirect()->route('supervision')
