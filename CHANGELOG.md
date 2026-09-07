@@ -77,6 +77,76 @@ qui double celle qui existe.* Corrigé avec sa remesure datée.
                     `fail2ban.js` — deux fichiers d'une AUTRE session. Non rafraichi
                     ici : le faire masquerait leur signal.
 
+## [2.0.233] - 2026-09-07
+
+### Securite - E-460 : `GEOIP_ENABLED`, le seul effet sortant sans interrupteur
+
+**Symptome.** `fail2ban_manager.geoip_lookup` interroge `ip-api.com` **en HTTP
+CLAIR** (`:397` — le tier gratuit n'autorise pas TLS, le code le dit et
+l'assume). **Neuf autres effets sortants ont deja leur drapeau** — APPROVAL,
+CHATOPS, CVE_ENRICH, NVD_ENRICHMENT, TICKETING, MAIL, WAZUH, WEBHOOK, BACKUP —
+**celui-la n'en avait pas.** Pour un outil auto-heberge en environnement clos,
+« aucun trafic sortant » n'etait donc pas exprimable sur ce geste, sauf a ne pas
+s'en servir. *Ce n'est pas un standard importe : c'est la convention du depot,
+appliquee neuf fois et manquante une.*
+
+**Correctif, quatre fichiers.**
+
+- `config.py` — `GEOIP_ENABLED = os.getenv('GEOIP_ENABLED', 'true').lower() == 'true'`
+- `fail2ban_manager.py` — la garde, **apres** le controle d'adresse privee
+- `routes/settings.py` — expose `geoip_enabled` comme les neuf autres (13 reglages)
+- `srv-docker.env.example` — la variable, sans quoi personne ne la decouvre
+
+**⚠ Defaut `'true'` : ISO-COMPORTEMENT**, on ne change pas le produit sous les
+pieds de qui met a jour. *Contrairement a ce qu'annoncait la consigne, les
+defauts ne sont PAS tous `'true'` : CHATOPS, TICKETING et MAIL sont a `'false'`
+— parce qu'ils exigent une configuration pour fonctionner. La geolocalisation
+marche sans reglage, donc `'true'` est l'iso.*
+
+**⚠ LE PLACEMENT DE LA GARDE N'EST PAS INDIFFERENT.** Elle vient **apres** le
+controle d'adresse privee, qui rend `Local`/`LO` **sans aucun trafic** : c'est
+une reponse EXACTE, pas un repli. Placee avant, elle dirait « desactive » pour
+une adresse locale — *on perdrait une information juste, sur le cas le plus
+frequent en reseau clos, et pour rien.*
+
+**⚠ CODE NEUF `'OFF'`, ET PAS `'??'`.** L'ecran traduit **par code**
+(`fail2ban.js:1111-1114` : `'LO'` -> `geo_locale`, `'??'` -> `geo_inconnu`,
+« le service n'a pas su repondre »). **Reutiliser `'??'` afficherait un reglage
+DELIBERE comme une panne du tiers** — quelqu'un chercherait un incident
+inexistant, ou rallumerait l'interrupteur en croyant reparer.
+
+### Mesure de la propriete — au reseau, avec temoin, et sans trafic reel
+
+Transport remplace : l'URL n'est jamais atteinte, **aucune requete ne part**.
+
+    garde-fou   8.8.8.8 franchit le controle d'adresse privee
+                -> la garde sera ATTEINTE
+    ETEINT      {'country':'Desactive','countryCode':'OFF'}   appels sortants : 0
+    ALLUME      {'country':'Testland','countryCode':'TL'}     appels sortants : 1  <- TEMOIN
+
+**⚠ Ma premiere mesure employait `203.0.113.9` (TEST-NET-3) comme adresse
+« publique ». Python la classe `is_reserved` : les deux passages sortaient par
+la branche `Local` AVANT d'atteindre la garde, et rendaient `0` appel des deux
+cotes.** *Le temoin positif a refuse la mesure — sans lui, je publiais un vert
+obtenu sans que la garde ait ete exercee une seule fois.* **Le garde-fou sur
+l'adresse est desormais dans la sonde.**
+
+### ⛔ La moitie portage n'est PAS livree ici, et c'est deliberé
+
+`fail2ban.js` (branche `'OFF'`) et `lang/{fr,en}/fail2ban.php` (cle
+`geo_desactivee`) appartiennent a la session qui tient ce perimetre. **Une
+branche `'OFF'` que le backend ne pourrait pas produire serait un ecran sans
+capacite** — et une session qui mesurerait « la desactivation est-elle geree ? »
+trouverait du code et conclurait que oui. *Le backend d'abord, l'ecran ensuite.*
+
+**Notes d'exploitation.** `backend/**.py` est lu au demarrage : **l'arbre est
+corrige, le service ne l'est pas** tant que le conteneur n'est pas recree.
+
+**Tests.** Import reel des trois modules, **672 passed, 5 skipped, 2 xfailed,
+0 FAILED**. Aucun appel reel a `ip-api.com`.
+
+---
+
 ## [2.0.106] - 2026-09-07
 
 ### `legacy/ssh/` est ARCHIVE — il ne reste qu'UNE page servie
