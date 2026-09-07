@@ -24,7 +24,9 @@ from iptables_manager import get_iptables_rules, apply_iptables_rules
 bp = Blueprint('iptables', __name__)
 
 
-def _archive_puis_applique(client, root_password, data, mid):
+def _archive_puis_applique(client, root_password, data, mid,
+                           rules_v4=None, rules_v6=None,
+                           message="Regles appliquees.", motif=None):
     """Archive l'etat courant PUIS applique les regles. Le SEUL chemin d'application.
 
     ══ POURQUOI CETTE FONCTION EXISTE ═══════════════════════════════════════
@@ -69,10 +71,16 @@ def _archive_puis_applique(client, root_password, data, mid):
     # premier jet de cette fonction comptait sur `rules_v4` defini dans la route
     # appelante : les deux portes levaient `NameError`, et la suite de 672 tests
     # ne l'a pas vu parce qu'AUCUN n'exercait la branche `apply`.
-    rules_v4 = data.get('rules_v4')
-    rules_v6 = data.get('rules_v6')
-    if not rules_v4:
-        return jsonify({"success": False, "message": "Regles IPv4 manquantes."}), 400
+    # QUATRE PORTES, UN SEUL CHEMIN. Les deux routes `action="apply"` lisent leurs
+    # regles dans le corps de la requete ; `/iptables-restore` les lit dans
+    # `iptables_rules` et `/iptables-rollback` dans `iptables_history`. Ces deux
+    # dernieres les passent donc explicitement, et seules les premieres tombent
+    # dans la lecture par defaut.
+    if rules_v4 is None:
+        rules_v4 = data.get('rules_v4')
+        rules_v6 = data.get('rules_v6')
+        if not rules_v4:
+            return jsonify({"success": False, "message": "Regles IPv4 manquantes."}), 400
 
     # Save history before apply
     try:
@@ -86,7 +94,7 @@ def _archive_puis_applique(client, root_password, data, mid):
         # L'identite retenue est celle que get_current_user()
         # recharge EN BASE a partir de X-User-ID.
         user_id, _role_id = get_current_user()
-        change_reason = data.get('change_reason', '')
+        change_reason = motif if motif is not None else data.get('change_reason', '')
         # get_iptables_rules rend `file_rules_v4` / `file_rules_v6`
         # (le CONTENU du fichier persistant), jamais `rules_v4`. Lire
         # la mauvaise cle enregistrait TOUTES les versions vides —
@@ -123,8 +131,12 @@ def _archive_puis_applique(client, root_password, data, mid):
                 )
     except Exception as hist_err:
         logger.warning("Iptables history save failed: %s", hist_err)
+    # L'ARCHIVE ENREGISTRE L'ETAT QUITTE, JAMAIS L'ETAT RESTAURE. Enregistrer
+    # l'etat vers lequel on va dupliquerait une entree deja presente et rendrait
+    # la chaine illisible : on ne saurait plus distinguer « voici ou j'etais » de
+    # « voici ou je vais ».
     apply_iptables_rules(client, root_password, rules_v4, rules_v6)
-    return jsonify({"success": True, "message": "Regles appliquees."})
+    return jsonify({"success": True, "message": message})
 
 
 
@@ -250,8 +262,15 @@ def manage_iptables_restore():
         if not (rules.get('rules_v4') or '').strip():
             return jsonify({"success": False, "message": "Copie enregistree vide, restauration refusee."}), 409
         with ssh_session(server_ip, server_port, ssh_user, ssh_password, service_account=svc_account) as client:
-            apply_iptables_rules(client, root_password, rules.get('rules_v4', ''), rules.get('rules_v6', ''))
-        return jsonify({"success": True, "message": "Regles restaurees."})
+            # LE MEME CHEMIN QUE LES TROIS AUTRES. Cette route appliquait sans
+            # archiver : l'etat COURANT de la machine etait perdu, et un rollback
+            # ulterieur ne pouvait plus y revenir.
+            return _archive_puis_applique(
+                client, root_password, data, mid,
+                rules_v4=rules.get('rules_v4', ''), rules_v6=rules.get('rules_v6', ''),
+                message="Regles restaurees.",
+                motif="etat quitte avant restauration depuis la copie enregistree",
+            )
     except Exception as e:
         logger.error("[iptables-restore] %s", e)
         return jsonify({"success": False, "message": "Erreur interne"}), 500
@@ -332,8 +351,23 @@ def iptables_rollback():
         ssh_pass = server_decrypt_password(row.get('password', '')) or ''
         root_pass = server_decrypt_password(row.get('root_password', '')) or ''
         with ssh_session(row['ip'], row['port'], row['user'], ssh_pass, logger=logger, service_account=row.get('service_account_deployed', False)) as client:
-            apply_iptables_rules(client, root_pass, row['rules_v4'], row['rules_v6'])
-        return jsonify({'success': True, 'message': 'Regles restaurees'})
+            # ⚠ LA ROUTE QUI DECIDAIT DE L'ARBITRAGE. Elle se presente comme
+            # REVERSIBLE et ne l'etait pas : l'etat courant n'etait conserve
+            # nulle part, donc on revenait en arriere et JAMAIS EN AVANT.
+            #
+            # *Une porte a sens unique habillee en porte reversible est pire
+            # qu'une porte a sens unique* — l'operateur clique PARCE QUE le nom
+            # lui promet qu'il pourra defaire.
+            #
+            # `data` n'est pas passe : le corps de cette route ne porte que
+            # `history_id`, et `mid` vient de la version DESIGNEE, jamais d'un
+            # parametre du demandeur.
+            return _archive_puis_applique(
+                client, root_pass, {}, row['server_id'],
+                rules_v4=row['rules_v4'], rules_v6=row['rules_v6'],
+                message="Regles restaurees",
+                motif="etat quitte avant rollback vers la version #%s" % history_id,
+            )
     except Exception as e:
         logger.error("[iptables-rollback] %s", e)
         return jsonify({'success': False, 'message': 'Erreur interne'}), 500
