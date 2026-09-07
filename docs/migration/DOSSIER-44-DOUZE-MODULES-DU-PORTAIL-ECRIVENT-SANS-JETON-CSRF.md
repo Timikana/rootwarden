@@ -1,4 +1,82 @@
-# DOSSIER-44 — 🔴 douze modules du portail écrivent SANS jeton CSRF, et le banc ne peut pas le voir
+# DOSSIER-44 — ⛔ RETIRÉ : mon alarme était fausse, et le dépôt l'avait anticipée le 2026-08-18
+
+> **CE DOSSIER EST RETIRÉ.** *Son constat de fait est exact — douze modules
+> n'envoient aucun jeton — et la conséquence que j'en tirais est FAUSSE.*
+> **Les POST du portail fonctionnent.**
+
+## ⛔ LA RÉFUTATION, et les CORPS la portent mieux que les statuts
+
+**Tirée des journaux conservés du LOT 4 par la session 7, sans aucun rejeu :**
+
+```
+go-fail2ban-f3   400   {"message":"lines doit etre un nombre","success":false}
+go-services-s3   403   Service protege : sshd
+LOT 3, legacy-go-fail2ban-f3   400, même corps
+```
+
+> **Un statut peut avoir plusieurs causes ; un corps porte la trace du chemin
+> parcouru.** *`lines doit etre un nombre` est une validation APPLICATIVE, et
+> `Service protege : sshd` une règle MÉTIER : la requête a traversé la couche
+> CSRF, atteint la route, et été désérialisée.* **Une couche qui bloque rend 419
+> et un corps générique, sans jamais avoir vu `lines` ni `sshd`.**
+
+*Ces deux suites font leur POST SANS CONDITION — c'est ce qui les rend probantes,
+là où `go-fail2ban-f4` a son POST derrière `if (! derniere)` et pouvait n'avoir
+jamais évalué son assertion.*
+
+## LE MÉCANISME, écrit dans le dépôt AVANT que je me trompe
+
+**`laravel/bootstrap/app.php:16-29`, commentaire daté du 2026-08-18 :**
+
+```
+Laravel 13 place `PreventRequestForgery` dans le groupe `web` par defaut.
+Ce middleware accepte une requete si l'UNE de ces conditions tient :
+  methode de lecture · chemin exclu · ORIGINE valide (Sec-Fetch-Site: same-origin)
+  · ou jeton correspondant
+
+« Une mesure du 2026-08-18 a d'abord fait croire a une absence de controle :
+  un `fetch` same-origin sans jeton passait. C'etait le comportement ATTENDU —
+  une requete same-origin n'est pas une falsification. La propriete a verifier
+  est qu'une requete CROSS-SITE sans jeton soit refusee, ce que fait
+  tests/e2e/go-socle-passerelle.mjs. »
+```
+
+> **Quelqu'un a commis exactement mon erreur le 18 août, l'a comprise, et a
+> écrit ce commentaire pour la prévenir.** *J'ai lu ce fichier deux fois
+> aujourd'hui — `:56` pour la liste d'exceptions, `:16` pour repérer le
+> commentaire — **sans lire le commentaire**.*
+
+## ⚠ POURQUOI MA SONDE NE POUVAIT PAS VOIR LE CAS QUI PASSE
+
+```
+mon curl        POST /api/gateway/test  ->  419
+mon TÉMOIN      POST /connexion         ->  419
+```
+
+*J'avais un témoin, et il ne discriminait rien : les deux rendent 419 sans
+session.* **Ce qu'il me manquait n'était pas un témoin mais un en-tête :
+`curl` n'envoie pas `Sec-Fetch-Site: same-origin`.** *Ma mesure était
+structurellement incapable d'observer le cas qui passe — et un instrument aveugle
+au cas favorable rend toujours l'alarme.*
+
+## Ce qui reste VRAI et sans conséquence
+
+*Les douze modules n'envoient effectivement aucun jeton, et `jetonCsrf` est
+redéfini dans 18 fichiers plutôt qu'une fois.* **Ce n'est pas un défaut de
+sécurité — c'est une inégalité de style.** *La propriété qui compte — une requête
+CROSS-SITE sans jeton est refusée — est déjà tenue par le middleware et déjà
+éprouvée par une suite.*
+
+⚠ **BORNE DE LA RÉFUTATION, posée par la session 7 :** *deux points de mesure,
+pas douze.* **« Les POST du portail sont inopérants » est faux comme énoncé
+général — un contre-exemple suffit, et il y en a deux.** *Cela ne certifie pas
+chacun des douze.*
+
+---
+
+*Ce qui suit est le dossier tel que publié, conservé pour la trace.*
+
+# ~~DOSSIER-44 — douze modules du portail écrivent SANS jeton CSRF~~
 
 **Session DSI, 2026-09-07 au soir. Trouvé par la session 5f** en portant la
 liste blanche CVE ; **mesuré et étendu ici.** *Ce dossier passe devant
