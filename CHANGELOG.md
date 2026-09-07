@@ -5,6 +5,61 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [2.0.100] - 2026-09-07
+
+### Portage — B4, les deux ecritures de `bashrc` (et les deux qu'on ne porte PAS)
+
+**Ce que le portage gagne** : deployer le `.bashrc` standardise, et restaurer la sauvegarde la plus
+recente. **Ce qu'il ne gagne pas, et c'est decide** : installer le paquet `figlet`.
+
+    /bashrc/deploy   PORTE     sauvegarde .bashrc.bak.<ts> chmod 600
+                               bloc personnalise migre vers ~/.bashrc.local
+                               validation `bash -n` apres ecriture
+    /bashrc/restore  PORTE     la sauvegarde la plus recente, PAR COMPTE
+    /bashrc/prerequisites  NON — `apt-get install figlet` en root
+    /bashrc/backups        non porte (lecture, reste a faire)
+
+**Pourquoi porter plutot qu'archiver** : *la valeur de `deploy` EST dans ses garde-fous.* Refaire ces
+gestes a la main, c'est les refaire sans la sauvegarde horodatee, sans la migration du contenu existant et
+sans le `bash -n` — et **un `.bashrc` casse retire le shell de connexion, ce qui ne se rattrape pas par le
+meme canal.**
+
+#### ⚠⚠ `mode` EST TOUJOURS ENVOYE, PARCE QUE LE DEFAUT EST LE PIRE DES DEUX
+
+Le backend fait `mode = data.get('mode', 'overwrite')`. **`overwrite` recrit le fichier sans migrer le bloc
+personnalise ; `merge` le migre.** Omettre le champ ne serait donc pas une abstention :
+
+> **Ce serait choisir la pire des deux valeurs sans l'ecrire.** *C'est l'inverse exact du champ `force` du
+> retrait de cle SSH, ou l'absence etait la prudence — ici l'absence est le danger.*
+
+Et `merge` est la valeur que **l'apercu** emploie deja : deployer dans un autre mode que celui qu'on vient
+de montrer rendrait l'apercu menteur. **`overwrite` n'est pas construit** — aucun bouton, aucun champ,
+aucune bascule. Verifie sur le code **depouille de ses commentaires** : `0` occurrence de `'overwrite'`,
+`0` de `prerequisites`, `0` de `dry_run`.
+
+#### Ce que la page DIT faute de pouvoir le faire
+
+`figlet_present` arrive **deja** dans la reponse de `/bashrc/users`. Le bouton d'installation n'etant pas
+porte, on garde le signal sans le geste : **la page nomme ce qui manque** et laisse l'operateur installer le
+paquet par le canal qu'il juge bon. *Ce qu'on perd est cosmetique — figlet ne change que la banniere.*
+
+#### Trois affirmations perimees, corrigees en passant
+
+- le docblock du JS disait *« ce fichier n'emet AUCUNE requete »* — **faux depuis B2** ;
+- un commentaire disait *« a relier au selecteur de mode des qu'il existe »* — **il n'existera pas**, la
+  garde est par construction ;
+- l'encart annoncait *« le deploiement n'est pas porte »* et renvoyait a l'ancien portail. **Un panneau qui
+  annonce une absence comblee envoie l'operateur ailleurs pour un geste qui est sous ses yeux.** Reformule
+  sur les deux qui restent ; son lien suit `app.url_legacy`, donc l'echange des ports l'a mis a jour seul.
+- et le controleur disait **« six routes »** : `bashrc.py` en declare **sept**.
+
+**Verifie** : `node --check` avec temoin negatif · `php -l` sur les trois fichiers PHP · parite FR/EN par
+`require` + `array_diff` (**85 = 85**, temoin negatif rendu) · **les trois ensembles croises** — catalogue,
+blob du controleur, cles lues par le JS : *onze cles manquaient au blob au premier jet et auraient rendu du
+VIDE* · colonnes du tableau **6 = 6** · `route:list`.
+
+**Aucun exercice du geste** : il ecrit dans un `$HOME` distant en root. *Aucune suite ne doit le soumettre.*
+
 ## [2.0.99] - 2026-09-07
 
 ### Extinction du legacy - bloc 3 : `fail2ban/` archive, sur un arbitrage RENDU
