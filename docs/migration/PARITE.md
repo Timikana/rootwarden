@@ -21926,3 +21926,49 @@ défaut de traduction* · colonnes **6 = 6** · `route:list`.
 
 **Aucun exercice du geste** : il écrit dans un `$HOME` distant en root. *Aucune suite ne doit le soumettre.*
 
+---
+
+## E-459 — ⚠ TROIS BOUTONS DU PORTAIL NEUF ENVOIENT SUR UN 404 DE L'ANCIEN
+
+**Découvert le 2026-09-07 en retirant le lien de `bashrc`** — un contrôle qui devait porter sur une seule
+vue en a trouvé trois autres. Les sept liens `url_legacy` du portage, éprouvés au réseau :
+
+    fail2ban.blade.php    /fail2ban/               ->  404   ⛔  archive le 2026-09-07
+    acces-sftp.blade.php  /adm/server_user_sftp    ->  404   ⛔  `adm/` archive
+    politiques.blade.php  /adm/server_user_sudo    ->  404   ⛔  `adm/` archive
+    cles-ssh.blade.php    /ssh/                    ->  302   vivant
+    pare-feu.blade.php    /iptables/               ->  302   vivant
+
+*Témoins sur la même cible : `/auth/login.php` → 200, `/zzz` → 404 — le portail répond et discrimine.*
+
+> **Un `404` se lit comme « l'ancien portail est tombé », pas comme « cette page a été archivée ».**
+> *L'opérateur qui clique cherchera une panne là où il y a eu une décision.*
+
+### C'est le mécanisme d'E-454, à sa forme la plus coûteuse
+
+Ni le bouton ni son libellé n'ont changé : **c'est ce vers quoi ils pointent qui a disparu sous eux.**
+Chaque archivage du legacy transforme silencieusement un renvoi du portage en cul-de-sac, et **rien dans la
+vue ne le signale** — le lien reste noir sur blanc, dans un encart dont le texte promet une capacité
+disponible ailleurs.
+
+**Et la réciproque est le piège inverse**, celui que je viens d'éviter sur `bashrc` :
+
+> **Un renvoi maintient en vie ce vers quoi il renvoie.** *Tant que l'encart de `bashrc` pointait vers
+> `legacy/bashrc/`, cette page devait rester en service — pour un dessin de bannière.* Retirer le lien en
+> gardant la mention est ce qui a permis à la session 8 de l'archiver.
+
+Les deux formes se tiennent : **archiver sans retirer le lien produit un 404 ; retirer le lien sans nommer
+ce qui manque produit une capacité perdue en silence.** Il faut les deux gestes, dans cet ordre.
+
+### Non corrigé, et pourquoi
+
+**Trois vues, et chacune demande une décision de produit, pas une correction de lien** : la capacité est-elle
+désormais portée (donc l'encart entier est faux), ou perdue (donc il faut le texte sans la porte, comme
+`bashrc`) ? Pour `fail2ban`, la session 8 a tranché « perte acceptée » ce matin — le geste manquant est
+exactement celui que je viens de faire pour `bashrc`. Pour `adm/server_user_sftp` et
+`adm/server_user_sudo`, je ne sais pas et je ne tranche pas.
+
+⚠ **Le contrôle est reproductible et vaut d'être posé au banc** : *pour chaque lien `url_legacy` du
+portage, la cible doit répondre autre chose qu'un `404`.* Trois lignes, et il mord aujourd'hui sur trois
+vues.
+
