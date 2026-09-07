@@ -382,6 +382,22 @@ def geoip_lookup(ip: str) -> dict:
     if addr.is_private or addr.is_loopback or addr.is_reserved:
         return {'country': 'Local', 'countryCode': 'LO', 'ip': ip}
 
+    # ══ GEOIP_ENABLED : aucun appel sortant quand l'exploitant l'a eteint ══════
+    #
+    # ⚠ PLACEE ICI, ET PAS PLUS HAUT. Le controle d'adresse privee ci-dessus rend
+    # `Local`/`LO` SANS aucun trafic : c'est une reponse EXACTE, pas un repli.
+    # Mettre cette garde avant lui ferait dire « desactive » pour une adresse
+    # locale — on perdrait une information juste, sur le cas le plus frequent en
+    # reseau clos, et pour rien.
+    #
+    # ⚠ CODE NEUF, PAS `'??'`. L'ecran traduit PAR CODE : `'??'` y signifie « le
+    # service n'a pas su repondre ». Reutiliser ce code afficherait un reglage
+    # DELIBERE comme une panne du tiers — quelqu'un chercherait un incident
+    # inexistant, ou rallumerait l'interrupteur en croyant reparer.
+    from config import Config
+    if not Config.GEOIP_ENABLED:
+        return {'country': 'Desactive', 'countryCode': 'OFF', 'ip': ip}
+
     # Cache
     now = _time.time()
     if ip in _geoip_cache:
