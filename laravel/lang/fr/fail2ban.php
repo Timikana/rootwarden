@@ -63,7 +63,6 @@ return [
      * backend, pas deduits : `install`, `restart` et `geoip` ne sont appeles
      * par aucun script du portage.
      */
-    'non_porte_titre' => "Ce que cet onglet ne fait pas",
     /*
      * ⚠ L'ENUMERATION PERD UN ELEMENT, ET C'EST TOUT CE QU'ELLE PERD.
      *
@@ -73,7 +72,6 @@ return [
      * gestes » ne se corrige pas en « trois », il se remplace par
      * l'enumeration, qui est la seule source.
      */
-    'non_porte_texte' => "Installer Fail2ban sur UNE machine et redémarrer le service ne sont pas dans le portail : ces deux gestes se font en SSH (`apt install fail2ban`, `systemctl restart fail2ban`). L'installation sur tout le parc, elle, est ici.",
 
     // ══ F8 — LA GEOLOCALISATION D'UNE ADRESSE BANNIE ══════════════════════
     //
@@ -308,4 +306,20 @@ return [
     // `user_logs` (temoin : 5 920 lignes au total). Le dire plutot que de
     // laisser croire que le chemin est eprouve.
     'desact_jamais_exercee' => "Ce geste n'a encore jamais été exercé depuis cette interface.",
+
+    /*
+     * ══ LES DEUX GESTES PAR MACHINE — ISO-PERIMETRE ══════════════════
+     *
+     * Le legacy les offrait ; ils avaient ete perdus par un arbitrage que
+     * l'exploitant a annule (« portage a iso-perimetre »). `install_all`
+     * etait deja porte : le geste le plus LARGE existait, le plus ETROIT
+     * manquait — l'inverse de l'ordre de risque.
+     */
+    'installer' => "Installer Fail2ban",
+    'redemarrer' => "Redémarrer le service",
+    'conf_titre_install' => "Installer Fail2ban sur :machine ?",
+    'conf_texte_install' => "Le paquet sera installé sur :machine, et sur elle seule. L'installation passe par le gestionnaire de paquets de la machine : elle peut prendre une minute et elle ne se défait pas depuis cet écran.",
+    'conf_titre_restart' => "Redémarrer Fail2ban sur :machine ?",
+    'conf_texte_restart' => "Le service sera redémarré sur :machine, et sur elle seule. Pendant le redémarrage, aucune adresse n'est bannie ni débannie ; la configuration est relue depuis le disque.",
+
 ];

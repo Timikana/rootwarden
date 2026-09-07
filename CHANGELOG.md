@@ -5,6 +5,66 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## [2.0.104] - 2026-09-07
+
+### Iso-perimetre — les deux gestes `fail2ban` par machine sont PORTES
+
+**Ma dette, et je la paie moi-meme.** *J'avais archive `legacy/fail2ban/` en
+acceptant la perte de ces deux gestes. L'exploitant a impose le portage a
+ISO-PERIMETRE : « perte acceptee » n'est plus une issue d'arbitrage.*
+
+```
+/fail2ban/install    26 l. backend   ->  fail2ban.js:1198
+/fail2ban/restart    24 l. backend   ->  fail2ban.js:1209
+TEMOIN /fail2ban/zzz-temoin              ABSENT
+mesure : scripts/geste-porte.py, l'outil calibre du depot
+```
+
+**EXCLUSION MUTUELLE, et elle vient du RELEVE** : « installer » ne s'affiche que
+si le service est absent, « redemarrer » que s'il est present. *Proposer
+d'installer ce qui est deja la serait offrir un echec, et un bouton qui echoue
+toujours au meme endroit apprend a l'operateur que les echecs sont normaux.*
+
+### ⚠ Trois choses que l'ecriture a corrigees d'elle-meme
+
+**① `releve()` n'existait pas.** *Mon premier jet l'appelait pour rafraichir
+l'etat apres le geste.* **Le bouton « relever » etait branche sur une fonction
+ANONYME** — extraite en `faitReleve()`, sans changement de comportement pour le
+clic. *L'etat affiche vient donc d'un releve, jamais de la reponse de celui qui
+vient d'agir : « installe » annonce par l'installateur n'est pas une reussite
+verifiee.*
+
+**② Le chemin est ecrit DANS chaque geste, deliberement.** *Mon premier jet
+passait par un helper commun recevant le chemin en argument. Le code marchait —
+et `geste-porte.py` rendait `ABSENT` pour les deux : il derive UN saut de
+helper, et il y en avait DEUX.*
+
+> **Un geste invisible a l'instrument du projet sera re-signale comme un trou
+> par la prochaine mesure.** *La lisibilite par l'instrument fait partie du
+> travail.*
+
+**③ L'encart « ce que cet onglet ne fait pas » est retire**, avec ses deux cles
+dans les DEUX catalogues. *Il annonçait ces gestes comme absents : vrai jusqu'a
+ce commit, faux depuis.* **Un encart qui annonce une absence comblee envoie
+l'operateur ailleurs pour un geste qui est sous ses yeux.**
+
+*Et les quatre cles de confirmation VOYAGENT dans le blob `$textes` du
+controleur — sans ce voyage le panneau s'ouvrirait VIDE, et un vide ne ressemble
+pas a un defaut de traduction.*
+
+```
+i18n   fr=200  en=200   jeux IDENTIQUES   ·   non_porte_* retirees des deux
+JS     node --check passe · toutes les fonctions appelees sont definies
+vue    @if 7 / @endif 7 · commentaires Blade equilibres 24/24
+```
+
+⛔ **AUCUN EXERCICE.** *`install` passe par le gestionnaire de paquets de la
+machine, `restart` interrompt le service. Aucune suite ne doit les declencher ;
+si un banc doit les toucher, c'est la machine d'essai et sur le mot de
+l'exploitant.*
+
+---
+
 ## [2.0.103] - 2026-09-07
 
 ### Extinction du legacy - bloc 5 : `security/` archive, et **S7b etait DEJA PORTE**

@@ -59,6 +59,8 @@ window.RW_FAIL2BAN = true;
 
     var voirConfig = document.querySelector('[data-rw="f2b-voir-config"]');
     var voirLogs = document.querySelector('[data-rw="f2b-voir-logs"]');
+    var boutonInstaller = document.querySelector('[data-rw="f2b-installer"]');
+    var boutonRedemarrer = document.querySelector('[data-rw="f2b-redemarrer"]');
     var sectionConfig = document.querySelector('[data-rw="f2b-config"]');
     var sourceConfig = document.querySelector('[data-rw="f2b-config-source"]');
     var messageConfig = document.querySelector('[data-rw="f2b-config-message"]');
@@ -194,6 +196,8 @@ window.RW_FAIL2BAN = true;
          */
         if (voirConfig) { voirConfig.hidden = true; }
         if (voirLogs) { voirLogs.hidden = true; }
+        if (boutonInstaller) { boutonInstaller.hidden = true; }
+        if (boutonRedemarrer) { boutonRedemarrer.hidden = true; }
         if (sectionConfig) { sectionConfig.hidden = true; }
         if (sectionLogs) { sectionLogs.hidden = true; }
         if (sectionServices) { sectionServices.hidden = true; }
@@ -1145,6 +1149,68 @@ window.RW_FAIL2BAN = true;
      * de la jail apres, ce qui donne un second temoin : la liste des adresses
      * bannies doit refleter le geste.
      */
+    /*
+     * ══ LES DEUX GESTES PAR MACHINE — ISO-PERIMETRE ══════════════════════
+     *
+     * Le legacy les offrait. Ils avaient ete perdus par un arbitrage que
+     * l'exploitant a annule : « le portage du legacy a iso-perimetre — apres
+     * tu peux ameliorer, mais voila ».
+     *
+     * ILS PASSENT PAR `litDistant` ET NON PAR `agit`. `agit` remet a zero le
+     * champ d'adresse et lit `jailCourante` : il appartient au ban. Un geste
+     * de SERVICE qui viderait le champ de saisie d'un ban ferait disparaitre
+     * une saisie en cours sans rapport avec lui.
+     *
+     * ⚠ AUCUNE SUITE NE DOIT LES DECLENCHER. `install` passe par le
+     * gestionnaire de paquets de la machine et `restart` interrompt le
+     * service. Si un banc doit les toucher, c'est la machine d'essai et sur
+     * le mot de l'exploitant.
+     */
+    /*
+     * ⚠ LE CHEMIN EST ECRIT DANS CHAQUE GESTE, ET C'EST DELIBERE.
+     *
+     * Ces deux fonctions passaient par un helper commun qui recevait le chemin
+     * en ARGUMENT. Le code marchait — et `scripts/geste-porte.py` rendait
+     * `ABSENT` pour les deux : son mecanisme derive UN saut de helper, et il y
+     * en avait DEUX (geste -> gesteService -> litDistant).
+     *
+     * Un geste invisible a l'instrument du projet sera re-signale comme un trou
+     * par la prochaine mesure. On ecrit donc le chemin la ou l'outil le voit,
+     * meme si ça duplique six lignes : la lisibilite par l'instrument fait
+     * partie du travail.
+     */
+    function suiteGeste(d) {
+        journalise(d
+            ? remplit('geste_reussi', { message: d.message || '' })
+            : remplit('geste_echoue', { message: textes.lecture_echec || '' }), ! d);
+        // L'etat affiche vient d'un RELEVE, jamais de la reponse du geste :
+        // « installe » annonce par celui qui installe n'est pas une reussite
+        // verifiee.
+        if (d && d.success === true) { faitReleve(); }
+    }
+
+    function demandeInstaller() {
+        var o = machineChoisie();
+        if (! o) { return; }
+        demande('conf_titre_install', 'conf_texte_install',
+            { machine: nomMachineChoisie() }, function () {
+                ferme();
+                litDistant('/fail2ban/install',
+                    { machine_id: parseInt(o.value, 10) }).then(suiteGeste);
+            });
+    }
+
+    function demandeRedemarrer() {
+        var o = machineChoisie();
+        if (! o) { return; }
+        demande('conf_titre_restart', 'conf_texte_restart',
+            { machine: nomMachineChoisie() }, function () {
+                ferme();
+                litDistant('/fail2ban/restart',
+                    { machine_id: parseInt(o.value, 10) }).then(suiteGeste);
+            });
+    }
+
     function agit(chemin, envoi) {
         ferme();
         var nom = jailCourante;
@@ -1815,8 +1881,20 @@ window.RW_FAIL2BAN = true;
 
     if (voirConfig) { voirConfig.addEventListener('click', litConfig); }
     if (voirLogs) { voirLogs.addEventListener('click', litLogs); }
+    if (boutonInstaller) { boutonInstaller.addEventListener('click', demandeInstaller); }
+    if (boutonRedemarrer) { boutonRedemarrer.addEventListener('click', demandeRedemarrer); }
 
-    relever.addEventListener('click', function () {
+    /*
+     * LE RELEVE EST NOMME — il ne l'etait pas, et il fallait le nommer.
+     *
+     * Deux gestes de service (installer, redemarrer) ont besoin de le
+     * declencher : l'etat affiche doit venir d'un RELEVE et jamais de la
+     * reponse de celui qui vient d'agir. « Installe » annonce par
+     * l'installateur n'est pas une reussite verifiee.
+     *
+     * Extraite telle quelle : aucun changement de comportement pour le clic.
+     */
+    function faitReleve() {
         var o = machineChoisie();
         if (! o) { return; }
         relever.disabled = true;
@@ -1849,10 +1927,21 @@ window.RW_FAIL2BAN = true;
             // offre — et la detection des services n'aurait rien a detecter.
             if (voirConfig) { voirConfig.hidden = ! d.installed; }
             if (voirLogs) { voirLogs.hidden = ! d.installed; }
+            /*
+             * EXCLUSION MUTUELLE, et elle vient du RELEVE et non d'une
+             * supposition : on n'offre pas d'installer ce qui est deja la, ni
+             * de redemarrer ce qui n'existe pas. Un bouton qui echoue toujours
+             * au meme endroit apprend a l'operateur que les echecs sont
+             * normaux.
+             */
+            if (boutonInstaller) { boutonInstaller.hidden = !! d.installed; }
+            if (boutonRedemarrer) { boutonRedemarrer.hidden = ! d.installed; }
             if (d.installed) { detecteServices(); chargeBlanche(); }
             // LES JAILS NE SE RENDENT QUE SI LE SERVICE TOURNE. Une grille vide
             // sous un « pas installe » ferait croire a un service sans jails.
             if (etatDe(d) === 'actif') { rendJails(d.jails); }
         });
-    });
+    }
+
+    relever.addEventListener('click', faitReleve);
 }());
