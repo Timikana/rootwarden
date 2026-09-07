@@ -116,6 +116,19 @@ return [
     'geo_resultat'   => ':pays (:code)',
     'geo_locale'     => 'adresse locale, aucune requête n\'est partie.',
     'geo_inconnu'    => 'le service n\'a pas su répondre.',
+    /*
+     * ⚠ « DESACTIVEE » N'EST PAS « EN PANNE », ET C'EST TOUT L'OBJET DE CETTE CLE.
+     * Le backend rend le code `OFF` (`fail2ban_manager.py:399`) et JAMAIS `??`,
+     * qui signifie deja « le service n'a pas su repondre ». Reutiliser `??`
+     * ferait passer un reglage delibere pour une panne du tiers : on
+     * chercherait une panne inexistante, ou on rallumerait l'interrupteur
+     * en croyant reparer.
+     *
+     * Le libelle NOMME la variable : sur un portail d'administration, savoir
+     * QUOI changer fait la difference entre un etat subi et un etat choisi.
+     */
+    'geo_desactivee' => "la géolocalisation est désactivée sur ce portail (GEOIP_ENABLED), "
+        . "aucune requête n'est partie — ce n'est pas une panne du service.",
     'geo_journal'    => ':ip — :detail',
     'geo_echec'      => "La géolocalisation a échoué. :message",
 

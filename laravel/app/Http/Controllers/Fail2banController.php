@@ -156,7 +156,7 @@ class Fail2banController extends Controller
             // tiers : un panneau vide y ferait consentir a une transmission
             // que rien ne nomme.
             'geo_bouton', 'geo_conf_titre', 'geo_conf_texte', 'geo_en_cours',
-            'geo_resultat', 'geo_locale', 'geo_inconnu', 'geo_echec', 'geo_journal',
+            'geo_resultat', 'geo_locale', 'geo_inconnu', 'geo_desactivee', 'geo_echec', 'geo_journal',
         ] as $cle) {
             $textes[$cle] = __('fail2ban.' . $cle);
         }

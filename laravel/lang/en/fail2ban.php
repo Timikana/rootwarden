@@ -76,6 +76,10 @@ return [
     'geo_resultat'   => ':pays (:code)',
     'geo_locale'     => 'local address, no request was sent.',
     'geo_inconnu'    => 'the service could not answer.',
+    /* See the French catalogue: `OFF` means DISABLED, never `??` (which already
+     * means "the service could not answer"). Naming the variable is deliberate. */
+    'geo_desactivee' => "geolocation is disabled on this portal (GEOIP_ENABLED); "
+        . "no request was sent — this is not a service failure.",
     'geo_journal'    => ':ip — :detail',
     'geo_echec'      => 'Geolocation failed. :message',
 
