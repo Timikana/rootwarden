@@ -22496,3 +22496,45 @@ ils sont de classe **A** aujourd'hui (`_config_file_path`, `AGENT_REGISTRY`), do
 > continuerait de l'exempter**. C'est le meme defaut qu'elle a decrit pour `shlex.quote`, sur l'autre
 > branche, et il est deja actif — sur des valeurs qui se trouvent etre sures.
 
+---
+
+## E-497 — REFERENCES DE LA SESSION 7 CLOTUREES, ET MON PROPRE PIEGE DE FORME POUR LA QUATRIEME FOIS
+
+**Clos le 2026-09-08.** Les deux references posees pour la session 7 sont non seulement **posees** mais
+**inscrites dans la liste jouee** — *une reference sans inscription est une couverture apparente.*
+
+    [go-adm-audit]            34 -> 22    l.360, posee le 2026-08-26 (e0174e65)
+    [go-page-cle-plateforme]  29 -> 30    l.361, posee le 2026-09-03 (ea476f17)
+
+**Mesure par APPARTENANCE aux quatre tableaux, pas par motif** :
+
+    SUITES_LARAVEL  85  =  REF_LARAVEL  85          reference sans inscription : AUCUNE
+    SUITES_LEGACY   82  =  REF_LEGACY   82          suite jouee sans reference : AUCUNE
+
+    go-adm-audit            SL oui / RL 22    SG oui / RG 32
+    go-page-cle-plateforme  SL oui / RL 30    SG oui / RG 15
+
+**Eprouve dans les deux sens et avec trois temoins** : `go-socle-navigation` present (positif),
+`go-bashrc-b4` absent (exclusion deliberee, `l.1265`), `go-adm-import-csv` dans aucune des deux (`l.1273`).
+
+### ⚠ ET MA PREMIERE SONDE ETAIT FAUSSE — QUATRIEME OCCURRENCE DU MEME PIEGE
+
+    grep -nE '^[[:space:]]*"?<suite>"?[[:space:]]*(\\|\)|$)' scripts/rejouer-lot.sh
+
+Ce motif suppose **une suite par ligne**. Les tableaux en portent **jusqu'a huit**. Resultat :
+
+    go-adm-audit            ->  « (pas sur cette forme) »   alors qu'elle est l.1309
+    go-page-cle-plateforme  ->  « l.1329 »                  ligne de SUITES_LEGACY, pas de la liste Laravel
+
+**Elle s'est trompee dans les DEUX sens a la fois** : un faux negatif *et* une fausse localisation. *Et le
+faux negatif etait du cote qui ALARME, la fausse localisation du cote qui RASSURE* — j'aurais pu conclure
+« la reference est une couverture apparente » ou « elle est bien dans la liste », les deux a tort.
+
+> **C'est la meme cause qu'E-452** (`awk` ancre en debut de ligne sur des lignes a quatre cles), que
+> l'espace unique avant `=>` (E-420), et que la regle d'allocation aveugle aux titres a emoji.
+> **Quatrieme fois. Un motif ecrit sur ses propres fichiers ne mesure pas un depot : il mesure un auteur** —
+> et ici il mesurait *l'auteur que je croyais etre*, celui qui met une suite par ligne.
+
+**La parade est structurelle, pas plus de soin** : *extraire le tableau, le decouper, tester
+l'APPARTENANCE.* Un ensemble ne se sonde pas par motif.
+
