@@ -581,19 +581,71 @@ jobs:
         with:
           php-version: "8.4"
           tools: composer
-      - name: Composer install (sans scripts pour eviter hooks arbitraires)
-        working-directory: legacy
-        run: composer install --no-scripts --no-interaction --no-progress
-      - name: Composer audit
-        working-directory: legacy
-        # --locked force le scan des versions exactes pinnees dans composer.lock
-        # --format=plain pour output GitHub-friendly
+      # ⚠ CE JOB N'AUDITAIT QUE LE LEGACY, ET C'EST UN JOB DE SECURITE.
+      #
+      # Les deux pas portaient `working-directory: legacy`. L'audit CVE couvrait
+      # donc les dependances du LEGACY MORT et jamais celles du portage :
+      #
+      #     legacy/composer.lock    14 paquets prod +  0 dev   <- audite
+      #     laravel/composer.lock   86 paquets prod + 33 dev   <- JAMAIS audite
+      #     74 paquets exclusifs au portage, dont guzzlehttp/guzzle,
+      #     egulias/email-validator, dragonmantank/cron-expression,
+      #     fruitcake/php-cors
+      #
+      # ── MESURE AVANT DE CHANGER, ET SON TEMOIN ──────────────────────────────
+      #
+      # `composer audit --locked` sur `laravel/` rend « No security vulnerability
+      # advisories found », code 0 (mesure du 2026-09-08 13:4x, en `www-data`,
+      # cache hors de l'arbre).
+      #
+      # ⛔ Et ce vert ne voulait rien dire tant que l'instrument n'avait pas ete
+      # eprouve : l'audit du legacy rendait AUSSI « rien trouve », donc deux zeros
+      # identiques. TEMOIN POSITIF forge — une copie du verrou dans /tmp avec
+      # `guzzlehttp/guzzle` retrograde de 7.15.3 a 6.5.0 — rend **14 avis
+      # affectant 1 paquet**, avec de vrais identifiants CVE. **L'instrument mord,
+      # donc le vert du portage est une mesure et non un silence.**
+      #
+      # ⚠ Au passage : CVE-2026-69246, severite haute, « Noncanonical host can
+      # bypass host-based checks », versions affectees `<7.15.2`. Le portage est
+      # en 7.15.3 — UN correctif au-dessus.
+      #
+      # ── `composer install` RETIRE ───────────────────────────────────────────
+      #
+      # `--locked` lit le VERROU : il n'a besoin ni de `vendor/` ni d'une
+      # installation. Verifie au temoin, qui a audite une copie sans jamais
+      # installer. Le job est donc plus couvrant ET plus rapide.
+      - name: Composer audit — LES DEUX verrous
         run: |
+          set -uo pipefail
+          echec=0
+          for d in laravel legacy; do
+            if [ ! -f "$d/composer.lock" ]; then
+              echo "::error::$d/composer.lock absent — les chemins ont bouge."
+              echo "Ce job ECHOUE plutot que de passer sans avoir mesure."
+              exit 1
+            fi
+            n=$(php -r '$v = json_decode(file_get_contents($argv[1]), true); echo count($v["packages"] ?? []) + count($v["packages-dev"] ?? []);' "$d/composer.lock")
+            # ⚠ TEMOIN : un verrou qui ne declare AUCUN paquet rendrait « rien
+            # trouve » sans avoir rien regarde.
+            if [ "$n" -eq 0 ]; then
+              echo "::error::$d/composer.lock ne declare aucun paquet."
+              exit 1
+            fi
+            echo "── $d : $n paquet(s) verrouilles"
+            if ! ( cd "$d" && composer audit --locked --format=plain ); then
+              echec=1
+            fi
+          done
+          # La clemence sur `pull_request` est CONSERVEE telle quelle : un avis
+          # publie entre deux commits ne doit pas bloquer une PR sans rapport.
+          # ⚠ Mais elle a un revers, dit ici plutot que tu : le bloquant ne joue
+          # que sur `main`, donc un nouvel avis y arrive SANS avertissement
+          # prealable. C'est une question ouverte, pas un choix mesure.
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            composer audit --locked --format=plain || true
-          else
-            composer audit --locked --format=plain
+            [ "$echec" -eq 0 ] || echo "::warning::avis trouve(s) — non bloquant sur une PR"
+            exit 0
           fi
+          [ "$echec" -eq 0 ] || exit 1
 
   # ─────────────────────────────────────────────────────────────
   # Job 4.5 : Trivy fs - scan vulnerabilites au niveau du repo
