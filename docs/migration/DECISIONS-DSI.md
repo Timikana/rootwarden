@@ -16705,3 +16705,63 @@ service, pas le fichier.*
 `07-…-NON-APPLIQUE.patch` → `07-…-APPLIQUE-2026-09-08.patch`. *Laisser un fichier
 dont le nom affirme le contraire de son état est le défaut que six dossiers de
 cette journée corrigent ailleurs.*
+
+---
+
+## E-517
+
+**RECTIFICATION de E-516, écrite vingt minutes après elle : archiver `php/`
+n'est PAS sûr, et archiver les `.htaccess` du legacy ouvrirait deux 403
+vivants.**
+
+J'allais archiver le répertoire `php/` (8 fichiers) et les 12 orphelins de
+`legacy/`, au motif que `patch 07` avait retiré la dernière référence. **La
+mesure l'interdit :**
+
+```
+rootwarden_php MONTE ENCORE, mesure par docker inspect :
+  legacy/        -> /var/www/html
+  legacy/logs/   -> /var/www/html/logs
+  php/php.ini    -> /usr/local/etc/php/php.ini
+  certs/         -> /var/www/certs
+
+et AU RESEAU, maintenant :
+  :8446/vendor/            -> 403     <- protege 767 fichiers .php
+  :8446/logs/              -> 403     <- « secrets, IPs, sessions » (son propre
+                                          commentaire)
+  TEMOIN /zzz-inexistant   -> 404     (donc les 403 signifient quelque chose)
+```
+
+**Les trois `.htaccess` — `legacy/`, `legacy/vendor/`, `legacy/logs/` — sont une
+protection ACTIVE, pas des vestiges.** Les archiver transformerait deux refus en
+répertoires ouverts, sur un service qui répond encore.
+
+### Ce que E-516 disait de faux, et pourquoi
+
+> *« retirer php/ (8 fichiers) — SÛR : plus aucune référence après ce patch »*
+
+**Plus aucune référence dans la DÉCLARATION. `php/php.ini` reste monté par le
+processus qui tourne.** *C'est ma propre distinction arbre / service, appliquée
+en écrivant au lieu d'en lisant : `patch 07` a modifié ce que `docker compose`
+LIRA, pas ce que le conteneur DÉTIENT.*
+
+### La conséquence sur l'ordre, et elle inverse une priorité
+
+**Le redémarrage n'est plus une commodité : c'est la PRÉCONDITION de tout geste
+d'archivage restant.**
+
+```
+1. `./maj.sh` ou `up -d`        retire le conteneur php et ses montages
+                                 -> emporte le faux UNHEALTHY (47 h)
+                                 -> met en service 19 commits backend
+2. SEULEMENT ENSUITE  archiver php/ (8) et les 12 orphelins de legacy/
+3. le numero de version         ordre non commutatif (E-507)
+4. retirer legacy/ et le vhost  l'etape ⑥ dit « en dernier »
+```
+
+*Et c'est exactement pourquoi la séquence d'extinction dit « en dernier, avec le
+vhost » : ses auteurs avaient l'ordre, je l'ai retrouvé en me heurtant dedans.*
+
+**Aucun geste ce tour-ci, et c'est le résultat.** *Un tour qui ne produit rien
+parce qu'une mesure l'a arrêté vaut mieux qu'un tour qui ouvre deux 403 sur 767
+fichiers.*
