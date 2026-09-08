@@ -156,6 +156,27 @@ use Illuminate\Support\Facades\DB;
  * Il reste donc une hypothese, et le trou de profil doit etre traite comme
  * potentiellement reel jusqu'a ce qu'une connexion le tranche.
  *
+ * ⛔ MAIS CETTE QUESTION OUVERTE NE RETIENT AUCUN GESTE — et il faut le dire ici,
+ * sinon ce commentaire fabrique lui-meme l'attente qu'il decrit.
+ *
+ *     correctif de VALIDATION  faire dominer `_validate_path` les DEUX branches
+ *                              -> ferme l'injection de saut de ligne
+ *                              -> ne touche AUCUNE des trois directives ouvertes
+ *                              -> NE DEPEND PAS de l'hypothese. A ecrire.
+ *     trou de PROFIL           nommer les trois directives dans le bloc
+ *                              -> exige de decider ce qu'un compte restreint doit
+ *                                 pouvoir faire : un ARBITRAGE, pas une mesure
+ *
+ * **Les deux defauts sont disjoints, et mesure : l'injection ne peut pas elargir
+ * le trou de profil** (les trois valent deja `yes`/`any`/`any`, y injecter la
+ * meme valeur ne change rien et l'inverse restreindrait). *La question ouverte
+ * informe la DECISION ; elle ne bloque pas le CORRECTIF.*
+ *
+ * ⚠ Et la voie « remonter a la documentation » est fermee d'ici : la page de
+ * manuel `sshd_config` n'est dans AUCUN conteneur — `rootwarden_test_server`
+ * porte le binaire sans la page, les autres n'ont ni l'un ni l'autre. Mesure
+ * faite pour que personne ne la refasse.
+ *
  * **Donc `sshd -t` ne rejette pas le doublon, et la directive la plus consequente
  * de cet endroit — `ForceCommand` — est neutralisee par la regle du premier
  * gagnant d'OpenSSH.** Le residu reel : un role 3 peut ACTIVER sur ce compte ce
