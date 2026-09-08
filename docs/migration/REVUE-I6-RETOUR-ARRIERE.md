@@ -116,3 +116,84 @@ if (mien !== jetonLecture) { return; }   // en tete du .then(), AVANT tout rendu
     NON MESURE    je n'ai pas provoque la course au navigateur : je ne prends
                   jamais le banc. **Le defaut est lu, pas reproduit** — et c'est
                   une borne, pas une reserve de style.
+
+---
+
+## 4. L'ASYMÉTRIE `restaure()` — la contrainte qui la bloquait NE S'APPLIQUE PAS
+
+**Personne ne l'a prise. Elle est dans mon périmètre. Et la raison invoquée pour
+ne pas la refermer est mesurée fausse.**
+
+### 4.1 La contrainte, telle qu'elle m'a été posée
+
+> *« `/iptables-` est une entrée à PRÉFIXE de la liste blanche : ce qui tient est
+> que ce script ne compose aucune autre requête — la fermeture PAR L'ABSENCE. Si
+> ton correctif ajoute un appel sous `/iptables-`, cette fermeture cesse d'être
+> vraie. »*
+
+**Elle est juste comme énoncé général. Elle ne s'applique pas ici.**
+
+```
+chemins /iptables- DEJA composes par pare-feu.js :
+  :333   '/iptables'
+  :752   '/iptables-validate'      <- DEJA DANS L'ENSEMBLE
+  :975   '/iptables-apply'
+  :1208  '/iptables-rollback'
+```
+
+> **La fermeture par l'absence porte sur QUELS points d'accès le script atteint,
+> pas sur COMBIEN de fois il les appelle.** *`/iptables-validate` y est depuis I4.
+> Ajouter un cinquième site d'appel vers un point déjà atteint n'élargit
+> l'ensemble d'aucun élément.*
+
+**La contrainte a été appliquée à un cas qu'elle ne couvre pas — et elle a tenu
+la correction fermée.**
+
+### 4.2 Et l'asymétrie a une conséquence que « atomique » ne couvre pas
+
+**On pourrait croire le manque bénin : `iptables-restore` échoue proprement, les
+règles en mémoire survivent.** *C'est vrai du RUNTIME, et faux du fichier.*
+
+`iptables_manager.py` — `apply_iptables_rules()` :
+
+```
+1. _write_rules_safe(...)  ->  ECRIT /etc/iptables/rules.v4
+2. iptables-restore < /etc/iptables/rules.v4   ->  CHARGE
+```
+
+> ⛔ **Le fichier est écrit AVANT d'être chargé.** *Un jeu malformé écrase le
+> fichier persistant, puis échoue au chargement : la machine garde ses règles
+> **jusqu'au prochain redémarrage**, et se relève sans pare-feu.*
+
+**Le chemin `apply` valide ; le chemin `restaure` ne valide pas ; les deux
+appellent la MÊME fonction en aval.** *Le défaut n'est donc pas « une validation
+en moins » : c'est un défaut À RETARDEMENT, sur le seul des deux chemins qui n'a
+pas de garde.*
+
+*Le risque reste modéré — une version archivée était chargeable le jour de son
+archivage. Il faut que l'`iptables` de la machine ait changé depuis. **Sur un parc
+qu'on met à jour, c'est une question de temps, pas de possibilité.***
+
+### 4.3 ⛔ CE QUI RESTE À ARBITRER, ET QUI N'EST PAS À MOI
+
+**Je peux écrire l'appel. Je ne peux pas décider de son SENS D'ÉCHEC.**
+
+    validate rend « syntaxe invalide »   -> refuser, evidemment
+    validate rend une ERREUR (500, reseau, machine injoignable)
+        -> proceder quand meme ?   le geste reste possible, la garde est muette
+        -> refuser ?               une machine injoignable interdit le retour
+                                   arriere, alors que c'est peut-etre pour ca
+                                   qu'on veut le faire
+
+> **C'est le même arbitrage que sur `/iptables-validate` en I4 : la route rend
+> `success: false` pour QUATRE situations distinctes, et le discriminant est le
+> STATUT.** *Ici la question n'est pas comment lire la réponse — c'est ce qu'on
+> fait quand il n'y en a pas.*
+
+**Refuser est cohérent avec « seule une preuve d'ouverture ouvre ». Mais Q2 a
+déjà refusé ce qu'il fallait refuser, et un second refus qui porte sur
+l'INJOIGNABILITÉ retire une capacité de reprise.**
+
+*Je pose la question plutôt que de choisir : c'est une décision de produit sur un
+geste irréversible, et la dernière fois qu'une contrainte a été appliquée sur une
+prémisse non vérifiée, elle a tenu un sous-lot fermé trois jours.*
