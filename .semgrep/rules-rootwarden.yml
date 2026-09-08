@@ -25,7 +25,18 @@ rules:
   - id: rw-shell-fstring-execute-as-root
     patterns:
       - pattern: execute_as_root($CLIENT, f"...{$VAR}...", ...)
-      - pattern-not: execute_as_root($CLIENT, f"...{shlex.quote($VAR)}...", ...)
+      # ⚠ CETTE EXEMPTION NE FONCTIONNAIT PAS, ET PERSONNE NE POUVAIT LE SAVOIR.
+      # Elle etait ecrite `f"...{shlex.quote($VAR)}..."` — une forme AST. La regle
+      # n'ayant jamais compile (cf. le `pattern-not` base64 ci-dessous), elle n'a
+      # jamais tourne : son exemption n'avait donc jamais ete eprouvee.
+      #
+      # Le temoin negatif de `ci.yml` l'a mesuree des la premiere execution : sur
+      # deux appels GARDES, seul celui a `shlex.quote` a mordu — celui passant par
+      # `base64 -d`, exempte par un `pattern-not-regex`, ne mordait pas.
+      # **La regle aurait donc accuse TOUT appel correctement echappe.** Une regle
+      # qui accuse a tort s'use plus vite qu'une regle absente : celui qui sait son
+      # code bon apprend que le garde se trompe, donc a passer outre.
+      - pattern-not-regex: 'shlex\.quote'
       # ⚠ CETTE EXEMPTION ETAIT `f"...{base64...}..."`, ET LA REGLE ENTIERE NE
       # COMPILAIT PAS : `base64...` n'est pas une expression Python. Une regle qui
       # ne compile pas rend ZERO trouvaille, et zero se lit « propre » — la regle
