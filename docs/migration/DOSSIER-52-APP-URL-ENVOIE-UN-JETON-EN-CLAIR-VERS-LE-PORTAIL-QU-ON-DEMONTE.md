@@ -376,3 +376,94 @@ demandé.*
 par `artisan tinker`, et par lecture de code. Soumettre `/mot-de-passe-oublie` enverrait un
 courriel à une personne réelle — et, ce défaut étant ce qu'il est, ce serait aussi la
 démonstration qu'on refuse de faire.*
+
+---
+
+# ⚖ ARBITRAGE FINAL — un seul geste, une clé dédiée, et l'absence est fatale
+
+**2026-09-08, ~05:4x, après la pré-relecture `195d1bfe`.** *La proposition qui m'est faite est
+meilleure que mon ordre ; je la retiens en changeant un point, parce qu'elle rouvrirait
+sinon le défaut qu'on vient de fermer ailleurs.*
+
+## ① `TrustHosts` D'ABORD EST REFUSÉ, ET L'ARGUMENT EST DÉCISIF
+
+```
+hotes declares dans le depot : localhost · 192.168.0.245     et rien d'autre
+le portail est joint par IP ET par nom, depuis plusieurs reseaux
+<VirtualHost> : 2 · ServerAlias : 0   ->  vhost CATCH-ALL, tout `Host:` est servi
+```
+
+> **Une liste incomplète COUPE un accès réel.** *Poser `TrustHosts` ce soir, c'est échanger
+> une vulnérabilité LATENTE contre une panne d'accès CERTAINE.* **Et côté Apache le rayon est
+> pire : une adresse oubliée ne casse pas le courriel, elle casse le PORTAIL.**
+
+**`TrustHosts` reste souhaitable ENSUITE**, en défense en profondeur, *le jour où quelqu'un
+peut énumérer sans deviner.*
+
+## ② MON ORDRE « 1 AVANT 0 » DISPARAÎT AU LIEU D'ÊTRE RESPECTÉ
+
+*Il n'existait que parce que le correctif lirait `config('app.url')` — une valeur qu'on SAIT
+fausse.* **Ne pas la lire supprime la dépendance.** Un geste, pas deux.
+
+## 🔴 ③ MAIS PAS UNE VALEUR ÉCRITE DANS LE CODE — ET VOICI POURQUOI
+
+*« Depuis une valeur vérifiée au moment de poser le correctif »* peut se lire « en dur ».
+**Ce serait exactement le défaut qu'on vient de refuser deux fois cette nuit** : une IP en
+dur est fausse pour tout autre déploiement et se périme au premier changement de port.
+
+**Donc : une CLÉ DÉDIÉE, et l'absence est FATALE.**
+
+```
+la cle      une variable dont le SEUL role est la base des liens de courriel
+            ⛔ PAS `MAIL_URL` : deja pris par config/mail.php:77, et c'est le DSN
+               du TRANSPORT Laravel. Reutiliser le nom serait une collision de sens.
+declaree    dans srv-docker.env.example, donc VISIBLE et gardable par l'arbre
+defaut      AUCUN. Absente => on n'envoie PAS, et on journalise.
+portee      le chemin du courriel seul. Aucun autre chemin ne bouge.
+```
+
+> **L'absence fatale est ce qui rend le défaut inexprimable, pas seulement corrigé.** *Un
+> repli — sur `APP_URL`, sur l'hôte de la requête, sur `localhost` — rouvre exactement la
+> classe de défaut qu'on ferme : un lien silencieusement faux.* **Ici, pas de valeur, pas de
+> courriel.**
+
+*C'est mon propre classement des gardes appliqué à moi-même : inexprimable > dérivé >
+exhaustif > contrôlé. Ma première recommandation était au troisième rang.*
+
+## ⚠ ④ CE QUE JE NE TRANCHE PAS, ET QUI APPARTIENT À CE FICHIER
+
+**« On n'envoie pas » change le profil de temps que ce contrôleur borne avec soin.** Son
+docblock mesure un résidu de **2,4 ms, 1 % du coût de base**, et maintient une liste fermée
+`TRANSPORTS_LOCAUX` pour que l'écart reste dans ce résidu.
+
+```
+la reponse au demandeur doit rester IDENTIQUE — la propriete anti-enumeration
+   du flux en depend, et elle est deliberee
+mais ne pas envoyer retire un cout ;  le journaliser en ajoute un autre
+```
+
+**Je ne décide pas comment absorber cet écart** — c'est la session qui tient ce fichier qui a
+mesuré le résidu, et elle seule sait si un `INSERT` de journal l'y maintient. *Ce que
+j'exige : que la réponse au demandeur ne change pas, et que l'écart soit MESURÉ et non
+supposé.*
+
+## ⑤ ET UNE FAUSSE ALARME QUI M'AURAIT VISÉE
+
+La pré-relecture allait signaler `LARAVEL_URL=https://192.168.0.245:8443` comme pointant
+vers le legacy. **Sa fiche disait l'inverse — et elle avait raison le jour où elle a été
+écrite.** `8443` est le PORTAGE depuis l'échange.
+
+> ⛔ **Mon argument « `APP_URL` pointe vers le legacy en clair » est vrai, et sa vérité dépend
+> d'un échange de ports que personne n'a en tête.** *Je l'ai revérifié : `:8444` est bien
+> `rootwarden_php`. Mais un argument dont la prémisse se retourne tous les deux jours doit
+> voyager avec sa mesure, jamais seul.*
+
+**Et la pré-relecture ne pouvait PAS vérifier `APP_URL` : `laravel/.env` lui est refusé en
+lecture.** *La valeur qui fondait mon ordre n'était donc contrôlée par personne d'autre que
+moi — raison de plus pour que l'ordre disparaisse.*
+
+## ⛔ LA DÉMONSTRATION NE SERA PAS FAITE, DES DEUX CÔTÉS
+
+**La démonstration de ce défaut EST le défaut** : elle enverrait un lien piégé à une personne
+réelle. *Ce qui était mesurable sans l'actionner l'a été ; le reste ne vaut pas ce qu'il
+coûterait.*
