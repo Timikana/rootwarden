@@ -343,6 +343,16 @@ def _switch_to_root_shell(client: paramiko.SSHClient, root_password: str,
         deadline = time.time() + 5
         while time.time() < deadline:
             if channel.recv_ready():
+                # LA REGLE MORD HORS DE SON OBJET, et son propre message le dit : elle vise
+                # `errors='ignore'` « sur un dechiffrement = padding oracle ». Ici il n'y a
+                # aucun dechiffrement : c'est un FLUX d'octets d'un canal paramiko, lu par
+                # tranches de 1024. Un caractere UTF-8 multi-octets peut etre COUPE entre
+                # deux tranches — `strict` leverait sur une coupure legitime, ce qui serait
+                # un defaut et non une garde.
+                # Le correctif JUSTE serait un decodeur incremental (`codecs.getincrementaldecoder`),
+                # pas `strict`. Note ecrite ici pour que l'exemption ne fasse pas oublier
+                # qu'il reste mieux a faire.
+                # nosemgrep: rw-decode-errors-ignore
                 output += channel.recv(1024).decode('utf-8', errors='ignore')
                 if '#' in output:
                     break

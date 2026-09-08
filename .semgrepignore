@@ -1,0 +1,19 @@
+# Code ARCHIVE par l'extinction du legacy : plus servi, plus charge, conserve
+# pour la trace. Le scanner y trouve de vrais defauts d'un code MORT (AES-CBC
+# sans MAC dans adm/includes/crypto.php), et ce bruit rendra la porte muette
+# — c'est deja arrive : le job est reste rouge cinq jours sans lecteur.
+# On ignore l'archive pour que le rouge redevienne un signal.
+legacy/_deprecated/
+
+# Tests du backend. ALIGNEMENT sur les deux scanners freres, mesure et non
+# suppose : `bandit` porte `--exclude ./tests` (ci.yml:311) et `.gitleaks.toml`
+# exempte `backend/tests/` (ligne 34). semgrep etait le seul a les scanner.
+#
+# Et l'annotation en place est IMPOSSIBLE ici, pas seulement malcommode :
+# la trouvaille (test_revocation_acces.py:242) vit dans un `with` continue par
+# des `\` — un `# nosemgrep` en ligne precedente casse la continuation, et en
+# fin de ligne il suit un `\`, ce qui est une erreur de syntaxe.
+#
+# Ce qu'elle signalait : `canal.execute(f'__remove_sudoers__ {u}')`, ou `canal`
+# est un MOCK et la chaine un marqueur — ni curseur, ni SQL.
+backend/tests/
