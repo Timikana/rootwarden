@@ -16889,3 +16889,58 @@ conteneur php                           Up 2 days (unhealthy) — patch 07 le
 ```
 
 **Rien de tout cela n'est cassé. Tout attend une recréation de conteneur.**
+
+---
+
+## E-520
+
+**RETRACTATION : « 63 tables » était juste. Mon « 65 » était deux commentaires.**
+
+Je l'ai transmis trois fois à l'exploitant, publié dans `DOSSIER-56 §7.2`, et
+inscrit dans `E-504` comme une péremption d'`ARCHITECTURE.md`. **C'était faux, et
+dans le sens qui accuse.**
+
+```
+base vivante (information_schema)   63 BASE TABLE, 0 vue
+schema, analyseur corrige           63
+migrations                          65 fichiers · 65 enregistrees · derniere 065
+```
+
+**Les deux « tables » en trop venaient de COMMENTAIRES :**
+
+```
+« ci »  033_graylog.sql:29
+        -- … les colonnes existent deja via CREATE TABLE ci-dessus.
+« if »  055_machine_groups.sql:10
+        -- Idempotent : CREATE TABLE IF NOT EXISTS. Pas de point-virgule…
+```
+
+*Quatrième contamination par les commentaires du même jour — les trois autres en
+JavaScript, celle-ci en SQL, quelques heures plus tard. **Et les deux
+commentaires coupables parlent de `CREATE TABLE` en expliquant l'idempotence :
+la prose d'un dépôt discute ses propres constructions.***
+
+### La parade est structurelle, pas lexicale
+
+**Exiger le `(` qui suit une déclaration de table suffit seul** — un commentaire
+qui cite `CREATE TABLE` ne le fait jamais suivre d'une parenthèse ouvrante.
+*S'ancrer sur la syntaxe qui DOIT suivre est plus fort que d'apparier le mot-clé,
+et ça ne demande aucun dépouillement.*
+
+### Deux conséquences
+
+**① `SKILL.md:16` n'est PAS à corriger.** Je l'ai signalé trois tours de suite
+comme un défaut. *Il avait raison, et j'ai bien fait de ne pas y toucher sans
+autorisation — mais pour la mauvaise raison : je respectais un périmètre, alors
+que le fond était en ma défaveur.*
+
+**② Aucune migration n'attend.** `schema_migrations` compte 65 entrées pour 65
+fichiers, dernière appliquée `065`. *Ma fiche mémoire portait « migrations
+052-061 à appliquer » — périmé.*
+
+### Le compte de la journée
+
+**Sept fausses alarmes, toutes du côté qui accuse.** Un substitut mesure la
+forme, et le soin se voit dans la forme : *ici, les fichiers accusés étaient ceux
+dont les commentaires expliquaient le plus soigneusement leur propre
+idempotence.*
