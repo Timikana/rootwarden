@@ -52,6 +52,72 @@ from routes.helpers import require_api_key, require_role, require_permission, re
 from ssh_utils import ssh_session, validate_machine_id, execute_as_root, execute_as_root_stream
 
 
+# ══ E-463 : `time_` ET `date` ATTEIGNAIENT UNE LIGNE DE `cron.d` EXECUTEE EN ROOT ══
+#
+# Les deux routes « advanced » construisaient leur expression cron par
+# `time_.split(':')` et `date.split('-')`, sans AUCUNE validation de forme —
+# `if not all([date, time_])` ne verifie que la PRESENCE. Le resultat part en
+# base64 vers `/etc/cron.d/…`, puis `chmod 0644` et `systemctl restart cron`.
+#
+# ⚠ LE BASE64 N'EST PAS LE DEFAUT, IL EST LE TRANSPORTEUR. Cote shell il est
+# irreprochable — alphabet `[A-Za-z0-9+/=]`, aucun metacaractere — et c'est
+# pourquoi la regle semgrep de shell se tait A JUSTE TITRE. **Mais le puits n'est
+# pas le shell** : le flux decode est un fichier `cron.d`, ou un saut de ligne
+# suivi de n'importe quoi devient UNE LIGNE EXECUTEE EN ROOT.
+#
+# ══ POURQUOI DERIVER ET NON FILTRER ════════════════════════════════════════
+#
+# Une regex serait le mauvais remede, et pas seulement par gout : en Python, une
+# ancre `$` accepte un `\n` FINAL. Une garde de ce type ne tient alors que par le
+# `.strip()` voisin — et un `.strip()` voisin se retire par megarde.
+#
+# Ces deux fonctions RENDENT DES ENTIERS. La chaine recue n'est jamais reemise,
+# donc rien de ce qu'elle contient ne peut survivre. C'est ce qui rend inoffensive
+# la tolerance de `int()`, mesuree le 2026-09-08 :
+#
+#     int('14\n')  ->  14      le saut de ligne est avale... et jete avec la chaine
+#     int('\u0661\u0664')   ->  14      chiffres arabes-indiens acceptes, meme resultat
+#     int('14\n* * * * * root x')  ->  ValueError
+#
+# **Un filtre aurait du enumerer ce que `int()` tolere. Une derivation s'en
+# moque** — elle n'emploie que la valeur produite.
+#
+# `strptime` refuse la queue (`'2026-01-05\n'` -> ValueError), et on rend quand
+# meme `d.year/d.month/d.day` : la meme raison, deux fois.
+#
+# ⚠ Et la forme etait DEJA dans ce fichier : `schedule_update` (`:411`) ecrit dans
+# le meme puits et n'interpole que `int(data.get('interval_minutes'))`. Les deux
+# routes « advanced » sont un OUBLI, pas une architecture.
+
+
+def _cron_heure_minute(brut):
+    """(heure, minute) bornes depuis « HH:MM ». Leve `ValueError` sinon.
+
+    Rend des ENTIERS : la chaine recue n'atteint jamais le fichier `cron.d`.
+    """
+    parties = str(brut).split(':')
+    if len(parties) != 2:
+        raise ValueError('format horaire attendu : HH:MM')
+    heure = int(parties[0])
+    minute = int(parties[1])
+    if not 0 <= heure <= 23:
+        raise ValueError('heure hors bornes [0,23]')
+    if not 0 <= minute <= 59:
+        raise ValueError('minute hors bornes [0,59]')
+    return heure, minute
+
+
+def _cron_annee_mois_jour(brut):
+    """(annee, mois, jour) depuis « YYYY-MM-DD ». Leve `ValueError` sinon.
+
+    `strptime` valide ET decompose ; on rend ses composants ENTIERS, jamais la
+    chaine — donc une queue eventuelle ne pourrait pas voyager.
+    """
+    import datetime as _dt
+    d = _dt.datetime.strptime(str(brut), '%Y-%m-%d')
+    return d.year, d.month, d.day
+
+
 def _maintenance_block(machine_id):
     """Retourne une reponse (json, 423) si une fenetre de maintenance interdit
     l'action mutante maintenant, sinon None. Best-effort (fail-open en cas
@@ -632,6 +698,16 @@ def schedule_advanced_update():
         return jsonify({'success': False, 'message': str(e)}), 400
     if not all([date, time_]):
         return jsonify({'success': False, 'message': 'Paramètres manquants'}), 400
+
+    # E-463 : la FORME est validee ICI, avant toute connexion. Une valeur forgee
+    # est refusee sans qu'aucune machine ne soit jointe.
+    try:
+        _heure, _minute = _cron_heure_minute(time_)
+        _annee, _mois, _jour = _cron_annee_mois_jour(date)
+    except (ValueError, TypeError) as e:
+        return jsonify({'success': False,
+                        'message': f'Date ou heure invalide : {e}'}), 400
+
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor(dictionary=True)
@@ -650,13 +726,13 @@ def schedule_advanced_update():
         root_password = server_decrypt_password(row['root_password'], logger=logger)
         # Construction de l'heure du job cron selon le type de répétition
         if repeat == 'daily':
-            cron_time = f"{time_.split(':')[1]} {time_.split(':')[0]} * * *"
+            cron_time = f"{_minute} {_heure} * * *"
         elif repeat == 'weekly':
-            cron_time = f"{time_.split(':')[1]} {time_.split(':')[0]} * * 1"
+            cron_time = f"{_minute} {_heure} * * 1"
         elif repeat == 'monthly':
-            cron_time = f"{time_.split(':')[1]} {time_.split(':')[0]} 1 * *"
+            cron_time = f"{_minute} {_heure} 1 * *"
         else:
-            cron_time = f"{time_.split(':')[1]} {time_.split(':')[0]} {date.split('-')[2]} {date.split('-')[1]} *"
+            cron_time = f"{_minute} {_heure} {_jour} {_mois} *"
         import base64
         apt_command = "export LC_ALL=C.UTF-8 && export LANG=C.UTF-8 && apt-get update && apt-get upgrade --with-new-pkgs --only-upgrade -y >> /var/log/auto_update.log 2>&1"
         cron_job = f"{cron_time} root {apt_command}\n"
@@ -700,6 +776,15 @@ def schedule_advanced_security_update():
     if not all([date, time_]):
         return jsonify({'success': False, 'message': 'Paramètres manquants (date ou time)'}), 400
 
+    # E-463 : la FORME est validee ICI, avant toute connexion (voir les
+    # deriveurs en tete de module).
+    try:
+        _heure, _minute = _cron_heure_minute(time_)
+        _annee, _mois, _jour = _cron_annee_mois_jour(date)
+    except (ValueError, TypeError) as e:
+        return jsonify({'success': False,
+                        'message': f'Date ou heure invalide : {e}'}), 400
+
     try:
         # Récupération des infos SSH depuis la BDD
         with get_db_connection() as conn:
@@ -718,23 +803,20 @@ def schedule_advanced_security_update():
         ssh_password = server_decrypt_password(row['password'], logger=logger)
         root_password = server_decrypt_password(row['root_password'], logger=logger)
 
-        # Construction de l'expression cron en décomposant la date et l'heure
-        parts_date = date.split('-')  # [YYYY, MM, DD]
-        parts_time = time_.split(':')  # [HH, MM]
-        minute = parts_time[1]
-        hour = parts_time[0]
-
+        # E-463 : l'expression cron ne porte QUE des entiers derives. Les
+        # `parts_date`/`parts_time` d'avant reemettaient la chaine recue.
         if repeat == 'daily':
-            cron_time = f"{minute} {hour} * * *"
+            cron_time = f"{_minute} {_heure} * * *"
         elif repeat == 'weekly':
             import datetime
-            dt = datetime.datetime.strptime(date, "%Y-%m-%d")
-            day_of_week = dt.weekday() + 1  # Monday=1, Sunday=7
-            cron_time = f"{minute} {hour} * * {day_of_week}"
+            # Le jour de semaine se derive des composants ENTIERS, pas de la
+            # chaine : `date` n'atteint plus l'expression par aucun chemin.
+            day_of_week = datetime.date(_annee, _mois, _jour).weekday() + 1  # lundi=1
+            cron_time = f"{_minute} {_heure} * * {day_of_week}"
         elif repeat == 'monthly':
-            cron_time = f"{minute} {hour} {parts_date[2]} * *"
+            cron_time = f"{_minute} {_heure} {_jour} * *"
         else:  # 'none'
-            cron_time = f"{minute} {hour} {parts_date[2]} {parts_date[1]} *"
+            cron_time = f"{_minute} {_heure} {_jour} {_mois} *"
 
         # Commande de mise à jour de sécurité
         security_command = (
