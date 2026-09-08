@@ -392,3 +392,32 @@ portées CHANGENT.
 **Le prédicat juste ne passe pas par git** : `version.txt` existe sur disque et pas dans
 l'index. Un test de préfixe de chemin le voit ; `git ls-files` ne le verra jamais.
 *Ce n'est pas mon périmètre d'y toucher.*
+
+### 10.4 ⛔ BORNE SUR MON §10.2 — « épuisée » ne vaut que pour `etapes()`
+
+**Mesuré le 2026-09-08 17:05 CEST**, après correction d'un pair. J'ai écrit que *« ce
+qu'il reste à décider n'est plus un ORDRE, c'est une LISTE »*, et j'ai conclu ailleurs
+que **`patch 07` n'avait plus d'objet. C'est faux.**
+
+    docs/migration/patchs-en-attente/07-retrait-du-service-php-NON-APPLIQUE.patch
+    3 hunks · 95 lignes retirees · 0 ajoutee
+    cibles : docker-compose.yml  ET  docker-compose.prod.yml
+    `php:` declare a docker-compose.yml:8 et prod.yml:58
+    mentions de `version.txt` dans le patch : 0   (contre-epreuve : `legacy` -> 9)
+
+> **J'ai confondu l'ÉTAPE 7 de `etapes()` — dont les portées sont vides — avec le
+> `patch 07`, qui retire le SERVICE.** Deux objets, deux numéros 7, deux natures : l'un
+> déplace des fichiers, l'autre supprime un service de l'orchestration. **C'est une
+> collision de NOMS, et le sens de mon erreur est un dédouanement** : j'ai déclaré sans
+> objet un geste qui en a 95 lignes.
+
+**L'énoncé juste, borné :** les 12 portées de `etapes()` sont épuisées ; **l'extinction
+au niveau de l'ORCHESTRATION ne l'est pas.** Il reste donc bien un ordre :
+
+    patch 07        retire le service `php` — 95 lignes, NON applique
+                    ⚠ ne touche PAS `- ./legacy/version.txt:…:ro` du service laravel
+    ensuite         le retrait de `_deprecated/` ou du vhost
+                    ⚠ C'EST LUI que la precondition du §9 garde, pas le patch 07
+
+*Après `patch 07`, le portage garde son montage et le pied de page affiche toujours son
+numéro.* **Nommer la précondition sur `patch 07` la ferait classer « déjà satisfaite ».**
