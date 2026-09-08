@@ -16311,3 +16311,84 @@ sans objet** : la file des 11 est épuisée, vérifiée item par item (E-501) pu
 par le script d'extinction lui-même (E-508, six fois « déjà archivée »).
 **Étape 3 : la déclaration `socle_avertissement` tient**, témoin étalonné dans
 le fichier, parité 40/40.
+
+---
+
+## E-511
+
+**Mon cliquet était aveugle sur 15 suites, et il ne se signalait pas. Il était
+déjà sur `main`.**
+
+Relevé par `gestion-ssh-key-c6` deux heures après ma fusion. Mon prédicat ne
+retenait que `puppeteer.launch` : les 15 suites qui lancent par
+`launchBrowser()` étaient **hors population**.
+
+```
+REFERENCE avant   { population: 110, defautA: 62, defautB: 37 }
+REFERENCE apres   { population: 125, defautA: 70, defautB: 37 }
+```
+
+> **Un cliquet dont la POPULATION est trop étroite ne se signale pas de
+> lui-même, et son vert rassure plus qu'une absence de cliquet.** *Une
+> régression dans ces 15 suites n'aurait rien déclenché.* C'est la forme que
+> j'écris aux autres sessions depuis trois jours, commise dans mon propre
+> instrument, deux heures après l'avoir publié.
+
+### Le motif de fermeture est maintenant DÉRIVÉ, plus deviné
+
+Recensement des receveurs de `.close(` sur la source dépouillée de tout
+`tests/e2e/` :
+
+```
+ctx 151 · navigateur 121 · browser 30 · c 28 · page 11 · ctxEn 4 · context 1
+```
+
+`ctx`, `c`, `ctxEn`, `context` sont des **contextes** et `page` une page.
+**Compter tout `.close()` fait passer un `ctx.close()` dans un `finally` pour
+une fermeture de navigateur — donc une suite qui ferme proprement ses contextes
+et n'a JAMAIS fermé le navigateur est classée saine.** C'est l'écart entre son
+(a) à 68 et le mien à 70 : *son motif exonère.*
+
+⚠ **Et le mien était sale dans l'autre sens** : il listait `nav` et `b`, qui ont
+**zéro** occurrence dans le recensement. Inoffensifs, mais inventés — *et deux de
+mes témoins forgés les employaient, donc ils ont échoué au resserrement et
+m'ont attrapé. Un témoin qui échoue parce qu'on a corrigé le code testé est un
+témoin qui fonctionne.*
+
+### Un recensement à l'EXÉCUTION, parce qu'un dérivé se périme
+
+Un motif dérivé de la source d'aujourd'hui ne couvre pas le code de demain : une
+suite neuve nommant son navigateur autrement serait invisible. **L'instrument
+recense donc les receveurs à chaque exécution et refuse tout nom inconnu** — la
+classification devient une décision explicite au lieu d'un oubli silencieux.
+
+**Six témoins forgés, tous verts**, dont les deux qui manquaient : la fabrique
+entre dans la population, et un contexte fermé ne dédouane plus.
+
+### Écart résiduel, déclaré plutôt que masqué
+
+**132 chez lui, 125 chez moi — sept fichiers, cause non identifiée.** Trois
+s'expliquent peut-être par mes propres fichiers `lib-navigateur*`, exclus chez
+moi. **Les quatre autres restent ouverts, et je le dis** : *un accord partiel
+présenté comme un accord ferait ranger le désaccord restant par ressemblance.*
+
+### Et la raison que j'avais donnée pour ne pas adopter était FAUSSE
+
+J'avais écrit que les 62 (désormais 70) adoptions « exigent le banc », en
+laissant entendre la mémoire. **Mesuré :**
+
+```
+memoire disponible          1103 Mio   -> assez pour UN Chromium (~300 Mio)
+:8443/connexion             200
+login_attempts              2 lignes   -> le garde anti-rejeu est quasi vide
+E2E_TOTP_SECRET             ABSENT de l'environnement ET de srv-docker.env
+```
+
+**Le mur n'est pas la mémoire : c'est un secret que je n'ai pas et que je ne
+dois pas demander.** *Une raison vague se recopie ; une raison nommée se lève ou
+se contourne.* Et le contournement que je cherchais — une suite n'exigeant
+aucune connexion — n'a pas pu être établi : **mon détecteur de secrets a rendu
+`0 / 110`, et ses deux témoins ont échoué** (`go-socle-auth.mjs` classé « aucun
+secret » alors qu'il lit `process.env.E2E_TEST_PASS`). Cause : `[A-Z_]*`
+n'apparie pas le **chiffre** de `E2E_`. *Le témoin a tenu, le relevé n'a pas eu
+lieu, et je ne publie pas la liste qui en sortait.*
