@@ -208,6 +208,14 @@ class LiensLegacy
         '/adm/server_user_sftp.php/'  => 'acces-sftp',
         '/security/compliance_report.php/' => 'rapport-conformite',
         '/documentation.php/'  => 'documentation',
+        /*
+         * ⚠ TROUVEE EN REBASCULANT LE MENU, pas en relisant la table. Le legacy
+         * porte `/notifications.php` en lien de la cloche (`menu.php:181`), et
+         * le portage a la route `notifications` (`web.php:737`) — mais rien ne
+         * les reliait ici. **Une table de correspondance ne se verifie pas en la
+         * lisant : elle se verifie contre ce que les pages POINTENT.**
+         */
+        '/notifications.php/'  => 'notifications',
         '/profile.php/'        => 'profil',
         '/'                    => 'accueil',
     ];
