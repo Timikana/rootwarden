@@ -22668,9 +22668,24 @@ est plus neuf. *Ici le JOUR differe, donc les 2 h de decalage ne suffisent pas a
     backend/ commite AVANT le demarrage   85 commits   ->  VIVANTS dans le service
     backend/ commite APRES le demarrage   18 commits   ->  ABSENTS du service
 
+> ⛔ **CES DEUX CHIFFRES SONT FAUX. Corriges le 2026-09-08 vers 12:35, sur remesure de la session 7 :**
+>
+>     VIVANTS  219        ABSENTS  19
+>     methode : git log --format='%ct' -- backend/  compare a l'epoch du StartedAt (1788785580)
+>
+> **Mon 85 etait borne par `--since='2026-08-27'` — c'est-a-dire par le `StartedAt` PERIME que ce meme
+> ecart venait de refuter.** *J'ai borne la mesure avec la valeur qu'elle demontrait fausse.* La session 7
+> a refuse d'aligner son chiffre sur le mien et m'a donne sa methode pour que je la rejoue : **c'est ce
+> qui a trouve la cause.** L'ecart de 1 sur les absents est `e801ea19`, tombe a 12:26 entre les deux
+> releves.
+>
+> *« Un instrument juste mal borne se lit exactement comme une absence »* — deja inscrit ici. **La forme
+> neuve est pire : la borne venait de l'erreur meme qu'on corrigeait.**
+
 **Les quatre plus lourds des dix-huit touchent une commande root :**
 
     5c5f0ca8  09-07 20:13  fix(sudo)      un echec de rendu ecrivait NOPASSWD: ALL
+    8ca4032f  09-07 20:20  test(sudo)     LA PREUVE du fail-closed est absente AUSSI
     266f21a2  09-07 23:31  fix(iptables)  SEC-015 : dest_path interpole BRUT en commande root
     ffe14f97  09-08 11:58  fix(updates)   E-463 : time_/date atteignaient une ligne cron.d root
     53e72b1b  09-08 04:13  fix(ssh)       E-461 : deux routes lisaient des FRAGMENTS comme des LIGNES
@@ -22706,4 +22721,38 @@ workers : *le service accorde toujours `ALL=(ALL:ALL) NOPASSWD: ALL` quand un re
 > processus qui l'a lu.** *C'est la verification qu'on ferait spontanement pour trancher arbre/service, et
 > elle rend le mauvais verdict.* **Ce qui porte est `use_reloader = False` plus les horodatages** — pas un
 > releve de contenu, de quelque cote qu'on le prenne.
+
+### 6. ⚠ UN TEST VERT DANS L'ARBRE SUR UN DEFAUT OUVERT DANS LE SERVICE — releve par la session 7
+
+`8ca4032f` (`test(sudo)`, 20:20) est **absent du service exactement comme le correctif qu'il prouve**.
+
+> **Un test vert dans l'arbre sur un defaut ouvert dans le service est plus trompeur qu'une absence de
+> test : l'absence se remarque, le vert rassure.** *C'est mon propre point retourne d'un cran — j'avais
+> nomme le correctif hors service, pas sa PREUVE, et c'est la preuve qu'on consultera pour se rassurer.*
+
+### 7. ⛔ ET LA MOITIE SEC-015 DE L'ARGUMENT DE LA SESSION 5 NE TIENT PAS — MESURE
+
+Elle conclut que *« le service porte AUJOURD'HUI les DEUX defauts a la fois : `dest_path` interpole brut
+ET le succes annonce sans verification »*, le second masquant le premier. **Mesure du code EN SERVICE**
+(`iptables_manager.py` au `5a2d131a`, **21 avril** — dernier commit du fichier avant le demarrage) :
+
+    SERVICE   _write_rules_safe(client, root_password, rules_v4, "/etc/iptables/rules.v4")
+              _write_rules_safe(client, root_password, rules_v6, "/etc/iptables/rules.v6")
+              -> DEUX appelants, DEUX LITTERAUX. `dest_path` n'est jamais une variable.
+              -> `dest_path` apparait 3 fois : signature, docstring, interpolation.
+
+    HEAD      _write_rules_safe(client, root_password, rules, tmp)      l.218
+              dans `_charge_puis_ecrit` (l.153), fonction QUI N'EXISTE PAS au 5a2d131a
+
+> **L'appelant variable et son correctif sont TOUS DEUX posterieurs au demarrage.** *Le service n'a ni la
+> vulnerabilite ni le remede.* **SEC-017 y est donc seul — et il n'y a pas de SEC-015 a masquer.**
+
+**Et ma propre formulation etait de la classe qu'elle denonce** : j'ai ecrit a la session 5 que `266f21a2`
+etait *« un correctif root absent du service »*. **C'est vrai du CORRECTIF et trompeur sur le RISQUE** —
+*le fait est juste, l'emballage fait ranger par ressemblance.* **Trois correctifs root manquent au
+service, pas quatre**, et SEC-015 sort de la liste **parce que son defaut en sort aussi**.
+
+> ⚠ **Ce dedouanement est le seul resultat du tour qu'aucun pair n'attrapera** : la relecture par un pair
+> prend les fausses alarmes et RATIFIE les exculpations. *Je l'ai donc mesure deux fois, sur le depot
+> entier (`git grep` au commit, pas dans le fichier) et avec un temoin negatif.*
 
