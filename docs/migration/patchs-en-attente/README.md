@@ -266,3 +266,51 @@ et il ne voit pas un signet non ouvert, une cle d'API non employee, un script
 
 *C'est la seule inconnue qui reste, et elle est bornée : appliquer le patch ne détruit rien
 — `_deprecated/` garde 214 fichiers, et le bloc retiré est un `git revert` de distance.*
+
+---
+
+# ⛔ ETAT DE LA FILE, MESURE le 2026-09-08 14:45 — SEPT ENTREES, TROIS REELLES
+
+`git apply --check` sur les huit fichiers de ce repertoire :
+
+| patch | applique ? | verdict |
+|---|---|---|
+| `01-E-231-psk-illisible` | ✅ | **EN ATTENTE, reelle** |
+| `02-E-280-portee-scheduler` | ⛔ | **PERIME — deja dans HEAD** |
+| `03-telegraf-jeton-en-clair` | ✅ | **EN ATTENTE, reelle** |
+| `04-E-281-apres-fusion-NE-PAS-APPLIQUER-SUR-HEAD` | ⛔ | deja marque par son nom |
+| `05-echange-des-ports-entrypoint` | ⛔ | **PERIME — deja dans HEAD** |
+| `06-echange-des-ports-runner` | ⛔ | **PERIME — deja dans HEAD** |
+| `07-retrait-du-service-php` | ✅ | **EN ATTENTE, reelle** (etendue le 2026-09-08) |
+| `QUARANTAINE-perime-refait-par-a345e65` | ⛔ | deja marque par son nom |
+
+## Les trois periment, et leur contenu est LA — verifie ligne par ligne
+
+**`02`** voulait remplacer un `else` par `elif schedule['target_type'] == 'all':`.
+C'est dans `backend/scheduler.py` **deux fois** — `:237` et `:340` — avec le bloc
+de commentaire `E-280` a `:341`.
+
+**`05`** voulait poser `LARAVEL_HTTPS_PORT="${LARAVEL_HTTPS_PORT:-8443}"`. C'est
+a `laravel/docker-entrypoint.sh:86`, avec le commentaire exact du patch a `:83`.
+
+**`06`** voulait poser le bloc `══ ECHANGE DES PORTS DU 2026-09-06 ══`. Il est a
+`scripts/rejouer-lot.sh:93`, avec `BASE_LEGACY`/`BASE_LARAVEL` a `:102-103`.
+
+*Temoin : `ZZZ-INEXISTANT` cherche dans les trois fichiers rend 0 — la sonde
+distingue.*
+
+> **Un patch qui echoue parce que son contenu est DEJA LA se lit exactement
+> comme un patch qui echoue parce qu'il a derive.** Les deux rendent « le patch
+> a echoue » ; seul le premier ne demande rien.
+
+## ⚠ Pourquoi ça comptait, et pas seulement pour la longueur de la file
+
+Un exploitant travaillant cette file aurait rencontre **trois echecs sans cause
+apparente**. Et le risque n'est pas l'echec : c'est de **forcer**. Un `patch
+--force` sur `02` aurait pu poser un SECOND `elif target_type == 'all'` dans un
+fichier qui en porte deja deux, legitimement, sur deux chemins distincts.
+
+⚠ **Et ça corrige une phrase qui circulait** : « les quatre `.patch` restent non
+appliques a l'arbre donc absents des deux cotes ». **Faux pour `02` au moins** :
+son correctif est dans l'arbre. Il n'est pas dans le SERVICE, ce qui est l'autre
+question — et un redemarrage l'y met.
