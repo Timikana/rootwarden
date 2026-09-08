@@ -185,3 +185,46 @@ inexistant ne trompe personne sur une capacité.*
 encore `:8444` ou `:8446`.** *La mesure porte sur le dépôt ; elle ne voit pas les usages.*
 **Le journal d'accès dit qu'en une heure, les seules requêtes reçues étaient la sonde de vie
 elle-même — mais une heure n'est pas une semaine.**
+
+### ✅ LE RISQUE « CONSOMMATEUR EXTERNE » EST LEVÉ — 38 HEURES, ET VOICI SES LIMITES
+
+*J'avais écrit : « une heure n'est pas une semaine ». Le journal du conteneur en couvre **38
+heures**, du 2026-09-06 19:40 au 2026-09-08 09:18. Mesuré, pas supposé.*
+
+```
+4782 lignes · 4499 requetes de 127.0.0.1 (la sonde) · 274 de 172.18.0.1 (l'hote)
+                                                     ·   4 de 192.168.0.245
+
+agents : curl/8.14.1 4753 · "-" 15 · Chrome/131 7 · HeadlessChrome 2
+```
+
+**Les trois catégories non-sonde, identifiées une par une :**
+
+```
+7  Chrome NON headless   06/09 19:45:42 -> :47, UN SEUL passage de 5 secondes,
+                         depuis l'HOTE : GET login.php 200 · POST login.php 302
+                         · verify_2fa.php 200 · adm/admin_page.php 404
+                         -> une authentification REUSSIE, il y a 38 heures
+4  192.168.0.245         08/09 05:04-05:52, curl, dont `/reinitialiser` — une
+                         route du PORTAGE : ce sont MES propres mesures de ce
+                         matin, arrivees par l'IP LAN de l'hote
+15 agent "-"             des octets de poignee TLS (\x16\x03\x01...) sur le port
+                         HTTP : mes `curl -k https://...:8444`
+```
+
+> **Aucun consommateur humain externe en 38 heures.** *Le seul passage d'un vrai navigateur
+> date du 06/09, depuis cette machine, et le flux qu'il a emprunté — connexion puis second
+> facteur — est porté.*
+
+⛔ **CE QUE CETTE MESURE NE COUVRE PAS, ET IL FAUT LE DIRE :**
+
+```
+38 heures, pas une semaine ni un mois
+le journal ne voit que ce qui ATTEINT ce conteneur — un client qui a renonce il y
+   a des mois, ou qui n'interroge qu'une fois par semaine, n'y figure pas
+et il ne voit pas un signet non ouvert, une cle d'API non employee, un script
+   planifie a une cadence plus longue que la fenetre
+```
+
+*C'est la seule inconnue qui reste, et elle est bornée : appliquer le patch ne détruit rien
+— `_deprecated/` garde 214 fichiers, et le bloc retiré est un `git revert` de distance.*
