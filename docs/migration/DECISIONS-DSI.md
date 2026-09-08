@@ -17066,3 +17066,59 @@ fichiers de `php/`, inertes — leur retrait attend le redémarrage (E-517 :
 **Et `security-scan` ne tourne pas sur une PR** (`if: … == 'push'`), donc son
 demi-correctif ne sera éprouvé qu'après la fusion sur `main`. *Déclaré plutôt que
 présenté comme vérifié.*
+
+---
+
+## E-523
+
+**Le job rouge à chaque exécution était `sast-semgrep-custom`, et sa cause est
+`--error`. Devenu un cliquet. Et j'y trouve deux choses de plus.**
+
+L'exploitant a demandé de régler « ces erreurs de CI/CD ». **Il n'y en avait
+qu'une, la même depuis le début :**
+
+```
+semgrep --config=.semgrep/rules-rootwarden.yml --error --metrics=off --severity=ERROR .
+  -> Ran 6 rules on 370 files: 105 findings
+  -> `--error` fait sortir en 1 des qu'il trouve QUELQUE CHOSE
+  -> job en `continue-on-error: true`, donc rouge PERMANENT et non bloquant
+```
+
+> **Une porte qui refuse toujours, on cesse de la regarder.** *C'est ce que
+> j'écrivais ce matin sur les cliquets, et ce job en était l'exemple vivant sous
+> mes yeux depuis quatorze PR.*
+
+**Corrigé en cliquet** : le compte est mesuré en `--json`, comparé à
+`.semgrep/reference-trouvailles.txt` (fichier **suivi**, donc toute variation
+passe par une relecture), échoue si le compte **croît**, avertit s'il baisse, et
+détaille les trouvailles par règle à chaque exécution. *Il n'échoue plus sur
+l'existant — il mord sur la régression.*
+
+⚠ **Le YAML aurait été cassé, et je l'ai attrapé avant de pousser.** J'avais écrit
+un bloc python multi-ligne à l'indentation 6 dans un scalaire `run: |` dont
+l'indentation est **10** — toute ligne moins indentée **termine le bloc**.
+Remplacé par une invocation d'une seule ligne, et vérifié : *aucune ligne du bloc
+sous 10, la première à 2 étant la section suivante.*
+
+### ⛔ Deux trouvailles en chemin
+
+**① Quatre règles maison ne sont JAMAIS évaluées.** Dix règles déclarées,
+**6 `ERROR` + 4 `WARNING`**, et le job passe `--severity=ERROR` :
+
+```
+rw-subprocess-shell-true · rw-php-equals-on-hash
+rw-php-weak-random       · rw-php-debug-leak
+```
+
+*Elles compilent, elles sont maintenues, et rien ne les exécute.* **Je ne les
+active pas dans le même geste : cela changerait la référence du cliquet, et deux
+changements simultanés dans un job qu'on vient de réparer ne se diagnostiquent
+pas.**
+
+**② « Rules run: 6 » n'a jamais été la preuve du défaut de compilation.** Le
+commentaire du job témoin l'affirme — *« Le scan annonçait "Rules run: 6" pour
+dix règles déclarées »* — en l'attribuant aux trois règles qui ne compilaient
+pas. **6 est exactement le nombre de règles `ERROR`. Il aurait affiché 6 que les
+règles compilent ou non.** *L'inférence était fausse ; la réparation, elle,
+restait bonne — et c'est le cas le plus traître : une conclusion juste soutenue
+par une preuve qui ne la soutient pas.*
