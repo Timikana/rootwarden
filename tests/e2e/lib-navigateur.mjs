@@ -11,29 +11,64 @@
  * DEUX CAUSES DE FUITE, INDEPENDANTES, et la seconde defait la parade de la
  * premiere :
  *
- *   (a) le `close()` n'est pas gouverne par un `finally`         67 suites
- *       -> 12 sans aucun `close()`, et 55 qui en ont un DEHORS d'un `finally`
- *          existant. Un `finally` qui existe ne gouverne pas ce qui est hors
- *          de lui : mesurer sa PRESENCE dedouane a tort.
+ *   (a) le `close()` n'est pas gouverne par un `finally`         62 suites
+ *       -> 12 sans aucune fermeture de navigateur, et 50 qui en ont une
+ *          DEHORS d'un `finally` existant. Un `finally` qui existe ne gouverne
+ *          pas ce qui est hors de lui : mesurer sa PRESENCE dedouane a tort.
  *
  *   (b) un `process.exit()` est interpose entre le lancement et la fermeture
- *       -> 41 suites. `process.exit()` termine IMMEDIATEMENT et n'execute
- *          AUCUN bloc `finally`. Donc un `finally` irreprochable ne ferme
- *          rien si un `exit` le precede a l'execution.
+ *       -> 37 suites. `process.exit()` termine IMMEDIATEMENT et n'execute
+ *          AUCUN bloc `finally`.
+ *
+ *   ⚠ CES DEUX CHIFFRES ONT ETE FAUX DEUX FOIS, ET DANS LE MEME SENS.
+ *   Premiers relevés : 67 et 41. Aucun des deux ne DEPOUILLAIT LES
+ *   COMMENTAIRES — et dans ces suites, **79 des 167 occurrences de `finally`
+ *   vivent dans de la prose** (47 %), ainsi que 41 des 182 `process.exit`. La
+ *   population elle-meme etait fausse : 114 suites annoncees, 110 reelles, les
+ *   quatre autres ne portant `puppeteer.launch` qu'en commentaire.
+ *   *Un motif trouve dans un commentaire compte comme du code jusqu'a ce qu'on
+ *   depouille, et la prose de ce depot parle beaucoup de ses propres defauts.*
+ *   L'instrument qui rend 62 / 37 est `lib-navigateur.invariant.mjs` : il
+ *   depouille, apparie les accolades, et porte trois temoins forges — dont un
+ *   fichier dont le `finally` n'existe QUE dans un commentaire.
  *
  * CE QUE L'ENVELOPPEUR REND INEXPRIMABLE :
  *   - l'appelant ne detient jamais le navigateur, donc il ne peut pas oublier
  *     de le fermer  -> (a) devient impossible a ecrire
- *   - un filet SYNCHRONE sur `process.on('exit')` tue le processus du
- *     navigateur  -> (b) est rattrape meme quand le `finally` est saute
  *
- * ⚠ POURQUOI LE FILET EST SYNCHRONE. Un gestionnaire de `process.on('exit')`
- * ne peut pas attendre une promesse : tout `await` y est ignore. `close()` est
- * asynchrone et serait donc inoperant a cet endroit. `kill()` sur le processus
- * du navigateur, lui, est synchrone — c'est la seule forme qui morde depuis un
- * `exit`. Ce n'est PAS un remplacement de `close()` (qui ferme proprement les
- * contextes et vide le profil) : c'est un filet, et son efficacite est
- * MESUREE par `lib-navigateur.epreuve.mjs`, pas supposee.
+ * ⛔ CE QU'IL NE FAIT PAS, et le dire est le point de ce bloc. Une version
+ * anterieure de ce commentaire affirmait que le filet « rattrape (b) meme
+ * quand le finally est saute ». **C'etait surpromis.** Table de couverture,
+ * mesuree au mecanisme par `gestion-ssh-key-c6` dans `@puppeteer/browsers`
+ * (`lib/cjs/launch.js:91`), et non deduite :
+ *
+ *   chemin de sortie      puppeteer   un finally   withNavigateur
+ *   sortie propre            oui         oui           oui
+ *   process.exit()           oui         NON           oui
+ *   SIGINT / TERM / HUP      oui         NON           oui
+ *   SIGKILL (tueur memoire)  NON         NON           NON   <- par definition
+ *
+ * **Puppeteer pose deja des gestionnaires sur `exit`, `SIGINT`, `SIGHUP` et
+ * `SIGTERM`.** Le filet ci-dessous est donc REDONDANT avec le sien sur les
+ * quatre chemins qu'il couvre. Il ne devient utile que si une suite passait
+ * `handleSIGINT: false` — et aucune ne le fait aujourd'hui (0 occurrence).
+ * *Il est garde parce qu'il coute une ligne et ferme un cas qu'une option
+ * pourrait ouvrir, pas parce qu'on peut montrer qu'il sert.*
+ *
+ * ⚠ POURQUOI IL EST SYNCHRONE, quand meme. Un gestionnaire de
+ * `process.on('exit')` ne peut pas attendre une promesse : tout `await` y est
+ * ignore. `close()` est asynchrone, donc inoperant a cet endroit ; `kill()`
+ * est synchrone. C'est la seule forme qui puisse mordre depuis un `exit`.
+ *
+ * ⚠ ET LA VALEUR REELLE DE L'ENVELOPPEUR N'EST PAS UN NETTOYAGE. `SIGKILL`
+ * n'est couvert par rien — c'est la definition du signal. Les 23 Chromium
+ * mesures le 2026-09-08 (dont 15 reparentes a `init`, tous du meme evenement
+ * a 2,8 jours, avec le swap plein a 120 Ki pres) viennent de la : un tueur de
+ * memoire. **Donc cet enveloppeur ne nettoie pas apres l'OOM, il le rend
+ * MOINS PROBABLE** — en ne gardant pas un navigateur ouvert pendant qu'une
+ * suite echoue. *Il agit sur la cause mesuree, pas sur son symptome, et il n'a
+ * pas a avoir de chemin par lequel il reduirait un compte d'orphelins.*
+ * (formulation de `c6`)
  *
  * ⚠ CE QUI RESTE A LA CHARGE DE L'APPELANT : ne pas appeler `process.exit()`
  * dans le corps. Poser `process.exitCode = n` et laisser le processus finir
