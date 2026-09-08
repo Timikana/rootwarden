@@ -142,6 +142,55 @@ const FORMES = [
      * > Une declaration d'angle mort protege le lecteur ; deux instruments qui
      * > declarent chacun le leur ne couvrent pas pour autant leur union.
      */
+    /*
+     * ⚠ AJOUTE LE 2026-09-08 08:1x, APRES UN ARCHIVAGE QUI L'A EXIGE.
+     *
+     * L'etape ③ de l'extinction a rendu mortes QUATRE references a
+     * `adm/api/notifications.php` dans `menu.php`. La suite n'en voyait que DEUX
+     * — les `fetch`. Les deux autres etaient des attributs **htmx** :
+     *
+     *     <button hx-post="/adm/api/notifications.php" hx-vals='{...}'>
+     *
+     * **Un `hx-post` est une destination navigable au meme titre qu'un `href`** :
+     * htmx emet la requete, le navigateur ne change pas de page mais l'appel part.
+     *
+     * ⚠ Ce motif rend ZERO sur le parc aujourd'hui, parce que je viens de retirer
+     * les deux seules occurrences. Il est donc PREVENTIF — et c'est precisement
+     * pourquoi son echantillon forge est obligatoire : sans lui, « 0 extraction »
+     * et « le motif ne mord pas » seraient la meme sortie.
+     */
+    { nom: 'hx-post="/x"',     motif: /hx-(?:get|post|put|patch|delete)\s*=\s*["'](\/[^"'\s]*)["']/g },
+
+    /*
+     * ⛔ ET UN MOTIF QUE JE REFUSE D'AJOUTER, APRES L'AVOIR MESURE.
+     *
+     * Un tableau PHP s'ecrit `'cle' => '/x'`, que le motif de table JS ne voit
+     * pas. J'allais l'ajouter pour fermer le troisieme angle mort. **Mesure sur
+     * le parc : 6 extractions, dont CINQ FAUSSES.**
+     *
+     *     auth/functions.php:40 · :311 · auth/login.php:192 · auth/logout.php:34
+     *     includes/lang.php:27        ->  'path' => '/'    des chemins de COOKIE
+     *     head.php:57                 ->  'API_URL' => '/api_proxy.php'
+     *
+     * ⚠ MES PREMIERS NUMEROS ETAIENT FAUX DE ONZE LIGNES (:29 :284 :186 :33 :16),
+     * et la SUBSTANCE etait juste. Le decalage venait de mon depouillement des
+     * commentaires — le piege exact qu'un pair m'avait nomme : depouiller en
+     * touchant au nombre de lignes detruit les numeros, qui sont ce qu'on veut
+     * rendre. **Verifie par `grep -n` sur les fichiers, pas sur ma copie
+     * depouillee** — et c'est ainsi qu'il faut rendre un numero de ligne.
+     *
+     * Les cinq premieres sont de la CONFIGURATION, pas des liens — et `/` compte
+     * comme cible archivee depuis que `index.php` l'est, donc elles seraient
+     * signalees comme mortes. **Et la sixieme, la seule vraie, n'est pas un lien
+     * non plus : c'est une DEFINITION que plus aucun incluant servi ne consomme.**
+     *
+     * > **Un angle mort dont le seul contenu reel n'est pas de l'espece qu'on
+     * > cherche ne se comble pas : il se declare.** *Le combler ajouterait cinq
+     * > fausses alarmes pour zero trouvaille.*
+     *
+     * Le motif refuse, pour memoire :
+     *     /['"][a-zA-Z0-9_]+['"]\s*=>\s*['"](\/[^'"\s]*)['"]/g
+     */
     { nom: 'table {k: "/x"}',  motif: /[A-Za-z_$][\w$]*\s*:\s*['"](\/[A-Za-z0-9_.\/-]+)['"]/g },
     /*
      * ⚠ J'AI AJOUTE ICI UN MOTIF `location = "/x"` PUIS JE L'AI RETIRE.
@@ -221,6 +270,7 @@ const ECHANTILLON = {
     "fetch('/x')":      "fetch('/temoin-forge.php?q=1')",
     'action="/x"':      '<form action="/temoin-forge.php">',
     'table {k: "/x"}':  "const r = {t: '/temoin-forge.php'};",
+    'hx-post="/x"':     '<button hx-post="/temoin-forge.php" hx-swap="none">x</button>',
     "sideLink('/x')":   "sideLink('/temoin-forge.php', 'x')",
     /*
      * ⚠ L'ECHANTILLON EST LA FORME NUE, PAS `window.location.href`.
