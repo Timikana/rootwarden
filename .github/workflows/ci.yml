@@ -481,7 +481,16 @@ jobs:
           n=$(python3 -c "import json;print(len(json.load(open('/tmp/semgrep.json'))['results']))")
           ref=$(tr -dc '0-9' < .semgrep/reference-trouvailles.txt)
           echo "trouvailles : $n   ·   reference : $ref"
-          python3 -c "import json,collections;d=json.load(open('/tmp/semgrep.json'));c=collections.Counter(r['check_id'].split('.')[-1] for r in d['results']);[print(f'  {v:>4}  {k}') for k,v in c.most_common()]"
+          # Le rapport vit dans `.semgrep/rapport.py` et NON dans un `python3 -c`
+          # ici : trois fois de suite j'ai casse ce scalaire YAML en y collant du
+          # python multi-ligne. L'indentation d'un scalaire est fixee par sa
+          # PREMIERE ligne, et toute ligne moins indentee le TERMINE. Un fichier
+          # n'a pas d'indentation heritee, et il se teste (`py_compile` + un JSON
+          # forge, hors CI).
+          echo "── par regle ──"
+          python3 .semgrep/rapport.py /tmp/semgrep.json --par-regle
+          echo "── ou, precisement ──"
+          python3 .semgrep/rapport.py /tmp/semgrep.json --par-fichier
           if [ -z "$ref" ]; then
             echo "::error::.semgrep/reference-trouvailles.txt vide ou illisible — le cliquet ne mesure rien."
             exit 1
