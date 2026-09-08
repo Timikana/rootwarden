@@ -446,11 +446,16 @@ jobs:
       #    dans `.semgrep/reference-trouvailles.txt`, un fichier SUIVI — toute
       #    variation passe donc par une relecture.
       #
-      #    ⚠ PERIMETRE INCHANGE : `--severity=ERROR` retenu, donc 6 des 10
-      #    regles. Les 4 regles WARNING (rw-subprocess-shell-true,
-      #    rw-php-equals-on-hash, rw-php-weak-random, rw-php-debug-leak) ne
-      #    sont TOUJOURS pas evaluees ici. Defaut separe : le corriger
-      #    changerait la reference, donc pas dans le meme geste. Voir E-523.
+      #    ⚠ CE COMMENTAIRE A DIT LE CONTRAIRE DU CODE, ET SEULE UNE
+      #    CONTRE-EPREUVE L'A ATTRAPE. Il portait « PERIMETRE INCHANGE :
+      #    --severity=ERROR retenu, donc 6 des 10 regles » — vrai a l'ecriture,
+      #    faux dix minutes plus tard quand le filtre a ete retire dans le meme
+      #    fichier. Le compte de « severity=ERROR » restait a 2 : une commande
+      #    dans l'AUTRE job, et cette prose-ci. J'ai regarde les lignes au lieu
+      #    de conclure du nombre.
+      #
+      #    ETAT REEL : les DIX regles sont evaluees. Reference 106 (105 ERROR +
+      #    1 des quatre WARNING).
       #
       #    ⚠ Et « Rules run: 6 » n'a JAMAIS ete la preuve du defaut de
       #    compilation que le job temoin decrit plus bas : 6 est exactement le
@@ -459,8 +464,20 @@ jobs:
       - name: Run custom rules (.semgrep/rules-rootwarden.yml)
         run: |
           set -o pipefail
+          # ⚠ PLUS DE FILTRE DE SEVERITE. Il ecartait quatre regles maison —
+          #    rw-subprocess-shell-true, rw-php-equals-on-hash,
+          #    rw-php-weak-random, rw-php-debug-leak — qui compilaient, etaient
+          #    maintenues, et n'etaient JAMAIS evaluees. Mesure du 2026-09-08 :
+          #    elles trouvent 1 chose de plus sur 370 fichiers (105 -> 106).
+          #
+          #    ⛔ ET LEUR MORDANT N'EST PAS PROUVE. Le job temoin ci-dessous ne
+          #    couvre que les TROIS regles reparees ce jour. « 1 trouvaille sur
+          #    370 fichiers » se lit « code propre » OU « regle qui ne matche
+          #    presque rien », et rien ici ne separe les deux — c'est exactement
+          #    le zero que le temoin existe pour refuser. Etendre ses fixtures a
+          #    ces quatre regles est un geste distinct, et il reste a faire.
           semgrep --config=.semgrep/rules-rootwarden.yml --metrics=off \
-                  --severity=ERROR --json --quiet . > /tmp/semgrep.json
+                  --json --quiet . > /tmp/semgrep.json
           n=$(python3 -c "import json;print(len(json.load(open('/tmp/semgrep.json'))['results']))")
           ref=$(tr -dc '0-9' < .semgrep/reference-trouvailles.txt)
           echo "trouvailles : $n   ·   reference : $ref"
@@ -476,28 +493,7 @@ jobs:
           if [ "$n" -lt "$ref" ]; then
             echo "::warning::$n trouvailles contre $ref : descendre la reference a $n."
           fi
-          # ── MESURE INFORMATIVE : ce que les 4 regles WARNING trouveraient ──
-          #
-          # Dix regles sont declarees, SIX seulement sont evaluees : le filtre
-          # `--severity=ERROR` ci-dessus ecarte rw-subprocess-shell-true,
-          # rw-php-equals-on-hash, rw-php-weak-random et rw-php-debug-leak. Elles
-          # compilent, elles sont maintenues, et rien ne les execute.
-          #
-          # Ce pas les fait tourner SANS GARDE, uniquement pour rendre leur compte.
-          # On ne peut pas poser un cliquet sur un nombre qu'on ne connait pas — et
-          # l'estimer au `grep` serait exactement le substitut qui s'est trompe sept
-          # fois aujourd'hui. Le nombre lu ici deviendra la reference du cliquet
-          # « toutes severites », dans un second geste. Voir E-523.
-          semgrep --config=.semgrep/rules-rootwarden.yml --metrics=off \
-                  --json --quiet . > /tmp/semgrep-tout.json || true
-          tout=$(python3 -c "import json;print(len(json.load(open('/tmp/semgrep-tout.json'))['results']))" 2>/dev/null || echo ILLISIBLE)
-          echo "toutes severites : $tout   (dont $n en ERROR, sous cliquet)"
-          python3 -c "import json,collections;d=json.load(open('/tmp/semgrep-tout.json'));c=collections.Counter(r['check_id'].split('.')[-1] for r in d['results']);[print(f'  {v:>4}  {k}') for k,v in c.most_common()]" 2>/dev/null || echo "  (compte par regle illisible)"
-          # `grep -c` rend 1 quand le compte est ZERO, et GitHub lance ce pas sous
-          # `bash -e` : sans le `|| true`, un fichier de regles vide AVORTERAIT le
-          # pas au lieu de le signaler. Le repli « ? » se voit, un avortement non.
-          echo "regles declarees dans le fichier : $(grep -c '^ *- id:' .semgrep/rules-rootwarden.yml || echo '?')"
-
+          
   # ─────────────────────────────────────────────────────────────
   # Job 4.3 : SCA Python (safety + pip-audit - CVE sur dependencies)
   # ─────────────────────────────────────────────────────────────
