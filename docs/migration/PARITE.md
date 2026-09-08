@@ -889,6 +889,16 @@ meme numero :
 ### ⟶ CORRECTION DU 2026-09-08 — **DIX, PAS HUIT. Et les deux de plus viennent de ma REGLE.**
 
     collisions recentes : E-452 453 454 455 456 457 458 459 463 468
+                          ⚠ INSTANTANE DATE, NON AUTORITATIF (2026-09-08 05:50)
+
+**Cette liste est INDICATIVE et se remesure ; elle ne fait pas autorite.** *Un inventaire de numeros est une
+SECONDE liste a cote de l'arbre : il derive, et sa derive est INVISIBLE — rien ne rougit quand un inventaire
+oublie un numero.* **L'arbre EST le registre.** La commande qui tranche :
+
+    comm -12 <(grep -ohE '^#{1,6}[^0-9]*E-[0-9]+' docs/migration/PARITE.md      | grep -oE '[0-9]+' | sort -u) \
+             <(grep -ohE '^#{1,6}[^0-9]*E-[0-9]+' docs/migration/DECISIONS-DSI.md | grep -oE '[0-9]+' | sort -u)
+
+*Refus de registre emprunte a la session 8, qui l'a oppose a sa propre tentation d'en tenir un.*
 
 **E-463 et E-468 ont ete alloues APRES ma regle du 2026-09-07, et PAR elle.** Le motif que j'avais inscrit
 — `^#{1,6} +E-[0-9]+` — **exige que `E-` suive immediatement les diese et les espaces.** Or
