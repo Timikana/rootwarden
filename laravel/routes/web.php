@@ -1067,6 +1067,26 @@ Route::middleware(['memorisation', 'session.authentifiee', 'session.revoquee', '
         ->middleware(['role:1', 'perm:can_manage_iptables'])->name('pare-feu.copie.enregistrer');
 
     /*
+     * I6 — LIRE UNE VERSION ARCHIVEE, pour la MONTRER avant de la consentir.
+     *
+     * Lecture seule, aucune machine jointe. Elle existe parce que le retour
+     * arriere est le seul des deux gestes ou l'humain ne peut pas se relire : a
+     * l'application il ECRIT les regles, au retour arriere il choisit une DATE.
+     * Et Q2 — « ce jeu laisse-t-il SSH ouvert ? » — ne se calcule pas sans le
+     * texte.
+     *
+     * `GET /iptables-history` cote backend ne rend PAS les regles (par volume) et
+     * le seul SELECT qui les lit est DANS la route qui les applique. Sans cette
+     * route-ci, montrer le texte exigerait de l'appliquer d'abord.
+     *
+     * Meme garde que la page. L'acces machine est verifie sur l'objet RESOLU, et
+     * le `WHERE` porte les DEUX identifiants : une version d'une autre machine
+     * rend `null`.
+     */
+    Route::post('/pare-feu/version', [PareFeuController::class, 'versionArchivee'])
+        ->middleware(['role:1', 'perm:can_manage_iptables'])->name('pare-feu.version');
+
+    /*
      * I3 — L'HISTORIQUE. Declaration qui ATTENDAIT depuis quatre jours (E-244).
      *
      * `PareFeuController::historique()` existait et `pare-feu.js:548` l'appelait

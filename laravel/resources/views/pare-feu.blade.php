@@ -183,6 +183,10 @@
                     <th>{{ __('pare-feu.histo_col_date') }}</th>
                     <th>{{ __('pare-feu.histo_col_auteur') }}</th>
                     <th>{{ __('pare-feu.histo_col_motif') }}</th>
+                    {{-- I6 : la colonne d'ACTION. Elle ne cede jamais la place —
+                         c'est l'appoint qui s'efface, jamais la colonne
+                         actionnable (regle de largeur du chantier). --}}
+                    <th>{{ __('pare-feu.rb_titre') }}</th>
                 </tr>
             </thead>
             <tbody data-rw="ipt-histo-corps"></tbody>
@@ -190,6 +194,49 @@
     </div>
 
     <div data-rw="ipt-histo-etat"></div>
+</div>
+
+{{-- ══ I6 — LE RETOUR ARRIERE ═══════════════════════════════════════════════
+
+     ⚠ PLUS DANGEREUX QUE L'APPLICATION, ET NON MOINS.
+
+       APPLIQUER       l'operateur ECRIT les regles : il les a sous les yeux
+       RETOUR ARRIERE  l'operateur choisit une DATE : il ne peut pas se relire
+
+     C'est le seul des deux gestes ou l'humain ne voit pas son objet — d'ou
+     l'apercu ci-dessous, qui n'est pas un confort : *un geste dont on ne voit pas
+     l'objet ne se consent pas, il s'accepte.*
+
+     Et `iptables_history` ne porte AUCUN port : une version etait valide LE JOUR
+     DE SON ARCHIVAGE. Q2 se calcule donc sur le port ACTUEL de la machine.
+--}}
+<div class="rw-section" data-rw="ipt-rb" hidden>
+    <h2 class="rw-sous-titre">{{ __('pare-feu.rb_titre') }}</h2>
+    <p class="rw-aide" data-rw="ipt-rb-archive"></p>
+
+    <p class="rw-sous-titre-fort">{{ __('pare-feu.rb_apercu') }}</p>
+    <pre class="rw-fichier" data-rw="ipt-rb-apercu"></pre>
+
+    <p class="rw-annonce" role="status" aria-live="polite" data-rw="ipt-rb-ssh"></p>
+
+    <div class="rw-actions">
+        <button type="button" class="rw-bouton rw-bouton--danger"
+                data-rw="ipt-rb-bouton" disabled>{{ __('pare-feu.rb_conf_ok') }}</button>
+    </div>
+
+    <p class="rw-annonce" role="status" aria-live="polite" data-rw="ipt-rb-annonce"></p>
+    <div data-rw="ipt-rb-etat"></div>
+</div>
+
+<div class="rw-section" data-rw="ipt-rb-conf" hidden>
+    <p class="rw-sous-titre-fort" data-rw="ipt-rb-conf-titre"></p>
+    <p class="rw-prose" data-rw="ipt-rb-conf-texte"></p>
+    <div class="rw-actions">
+        <button type="button" class="rw-bouton rw-bouton--discret"
+                data-rw="ipt-rb-conf-non">{{ __('pare-feu.rb_conf_non') }}</button>
+        <button type="button" class="rw-bouton rw-bouton--danger"
+                data-rw="ipt-rb-conf-ok" disabled>{{ __('pare-feu.rb_conf_ok') }}</button>
+    </div>
 </div>
 
 {{-- ══ I5 — APPLIQUER UN JEU DE REGLES ═══════════════════════════════════════

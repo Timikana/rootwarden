@@ -189,4 +189,38 @@ return [
     'appl_conf_ok'    => 'Remplacer les règles',
     'appl_conf_non'   => 'Annuler',
     'appl_annule'     => "Annulé — aucune requête n'a été envoyée.",
+
+    /* ══ I6 — LE RETOUR ARRIERE ════════════════════════════════════════════════
+     *
+     * ⚠ POURQUOI CE GESTE EST PLUS DANGEREUX QUE L'APPLICATION, ET NON MOINS.
+     *
+     *   APPLIQUER       l'operateur ECRIT les regles : il les a sous les yeux
+     *   RETOUR ARRIERE  l'operateur choisit une DATE : il ne peut pas se relire
+     *
+     * `iptables_history` ne porte AUCUN port, et une version archivee etait valide
+     * LE JOUR DE SON ARCHIVAGE. Si le port SSH a change depuis — c'est-a-dire si
+     * quelqu'un a suivi le durcissement qu'on prescrit — la restaurer FERME
+     * l'acces. Q2 se calcule donc sur le port ACTUEL, jamais sur celui de
+     * l'archive.
+     *
+     * Les deux premieres cles sont rendues par le SERVEUR (message JSON) : elles
+     * n'ont pas a voyager jusqu'au JS.
+     */
+    'rb_version_absente'     => 'Aucune version désignée.',
+    'rb_version_introuvable' => "Cette version est introuvable pour cette machine.",
+    'rb_titre'      => 'Retour arrière',
+    'rb_bouton'     => 'Revenir à cette version',
+    'rb_lecture'    => 'Lecture de la version archivée…',
+    'rb_lecture_echec' => "La version n'a pas pu être lue. Rien n'a été restauré.",
+    'rb_apercu'     => 'Ce qui sera restauré',
+    'rb_archive_le' => 'Version archivée le :date',
+    'rb_ssh_ouvert' => 'Le port SSH :port — celui de la machine AUJOURD\'HUI — reste joignable avec cette version.',
+    'rb_ssh_ferme'  => "⛔ Cette version FERME le port SSH :port, qui est celui de la machine aujourd'hui. Elle était peut-être valide le jour de son archivage : restaurée maintenant, elle vous couperait l'accès.",
+    'rb_ssh_doute'  => "⛔ Impossible de dire si cette version laisse le port SSH :port ouvert. On refuse plutôt que de parier — et la reprise passerait elle aussi par SSH.",
+    'rb_conf_titre' => 'Restaurer la version du :date sur :machine ?',
+    'rb_conf_texte' => "Les règles actuelles de :machine seront REMPLACÉES par cette version archivée. L'état actuel est archivé avant l'écriture, donc ce retour arrière est lui-même réversible. Aucune requête n'a encore été envoyée.",
+    'rb_conf_ok'    => 'Restaurer cette version',
+    'rb_conf_non'   => 'Annuler',
+    'rb_en_cours'   => 'Restauration en cours…',
+    'rb_annule'     => "Annulé — aucune requête n'a été envoyée.",
 ];
