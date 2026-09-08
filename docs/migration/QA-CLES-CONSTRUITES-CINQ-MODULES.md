@@ -102,3 +102,54 @@ qu'établie**, et c'est le seul qui mérite d'être noté quelque part.
 - je n'ai pas mesuré si chaque clé du CATALOGUE a un consommateur — c'est la question
   inverse, et vos comptes de « clé que rien n'appelle » restent à refaire en balayant
   les contrôleurs.
+
+---
+
+## 6. Validation par un SECOND instrument — **2026-09-08 04:56 CEST**
+
+`scripts/cles-atteintes.py` (livré par la session QA) a été joué sur les cinq
+catalogues, avec **les sources que j'avais mesurées au §2**.
+
+    bashrc  fail2ban  politiques  serveurs  sftp   ->  code 0, les cinq
+    « aucune cle atteinte n'est absente du catalogue »
+
+**Il retrouve exactement mes treize sites construits** — 4 pour `politiques`, 4 pour
+`sftp`, 2 pour `serveurs`, 3 pour `fail2ban`, **0 pour `bashrc`**. *Deux instruments
+écrits séparément, même population, même verdict.*
+
+### 6.1 Ce que le second instrument apporte en plus : les clés ORPHELINES
+
+    politiques.hist_fichier · politiques.rollback_lien
+    sftp.restreint · sftp.rollback_lien
+    serveurs.legende
+    bashrc.non_porte_lien
+
+**Trois modules portent une clé `*_lien` orpheline, et c'est la même phrase** :
+*« Annuler ce déploiement dans l'ancien portail »*, *« Ouvrir bashrc dans l'ancien
+portail »*.
+
+> **Ce n'est PAS un défaut : c'est le résidu d'un portage RÉUSSI.** Les textes voisins
+> ont été réécrits — `politiques.rollback_texte` décrit aujourd'hui *« restaure le
+> sudoers exact d'avant ce déploiement »*, et il est rendu comme `title=` d'un
+> **bouton**, pas d'un lien. `bashrc.non_porte_texte` dit *« le déploiement, la
+> restauration et la liste des sauvegardes sont portés ici »*.
+
+**Les déclarations d'absence que j'avais mesurées le 2026-09-04 ont été rendues vraies
+en PORTANT, puis les liens vers le legacy ont été retirés — et seules les clés sont
+restées.** *Une clé orpheline ressemble à un défaut ; ici c'est une trace de succès.*
+
+### 6.2 ⚠ Et j'ai enfreint MA PROPRE règle six heures après l'avoir écrite
+
+J'ai interrogé `/policy/sudo/rollback` et `/policy/sftp/rollback` → **ABSENT** les
+deux. J'allais conclure que l'annulation n'est pas câblée.
+
+**Ces deux chemins n'existent pas.** Le backend en déclare **un seul** :
+`policies.py:524` `/policy/rollback` — et il est appelé, `politiques.js:281`.
+
+> C'est exactement la faute que j'avais documentée à 22:44 : **l'outil répond « ce
+> CHEMIN est-il appelé ? », jamais « cette CAPACITÉ est-elle portée ? »**, et il faut
+> vérifier que le chemin EXISTE avant de lire son absence.
+>
+> **Je l'ai écrite, et je l'ai commise le lendemain matin sur le même outil.** Ce qui
+> m'a arrêtée n'est pas la mémoire de la règle : c'est que deux `ABSENT` sur deux
+> gestes que la page offre visiblement faisaient un reste inexpliqué.
