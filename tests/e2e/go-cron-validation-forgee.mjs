@@ -94,6 +94,43 @@ if (SURCHARGE) {
     console.log(`      ${SURCHARGE}`);
     console.log('   Cette surcharge sert a eprouver la suite, jamais a la conclure.');
 }
+
+/*
+ * ⚠ CE VERDICT PORTE SUR L'ARBRE, PAS SUR LE SERVICE — nomme le 2026-09-08.
+ *
+ * Les fonctions sont extraites du FICHIER et jouees dans un python neuf, parce
+ * que `flask` n'est pas installe sur ce banc. Ce qui est etabli est donc :
+ *
+ *     « les validateurs TELS QU'ECRITS dans le fichier refusent ces charges »
+ *   et NON
+ *     « le validateur TEL QUE LE SERVICE L'EXECUTE les refuse »
+ *
+ * Un `.py` est lu au DEMARRAGE. Mesure du 2026-09-08 12:20 :
+ *
+ *     backend/hypercorn_config.py:17   use_reloader = False   (4 workers)
+ *     rootwarden_python StartedAt      2026-09-07T12:53:00Z
+ *     validateurs ecrits               2026-09-08 12:16 CEST  = 21 h APRES
+ *
+ * `backend/` est monte en bind sur `/app`, donc le FICHIER du conteneur est
+ * celui de l'arbre — 3 occurrences des deux cotes. **Mais les quatre workers
+ * qui servent `/schedule_advanced_update` ont importe le module 21 h avant que
+ * ces validateurs existent, et le rechargement est desactive.**
+ *
+ * > Un fichier partage ne fait pas un code partage : le montage synchronise
+ * > l'octet, pas la memoire du processus qui l'a lu.
+ *
+ * Donc un vert ici ne dit rien de ce qui repond aujourd'hui sur le reseau. Le
+ * verdict le porte en clair, plutot que dans ce commentaire seul — un lecteur
+ * n'ouvre pas le fichier avant de croire une ligne de sortie.
+ *
+ * Pour lever le doute, il faut redemarrer le service — geste qui n'est pas a
+ * moi — puis relever :
+ *
+ *     sudo docker inspect -f '{{.State.StartedAt}}' rootwarden_python
+ *
+ * et le comparer a la date du dernier commit touchant `backend/routes/updates.py`.
+ */
+const REGIME = 'ARBRE (fonctions extraites du fichier) — PAS le service qui repond';
 const VALIDATEURS = ['_cron_heure_minute', '_cron_annee_mois_jour'];
 const ROUTE = 'schedule_advanced_update';
 
@@ -202,6 +239,8 @@ if (charge.erreur) {
     process.exit(2);
 }
 
+console.log(`\nREGIME MESURE : ${REGIME}`);
+console.log('  un `.py` est lu au DEMARRAGE ; ce vert ne dit rien du processus qui sert.');
 console.log('\n=== ① les deux sens, sur les fonctions LUES depuis la source\n');
 let nominauxOk = 0;
 charge.resultats.forEach((r, i) => {
@@ -306,4 +345,7 @@ if (echecs) {
 }
 console.log(`Les deux sens tiennent — ${nominauxOk} valeur(s) nominale(s) acceptee(s),`);
 console.log('aucune chaine ne ressort, et les deux gardes precedent le geste.');
+console.log('');
+console.log(`⚠ PORTEE DE CE VERT : ${REGIME}.`);
+console.log('  Il ne dit PAS que le service refuse ces charges aujourd\'hui.');
 process.exit(0);
