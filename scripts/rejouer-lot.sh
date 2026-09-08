@@ -1596,7 +1596,23 @@ joue() {
   #    et une suite jouee sans reference EN EST UNE AUSSI. `joue` rend 0 pour le
   #    verdict « (pas de reference) » — donc elle ne compte pas comme ecart, donc
   #    « LOT conforme » s'imprime en l'englobant. Mesure du 2026-09-06 :
-  #    **53 des 167 executions du LOT n'ont AUCUNE reference** (27 laravel, 26 legacy).
+  #    ⛔ CE CHIFFRE ETAIT FAUX ET IL A CIRCULE DEPUIS CE COMMENTAIRE.
+  #
+  #    Il disait « 53 des 167 executions n'ont AUCUNE reference (27 laravel,
+  #    26 legacy) ». **La valeur est ZERO**, des deux cotes — mesure par `bash`
+  #    sourcant les quatre tableaux : SUITES_LARAVEL 85 contre REF_LARAVEL 85,
+  #    SUITES_LEGACY 82 contre REF_LEGACY 82. Retracte le 2026-09-07 dans
+  #    `PARITE.md` (E-452), **et laisse ici jusqu'au 2026-09-08**.
+  #
+  #    LA CAUSE : les lignes de reference portent PLUSIEURS CLES chacune
+  #    (`[go-socle-navigation]=75 [go-socle-i18n]=23 …`). Tout motif ancre sur
+  #    un DEBUT DE LIGNE n'en voit que la premiere — 58 au lieu de 85.
+  #
+  #    ⚠⚠ ET CE COMMENTAIRE A SERVI DE PREUVE. Le 2026-09-08, une session l'a
+  #    lu, a construit trois mesures pour le defendre — les trois ancrees sur
+  #    un debut de ligne, donc la MEME methode trois fois — et a demande un
+  #    durcissement sur cette base. *Une retractation qui reste au registre
+  #    pendant que l'artefact garde l'affirmation ne retracte rien.*
   #
   #    « LOT conforme » affirme alors une conformite sur des comptes qui n'ont ete
   #    compares a RIEN. On ne le corrige PAS en les comptant comme ecarts : la
@@ -1609,24 +1625,7 @@ joue() {
   fi
   printf '%-24s %-8s PASS=%-4s FAIL=%-3s %4ss  %s\n' \
     "$suite" "$cible" "$pass" "$affiche_fail" "$((t1-t0))" "$verdict"
-  # ══ `(pas de reference)` AVORTE DESORMAIS ═══════════════════════════════
-  #
-  # Il rendait 0, donc l'appelant ne le comptait pas, donc « LOT conforme »
-  # pouvait s'imprimer sur des executions comparees a RIEN. **Demande par la
-  # session qui tient le banc le 2026-09-08 ; le contrat de sortie est le sien,
-  # l'ecriture est ici.**
-  #
-  # ⚠ IL EST INERTE AUJOURD'HUI, ET C'EST MESURE : SUITES_LARAVEL 85 contre
-  # REF_LARAVEL 85, SUITES_LEGACY 82 contre REF_LEGACY 82 — **zero suite jouee
-  # sans reference, des deux cotes.** Sa valeur est a venir : une suite ajoutee
-  # sans reference avortera au lieu d'etre absoute.
-  #
-  # ⚠ ET IL NE PEUT PAS AVORTER SUR UNE REFERENCE PERIMEE. Une reference fausse
-  # rend `ECART attendu=<n>`, verdict DISJOINT de celui-ci et qui comptait deja.
-  # *La crainte d'un avortement « sur un retard de references » n'avait pas
-  # d'objet : les deux chemins ne se touchent pas.*
   [ "$verdict" = "ECHEC" ] || [ "${verdict:0:5}" = "ECART" ] \
-    || [ "$verdict" = "(pas de reference)" ] \
     || [ "${verdict:0:12}" = "FENETRE SALE" ] || [ "${verdict:0:13}" = "GARDE INDISPO" ] && return 1
   return 0
 }
