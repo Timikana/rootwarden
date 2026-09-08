@@ -99,3 +99,58 @@ parent immédiat.*
 > **La valeur réelle est la LISIBILITÉ de l'arbre de processus.** *C'est son
 > illisibilité qui a produit une accusation fausse de 2,9 Gio — donc le correctif
 > paie en mesures justes, pas en mémoire.*
+
+
+---
+
+## 5. ⛔ RECTIFICATION — « fuyards » est le mauvais mot, et le mécanisme le dit
+
+**Ce document appelle les 67 des « fuyards ». Sur un arrêt PROPRE, ils ne fuient
+pas.**
+
+`@puppeteer/browsers` installe ses propres répartiteurs de sortie — mesuré
+(`lib/cjs/launch.js:91`, `src/launch.ts:219`) :
+
+```
+evenements couverts   exit · SIGINT · SIGHUP · SIGTERM
+mecanisme             detached: true  +  onProcessExit  +  process.kill
+desactives ?          aucune suite ne passe handleSIGINT/TERM/HUP  ->  0 occurrence
+  temoin : la sonde voit 359 `timeout:`, 117 `headless:`, 116 `args:` — elle lit bien
+```
+
+    chemin de sortie      puppeteer   finally   enveloppeur
+    sortie propre             ✅          ✅          ✅
+    process.exit()            ✅          ❌          ✅
+    SIGINT/TERM/HUP           ✅          ❌          ✅
+    SIGKILL (OOM)             ❌          ❌          ❌   ← par definition du signal
+
+> **Les 15 orphelins réparentés à `init`, d'un SEUL événement à 2,8 jours, avec le
+> swap plein à 120 Ki près, sont un SIGKILL. Et SIGKILL est le seul chemin
+> qu'aucun gestionnaire ne peut couvrir.**
+
+### 5.1 La causalité était inversée, et le correctif reste bon
+
+**Ce n'est pas le défaut des 67 qui a produit la pression mémoire : c'est la
+pression mémoire qui a produit les orphelins.**
+
+> **Donc l'enveloppeur ne nettoie pas après l'OOM — il rend l'OOM MOINS
+> PROBABLE**, en ne gardant pas un navigateur ouvert pendant qu'une suite échoue.
+> *Il agit sur la cause mesurée, pas sur le symptôme — et il n'a aucun chemin par
+> lequel il réduirait un compte d'orphelins.*
+
+**Le mot juste n'est donc pas « fuyard » mais « qui garde un navigateur ouvert
+plus longtemps que nécessaire ».** *Ça se corrige par la même chose et ça ne fait
+pas chercher une fuite qui n'existe pas.*
+
+### 5.2 ⚠ Et mon propre angle mort, qui a failli réfuter le vrai
+
+**Ma première sonde a cherché les gestionnaires dans `puppeteer-core` et rendu
+ZÉRO.** *J'ai failli écrire « puppeteer ne pose aucun gestionnaire ».*
+
+**Ils sont dans `@puppeteer/browsers`.** *Mon `find` avait atterri sur le premier
+répertoire portant le nom, et **j'ai laissé la portée de ma sonde être décidée par
+où il était tombé**.*
+
+> **C'est le témoin qui m'a sauvée** : il montrait 7 fichiers avec `process.on`
+> dans l'arbre, donc la sonde LISAIT. **Le zéro venait de son périmètre, pas d'une
+> absence — et sans témoin les deux sont la même sortie.**
