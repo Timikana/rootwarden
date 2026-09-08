@@ -15686,3 +15686,106 @@ travaille par **dix `<form>` côté serveur** et n'a qu'un seul `fetch` de sonda
 — apparier contre son JS aurait conclu que rien n'est porté sur un module de 113
 clés. *Ce qui prouve l'atteignabilité est un site d'appel ; un `<form action>` en
 est un.* (mesuré par `4f`)
+
+
+## E-497 — Deux vrais défauts, et aucun des deux n'était visible par la règle qui les cherchait
+
+Le tri des 105 trouvailles a été ventilé entre six sessions, par périmètre, en
+lecture seule. **Cinq lots rendus, et le résultat n'est pas celui qu'on
+attendait : les seuls vrais défauts sont ceux que la règle ne pouvait PAS voir.**
+
+    0b  sftp_manager      27   3 constantes · 24 serveur · 2 base   -> 0 defaut DANS les 27
+    94  fail2ban+graylog   7   0 defaut
+    c1  sudo_manager       5   0 defaut, refute par CONSTRUCTION
+    4f  supervision       21   3a = ZERO · 3c = 4
+    5f  services+updates  15   ⛔ 3a = DEUX
+    ec  ssh+ssh_audit     31   3a = ZERO · 3c = 6
+    moi                    4   0 defaut
+
+### ⛔ DÉFAUT 1 — `updates.py:666` et `:762` : une ligne de `cron.d` écrite depuis une entrée non validée
+
+Trouvé par `5f`, chaîne vérifiée par moi ligne par ligne.
+
+    627  time_ = data.get('time')                       AUCUNE validation
+    633  if not all([date, time_])                      PRESENCE, pas la FORME
+    653  cron_time = f"{time_.split(':')[1]} {time_.split(':')[0]} * * *"
+    659  ... + date.split('-')[2] et [1]                `date` aussi, branche monthly
+    662  cron_job = f"{cron_time} root {apt_command}\n"
+    664  encoded  = base64.b64encode(cron_job…)
+    666  printf '%s' '{encoded}' | base64 -d > /etc/cron.d/auto_update_advanced
+    667  chmod 0644 · 668  systemctl restart cron       -> CRON EXECUTE EN ROOT
+
+**Côté shell la règle a raison de se taire : le base64 est une neutralisation
+par construction, plus forte qu'un quote. Mais le sink n'est pas le shell.** Le
+flux décodé est un fichier `cron.d` exécuté en root, et le base64 transporte
+fidèlement un saut de ligne suivi de n'importe quoi.
+
+Le seul garde de forme du fichier est `strptime(date, "%Y-%m-%d")` à `:731` : il
+est dans **l'autre** route, ne couvre que `date`, et seulement la branche
+`weekly`. **`time_` n'est contrôlé nulle part.**
+
+Deux routes : `POST /schedule_advanced_update` et
+`/schedule_advanced_security_update`, gardées par `@require_api_key` +
+`@require_permission('can_update_linux')` + `@require_machine_access`.
+
+**Le voisin sain rend l'écart lisible** : `schedule_update` (`:411`) écrit dans
+le même sink et n'interpole que `int(data.get('interval_minutes'))`. *C'est un
+oubli, pas une architecture.*
+
+### ⛔ DÉFAUT 2 — `sftp_manager` : une garde du mauvais côté de sa condition
+
+Trouvé par `0b`, **hors des 27 signalées**.
+
+    127  working_dir = policy.get('working_dir')     de la BASE, NON valide
+    151  if sftp_only:
+    153      f" -d {working_dir}"                    INTERPOLE BRUT, dans ForceCommand
+    157  elif working_dir:
+    158      working_dir = _validate_path(…)         valide ICI
+    162      f"    # working_dir={working_dir}"      et n'atterrit qu'en COMMENTAIRE
+
+**La validation est présente exactement là où la valeur est inoffensive, et
+absente exactement là où elle est employée.** Ce n'est pas une injection de
+shell — le heredoc est cité — c'est une **injection dans `sshd_config`** : un
+saut de ligne écrit des directives arbitraires dans le bloc `Match User`, puis
+`systemctl reload ssh`. Borné par `@require_role(3)` : défense en profondeur, pas
+élévation de privilège.
+
+⚠ Et `AccesSftp.php:71` **affirme le contraire** — « les chemins chroot_dir ET
+working_dir passent par `_validate_path` […] vérifié AU BACKEND ». Vrai pour
+`chroot_dir`, faux pour `working_dir` quand `sftp_only` est vrai — le seul cas où
+la valeur atteint une directive.
+
+### Ce que les 105 comptent vraiment, et les deux angles morts
+
+**`ec` a mesuré le plus gros** : `routes/ssh.py` porte 58 appels
+`execute_as_root`, dont **17 passent une VARIABLE** et non une f-string
+littérale — dont 8 assemblées quelques lignes plus haut. *Le motif ne les
+apparie jamais.*
+
+> **L'exemption `shlex.quote` fait ACCUSER À TORT ; l'assemblage en variable fait
+> NE PAS REGARDER. Le second est plus grave : une fausse accusation se vérifie en
+> lisant, un silence ne se remarque pas.** *(formulation de `ec`)*
+
+Second angle mort, mesuré par `4f` : l'exemption couvre la **région**, donc
+**6 exemptions sur 7** de `supervision.py` masquent une interpolation nue à côté
+de la charge base64. Les valeurs sont sûres aujourd'hui (littéraux) — *l'angle
+mort, lui, est actif*.
+
+Et son ordre de grandeur : sur `supervision.py`, **21 liaisons pour 15 appels,
+dont 4 d'origine externe et 0 sans neutralisation.** Si le rapport tient
+ailleurs, **les 105 comptent surtout des littéraux de module.**
+
+### Décision
+
+**Je ne corrige aucun des deux moi-même.** Ce sont des correctifs de sécurité sur
+des chemins vivants du backend, et une session ne valide pas seule ce qu'elle
+vient d'écrire. Le défaut 1 est le plus grave et le plus simple : typer `time_`
+et `date` comme le voisin sain type `interval_minutes`. Il sera écrit par une
+session et relu par une autre, et il ne part pas sans le mot de l'exploitant.
+
+⚠ Et une correction de mon propre compte, consignée pour qu'elle ne recircule
+pas : j'ai annoncé **67** interpolations, c'était **106** — mon extraction
+comptait les blocs `❯❯❱` (un par couple règle-fichier) au lieu des trouvailles,
+séparées par des `⋮┆` **à l'intérieur** des blocs. Réconcilié à 109 = 109 par un
+contrôle qui refuse de rendre en cas d'écart. *Le grain de la mesure, sur mon
+propre relevé, le jour où je le reprochais à trois sessions.*

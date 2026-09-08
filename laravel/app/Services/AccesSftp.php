@@ -64,13 +64,142 @@ use Illuminate\Support\Facades\DB;
  * Comme en D9a, et pour les memes raisons : gardes completes aux trois niveaux
  * (page en `checkAuth([ROLE_SUPERADMIN])` — role 2 mesure a 403 —, `/policy/`
  * en prefixe d'administration du proxy, `@require_role(3)` sur les routes), et
- * geste distant sur — `sftp_manager` ecrit un temporaire, lance `sshd -t` pour
- * valider la configuration COMPLETE, et ne deplace qu'ensuite. Un bloc syntaxi-
- * quement invalide ne peut pas fermer l'acces SSH a la machine.
+ * ⚠ CORRECTION DU 2026-09-08 : CETTE PHRASE DISAIT L'ORDRE A L'ENVERS.
  *
- * Les chemins `chroot_dir` et `working_dir` passent par `_validate_path` :
- * absolu, sans traversee. C'est verifie AU BACKEND, donc une requete forgee ne
- * le contourne pas.
+ * Elle affirmait que `sftp_manager` « ecrit un temporaire, lance `sshd -t` […] et
+ * ne deplace qu'ensuite ». **L'ordre reel est l'inverse** (`sftp_manager.py`) :
+ *
+ *     :227  cp -a target backup          sauvegarde de l'ancien
+ *     :231  mv tmpfile target            LE FICHIER FAUTIF EST EN PLACE
+ *     :236  sshd -t                      validation GLOBALE, apres le deplacement
+ *     :240  mv backup target / rm        restauration si KO
+ *     :253  systemctl reload             seulement si OK
+ *
+ * `sudo_manager`, lui, valide le TEMPORAIRE avant de deplacer. **Les deux modules
+ * du meme depot n'ont pas le meme ordre, et le commentaire decrivait le bon.**
+ *
+ * Ce qui reste VRAI : le sshd en service n'est jamais recharge avec un bloc
+ * invalide — la validation precede le `reload`. Ce qui est FAUX : « ne deplace
+ * qu'ensuite ». **Entre `:231` et `:236` le fichier fautif est a son chemin
+ * definitif** : un `reload` declenche par ailleurs dans cette fenetre
+ * l'appliquerait, et un arret du processus le laisserait en place.
+ *
+ * ⚠ CE QUE CE COMMENTAIRE AFFIRMAIT, ET QUI ETAIT FAUX A MOITIE.
+ *
+ * Il disait : « les chemins `chroot_dir` ET `working_dir` passent par
+ * `_validate_path` […] verifie AU BACKEND, donc une requete forgee ne le
+ * contourne pas. » **Vrai pour `chroot_dir`, FAUX pour `working_dir` quand
+ * `sftp_only` est vrai.** Mesure du 2026-09-08 sur `backend/sftp_manager.py` :
+ *
+ *     :127  working_dir = policy.get('working_dir')     de la BASE, non valide
+ *     :151  if sftp_only:
+ *     :153      "ForceCommand internal-sftp" + f" -d {working_dir}"   BRUT
+ *     :157  elif working_dir:
+ *     :158      working_dir = _validate_path(working_dir, 'working_dir')
+ *     :162      lines.append(f"    # working_dir={working_dir} …")    COMMENTAIRE
+ *
+ * **La validation est presente exactement la ou la valeur est inoffensive, et
+ * absente exactement la ou elle est employee.** Et `routes/policies.py:370`
+ * prend `data.get('working_dir')` brut a l'ecriture.
+ *
+ * ⚠ CE N'EST PAS UNE INJECTION DE SHELL — le contenu part par un heredoc CITE.
+ * C'est une injection dans `sshd_config` : un saut de ligne ecrit des directives
+ * arbitraires dans le bloc `Match User`, et un `reload` suit.
+ *
+ * ⚠ ET LA PORTEE SE MESURE, elle ne se suppose pas. Eprouve le 2026-09-08 sur
+ * OpenSSH 9.2, dans un conteneur JETABLE `--network none` (aucune machine du parc
+ * jointe), avec `sshd -T -C user=bob` qui rend la configuration EFFECTIVE :
+ *
+ * ⚠ ET LE PERIMETRE SE LIT DANS L'ORDRE D'EMISSION, PAS DANS LE CONTENU.
+ *
+ * Mon premier essai portait un bloc ECRIT A LA MAIN : il mesurait ma
+ * reconstruction, pas le produit — et la propriete qui decide ici est l'ORDRE des
+ * lignes, c'est-a-dire exactement ce qu'une reconstruction ne preserve pas.
+ * Refait en rendant le bloc par `render_policy()` LUI-MEME, `working_dir` porteur
+ * de sauts de ligne, verdict par `sshd -T -C user=bob` :
+ *
+ *     directive                    propre  injecte   verdict
+ *     forcecommand                 idem    idem      PROTEGE  (premier gagne)
+ *     allowtcpforwarding           no      no        PROTEGE  (emis AVANT :153)
+ *     chrootdirectory              idem    idem      PROTEGE  (emis AVANT)
+ *     permittunnel                 no      YES       FLIPPE   (emis APRES :153)
+ *     permittty                    no      YES       FLIPPE   (emis APRES)
+ *     gatewayports                 no      YES       FLIPPE   (ABSENTE du bloc)
+ *     sshd -t sur les deux         code 0, aucune sortie
+ *
+ * **Les cinq directives emises AVANT le point d'injection sont protegees par la
+ * regle du premier gagnant ; seules celles qui SUIVENT et celles qui MANQUENT
+ * sont retournables.** Mon essai a la main annoncait `AllowTcpForwarding` comme
+ * retournable : c'est FAUX avec ce generateur, qui l'emet onze lignes plus haut.
+ *
+ * ⚠ ET UN TROU DE PROFIL, DISTINCT DU DEFAUT D'INJECTION — TROIS DIRECTIVES.
+ *
+ * Mesure sur le bloc PROPRE (aucune injection), `sshd -T -C user=bob` :
+ *
+ *     allowtcpforwarding           no     <- FERME par le bloc
+ *     gatewayports                 no     <- ferme par le DEFAUT d'OpenSSH
+ *     allowstreamlocalforwarding   yes    <- OUVERT, non nomme par le bloc
+ *     permitopen                   any    <- OUVERT, non nomme
+ *     permitlisten                 any    <- OUVERT, non nomme
+ *
+ * **Le profil « SFTP restreint » ferme cinq leviers et en laisse TROIS ouverts** :
+ * la redirection de sockets Unix, et les deux listes `PermitOpen`/`PermitListen`
+ * qui valent `any`. *Ce n'est PAS retourne par l'injection — c'est absent du
+ * profil, donc une decision a prendre, pas un defaut a corriger.*
+ *
+ * ⚠ LIMITE DE L'INSTRUMENT, ET ELLE DECIDE DE LA SUITE. `sshd -T` rend la
+ * configuration RESOLUE, pas le comportement. Il ne peut donc PAS dire si
+ * `PermitOpen any` a un effet quand `AllowTcpForwarding` vaut `no` — c'est une
+ * question de comportement a l'execution, qui exigerait une connexion reelle.
+ * **On m'a proposé le raisonnement « ces trois ne gouvernent que la redirection
+ * TCP, donc elles sont inertes » : il est plausible et je ne l'ai PAS mesure.**
+ * Il reste donc une hypothese, et le trou de profil doit etre traite comme
+ * potentiellement reel jusqu'a ce qu'une connexion le tranche.
+ *
+ * ⛔ MAIS CETTE QUESTION OUVERTE NE RETIENT AUCUN GESTE — et il faut le dire ici,
+ * sinon ce commentaire fabrique lui-meme l'attente qu'il decrit.
+ *
+ *     correctif de VALIDATION  faire dominer `_validate_path` les DEUX branches
+ *                              -> ferme l'injection de saut de ligne
+ *                              -> ne touche AUCUNE des trois directives ouvertes
+ *                              -> NE DEPEND PAS de l'hypothese. A ecrire.
+ *     trou de PROFIL           nommer les trois directives dans le bloc
+ *                              -> exige de decider ce qu'un compte restreint doit
+ *                                 pouvoir faire : un ARBITRAGE, pas une mesure
+ *
+ * **Les deux defauts sont disjoints, et mesure : l'injection ne peut pas elargir
+ * le trou de profil** (les trois valent deja `yes`/`any`/`any`, y injecter la
+ * meme valeur ne change rien et l'inverse restreindrait). *La question ouverte
+ * informe la DECISION ; elle ne bloque pas le CORRECTIF.*
+ *
+ * ⚠ Et la voie « remonter a la documentation » est fermee d'ici : la page de
+ * manuel `sshd_config` n'est dans AUCUN conteneur — `rootwarden_test_server`
+ * porte le binaire sans la page, les autres n'ont ni l'un ni l'autre. Mesure
+ * faite pour que personne ne la refasse.
+ *
+ * **Donc `sshd -t` ne rejette pas le doublon, et la directive la plus consequente
+ * de cet endroit — `ForceCommand` — est neutralisee par la regle du premier
+ * gagnant d'OpenSSH.** Le residu reel : un role 3 peut ACTIVER sur ce compte ce
+ * que le bloc ne fixait pas — redirection TCP, tunnel — c'est-a-dire elargir un
+ * compte SFTP restreint sans defaire son `ForceCommand`.
+ *
+ * ⚠ BORNE DE SEVERITE, pour ne ni dramatiser ni minimiser : la page est en
+ * `ROLE_SUPERADMIN` et les routes en `@require_role(3)`. **Ce n'est donc pas une
+ * elevation de privilege, c'est un defaut de defense en profondeur** — un role 3
+ * peut ecrire des directives sshd par un champ qui n'est pas fait pour ca.
+ *
+ * ⚠ ET LE CORRECTIF N'EST PAS DE MON COTE. Il vit dans `backend/sftp_manager.py`,
+ * hors de mon perimetre d'ecriture. Ce commentaire dit donc l'etat REEL en
+ * attendant, plutot que de promettre un controle absent : **un commentaire qui
+ * affirme plus que le code est pire que pas de commentaire — il dispense le
+ * lecteur de verifier.**
+ *
+ * Ce qui EST vrai aujourd'hui : `chroot_dir` passe par `_validate_path`, et
+ * cette fonction est saine — eprouve le 2026-09-08, les deux sens :
+ * saut de ligne AU MILIEU refuse, traversee refusee, chemin nominal ACCEPTE
+ * (`_PATH_RE` sans `re.MULTILINE`, donc `$` ne s'apparie pas en milieu de
+ * chaine). Le correctif consiste donc a la faire DOMINER les deux branches, pas
+ * a en ecrire une nouvelle.
  */
 class AccesSftp
 {
