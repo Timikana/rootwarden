@@ -276,6 +276,79 @@ function declaration(fichier) {
     return m ? m[1].trim() : null;
 }
 
+/*
+ * ⚠ CE LECTEUR N'AVAIT AUCUN TEMOIN — ajoute le 2026-09-08.
+ *
+ * Mesure : en remplaçant sa lecture par du vide, l'inventaire rend 1 et annonce
+ * simplement PLUS de suites sans raison. Aucun garde ne bronche. La panne se
+ * deguise donc en resultat, et dans les DEUX sens :
+ *
+ *   lecteur AVEUGLE   -> tout est « sans raison declaree »   -> fausse ALARME
+ *   motif TROP LARGE  -> tout est « declare »                -> DEDOUANEMENT
+ *
+ * Le second est le dangereux, et c'est celui que les donnees reelles ne
+ * couvrent pas : aujourd'hui 20 suites n'ont pas de marqueur, donc le cas
+ * « absent » est exerce par le parc. Le jour ou les 32 en auront un, un motif
+ * relache rendrait zero et personne ne le verrait.
+ *
+ * > Un lecteur ne se verifie pas sur le cas que le parc lui presente : le parc
+ * > change, et c'est justement quand il n'offre plus le cas negatif que le
+ * > lecteur relache devient invisible.
+ *
+ * D'ou une paire FORGEE, en memoire, jamais sur le disque : un texte qui porte
+ * un marqueur, un texte qui n'en porte pas. Le lecteur doit rendre la raison
+ * pour l'un et `null` pour l'autre.
+ *
+ * ⚠ ET LE TEMOIN N'APPELLE PAS `declaration()`, qui LIT UN FICHIER. Il exerce
+ * `MARQUEUR` — la seule partie qui peut se relacher. Faire ecrire deux fichiers
+ * temporaires pour l'eprouver ajouterait dans `tests/e2e/` deux suites que
+ * l'inventaire compterait ensuite : **l'instrument deviendrait une partie de sa
+ * propre population.**
+ */
+const FORGES = [
+    { texte: ' * HORS-LOT: une raison quelconque', attendu: 'une raison quelconque' },
+    { texte: 'HORS-LOT: sans prefixe de commentaire', attendu: 'sans prefixe de commentaire' },
+    { texte: '/* une suite ordinaire, aucun marqueur */\nimport x from "y";', attendu: null },
+    /*
+     * Un marqueur VIDE ne declare rien : `\S` l'exige non blanc. Sans ce cas, un
+     * motif passe a `(.*)` rendrait la chaine vide — donc « declare » — et le
+     * `sansRaison` tomberait a zero.
+     */
+    { texte: ' * HORS-LOT:', attendu: null },
+    { texte: ' * HORS-LOT:    ', attendu: null },
+    /*
+     * ⚠ LE MARQUEUR N'EST PAS SUR LA PREMIERE LIGNE, et ce cas manquait.
+     *
+     * Mutation qui l'a revele : retirer le drapeau `/m`. Sans lui, `^` n'ancre
+     * plus qu'au DEBUT DE LA CHAINE — et mes cinq premiers cas tenaient tous sur
+     * une seule ligne, ou commençaient par le marqueur. Ils passaient donc tous,
+     * et la mutation rendait 1 : **le temoin ne voyait pas la panne qu'il est la
+     * pour voir.**
+     *
+     * C'est la forme REELLE : un marqueur vit dans un docblock, a la dixieme
+     * ligne d'un fichier. Un jeu de cas forges qui n'exerce que la position la
+     * plus simple mesure la position la plus simple.
+     */
+    { texte: '/**\n * Une suite.\n *\n * HORS-LOT: raison en milieu de docblock\n */',
+      attendu: 'raison en milieu de docblock' },
+];
+const lecteurCasse = [];
+for (const f of FORGES) {
+    const m = f.texte.match(MARQUEUR);
+    const rendu = m ? m[1].trim() : null;
+    if (rendu !== f.attendu) {
+        lecteurCasse.push(`${JSON.stringify(f.texte.slice(0, 40))} -> ${JSON.stringify(rendu)}`
+            + ` au lieu de ${JSON.stringify(f.attendu)}`);
+    }
+}
+if (lecteurCasse.length) {
+    console.log('⛔ LE LECTEUR DE MARQUEUR NE CLASSE PAS SES PROPRES CAS FORGES :');
+    for (const l of lecteurCasse) console.log(`   ${l}`);
+    console.log('   Un motif relache rend « tout est declare » et DEDOUANE toute la');
+    console.log('   liste. NE RIEN CONCLURE.');
+    process.exit(2);
+}
+
 const sansRaison = [];
 for (const s of horsListe) {
     if (declaration(`${s}.mjs`) === null) sansRaison.push(s);
