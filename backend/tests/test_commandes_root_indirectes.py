@@ -60,7 +60,7 @@ RACINE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Releve le 2026-09-09 a 01:45 CEST, par ce meme balayage, sur `backend/**.py`
 # hors `tests/`. Il ECHOUE si le compte CROIT, il informe s'il descend.
 # Remesure :  python3 backend/tests/test_commandes_root_indirectes.py
-REFERENCE = 33
+REFERENCE = 34
 
 
 def _interpolee(noeud) -> bool:
@@ -99,25 +99,70 @@ def sites_indirects(source: str):
     """
     arbre = ast.parse(source)
     trouves = []
+    non_resolus = []
+    # carte des portees englobantes, pour que l'aveu ne denonce pas une fermeture
+    parents = {}
+    for pere in ast.walk(arbre):
+        if isinstance(pere, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            for fils in ast.walk(pere):
+                if fils is not pere and isinstance(fils, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    parents.setdefault(fils, pere)
     for fonction in ast.walk(arbre):
         if not isinstance(fonction, (ast.FunctionDef, ast.AsyncFunctionDef)):
             continue
         teintes = collections.defaultdict(list)
-        for n in ast.walk(fonction):
-            valeur = cibles = None
-            if isinstance(n, ast.Assign):
-                valeur, cibles = n.value, n.targets
-            elif isinstance(n, ast.AnnAssign):
-                valeur, cibles = n.value, [n.target]
-            elif isinstance(n, ast.AugAssign):
-                valeur, cibles = n.value, [n.target]
-            elif isinstance(n, ast.NamedExpr):
-                valeur, cibles = n.value, [n.target]
-            if valeur is None or not _interpolee(valeur):
-                continue
-            for cible in cibles:
-                for nom in _noms_cibles(cible):
-                    teintes[nom].append(n.lineno)
+        # Les noms connus incluent les parametres des portees ENGLOBANTES : une
+        # fonction imbriquee voit `root_password` de sa mere. Sans ca l'aveu
+        # denonce des fermetures parfaitement ordinaires, et un aveu qui crie
+        # tout le temps ne se lit plus.
+        connus = {p.arg for p in ast.walk(fonction) if isinstance(p, ast.arg)}
+        englobante = parents.get(fonction)
+        while englobante is not None:
+            connus |= {p.arg for p in englobante.args.args + englobante.args.kwonlyargs}
+            if englobante.args.vararg:
+                connus.add(englobante.args.vararg.arg)
+            if englobante.args.kwarg:
+                connus.add(englobante.args.kwarg.arg)
+            connus |= {n.id for x in ast.walk(englobante) if isinstance(x, ast.Assign)
+                       for c in x.targets for n in ast.walk(c) if isinstance(n, ast.Name)}
+            englobante = parents.get(englobante)
+        # DEUX passes : la seconde propage `for cmd in cmds` quand `cmds` n'est
+        # teinte qu'apres la premiere. Sans elle, la liaison indirecte par une
+        # variable intermediaire echappe — et elle echappe DANS LE SENS QUI
+        # DEDOUANE.
+        for _ in range(2):
+            for n in ast.walk(fonction):
+                valeur = cibles = ligne = None
+                if isinstance(n, ast.Assign):
+                    valeur, cibles, ligne = n.value, n.targets, n.lineno
+                elif isinstance(n, (ast.AnnAssign, ast.AugAssign, ast.NamedExpr)):
+                    valeur, cibles, ligne = n.value, [n.target], n.lineno
+                elif isinstance(n, (ast.For, ast.AsyncFor)):
+                    # Une cible de boucle n'est PAS un `ast.Assign`. Signalee par
+                    # `gestion-ssh-key-5f` le 2026-09-09 : `fail2ban_manager.py`
+                    # porte un `for cmd in cmds:` ou `cmds` est une liste de
+                    # TROIS commandes root. Mon compte de 33 en cachait une.
+                    valeur, cibles, ligne = n.iter, [n.target], n.lineno
+                elif isinstance(n, ast.comprehension):
+                    valeur, cibles, ligne = n.iter, [n.target], getattr(n.target, 'lineno', 0)
+                elif isinstance(n, (ast.With, ast.AsyncWith)):
+                    for item in n.items:
+                        if item.optional_vars is None:
+                            continue
+                        for nom in _noms_cibles(item.optional_vars):
+                            connus.add(nom)
+                            if _interpolee(item.context_expr) and n.lineno not in teintes[nom]:
+                                teintes[nom].append(n.lineno)
+                    continue
+                if valeur is None:
+                    continue
+                # teinte DIRECTE, ou TRANSITIVE : la valeur est un nom deja teinte
+                teinte = _interpolee(valeur) or (isinstance(valeur, ast.Name) and valeur.id in teintes)
+                for cible in cibles:
+                    for nom in _noms_cibles(cible):
+                        connus.add(nom)
+                        if teinte and ligne not in teintes[nom]:
+                            teintes[nom].append(ligne)
         for n in ast.walk(fonction):
             if not isinstance(n, ast.Call):
                 continue
@@ -131,7 +176,14 @@ def sites_indirects(source: str):
                 anterieurs = [l for l in teintes.get(a.id, []) if l <= n.lineno]
                 if anterieurs:
                     trouves.append((n.lineno, a.id, max(anterieurs)))
-    return sorted(set(trouves))
+                elif a.id not in connus:
+                    # L'AVEU. Regle de `gestion-ssh-key-5f` : un resolveur doit
+                    # rendre « je n'ai pas resolu » plutot que rien. C'est le
+                    # seul moyen qu'une forme de liaison a laquelle personne n'a
+                    # pense se SIGNALE, au lieu de disparaitre en silence du
+                    # cote qui dedouane. L'enumeration des formes n'a pas de fin.
+                    non_resolus.append((n.lineno, a.id))
+    return sorted(set(trouves)), sorted(set(non_resolus))
 
 
 def _fichiers():
@@ -145,18 +197,22 @@ def _fichiers():
     return sorted(out)
 
 
-def releve():
+def releve(aveux=None):
     """{chemin relatif: [sites]} pour tout `backend/` hors `tests/`."""
     par_fichier = {}
+    aveux = {} if aveux is None else aveux
     for chemin in _fichiers():
         with open(chemin, encoding='utf-8') as fh:
             source = fh.read()
         try:
-            s = sites_indirects(source)
+            s, inconnus = sites_indirects(source)
         except SyntaxError:
             continue
+        rel = os.path.relpath(chemin, RACINE)
         if s:
-            par_fichier[os.path.relpath(chemin, RACINE)] = s
+            par_fichier[rel] = s
+        if inconnus:
+            aveux[rel] = inconnus
     return par_fichier
 
 
@@ -184,6 +240,16 @@ _DOIT_MORDRE = [
      "def f(c, p):\n    a, cmd = 1, f'{x}'\n    execute_as_root(c, cmd, p)\n"),
     ('affectation annotee',
      "def f(c, p):\n    cmd: str = f'rm {x}'\n    execute_as_root(c, cmd, p)\n"),
+    ('cible de boucle : for cmd in [f"a{x}"]',
+     "def f(c, p):\n    for cmd in [f'a{x}', 'b']:\n        execute_as_root(c, cmd, p)\n"),
+    ('boucle sur une variable teintee plus haut',
+     "def f(c, p):\n    cmds = [f'a{x}']\n    for cmd in cmds:\n        execute_as_root(c, cmd, p)\n"),
+    ('gestionnaire de contexte : with ... as cmd',
+     "def f(c, p):\n    with ctx(f'a{x}') as cmd:\n        execute_as_root(c, cmd, p)\n"),
+    ('comprehension',
+     "def f(c, p):\n    [execute_as_root(c, cmd, p) for cmd in [f'a{x}']]\n"),
+    ('alias : b = a, a teinte',
+     "def f(c, p):\n    a = f'x{y}'\n    b = a\n    execute_as_root(c, b, p)\n"),
 ]
 
 _NE_DOIT_PAS_MORDRE = [
@@ -201,20 +267,24 @@ _NE_DOIT_PAS_MORDRE = [
      "def f(c, p):\n    execute_as_root(c, cmd, p)\n    cmd = f'{x}'\n"),
     ('appel a une autre fonction',
      "def f(c, p):\n    cmd = f'{x}'\n    subprocess.run(cmd)\n"),
+    ('boucle sur des litteraux NUS',
+     "def f(c, p):\n    for cmd in ['a', 'b']:\n        execute_as_root(c, cmd, p)\n"),
+    ('variable NUE puis boucle',
+     "def f(c, p):\n    cmds = ['a', 'b']\n    for cmd in cmds:\n        execute_as_root(c, cmd, p)\n"),
 ]
 
 
 def test_les_formes_a_voir_sont_vues():
     """Neuf formes d'interpolation indirecte, toutes detectees."""
     for libelle, source in _DOIT_MORDRE:
-        n = len(sites_indirects(source))
+        n = len(sites_indirects(source)[0])
         assert n == 1, f'forme NON DETECTEE ({libelle}) : {n} site(s) au lieu de 1'
 
 
 def test_les_formes_a_ignorer_sont_ignorees():
     """Sept formes sûres ou deja couvertes, aucune signalee."""
     for libelle, source in _NE_DOIT_PAS_MORDRE:
-        n = len(sites_indirects(source))
+        n = len(sites_indirects(source)[0])
         assert n == 0, f'FAUSSE ALARME ({libelle}) : {n} site(s) au lieu de 0'
 
 
@@ -246,6 +316,39 @@ def test_le_site_de_la_vulnerabilite_est_bien_dans_la_moitie_invisible():
     variables = {v for _, v, _ in updates}
     assert 'command' in variables, \
         'la variable de la vulnerabilite du 2026-09-08 a disparu du releve'
+
+
+def test_l_instrument_AVOUE_ce_qu_il_ne_resout_pas():
+    """Un resolveur doit rendre « je n'ai pas resolu » plutot que rien.
+
+    Regle de `gestion-ssh-key-5f`, le 2026-09-09. Sa forme manquante — une cible
+    de `for` — n'est ressortie que parce que SON releve imprimait « NON LIEE »
+    au lieu de sauter en silence. Mon releve, lui, la perdait sans un mot : le
+    compte tombait de 34 a 33, et un chiffre plus bas ressemble a un progres.
+
+    > L'enumeration des formes de liaison n'a pas de fin. Ce qui a une fin, c'est
+    > le silence : un nom non resolu doit se DIRE.
+
+    Ce test verifie que le mecanisme existe et discrimine — pas que le depot
+    contienne un cas particulier.
+    """
+    _, inconnus = sites_indirects(
+        "def f(c, p):\n    execute_as_root(c, VENU_D_AILLEURS, p)\n"
+    )
+    assert inconnus, "un nom jamais lie dans la fonction doit etre AVOUE"
+    _, connus = sites_indirects(
+        "def f(c, p):\n    cmd = 'litteral'\n    execute_as_root(c, cmd, p)\n"
+    )
+    assert not connus, "un nom LIE, meme a un litteral, ne doit pas etre avoue"
+
+    aveux = {}
+    releve(aveux)
+    for fichier, noms in aveux.items():
+        for _, nom in noms:
+            assert nom.isupper() or nom.startswith('_'), (
+                f'{fichier} : `{nom}` non resolu et son nom ne dit pas une '
+                f'constante de module — une forme de liaison echappe peut-etre'
+            )
 
 
 def test_le_cliquet_ne_monte_pas():
