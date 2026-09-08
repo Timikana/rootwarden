@@ -62,17 +62,63 @@ jobs:
         with:
           php-version: "8.4"
 
+      # ⚠ CE JOB LINTAIT L'ARCHIVE ET RIEN D'AUTRE.
+      #
+      # `find legacy/ -name "*.php"` traverse `legacy/_deprecated/`, donc il
+      # trouvait 178 fichiers — TOUS ARCHIVES, plus servis, plus charges — et
+      # ZERO des 144 `.php` vivants de `laravel/`. Il etait vert parce que du code
+      # mort reste syntaxiquement valide.
+      #
+      # Et trois jobs en DEPENDENT (`test-php`, `build-docker`, `auto-tag`) : une
+      # porte qui mesure du code mort en gardait celle qui mesure le vivant.
+      #
+      # ⛔ Le jour ou `patch 07` emporte l'archive, l'ancienne forme aurait passe
+      # au vert SUR UN ENSEMBLE VIDE — un zero qui se lit « propre ».
+      #
+      # ── CE QUI EST LINTE, ET CE QUI NE L'EST PAS ────────────────────────────
+      #
+      # Le PHP SIMPLE de `laravel/` : 144 fichiers suivis, 146 vus dans le
+      # conteneur, TOUS passent (mesure du 2026-09-08 13:2x, en `www-data`).
+      #
+      # ⛔ `resources/views/` est EXCLU, et ce n'est pas une commodite : Blade
+      # n'est pas du PHP valide, il est COMPILE avant execution. Mesure : 56 des
+      # 57 `.blade.php` passent `php -l` par ACCIDENT — un fichier sans balise
+      # `<?php` est du HTML inline, donc valide — et le 57e echoue sur un
+      # COMMENTAIRE qui cite `@php(`. **`php -l` n'est pas un linter de Blade :
+      # il passe incidemment, et il rougit sur un non-defaut.** La syntaxe des
+      # vues est couverte en aval, par `test-php`, qui charge l'application.
+      #
+      # ⛔ `vendor/` est exclu : ce n'est pas notre code.
       - name: PHP syntax check
         run: |
           echo "=== Verification syntaxe PHP ==="
+          fichiers=$(
+            find laravel/app laravel/config laravel/routes laravel/database \
+                 laravel/tests laravel/bootstrap laravel/public \
+                 -name "*.php" -type f 2>/dev/null
+            find legacy/ -name "*.php" -type f -not -path "legacy/_deprecated/*" 2>/dev/null
+          )
+          n=$(printf '%s\n' "$fichiers" | grep -c . || true)
+
+          # ⚠ TEMOIN : un ensemble VIDE n'est pas un succes, c'est une mesure
+          # qui n'a pas eu lieu. Sans cette garde, un chemin renomme rendrait ce
+          # job vert en ne lintant rien.
+          if [ "$n" -eq 0 ]; then
+            echo "::error::aucun fichier PHP trouve — les chemins ont bouge."
+            echo "Ce job ECHOUE plutot que de passer sans avoir mesure."
+            exit 1
+          fi
+          echo "$n fichier(s) a verifier"
+
           errors=0
           while IFS= read -r file; do
+            [ -n "$file" ] || continue
             if ! php -l "$file" > /dev/null 2>&1; then
               php -l "$file"
               errors=$((errors + 1))
             fi
-          done < <(find legacy/ -name "*.php" -type f)
-          echo "=== $errors erreur(s) de syntaxe ==="
+          done < <(printf '%s\n' "$fichiers")
+          echo "=== $errors erreur(s) de syntaxe sur $n fichier(s) ==="
           [ $errors -eq 0 ] || exit 1
 
   # ─────────────────────────────────────────────────────────────
