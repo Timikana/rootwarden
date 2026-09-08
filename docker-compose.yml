@@ -257,13 +257,41 @@ services:
   # Lancez manuellement si besoin :
   #   docker-compose run --rm composer
   #   docker-compose run --rm composer-update
+  #
+  # ⚠ CES DEUX SERVICES MONTAIENT `./legacy:/app`, DONC LA FAÇON DOCUMENTEE DE
+  # GERER LES DEPENDANCES GERAIT LES MORTES.
+  #
+  #     legacy/composer.lock    14 paquets prod +  0 dev  — fige avec l'archive
+  #     laravel/composer.lock   86 paquets prod + 33 dev  — l'application VIVANTE
+  #
+  # Un exploitant suivant la ligne ci-dessus installait ou mettait a jour le
+  # legacy, et `laravel/composer.lock` restait inatteignable par l'outillage que
+  # ce fichier documente. Troisieme occurrence de la meme espece le 2026-09-08,
+  # apres `lint-php` (qui lintait 178 fichiers archives et 0 vivant) et `sca-php`
+  # (dont l'audit CVE couvrait 14 paquets morts et jamais les 119 vivants).
+  #
+  # La cible est desormais EXPLICITE et surchargeable, par defaut l'application
+  # vivante :
+  #     docker-compose run --rm composer                       -> ./laravel
+  #     COMPOSER_CIBLE=./legacy docker-compose run --rm composer -> l'archive
+  #
+  # ⛔ ET UN DANGER A CONNAITRE AVANT DE LANCER `composer` : la commande porte
+  # `--no-dev`, donc elle RETIRE les dependances de developpement de `vendor/`.
+  # PHPUnit en fait partie. Apres un `composer install --no-dev` sur `./laravel`,
+  # la suite de tests ne tourne plus tant qu'on n'a pas rejoue une installation
+  # SANS `--no-dev`. C'est le bon comportement pour une image de production et le
+  # mauvais sur un poste de travail — dit ici plutot que decouvert apres coup.
+  #
+  # ⛔ Et `./laravel` est monte en BIND dans le conteneur qui SERT : une
+  # installation regenere `vendor/` sous le service vivant. Ce n'est pas un geste
+  # a jouer pendant qu'une suite tourne.
   # ─────────────────────────────────────────────────────────────
   composer:
     image: composer:2
     container_name: rootwarden_composer
     working_dir: /app
     volumes:
-      - ./legacy:/app
+      - ${COMPOSER_CIBLE:-./laravel}:/app
     command: ["composer", "install", "--no-dev", "--optimize-autoloader"]
     profiles:
       - tools
@@ -275,7 +303,7 @@ services:
     container_name: rootwarden_composer_update
     working_dir: /app
     volumes:
-      - ./legacy:/app
+      - ${COMPOSER_CIBLE:-./laravel}:/app
     command: ["composer", "update", "--no-dev", "--optimize-autoloader"]
     profiles:
       - tools
