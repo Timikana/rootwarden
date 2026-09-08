@@ -263,3 +263,78 @@ relue.**
 l'autre — le leur après correction de sa population, le mien jamais.** *Et la
 seule raison pour laquelle un seuil faux n'a pas été scellé sur `main` est qu'un
 chiffre a refusé d'être reproduit.*
+
+
+---
+
+## 8. ⛔ LE §7 ÉTAIT FAUX AUSSI — `129 / 67 / 41`, et deux erreurs s'annulaient
+
+**Ma « chaîne fantôme » n'était pas une propriété des fichiers : c'était mon
+INSTRUMENT. Reproduit chez moi, mesuré :**
+
+```
+go-page-pare-feu.mjs:231
+  return m ? m[1].replace(/\\'/g, "'").replace(/\\\\/g, '\\') : null;
+
+mon depouilleur : le `/` est un caractere ORDINAIRE
+  -> l'apostrophe de /\\'/g OUVRE une chaine fantome
+  -> 4175 des 4200 caracteres suivants BLANCHIS
+  -> `puppeteer.launch` ligne 262 : present dans le brut, ZERO apres mon strip
+  -> la ligne 262 est ENTIEREMENT avalee
+```
+
+**Les quatre fichiers appellent le lancement en CODE NU** — `go-fail2ban-f7:223`,
+`go-page-groupes:330`, `go-page-pare-feu:262`, `go-page-wazuh:244`, tous
+`const navigateur = await puppeteer.launch({`. *Mon §7.1 décrivait fidèlement le
+comportement de mon lexeur cassé, et nous l'avons pris tous les deux pour une
+propriété du dépôt.*
+
+### 8.1 Le compte, confirmé par un lexeur qui connaît les regex
+
+```
+population 129  ·  (a) 67  ·  (b) 41       <- ma mesure independante
+                                              accord exact avec l'annonce
+
+temoins du lexeur, les trois :
+  apostrophe dans une regex   -> le launch SURVIT          ✔
+  division qui n'est pas une regex -> le code survit       ✔
+  launch dans une CHAINE seule -> hors population          ✔
+```
+
+*Règle du `/` : il ouvre une regex quand le dernier jeton significatif n'est pas
+une valeur (identifiant, nombre, `)`, `]`), ou quand c'est un mot-clé — `return`,
+`await`, `typeof`, `new`, `throw`, `case`, `of`, `in`…*
+
+### 8.2 ⚠⚠ ET VOICI CE QUI COMPTE : `67 / 41` SONT NOS CHIFFRES DU DÉPART
+
+```
+avant tout depouillement   67  ·  41
+apres depouillement (faux) 62/70 · 37
+apres correction du lexeur 67  ·  41      <- identiques au depart
+```
+
+> ⛔ **Deux erreurs de signes opposés s'annulaient : la PROSE gonflait les
+> comptes, la CHAÎNE FANTÔME les dégonflait.**
+
+**Donc retomber sur un chiffre antérieur n'est PAS une preuve de justesse.** *Et
+c'est cette coïncidence qui aurait fait clore le sujet si l'un de nous s'était
+arrêté à la première correction — nous aurions eu le bon nombre pour deux mauvaises
+raisons, sans le savoir.*
+
+**La seule chose qui nous a fait continuer est que nos deux valeurs FAUSSES
+divergeaient entre elles.** *Un désaccord entre deux mesures fausses est plus
+informatif qu'un accord entre une mesure fausse et un souvenir.*
+
+### 8.3 ⛔ LA RÈGLE, ET ELLE EST NEUVE
+
+> **Un témoin qui vérifie ce qu'on CLASSE ne vérifie pas ce qu'on LIT.**
+
+**Nos six et huit témoins forgés portaient tous sur `(a)` et `(b)` — le
+classement. Aucun ne demandait « ce fichier est-il ENTIÈREMENT lu ? »** *Le
+dépouillement était traité comme une plomberie, pas comme une mesure — et une
+plomberie ne porte pas de témoin.*
+
+**Le témoin manquant tient en une ligne** : *après dépouillement, un jeton connu
+pour être présent en code nu doit subsister.* **Trois d'entre eux existent
+maintenant, et les deux premiers sont exactement ceux qui manquaient à nos DEUX
+instruments.**

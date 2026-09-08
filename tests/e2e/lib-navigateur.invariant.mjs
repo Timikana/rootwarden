@@ -301,6 +301,50 @@ for (const f of fichiers(racine)) {
     if (r) pop.push([basename(f), r]);
 }
 
+/*
+ * ⚠ LE TEMOIN QUI MANQUAIT A DEUX INSTRUMENTS, et il coute trois lignes.
+ *
+ * Nos huit temoins portaient tous sur ce qu'on CLASSE — (a) et (b). Aucun ne
+ * demandait « ce fichier est-il ENTIEREMENT lu ? ». Le depouillement etait
+ * traite comme une plomberie, et une plomberie ne porte pas de temoin. Une
+ * chaine fantome ouverte par l'apostrophe de `/\\'/g` a ainsi blanchi 3800
+ * caracteres et fait tomber QUATRE suites hors population, sans qu'aucun vert
+ * ne bouge.
+ *
+ * **Un temoin qui verifie ce qu'on CLASSE ne verifie pas ce qu'on LIT.**
+ * (formulation de `gestion-ssh-key-c6`)
+ *
+ * Forme generale : tout fichier dont la source BRUTE porte le jeton de
+ * lancement doit soit le conserver apres depouillement, soit figurer dans la
+ * liste ci-dessous avec sa raison. Une entree NOUVELLE fait echouer le
+ * controle — c'est le seul moyen qu'une perte de lecture se signale.
+ */
+const PERTE_LEGITIME = {
+    'lib-navigateur.epreuve.mjs': 'le jeton vit dans la source d\'un processus fils (chaine), et le fichier est exclu',
+    'lib-navigateur.invariant.mjs': 'le jeton vit dans les temoins forges (chaines), et le fichier est exclu',
+};
+
+{
+    const perdus = [];
+    for (const f of fichiers(racine)) {
+        const brut = readFileSync(f, 'utf8');
+        if (!brut.includes('puppeteer.launch')) continue;
+        if (depouille(brut).includes('puppeteer.launch')) continue;
+        perdus.push(basename(f));
+    }
+    const inattendus = perdus.filter((n2) => !(n2 in PERTE_LEGITIME));
+    verifie('aucun fichier ne PERD son jeton de lancement au depouillement',
+        inattendus.length === 0,
+        `${inattendus.join(' ')} — la source brute porte « puppeteer.launch » et le `
+        + 'depouillement le mange. Soit le lexeur casse (chaine fantome, regex mal '
+        + 'lue), soit le jeton n\'est vraiment qu\'en commentaire/chaine : LIRE le '
+        + 'fichier, puis corriger le lexeur ou inscrire la raison dans PERTE_LEGITIME.');
+    if (perdus.length) {
+        note(`      (pertes declarees : ${perdus.map((n2) => `${n2}`).join(', ')})`);
+    }
+}
+note('');
+
 // ── le recensement, AVANT les comptes : un nom inconnu invalide les comptes ──
 const cens = recense(fichiers(racine).map((f) => readFileSync(f, 'utf8')));
 const inconnus = [...cens.entries()].filter(([nom]) => !(nom in RECEVEURS_CONNUS));
