@@ -15834,3 +15834,68 @@ lieu de l'arbre** — et ça exige le redémarrage, qui appartient à l'exploita
 *Deux sessions me l'avaient dit avant que je le mesure : « ne m'assigne rien pour
 combler le temps », « le dire vaut mieux qu'un travail inventé ». Et l'une a
 chiffré le coût : cinq assignations en deux jours hors périmètre ou déjà faites.*
+
+
+## E-502 — L'extinction a laissé chaque outil borné au legacy pointer sur un cadavre, et chacun était VERT
+
+**Trois occurrences en un tour, toutes trouvées en balayant les outils plutôt que
+le code.** Aucune n'était signalée par quoi que ce soit : elles étaient toutes
+vertes, parce qu'un outil qui mesure du code mort réussit.
+
+| outil | ce qu'il mesurait | ce qu'il ratait |
+|---|---|---|
+| `lint-php` | **178** fichiers archivés | **144** `.php` vivants de `laravel/` |
+| `sca-php` (audit CVE) | **14** paquets du legacy | **119** paquets du portage |
+| `composer` / `composer-update` | les dépendances du legacy | celles de l'application vivante |
+
+**Et `sca-php` est un job de sécurité** : l'audit CVE ne couvrait aucune des
+dépendances servies, dont `guzzlehttp/guzzle`, `egulias/email-validator`,
+`fruitcake/php-cors`.
+
+**Et les deux services Composer sont la façon que `docker-compose.yml` DOCUMENTE
+lui-même de gérer les dépendances.** Un exploitant suivant cette ligne mettait à
+jour le mort.
+
+### La forme du défaut, et pourquoi rien ne le signalait
+
+> **Un outil borné à un périmètre qui se vide ne tombe pas en panne : il réussit
+> plus vite.** Le vert ne distingue pas « rien à reprocher » de « rien à
+> regarder ».
+
+Et `lint-php` gardait **trois** jobs (`test-php`, `build-docker`, `auto-tag`) :
+*une porte qui mesurait du code mort gardait celle qui mesure le vivant.*
+
+⛔ Le pire était à venir : après `patch 07`, `find legacy/ -name "*.php"` aurait
+rendu **zéro**, et le job serait passé au vert **sur un ensemble vide**.
+
+### Ce que j'ai ajouté partout : un témoin d'ensemble vide
+
+    lint-php  : 0 fichier trouve      -> ::error:: + exit 1
+    sca-php   : verrou absent         -> ::error:: + exit 1
+                verrou sans paquet    -> ::error:: + exit 1
+
+*Un ensemble vide n'est pas un succès, c'est une mesure qui n'a pas eu lieu.*
+
+### Et deux de mes propres témoins ont échoué avant de mordre
+
+**`composer audit` sur le portage rendait « no advisories » — et l'audit du
+legacy AUSSI.** Deux zéros identiques : aucune preuve que l'instrument regarde.
+Témoin forgé (copie du verrou avec `guzzle` rétrogradé de 7.15.3 à 6.5.0) → **14
+avis, vrais CVE**. *Alors seulement le vert du portage est devenu une mesure.*
+
+**Et mon témoin de surcharge de `COMPOSER_CIBLE` a rendu deux fois la même
+valeur** : `sudo` dépouille l'environnement, donc la variable n'atteignait jamais
+compose. *Je mesurais le dépouillement de sudo.* Repassé en donnant la variable
+**à** sudo : trois lectures qui diffèrent.
+
+### Ce que je NE corrige pas, et pourquoi
+
+`sync-obsidian-vault.py:331` globe `legacy/adm/api/*.php` → **0 fichier** ; les
+16 sont sous `_deprecated/`. Son propre en-tête (`:18`) prévoyait qu'un
+renommage de `legacy/` orphelinerait les fiches publiées — **l'archivage a eu le
+même effet et personne ne les a reliés.** Le hook post-commit n'est pas installé,
+donc rien n'échoue bruyamment.
+
+**Repointer vers `_deprecated/` ressusciterait 16 fiches décrivant du code
+mort : le bon geste est de RETIRER la cartographie, et c'est une décision sur le
+coffre de documentation de quelqu'un, pas la mienne.**
