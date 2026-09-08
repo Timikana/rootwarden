@@ -28,6 +28,7 @@ paths = [
     '''ARCHITECTURE\.md''',
     '''backend/bandit\.yml''',        # config scanner, contient des justifications prose
     '''tests/e2e/helpers\.mjs''',     # contient un TOTP_SECRET de test documente
+    '''tests/e2e/go-page-notifications-portee\.mjs''',  # idem : COMPTES rw-test-* (TOTP de test)
     '''mysql/init\.sql''',
     '''legacy/vendor/''',
     '''backend/tests/''',
