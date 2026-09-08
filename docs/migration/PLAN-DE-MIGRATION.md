@@ -138,9 +138,27 @@ ls legacy/_deprecated/                                   # parties archivees
   #    numeros (E-452..E-459) designaient deux ecarts DIFFERENTS. Pour COMPTER
   #    les ecarts de parite, la ligne ci-dessous est juste ; pour ALLOUER un
   #    numero neuf, prendre le maximum des DEUX (vrai max au 2026-09-07 : 462) :
-  #      cat <(grep -ohE '^#{1,6}[^0-9]*E-[0-9]+' docs/migration/PARITE.md) \
-  #          <(grep -ohE '^#{1,6}[^0-9]*E-[0-9]+' docs/migration/DECISIONS-DSI.md) \
-  #        | grep -oE 'E-[0-9]+' | grep -oE '[0-9]+' | sort -n | tail -1
+  #      grep -rhoE '\bE-[0-9]+\b' docs/ | grep -oE '[0-9]+' | sort -n | tail -1
+  #
+  # ⚠⚠ LA PARADE N'EST PAS UN MEILLEUR MOTIF : C'EST UN SENS D'ERREUR.
+  #
+  #    Formulee par la session 8, et elle vaut mieux que ma correction :
+  #    **quand une mesure alimente une ALLOCATION, il faut se tromper LARGE.**
+  #    Un motif trop large ne peut que pousser le numero plus haut — il
+  #    GASPILLE des numeros. Un motif trop etroit fait COLLISION. *Les deux
+  #    erreurs ne se paient pas dans la meme monnaie.*
+  #
+  #    C'est pourquoi la commande ci-dessus ne lit plus les TITRES mais TOUTE
+  #    mention de `E-nnn` dans `docs/` — citations comprises. Elle surestime par
+  #    construction, et c'est exactement ce qu'on veut d'un compteur.
+  #
+  #    Demonstration sur l'artefact, le 2026-09-08 :
+  #      motif ETROIT  max 467  ->  propose 468  ->  468 DEJA EMPLOYE   ⛔
+  #      motif LARGE   max 482  ->  propose 483  ->  483 libre          ✅
+  #
+  #    *Mon `^#{1,6}[^0-9]*E-` etait juste et restait DANGEREUX : il ratait 33
+  #    des 102 titres de `DECISIONS-DSI.md`, parce qu'un motif ecrit sur ses
+  #    propres fichiers ne mesure pas un depot — il mesure un AUTEUR.*
   #
   # ⚠⚠ LE `[^0-9]*` N'EST PAS DECORATIF, ET LA PREMIERE FORME A COLLISIONNE DEUX
   #    FOIS DE PLUS. `DECISIONS-DSI.md` titre ses entrees `## ⚖ E-480 — …` et
