@@ -122,6 +122,11 @@ class TableDesGardes
             // lecture : l'identifiant voyage dans le CORPS, pas dans l'URL ni dans
             // les journaux d'acces. Le controle porte sur l'objet RESOLU.
             ['POST', 'pare-feu/historique', ['role:1', 'perm:can_manage_iptables']],
+            // I6 — le retour arriere, declare par 63caeb24. Meme garde que la page et
+            // que ses voisines. `POST` malgre la lecture : `version_id` voyage dans le
+            // CORPS. L'acces est verifie sur l'objet RESOLU, et le `WHERE` porte les
+            // DEUX identifiants — une version d'une autre machine rend `null`.
+            ['POST', 'pare-feu/version', ['role:1', 'perm:can_manage_iptables']],
             // Fermer une session ACTIVE : l'objet est une session de l'utilisateur
             // lui-meme, resolue depuis la sienne. Aucun role ni permission a
             // exiger — un compte quelconque doit pouvoir fermer les siennes.
