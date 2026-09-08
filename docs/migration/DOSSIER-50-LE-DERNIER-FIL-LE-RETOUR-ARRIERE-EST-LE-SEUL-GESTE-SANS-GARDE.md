@@ -155,3 +155,113 @@ Et la session qui tient le banc a mesuré deux fois cette nuit qu'**un défaut p
 qu'à l'image** : un panneau de consentement rendu hors de l'écran, `hidden = false`,
 correctement rempli, invisible. **Quatrième occurrence dans ce chantier.** *Aucune de mes
 assertions n'aurait pu le voir.*
+
+---
+
+# AMENDEMENT — la pré-relecture sécurité améliore l'arbitrage sur deux points
+
+**2026-09-08, ~05:0x, après `e64fe070`.** *Ma conclusion tient ; deux de mes arguments sont
+remplacés par de meilleurs, et un trou que je n'avais pas nommé est comblé.*
+
+## ① MON ARGUMENT « Q2 COMPTE PLUS ICI » EST FAIBLE. LE BON EST : **Q2 MARCHE MIEUX ICI**
+
+J'avais écrit que Q2 *compte* davantage pour le retour arrière, parce que l'opérateur ne
+peut pas se relire. **La pré-relecture donne l'argument fort :**
+
+> **C'est le geste où Q2 fonctionne LE MIEUX. Les règles sont connues À L'AVANCE — elles
+> sont en base, `iptables_history.rules_v4`. Q2 peut donc tourner AVANT qu'aucune session
+> SSH ne soit ouverte, sur le contenu exact qui partira.** *Sur `apply` l'opérateur compose ;
+> ici l'objet existe déjà et se laisse inspecter.*
+
+*Le mien décrivait un besoin ; celui-là décrit une possibilité.* **Un argument qui nomme ce
+qu'on PEUT faire est plus fort qu'un argument qui nomme ce qu'on RISQUE.**
+
+## ② ET MON REMÈDE EST REMPLACÉ
+
+J'avais proposé : *« montrer le texte avant de proposer le geste »*. C'était le remède le
+plus faible des deux possibles.
+
+```
+mon remede    rendre `rules_v4` avec chaque version, et l'afficher
+LE REMEDE     executer Q2 sur CHAQUE version au moment ou la liste se
+              construit, et PASTILLER chaque ligne
+```
+
+**Le second transforme un refus en un CHOIX** — *l'opérateur voit laquelle le couperait
+**avant** de cliquer, au lieu de le découvrir après.* **Et il ne coûte rien de plus** : la
+propriété est écrite, les données sont en base, la liste est déjà construite côté serveur.
+
+### Et il comble un trou que je n'avais pas nommé
+
+Mesuré **dans les deux portails** :
+
+```
+backend  /iptables-history          id · created_at · changed_by · change_reason
+portage  PareFeuController:279-282  'id' · 'date' · 'auteur' · 'motif'
+```
+
+**L'historique ne rend pas les règles, des DEUX côtés.** *J'avais mesuré le backend et pas le
+portage — donc je décrivais comme un manque du legacy ce qui est un manque des deux.*
+
+Et la conséquence est celle-ci :
+
+> ⛔ **Un refus qu'on ne peut pas instruire est un refus qu'on contourne.** *Q2 dirait « je ne
+> peux pas prouver que cette version laisse le port ouvert » sur une ligne qui n'affiche
+> qu'une date et un motif. L'opérateur qui sait que sa version est bonne apprend que le
+> garde se trompe — donc à passer outre.*
+
+*C'est ma propre règle sur les gardes qui accusent à tort, appliquée là où je ne l'avais pas
+vue : je l'avais écrite pour `apply`, où l'opérateur a ses règles sous les yeux. **Ici il ne
+les a pas, et je n'avais pas refait le raisonnement.***
+
+## 🔴 ③ ET UNE MESURE QUI DOIT VOYAGER AVEC I5, PARCE QU'ELLE CONTREDIT CE QU'ON EN DIRA
+
+```
+--dport dans TOUT le code backend (docstrings et commentaires retires) :  0
+temoin+ : occurrences de « iptables » dans le meme perimetre :          121
+```
+
+**Ce n'est pas « cette route n'inspecte pas les règles » : AUCUN module du backend ne lit le
+contenu d'un jeu de règles.**
+
+> ⛔ **La phrase qui doit accompagner Q2 partout où elle voyage : elle est la SEULE chose
+> entre un opérateur et son propre verrouillage, et elle s'exécute dans le NAVIGATEUR.**
+
+**Et le crible effectif n'est pas celui que « trois décorateurs » laisse croire :**
+
+```
+check_machine_access   helpers.py:364   `if role_id >= 2: return True`   INCONDITIONNEL
+require_permission     helpers.py:323   superadmin (role >= 3) COURT-CIRCUITE
+
+crible REEL :
+  role >= 3                      AUCUNE garde
+  role 2 + can_manage_iptables   TOUT le parc, production comprise
+  role 1 + can_manage_iptables   ses machines seulement
+```
+
+**« C'est gardé par trois décorateurs » ne doit pas voyager avec I5.** *Trois décorateurs, un
+seul crible réel.* **Ce n'est pas un défaut d'I5 — c'est le socle — mais I5 est le premier
+écran qui OFFRE ce geste**, et une assurance fausse est plus dangereuse sur l'écran qui offre
+que dans le module qui exécute.
+
+*Ce que la pré-relecture confirme par ailleurs et qui est bon* : `resolve_ssh_creds` lit les
+identifiants **en base** depuis `machine_id` et refuse de travailler sans lui — les
+`server_ip` / `ssh_password` du corps sont **ignorés**. **L'objet contrôlé et l'objet atteint
+sont donc le même** : ce n'est pas une garde sans objet.
+
+## CE QUE L'ARBITRAGE DEVIENT
+
+**Le retour arrière se porte avec Q1–Q4, et le point 3 change** :
+
+```
+1  recuperer le texte archive                       inchange
+2  Q2 avec le port ACTUEL de la machine             inchange
+3  ⬅ REMPLACE : executer Q2 sur CHAQUE version AU MOMENT OU LA LISTE SE
+   CONSTRUIT, et pastiller chaque ligne — l'operateur voit AVANT de cliquer
+   laquelle le couperait. Un refus non instruit se contourne.
+4  Q4 : aucune requete avant consentement           inchange
+```
+
+**Et je retire ce que j'avais écrit sur la colonne de port** : je disais qu'enregistrer le
+port dans `iptables_history` n'aiderait qu'à expliquer un refus après coup. *C'est encore
+vrai — mais le remède ② rend la question sans objet, puisque le refus n'arrive plus après.*
