@@ -333,9 +333,40 @@ for (const f of lus) {
  * aucun lien vivant ne mesure rien : ses motifs ne mordent pas, ou la portee a
  * change sous elle. Son « zero lien mort » serait alors vrai a vide.
  */
-console.log(`\nTEMOIN POSITIF  : ${vivants} lien(s) vers une cible VIVANTE`);
-if (vivants === 0) {
-    console.log('⛔ TEMOIN MUET — la sonde ne voit AUCUN lien vivant, alors qu\'il en existe.');
+/*
+ * ⚠ LE TEMOIN A CHANGE D'OBJET LE 2026-09-08 08:3x, ET C'EST L'EXTINCTION QUI L'A
+ *   EXIGE.
+ *
+ * Il exigeait « au moins un lien vers une cible VIVANTE », avec ce message :
+ * « la sonde ne voit AUCUN lien vivant, ALORS QU'IL EN EXISTE ». **Cette premisse
+ * a expire :** apres l'archivage de `iptables/`, `notifications.php` et
+ * `api_proxy.php`, puis le rebasage des deux derniers `href="/auth/logout.php"`
+ * sur `/deconnexion`, **il ne reste AUCUN lien vivant dans le legacy.** La suite
+ * rendait donc `2` — « je n'ai pas pu mesurer » — sur un parc parfaitement mesure.
+ *
+ * > **Un temoin EMPRUNTE AU PARC se perime quand le parc change ; et ici le parc
+ * > change PARCE QU'ON L'ETEINT.** *Le temoin devenait faux du fait meme du
+ * > travail qu'il surveille.*
+ *
+ * ══ CE QUE LE TEMOIN DOIT PROUVER, ET CE QU'IL PROUVAIT ═════════════════════
+ *
+ *   ce qu'on veut savoir   « la sonde a-t-elle LU le parc ? »
+ *   ce qu'il testait       « le parc contient-il encore un lien vivant ? »
+ *
+ * **Deux questions differentes, qui coincidaient tant que le parc etait plein.**
+ * Le test juste est donc : la sonde a-t-elle extrait QUELQUE CHOSE — vivant, mort
+ * ou inconnu ? *Zero extraction de toute espece, sur 99 fichiers, c'est un
+ * instrument muet. Zero VIVANT, c'est une extinction qui avance.*
+ *
+ * Le compte des vivants reste imprime : il informe, il ne juge plus.
+ */
+const extraites = vivants + morts.length + inconnus.length;
+console.log(`\nTEMOIN POSITIF  : ${extraites} lien(s) extrait(s) du parc` +
+            `  (dont ${vivants} vers une cible VIVANTE)`);
+if (extraites === 0) {
+    console.log('⛔ TEMOIN MUET — la sonde n\'a extrait AUCUN lien, d\'aucune espece,');
+    console.log('   sur les fichiers lus. Ce n\'est pas une extinction avancee : c\'est un');
+    console.log('   instrument qui ne lit pas.');
     console.log('   Ses motifs ne mordent pas, ou la portee a change. NE RIEN CONCLURE.');
     process.exit(2);
 }
