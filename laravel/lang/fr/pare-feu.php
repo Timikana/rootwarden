@@ -218,6 +218,17 @@ return [
     'rb_conf_texte' => "Les règles actuelles de :machine seront REMPLACÉES par cette version archivée. L'état actuel est archivé avant l'écriture, donc ce retour arrière est lui-même réversible. Aucune requête n'a encore été envoyée.",
     'rb_conf_ok'    => 'Restaurer cette version',
     'rb_conf_non'   => 'Annuler',
+    /*
+     * LA VALIDATION AVANT LE RETOUR ARRIERE — DEUX REFUS, DEUX PHRASES.
+     *
+     * « invalide » est une ACCUSATION : elle porte sur les regles, et elle doit
+     * etre vraie. « indecidable » est un AVEU : rien n'a ete verifie. Les deux
+     * refusent ; les confondre userait la garde, parce que l'operateur qui sait
+     * son jeu bon apprendrait qu'elle se trompe.
+     */
+    'rb_valid_en_cours'   => 'Vérification de cette version sur la machine…',
+    'rb_valid_invalide'   => "⛔ Cette version est refusée : la machine ne peut pas la charger. Elle était peut-être valide le jour de son archivage — restaurée maintenant, elle écraserait le fichier de règles sans pouvoir le charger, et la machine se relèverait sans pare-feu. Rien n'a été appliqué.",
+    'rb_valid_indecidable' => "⚠ Restauration refusée : la vérification n'a pas abouti, donc rien ne prouve que cette version soit chargeable. Motif : :motif. Rien n'a été appliqué.",
     'rb_en_cours'   => 'Restauration en cours…',
     'rb_annule'     => "Annulé — aucune requête n'a été envoyée.",
 ];

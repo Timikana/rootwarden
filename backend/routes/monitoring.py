@@ -24,6 +24,12 @@ from server_checks import parse_os_release
 bp = Blueprint('monitoring', __name__)
 
 
+# Sonde de vie : elle rend une chaine STATIQUE, ne lit rien et n'ecrit rien.
+# Aucune donnee ni geste derriere elle, donc rien a garder.
+# ⚠ Elle reste NON AUTHENTIFIEE et joignable : si un jour elle rend un detail
+# d'etat — version, nom d'hote, compte de machines — cette exemption cesse
+# d'etre fondee et doit partir avec le changement.
+# nosemgrep: rw-flask-route-without-api-key
 @bp.route('/test', methods=['GET'])
 @threaded_route
 def test():

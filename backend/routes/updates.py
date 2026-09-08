@@ -780,6 +780,16 @@ def schedule_advanced_security_update():
 # Security exec callback (called by cron after update)
 # ─────────────────────────────────────────────────────────────────────────────
 
+# EXCEPTION DOCUMENTEE, ET LE CONTROLE A ETE VERIFIE, pas seulement annonce :
+#   :802  provided = request.headers.get('X-Update-Token', '')
+#   :804  expected = _security_exec_token(machine_id)
+#   :807  hmac.compare_digest(provided, expected)   <- temps CONSTANT
+#   :810  401 sinon
+# Le jeton est un HMAC signe avec SECRET_KEY et borne au machine_id par un
+# `int()` (:96), donc non forgeable et non deplaçable d'une machine a l'autre.
+# Un cron ne peut fournir ni cle d'API ni session : les decorateurs de session
+# sont remplaces, pas retires.
+# nosemgrep: rw-flask-route-without-api-key
 @bp.route('/update_security_exec', methods=['POST'])
 @threaded_route
 def update_security_exec():
