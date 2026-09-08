@@ -65,11 +65,12 @@
  *   E2E_BASE=https://localhost:8443 node go-page-supervision-ecriture.mjs
  */
 import puppeteer from 'puppeteer';
+import { baseDeclaree } from './lib-cible.mjs';
 import { createHmac } from 'crypto';
 import { constateArchivage, verifieMenuLegacy } from './archive.mjs';
 import { execFileSync } from 'child_process';
 
-const BASE = process.env.E2E_BASE || 'https://localhost:8443';
+const BASE = baseDeclaree('https://localhost:8443');
 const MDP = process.env.E2E_TEST_PASS || 'RootWarden@2026-Test!';
 const CIBLE = (() => {
     /*

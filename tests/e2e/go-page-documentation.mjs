@@ -59,12 +59,13 @@
  * divergerait, et ce serait voulu.** Aucune assertion ici ne compare les deux.
  */
 import puppeteer from 'puppeteer';
+import { baseDeclaree } from './lib-cible.mjs';
 import { createHmac } from 'crypto';
 import { litEnBase } from './lib-base.mjs';
 import { mkdirSync } from 'node:fs';
 import { constateArchivage } from './archive.mjs';
 
-const BASE = process.env.E2E_BASE || 'http://localhost:8444';
+const BASE = baseDeclaree('http://localhost:8444');
 const CIBLE = (() => {
     /*
      * ══ LA CIBLE VIENT DE L'ENVIRONNEMENT, L'URL N'EST QU'UN REPLI ════════

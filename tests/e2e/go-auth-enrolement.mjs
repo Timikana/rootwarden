@@ -53,11 +53,12 @@
  *   E2E_BASE=https://localhost:8443 node go-auth-enrolement.mjs
  */
 import puppeteer from 'puppeteer';
+import { baseDeclaree } from './lib-cible.mjs';
 import { createHmac } from 'crypto';
 import { litEnBase } from './lib-base.mjs';
 import { constateArchivage } from './archive.mjs';
 
-const BASE = process.env.E2E_BASE || 'https://localhost:8443';
+const BASE = baseDeclaree('https://localhost:8443');
 const CIBLE = (() => {
     /*
      * ══ LA CIBLE VIENT DE L'ENVIRONNEMENT, L'URL N'EST QU'UN REPLI ════════
