@@ -62,6 +62,21 @@
                  cherche. En pied de barre laterale, ils bornaient la liste du
                  menu, qui se coupait en plein libelle. --}}
             <div class="rw-entete__compte">
+                {{-- LA RECHERCHE VIVANTE, DANS LE GROUPE DE DROITE.
+
+                     ⚠ Sa place n'est pas cosmetique : le panneau s'ancre par
+                     `right: 0`. Pose entre le titre et ce groupe, il s'ouvrait
+                     VERS LA GAUCHE et sortait de l'ecran — libelles coupes au bord.
+                     Treize assertions etaient vertes pendant ce temps : c'est un
+                     defaut que seule l'image montre.
+
+                     Le panneau appelle LE MEME chemin que la page `/recherche`
+                     (`GET /api/gateway/search`) : pas de second endpoint. Le
+                     partiel porte la garde de la route (`role:2` +
+                     `can_admin_portal`) — un champ offert a qui ne peut pas s'en
+                     servir est une panne promise a chaque frappe. --}}
+                @include('composants.recherche-menu')
+
                 {{-- La cloche vit dans l'EN-TETE, comme celle du legacy — donc sur
                      toutes les pages. Le compte est rendu PAR LE SERVEUR, pas
                      recupere par un appel au chargement : un appel de moins par

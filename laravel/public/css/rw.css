@@ -2970,6 +2970,62 @@ a.rw-alerte:focus-visible { outline: 2px solid var(--rw-accent); outline-offset:
 .rw-profil > summary::-webkit-details-marker { display: none; }
 .rw-profil > summary:hover { filter: brightness(1.08); }
 
+/* ══ LE PANNEAU DE RECHERCHE DE L'EN-TETE ══════════════════════════════════════
+ *
+ * Geometrie de la famille `.rw-profil__menu` juste en dessous : un controle de
+ * l'en-tete qui ouvre un panneau sous lui.
+ *
+ * ⚠ UN BLOC A PART, ET SURTOUT PAS UNE REUTILISATION DE `.rw-profil__menu`. Ce
+ * depot a deja paye une classe definie deux fois avec des intentions opposees
+ * sur dix sites d'appel : partager la classe ferait qu'un reglage du menu de
+ * compte deplacerait la recherche, sans que personne ne l'ait demande.
+ *
+ * Le CONTENU, lui, REUTILISE `.rw-resultats` / `.rw-resultat*` de la page de
+ * recherche : c'est la meme liste de resultats, elle ne doit pas avoir deux
+ * apparences.
+ *
+ * Jetons RELEVES dans ce fichier avant usage (`--rw-surface`, `--rw-bordure`,
+ * `--rw-rayon`, `--rw-ombre`) : mon premier jet en avait inventes DEUX
+ * (`--rw-bord`, `--rw-fond-carte`), qui n'existent pas — une variable CSS
+ * absente ne leve rien, elle rend la declaration inerte.
+ */
+.rw-recherche { position: relative; }
+
+/* Le chevron par defaut de `<details>` doublait la loupe : deux marqueurs pour un
+   seul controle. Meme traitement que `.rw-profil > summary`. */
+.rw-recherche > summary { list-style: none; cursor: pointer; }
+.rw-recherche > summary::-webkit-details-marker { display: none; }
+.rw-recherche > summary::marker { content: ''; }
+
+.rw-recherche__menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    z-index: 40;
+    /* Plus large que le menu de compte : ces lignes portent un nom ET un detail,
+     * pas un intitule court. */
+    width: min(30rem, calc(100vw - 24px));
+    max-height: min(60vh, 30rem);
+    overflow-y: auto;
+    padding: 8px;
+    background: var(--rw-surface);
+    border: 1px solid var(--rw-bordure);
+    border-radius: var(--rw-rayon);
+    box-shadow: var(--rw-ombre);
+}
+
+/* La saisie de l'en-tete : elle cede la place avant le titre. */
+/* La saisie est DANS le panneau : elle en prend la largeur. Un `min(18rem,34vw)`
+   herite du premier jet la laissait etroite au milieu d'un panneau de 30rem. */
+.rw-recherche__saisie { width: 100%; }
+
+/* Sous ~700 px l'en-tete n'a plus la place d'un champ ET du titre ET des
+ * pastilles. C'est le CHAMP qui s'efface, pas les pastilles : la recherche reste
+ * atteignable par son entree de menu, une pastille de compte non. */
+@media (max-width: 700px) {
+    .rw-recherche { display: none; }
+}
+
 .rw-profil__menu {
     position: absolute;
     top: calc(100% + 8px);
