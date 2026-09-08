@@ -158,6 +158,16 @@ jobs:
 
       - name: Upload test results
         if: always()
+        # ⚠ NON BLOQUANT, ET C'EST MESURE. Ce pas a rendu ROUGE deux fois un job
+        #    dont les 686 tests etaient VERTS : `FinalizeArtifact: (403)
+        #    Forbidden`, cote infrastructure d'artefacts, pas cote code. Le
+        #    2026-09-08, un rejeu du meme SHA sans aucun changement est passe.
+        #    Le degat n'est pas l'artefact perdu — c'est qu'un job rouge sur une
+        #    suite verte pousse a fusionner sur rouge (ce que j'ai fait une fois)
+        #    et fait chercher une panne dans des tests qui passent.
+        #    Le VERDICT des tests est le pas precedent ; celui-ci n'est qu'un
+        #    depot de commodite (junit xml), il ne garde rien.
+        continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1 (node24, pinned 2026-06-16)
         with:
           name: test-results
