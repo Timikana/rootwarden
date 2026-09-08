@@ -1,0 +1,6 @@
+# Code ARCHIVE par l'extinction du legacy : plus servi, plus charge, conserve
+# pour la trace. Le scanner y trouve de vrais defauts d'un code MORT (AES-CBC
+# sans MAC dans adm/includes/crypto.php), et ce bruit rendra la porte muette
+# — c'est deja arrive : le job est reste rouge cinq jours sans lecteur.
+# On ignore l'archive pour que le rouge redevienne un signal.
+legacy/_deprecated/
