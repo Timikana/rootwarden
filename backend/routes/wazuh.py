@@ -166,7 +166,7 @@ def _wazuh_pkg_specs(version: str):
     if not version or version.lower() == 'latest':
         return ('wazuh-agent', 'wazuh-agent')
     # Accepte 4.14.5 ou 4.14.5-1 ; refuse tout caractere shell
-    if not re.match(r'^[0-9]+(\.[0-9]+){1,3}(-[0-9]+)?$', version):
+    if not re.fullmatch(r'^[0-9]+(\.[0-9]+){1,3}(-[0-9]+)?$', version):
         return ('wazuh-agent', 'wazuh-agent')
     ver_with_build = version if '-' in version else f'{version}-1'
     return (f'wazuh-agent={ver_with_build}', f'wazuh-agent-{ver_with_build}')
@@ -243,13 +243,13 @@ def save_config():
     api_user = (data.get('api_user') or '').strip() or None
     api_pwd = data.get('api_password', '')
 
-    if not _IP_OR_FQDN_RE.match(manager_ip):
+    if not _IP_OR_FQDN_RE.fullmatch(manager_ip):
         return jsonify({'success': False, 'message': 'manager_ip invalide'}), 400
     if not (1 <= manager_port <= 65535 and 1 <= registration_port <= 65535):
         return jsonify({'success': False, 'message': 'Port invalide'}), 400
-    if not _GROUP_RE.match(default_group):
+    if not _GROUP_RE.fullmatch(default_group):
         return jsonify({'success': False, 'message': 'default_group invalide'}), 400
-    if not re.match(r'^[a-zA-Z0-9._-]{1,20}$', agent_version):
+    if not re.fullmatch(r'^[a-zA-Z0-9._-]{1,20}$', agent_version):
         return jsonify({'success': False, 'message': 'agent_version invalide'}), 400
 
     user_id, _ = get_current_user()
@@ -336,7 +336,7 @@ def install():
     manager = cfg['manager_ip']
     reg_pwd = _dec(cfg.get('registration_password'))
     group = group or cfg['default_group']
-    if not _GROUP_RE.match(group):
+    if not _GROUP_RE.fullmatch(group):
         return jsonify({'success': False, 'message': f'group invalide : {group}'}), 400
 
     user_id, _ = get_current_user()
@@ -566,7 +566,7 @@ def install_all():
             manager = cfg['manager_ip']
             reg_pwd = _dec(cfg.get('registration_password'))
             group = requested_group or cfg['default_group']
-            if not _GROUP_RE.match(group):
+            if not _GROUP_RE.fullmatch(group):
                 results['fail'] += 1
                 results['details'].append({'id': t['id'], 'name': t['name'],
                                            'success': False, 'message': f'group invalide : {group}'})
@@ -916,7 +916,7 @@ def set_group():
     """Assigne un groupe a un agent (via API manager ou fichier local)."""
     data = request.get_json(silent=True) or {}
     group = (data.get('group') or '').strip()
-    if not _GROUP_RE.match(group):
+    if not _GROUP_RE.fullmatch(group):
         return jsonify({'success': False, 'message': 'group invalide'}), 400
 
     row, err = _resolve_machine(data.get('machine_id'))
@@ -1084,7 +1084,7 @@ def list_rules():
 @require_permission('can_manage_wazuh')
 @threaded_route
 def get_rule(name):
-    if not _NAME_RE.match(name):
+    if not _NAME_RE.fullmatch(name):
         return jsonify({'success': False, 'message': 'Nom invalide'}), 400
     with get_db_connection() as conn:
         cur = conn.cursor(dictionary=True)
@@ -1106,7 +1106,7 @@ def save_rule():
     rtype = (data.get('rule_type') or 'rules').lower()
     content = data.get('content', '')
 
-    if not _NAME_RE.match(name):
+    if not _NAME_RE.fullmatch(name):
         return jsonify({'success': False, 'message': 'Nom invalide'}), 400
     if rtype not in _VALID_RULE_TYPES:
         return jsonify({'success': False, 'message': f'rule_type invalide : {rtype}'}), 400
@@ -1147,7 +1147,7 @@ def save_rule():
 @require_permission('can_manage_wazuh')
 @threaded_route
 def delete_rule(name):
-    if not _NAME_RE.match(name):
+    if not _NAME_RE.fullmatch(name):
         return jsonify({'success': False, 'message': 'Nom invalide'}), 400
     user_id, _ = get_current_user()
     try:

@@ -67,7 +67,7 @@ _HOME_RE = re.compile(r'^/[A-Za-z0-9._/-]{1,128}$')
 
 
 def _safe_home(home) -> bool:
-    return bool(home) and bool(_HOME_RE.match(str(home)))
+    return bool(home) and bool(_HOME_RE.fullmatch(str(home)))
 
 # ── Template standard ────────────────────────────────────────────────────────
 # Source DB prioritaire (editable via UI /bashrc/ onglet Template).
@@ -197,7 +197,7 @@ def _list_users(client, root_password: str):
         if len(parts) != 4:
             continue
         name, uid, home, shell = parts
-        if not _USERNAME_RE.match(name):
+        if not _USERNAME_RE.fullmatch(name):
             continue
         users.append({
             'name': name,
@@ -389,7 +389,7 @@ def preview():
     if not users or not isinstance(users, list):
         return jsonify({'success': False, 'message': "Liste d'utilisateurs requise."}), 400
     for u in users:
-        if not isinstance(u, str) or not _USERNAME_RE.match(u):
+        if not isinstance(u, str) or not _USERNAME_RE.fullmatch(u):
             return jsonify({'success': False, 'message': f"Username invalide : {u!r}"}), 400
 
     row, err = _resolve_machine(machine_id)
@@ -450,7 +450,7 @@ def deploy():
     if not users or not isinstance(users, list):
         return jsonify({'success': False, 'message': "Liste d'utilisateurs requise."}), 400
     for u in users:
-        if not isinstance(u, str) or not _USERNAME_RE.match(u):
+        if not isinstance(u, str) or not _USERNAME_RE.fullmatch(u):
             return jsonify({'success': False, 'message': f"Username invalide : {u!r}"}), 400
 
     row, err = _resolve_machine(machine_id)
@@ -587,9 +587,9 @@ def restore():
     uname = data.get('user', '')
     backup = data.get('backup', '')  # optionnel : nom precis
 
-    if not _USERNAME_RE.match(uname or ''):
+    if not _USERNAME_RE.fullmatch(uname or ''):
         return jsonify({'success': False, 'message': f"Username invalide : {uname!r}"}), 400
-    if backup and not _BACKUP_NAME_RE.match(backup):
+    if backup and not _BACKUP_NAME_RE.fullmatch(backup):
         return jsonify({'success': False, 'message': f"Nom de backup invalide : {backup!r}"}), 400
 
     row, err = _resolve_machine(machine_id)
@@ -620,7 +620,7 @@ def restore():
                     return jsonify({'success': False, 'message': 'Aucun backup disponible'}), 404
                 backup_path = latest
                 backup = os.path.basename(latest)
-                if not _BACKUP_NAME_RE.match(backup):
+                if not _BACKUP_NAME_RE.fullmatch(backup):
                     return jsonify({'success': False, 'message': 'Nom de backup inattendu'}), 400
             else:
                 backup_path = f"{home}/{backup}"
@@ -753,7 +753,7 @@ def list_backups():
     machine_id = request.args.get('machine_id')
     uname = request.args.get('user', '')
 
-    if not _USERNAME_RE.match(uname or ''):
+    if not _USERNAME_RE.fullmatch(uname or ''):
         return jsonify({'success': False, 'message': f"Username invalide : {uname!r}"}), 400
 
     row, err = _resolve_machine(machine_id)
@@ -784,7 +784,7 @@ def list_backups():
                     continue
                 size, mtime, path = parts
                 name = os.path.basename(path)
-                if not _BACKUP_NAME_RE.match(name):
+                if not _BACKUP_NAME_RE.fullmatch(name):
                     continue
                 backups.append({
                     'name': name,

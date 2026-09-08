@@ -333,10 +333,10 @@ def _build_config_lines(global_cfg, machine_row, overrides=None, profile=None):
     for key, value in overrides.items():
         if key in _handled or not value:
             continue
-        if not _SAFE_PARAM_RE.match(key):
+        if not _SAFE_PARAM_RE.fullmatch(key):
             continue  # cle invalide (anti-injection)
         valeur = _interpolate(value, machine_row)
-        if not isinstance(valeur, str) or not _SAFE_VALUE_RE.match(valeur):
+        if not isinstance(valeur, str) or not _SAFE_VALUE_RE.fullmatch(valeur):
             # Une valeur multiligne produirait une directive supplementaire : on
             # la refuse ICI AUSSI, pour les lignes posees avant le correctif.
             logger.warning(
@@ -658,7 +658,7 @@ def save_config():
         return jsonify({'success': False, 'message': 'zabbix_server requis'}), 400
 
     agent_version = (data.get('agent_version') or '7.0').strip()
-    if not _VERSION_RE.match(agent_version):
+    if not _VERSION_RE.fullmatch(agent_version):
         return jsonify({'success': False, 'message': 'Version agent invalide'}), 400
 
     user_id, _ = get_current_user()
@@ -1380,7 +1380,7 @@ def zabbix_restore_backup():
         return err
 
     backup_name = (data.get('backup_name') or '').strip()
-    if not backup_name or not _BACKUP_NAME_RE.match(backup_name):
+    if not backup_name or not _BACKUP_NAME_RE.fullmatch(backup_name):
         return jsonify({'success': False, 'message': 'Nom de backup invalide'}), 400
 
     global_cfg = _get_global_config()
@@ -1458,10 +1458,10 @@ def save_overrides(machine_id):
     retenus = {}
     for param, value in overrides.items():
         texte = str(value)
-        if not _SAFE_PARAM_RE.match(str(param)):
+        if not _SAFE_PARAM_RE.fullmatch(str(param)):
             refuses.append({'param': str(param)[:100], 'raison': 'nom invalide'})
             continue
-        if not _SAFE_VALUE_RE.match(texte):
+        if not _SAFE_VALUE_RE.fullmatch(texte):
             # Le cas mesure : un saut de ligne dans la valeur produisait une
             # directive autonome dans le fichier de configuration (E-85).
             refuses.append({'param': str(param)[:100],
@@ -2253,7 +2253,7 @@ def generic_restore(platform):
         return merr
 
     backup_name = (data.get('backup_name') or '').strip()
-    if not backup_name or not _BACKUP_NAME_RE.match(backup_name):
+    if not backup_name or not _BACKUP_NAME_RE.fullmatch(backup_name):
         return jsonify({'success': False, 'message': 'Nom de backup invalide'}), 400
 
     agent_info = AGENT_REGISTRY[platform]
@@ -2404,7 +2404,7 @@ _PROFILE_NAME_RE = re.compile(r'^[A-Za-z][A-Za-z0-9_-]{0,99}$')
 
 def _profile_fields(data):
     name = (data.get('name') or '').strip()
-    if not _PROFILE_NAME_RE.match(name):
+    if not _PROFILE_NAME_RE.fullmatch(name):
         return None, 'Nom de profil invalide (alphanumerique, _, -, commence par lettre).'
     platform = (data.get('platform') or 'zabbix').strip()
     if platform not in _VALID_PLATFORMS:

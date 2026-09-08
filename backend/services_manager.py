@@ -49,7 +49,7 @@ for _cat, _svcs in SERVICE_CATEGORIES.items():
 def _validate_service_name(name: str) -> str:
     """Valide le nom d'un service contre l'injection de commandes."""
     name = name.strip()
-    if not _SERVICE_RE.match(name):
+    if not _SERVICE_RE.fullmatch(name):
         raise ValueError(f"Nom de service invalide : {name!r}")
     return name
 

@@ -37,7 +37,7 @@ _BACKUP_NAME_RE = re.compile(r'^rootwarden_backup_\d{8}_\d{6}\.sql\.gz$')
 def _safe_backup_path(filename):
     """Valide le nom (pas de traversal) et retourne le Path, ou leve ValueError."""
     name = os.path.basename(filename or '')
-    if not _BACKUP_NAME_RE.match(name):
+    if not _BACKUP_NAME_RE.fullmatch(name):
         raise ValueError("Nom de backup invalide")
     path = BACKUP_DIR / name
     if not path.exists():

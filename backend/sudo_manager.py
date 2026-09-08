@@ -54,7 +54,7 @@ FILE_PREFIX = 'rootwarden-'
 def _validate_username(username: str) -> str:
     """Valide un nom d'utilisateur Linux. Bloque path traversal et chars sudoers."""
     username = (username or '').strip()
-    if not _USERNAME_RE.match(username):
+    if not _USERNAME_RE.fullmatch(username):
         raise ValueError(f"Nom d'utilisateur invalide : {username!r}")
     return username
 
@@ -70,7 +70,7 @@ def _target_path(username: str) -> str:
 def _runas_spec(runas: str) -> str:
     """Construit le Runas_Spec (defaut root). Valide la chaine."""
     runas = (runas or 'root').strip()
-    if not re.match(r'^[a-z_][a-z0-9_-]{0,31}$', runas):
+    if not re.fullmatch(r'^[a-z_][a-z0-9_-]{0,31}$', runas):
         raise ValueError(f"Runas invalide : {runas!r}")
     return f"({runas})"
 
@@ -126,7 +126,7 @@ def render_preset_systemctl_specific(username: str, services: list[str],
     safe_cmds = []
     for svc in services:
         svc = svc.strip()
-        if not _SVC_RE.match(svc):
+        if not _SVC_RE.fullmatch(svc):
             raise ValueError(f"Nom de service invalide : {svc!r}")
         safe_cmds.extend([
             f"/bin/systemctl restart {svc}",
