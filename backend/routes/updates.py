@@ -509,7 +509,34 @@ def _validate_package_list(packages: list) -> list:
     """Valide une liste de noms de paquets : autorise uniquement les caractères sûrs."""
     validated = []
     for pkg in packages:
-        if isinstance(pkg, str) and _SAFE_PKG.match(pkg):
+    # ⛔ `fullmatch` ET NON `match` : LE `$` DE PYTHON ACCEPTE UN `\n` FINAL.
+    #
+    #    Mesure du 2026-09-08. `_SAFE_PKG` est `^[a-zA-Z0-9][a-zA-Z0-9.+_\-]*$`,
+    #    ancre aux deux bouts — et pourtant `re.match('nginx\n')` REND UN MATCH,
+    #    parce que `$` s'apparie aussi juste AVANT un saut de ligne terminal.
+    #    Contrairement a `_validate_username` du `sudo_manager`, il n'y a ici
+    #    AUCUN `.strip()` pour le rattraper.
+    #
+    #    CE QUE CA OUVRAIT, reproduit localement :
+    #      POST /custom_update  {"selected_packages": ["nginx\n", "reboot"]}
+    #      les DEUX passent le filtre, et `' '.join(...)` rend "nginx\n reboot"
+    #      interpole dans `f"{env_prefix} && apt-get install -y … {pkg_str}"` :
+    #        [0] export … && apt-get install -y nginx
+    #        [1]  reboot            <- LIGNE SEPAREE, EXECUTEE EN ROOT
+    #      Meme mecanisme sur `hold_cmd`/`unhold_cmd` (:642, :643).
+    #
+    #    BORNES DE L'EXPLOITATION, mesurees et non supposees : la seconde
+    #    entree doit elle-meme passer le motif, donc PAS d'espace, PAS
+    #    d'argument, PAS de `;`. La charge est UNE commande NUE — `id`,
+    #    `reboot`, `poweroff`, `halt`, `sync`, `nc` passent ; `rm -rf /`,
+    #    `curl http://x`, `sh -c id` NON. Et la route exige `require_api_key`
+    #    + `can_update_linux` + `require_machine_access` : c'est une
+    #    ELEVATION de « peut mettre a jour des paquets » vers « execute une
+    #    commande nue en root », pas une RCE non authentifiee.
+    #
+    #    `fullmatch` ferme la classe PAR CONSTRUCTION : il refuse tout `\n`
+    #    final sans dependre d'un `.strip()` place au bon endroit.
+        if isinstance(pkg, str) and _SAFE_PKG.fullmatch(pkg):
             validated.append(pkg)
     return validated
 
