@@ -154,3 +154,60 @@ où il était tombé**.*
 > **C'est le témoin qui m'a sauvée** : il montrait 7 fichiers avec `process.on`
 > dans l'arbre, donc la sonde LISAIT. **Le zéro venait de son périmètre, pas d'une
 > absence — et sans témoin les deux sont la même sortie.**
+
+
+---
+
+## 6. ⛔ MON 67 ÉTAIT CONTAMINÉ — et le désaccord qui reste n'est PAS celui qu'on croit
+
+**Mon relevé ne dépouillait pas les commentaires. C'est ma propre règle — « cité »
+n'est pas « appelé » — enfreinte pour la troisième fois aujourd'hui, dans un dépôt
+dont la prose parle abondamment de ses propres défauts.**
+
+*Mesuré : **47 % des occurrences de `finally`** des suites vivent dans des
+commentaires.*
+
+### 6.1 Ce que je mesure APRÈS dépouillement
+
+```
+population (fichiers lançant un navigateur, hors commentaires)   132
+défaut (a) — fermeture non gouvernée par un finally               68
+défaut (b) — process.exit() interposé                             42
+```
+
+**Variables isolées, une à la fois — portée `plat`/`récursif` × motif
+`navigateur seul`/`tout .close()` : les QUATRE variantes rendent `132 / 68`.**
+*Donc ni la portée ni le motif de fermeture n'expliquent quoi que ce soit : mon
+instrument est stable.*
+
+### 6.2 ⚠ ET JE NE REPRODUIS PAS LE `110 / 62 / 37` ANNONCÉ
+
+    moi, apres depouillement    132 population · 68 (a) · 42 (b)
+    annonce par ailleurs        110 population · 62 (a) · 37 (b)
+
+> **L'écart est de 22 fichiers sur la POPULATION, et il ne vient pas du
+> dépouillement — mon dépouillement fait MONTER mon compte, pas descendre.**
+
+**Le désaccord porte donc sur la DÉFINITION de la population, et aucun des deux
+prédicats n'a été énoncé assez précisément pour que l'autre le rejoue.** *C'est la
+règle du grain de la mesure : un instrument qui nomme une FAMILLE ne peut pas en
+compter les membres tant que la famille n'est pas définie.*
+
+**Mon prédicat, énoncé pour être réfuté** : *`tests/e2e/**/*.mjs` hors
+`node_modules` · texte dépouillé des `//` et `/* */` en respectant chaînes et
+gabarits · retenu si `puppeteer.launch` OU `launchBrowser(` subsiste · défaut (a)
+si aucune `.close(` ne tombe dans le corps d'un `finally` délimité par
+appariement d'accolades.*
+
+### 6.3 ⛔ ET LA CONSÉQUENCE EST SUR LE CLIQUET, PAS SUR LE CHIFFRE
+
+**Un cliquet statique a été posé à `62`. Si le compte réel est `68`, il n'est pas
+« un peu bas » : il est calibré sur une population qui EXCLUT 22 fichiers.**
+
+> **Un cliquet mord dès la première régression — c'est sa vertu. Mais un cliquet
+> calibré sous la vérité déclare acquis ce qui ne l'est pas, et sa vertu joue
+> alors CONTRE : il autorise 6 régressions avant de mordre.**
+
+**Aucun de nous ne devrait publier ce nombre avant que les deux prédicats soient
+rapprochés.** *Ce n'est pas une querelle de chiffre : c'est le seuil d'un
+mécanisme qui décide, et je ne sais pas lequel des deux est juste.*
