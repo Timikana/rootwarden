@@ -509,6 +509,68 @@ qui double celle qui existe.* Corrigé avec sa remesure datée.
                     `fail2ban.js` — deux fichiers d'une AUTRE session. Non rafraichi
                     ici : le faire masquerait leur signal.
 
+## [2.0.279] - 2026-09-08
+
+### Correction - E-461 : deux routes lisaient des FRAGMENTS comme des LIGNES
+
+**Cause commune.** `execute_as_root_stream` fait `stdout.channel.recv(4096)` et
+cede le texte tel quel (`ssh_utils.py:693-698`) : **il rend des fragments, pas
+des lignes.** Deux routes materialisaient ce flux dans une variable nommee
+`output_lines` — **un nom qui AFFIRMAIT la propriete que le generateur ne
+fournit pas, et c'est ce nom qui a fait tenir les deux defauts.**
+
+**① `POST /iptables-validate` — un jeu de regles VALIDE declare invalide**
+
+`EXIT_CODE=0` fait 12 octets. A cheval sur une frontiere de 4096, **aucun
+fragment ne le contient** : le `any(...)` rendait `False` et la route repondait
+« Erreur de syntaxe » sur des regles correctes. *Et le `'
+'.join` aggravait le
+cas — il inserait un saut de ligne au milieu du marqueur, donc meme la chaine
+recollee ne le portait plus.*
+
+Corrige : recoller les fragments (`''.join`) **puis** decouper en lignes, et
+comparer la **derniere** ligne `EXIT_CODE=` **en entier**. *Chercher la
+sous-chaine n'importe ou accepterait un `EXIT_CODE=0` present dans un message
+d'erreur d'`iptables-restore`, lequel peut citer une ligne des regles fournies
+par l'appelant.*
+
+**② `POST /pending_packages` — la liste des mises a jour SOUS-RAPPORTAIT**
+
+La boucle parsait chaque element comme une ligne de paquet
+(`nom/source version arch`). Applique a un fragment qui en contient des
+dizaines, `split('/')` ne rend que le **premier** nom et colle tout le reste.
+
+    mesure : 3 paquets disponibles dans un seul fragment -> 1 rapporte
+             et AUCUN message
+
+**Un exploitant lisant cette page croyait qu'un paquet attendait une mise a jour
+quand trois en attendaient — dont, le cas echeant, des correctifs de securite.**
+*C'est le defaut le plus silencieux des deux : le premier refuse a tort et se
+voit, le second sous-rapporte et se lit comme une bonne nouvelle.*
+
+### Mesure — logique EXTRAITE des fichiers, pas retapee
+
+    fragment unique, marqueur entier      -> 0   (attendu 0)
+    marqueur A CHEVAL sur 2 fragments     -> 0   (attendu 0)   <- le defaut
+    TEMOIN echec reel                     -> 1   (attendu 1)
+    TEMOIN injection dans un message      -> 1   (attendu 1)   <- pas de faux valide
+    3 paquets dans UN fragment            -> 3   (valait 1)
+
+### Ce qui n'est PAS touche
+
+Les onze autres appels a `execute_as_root_stream` (`supervision.py`,
+`updates.py:295/363/907`) emploient `yield from` et lisent la **valeur de
+retour** du generateur, pas ses fragments : ils ne portent pas ce defaut.
+**Balaye, pas suppose.**
+
+**Notes d'exploitation.** `backend/**.py` est lu au demarrage : **inerte jusqu'a
+la recreation du conteneur.**
+
+**Tests.** Import reel des deux modules, **683 passed, 5 skipped, 2 xfailed,
+0 FAILED**.
+
+---
+
 ## [2.0.233] - 2026-09-07
 
 ### Securite - E-460 : `GEOIP_ENABLED`, le seul effet sortant sans interrupteur
