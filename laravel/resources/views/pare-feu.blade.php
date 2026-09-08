@@ -297,13 +297,26 @@
     </div>
 </div>
 
-<div class="rw-encart" data-rw="ipt-non-porte">
-    <p class="rw-sous-titre-fort">{{ __('pare-feu.suite_titre') }}</p>
-    <p class="rw-prose">{{ __('pare-feu.suite') }}</p>
-    <a class="rw-bouton" data-rw="ipt-lien-legacy"
-       href="{{ rtrim(config('app.url_legacy'), '/') }}/iptables/"
-       target="_blank" rel="noopener">{{ __('pare-feu.suite_lien') }} ↗</a>
-</div>
+{{-- ⚠ L'ENCART « NON PORTE » A ETE RETIRE, ET C'ETAIT LE DERNIER FIL.
+
+     Il portait deux enonces devenus FAUX, et un lien `/iptables/` en dur :
+
+       'suite_titre'  « Cette page ne modifie rien »   -> elle applique et restaure
+       'suite'        « seul le retour arriere reste » -> I6 l'a porte
+
+     Les cinq gestes du pare-feu sont ici : relever, copier, valider, appliquer,
+     revenir. Un encart qui envoie vers un portail qu'on demonte, pour un geste
+     qui est sous les yeux de qui le lit, est pire qu'inutile.
+
+     ⚠ ET C'ETAIT LE SEUL LIEN VIVANT DU PORTAGE VERS LE LEGACY. Les six autres
+     sites sont des branches `@else` jamais prises : `Navigation` ne porte plus
+     AUCUNE entree `legacy` (0 occurrence contre 33 `route`), et le predicat
+     `porteDuLegacy` rend `false` pour les trois roles — avec un temoin qui
+     montre qu'il SAIT rendre `true` sur un menu forge sans route.
+
+     Les trois cles `suite*` sont retirees des deux catalogues dans le meme
+     geste : une cle que personne ne cite est un orphelin, et un orphelin se lit
+     comme une capacite qui existe encore ailleurs. --}}
 @endif
 
     {{-- `@json` reste sur UNE ligne : multiligne, il casse le PHP compile. --}}

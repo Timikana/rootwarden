@@ -65,7 +65,6 @@ return [
     'fichier_absent' => 'Ce fichier n\'existe pas sur la machine. Les règles actives ne seront donc pas rétablies au redémarrage.',
 
     // ── Ce que I1 ne fait pas, dit à l'écran plutôt qu'absent en silence ──
-    'suite_titre' => 'Cette page ne modifie rien',
     /*
      * ⚠ CORRIGE le 2026-09-02 (E-318). Ce libelle declarait la validation a blanc
      * NON PORTEE. Elle l'est : `pare-feu.js:710` appelle `/iptables-validate`, et
@@ -83,8 +82,6 @@ return [
      * modules que le processus servi n'a pas recharges, donc que le JS appelle la
      * route ne dit pas qu'elle repond. A remesurer apres le redemarrage.
      */
-    'suite' => "Le relevé, la copie en base, la validation à blanc et l'APPLICATION des règles sont portés ici. Seul le retour arrière — restaurer une version archivée — reste sur l'ancien portail. L'historique ci-dessus liste les versions ; c'est de là que le retour arrière partira quand il sera porté.",
-    'suite_lien' => 'Ouvrir le pare-feu sur l\'ancien portail',
 
     // ── I2 : la copie en base ───────────────────────────────────────────
     'copie_titre' => 'Copie enregistrée en base',
