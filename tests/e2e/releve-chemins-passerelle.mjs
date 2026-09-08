@@ -52,11 +52,51 @@ const JS = 'laravel/public/js/';
  * et 14 noms distincts. Suivre les trois de `groupes.js` en raterait 38.
  */
 const fichiers = readdirSync(JS).filter((f) => f.endsWith('.js'));
+
+/*
+ * ⚠ LE NOM NE SUFFIT PAS : IL FAUT QUE LE CORPS CITE `PASSERELLE` — et le
+ * discriminant est par FICHIER, pas par nom.
+ *
+ * Premier jet : toute fonction prenant un parametre `chemin` etait tenue pour un
+ * helper de passerelle. Quatorze noms, dont QUATRE qui ne touchent pas la
+ * passerelle : `appellePortage` (les routes du portage lui-meme), `resout` (la
+ * resolution de liens legacy), `verseLeJson`, et `appelle` DANS CERTAINS
+ * FICHIERS SEULEMENT.
+ *
+ * Le releve rendait donc `/pare-feu/copie`, `/pare-feu/historique`,
+ * `/pare-feu/version` et `/profil/step-up` comme des chemins de PASSERELLE.
+ * **Ce sont des routes NATIVES du portage** — le nom `appellePortage` le dit.
+ *
+ * ⚠ ET LE MEME NOM EST LES DEUX SELON LE FICHIER : `appelle` cite `PASSERELLE`
+ * dans une dizaine de modules et ne la cite pas ailleurs. Un ensemble global de
+ * noms ne peut donc pas trancher — la question « ce nom est-il un helper de
+ * passerelle » n'a pas de reponse hors d'un fichier.
+ *
+ * > Un helper ne se reconnait pas a son nom ni a la forme de ses parametres,
+ * > mais a ce qu'il APPELLE. Et deux fichiers peuvent donner le meme nom a deux
+ * > gestes differents sans que rien ne s'en plaigne.
+ *
+ * Direction de l'erreur : elle SURESTIMAIT les chemins de passerelle, donc elle
+ * aurait fait GARDER des prefixes inutiles — le sens inoffensif. Elle n'aurait
+ * pas fait couper. Ca ne la rend pas juste : les 41 prefixes annonces n'etaient
+ * pas 41 prefixes de passerelle.
+ */
+function helpersDe(t) {
+    const out = new Set();
+    for (const m of t.matchAll(/function\s+([A-Za-zéèà]+)\s*\(\s*chemin/g)) {
+        const deb = m.index + m[0].length;
+        const suivante = t.indexOf('\n    function ', deb);
+        const corps = t.slice(deb, suivante > 0 ? suivante : deb + 1200);
+        if (corps.includes('PASSERELLE')) out.add(m[1]);
+    }
+
+    return out;
+}
 const noms = new Set();
 for (const f of fichiers) {
     const t = readFileSync(JS + f, 'utf8');
     if (! t.includes('/api/gateway')) continue;
-    for (const m of t.matchAll(/function\s+([A-Za-zéèà]+)\s*\(\s*chemin/g)) noms.add(m[1]);
+    for (const n of helpersDe(t)) noms.add(n);
 }
 
 /*
@@ -64,11 +104,21 @@ for (const f of fichiers) {
  * `'/groups/' + encodeURIComponent(id) + '/members'` vaut `/groups/{}/members`,
  * jamais `/groups/`. Un releve qui perd le suffixe classe deux gestes comme un.
  */
-function chemins(t, ouvre) {
+function chemins(t, quoi, motEntier) {
     const out = [];
-    let i = 0;
-    while ((i = t.indexOf(ouvre, i)) !== -1) {
-        let j = i + ouvre.length, prof = 1, arg = '';
+    const ouvre = motEntier ? `${quoi}(` : quoi;
+    const positions = [];
+    if (motEntier) {
+        for (const m of t.matchAll(new RegExp(`(?<![\\w$])${quoi}\\s*\\(`, 'g'))) {
+            positions.push(m.index + m[0].length - 1);
+        }
+    } else {
+        let k = 0;
+        while ((k = t.indexOf(ouvre, k)) !== -1) { positions.push(k + ouvre.length - 1); k += ouvre.length; }
+    }
+    for (const p of positions) {
+        const i = p;
+        let j = i + 1, prof = 1, arg = '';
         while (j < t.length && prof > 0) {
             const c = t[j];
             if (c === '(') prof++;
@@ -91,7 +141,6 @@ function chemins(t, ouvre) {
             if (dyn && ! finitParLitteral) rendu += '{}';
             out.push(rendu);
         }
-        i = j;
     }
 
     return out;
@@ -102,9 +151,17 @@ let sitesVus = 0;
 for (const f of fichiers) {
     const t = readFileSync(JS + f, 'utf8');
     if (! t.includes('/api/gateway')) continue;
+    /*
+     * ⚠ LES HELPERS SONT CEUX DE CE FICHIER, et l'appel est cherche avec une
+     * FRONTIERE DE MOT. `indexOf('lis(')` matchait `remplis(`, `etablis(` ;
+     * `lit(` matchait `remplit(` et `traduit(` — donc des lectures i18n prises
+     * pour des appels de passerelle. Elles ne ressortaient pas dans le verdict
+     * parce que leurs arguments ne commencent pas par `/`, mais elles gonflaient
+     * le COMPTE de sites.
+     */
     const trouves = [];
-    for (const n of noms) trouves.push(...chemins(t, `${n}(`));
-    trouves.push(...chemins(t, 'fetch(PASSERELLE +'));  /* les fetch DIRECTS */
+    for (const n of helpersDe(t)) trouves.push(...chemins(t, n, true));
+    trouves.push(...chemins(t, 'fetch(PASSERELLE +', false));  /* les fetch DIRECTS */
     for (const c of trouves) {
         sitesVus++;
         const pref = '/' + c.replace(/^\//, '').split(/[/?{]/)[0];
