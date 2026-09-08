@@ -148,6 +148,57 @@ sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 
 ---
 
+## 2 quinquies. LA LISTE DES « 11 PORTABLES » EST **FERMEE** — et c'est la QUATRIEME fermeture
+
+**Mesure du %s. Trois raisons de cloture, et elles ne se resument pas l'une a l'autre.**
+
+| # | item | cloture | preuve |
+|---|---|---|---|
+| 1 | les 5 catalogues | **DEJA PORTE** | 13 sites appaires, 0 cle manquante |
+| 2 | `ssh_audit` releve planifie | **DEJA PORTE** | `/ssh-audit/schedules` — CRUD complet |
+| 3 | `ssh_audit` `sshd_config` en lecture | **DEJA PORTE** | `/ssh-audit/config` |
+| 4 | `ssh_audit` relever un serveur | **DEJA PORTE** | `/ssh-audit/scan`, `audit-ssh.js:176` |
+| 5 | `groups` creer un groupe | **DEJA PORTE** | 12 occurrences |
+| 6 | `groups` scan de derive de masse | **DEJA PORTE** | `/drift/scan` |
+| 7 | `fail2ban` desactiver une jail | **DEJA PORTE** | `/fail2ban/jail` |
+| 8 | `fail2ban` geolocaliser une adresse | **DEJA PORTE** | `/fail2ban/geoip` |
+| 9 | `superv` les 2 capacites « PERDUES » | **AUDITE INEXISTANT** | *« il n'y en a aucune »* — audit dedie |
+| 10 | `serveurs` test de connexion | ⛔ **PAS UN PORTAGE** | **aucun endpoint backend** |
+| 11 | `serveurs` import CSV | ⛔ **PAS UN PORTAGE** | **aucun endpoint backend** |
+
+**Les six chemins des items 2 a 8 sont verifies par `./scripts/geste-porte.py`** — six `APPELE`, avec les
+temoins du jeu. *Releve par la session 8, remesure ici avec un autre instrument que le sien.*
+
+**Et les deux « aucun endpoint » sont verifies independamment**, motif + temoin :
+
+    routes du backend contenant `test`   /cve_test_connection · /graylog/test
+                                         /test · /test_platform_key
+                                         -> aucune n'est un test de connexion serveur
+    routes contenant `import` ou `csv`   0
+    TEMOIN                               229 routes lues au total — le motif LIT
+
+> **Les items 10 et 11 ne sont pas des portages non faits : ce sont des DEVELOPPEMENTS NEUFS.** *Demander
+> « ce chemin est-il appele » quand le chemin n'existe pas assigne un fantome.*
+
+### ⚠⚠ C'EST LA QUATRIEME FERMETURE, ET C'EST LE FAIT LE PLUS IMPORTANT DE CETTE SECTION
+
+`E-464` en avait ferme **6 sur 9**, mesure trois fois. **La liste se reemet a chaque tour de relance**, et
+*une relance qui reconduit une liste fermee FABRIQUE le ratio doc/code qu'elle denonce.*
+
+**Un fait repete dans une relance se perime au tour suivant ; un fait inscrit avec sa date de mesure ne se
+perime qu'avec l'artefact.** C'est pourquoi la cloture est ici et pas dans une consigne.
+
+### Deux arbitrages rendus, inscrits comme tels
+
+- **test de connexion : NE PAS DEVELOPPER.** `/ssh-audit/scan` ouvre une session et rend le `sshd_config` —
+  *l'echec du releve EST le test.* Un bouton « tester » a cote d'un bouton qui teste **en faisant quelque
+  chose d'utile** ajoute un chemin sans ajouter une capacite.
+- **import CSV : NE PAS PORTER.** Fichier absent du disque, 403 au reseau, aucun endpoint, quatre tables
+  ecrites, trois arbitrages non rendus. *Rien ne regresse en ne le portant pas.* **Un import de masse dont
+  les regles ne sont pas decidees ne se porte pas : il se SPECIFIE.**
+
+---
+
 ## 2 quater. L'ETAT DU LEGACY SERVI — et pourquoi ce compte NE SE MESURE PAS PAR MOTIF
 
 **Releve par la session 8 le %s ; le point qui portait son erreur est verifie ici.**
@@ -1436,6 +1487,19 @@ ce qui vit :
 ```bash
 # dans un appel SEPARE, qui ne cite AUCUN nom de suite ailleurs dans la commande
 ps -eo pid,etime,cmd | grep -E "[r]ejouer-lot-[A-Za-z0-9]+\.sh|[g]o-[a-z0-9-]+\.mjs" | grep -v grep
+
+# ⚠ ET `ps` SEUL NE SUFFIT PAS — voir plus bas « UN `ps` NE REPOND PAS AUX
+#   BONNES QUESTIONS ». Mesure du 2026-09-08 : `ps` a rendu 3 processus puis 0 en
+#   quelques secondes, et l'enumeration ne montrait que du MCP puppeteer vieux
+#   de onze jours. **A ce grain, c'est un signal de bruit.**
+#
+#   Le signal qui TIENT est une ECRITURE, pas un processus — et il porte son
+#   temoin :
+#     find tests/e2e/screenshots -type f -newermt "$(date -d '3 minutes ago' '+%Y-%m-%d %H:%M:%S')" | wc -l
+#     find tests/e2e/screenshots -type f -newermt "$(date -d '30 days ago'  '+%Y-%m-%d %H:%M:%S')" | wc -l   # TEMOIN : doit etre > 0
+#   Mesure du 2026-09-08 : 0 sur trois minutes, 645 sur trente jours — la sonde lit,
+#   et le banc est au repos. **Zero sans le temoin ne distingue pas « rien ne
+#   tourne » de « la sonde ne mesure rien ».**
 ```
 
 > **⚠ La commande que ce document donnait était PÉRIMÉE, et dans le mauvais sens.** Elle disait
