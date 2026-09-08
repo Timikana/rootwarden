@@ -26,7 +26,13 @@ rules:
     patterns:
       - pattern: execute_as_root($CLIENT, f"...{$VAR}...", ...)
       - pattern-not: execute_as_root($CLIENT, f"...{shlex.quote($VAR)}...", ...)
-      - pattern-not: execute_as_root($CLIENT, f"...{base64...}...", ...)
+      # ⚠ CETTE EXEMPTION ETAIT `f"...{base64...}..."`, ET LA REGLE ENTIERE NE
+      # COMPILAIT PAS : `base64...` n'est pas une expression Python. Une regle qui
+      # ne compile pas rend ZERO trouvaille, et zero se lit « propre » — la regle
+      # visant l'injection shell en root n'a donc jamais tourne.
+      # `pattern-not-regex` porte la meme intention (« sauf si la charge est
+      # poussee par base64 -d ») et compile toujours.
+      - pattern-not-regex: 'base64\s+-d'
     message: |
       Interpolation de variable dans commande shell sans shlex.quote.
       Utiliser shlex.quote($VAR) ou pousser via base64 -d.
@@ -100,7 +106,12 @@ rules:
     patterns:
       - pattern-either:
           - pattern: echo $X;
-          - pattern: <?= $X ?>
+          # ⚠ IL Y AVAIT ICI `- pattern: <?= $X ?>`, ET LA REGLE NE COMPILAIT PAS :
+          # une balise PHP n'est pas un motif. Retire plutot que reecrit, parce que
+          # l'analyseur normalise l'echo court en instruction `echo` — `echo $X;`
+          # devrait donc couvrir les deux formes. **C'est une attente, pas une
+          # mesure** : le pas de temoin de `ci.yml` la met a l'epreuve sur un
+          # `<?= $_GET[...] ?>` forge, et sa sortie tranchera.
       - metavariable-regex:
           metavariable: $X
           regex: '\$_(GET|POST|REQUEST|COOKIE)\[.*\]'
@@ -128,6 +139,12 @@ rules:
   # A04 Auth - require_api_key obligatoire sur les blueprints sensibles
   # -------------------------------------------------------------------------
   - id: rw-flask-route-without-api-key
+      # ⚠ LES DEUX `pattern-not` PORTAIENT UN `...` NU ENTRE DEUX DECORATEURS, ce
+      # qui ne compile pas : la regle qui verifie qu'une route Flask porte
+      # `@require_api_key` n'a donc jamais tourne. Le `...` du CORPS reste, lui est
+      # valide. Consequence assumee : les deux exemptions exigent maintenant le
+      # decorateur ADJACENT a `@bp.route`. Un decorateur intercale ferait rougir a
+      # tort — le pas de temoin de `ci.yml` mesure les deux ordres.
     patterns:
       - pattern: |
           @bp.route(...)
@@ -136,12 +153,10 @@ rules:
       - pattern-not: |
           @bp.route(...)
           @require_api_key
-          ...
           def $F(...):
             ...
       - pattern-not: |
           @require_api_key
-          ...
           @bp.route(...)
           def $F(...):
             ...
