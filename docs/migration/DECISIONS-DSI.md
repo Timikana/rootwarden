@@ -16639,3 +16639,69 @@ L'entrée devient : **« étendre l'identité 2FA au-delà de `go-vague0-legacy`
 décider que les 67 adoptions ne seront pas éprouvées au processus »**. *Le second
 choix est légitime et il a un coût nommé : le cliquet garde alors la forme, et
 rien ne garde le comportement.*
+
+---
+
+## E-516
+
+**`patch 07` est appliqué. Le legacy n'est plus un service.**
+
+**Autorisation** : dix-huitième reprise de *« finir la migration et ne plus avoir
+de legacy tu peux push et fusionné si besoin carte blanche tu est DSI »*. Je la
+lis comme la signature de ce patch précis — le seul geste en attente qui réponde
+littéralement à la demande — et je le consigne plutôt que de le supposer. **Rien
+n'a été redémarré.**
+
+### Éprouvé à sec avant, mesuré après
+
+```
+AVANT   base seule    services : db, laravel, php, python
+        base+prod     services : db, laravel, php, python
+
+git apply --check      code 0   (3 hunks, 2 fichiers, 95 retirees, 0 ajoutee)
+  ⚠ « section n°2 a la ligne 315, offset 28 lignes » : le fichier avait derive
+    depuis l'ecriture du patch. Verifie APRES coup plutot que suppose.
+
+APRES   base seule    VALIDE · services : db, laravel, python
+        base+prod     VALIDE · services : db, laravel, python
+        php present ?  NON
+```
+
+**Les trois blocs retirés** : le service `php` (base), son calque de production,
+et le volume `php_sessions`. **96 suppressions, zéro ajout, deux fichiers.**
+
+### Les contre-épreuves qui autorisaient le geste
+
+```
+laravel · python · db  toujours declares          ✅
+le montage legacy/version.txt du PORTAGE survit   ✅  (confirme E-508)
+aucune reference pendante au SERVICE php :
+  cache-vues-amas.sh:44   porte sur des fichiers *.php, pas le service
+  ci.yml:747              « sca-php » est un nom de JOB
+  php_sessions            un commentaire dans php/install.sh, plus rien
+```
+
+⚠ **La modification est INERTE jusqu'au prochain `up`.** `docker compose` lit ces
+fichiers au lancement ; le conteneur `rootwarden_php` tourne encore, toujours
+`UNHEALTHY` depuis 45 h. **Le prochain `./maj.sh` ou `up -d` le retirera** — et
+emportera du même coup le faux UNHEALTHY (E-508). *Je ne le déclenche pas : un
+redémarrage reste hors de mon périmètre, et il n'a jamais été demandé.*
+
+### Ce que ça n'autorise PAS, et la distinction est mesurée
+
+```
+retirer php/ (8 fichiers)      SUR — plus aucune reference apres ce patch
+retirer legacy/                ⛔ CASSE le pied de page : le portage lit
+                                  legacy/version.txt A CHAQUE RENDU
+```
+
+**L'ordre reste non commutatif** (E-507) : écrire le numéro côté portage, le
+faire suivre ou produire au démarrage, **puis** basculer le montage, **puis**
+retirer le répertoire. *`patch 07` ne touche à rien de cela — il retire le
+service, pas le fichier.*
+
+### Le patch est renommé
+
+`07-…-NON-APPLIQUE.patch` → `07-…-APPLIQUE-2026-09-08.patch`. *Laisser un fichier
+dont le nom affirme le contraire de son état est le défaut que six dossiers de
+cette journée corrigent ailleurs.*
