@@ -22436,6 +22436,42 @@ mal forme : *onze refus et zero acceptation ne discriminent pas.*
 > accepter un horodatage d'un autre format, par exemple — les quatre sites redeviennent nus **sans qu'aucune
 > regle ne bouge**, puisqu'elles ne sont pas exemptees : elles sont deja accusees.
 
+### ⟶ RECLASSE SUR DEUX AXES (correction de taxonomie de la session 8, meme jour)
+
+**Sa premiere taxonomie confondait deux axes** : A, B, C disaient *pourquoi c'est sur*, D disait *d'ou ca
+vient*. **Un cas peut etre externe par origine ET sur par neutralisation**, et l'ancien schema ne pouvait
+pas l'exprimer — *donc un lecteur cherchant « les D » n'aurait pas trouve les endroits ou une donnee externe
+atteint une commande root, meme neutralisee : exactement ceux qu'un changement futur casse.*
+
+    ORIGINE          1 litteral / constante de module
+                     2 calculee cote serveur, sans entree
+                     3 venue d'une ENTREE ou de la BASE
+
+    NEUTRALISATION   a AUCUNE      b echappement (shlex.quote)
+                     c REJET (liste blanche)      d typage / bornage      e confinement
+
+| variable | sites | n | croisement |
+|---|---|---|---|
+| `config_path` | 1250 · 1298 · 1407 · 2090 · 2168 · 2274 | 6 | **1a** |
+| `service_name` | 1302 · 1412 · 2172 · 2280 | 4 | **1a** |
+| `config_dir` | 1344 · 1846 · 2218 | 3 | **2a** |
+| `filename` | 1344 · 2218 | 2 | **2a** |
+| `backup_path` (de `_backup_agent_config`) | 1298 · 2168 | 2 | **2a** |
+| `backup_path` (avec `backup_name`) | 1399 · 1407 · 2269 · 2274 | 4 | ⚠ **3c** |
+
+    3a  origine externe, AUCUNE neutralisation   ->  **ZERO**
+    3c  origine externe, NEUTRALISEE par rejet   ->  **4**   <- ce qu'un changement casse
+    1a  10        2a  7
+
+**La neutralisation est un REJET, pas un echappement, et c'est mesure caractere par caractere** — 25
+metacaracteres inseres dans une charge de forme valide (`a<meta>b.bak.20260908_123456`) :
+
+    ACCEPTES : AUCUN          TEMOIN POSITIF (sans meta) : ACCEPTE
+
+*Le motif ne transforme rien : il REFUSE.* **Et sa remarque tient — le rejet est plus fort que
+l'echappement** : `shlex.quote` protege une chaine quelconque, une liste blanche **empeche la chaine
+d'exister**. *Mais le rejet depend d'un motif qui reste strict, la ou le quote ne depend de rien.*
+
 ### ⚠⚠ ET UN DEFAUT DE LA REGLE QUE LA SESSION 8 N'AVAIT PAS VU DE CE COTE
 
 Elle m'avertit que son `pattern-not-regex: 'shlex\.quote'` exempte **la region entiere**, donc que
