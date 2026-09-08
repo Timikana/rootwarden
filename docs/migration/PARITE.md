@@ -22343,3 +22343,41 @@ sans rapport : un import CSV n'a pas besoin du backend Python.**
 **Aucun geste exerce** : les trois routes interdites (`cycle`, `supprimer`, `importer`) sont relevees et non
 appelees. *Seuls deux GET de sonde ont ete emis, sur `/serveurs/importer` (405) et `/serveurs/zzz` (404).*
 
+---
+
+## E-495 — `APP_URL` EST EN CLAIR SUR LE PORT DU LEGACY, et ce n'est PAS le mailer qui tient le defaut ferme
+
+**Signale par la session 8, dont l'argument de securite est FAUX. Mesure du 2026-09-08.**
+
+    config('app.url')            http://192.168.0.245:8444
+                                 -> `http`, en CLAIR
+                                 -> `:8444`, que le LEGACY occupe depuis l'echange du 07/09
+
+    route() HORS requete (CLI)   http://192.168.0.245:8444/reinitialiser?uid=1&jeton=x
+    route() EN requete           https://localhost:8443/...      <- suit l'en-tete `Host`
+
+**Le lien du courriel de reinitialisation est bati `l.156` par `route()`, DANS la requete** — il suit donc
+le `Host` par lequel l'operateur est entre, et il est JUSTE. **`APP_URL` ne mord que HORS requete** : tache
+planifiee, job en file, CLI.
+
+### ⛔ CE QUI TIENT LE DEFAUT FERME N'EST PAS CE QU'ELLE CROIT
+
+Elle ecrit que le defaut est *« tenu ferme par `MAIL_MAILER=log` »*. **Mesure :**
+
+    mail.default   smtp          transport  smtp
+    host           ssl0.ovh.net  port       465
+    username       DEFINI        password   DEFINI
+    from           test@timikana-heero.fr
+
+**Le mailer est ARME, avec des identifiants reels et un expediteur reel.** *Ce qui tient le defaut ferme est
+que `route()` se resout EN REQUETE — pas que le courrier ne parte pas.*
+
+> ⚠⚠ **La difference est operationnelle** : si quelqu'un deplaçait l'envoi vers une file ou une tache
+> planifiee — ce que le docblock de `ReinitialisationController` dit avoir deja envisage — le lien
+> deviendrait `http://…:8444`, **en clair et vers le legacy**, ET il partirait pour de vrai. *Croire le
+> mailer desarme est exactement ce qui autoriserait ce deplacement.*
+
+**Non corrige** : `laravel/.env` est en `640` et **illisible depuis mon compte** (`Permission denied`) — la
+valeur n'est donc etablie que par `config('app.url')` dans le conteneur. **Et c'est un fichier de
+l'exploitant.** *Signale, pas touche.*
+
