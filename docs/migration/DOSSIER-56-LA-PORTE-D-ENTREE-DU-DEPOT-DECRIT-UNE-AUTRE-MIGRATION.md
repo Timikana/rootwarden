@@ -229,8 +229,40 @@ arbre archivé, par des chemins portant un préfixe retiré depuis deux renommag
 
 ## 7.2 Les comptes, contre la mesure — et le témoin qui valide l'instrument
 
+⛔ **RETRACTATION DU 2026-09-08 19:50 — « 63 tables » ETAIT JUSTE, ET C'EST MOI
+QUI ME TROMPAIS.** La ligne barree ci-dessous est fausse ; je la garde visible
+parce que je l'ai transmise trois fois a l'exploitant et publiee dans une PR
+fusionnee.
+
 ```
-:39   « Sur 63 tables »                   mesure  65 CREATE TABLE
+~~:39   « Sur 63 tables »                 mesure  65 CREATE TABLE~~   <- FAUX
+
+  base vivante (information_schema)        63 BASE TABLE, 0 vue
+  schema, analyseur corrige                63
+  migrations : 65 fichiers, 65 enregistrees, derniere appliquee 065
+
+  mes deux « tables » en trop venaient de COMMENTAIRES :
+    « ci »  033_graylog.sql:29
+            -- … les colonnes existent deja via CREATE TABLE ci-dessus.
+    « if »  055_machine_groups.sql:10
+            -- Idempotent : CREATE TABLE IF NOT EXISTS. Pas de point-virgule…
+```
+
+*Quatrieme contamination par les commentaires du meme jour — les trois autres
+etaient en JavaScript, celle-ci en SQL, quelques heures plus tard. Et les deux
+commentaires coupables parlent de `CREATE TABLE` en expliquant l'idempotence.*
+
+**La parade qui aurait suffi seule, et elle est structurelle plutot que
+lexicale : EXIGER le `(` qui suit une declaration de table.** Un commentaire qui
+cite `CREATE TABLE` ne le fait jamais suivre d'une parenthese ouvrante.
+*S'ancrer sur la syntaxe qui DOIT suivre est plus fort que d'apparier le
+mot-cle.*
+
+⚠ **Et j'ai accuse le bon cote de la mesure** : `ARCHITECTURE.md:39`,
+`SKILL.md:16`, `:25` et `:48` disent tous « 63 » et **ont raison**. Septieme
+fausse alarme de la journee, toutes du cote qui accuse.
+
+```
 :414  « 77 routes en 8 modules »          mesure  229 @bp.route en 27 modules
 
   fail2ban.py   annonce 19  ·  mesure 19   ✅  <- LE TEMOIN
