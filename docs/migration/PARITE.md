@@ -22301,3 +22301,45 @@ donc inerte. *Signale a qui tient le vhost du portage.*
 *Les quatre premiers etaient des VALEURS ; le cinquieme est un ENONCE. C'est la meme cause — l'echange — et
 deux especes d'artefact.*
 
+---
+
+## E-492 — LE CATALOGUE `serveurs` APPARIE : 113 cles, UNE orpheline, et l'import CSV EST PORTE
+
+**Appariement demande par la session 8 le 2026-09-08. Sa methode aurait regarde au mauvais endroit, et son
+arbitrage sur l'import reposait sur une premisse juste mais hors sujet.**
+
+### Le compte
+
+    113 cles      fr = en, diff 0
+    112 atteignables    106 litterales + 6 CONSTRUITES
+      1 ORPHELINE       `serveurs.legende` = « Environnements »
+
+**Les six construites** — `cycle_active`, `cycle_archived`, `cycle_retiring` et leurs trois `*_fait` — sont
+rendues par `serveurs.blade.php:382` (`__('serveurs.cycle_' . $etat)`) et
+`ServeursController.php:251` (`__('serveurs.cycle_' . $etat . '_fait')`). *Ma premiere sonde, par
+sous-chaine, les declarait orphelines : une cle construite n'apparait nulle part sous sa forme finale.*
+
+### ⚠ APPARIER CONTRE LE JS AURAIT RENDU UN CHIFFRE ABSURDE
+
+La consigne etait *« apparier contre ce que le JS APPELLE, jamais contre la table des routes »*. Mesure :
+
+    serveurs.js            138 lignes · UN seul `fetch` · 0 `href` · 0 `location` · 0 `submit`
+                           -> PASSERELLE + '/server_status', un sondage d'etat
+    serveurs.blade.php     DIX `<form>` vers DIX routes Laravel POST
+
+> **Le module travaille par formulaires cote SERVEUR, pas par JS.** *Un appariement contre le JS aurait
+> trouve un site d'appel pour un module de 113 cles, et conclu que rien n'est porte.*
+
+**La regle « une route qui existe ne dit pas que le geste est porte » reste vraie** — mais sa reciproque ne
+l'est pas : *un geste peut etre porte sans qu'aucun JS ne l'appelle.* Ce qui prouve l'atteignabilite est un
+**site d'appel**, et un `<form action>` en est un.
+
+### ⛔ ET L'IMPORT CSV EST PORTE
+
+Voir `PLAN-DE-MIGRATION.md` §2 quinquies, corrige : route, controleur, service de 54 lignes qui ecrit, 22
+cles de catalogue, et `405` contre `404` au reseau. **La premisse « aucun endpoint backend » etait juste et
+sans rapport : un import CSV n'a pas besoin du backend Python.**
+
+**Aucun geste exerce** : les trois routes interdites (`cycle`, `supprimer`, `importer`) sont relevees et non
+appelees. *Seuls deux GET de sonde ont ete emis, sur `/serveurs/importer` (405) et `/serveurs/zzz` (404).*
+

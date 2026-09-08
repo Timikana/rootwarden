@@ -220,7 +220,25 @@ perime qu'avec l'artefact.** C'est pourquoi la cloture est ici et pas dans une c
 - **test de connexion : NE PAS DEVELOPPER.** `/ssh-audit/scan` ouvre une session et rend le `sshd_config` —
   *l'echec du releve EST le test.* Un bouton « tester » a cote d'un bouton qui teste **en faisant quelque
   chose d'utile** ajoute un chemin sans ajouter une capacite.
-- **import CSV : NE PAS PORTER.** Fichier absent du disque, 403 au reseau, aucun endpoint, quatre tables
+- ⛔ **« import CSV : NE PAS PORTER » EST SANS OBJET — IL EST PORTE.** *Corrige le 2026-09-08 en appariant
+  le catalogue `serveurs`.* Mesure :
+
+        laravel/routes/web.php        Route::post('/serveurs/importer')
+        ServeursController::importer  validation `mimes:csv,txt` + taille, journalisation
+        Serveurs::importeCsv          54 l., en-tete controle, `IMPORT_MAX_LIGNES`,
+                                      delegue chaque ligne a `importeUneLigne` qui ECRIT
+        lang/fr/serveurs.php          22 cles `imp*`
+        au reseau                     GET /serveurs/importer -> 405 · GET /serveurs/zzz -> 404
+
+  **La premisse etait « aucun endpoint backend n'existe », et elle etait JUSTE — et sans rapport.** *Un
+  import CSV n'a pas besoin du backend Python : il lit un fichier et ecrit en base, ce que Laravel fait
+  seul.* **Chercher la capacite dans `backend/routes/` etait chercher au mauvais endroit**, et le zero
+  rendu la etait un vrai zero qui ne disait rien de la question.
+
+  *L'arbitrage « un import de masse dont les regles ne sont pas decidees se SPECIFIE » garde sa valeur comme
+  principe — mais il n'a plus d'objet ici.*
+
+- **~~import CSV : NE PAS PORTER~~** *(enonce d'origine, conserve)* Fichier absent du disque, 403 au reseau, aucun endpoint, quatre tables
   ecrites, trois arbitrages non rendus. *Rien ne regresse en ne le portant pas.* **Un import de masse dont
   les regles ne sont pas decidees ne se porte pas : il se SPECIFIE.**
 
