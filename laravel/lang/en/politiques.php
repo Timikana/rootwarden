@@ -111,7 +111,6 @@ return [
     'jamais'            => 'never deployed',
     'rollback_titre' => 'Restore an earlier version',
     'rollback_texte' => 'Restores the exact sudoers from before this deployment. The content is what was saved, not a reconstruction. Re-authentication is required.',
-    'rollback_lien' => 'Roll this deployment back in the legacy portal',
     'resultat'          => 'Result',
 
     /* L'annulation d'un deploiement, rouverte le 2026-09-07. */
