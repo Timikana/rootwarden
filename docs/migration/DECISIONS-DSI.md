@@ -15426,3 +15426,89 @@ cette fois j'aurais renoncé au préflight pour rien.**
 geste.* **C'est la forme la plus utile d'un signalement entre pairs : nommer la conséquence,
 pas prescrire le remède.** *Le remède qu'elle n'a pas prescrit — arrêter de pousser — aurait
 été le mauvais.*
+
+---
+
+## E-489 ✅ — SEPT ESPÈCES, PAS CINQ : J'AVAIS SUBSTITUÉ MON ÉNUMÉRATION À CELLE DU DOSSIER
+
+**2026-09-08, ~06:3x.** *En `E-486` j'ai écrit « les cinq espèces de dépendance sont mesurées »
+puis « je ne sais plus où chercher une sixième ». **Le `DOSSIER-48` en listait cinq AUTRES,
+et je l'avais lu.***
+
+### ① LES DEUX LISTES, ET AUCUNE N'EST UN SUR-ENSEMBLE
+
+```
+LES MIENNES (E-486)                    CELLES DU DOSSIER-48 §« trois controles »
+1 les 11 racines servies               require / include
+2 portage -> legacy                     appel HTTP
+3 backend -> legacy                     lien entrant du portage
+4 les courriels                         chemin CONSTRUIT par glob()
+5 l'ecrivain exclusif en base           configuration du SERVEUR (ErrorDocument)
+                                      + l'URL composee pour un COURRIEL
+```
+
+**Union : sept.** *Deux que je n'avais jamais mesurées — `glob()` et la configuration du
+serveur — et une qui m'est propre, l'écrivain exclusif en base.*
+
+> **J'ai remplacé l'énumération canonique par la mienne, puis demandé si la mienne était
+> complète.** *La question « y en a-t-il une sixième ? » avait sa réponse dans le document
+> qui posait la question.*
+
+### ✅ LES DEUX MANQUANTES, MESURÉES MAINTENANT
+
+```
+ESPECE 4 — glob()
+  legacy : 2 appels REELS en code servi, depouille
+     lang/en.php:12  glob(__DIR__ . '/en/*.php')
+     lang/fr.php:12  glob(__DIR__ . '/fr/*.php')
+     -> ce sont les 74 CATALOGUES : aucun fichier ne les NOMME, ils meurent
+        avec leurs deux chargeurs
+  portage -> legacy : 0 glob
+  TEMOIN+ : 183 occurrences du mot « glob » dans legacy/, dont 2 sont des appels
+            -> la sonde lit, et le depouillement discrimine
+
+ESPECE 5 — configuration du serveur
+  legacy/.htaccess:43   ErrorDocument 404 /_sortie.php     <- l'etape ⑥, connue
+  vhost du portage      les mentions de « legacy » sont TOUTES en commentaire
+```
+
+**Les sept sont désormais mesurées, et aucune n'est vivante** — sauf la sixième, les
+courriels, où le défaut est réel et tenu fermé par `MAIL_MAILER=log`.
+
+### ⚠ ② ET EN LISANT LE VHOST DU PORTAGE, UNE MESURE PÉRIMÉE QUI SE LIT ENCORE COMME VRAIE
+
+Le vhost porte, à l'appui d'une correction : *« Mesure sur profil Chrome PERSISTANT, deux
+processus : aucun surclassement. `http://localhost:8444/connexion` rend 200, servi en
+clair. »*
+
+```
+mesure du 2026-09-08, au reseau :
+  http://localhost:8444/connexion    301 -> https://localhost:8444/connexion
+  https://localhost:8446/connexion   404
+  http://localhost:8080/connexion    301 -> https://localhost:8443/connexion   correct
+```
+
+**Le legacy ne sert pas `/connexion`.** *La mesure citée date du 2026-09-06 — **avant**
+l'application de l'échange le 2026-09-07 à 19:39 — quand `:8444` était le port HTTP du
+PORTAGE.* **Elle était juste, et son sens s'est inversé sous elle.**
+
+> **Cinquième membre de la famille de l'échange, et le premier qui vive dans un
+> COMMENTAIRE plutôt que dans une valeur.** *Une valeur périmée casse ou se signale ; une
+> MESURE périmée citée à l'appui d'un raisonnement se relit comme une preuve.*
+
+⚠ **Ce que ça ne renverse pas** : la décision de ne pas poser HSTS sur le portage tient sur
+son propre argument — *une porte à sens unique mise en cache un an, sur un certificat
+auto-signé, se pose après vérification au réseau et sur décision.* **La mesure périmée
+étayait une CORRECTION accessoire, pas la décision.** *Je le dis parce que signaler une preuve
+périmée sans dire ce qu'elle portait ferait rouvrir un arbitrage qui n'a pas bougé.*
+
+### ③ ET L'ÉTAPE ① DU `DOSSIER-48` EST FAITE
+
+*Son dernier commit est de 03:02 ; I5 est de 04:34, I6 de 04:49, le retrait de l'encart de
+06:08.* **Le document dit encore « porter I5, avec Q1–Q4 ».** *Il est le seul artefact qui
+présente la séquence d'extinction comme non commencée, et c'est celui qu'on lira pour
+l'exécuter.*
+
+**Je ne le réécris pas ce tour** — il appartient à la séquence, pas à mon journal — *mais son
+étape ① est close, ses trois contrôles sont ceux que j'ai appliqués toute la nuit, et ses
+espèces 4 et 5 viennent d'être mesurées pour la première fois.*
