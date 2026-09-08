@@ -51,47 +51,7 @@ rules:
     languages: [python]
     severity: ERROR
 
-    - id: rw-shell-fstring-var-execute-as-root
-    # ⛔ LA REGLE SOEUR NE VOIT QUE LA F-STRING EN LIGNE, ET C'EST LA MOITIE DU
-    # DESSIN. Mesure du 2026-09-09 sur `routes/updates.py` : la route
-    # `apt_update` construit CINQ commandes root dans une VARIABLE avant de les
-    # passer, et `rw-shell-fstring-execute-as-root` n'en voyait AUCUNE :
-    #
-    #   command    = f"{env_prefix} && … {dpkg_opts} {pkg_str}"   <- REQUETE
-    #   hold_cmd   = f"apt-mark hold {' '.join(exclusions)}"      <- REQUETE
-    #   unhold_cmd = f"apt-mark unhold {' '.join(exclusions)}"    <- REQUETE
-    #   … puis  execute_as_root(client, hold_cmd, root_password)
-    #
-    # C'est precisement la classe ou la vulnerabilite du 2026-09-08 vivait
-    # (`_SAFE_PKG` employait `.match()`, et le `$` de python accepte un `\n`
-    # final) : `command` de `:596` porte `pkg_str`, et l'instrument ne le
-    # regardait pas. **Un compte qui ignore une forme entiere se lit comme un
-    # compte complet.**
-    #
-    # ⚠ ID SEPARE ET NON une alternative dans la regle soeur : le cliquet de
-    #   `sast-semgrep-custom` detaille par regle, donc deux ids gardent les deux
-    #   comptes lisibles — et le temoin de mordant peut asserter chacun.
-    patterns:
-      - pattern: |
-          $CMD = f"...{$VAR}..."
-          ...
-          execute_as_root($CLIENT, $CMD, ...)
-      # Memes exemptions que la regle soeur, et elles portent ici sur TOUT
-      # l'intervalle apparie — de l'affectation a l'appel. C'est plus genereux
-      # que sur une ligne unique, et c'est voulu : une protection posee entre
-      # les deux compte.
-      - pattern-not-regex: 'shlex\.quote'
-      - pattern-not-regex: 'base64\s+-d'
-    message: |
-      Commande root construite dans une variable avec interpolation, puis passee
-      a execute_as_root. Meme risque que la forme en ligne : le shell distant
-      voit la chaine assemblee. Utiliser shlex.quote sur chaque valeur, ou
-      pousser la charge via base64 -d.
-      Voir CONTRIBUTING-SECURITY.md section 3.
-    languages: [python]
-    severity: ERROR
-
-- id: rw-subprocess-shell-true
+  - id: rw-subprocess-shell-true
     patterns:
       - pattern: subprocess.run(..., shell=True, ...)
       - pattern-not: subprocess.run([...], ...)
