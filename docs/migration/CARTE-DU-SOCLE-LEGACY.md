@@ -326,3 +326,69 @@ une précondition** :
     AVANT de supprimer `legacy/`, deplacer la source de `version.txt`
     et corriger `docker-compose.yml:123` et `docker-compose.prod.yml:124`
     — sinon le portage perd son numero de version au meme instant.
+
+
+---
+
+## 10. ⛔ LA SÉQUENCE D'EXTINCTION NE NOMME PLUS AUCUN FICHIER EXISTANT
+
+**Mesuré le 2026-09-08 16:40 CEST**, en vérifiant le garde que `eteindre-le-legacy.sh`
+oppose au montage de `version.txt`. *Je cherchais un garde ; j'ai trouvé que l'objet
+gardé n'a plus de séquence autour de lui.*
+
+### 10.1 Les 12 portées de `etapes()` contiennent ZÉRO fichier
+
+| étape | portée déclarée | état mesuré |
+|---|---|---|
+| 2 | `legacy/iptables` | **répertoire VIDE** (0 sur disque, 0 suivi) |
+| 3 | `legacy/adm/api/notifications.php` | **absent** — sous `_deprecated/` |
+| 4 | `legacy/api_proxy.php` | **absent** — sous `_deprecated/` |
+| 5 | `legacy/auth` · `legacy/lang` | **répertoires VIDES** |
+| 6 | `legacy/_sortie.php` | **absent** — sous `_deprecated/` |
+| 7 | `db.php` `head.php` `footer.php` `menu.php` | **absents** — sous `_deprecated/` |
+| 7 | `legacy/includes` · `legacy/adm/includes` | **répertoires VIDES** |
+
+**7 chemins absents, 5 répertoires vides, 0 fichier au total.**
+
+### 10.2 Et les 12 fichiers qui RESTENT ne sont nommés par aucune étape
+
+    legacy/.htaccess              legacy/img/favicon.png
+    legacy/logs/.htaccess         legacy/img/logos/*.svg|.png   (3)
+    legacy/api/openapi.yaml       legacy/js/htmx.min.js
+    legacy/assets/css/tailwind.css legacy/js/utils.js
+    legacy/composer.json / .lock
+
+**Recoupement portées × résidu : 0.** Plus `version.txt`, non suivi — les 13 du §9.
+
+> **La séquence est intégralement exécutée sur ce qu'elle nomme, et ne nomme rien de ce
+> qui subsiste.** Ce n'est pas une séquence périmée au sens habituel — ses verdicts
+> étaient justes. **Elle est ACHEVÉE sans le dire, et le reliquat est hors de son
+> vocabulaire.** *Ce qu'il reste à décider n'est plus un ORDRE, c'est une LISTE.*
+
+### 10.3 Le garde du contrôle 1 ne peut pas se déclencher
+
+    :102   if git ls-files "$p" | grep -qx 'legacy/version.txt'; then
+
+`git ls-files` ne liste que les fichiers **SUIVIS**. Or `legacy/version.txt` est
+**exclu par `.gitignore:162`** — délibérément, parce qu'il est *dérivé*. Le prédicat
+ne peut donc jamais correspondre, **pour aucune portée** :
+
+    git ls-files legacy | grep -qx 'legacy/version.txt'   -> muet
+    contre-epreuve : 227 fichiers suivis sous legacy/, dont 0 nomme version.txt
+
+Le corps de la boucle est mort ; la ligne 108 imprime `✅ aucune étape ne l'emporte`
+**inconditionnellement**.
+
+> **La décision qui protège le fichier — ne pas le suivre, parce qu'il est dérivé — est
+> exactement celle qui tue le garde écrit pour le protéger.** Le garde a été écrit
+> contre un fichier suivi ; `.gitignore` explique en six lignes pourquoi il ne l'est pas.
+
+**Et son `✅` est aujourd'hui VRAI** : aucune des 6 portées ne contient `version.txt`
+(vérifié par préfixe de chemin, indépendamment de git). *Un garde inerte dont le verdict
+est juste ne se signale pas* — c'est la forme du §9 de `CONTRADICTION-DOSSIER-48`, mais
+dans un **garde**, où elle est pire : le rôle d'un garde est de rester juste quand les
+portées CHANGENT.
+
+**Le prédicat juste ne passe pas par git** : `version.txt` existe sur disque et pas dans
+l'index. Un test de préfixe de chemin le voit ; `git ls-files` ne le verra jamais.
+*Ce n'est pas mon périmètre d'y toucher.*
