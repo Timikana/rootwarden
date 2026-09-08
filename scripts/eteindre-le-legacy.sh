@@ -20,6 +20,33 @@
 # AVANT, pas après. Une liste de commandes dans un document ne porte pas ses
 # refus ; celui-ci les porte.
 #
+# ══ ÉTAPE ⑦ — MESURÉE LE 2026-09-08 08:4x, ET ELLE N'EXISTAIT PAS AVANT ═══════
+#
+# Après l'étape ⑤, il ne reste que DOUZE `.php` servis, et DIX sont orphelins —
+# aucun fichier ne les inclut. Les deux exceptions ne le sont que par des
+# orphelins :
+#
+#     includes/feature_flags.php   inclus par menu.php        (orphelin)
+#     includes/lang.php            inclus par footer/head/menu (les trois orphelins)
+#
+# > **Le reste du legacy après ⑤ n'est pas un ensemble de fichiers isolés : c'est
+# > un GRAPHE FERMÉ d'orphelins.** *Rien hors de lui n'y entre, et il ne sort
+# > nulle part.*
+#
+# ⚠ Cette étape ne se mesure qu'APRÈS ⑤ — avant, `auth/verify.php` inclut
+# `head.php`, et `head.php` inclut `lang.php`. **L'ordre n'est pas un confort :
+# l'orphelinage est une CONSÉQUENCE de ⑤, pas un état préexistant.**
+#
+# ══ ET L'ErrorDocument DE L'ÉTAPE ⑥ ═══════════════════════════════════════════
+#
+#     legacy/.htaccess:43   ErrorDocument 404 /_sortie.php
+#     vhost du conteneur    aucun ErrorDocument actif (exemples commentes seulement)
+#
+# Archiver `_sortie.php` laisse donc une directive qui pointe vers rien : Apache
+# retombe sur sa page 404 par défaut. **Pas de panne, mais une directive morte.**
+# *La ligne 43 doit partir avec `_sortie.php`, et le `.htaccess` entier avec le
+# vhost — après ⑦ il ne garde plus rien.*
+#
 # ⛔ L'ÉTAPE ⓪ DU DOSSIER-48 — le verrou — N'EST PAS ICI. Elle appartient à
 #    l'exploitant, et ce script ne la simule pas.
 #
@@ -52,6 +79,7 @@ etapes() {
 4|legacy/api_proxy.php|le portage a sa passerelle : /api/gateway/{chemin?}
 5|legacy/auth legacy/lang|la chaine d'auth est portee ; les 74 catalogues meurent avec leurs 2 chargeurs
 6|legacy/_sortie.php|l'ErrorDocument du vhost — EN DERNIER, avec le vhost
+7|legacy/db.php legacy/head.php legacy/footer.php legacy/menu.php legacy/includes legacy/adm/includes|les 12 .php restants sont un GRAPHE D'ORPHELINS — mesure apres ⑤
 ETAPES
 }
 
@@ -102,7 +130,18 @@ dire ""
 dire "══ contrôle 3 — l'arbre ══"
 sales=$(git status --porcelain | wc -l)
 if [ "$sales" -eq 0 ]; then dire "  ✅ arbre propre"
-else dire "  ⛔ $sales fichier(s) en cours — une autre session écrit. REFUS"; git status --porcelain | sed 's/^/     /'; ko=$((ko+1)); fi
+else
+    # ⚠ « une AUTRE session écrit » était une attribution que ce contrôle ne peut
+    # pas mesurer : il voit des modifications, pas leur auteur — et trois fois sur
+    # trois c'était MA propre édition non commitée.
+    #
+    # > Un contrôle qui nomme une cause qu'il ne mesure pas fait chercher au mauvais
+    # > endroit. Il dit ce qu'il VOIT, et laisse conclure.
+    dire "  ⛔ $sales modification(s) non commitée(s). REFUS — un git mv par-dessus"
+    dire "     rendrait le déplacement indissociable de ce travail, quel qu'en soit l'auteur."
+    git status --porcelain | sed 's/^/     /'
+    ko=$((ko+1))
+fi
 
 # ══ CONTRÔLE 5 — LA SONDE DE VIE DU LEGACY VISE CE QU'ON ARCHIVE ════════════
 #
