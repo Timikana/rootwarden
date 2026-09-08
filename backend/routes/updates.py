@@ -52,6 +52,72 @@ from routes.helpers import require_api_key, require_role, require_permission, re
 from ssh_utils import ssh_session, validate_machine_id, execute_as_root, execute_as_root_stream
 
 
+# ══ E-463 : `time_` ET `date` ATTEIGNAIENT UNE LIGNE DE `cron.d` EXECUTEE EN ROOT ══
+#
+# Les deux routes « advanced » construisaient leur expression cron par
+# `time_.split(':')` et `date.split('-')`, sans AUCUNE validation de forme —
+# `if not all([date, time_])` ne verifie que la PRESENCE. Le resultat part en
+# base64 vers `/etc/cron.d/…`, puis `chmod 0644` et `systemctl restart cron`.
+#
+# ⚠ LE BASE64 N'EST PAS LE DEFAUT, IL EST LE TRANSPORTEUR. Cote shell il est
+# irreprochable — alphabet `[A-Za-z0-9+/=]`, aucun metacaractere — et c'est
+# pourquoi la regle semgrep de shell se tait A JUSTE TITRE. **Mais le puits n'est
+# pas le shell** : le flux decode est un fichier `cron.d`, ou un saut de ligne
+# suivi de n'importe quoi devient UNE LIGNE EXECUTEE EN ROOT.
+#
+# ══ POURQUOI DERIVER ET NON FILTRER ════════════════════════════════════════
+#
+# Une regex serait le mauvais remede, et pas seulement par gout : en Python, une
+# ancre `$` accepte un `\n` FINAL. Une garde de ce type ne tient alors que par le
+# `.strip()` voisin — et un `.strip()` voisin se retire par megarde.
+#
+# Ces deux fonctions RENDENT DES ENTIERS. La chaine recue n'est jamais reemise,
+# donc rien de ce qu'elle contient ne peut survivre. C'est ce qui rend inoffensive
+# la tolerance de `int()`, mesuree le 2026-09-08 :
+#
+#     int('14\n')  ->  14      le saut de ligne est avale... et jete avec la chaine
+#     int('\u0661\u0664')   ->  14      chiffres arabes-indiens acceptes, meme resultat
+#     int('14\n* * * * * root x')  ->  ValueError
+#
+# **Un filtre aurait du enumerer ce que `int()` tolere. Une derivation s'en
+# moque** — elle n'emploie que la valeur produite.
+#
+# `strptime` refuse la queue (`'2026-01-05\n'` -> ValueError), et on rend quand
+# meme `d.year/d.month/d.day` : la meme raison, deux fois.
+#
+# ⚠ Et la forme etait DEJA dans ce fichier : `schedule_update` (`:411`) ecrit dans
+# le meme puits et n'interpole que `int(data.get('interval_minutes'))`. Les deux
+# routes « advanced » sont un OUBLI, pas une architecture.
+
+
+def _cron_heure_minute(brut):
+    """(heure, minute) bornes depuis « HH:MM ». Leve `ValueError` sinon.
+
+    Rend des ENTIERS : la chaine recue n'atteint jamais le fichier `cron.d`.
+    """
+    parties = str(brut).split(':')
+    if len(parties) != 2:
+        raise ValueError('format horaire attendu : HH:MM')
+    heure = int(parties[0])
+    minute = int(parties[1])
+    if not 0 <= heure <= 23:
+        raise ValueError('heure hors bornes [0,23]')
+    if not 0 <= minute <= 59:
+        raise ValueError('minute hors bornes [0,59]')
+    return heure, minute
+
+
+def _cron_annee_mois_jour(brut):
+    """(annee, mois, jour) depuis « YYYY-MM-DD ». Leve `ValueError` sinon.
+
+    `strptime` valide ET decompose ; on rend ses composants ENTIERS, jamais la
+    chaine — donc une queue eventuelle ne pourrait pas voyager.
+    """
+    import datetime as _dt
+    d = _dt.datetime.strptime(str(brut), '%Y-%m-%d')
+    return d.year, d.month, d.day
+
+
 def _maintenance_block(machine_id):
     """Retourne une reponse (json, 423) si une fenetre de maintenance interdit
     l'action mutante maintenant, sinon None. Best-effort (fail-open en cas
@@ -632,6 +698,23 @@ def schedule_advanced_update():
         return jsonify({'success': False, 'message': str(e)}), 400
     if not all([date, time_]):
         return jsonify({'success': False, 'message': 'Paramètres manquants'}), 400
+
+    # E-463 : la FORME est validee ICI, avant toute connexion. Une valeur forgee
+    # est refusee sans qu'aucune machine ne soit jointe.
+    # E-463 bis : DEUX blocs, pour que le message dise LAQUELLE des deux valeurs
+    # est en cause. Un `try` commun disait « date ou heure », et l'appelant devait
+    # deviner — un refus qui n'instruit pas se fait contourner.
+    try:
+        _heure, _minute = _cron_heure_minute(time_)
+    except (ValueError, TypeError) as e:
+        return jsonify({'success': False,
+                        'message': f"Champ « time » invalide : {e}"}), 400
+    try:
+        _annee, _mois, _jour = _cron_annee_mois_jour(date)
+    except (ValueError, TypeError) as e:
+        return jsonify({'success': False,
+                        'message': f"Champ « date » invalide : {e}"}), 400
+
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor(dictionary=True)
@@ -650,13 +733,13 @@ def schedule_advanced_update():
         root_password = server_decrypt_password(row['root_password'], logger=logger)
         # Construction de l'heure du job cron selon le type de répétition
         if repeat == 'daily':
-            cron_time = f"{time_.split(':')[1]} {time_.split(':')[0]} * * *"
+            cron_time = f"{_minute} {_heure} * * *"
         elif repeat == 'weekly':
-            cron_time = f"{time_.split(':')[1]} {time_.split(':')[0]} * * 1"
+            cron_time = f"{_minute} {_heure} * * 1"
         elif repeat == 'monthly':
-            cron_time = f"{time_.split(':')[1]} {time_.split(':')[0]} 1 * *"
+            cron_time = f"{_minute} {_heure} 1 * *"
         else:
-            cron_time = f"{time_.split(':')[1]} {time_.split(':')[0]} {date.split('-')[2]} {date.split('-')[1]} *"
+            cron_time = f"{_minute} {_heure} {_jour} {_mois} *"
         import base64
         apt_command = "export LC_ALL=C.UTF-8 && export LANG=C.UTF-8 && apt-get update && apt-get upgrade --with-new-pkgs --only-upgrade -y >> /var/log/auto_update.log 2>&1"
         cron_job = f"{cron_time} root {apt_command}\n"
@@ -666,6 +749,46 @@ def schedule_advanced_update():
             execute_as_root(client, f"printf '%s' '{encoded}' | base64 -d > {cron_file}", root_password)
             execute_as_root(client, f"chmod 0644 {cron_file}", root_password)
             execute_as_root(client, "systemctl restart cron 2>/dev/null || service cron restart 2>/dev/null || true", root_password)
+        # ⚠ CETTE ROUTE N'ENREGISTRE RIEN, ET CE N'EST PAS UN OUBLI DE CODE.
+        #
+        # Mesure du 2026-09-08 : 0 ecriture SQL ici, 1 dans la route soeur
+        # (`UPDATE machines SET maj_secu_date`) — temoin que la sonde fonctionne.
+        #
+        # ⚠ CORRECTION D'UNE PREMIERE REDACTION DE CE COMMENTAIRE. J'avais ecrit
+        # « il n'existe aucune colonne pour la mise a jour complete ». C'est FAUX,
+        # et la verite est en deux morceaux qui ne sont pas le meme travail :
+        #
+        #   `mysql/init.sql:99-107`   TABLE `update_schedules` — machine_id,
+        #                             interval_minutes, last_run, next_run, FK
+        #                             vers `machines`. Elle modelise un INTERVALLE.
+        #   qui la touche             py=0 · php=0     ZERO code, nulle part
+        #                             (temoin : `machines` py=28/php=115,
+        #                              `ssh_audit_schedules` py=2 — la sonde voit)
+        #
+        # Donc : **une structure existe pour le modele par INTERVALLE et personne
+        # ne l'ecrit — c'est un VESTIGE. Aucune structure n'existe pour le modele
+        # par DATE/HEURE/RECURRENCE, celui de cette route — c'est une MIGRATION.**
+        #
+        # Consequence inchangee : pour cette route, « planifiee sur la machine et
+        # rien en base » est l'etat PERMANENT. L'ecran peut montrer une MAJ de
+        # securite planifiee, jamais une MAJ complete planifiee.
+        #
+        # ⚠ ET LE « VOISIN SAIN » PARTAGE CET ANGLE MORT. `schedule_update`
+        # (`:447-498`), cite partout comme le modele d'hygiene, installe un cron et
+        # **n'enregistre rien non plus** — alors que `update_schedules` a ete taillee
+        # exactement pour lui. Il est sain sur l'INJECTION (`int()` plus bornes
+        # `1 <= n <= 10080`) et aveugle sur la PERSISTANCE. *« Voisin sain » etait
+        # vrai sur l'axe mesure et faux comme jugement general : l'etiquette a
+        # voyage d'un axe a l'autre sans que personne le dise.*
+        #
+        # Trois routes installent un cron ; la base n'en garde qu'une trace,
+        # `maj_secu_date`, par une COLONNE et non par cette table.
+        #
+        # Rien n'est corrige ici, et la raison se demontre toute seule : **une
+        # table sans lecteur, nous en avons une sous les yeux.** C'est exactement
+        # ce qu'on obtient en decidant une moitie sans l'autre. Si
+        # `update_schedules` est un vestige a retirer ou une intention jamais
+        # cablee, `init.sql` ne le dit pas — a trancher par qui tient le schema.
         return jsonify({'success': True, 'message': 'Planification avancée enregistrée avec succès.'}), 200
     except Exception as e:
         logging.error(f"[schedule_advanced_update] Erreur: {e}")
@@ -700,6 +823,22 @@ def schedule_advanced_security_update():
     if not all([date, time_]):
         return jsonify({'success': False, 'message': 'Paramètres manquants (date ou time)'}), 400
 
+    # E-463 : la FORME est validee ICI, avant toute connexion (voir les
+    # deriveurs en tete de module).
+    # E-463 bis : DEUX blocs, pour que le message dise LAQUELLE des deux valeurs
+    # est en cause. Un `try` commun disait « date ou heure », et l'appelant devait
+    # deviner — un refus qui n'instruit pas se fait contourner.
+    try:
+        _heure, _minute = _cron_heure_minute(time_)
+    except (ValueError, TypeError) as e:
+        return jsonify({'success': False,
+                        'message': f"Champ « time » invalide : {e}"}), 400
+    try:
+        _annee, _mois, _jour = _cron_annee_mois_jour(date)
+    except (ValueError, TypeError) as e:
+        return jsonify({'success': False,
+                        'message': f"Champ « date » invalide : {e}"}), 400
+
     try:
         # Récupération des infos SSH depuis la BDD
         with get_db_connection() as conn:
@@ -718,23 +857,20 @@ def schedule_advanced_security_update():
         ssh_password = server_decrypt_password(row['password'], logger=logger)
         root_password = server_decrypt_password(row['root_password'], logger=logger)
 
-        # Construction de l'expression cron en décomposant la date et l'heure
-        parts_date = date.split('-')  # [YYYY, MM, DD]
-        parts_time = time_.split(':')  # [HH, MM]
-        minute = parts_time[1]
-        hour = parts_time[0]
-
+        # E-463 : l'expression cron ne porte QUE des entiers derives. Les
+        # `parts_date`/`parts_time` d'avant reemettaient la chaine recue.
         if repeat == 'daily':
-            cron_time = f"{minute} {hour} * * *"
+            cron_time = f"{_minute} {_heure} * * *"
         elif repeat == 'weekly':
             import datetime
-            dt = datetime.datetime.strptime(date, "%Y-%m-%d")
-            day_of_week = dt.weekday() + 1  # Monday=1, Sunday=7
-            cron_time = f"{minute} {hour} * * {day_of_week}"
+            # Le jour de semaine se derive des composants ENTIERS, pas de la
+            # chaine : `date` n'atteint plus l'expression par aucun chemin.
+            day_of_week = datetime.date(_annee, _mois, _jour).weekday() + 1  # lundi=1
+            cron_time = f"{_minute} {_heure} * * {day_of_week}"
         elif repeat == 'monthly':
-            cron_time = f"{minute} {hour} {parts_date[2]} * *"
+            cron_time = f"{_minute} {_heure} {_jour} * *"
         else:  # 'none'
-            cron_time = f"{minute} {hour} {parts_date[2]} {parts_date[1]} *"
+            cron_time = f"{_minute} {_heure} {_jour} {_mois} *"
 
         # Commande de mise à jour de sécurité
         security_command = (
@@ -744,6 +880,18 @@ def schedule_advanced_security_update():
             ">> /var/log/auto_security_update.log 2>&1"
         )
         # Appel curl pour notifier le backend après exécution
+        # ⚠ E-463 ter : LA SEULE VALEUR DE CETTE LIGNE CRON QUI NE SOIT NI UN ENTIER
+        # NI UN CONDENSE HEX. Les deux autres interpolees dans `callback_command` sont
+        # sures par CONSTRUCTION — `exec_token` est un `hexdigest()` (`[0-9a-f]{64}`)
+        # et `machine_id` sort de `validate_machine_id`, donc un `int`.
+        #
+        # `backend_url` vient de l'ENVIRONNEMENT, non cite, dans une ligne executee en
+        # root. **Ce n'est pas un defaut aujourd'hui** : l'environnement est pose au
+        # deploiement, pas par un appelant. *Mais si `API_URL` devenait un jour reglable
+        # depuis l'application ou la base, elle atterrirait ici SANS AUCUNE GARDE* — et
+        # le puits est le meme fichier `cron.d` que celui d'E-463.
+        # Signale plutot que corrige : borner une variable d'environnement au hasard
+        # casserait les deploiements qui emploient un nom d'hote legitime.
         backend_url = os.environ.get("API_URL", "https://srv-docker:5000")
         # Token HMAC machine-to-machine (cf. _security_exec_token) - le cron
         # n'a pas de session, on l'authentifie via ce token borne au machine_id.
@@ -763,10 +911,41 @@ def schedule_advanced_security_update():
             execute_as_root(client, f"chmod 0644 {cron_file}", root_password)
             execute_as_root(client, "systemctl restart cron 2>/dev/null || service cron restart 2>/dev/null || true", root_password)
 
-        # Enregistrement de la date de planification dans la BDD
-        scheduled_datetime = f"{date} {time_}:00"
+        # ══ E-463 ter : LA BASE AUSSI SE DERIVE ════════════════════════════
+        #
+        # Cette ligne reassemblait les CHAINES recues (`f"{date} {time_}:00"`)
+        # alors que les entiers derives existaient dix lignes plus haut. J'avais
+        # derive pour le cron et pas pour la base : cinq entrees sur six, POURTANT
+        # ACCEPTEES, produisaient une ligne cron juste et une valeur de base
+        # malformee — mesure du 2026-09-08 :
+        #
+        #     time_=' 14 : 30 '  -> cron '30 14 * * *'  base '2026-01-05  14 : 30 :00'
+        #     time_='1_4:3_0'    -> cron '30 14 * * *'  base '2026-01-05 1_4:3_0:00'
+        #     time_='14:\u0663\u0660'      -> cron '30 14 * * *'  base '2026-01-05 14:\u0663\u0660:00'
+        #     time_='14\n:30'    -> cron '30 14 * * *'  base '2026-01-05 14\n:30:00'
+        #     date='2026-1-5'    -> cron  '5 9 * * *'   base '2026-1-5 09:05:00'
+        #
+        # ⚠ ET L'ORDRE AGGRAVAIT : le `cron.d` est ecrit et cron redemarre AVANT
+        # cet `UPDATE`. En mode strict MySQL refuse ces valeurs — donc la
+        # planification est INSTALLEE sur la machine et la base n'en dit rien.
+        # L'ecran et la machine divergent en silence, c'est-a-dire le mode d'echec
+        # exact que ce correctif existait pour eviter.
+        #
+        # `%02d` sur des entiers : il n'y a plus de chaine recue nulle part.
+        scheduled_datetime = (
+            f"{_annee:04d}-{_mois:02d}-{_jour:02d} "
+            f"{_heure:02d}:{_minute:02d}:00"
+        )
         with get_db_connection() as conn:
             cursor = conn.cursor()
+            # ⚠ RESIDU D'ORDRE, prealable a E-463 et plus etroit depuis : le `cron.d`
+            # est ecrit et cron redemarre AVANT cette ligne. E-463 ter a ferme l'echec
+            # de FORMAT (la valeur derive, MySQL ne peut plus la refuser), mais un echec
+            # de la base pour une AUTRE raison — connexion perdue, verrou — laisse encore
+            # la planification installee sur la machine et rien d'enregistre.
+            # Inscrit et non corrige : intervertir demanderait de defaire le `cron.d` en
+            # cas d'echec SQL, donc un chemin de rattrapage qui joint la machine une
+            # seconde fois — un geste que ce lot n'a pas mandat d'ecrire.
             cursor.execute("UPDATE machines SET maj_secu_date = %s WHERE id = %s", (scheduled_datetime, machine_id))
             conn.commit()
 

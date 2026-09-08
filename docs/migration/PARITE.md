@@ -22496,3 +22496,137 @@ ils sont de classe **A** aujourd'hui (`_config_file_path`, `AGENT_REGISTRY`), do
 > continuerait de l'exempter**. C'est le meme defaut qu'elle a decrit pour `shlex.quote`, sur l'autre
 > branche, et il est deja actif — sur des valeurs qui se trouvent etre sures.
 
+---
+
+## E-497 — REFERENCES DE LA SESSION 7 CLOTUREES, ET MON PROPRE PIEGE DE FORME POUR LA QUATRIEME FOIS
+
+**Clos le 2026-09-08.** Les deux references posees pour la session 7 sont non seulement **posees** mais
+**inscrites dans la liste jouee** — *une reference sans inscription est une couverture apparente.*
+
+    [go-adm-audit]            34 -> 22    l.360, posee le 2026-08-26 (e0174e65)
+    [go-page-cle-plateforme]  29 -> 30    l.361, posee le 2026-09-03 (ea476f17)
+
+**Mesure par APPARTENANCE aux quatre tableaux, pas par motif** :
+
+    SUITES_LARAVEL  85  =  REF_LARAVEL  85          reference sans inscription : AUCUNE
+    SUITES_LEGACY   82  =  REF_LEGACY   82          suite jouee sans reference : AUCUNE
+
+    go-adm-audit            SL oui / RL 22    SG oui / RG 32
+    go-page-cle-plateforme  SL oui / RL 30    SG oui / RG 15
+
+**Eprouve dans les deux sens et avec trois temoins** : `go-socle-navigation` present (positif),
+`go-bashrc-b4` absent (exclusion deliberee, `l.1265`), `go-adm-import-csv` dans aucune des deux (`l.1273`).
+
+### ⚠ ET MA PREMIERE SONDE ETAIT FAUSSE — QUATRIEME OCCURRENCE DU MEME PIEGE
+
+    grep -nE '^[[:space:]]*"?<suite>"?[[:space:]]*(\\|\)|$)' scripts/rejouer-lot.sh
+
+Ce motif suppose **une suite par ligne**. Les tableaux en portent **jusqu'a huit**. Resultat :
+
+    go-adm-audit            ->  « (pas sur cette forme) »   alors qu'elle est l.1309
+    go-page-cle-plateforme  ->  « l.1329 »                  ligne de SUITES_LEGACY, pas de la liste Laravel
+
+**Elle s'est trompee dans les DEUX sens a la fois** : un faux negatif *et* une fausse localisation. *Et le
+faux negatif etait du cote qui ALARME, la fausse localisation du cote qui RASSURE* — j'aurais pu conclure
+« la reference est une couverture apparente » ou « elle est bien dans la liste », les deux a tort.
+
+> **C'est la meme cause qu'E-452** (`awk` ancre en debut de ligne sur des lignes a quatre cles), que
+> l'espace unique avant `=>` (E-420), et que la regle d'allocation aveugle aux titres a emoji.
+> **Quatrieme fois. Un motif ecrit sur ses propres fichiers ne mesure pas un depot : il mesure un auteur** —
+> et ici il mesurait *l'auteur que je croyais etre*, celui qui met une suite par ligne.
+
+**La parade est structurelle, pas plus de soin** : *extraire le tableau, le decouper, tester
+l'APPARTENANCE.* Un ensemble ne se sonde pas par motif.
+
+---
+
+## E-498 — LES « 2 CAPACITES PERDUES » DE `superv` : UNE PORTEE, UNE BLOQUEE SUR §7 — ET « IL N'Y EN A AUCUNE » FERMAIT LA SECONDE
+
+**Mesure du 2026-09-08**, sur demande de la session 8 (item 11 de la file des portables, *« rouvrir les 2
+capacites PERDUES »*). Lecture seule : aucun geste de supervision, aucune machine jointe.
+
+**Verdict : aucun code a ecrire, et ce n'est pas parce qu'il n'y a rien.**
+
+### B — « rattacher un serveur a un profil » : **PORTEE, VIVANTE**
+
+    site d'appel   laravel/public/js/supervision.js:151-166
+                   url_profil, {mid} substitue, POST {profile_id}
+    l'URL          SupervisionController.php:760
+                   url('/api/gateway/supervision/machines/{mid}/profile')
+    la COUCHE      la PASSERELLE  (web.php:1222, groupe `web` : session ET jeton CSRF)
+    le backend     supervision.py:2539
+                   @require_api_key + @require_role(2)
+                   + @require_permission('can_manage_supervision') + @require_machine_access
+
+### A — « modifier le jeton d'API telegraf » : **NON PORTEE, DELIBEREMENT, ET LE BLOCAGE EST VIVANT**
+
+L'arbitrage est **rendu** (`DECISIONS-DSI.md:4522`, le 2026-09-03) : *« porter cet ecran ajouterait une
+porte d'entree pour stocker un secret en clair — le legacy en avait une, le portage n'en a pas ; en porter
+une avant le correctif de chiffrement serait ajouter le defaut plutot que le migrer ».*
+
+    ce qui l'ecrit EN CLAIR   supervision.py:2351   telegraf_output_token = COALESCE(...)
+    le dossier                DOSSIER-13-JETON-TELEGRAF-EN-CLAIR.md
+    le correctif              docs/migration/patchs-en-attente/03-telegraf-jeton-en-clair.patch
+    son etat                  EN ATTENTE DE SIGNATURE — objet vivant de §7
+
+**La capacite devient portable le jour ou le patch 03 est applique. Pas avant, et ce n'est pas mon geste.**
+
+### ⚠⚠ CE QUI VALAIT LA MESURE : « IL N'Y EN A AUCUNE » SE TROMPAIT DU COTE QUI FERME
+
+`PLAN-DE-MIGRATION.md:192` portait **« AUDITE INEXISTANT — il n'y en a aucune »**, sur la foi de
+`AUDIT-SUPERVISION-CAPACITES-DITES-PERDUES.md` (2026-09-05). *La conclusion est juste pour B et fausse pour
+A* — A n'est pas inexistante, elle est **PENDANTE**.
+
+> **Et c'est le sens couteux de l'erreur.** *Un item « il n'y en a aucune » ne se rouvre jamais.* Le
+> registre porte deja la formule exacte : *« un document qui dit „fait“ sur du non-fait ne se rouvre
+> jamais »* — ecrite **dans cet audit meme**, a propos de l'erreur inverse. **L'audit a nomme le sens
+> dangereux et a produit celui-la.**
+
+**Et sa preuve pour B etait faible** : il citait les cles i18n de `superv.php` et le CHANGELOG v1.37.15, en
+concluant *« deux sources independantes, et elles concordent »*. **Ce sont deux DECLARATIONS, pas
+l'artefact** — un libelle n'est pas un geste (E-318), et *ce qui corrobore est un PREDICAT different, pas
+un EMBALLAGE different*. B est bien portee ; **la preuve est le site d'appel**, que l'audit n'avait pas
+releve et dont il declarait honnetement l'absence : *« un lien pose par le JS plutot que par le gabarit —
+non verifie, le banc n'est pas a moi ».* **Ce trou-la etait a moi, et il est comble.**
+
+### ⛔ ET JE REFUSE UNE CONSIGNE DE LA SESSION 8, AVEC SON MECANISME
+
+Elle demande *« son inscription dans `laravel/tests/Support/TableDesGardes.php` dans le meme commit »*.
+**Pour une capacite portee par la PASSERELLE, cette inscription est fausse par construction :**
+
+    la table gele les routes du PORTAGE   InventaireDesGardesTest:244   Routeur::getRoutes()
+    or POST supervision/machines/{mid}/profile n'en est pas une : c'est une route BACKEND
+    atteinte par la route generique       web.php:1222   /api/gateway/{chemin?}
+
+**Consequence mesuree** : `le_releve_ne_nomme_aucune_route_disparue` (l.51-69) parcourt la table et signale
+toute cle absente de `routesDuPortage()`. **L'inscrire ferait rougir ce test** — et affirmerait qu'un
+intergiciel Laravel porte la garde, alors qu'elle est sur le backend.
+
+> **L'en-tete de la table dit deja exactement cela** : *« y forcer une ligne dirait qu'un intergiciel la
+> porte — une chose fausse, dans le fichier qui existe pour dire le vrai ».* **Sa consigne evitait une
+> vraie panne** (une route declaree a 04:49 et jamais inscrite, qu'elle a reparee ce matin) ; **elle ne
+> transporte pas au chemin de la passerelle.** *Le remede juste pour un cas est un defaut pour l'autre.*
+
+**La ligne `['GET', 'api/gateway/{chemin?}', []]` (l.63) est deja la**, et son tableau vide **est une
+information** : la passerelle n'ajoute ni role ni permission cote Laravel. **Rien a inscrire de plus.**
+
+#### Le CRITERE, sous sa forme durable — retenu de la session 8 le 2026-09-08
+
+Elle a **accepte le refus et corrige la consigne**, en la reformulant mieux que je ne l'avais fait :
+
+> **La route est-elle dans `Routeur::getRoutes()` ?** *Si oui, inscription obligatoire dans le meme
+> commit. Si elle passe par la passerelle, ne pas inscrire — et dire pourquoi.*
+
+⚠ **Et elle avait donne la consigne fausse a TROIS sessions, en ne la corrigeant qu'aupres de moi.** *Une
+correction n'a pas de destinataire naturel* — deja inscrit dans la memoire du chantier, et c'est la
+deuxieme fois aujourd'hui : les deux autres sessions tiennent encore la version qui fait rougir
+`le_releve_ne_nomme_aucune_route_disparue`. **Signale, parce que le cout de ne pas le faire tombe sur le
+banc d'un autre.**
+
+### Ce que je n'ai pas mesure, et je le dis
+
+Je n'ai pas ouvert la page au navigateur, et **je n'ai exerce aucun des deux gestes** : le POST
+d'affectation ecrit `machine_supervision_profile` pour une machine du parc, et le seul banc ou il serait
+licite est la machine **3** (OpenCVE-Test-OnPrem) sur le mot de l'exploitant. *La chaine est etablie par
+lecture — site d'appel, URL, couche, decorateurs — pas par un aller-retour reseau.*
+

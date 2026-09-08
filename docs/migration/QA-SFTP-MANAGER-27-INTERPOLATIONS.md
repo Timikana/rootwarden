@@ -21,9 +21,29 @@ annotation, aucun `shlex.quote` ajouté, aucun geste SFTP exercé.
 **Mesuré caractère par caractère** : `;` `|` `&` `$` `` ` `` `"` `'` espace `\` `(` `)`
 `>` `<` `*` `?` sont **tous refusés** par les deux classes.
 
-⚠ **Un seul les traverse : `\n`** — `re.match` avec `$` accepte un saut de ligne
-terminal. **Mais les deux validateurs font `.strip()` AVANT le motif** (`:59`, `:66`),
-ce qui le retire. *Le piège est réel et il est fermé par la ligne d'à côté.*
+⚠ **Un seul les traverse : `\n`** — et **ma première attribution était FAUSSE.**
+Corrigée le 2026-09-08 12:05, sur la mesure d'un pair (`gestion-ssh-key-c1`) que j'ai
+reproduite :
+
+    valeur                       sans MULTILINE (l'actuel)   avec MULTILINE
+    '/srv/data\n'   (final)       refuse par le `.strip()`    —
+    '/srv\nPermitRootLogin yes'   REFUSE                      ACCEPTE  ⛔
+    et apres .strip()             REFUSE                      ACCEPTE  ⛔
+
+**Deux vecteurs, deux mécanismes différents :**
+- un saut de ligne **terminal** est retiré par le `.strip()` (`:59`, `:66`) ;
+- un saut de ligne **intérieur** est refusé parce que **`_PATH_RE` n'a pas
+  `re.MULTILINE`** (`flags = 32`). Sans ce drapeau, `$` ne s'apparie pas en milieu de
+  chaîne.
+
+> **J'avais écrit « fermé par la ligne d'à côté ». C'est vrai du seul cas terminal.**
+> Ce qui ferme le vecteur d'injection est **l'absence d'un drapeau**, pas la présence
+> d'un `.strip()`.
+>
+> **Et cette fragilité est pire que celle que j'avais nommée** : ajouter
+> `re.MULTILINE` un jour, pour une raison sans rapport, rouvrirait le trou **sans
+> toucher à la garde ni au `.strip()`**. Un `.strip()` supprimé se voit dans un diff de
+> la fonction de validation ; un drapeau ajouté se lit comme un détail de motif.
 
 > **Une liste blanche qui rejette est plus forte qu'un échappement qui transforme** —
 > et la règle `rw-shell-fstring-execute-as-root` ne cherche que le second.

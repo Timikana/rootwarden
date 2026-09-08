@@ -189,7 +189,7 @@ sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 | 6 | `groups` scan de derive de masse | **DEJA PORTE** | `/drift/scan` |
 | 7 | `fail2ban` desactiver une jail | **DEJA PORTE** | `/fail2ban/jail` |
 | 8 | `fail2ban` geolocaliser une adresse | **DEJA PORTE** | `/fail2ban/geoip` |
-| 9 | `superv` les 2 capacites « PERDUES » | **AUDITE INEXISTANT** | *« il n'y en a aucune »* — audit dedie |
+| 9 | `superv` les 2 capacites « PERDUES » | **UNE PORTEE, UNE BLOQUEE** | voir **E-498** — ⚠ *« il n'y en a aucune » etait FAUX du cote qui FERME* |
 | 10 | `serveurs` test de connexion | ⛔ **PAS UN PORTAGE** | **aucun endpoint backend** |
 | 11 | `serveurs` import CSV | ⛔ **PAS UN PORTAGE** | **aucun endpoint backend** |
 
