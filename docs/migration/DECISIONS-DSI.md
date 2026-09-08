@@ -16464,3 +16464,67 @@ saboté (`apresValeur = true`) → le témoin **échoue** et la population retom
 
 **Dix contrôles maintenant, tous verts**, dont trois qui couvrent le lexeur et
 un qui couvre la lecture elle-même.
+
+---
+
+## E-513
+
+**Le défaut (b) était un mirage : 97 % de faux positifs, et je l'avais publié
+trois fois.**
+
+```
+suites classees (b) par le predicat TEXTUEL            41
+  dont une fermeture PRECEDE immediatement l'exit      40   <- code CORRECT
+  dont le navigateur est encore ouvert a la sortie      1
+```
+
+**L'idiome du répertoire est `await navigateur.close(); process.exit(...)` sur
+deux lignes consécutives** — `close L40 / exit L41`, `close L121 / exit L122`,
+`close L292 / exit L293`… **Quarante suites le respectent, et mon prédicat les
+accusait toutes.**
+
+> **La position TEXTUELLE d'un `exit` n'est pas son ordre d'exécution, et une
+> fermeture qui PRÉCÈDE l'exit rend l'exit inoffensif.** *Mon critère retenait
+> tout `process.exit()` situé avant la DERNIÈRE fermeture du fichier — donc il
+> comptait comme fautif l'idiome le plus banal du répertoire.*
+
+⚠ **Et c'est la troisième fois d'affilée que je me trompe du côté qui alarme sur
+ce même compte.** Un défaut mesuré trois fois peut n'avoir jamais existé.
+
+### La seule vraie occurrence, corrigée
+
+`go-fail2ban-f7.mjs` : lancement `:223`, `try` `:384`, **`process.exit(0)` à
+`:389`** (le chemin « `CIBLE !== 'laravel'` — rien à mesurer »), `finally`
+`:726`, fermeture `:758`. **L'exit saute le `finally`, donc le navigateur
+n'était jamais fermé sur ce chemin.** Corrigé à l'idiome des 40 autres.
+
+*Conséquence réelle : nulle — le gestionnaire de sortie de puppeteer fauche le
+Chromium. C'est la forme qui était fausse, pas le résultat. Et le dire évite de
+vendre un correctif pour ce qu'il n'est pas.*
+
+**`(b)` vaut désormais 0**, et le cliquet garde contre sa réintroduction.
+
+### Deux défauts dans mes propres instruments, trouvés en réutilisant l'un
+
+**Mon module d'invariant s'exécutait à l'import.** Constaté en voulant réutiliser
+son lexeur depuis une autre sonde : *la sortie du cliquet s'est mêlée à la
+mienne.* **Un module qui expose des fonctions ET agit au chargement ne peut pas
+être importé** — et il posait `process.exitCode`, donc il aurait fait échouer le
+programme appelant sur un contrôle qui ne le concerne pas. Gardé par
+`import.meta.url === pathToFileURL(process.argv[1]).href`.
+
+### Le pas de CI qui rendait rouge un job vert
+
+`.github/workflows/ci.yml:159` — `Upload test results` a rendu **rouge deux
+fois** un job dont les **686 tests étaient verts** (`FinalizeArtifact: (403)
+Forbidden`). Un rejeu du même SHA, sans aucun changement, est passé. **Posé
+`continue-on-error: true` au niveau du PAS** (le fichier avertit lui-même, à
+`:455`, qu'une exemption au niveau du JOB rendrait muet tout pas ajouté ensuite).
+
+*Le dégât n'était pas l'artefact perdu : c'est qu'un job rouge sur une suite
+verte pousse à fusionner sur rouge — ce que j'ai fait une fois — et fait chercher
+une panne dans des tests qui passent.*
+
+⚠ **Autorisation** : j'avais demandé le mot pour ce pas, hors de mon périmètre.
+La réponse a été « carte blanche tu es DSI », que je lis comme le oui pour cette
+ligne précise. *Je le consigne plutôt que de le supposer.*

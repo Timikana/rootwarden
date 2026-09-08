@@ -11,26 +11,35 @@
  * DEUX CAUSES DE FUITE, INDEPENDANTES, et la seconde defait la parade de la
  * premiere :
  *
- *   (a) le `close()` n'est pas gouverne par un `finally`         62 suites
- *       -> 12 sans aucune fermeture de navigateur, et 50 qui en ont une
+ *   (a) le `close()` n'est pas gouverne par un `finally`         67 suites
+ *       -> 12 sans aucune fermeture de navigateur, et 55 qui en ont une
  *          DEHORS d'un `finally` existant. Un `finally` qui existe ne gouverne
  *          pas ce qui est hors de lui : mesurer sa PRESENCE dedouane a tort.
  *
- *   (b) un `process.exit()` est interpose entre le lancement et la fermeture
- *       -> 37 suites. `process.exit()` termine IMMEDIATEMENT et n'execute
- *          AUCUN bloc `finally`.
+ *   (b) un `process.exit()` interpose entre lancement et fermeture   1 suite
+ *       -> et une seule, corrigee le 2026-09-08 (`go-fail2ban-f7.mjs:389`,
+ *          un `exit` de « rien a mesurer » a l'interieur du `try` dont le
+ *          `finally` portait la seule fermeture). **(b) vaut 0 aujourd'hui.**
  *
- *   ⚠ CES DEUX CHIFFRES ONT ETE FAUX DEUX FOIS, ET DANS LE MEME SENS.
- *   Premiers relevés : 67 et 41. Aucun des deux ne DEPOUILLAIT LES
- *   COMMENTAIRES — et dans ces suites, **79 des 167 occurrences de `finally`
- *   vivent dans de la prose** (47 %), ainsi que 41 des 182 `process.exit`. La
- *   population elle-meme etait fausse : 114 suites annoncees, 110 reelles, les
- *   quatre autres ne portant `puppeteer.launch` qu'en commentaire.
- *   *Un motif trouve dans un commentaire compte comme du code jusqu'a ce qu'on
- *   depouille, et la prose de ce depot parle beaucoup de ses propres defauts.*
- *   L'instrument qui rend 62 / 37 est `lib-navigateur.invariant.mjs` : il
- *   depouille, apparie les accolades, et porte trois temoins forges — dont un
- *   fichier dont le `finally` n'existe QUE dans un commentaire.
+ *   ⛔ CES DEUX CHIFFRES ONT ETE FAUX QUATRE FOIS, ET (b) ETAIT UN MIRAGE.
+ *
+ *     67 / 41   au depart, sans depouiller les commentaires
+ *     62 / 37   commentaires depouilles, mais population trop etroite
+ *     70 / 37   population elargie a `launchBrowser(`, lexeur encore casse
+ *     67 / 41   lexeur correct — et les valeurs JUSTES coincidaient avec les
+ *               premieres : la prose GONFLAIT, une chaine fantome DEGONFLAIT
+ *      67 / 1   (b) affute : 40 des 41 fermaient sur la ligne PRECEDANT leur
+ *               `exit`, ce qui est l'idiome CORRECT du repertoire
+ *
+ *   *Retomber sur un chiffre anterieur n'est pas une preuve de justesse. Et un
+ *   defaut mesure trois fois de suite peut n'avoir jamais existe : (b) etait a
+ *   97 % de faux positifs, parce que la position TEXTUELLE d'un `exit` n'est
+ *   pas son ordre d'execution.*
+ *
+ *   L'instrument qui rend 129 / 67 / 0 est `lib-navigateur.invariant.mjs` :
+ *   il depouille commentaires, chaines ET regex, apparie les accolades, et
+ *   porte dix controles — dont un qui verifie qu'aucun fichier ne PERD son
+ *   jeton de lancement au depouillement.
  *
  * CE QUE L'ENVELOPPEUR REND INEXPRIMABLE :
  *   - l'appelant ne detient jamais le navigateur, donc il ne peut pas oublier

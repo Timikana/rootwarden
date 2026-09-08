@@ -29,14 +29,24 @@
 
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, basename, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 /* Etat mesure le 2026-09-08 par cet instrument. A DESCENDRE en meme temps que
  * les adoptions, jamais a monter. */
-export const REFERENCE = { population: 129, defautA: 67, defautB: 41 };
+export const REFERENCE = { population: 129, defautA: 67, defautB: 0 };
 
 /*
- * ⛔ CETTE REFERENCE A ETE FAUSSE UNE FOIS, ET DANS LE SENS QUI DEDOUANE.
+ * ⛔ CETTE REFERENCE A ETE FAUSSE TROIS FOIS.
+ *
+ *   110 / 62 / 37   population trop etroite (launchBrowser ignore) ET prose
+ *                   comptee comme du code
+ *   125 / 70 / 37   population elargie, mais une chaine fantome avalait encore
+ *                   quatre suites
+ *   129 / 67 / 41   lexeur correct — et (b) etait a 97 % de FAUX POSITIFS
+ *   129 / 67 /  0   predicat (b) affute : 40 des 41 fermaient sur la ligne
+ *                   PRECEDANT leur `exit`, et la 41e a ete corrigee
+ *
+ * ⛔ ET LA PREMIERE ERREUR ETAIT DANS LE SENS QUI DEDOUANE.
  * Premiere version : { population: 110, defautA: 62, defautB: 37 } — calibree
  * sur un predicat qui ne retenait que `puppeteer.launch` et manquait donc les
  * 15 suites qui lancent par `launchBrowser()`. **Une regression chez elles
@@ -186,8 +196,22 @@ export function classe(src) {
     const exits = [...d.matchAll(/process\.exit\s*\(/g)].map((m) => m.index);
     const gouvernees = nav.filter((p) => spans.some(([a, z]) => a < p && p < z));
     const dernier = nav.length ? Math.max(...nav) : null;
+    /*
+     * ⛔ CE PREDICAT ETAIT A 97 % DE FAUX POSITIFS, ET PUBLIE TROIS FOIS.
+     * Sa premiere forme retenait tout `process.exit()` situe entre le
+     * lancement et la DERNIERE fermeture — un critere purement TEXTUEL. Or
+     * l'idiome du repertoire est `await navigateur.close(); process.exit(...)`
+     * sur deux lignes consecutives : mesure, 40 des 41 suites signalees
+     * fermaient sur la ligne PRECEDANT immediatement leur `exit`.
+     *
+     * *La position textuelle n'est pas l'ordre d'execution, et une fermeture
+     * qui PRECEDE l'exit rend l'exit inoffensif.* Le predicat juste exige donc
+     * qu'AUCUNE fermeture de navigateur ne precede l'exit — c'est-a-dire que
+     * le navigateur soit encore ouvert quand le processus se termine.
+     */
     const interposes = dernier === null ? []
-        : exits.filter((e) => e > lan && e < dernier);
+        : exits.filter((e) => e > lan && e < dernier
+            && !nav.some((c) => c > lan && c < e));
     return {
         fermetures: nav.length,
         blocsFinally: spans.length,
@@ -244,8 +268,22 @@ function fichiers(racine) {
     return trouves;
 }
 
+/*
+ * ⚠ CE MODULE S'EXECUTAIT A L'IMPORT. Ses fonctions (`depouille`, `classe`,
+ * `recense`) sont exportees pour etre reutilisables — mais tout le controle
+ * vivait au niveau superieur, donc `import { depouille } from ...` lancait le
+ * cliquet entier. Constate en voulant reutiliser le lexeur depuis une autre
+ * sonde : la sortie du cliquet s'est melee a la mienne.
+ *
+ * **Un module qui expose des fonctions ET agit au chargement ne peut pas etre
+ * importe.** La partie executable est desormais gardee par une comparaison
+ * entre `import.meta.url` et le fichier reellement lance.
+ */
+const LANCE_DIRECTEMENT = process.argv[1]
+    && import.meta.url === pathToFileURL(process.argv[1]).href;
+
 let echecs = 0;
-const note = (s) => process.stdout.write(`${s}\n`);
+const note = (s) => { if (LANCE_DIRECTEMENT) process.stdout.write(`${s}\n`); };
 function verifie(quoi, ok, detail) {
     if (ok) { note(`PASS  ${quoi}`); return; }
     echecs += 1;
@@ -389,4 +427,11 @@ if (a.length < REFERENCE.defautA || b.length < REFERENCE.defautB
 }
 
 note(`\n${echecs === 0 ? '=== TOUT OK ===' : `=== ${echecs} ECHEC(S) ===`}`);
-process.exitCode = echecs === 0 ? 0 : 1;
+/*
+ * Le code de sortie n'est pose QUE si ce fichier est lance directement : un
+ * import qui rendrait `exitCode = 1` ferait echouer le programme APPELANT sur
+ * un controle qui ne le concerne pas. Le travail lui-meme tourne encore a
+ * l'import — inutile, mais inoffensif, et je prefere une garde d'une ligne a
+ * une restructuration de la portee des `const`.
+ */
+if (LANCE_DIRECTEMENT) process.exitCode = echecs === 0 ? 0 : 1;
