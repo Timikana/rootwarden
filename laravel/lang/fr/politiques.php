@@ -112,7 +112,6 @@ return [
     'jamais'            => 'jamais deployee',
     'rollback_titre' => 'Restaurer une version anterieure',
     'rollback_texte' => 'Restaure le sudoers exact d\'avant ce deploiement. Le contenu est celui qui a ete sauvegarde, pas une reconstitution. Une re-authentification est exigee.',
-    'rollback_lien' => 'Annuler ce deploiement dans l\'ancien portail',
     'resultat'          => 'Resultat',
 
     /* L'annulation d'un deploiement, rouverte le 2026-09-07. */
