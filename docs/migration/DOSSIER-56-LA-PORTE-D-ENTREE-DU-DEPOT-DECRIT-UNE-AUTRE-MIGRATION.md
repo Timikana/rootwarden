@@ -114,3 +114,87 @@ qui fasse mesurer faux.*
 
 Les trois autres sont de la mise à jour : la version dans quatre documents, la
 mesure du 2026-08-23, et la section de dépannage qui part avec `patch 07`.
+
+
+---
+
+# 6. ⛔ LE RUNBOOK EST PIRE QUE LE README : il fait TAPER des commandes mortes
+
+**Mesuré le 2026-09-08 15:55.** `OPERATIONS.md` — le document qui te fait
+**agir** — annonce `v1.37.16` et porte **le même tableau de ports inversé** :
+
+```
+:14  | rootwarden_laravel | 8444 | le portage, la cible |
+:15  | rootwarden_php     | 8443 | l'ancien portail, deprecie partie par partie |
+```
+
+## Trois commandes, trois 404
+
+```
+:183  curl -k -b cookies.txt https://localhost:8443/adm/api/audit_verify.php
+:200  curl … -X POST https://localhost:8443/api_proxy.php/revoke_service_account
+:209  curl … -X POST https://localhost:8443/api_proxy.php/regenerate_platform_key
+:224  « si tu appelles /adm/api/delete_user.php sans step-up, tu reçois : »
+```
+
+**Les quatre points d'entrée sont ARCHIVÉS**, mesuré fichier par fichier :
+
+```
+adm/api/audit_verify.php    vivant 0  ·  archive 1
+api_proxy.php               vivant 0  ·  archive 1
+adm/api/delete_user.php     vivant 0  ·  archive 1
+
+au reseau, sur :8443 (le PORTAGE) :
+  /adm/api/audit_verify.php               -> 404
+  /api_proxy.php/revoke_service_account   -> 404
+```
+
+*⛔ Les deux POST n'ont pas été envoyés : `revoke` et `regenerate` sont
+destructeurs. Seuls les GET ont été mesurés.*
+
+## ⚠ ET LES TROIS CAPACITÉS FONCTIONNENT
+
+C'est ce qui rend ce défaut plus grave que celui du README :
+
+```
+① verifier un sceau d'audit
+     /journal-audit                  web.php:1200
+     journal-audit/verifier          TableDesGardes:112, role:3 + can_admin_portal
+② revoquer un compte de service
+     backend/routes/ssh.py:988       @bp.route('/revoke_service_account', POST)
+     page du portage : /comptes-distants        web.php:1171
+③ regenerer la cle de plateforme
+     backend/routes/ssh.py:14 · ssh_key_manager.py:192
+     page du portage : /cle-plateforme          web.php:1018
+```
+
+> **Le runbook fait taper trois commandes qui rendent 404, pour trois capacités
+> qui MARCHENT — atteintes par un autre chemin.** C'est l'inverse d'une
+> documentation qui sous-promet : **celle-ci fait paraître cassé un système qui
+> fonctionne.** Un exploitant qui la suit conclut que la migration a perdu la
+> vérification de sceau, la révocation de compte de service et la régénération de
+> clé de plateforme.
+
+## Ce que je n'écris PAS, et pourquoi
+
+**Je ne fabrique pas les commandes de remplacement.** Les deux gestes d'API
+passent désormais par la passerelle, dont l'accès porte session **et** jeton CSRF
+— donc un code TOTP. Écrire un `curl` sans avoir mesuré cette chaîne
+reproduirait exactement le défaut que ce dossier signale : *une commande fausse
+dans un runbook se tape.*
+
+**Ce qui est vérifié et suffit à corriger** : les trois **pages** du portage
+(`/journal-audit`, `/comptes-distants`, `/cle-plateforme`) et le fait que les
+deux points d'API vivent côté backend, atteints par la passerelle.
+
+## Priorité, revue
+
+Le geste le plus court de ce dossier n'est plus `README.md:16-17` seul :
+
+```
+1. OPERATIONS.md:183 :200 :209 :224   -> quatre commandes/renvois MORTS
+                                          sur des capacites VIVANTES
+2. OPERATIONS.md:14-15 + README.md:16-17  -> le meme tableau inverse, DEUX fois
+3. la version annoncee dans quatre documents
+4. README.md:19, la mesure du 2026-08-23
+```
