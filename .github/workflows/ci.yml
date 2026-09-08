@@ -583,6 +583,10 @@ jobs:
           // « token » ; `pattern-not` n'exclut que la comparaison a $_SESSION.
           $token_recu = 'x';
           if ($token_recu === $attendu) { }
+          // et la forme NEGATIVE, celle que la regle ne voyait pas avant le
+          // 2026-09-08 : « si ca NE correspond PAS » est la formulation la plus
+          // naturelle d'une verification, et c'etait la moitie du domaine.
+          if ($token_recu !== $attendu) { }
           // rw-php-weak-random
           $n = mt_rand(1, 10);
           // rw-php-debug-leak
@@ -632,6 +636,12 @@ jobs:
           echo htmlspecialchars($_GET['nom'], ENT_QUOTES, 'UTF-8');
           // rw-php-equals-on-hash : forme GARDEE — comparaison a temps constant
           if (hash_equals($token_attendu, $token_recu)) { }
+          // et un TEST DE NULLITE, qui n'est PAS une comparaison de hachage :
+          // la regle appariait le NOM de la variable, pas la nature de
+          // l'operande droite. Aucune fuite de temps a comparer a `null` — il
+          // n'y a pas de valeur du tout de ce cote.
+          if ($token_stocke === null) { }
+          if ($token_stocke !== null) { }
           // rw-php-weak-random : forme GARDEE
           $octets = random_bytes(32);
           // rw-aes-cbc-encrypt : forme GARDEE — AEAD, pas CBC

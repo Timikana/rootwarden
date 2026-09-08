@@ -108,7 +108,7 @@ rules:
       - pattern-not: $X == null
       - pattern-not: $X != null
     message: |
-      Comparaison de token/hash/csrf avec == ou === = timing attack potentielle.
+      Comparaison de token/hash/csrf avec == === != !== = timing attack potentielle.
       Utiliser hash_equals($a, $b) pour comparaison constant-time.
       Si la comparaison est legitime (deux valeurs serveur-side), ajouter en
       commentaire : // nosemgrep: rw-php-equals-on-hash
