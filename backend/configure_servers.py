@@ -89,7 +89,7 @@ def _motif_nom_invalide(username):
         # `.`, `..`, `...` — E-197. Total pour la classe, la ou tester deux
         # valeurs a la main laisserait passer la troisieme.
         return MOTIF_NOM_COMPOSANT_DE_CHEMIN
-    if not _USERNAME_RE.match(nom):
+    if not _USERNAME_RE.fullmatch(nom):
         return MOTIF_NOM_CARACTERES_INTERDITS
     return None
 

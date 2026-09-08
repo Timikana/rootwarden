@@ -126,7 +126,7 @@ def create_window():
         return jsonify({'success': False, 'message': 'Au moins un jour requis'}), 400
     start_t = (data.get('start_time') or '').strip()
     end_t = (data.get('end_time') or '').strip()
-    if not _TIME_RE.match(start_t) or not _TIME_RE.match(end_t):
+    if not _TIME_RE.fullmatch(start_t) or not _TIME_RE.fullmatch(end_t):
         return jsonify({'success': False, 'message': 'Heures invalides (HH:MM)'}), 400
     enabled = 1 if data.get('enabled', True) else 0
     user_id, _ = get_current_user()
@@ -162,7 +162,7 @@ def update_window(window_id):
     for col in ('start_time', 'end_time'):
         if col in data:
             v = (data[col] or '').strip()
-            if not _TIME_RE.match(v):
+            if not _TIME_RE.fullmatch(v):
                 return jsonify({'success': False, 'message': f'{col} invalide (HH:MM)'}), 400
             sets.append(f'{col} = %s')
             vals.append(v + ':00')

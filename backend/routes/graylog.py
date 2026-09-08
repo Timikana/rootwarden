@@ -199,7 +199,7 @@ def save_config():
     rl_burst = int(data.get('ratelimit_burst') or 0)
     rl_interval = int(data.get('ratelimit_interval') or 0)
 
-    if not _HOST_RE.match(host):
+    if not _HOST_RE.fullmatch(host):
         return jsonify({'success': False, 'message': 'Host invalide'}), 400
     if not (1 <= port <= 65535):
         return jsonify({'success': False, 'message': 'Port hors bornes'}), 400
@@ -327,7 +327,7 @@ def deploy():
 
             pushed = []
             for tpl in templates:
-                if not _NAME_RE.match(tpl['name']):
+                if not _NAME_RE.fullmatch(tpl['name']):
                     continue
                 path = f"{_RW_CONF_PREFIX}{tpl['name']}.conf"
                 b = base64.b64encode((tpl['content'] or '').encode('utf-8')).decode('ascii')
@@ -494,7 +494,7 @@ def list_templates():
 @require_permission('can_manage_graylog')
 @threaded_route
 def get_template(name):
-    if not _NAME_RE.match(name):
+    if not _NAME_RE.fullmatch(name):
         return jsonify({'success': False, 'message': 'Nom invalide'}), 400
     with get_db_connection() as conn:
         cur = conn.cursor(dictionary=True)
@@ -517,7 +517,7 @@ def save_template():
     content = data.get('content', '')
     enabled = bool(data.get('enabled', False))
 
-    if not _NAME_RE.match(name):
+    if not _NAME_RE.fullmatch(name):
         return jsonify({'success': False, 'message': 'Nom invalide (^[a-zA-Z0-9_-]{1,100}$)'}), 400
     if not isinstance(content, str):
         return jsonify({'success': False, 'message': 'Contenu invalide'}), 400
@@ -551,7 +551,7 @@ def save_template():
 @require_permission('can_manage_graylog')
 @threaded_route
 def delete_template(name):
-    if not _NAME_RE.match(name):
+    if not _NAME_RE.fullmatch(name):
         return jsonify({'success': False, 'message': 'Nom invalide'}), 400
     user_id, _ = get_current_user()
     try:
