@@ -198,6 +198,33 @@ def _charge_puis_ecrit(client, root_password: str, rules: str,
     apres — il DOIT etre identique. *Un correctif qui rendrait un echec en ayant
     quand meme ecrit passerait un test qui ne lit que le code de retour.*
     """
+    # ------------------------------------------------------------------
+    # POURQUOI LES SIX `nosemgrep` DE CE BLOC SONT LEGITIMES
+    #
+    # La regle `rw-shell-fstring-execute-as-root` porte sur la VALEUR
+    # interpolee, pas sur le pas qui l'utilise. Les commentaires de chaque
+    # etape ci-dessous decrivent la CONCEPTION (pourquoi cet ordre, pourquoi
+    # ce controle) : ils ne justifient PAS l'exemption. La justification est
+    # ici, une fois, et elle porte sur les valeurs.
+    #
+    # Seules TROIS valeurs atteignent un shell dans cette fonction :
+    #   tmp          prefixe litteral + `secrets.token_hex(8)` -> [0-9a-f]{16}
+    #                inexprimable autrement : aucun caractere de shell possible
+    #   dest_path    litteral aux deux appelants ('/etc/iptables/rules.v4|v6')
+    #   restore_cmd  litteral aux deux appelants ('ip[6]tables-restore')
+    # `code`, `err` et `out` n'apparaissent que dans des `RuntimeError`.
+    #
+    # ⚠ CRITERE POUR UN APPEL SUPPLEMENTAIRE — ne pas recopier `nosemgrep`
+    # parce qu'il est deja la six fois. L'exemption ne vaut que si la valeur
+    # interpolee est un litteral, un jeton hexadecimal, ou un entier borne
+    # DERIVE de l'entree (jamais une chaine echappee). Sinon : passer par
+    # `shlex.quote`, ou par une charge base64 -- et se souvenir que ce dernier
+    # gage porte sur le shell, pas sur le PUITS (cf E-463, sink `cron.d`).
+    #
+    # Cette liste doit rester vraie : elle se remesure par AST, en verifiant
+    # que `_charge_puis_ecrit` n'a que deux appelants et que leurs arguments
+    # `dest_path` / `restore_cmd` sont des `ast.Constant`.
+    # ------------------------------------------------------------------
     rand = secrets.token_hex(8)
     tmp = f"/etc/iptables/.rootwarden-ipt-{rand}.tmp"
     try:
