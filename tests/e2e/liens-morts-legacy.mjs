@@ -98,7 +98,26 @@ const MOI = new URL(import.meta.url).pathname;
 const FORMES = [
     { nom: "sideLink('/x')",  motif: /sideLink\(\s*['"](\/[^'"]*)['"]/g },
     { nom: 'href="/x"',       motif: /href\s*=\s*["'](\/[^"']*)["']/g },
-    { nom: 'window.location', motif: /window\.location[^=;]*=\s*['"](\/[^'"]*)['"]/g },
+    /*
+     * ⚠ ELARGI LE 2026-09-08. Ce motif s'appelait `window.location` et exigeait
+     * ce prefixe litteral. Mesure : il RATE `location.href = '/x'` (nu),
+     * `document.location`, `top.location`, et `.replace('/x')`.
+     *
+     * Un second motif `location = "/x"` avait ete ajoute puis retire comme
+     * « deja couvert par window.location ». **Il ne l'etait pas** : il couvrait
+     * un ensemble STRICTEMENT PLUS LARGE. La conclusion tenait — le parc n'a
+     * aucune forme nue hors `vendor/`, deja ignore — mais la RAISON etait fausse,
+     * et une raison fausse ne se perime pas au meme rythme que son parc.
+     *
+     * > Deux motifs qui rendent zero sur le parc ne sont pas pour autant
+     * > redondants : l'un peut rendre zero parce qu'il est couvert, l'autre
+     * > parce que la forme est absente aujourd'hui.
+     *
+     * Un seul motif dont le grain EST l'objet, plutot que deux dont l'un
+     * dedouane l'autre.
+     */
+    { nom: 'location = "/x"',
+      motif: /(?:^|[^\w$.])(?:\w+\.)?location(?:\.href)?\s*(?:=\s*|\.(?:replace|assign)\(\s*)['"](\/[^'"]*)['"]/g },
     { nom: "fetch('/x')",     motif: /fetch\(\s*['"`](\/[^'"`?]*)/g },
     /*
      * ⚠ AJOUTEES LE 2026-09-08, APRES UN DEDOUANEMENT.
@@ -203,7 +222,14 @@ const ECHANTILLON = {
     'action="/x"':      '<form action="/temoin-forge.php">',
     'table {k: "/x"}':  "const r = {t: '/temoin-forge.php'};",
     "sideLink('/x')":   "sideLink('/temoin-forge.php', 'x')",
-    'window.location':  "window.location.href = '/temoin-forge.php';",
+    /*
+     * ⚠ L'ECHANTILLON EST LA FORME NUE, PAS `window.location.href`.
+     *
+     * Un echantillon qui n'exerce que le cas facile ne prouve pas l'elargissement :
+     * si quelqu'un restreint un jour le motif a `window.`, un echantillon prefixe
+     * resterait VERT et l'elargissement serait perdu en silence. Celui-ci echoue.
+     */
+    'location = "/x"':  "location.href = '/temoin-forge.php';",
 };
 const inertes = [];
 for (const forme of FORMES) {
