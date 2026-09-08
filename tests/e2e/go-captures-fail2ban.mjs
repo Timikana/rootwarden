@@ -30,11 +30,12 @@
  *   E2E_BASE=https://localhost:8443 node go-captures-fail2ban.mjs   # legacy
  */
 import puppeteer from 'puppeteer';
+import { baseDeclaree } from './lib-cible.mjs';
 import { mkdirSync } from 'node:fs';
 import { createHmac } from 'node:crypto';
 import { litEnBase, compteEnBase } from './lib-base.mjs';
 
-const BASE = process.env.E2E_BASE || 'http://localhost:8444';
+const BASE = baseDeclaree('http://localhost:8444');
 const COMPTE = 'rw-test-super';
 const SECRET = 'MZXW6YTBOJSXG5BAMZXW6YTBOJSXG5BAMZXW6YTBOJSXG5BAMZXW';
 const MDP = process.env.E2E_TEST_PASS || 'RootWarden@2026-Test!';

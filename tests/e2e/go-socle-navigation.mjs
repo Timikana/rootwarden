@@ -21,10 +21,11 @@
  *   node go-socle-navigation.mjs
  */
 import puppeteer from 'puppeteer';
+import { baseDeclaree } from './lib-cible.mjs';
 import { execFileSync } from 'child_process';
 import { createHmac } from 'crypto';
 
-const BASE = process.env.E2E_BASE || 'http://localhost:8444';
+const BASE = baseDeclaree('http://localhost:8444');
 /**
  * La base du legacy, LUE DANS LA CONFIGURATION DU PORTAGE et non ecrite en dur.
  *

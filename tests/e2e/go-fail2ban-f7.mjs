@@ -52,11 +52,12 @@
  *   E2E_BASE=http://localhost:8444 node go-fail2ban-f7.mjs
  */
 import puppeteer from 'puppeteer';
+import { baseDeclaree } from './lib-cible.mjs';
 import { createHmac } from 'crypto';
 import { litEnBase } from './lib-base.mjs';
 import { mkdirSync, readFileSync } from 'node:fs';
 
-const BASE = process.env.E2E_BASE || 'http://localhost:8444';
+const BASE = baseDeclaree('http://localhost:8444');
 const CIBLE = (() => {
     /*
      * ══ LA CIBLE VIENT DE L'ENVIRONNEMENT, L'URL N'EST QU'UN REPLI ════════
