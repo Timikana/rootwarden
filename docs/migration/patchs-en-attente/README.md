@@ -314,3 +314,44 @@ fichier qui en porte deja deux, legitimement, sur deux chemins distincts.
 appliques a l'arbre donc absents des deux cotes ». **Faux pour `02` au moins** :
 son correctif est dans l'arbre. Il n'est pas dans le SERVICE, ce qui est l'autre
 question — et un redemarrage l'y met.
+
+
+## ✅ `01` ET `03` EPROUVES ENSEMBLE — mesure du 2026-09-08 14:50
+
+Les deux touchent **le même fichier**, `backend/routes/supervision.py`, et chacun
+n'avait été validé que **seul**. C'est la leçon de `07` appliquée en amont : *une
+validation juste sur son objet peut être muette sur celui qui compte.*
+
+    ordre 01 -> 03   applique, avec offset (Hunk #2 a 2380, +26 lignes)
+    ordre 03 -> 01   applique, avec offsets (Hunk #1 a 859, Hunk #2 a 867, +17)
+
+    les deux ordres produisent un fichier IDENTIQUE          ✅ (cmp -s)
+    le resultat COMPILE                                       ✅ 2647 lignes
+    original                                                     2584 lignes
+
+⚠ **Et « le patch s'est appliqué » n'est pas « le résultat est juste »** : un
+offset veut dire que le contexte a matché **ailleurs** que prévu. D'où le
+contrôle sur le contenu, et non sur le code de retour :
+
+    01 : 8 lignes FONCTIONNELLES ajoutees · 8/8 presentes · 0 deja presente
+    03 : 8 lignes FONCTIONNELLES ajoutees · 8/8 presentes · 2 deja presentes
+
+    TEMOIN : une ligne FORGEE (`zzz_ligne_forgee = 1`) est absente du resultat
+
+*Les lignes de commentaire sont ÉCARTÉES du décompte : elles n'attestent aucun
+geste. Mon premier contrôle les comptait — il grepait des mots français extraits
+des patchs (`annoncait`, `aucune`, `absent`) et rendait du vert sans mesurer le
+changement. **Un compte de grep porte le nom, pas le geste.***
+
+### Ce que ça autorise
+
+**`01` et `03` peuvent être signés et appliqués ensemble, dans n'importe quel
+ordre.** Ils sont indépendants, leur résultat compile, et aucun des deux n'est un
+coup pour rien.
+
+### La file, entièrement caractérisée
+
+    3 PERIMES        02 · 05 · 06   contenu deja dans HEAD
+    2 DEJA MARQUES   04 · QUARANTAINE
+    3 REELS          01 · 03 (independants, eprouves ensemble)
+                     07 (etendu a DEUX fichiers compose, eprouve de bout en bout)
