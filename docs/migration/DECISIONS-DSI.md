@@ -14299,3 +14299,146 @@ délimiteur et rendu `code : 0`** — *l'apparence d'un vert pour une mesure qui
 lieu.* Refaite par chaîne exacte avec assertion d'unicité. **Ma propre première mutation de
 son motif a rendu « ancre absente » pour la même raison** : je l'ai refaite sur la chaîne
 réelle plutôt que d'écrire « vérifié ».
+
+---
+
+## ✅ E-477 — I5 N'ÉTAIT PLUS BLOQUÉ, ET JE PORTAIS CE BLOCAGE DEPUIS PLUSIEURS TOURS
+
+**2026-09-08, 04:0x → 05:0x.** *« Finir la migration et ne plus avoir de legacy. »* J'ai
+cherché le plus gros levier non bloqué. **Il n'était pas bloqué du tout.**
+
+### ① LA CONDITION ÉTAIT TRANCHÉE, ET JE LA RELAYAIS COMME OUVERTE
+
+`MODULE-FILTRAGE.md:269` : *« I5 … ne se porte pas avant que la décision sur le port SSH
+soit tranchée »*. Je comptais « le mot du port SSH » parmi les actes de l'exploitant depuis
+plusieurs tours.
+
+**`E-465` porte la réponse, en toutes lettres** : *« Réponse de l'exploitant : porter, avec
+les quatre propriétés obligatoires »* — et **Q1 EST la décision sur le port** : lu en base,
+jamais `22` en dur.
+
+> **J'avais lu la décision comme le RÉSULTAT d'un arbitrage, sans voir qu'elle en était
+> aussi le CONTENU.** *La condition demandait qu'une décision existe ; la décision existait
+> et disait quoi faire du port.*
+
+*Et je l'ai relayée trois fois en attente — dans mes relances, dans DOSSIER-48, dans la
+clôture de `E-476`.* **Un blocage relayé se vérifie moins qu'un blocage rencontré**, parce
+que chaque relais s'appuie sur le précédent au lieu de la source.
+
+### ② CE QUI RESTE DU LEGACY : ONZE RACINES, ET C'EST UN SEUL BLOC
+
+```
+100 .php servis · 76 catalogues lang · 24 metier
+
+ 7  chaine d'auth        login · logout · verify · verify_2fa · step_up
+                         forgot_password · reset_password
+                         -> PORTEE : /connexion /deconnexion /second-facteur
+                            /mot-de-passe-oublie /reinitialiser /profil/step-up
+                            SessionAuthentifiee.php remplace verify.php
+                            + relais /auth/login.php et /auth/verify_2fa.php
+ 2  api_proxy.php · adm/api/notifications.php
+                         servent le JS des pages legacy, EN MEME ORIGINE
+ 1  _sortie.php          l'ErrorDocument 404 — part avec le vhost
+ 1  iptables/index.php   I5, la SEULE capacite qui manque
+```
+
+**Les onze ne s'éteignent pas un par un.** `api_proxy.php` et
+`adm/api/notifications.php` sont appelés par `menu.php` en `fetch` **même origine** : le
+portage écoute sur un autre port, et **un lien peut traverser une origine, un XHR
+authentifié non**. *Mon rebasage de liens de 03:50 était sûr pour cette raison exacte, et
+rebaser ces `fetch` ne l'aurait pas été* — ils auraient rendu 401 en silence, dans un
+`catch` qui cache.
+
+> **Ce qui restait n'était pas une liste de fichiers à ronger : c'était une capacité, plus
+> un redémarrage.**
+
+### ③ Q3 LIVRÉE — ET SA FORME EST UNE TOTALITÉ, PAS UN SOIN
+
+`laravel/public/js/pare-feu-retour-visible.js` (`b669d9b3`). `rwRetourPareFeu` **est
+totale** : aucune entrée ne rend `null`, `undefined` ou un titre vide.
+
+*Le défaut qu'elle ferme n'est pas « un message manque » : c'est un chemin de retour sur
+lequel personne n'a pensé à en mettre un.* **Rendre la fonction totale déplace la question —
+on ne peut plus en oublier un.** [[feedback_garde_par_construction]], premier rang : rendre
+le cas dangereux **inexprimable**.
+
+Et le fond vient du défaut mesuré cette nuit dans `menu.php` : `catch (e) { hide(); }` sur
+un endpoint archivé. **Quatre issues, pas deux, et le discriminant n'est pas `success`** —
+`/iptables-validate` rend `success: false` pour quatre situations dont une `200`. Le champ
+`sur` porte ce qu'un booléen ne pouvait pas : **si le verdict est fondé**, doute sur le
+marqueur `EXIT_CODE` à cheval sur deux fragments de 4096 octets compris.
+
+```
+base        24 ok · 0 silence
+mutation    le cas sans nom redevient un repli silencieux
+            -> exactement les 6 cas prevus, verifie par IDENTITE
+```
+
+*La liste des attendus est **dérivée** des cas, pas recomptée : « 6 rouges » serait vrai si
+six AUTRES cassaient, et j'ai donné quatre comptes faux la nuit même en recomptant à la
+main.*
+
+### ④ MON COMPTE DE RACINES, FAUX UNE QUATRIÈME FOIS — ET FAVORABLEMENT
+
+**J'ai mesuré 2 racines avant d'en mesurer 11.** Deux instruments fautifs, coup sur coup :
+
+```
+24  graphe d'inclusion sur les LITTERAUX seuls
+    -> head/menu/db sont inclus par `__DIR__ . '/head.php'` : concatenation
+ 2  `Require all denied` cherche N'IMPORTE OU dans un .htaccess
+    -> dans auth/.htaccess il est dans un <FilesMatch> : refus SCOPE lu comme GLOBAL
+11  graphe corrige + .htaccess LUS  == le chiffre d'E-474, qui tient
+```
+
+**Les deux fois du côté qui dédouane**, et la seconde disait « il ne reste que deux
+fichiers ». *`E-474` avait déjà payé cette erreur ; c'est la quatrième fois sur ce même
+compte, et la troisième fois que la cause est un `<FilesMatch>` lu comme un refus global.*
+**Ce compte-là ne se mesure pas par motif. Il se mesure en lisant les quatre `.htaccess`,
+qui font 51 + 7 + 4 + 28 lignes.**
+
+### ⑤ LE PLAN EST PÉRIMÉ SUR DEUX CHIFFRES QUE D'AUTRES CITENT ENCORE
+
+```
+§2 ter dit                        mesure du 2026-09-08
+151 compiles dont 111 root        22 dont 7, et les 7 sont NOMMES
+entrypoint:86 porte 8446          il porte 8443 — correctif applique
+patchs-en-attente/ 05 et 06       le repertoire n'existe plus
+```
+
+Les 7 : `403` · `comptes` · `cles-ssh` · `minimal` · `composants/profil` ·
+`composants/theme` · `composants/onglets-adm`. **Les trois `composants/` sont les
+dangereuses** — incluses ailleurs, donc éditer l'une casse toutes ses pages.
+
+**Et `pare-feu.blade.php` n'a AUCUN compilé** : l'éditer crée un fichier neuf, sans root à
+écraser. *C'est la seule vue du lot sûre sans `chown`.*
+
+> **L'artefact est en avance sur le journal, et le journal reste l'autorité pour qui ne
+> mesure pas.** *L'avertissement du §2 ter — « un opérateur silencieusement déposé sur
+> l'ANCIEN portail » — décrivait un risque réel et déjà fermé. Un avertissement périmé
+> coûte moins qu'un chiffre périmé : il fait hésiter, pas se tromper.*
+
+### ⑥ ET MA SPEC PORTAIT DEUX FOIS LA MÊME FAUTE
+
+Le pair qui prend la recherche a trouvé la seconde : **j'ai écrit `url`, le code écrit
+`link`**. *La forme plate ET le nom du champ, tous deux lus dans le JS du legacy mort.*
+Deux erreurs, un seul geste fautif — **j'ai lu le consommateur au lieu du producteur, et je
+l'ai transmis comme une spécification.**
+
+Et son premier relevé disait « 0 FAIL » avec les cinq entrées rendant la même sortie :
+`resout(undefined)` retombait sur la racine mappée. *Ce qui l'a trahi n'est pas une
+assertion rouge — c'est que le **témoin** rendait la même sortie que les hostiles.*
+
+> **Un témoin qui ne se distingue pas est un témoin qui ne témoigne pas.** *(formulation du
+> pair, meilleure que la mienne)*
+
+### CE QUI ATTEND VRAIMENT L'EXPLOITANT, APRÈS CE TOUR
+
+```
+1  docker compose up -d      applique l'echange des ports, deja ECRIT partout
+2  docker compose restart python   (inchange)
+3  .claude/skills/rw-pre-commit/SKILL.md:15   (inchange)
+4  MAIL_MAILER=smtp          pour l'etape ⑤ de DOSSIER-48
+5  les durees de conservation + le sort du transfert ip-api.com   DOSSIER-49
+```
+
+**Et le mot du port SSH n'y est plus** : il avait été donné.
