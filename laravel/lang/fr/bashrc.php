@@ -120,11 +120,9 @@ return [
      * sa place et son bouton disent. Un encart « ce qui manque » n'enonce que
      * des manques ; le present, la page le MONTRE.
      */
-    'non_porte_titre' => 'Un geste reste hors du portail',
-    'non_porte_texte' => 'Le deploiement, la restauration et la liste des sauvegardes sont portes ici. L\'installation du paquet figlet ne l\'est pas : elle ecrit sur la machine en root pour un utilitaire d\'affichage. Elle se fait par SSH, une fois par machine.'
-                         . 'd\'une version anterieure et la liste des sauvegardes se font pour '
-                         . 'l\'instant depuis l\'ancien portail.',
-    'non_porte_lien'  => 'Ouvrir bashrc dans l\'ancien portail',
+
+
+
     /* B4 — les deux ecritures (2026-09-07). `overwrite` et
        `/bashrc/prerequisites` ne sont PAS construits : voir public/js/bashrc.js. */
     'col_action' => 'Action',

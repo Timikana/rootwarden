@@ -98,11 +98,9 @@ return [
      * `backend/routes/bashrc.py`. Called by this page: `users`, `preview`,
      * `template`. Called by nobody, hence absent: `deploy`, `prerequisites`
      * (POST -- it INSTALLS), `restore`, `backups`. */
-    'non_porte_titre' => 'One gesture stays outside the portal',
-    'non_porte_texte' => 'Deployment, restore and the backup list are ported here. Installing the figlet package is not: it writes to the machine as root for a display utility. Do it over SSH, once per machine.'
-                         . 'version and listing the backups are done from the legacy portal for '
-                         . 'now.',
-    'non_porte_lien'  => 'Open bashrc on the legacy portal',
+
+
+
     /* B4 — les deux ecritures (2026-09-07). `overwrite` et
        `/bashrc/prerequisites` ne sont PAS construits : voir public/js/bashrc.js. */
     'col_action' => 'Action',

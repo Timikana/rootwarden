@@ -230,38 +230,6 @@
         <div data-rw="bashrc-apercu-contenu"></div>
     </section>
 
-    {{--
-        Une capacite non portee n'est pas un bouton inerte : le panneau dit ce
-        que le geste engage, et son action principale est un lien MARQUE vers
-        l'ancien portail.
-
-        ⚠ CE PANNEAU DISAIT « le deploiement n'est pas porte ». C'est FAUX depuis
-        B4 (2026-09-07) : `deploy` et `restore` sont ici. Il ne reste que DEUX
-        routes non appelees, mesurees sur le code depouille de ses commentaires :
-
-            /bashrc/prerequisites   PORTE depuis l'iso-perimetre (bouton dans
-            /bashrc/backups         liste les sauvegardes    — non porte
-
-        **Un panneau qui annonce une absence comblee envoie l'operateur ailleurs
-        pour un geste qui est sous ses yeux.** Le lien reste utile pour les deux
-        qui manquent — et il suit `app.url_legacy`, donc l'echange des ports du
-        2026-09-06 l'a mis a jour tout seul (`https://…:8446`).
-    --}}
-    <div class="rw-encart" data-rw="bashrc-non-porte">
-        <p class="rw-sous-titre-fort">{{ __('bashrc.non_porte_titre') }}</p>
-        <p class="rw-prose">{{ __('bashrc.non_porte_texte') }}</p>
-        {{--
-            ⚠ LE LIEN VERS L'ANCIEN PORTAIL EST RETIRE (2026-09-07, decision de
-            l'exploitant). Il etait le dernier motif de garder `legacy/bashrc/`
-            EN SERVICE : un encart doit renvoyer quelque part, donc la page
-            devait vivre. **Un renvoi maintient en vie ce vers quoi il renvoie.**
-
-            La MENTION reste, et elle dit comment faire — `apt install figlet`,
-            par SSH, une fois par machine. Nommer un manque sans offrir de porte
-            est plus honnete qu'une porte vers un portail qu'on demonte, et dont
-            l'adresse a change hier (`:8443` -> `:8446`).
-        --}}
-    </div>
 </section>
 
 <section class="rw-section" data-rw="bashrc-panneau-historique" hidden>
