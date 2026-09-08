@@ -22381,3 +22381,82 @@ que `route()` se resout EN REQUETE — pas que le courrier ne parte pas.*
 valeur n'est donc etablie que par `config('app.url')` dans le conteneur. **Et c'est un fichier de
 l'exploitant.** *Signale, pas touche.*
 
+---
+
+## E-496 — LES 21 INTERPOLATIONS ROOT DE `supervision.py` CLASSEES : aucune classe D non gardee
+
+**Demande de la session 8 le 2026-09-08, apres reparation de trois regles semgrep maison qui ne compilaient
+pas.** *Une regle qui ne compile pas rend zero, et zero se lit « propre ».* Lecture seule, aucun geste
+exerce.
+
+### Reconciliation d'abord : 15 appels, 21 trouvailles
+
+Le motif est `execute_as_root($CLIENT, f"...{$VAR}...", ...)` — **une trouvaille par liaison `$VAR`, pas par
+appel.** 22 appels portent une f-string interpolee, 7 sont exemptes, **15 restent** — et la somme de leurs
+variables interpolees fait **exactement 21**. *Sans cette reconciliation, « 15 » et « 21 » auraient ressemble
+a un desaccord.*
+
+### Le classement
+
+| variable | sites | n | classe | origine |
+|---|---|---|---|---|
+| `config_path` | 1250 · 1298 · 1407 · 2090 · 2168 · 2274 | 6 | **A** | `_config_file_path()` → litteraux `/etc/zabbix/…`, ou `AGENT_REGISTRY[platform]['config_path']` |
+| `service_name` | 1302 · 1412 · 2172 · 2280 | 4 | **A** | ternaire de deux litteraux, ou `agent_info['service']` |
+| `config_dir` | 1344 · 1846 · 2218 | 3 | **C** | `'/'.join(config_path.split('/')[:-1])` |
+| `filename` | 1344 · 2218 | 2 | **C** | `config_path.split('/')[-1]` |
+| `backup_path` | 1298 · 2168 | 2 | **C** | retour de `_backup_agent_config(...)`, chemin date calcule cote serveur |
+| `backup_path` | 1399 · 1407 · 2269 · 2274 | 4 | ⚠ **D** | `f"{config_dir}/{backup_name}"`, et `backup_name = data.get('backup_name')` |
+
+    A  10      B  0      C  7      D  4
+
+`platform` est sur **liste blanche** (`l.1779`, `('centreon','prometheus','telegraf')`), donc
+`AGENT_REGISTRY[platform]` ne peut pas etre indexe par une valeur libre.
+
+### Les 4 de classe D : origine d'ENTREE, garde MESUREE
+
+`backup_name` vient de la requete, **et il est valide immediatement** — `l.1383` et `l.2256`, `400` sinon :
+
+    _BACKUP_NAME_RE = re.compile(r'^[\w.-]+\.bak\.\d{8}_\d{6}$')
+
+**Eprouve dans les DEUX sens** — mon premier releve ne rendait que des refus, y compris sur un nom nominal
+mal forme : *onze refus et zero acceptation ne discriminent pas.*
+
+    TEMOIN POSITIF   zabbix_agent2.conf.bak.20260908_123456    ACCEPTE
+                     centreon-engine.cfg.bak.20260101_000000   ACCEPTE
+    TEMOIN NEGATIF   a;id.bak.20260908_123456                  refuse
+                     a$(id).bak.20260908_123456                refuse
+                     ../x.bak.20260908_123456                  refuse
+                     a b.bak.20260908_123456                   refuse
+
+*Les charges negatives sont forgees pour EPOUSER le suffixe valide — c'est ce qui rend le refus concluant.*
+
+> **Je les laisse en classe D** parce que leur ORIGINE est une entree, et que la classe se lit a l'origine.
+> **Mais la garde n'est pas un echappement : c'est une liste blanche de forme.** *`shlex.quote` protege quoi
+> qu'on lui donne ; un motif protege tant qu'il reste strict.* Le jour ou quelqu'un l'elargit — pour
+> accepter un horodatage d'un autre format, par exemple — les quatre sites redeviennent nus **sans qu'aucune
+> regle ne bouge**, puisqu'elles ne sont pas exemptees : elles sont deja accusees.
+
+### ⚠⚠ ET UN DEFAUT DE LA REGLE QUE LA SESSION 8 N'AVAIT PAS VU DE CE COTE
+
+Elle m'avertit que son `pattern-not-regex: 'shlex\.quote'` exempte **la region entiere**, donc que
+`f"cmd {shlex.quote(a)} {b}"` avec `b` nu passerait. **Aucun appel de ce fichier n'est exempte par
+`shlex.quote`** — les sept le sont par `base64 -d`. *Son angle mort redoute est absent ici.*
+
+**Mais le meme defaut de portee vaut pour la branche `base64`, et il MORD :**
+
+    l.399    encoded, file_path        <- une charge encodee ET un chemin NU
+    l.901    extra_b64, config_path
+    l.1854   b64, config_path
+    l.1863   extra_b64, config_path
+    l.2048   b64, config_path
+    l.2162   b64, config_path
+    l.1206   psk_b64                   <- le SEUL ou la charge est la seule interpolation
+
+**Six des sept exemptions masquent une interpolation nue.** Les charges (`*_b64`, `encoded`) sont des
+`base64.b64encode(...)` — alphabet base64, inoffensives. **Les chemins, eux, ne sont proteges par rien** —
+ils sont de classe **A** aujourd'hui (`_config_file_path`, `AGENT_REGISTRY`), donc **aucun defaut vivant**.
+
+> *Mais la regle ne peut PAS les voir.* Si un jour un de ces chemins venait d'une entree, **`base64 -d`
+> continuerait de l'exempter**. C'est le meme defaut qu'elle a decrit pour `shlex.quote`, sur l'autre
+> branche, et il est deja actif — sur des valeurs qui se trouvent etre sures.
+
