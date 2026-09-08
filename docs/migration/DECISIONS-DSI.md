@@ -15273,3 +15273,77 @@ omission.*
 ⚠ **Et « aucune espèce vivante » n'est pas « aucune espèce ».** *Les cinq ont été trouvées une
 par une, par cinq chemins différents ; aucune par un recensement.* **Je ne peux pas affirmer
 qu'il n'en existe pas une sixième — seulement que je ne sais plus où la chercher.**
+
+---
+
+## E-487 ✅ — LE DERNIER FIL EST COUPÉ, ET J'AI COMMIS MA PROPRE RÈGLE D'ATTRIBUTION DANS UN COMPLIMENT
+
+**2026-09-08, ~06:1x.** *La mémoire a rendu 1,4 Go, Chrome a démarré, et l'encart est tombé
+avec la mesure — dans le même geste, comme il avait été annoncé.*
+
+### ① LA VÉRIFICATION
+
+```
+ipt-non-porte · url_legacy · suite_lien · pare-feu.suite   0 dans pare-feu.blade.php
+lang/fr/pare-feu.php · lang/en                             113 = 113 · zero cle `suite*`
+porteDuLegacy(role 3)                                      false   TEMOIN+ forge -> true
+sites du portage construisant une URL legacy               7 -> 6, tous INERTES
+```
+
+**Les trois clés `suite*` ont quitté les deux catalogues dans le même geste que l'encart** —
+*et la raison donnée est juste : une clé que personne ne cite se lit comme une capacité qui
+existe encore ailleurs.* **C'est l'exacte symétrie du défaut de mon Q3** — un titre rendu
+sans destinataire — pris par l'autre bout.
+
+> **Plus rien, côté portage, ne mène au legacy.**
+
+### 🔴 ② ET LE DÉFAUT D'INSTRUMENT QUI A ROUGI TROIS FOIS EST CELUI QUI M'INTÉRESSE LE PLUS
+
+`p.click()` sur le bouton d'historique **n'a pas déclenché son écouteur, sans lever.** Le
+verdict Q2 portait donc sur le jeu précédent, et **trois assertions convergentes accusaient
+mon module.** *Q2 était juste tout du long — mesuré séparément, hors navigateur, sur les six
+formes de fermeture, avant de toucher au code.*
+
+**Mais la généralisation dépasse ce cas :**
+
+> ⛔ **Un clic qui n'atteint rien ferait aussi PASSER une assertion « 0 requête ». C'est la
+> même sortie que « la garde a tenu ».**
+
+*Q4 — « avant consentement, aucune requête n'est émise » — n'a survécu que parce qu'elle
+porte son témoin : **exactement 1 APRÈS consentement**.* **Sans ce second membre, un clic
+perdu aurait produit un vert.**
+
+**Et la cause du clic perdu est une course avec le `scrollIntoView` du panneau de
+consentement — le correctif d'ergonomie d'I5, qui a cassé l'instrument d'I6 deux lots plus
+tard.** *Un correctif d'affichage devenu un défaut de mesure : je n'avais pas cette forme.*
+
+### ⛔ ③ ET J'AI COMMIS MA PROPRE RÈGLE D'ATTRIBUTION — DANS UN COMPLIMENT
+
+J'ai écrit : *« si tu l'as écrit, c'est le meilleur morceau d'infrastructure de la nuit »*, à
+propos de `porteDuLegacy`. **La session a refusé le crédit** : rien dans l'historique git ne
+distingue les sessions, elle n'a pas souvenir de ce prédicat, et `07fdbfe4` ne nomme personne.
+
+**C'est MA règle, établie cette nuit après deux erreurs d'attribution** : *git ne porte
+aucune identité de session — cite le commit, jamais l'auteur.* **Je l'ai enfreinte trois
+heures plus tard.**
+
+> **Et la forme de la faute compte : je l'ai enfreinte dans un COMPLIMENT.** *Un crédit
+> erroné est une erreur d'attribution comme une autre — mais c'est la seule que le
+> destinataire est en position d'attraper, et qu'il n'a aucune raison de refuser.*
+
+**Celle-ci l'a refusé.** *C'est la première fois de ce chantier qu'une attribution fausse est
+corrigée par son bénéficiaire.* **Ce qui reste vrai est ce qu'elle dit elle-même** : la
+mesure du prédicat est bonne, et sa forme — dérivée de l'état, avec un témoin qui montre
+qu'elle sait rendre `true` — est ce qui permet d'écrire *« propre par construction »* et pas
+*« propre aujourd'hui »*. **Ça ne dépend d'aucun auteur.**
+
+### CE QUI RESTE, ET IL N'Y A PLUS RIEN DE TECHNIQUE
+
+```
+les 5 especes de dependance au legacy   toutes mesurees, aucune vivante (E-486)
+cote portage                            plus aucun lien, verifie au rendu
+il reste                                les 8 gestes du DOSSIER-53, tous a l'exploitant
+                                        et le premier est : NE PAS ARMER SMTP
+```
+
+*Le legacy peut être arrêté. Ce qui l'en empêche n'est plus dans le code.*
