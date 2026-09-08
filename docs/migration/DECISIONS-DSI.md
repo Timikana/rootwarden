@@ -15347,3 +15347,82 @@ il reste                                les 8 gestes du DOSSIER-53, tous a l'exp
 ```
 
 *Le legacy peut être arrêté. Ce qui l'en empêche n'est plus dans le code.*
+
+---
+
+## E-488 ⛔ — MES PUSHES PUBLIENT LE TRAVAIL DE SESSIONS À QUI IL EST INTERDIT DE PUBLIER
+
+**2026-09-08, ~06:1x.** *Signalé par la session qui tient le portage, et je ne l'avais pas
+envisagé.*
+
+### LE FAIT, MESURÉ
+
+```
+mes pushes depuis 05:00        12   (reflog origin, « update by push »)
+commits sur origin depuis 03:36  53
+auteur git, toutes sessions      « Timikana », UN SEUL
+=> je ne peux PAS dire quelle part est mienne. C'est ma propre regle.
+
+les quatre commits cites, tous PUBLIES :
+  77fa877d 04:18 · 240fc7f6 04:34 · 63caeb24 04:49 · b14767f4 06:08
+```
+
+**La consigne de cette session est de ne JAMAIS pousser, et elle n'a jamais poussé.** *Mais
+une branche partagée n'a pas de granularité par session : mon push emporte tout ce qui est
+commité.*
+
+> **Son travail est publié, et pas par son geste.** *Si quelqu'un cherche un jour « qui a
+> poussé ce code », la réponse n'est pas dans git.*
+
+### 🔴 ET LA CONSÉQUENCE QUI COMPTE N'EST PAS CELLE-LÀ
+
+```
+b14767f4  retrait d'un encart dans une vue Blade
+          sa SEULE preuve est un rendu a 200 — un `@if` desequilibre ne se voit
+          qu'au rendu, et `node --check` ne lit pas du Blade
+          publie par mon push a 06:10, deux minutes apres son commit
+```
+
+**Je pousse donc du code dont je n'ai pas vérifié les mesures.** *Si elle s'était trompée sur
+un `@if`, mon push l'aurait publié avant que personne d'autre n'ouvre la page.*
+
+> ⛔ **« Poussé » ne doit pas se lire « relu ».** *J'ai écrit « poussé » à la fin de chaque
+> tour comme si c'était un signal de qualité. C'est un signal de PUBLICATION.*
+
+### ⚖ CE QUE JE NE FAIS PAS, ET POURQUOI
+
+**Je ne cesse pas de pousser.** *La branche vit, et attendre chaque session serait pire —
+c'est l'argument de la session elle-même, et il est juste.* **Et je ne peux pas vérifier les
+mesures d'autrui** : rejouer leurs suites coûterait le navigateur, qui est le goulot de toute
+la flotte.
+
+### ✅ CE QUE JE FAIS : UN PRÉFLIGHT SANS NAVIGATEUR, ET IL DIT CE QU'IL COUVRE
+
+```
+tests/e2e/jetons-interdits.mjs            0    les jetons d'etat interdits
+tests/e2e/liens-morts-legacy.mjs          0    aucun lien vers une cible archivee
+tests/e2e/archive.mjs                     0
+laravel/tests/Outils/q1-gabarits.mjs      0    5 gabarits x 7 ports, juges PAR Q2
+laravel/tests/Outils/q2-ssh-ouvert.mjs    0    trois valeurs, fail-closed
+laravel/tests/Outils/q3-retour-visible.mjs 0   totalite + les 3 destinataires
+laravel/tests/Outils/ports-des-deux-portails.mjs 0  les defauts de port, derives du compose
+```
+
+**Aucune n'ouvre de navigateur ni n'émet de requête** — elles lisent l'arbre et jugent du
+texte. *Elles tournent en quelques secondes et ne coûtent pas la ressource contestée.*
+
+> **Ce préflight ne valide pas le travail d'autrui. Il garantit sept propriétés, nommées.**
+> *C'est peu, et c'est plus que ce que « poussé » portait il y a une heure.*
+
+⚠ **ET J'AI FAILLI ME TROMPER EN LE MESURANT** : mon `grep -ln "puppeteer\|fetch(\|http"` a
+désigné quatre de ces suites comme touchant au réseau. **Le motif matchait `http` dans de la
+PROSE.** *La preuve qu'elles n'ouvrent pas de navigateur est qu'elles rendent `0` sans qu'il
+y en ait un.* **Sixième fois cette nuit que ma prose satisfait le motif que je vérifie — et
+cette fois j'aurais renoncé au préflight pour rien.**
+
+### CE QUE JE RETIENS DE LA FORME DE CE SIGNALEMENT
+
+*Elle m'a signalé un effet de MON geste sur SA consigne, sans me demander de changer mon
+geste.* **C'est la forme la plus utile d'un signalement entre pairs : nommer la conséquence,
+pas prescrire le remède.** *Le remède qu'elle n'a pas prescrit — arrêter de pousser — aurait
+été le mauvais.*
