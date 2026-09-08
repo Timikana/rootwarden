@@ -16586,3 +16586,56 @@ ne compte pas comme CODE au sens de la mission, et son adoption est bloquée sur
 
 **Détail, la table des cinq substituts et la file de l'exploitant :
 `DOSSIER-60`.**
+
+---
+
+## E-515
+
+**« Bloqué sur `E2E_TOTP_SECRET` » était la mauvaise formulation, trois fois. Le
+secret n'est pas absent : il est délibérément retiré.**
+
+Relevé par `gestion-ssh-key-c6`, vérifié ici — `scripts/rejouer-lot.sh:1435-1441` :
+
+```
+if [ "$suite" = go-vague0-legacy ]; then
+    export E2E_USER=rw-test-super
+    export E2E_PASS="${E2E_TEST_PASS:-…}"
+    export E2E_TOTP_SECRET="$(secretRole3)"     <- UNE seule suite
+else
+    unset E2E_USER E2E_PASS E2E_TOTP_SECRET     <- TOUTES les autres
+fi
+```
+
+**Et le dessin est cohérent d'un bout à l'autre** : chaque suite porte
+`const SECRET = process.env.… || ''`, avec le commentaire *« audit v1.23 :
+secret 2FA via env uniquement, plus de secret en dur »*. L'identité 2FA vient
+donc de l'environnement, et le harnais ne l'accorde qu'à `go-vague0-legacy`.
+
+> **« Bloqué sur un secret » se lit « il faut trouver le secret ». Le fait est
+> « il faut décider de donner une identité 2FA aux suites ».** *C'est une
+> décision d'exploitant, pas une recherche de valeur — et la différence change à
+> qui la question se pose.* (formulation de `c6`)
+
+**J'ai transmis la mauvaise formulation trois fois**, y compris dans `E-511` et
+`DOSSIER-60`. *Une absence et un retrait délibéré rendent le même symptôme, et
+seul le second a un destinataire.*
+
+### Et une alarme que je n'ai pas publiée
+
+Sept lignes de fichiers **suivis** portent `E2E_TOTP_SECRET=`. Caractérisées sans
+jamais afficher de valeur : **aucune ne contient un germe base32** — le
+détecteur rend `OUI` sur un germe forgé et `non` sur les sept. Cinq sont des
+**exemples de documentation** (`'<secret>'`, `'...'`, `***`), une est une
+référence de variable (`"$(secretRole3)"`), une est une affectation depuis une
+variable locale.
+
+**Aucun secret 2FA n'est committé.** *`c6` avait le même soupçon et l'a réfuté de
+son côté ; je l'ai refait plutôt que de le croire, et les deux relevés
+concordent.*
+
+### Ce que ça change pour la file de l'exploitant
+
+L'entrée devient : **« étendre l'identité 2FA au-delà de `go-vague0-legacy`, ou
+décider que les 67 adoptions ne seront pas éprouvées au processus »**. *Le second
+choix est légitime et il a un coût nommé : le cliquet garde alors la forme, et
+rien ne garde le comportement.*
