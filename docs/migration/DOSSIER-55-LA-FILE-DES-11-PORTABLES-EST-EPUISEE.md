@@ -118,3 +118,67 @@ main l'a vu.
 (retrait du service `php` — dernier reste du legacy). Plus les décisions de
 `DOSSIER-49` (durées de conservation · sort du transfert `ip-api.com`, qui
 gouverne ⑥).
+
+
+---
+
+## 5. CLÔTURE DU CÔTÉ DES LIENS — mesurée le 2026-09-08 13:05
+
+Il restait une question que ce dossier ne posait pas : **après `patch 07`, le
+portage proposerait-il des liens vers un hôte mort ?** `config('app.url_legacy')`
+est lu sur **six sites vivants** :
+
+```
+PortailController.php:310 · :354
+LiensLegacy.php:259 · :280
+accueil.blade.php:349
+composants/entrees-menu.blade.php:32
+```
+
+**La réponse est non, et pour une raison de dessin.** `LiensLegacy::REMPLACEMENTS`
+(`:30`) n'est pas une liste de liens **vers** le legacy — c'est une table de
+**détournement** :
+
+```
+'/commandlog/' => 'journal-commandes'    '/tasks/'    => 'taches'
+'/approvals/'  => 'approbations'         '/tickets/'  => 'tickets'
+'/drift/'      => 'derive-config'        '/backups/'  => 'sauvegardes'
+```
+
+`url_legacy` ne sert que de **repli** pour un chemin sans remplacement. Et sa
+table est **dérivée** de l'archive, pas maintenue à la main : le commentaire de
+`:36-52` dit que la propriété de la session 7 — *dériver la liste de
+`legacy/_deprecated/*` et la comparer à cette table* — a trouvé un `/search/`
+manquant **à sa première mesure**, un oubli que personne n'avait vu depuis son
+archivage.
+
+**Mesure au réseau, avec son témoin :**
+
+```
+GET https://192.168.0.245:8443/connexion   ->  200, 3838 octets
+liens vers :8446 (le port du legacy)       ->  0
+TEMOIN : liens absolus rendus par la page  ->  3
+```
+
+*Sans le témoin, « 0 lien vers `:8446` » aurait pu vouloir dire « la page ne rend
+aucun lien absolu ».*
+
+### Ce que les 13 fichiers restants sont
+
+Un `.htaccess` (plus deux dans `logs/` et `vendor/`), un `openapi.yaml`, un
+`tailwind.css`, un `composer.json`/`.lock`, quatre images, `htmx.min.js` et
+`utils.js`. **C'est la coquille, pas le legacy** : aucun `.php` ne les charge, et
+le portage ne les cite pas.
+
+⚠ **Je ne les archive pas, et c'est un choix.** Le geste n'aurait aucun gain
+fonctionnel — ils sont déjà inertes — et il ajouterait un `git mv` dans un arbre
+que sept sessions partagent. **Leur place est dans `patch 07`, avec le service
+qui les servait, pas avant lui.**
+
+⚠ Et une mesure que j'ai ratée en chemin, dite parce qu'elle instruit : mon
+premier relevé comptait les citations par **nom de base**. `.htaccess` rendait
+10, `composer.json` 7 — c'étaient les mentions de *n'importe quel* `.htaccess` et
+du `composer.json` de `laravel/`. **Un compte de grep porte le nom, pas la
+chose.** Et ma seconde tentative a rendu des zéros dont le **témoin rendait zéro
+aussi** : la mesure n'avait pas eu lieu. Seule la troisième, avec un témoin qui
+mord (`url_legacy` 6, `pare-feu` 24, absurdité 0), porte quelque chose.
