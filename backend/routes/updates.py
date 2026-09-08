@@ -952,9 +952,21 @@ def pending_packages():
         with ssh_session(row['ip'], row['port'], row['user'], ssh_pass, logger=logger, service_account=row.get('service_account_deployed', False)) as client:
             # apt update silencieux puis liste des upgradables
             cmd = "apt-get update -qq 2>/dev/null; apt list --upgradable 2>/dev/null | grep -v '^Listing'"
-            output_lines = list(execute_as_root_stream(client, cmd, root_pass, logger=logger))
+            # ══ E-461 : MEME DEFAUT, ET IL SE VOIT MOINS ══════════════════════
+            #
+            # `execute_as_root_stream` cede des FRAGMENTS de 4096 octets, pas des
+            # lignes. La boucle ci-dessous parse chaque element comme une ligne de
+            # paquet (`nom/source version arch`) : appliquee a un fragment qui en
+            # contient des dizaines, `split('/')` ne rend que le PREMIER nom et
+            # colle tout le reste.
+            #
+            # Mesure : sur une sortie de 3 paquets tenant dans un seul fragment,
+            # le code rendait 1 paquet. **Sans aucun message.** Un exploitant lisant
+            # cette page croyait qu'un paquet attendait une mise a jour quand trois
+            # en attendaient — dont, le cas echeant, des correctifs de securite.
+            flux = ''.join(execute_as_root_stream(client, cmd, root_pass, logger=logger))
 
-            for line in output_lines:
+            for line in flux.splitlines():
                 line = line.strip()
                 if not line or 'Listing' in line:
                     continue

@@ -231,9 +231,29 @@ def validate_iptables():
         with ssh_session(server_ip, server_port, ssh_user, ssh_password, service_account=svc_account) as client:
             encoded = base64.b64encode(rules_v4.encode()).decode()
             test_cmd = f"printf '%s' '{encoded}' | base64 -d > /tmp/_ipt_test.rules && iptables-restore --test /tmp/_ipt_test.rules 2>&1; echo EXIT_CODE=$?"
-            output_lines = list(execute_as_root_stream(client, test_cmd, root_password, logger=logger))
-            output = '\n'.join(output_lines)
-            exit_code = 0 if any('EXIT_CODE=0' in l for l in output_lines) else 1
+            # ══ E-461 : CE GENERATEUR REND DES FRAGMENTS, PAS DES LIGNES ══════
+            #
+            # `execute_as_root_stream` fait `stdout.channel.recv(4096)` et cede le
+            # texte tel quel (`ssh_utils.py:693-698`). Le nom `output_lines` que
+            # portait cette variable AFFIRMAIT une propriete que le generateur ne
+            # fournit pas — et c'est ce nom qui a fait tenir le defaut.
+            #
+            # Consequence mesuree : `EXIT_CODE=0` fait 12 octets. A cheval sur une
+            # frontiere de 4096, AUCUN fragment ne le contient : le `any(...)`
+            # rendait False et un jeu de regles VALIDE etait declare « Erreur de
+            # syntaxe ». Et le `'\n'.join` aggravait le cas — il INSERAIT un saut
+            # de ligne au milieu du marqueur, donc meme la chaine recollee ne le
+            # portait plus.
+            fragments = list(execute_as_root_stream(client, test_cmd, root_password, logger=logger))
+            output = ''.join(fragments)          # recoller, PUIS decouper
+            lignes = output.splitlines()
+
+            # Le marqueur est la DERNIERE ligne `EXIT_CODE=` du flux, comparee en
+            # ENTIER. Chercher la sous-chaine n'importe ou accepterait un
+            # `EXIT_CODE=0` present dans un message d'erreur d'`iptables-restore`,
+            # lequel peut citer une ligne des regles fournies par l'appelant.
+            marqueurs = [l.strip() for l in lignes if l.strip().startswith('EXIT_CODE=')]
+            exit_code = 0 if marqueurs and marqueurs[-1] == 'EXIT_CODE=0' else 1
             if exit_code == 0:
                 return jsonify({"success": True, "message": "Regles valides.", "output": output})
             else:
