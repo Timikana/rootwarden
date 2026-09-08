@@ -22816,6 +22816,53 @@ place :* **la premiere modification de `profil`, `theme` ou `onglets-adm` fera e
 500 sur toutes les pages qui les incluent** — et ce sont precisement les vues qu'une session de portage
 touche. *Le declencheur est un geste ordinaire, pas un incident.*
 
+### 4 bis. ⛔ LE RAYON : 39 PAGES, ET LE DECLENCHEUR EST UN CHANGEMENT DE THEME
+
+**Trouvaille de la session 5, remesuree ici parce qu'elle ALARME.** Confirmee exactement :
+
+    layouts/portail.blade.php:119   @include('composants.theme')     <- compile ROOT
+    layouts/portail.blade.php:125   @include('composants.profil')    <- compile ROOT
+
+    vues qui etendent layouts.portail   39
+    vues qui etendent layouts.socle      6
+    total portant un @extends           45      (39 + 6, la somme recoupe)
+    temoin negatif  layouts.FORGE        0      -> la sonde discrimine
+
+> **Le declencheur n'est pas « une des sept vues » : ce sont DEUX composants du socle, et leur rayon est
+> 39 pages.** *La premiere modification de `composants/theme.blade.php` ou `composants/profil.blade.php`
+> rend 500 sur toutes les pages du portage.* **J'ecrivais « le declencheur est un geste ordinaire de
+> portage » ; il est plus ordinaire que ca — c'est un changement de theme ou de menu de profil.**
+
+**Et sa lecon sur son propre controle est la plus transferable du lot** : elle avait verifie *« le compile
+de LA VUE QUE J'EDITE appartient-il a root ? »*, ce qui est **necessaire et pas suffisant**.
+
+> **Une page dont le compile est sain casse quand meme si un COMPOSANT qu'elle inclut a un compile root —
+> et cette propriete n'est pas visible depuis la page qu'on edite.** *Il faut interroger la CHAINE
+> D'INCLUSION, pas le fichier.*
+
+### 4 ter. ⚠ MA SONDE DU RAYON A RENDU ZERO, ET LE TEMOIN AUSSI — CINQUIEME MOTIF QUI SUPPOSE UNE FORME
+
+    grep "@extends('layouts.portail')"          ->  0 vue      ⛔
+    grep "@extends('layouts.INEXISTANT')"       ->  0 vue      <- le temoin ne discrimine PAS
+    -> zero des deux cotes = LA MESURE N'A PAS EU LIEU
+
+**Cause** : *les 45 `@extends` du depot portent TOUS un second argument* —
+`@extends('layouts.portail', ['titre' => __('...')])`. **Ma parenthese fermante n'existe nulle part.**
+Refait sans supposer la fermeture (motif arrete apres la quote) : **39**.
+
+> **Cinquieme occurrence du meme piege en une journee** : l'espace unique avant `=>` (E-420), une entree
+> par ligne (E-452), rien entre `##` et `E-` (allocation), un `--since` herite de la date refutee
+> (E-499), et maintenant un `@extends` a un seul argument. *Ce qui l'a rattrape n'est pas la vigilance :
+> c'est la regle du zero-plus-temoin, appliquee avant de lire le resultat.*
+
+### 4 quater. Et une correction de son releve, dans l'autre sens
+
+Elle annonce avoir porte mon *« 0 arme »* **de 3/7 a 7/7**. **Ma mesure resolvait deja les SEPT** — les
+deux `vendor/` inclus — et les sept lignes portaient leur date de source et de compile. *Sa completion
+etait reelle sur le RAYON, pas sur la resolution.* **Je le corrige parce qu'un releve credite d'avoir
+comble un trou inexistant deplace la confiance vers le mauvais controle** — et parce que sa remarque de
+principe, elle, est juste : *un `0` sur 3/7 et un `0` sur 7/7 se lisent pareil et ne valent pas pareil.*
+
 **Parades, par ordre de solidite** : compiler en `www-data` (`gosu`/`setpriv` sur la l.44) plutot que
 chowner apres ; a defaut, un `chown` **periodique** ou **avant chaque suite**. ⚠ Et la l.59 porte
 `2>/dev/null || true` : **un chown en echec est indiscernable d'un chown reussi**, donc la parade ne peut
