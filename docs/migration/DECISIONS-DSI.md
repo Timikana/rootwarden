@@ -16765,3 +16765,74 @@ vhost » : ses auteurs avaient l'ordre, je l'ai retrouvé en me heurtant dedans.
 **Aucun geste ce tour-ci, et c'est le résultat.** *Un tour qui ne produit rien
 parce qu'une mesure l'a arrêté vaut mieux qu'un tour qui ouvre deux 403 sur 767
 fichiers.*
+
+---
+
+## E-518
+
+**`patch 08` est prêt : il sort `version.txt` du legacy. Et je l'ai écrit après
+avoir cassé, par un `mv`, le montage même que le dépôt m'interdisait de casser.**
+
+### ⛔ Ce que j'ai fait, d'abord
+
+Pour éprouver la stratégie d'écriture, j'ai remplacé `laravel/version.txt` par
+`mv`. **`version.sh:221-235` interdit ce geste explicitement, depuis le
+2026-09-05, avec sa mesure :**
+
+> *« ON N'UTILISE PAS `mv`. IL CHANGE L'INODE, ET LE MONTAGE NE LE SUIT PAS.
+> […] tout `mv`, `git checkout` ou réécriture par renommage le DÉTACHE […] Le
+> seul remède à un montage détaché est de RECRÉER le conteneur. »*
+
+```
+AVANT   conteneur -> 2.0.183   (= legacy/version.txt, le montage tenait)
+        laravel/version.txt : 0 octet, root:root
+
+APRES   conteneur -> inode 2000308 = laravel/version.txt = 2.0.470
+        /proc/mounts dans le conteneur : plus AUCUN montage de version.txt
+```
+
+**Le montage est détaché, et seule une recréation du conteneur le rétablit.**
+*L'état est bénin — `2.0.470` est la version correctement dérivée, elle passe le
+garde `/^\d+\.\d+\.\d+$/`, et `legacy/version.txt` est intact (mtime du 07/09).
+La valeur servie est même plus juste que les 2.0.183 périmés de 287 commits.*
+
+⚠ **Et j'avais lu ce fichier ce tour-ci — ses lignes 3 à 55 — pour comprendre la
+dérivation. Je me suis arrêté avant la ligne 221.** *Lire l'en-tête d'un fichier
+n'est pas le lire ; et le passage qui interdisait mon geste était celui qui
+portait la mesure de ce geste.*
+
+### Ce que ça donne à `patch 08`, et c'est meilleur
+
+**Si tout `mv`, `git checkout` ou renommage détache ce montage, et si le seul
+remède est de recréer le conteneur, alors le montage est une fragilité
+structurelle — pas une commodité.** Le retirer supprime la classe entière.
+
+```
+docker-compose.yml + prod.yml   retirer ./legacy/version.txt:…:ro
+scripts/version.sh              FICHIER_PRODUIT -> laravel/version.txt
+scripts/ecrire-version.sh       CIBLE           -> laravel/version.txt
+scripts/version.sh              `cat > FICHIER` -> `chmod 0644` + `mv -f`
+```
+
+**Aucun montage de remplacement n'est nécessaire, et c'est mesuré** : `laravel/`
+est déjà monté sur `/var/www/html`, donc `laravel/version.txt` y apparaît de
+lui-même. *Preuve : un fichier témoin déposé dans `laravel/` est apparu
+immédiatement dans le conteneur, sans redémarrage, avec son témoin négatif.*
+
+**Et les deux changements sont mutuellement dépendants** : `mv` n'est sûr que
+parce que le montage disparaît, et il est **nécessaire** parce que
+`laravel/version.txt` peut être recréé en `root:root` par l'entrypoint — mesuré
+aujourd'hui — auquel cas `cat > fichier` échouerait, **et `maj.sh:214` comme
+`start.sh:139` l'appellent avec `|| true`, donc l'échec serait avalé.**
+
+### ⛔ Ce patch n'est PAS éprouvé, et je le dis
+
+**Sa précondition est une recréation de conteneur, qui n'est pas à moi.** Ce qui
+est éprouvé : il applique proprement (`--check` → 0), le script modifié passe
+`bash -n`, le montage de `laravel/` porte un fichier neuf sans redémarrage, et la
+stratégie `mv` franchit bien un fichier possédé par root. **Ce qui ne l'est pas :
+le comportement après `up`.**
+
+*Je le dépose dans la file plutôt que de l'appliquer : un patch qui touche le
+mécanisme de version et dont l'échec est avalé par deux `|| true` ne s'applique
+pas sans pouvoir l'exercer.*
