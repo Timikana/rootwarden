@@ -17184,3 +17184,71 @@ pas, et j'ai committé sans regarder.
 
 *Le commit étant poussé, je ne l'ai pas réécrit : `af24756e` le complète et le
 dit.*
+
+---
+
+## 2026-09-09, 01:30 CEST — la classe des interpolations root est fermée
+
+**E-525 — Le cliquet semgrep passe à ZÉRO, et je l'assume comme un changement de
+nature, pas comme une fin de dette.** `106 → 104 → 99 → 94 → 89 → 80 → 71 → 44 →
+1 → 0`. Les 106 interpolations de commande root du dépôt portent chacune une
+justification qui **nomme son mécanisme** — alphabet, rejet, dérivation, origine
+littérale, échappement, calcul serveur — et **son site**. Aucune ne dit « c'est
+sûr ».
+
+> À zéro, le cliquet ne mesure plus une dette qui descend : il **refuse** la
+> première interpolation non justifiée qui reparaîtra. *Une porte qui refuse
+> toujours, on cesse de la regarder ; une porte qui n'a jamais refusé et qui
+> refuse aujourd'hui, on la lit.*
+
+⚠ **Et je consigne la limite dans la même décision, parce qu'elle voyagera avec
+le zéro** : la règle ne voit que la f-string **en ligne** dans l'appel. Une
+f-string affectée à une variable d'abord lui échappe — **cinq sites dans
+`routes/updates.py` seul**, dont celui qui portait la vulnérabilité corrigée
+cette semaine. *Zéro trouvaille ne veut pas dire zéro site : ça veut dire zéro
+site VISIBLE par cet instrument.* **Un chiffre rond est exactement le genre de
+résultat qu'on relaie sans sa réserve.**
+
+**E-526 — Je n'unifie pas les deux blocs de déploiement, et je remonte
+l'arbitrage.** `deploy_platform_key` (`:813`) et `deploy_service_account`
+(`:1346`) exécutent les **mêmes neuf commandes root**, dont
+`NOPASSWD: ALL > /etc/sudoers.d/rootwarden`. Le geste est nommé dans les
+interdits (*« ssh le déploiement K4 »*), et le service ne recharge pas l'arbre :
+un refactor écrit aujourd'hui ne serait éprouvable qu'après un redémarrage qui
+n'est pas à moi. **Détail, mesure et recommandation dans `DOSSIER-61`.**
+
+*Ce que j'ai posé à la place est un **panneau**, pas une garde : chaque bloc
+porte l'adresse de son jumeau. Il vaut ce que vaut un panneau — il ne tient que
+si on le lit.* **La garde par construction — un helper appelé deux fois — reste
+à faire.**
+
+**E-527 — J'ai rectifié une alarme AVANT de la graver, et c'est la seule raison
+pour laquelle elle n'est pas dans le dépôt.** J'allais écrire, dans un
+commentaire permanent de `routes/supervision.py`, que `fullmatch` **ferme** le
+vecteur du `\n` et que c'est celui de `routes/updates.py`. Mesure faite avant
+d'écrire : `.strip()` ramenait déjà le saut final à un nom valide, `fullmatch`
+le refuserait de toute façon, et un `\n` interne est refusé par la classe
+`[\w.-]` — **trois raisons indépendantes, et le site n'a jamais été ouvert.**
+
+> Une exemption qui s'appuie sur un mérite qu'elle n'a pas se recopie comme les
+> autres. *Et une fausse alarme gravée dans un commentaire permanent ne se
+> rétracte jamais : elle se relit.*
+
+**E-528 — Le contrôle doit commander le COMMIT, pas seulement l'écriture.** Deux
+fois dans ce fil :
+
+```
+supervision.py   l'assert a echoue (ancre non indentee) et le commit a SUIVI,
+                 avec un message decrivant une correction absente de l'arbre
+                 -> exactement 77e45f63, a l'identique
+JournalAudit.php le meme piege, mais chaine par `&&` : la reference du cliquet
+                 n'a pas bouge tant que le controle n'etait pas vert
+```
+
+**Et les deux prédicats qui ont mordu étaient faux, pas le fichier** :
+`count('hash_equals') == 2` se déclenchait sur **ma propre prose** (dixième fois
+du chantier), et l'attendu `[434, 438]` était **retapé** et faux d'un cran.
+
+> **Un attendu retapé mesure ma mémoire ; un attendu dérivé mesure le fichier.**
+> Repris en lisant les positions dans `git show HEAD:<fichier>` et en exigeant
+> que le décalage **égale** le nombre de lignes insérées.
