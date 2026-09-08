@@ -1,10 +1,18 @@
 <?php
+
+/*
+ * Les liens de ces astuces pointaient vers des pages ARCHIVEES du legacy.
+ * Ils sont rebases sur le portage — un catalogue est un `return [...]`, donc la
+ * concatenation, pas `<?= ?>`.
+ */
+$rwPortage = rtrim(getenv('LARAVEL_URL') ?: 'http://localhost:8080', '/');
+
 return [
     'tip.default_title' => 'How does it work?',
 
     'tip.ssh_title' => 'How to deploy SSH keys?',
-    'tip.ssh_step1' => '<strong>Prerequisite:</strong> add your SSH public key in <a href="/profile.php" class="text-blue-600 underline">your profile</a>.',
-    'tip.ssh_step2' => '<strong>Scan</strong> server users in <a href="/adm/server_users.php" class="text-blue-600 underline">Remote Users</a> and classify each account.',
+    'tip.ssh_step1' => '<strong>Prerequisite:</strong> add your SSH public key in <a href="' . $rwPortage . '/profil" class="text-blue-600 underline">your profile</a>.',
+    'tip.ssh_step2' => '<strong>Scan</strong> server users in <a href="' . $rwPortage . '/comptes-distants" class="text-blue-600 underline">Remote Users</a> and classify each account.',
     'tip.ssh_step3' => '<strong>Check</strong> the target servers in the list below.',
     'tip.ssh_step4' => '<strong>Click</strong> "Deploy keys" - the preflight checks connectivity and shows the account inventory.',
     'tip.ssh_step5' => 'Deployment <strong>never deletes</strong> any account. It only deploys SSH keys for authorized users.',
@@ -20,7 +28,7 @@ return [
     'tip.admin_step2' => '<strong>Create</strong> users in the "Users" tab and assign their SSH keys.',
     'tip.admin_step3' => '<strong>Assign</strong> servers to each user in "Access & Permissions".',
     'tip.admin_step4' => '<strong>Configure</strong> email notifications in "Access & Permissions > Notifications".',
-    'tip.admin_step5' => 'Go to <a href="/adm/server_users.php" class="text-blue-600 underline">Remote Users</a> to scan and classify existing accounts.',
+    'tip.admin_step5' => 'Go to <a href="' . $rwPortage . '/comptes-distants" class="text-blue-600 underline">Remote Users</a> to scan and classify existing accounts.',
 
     'tip.cve_title' => 'How does CVE scanning work?',
     'tip.cve_step1' => 'The scan connects via SSH and lists installed packages (<code class="text-xs bg-gray-200 dark:bg-gray-700 px-1 rounded">dpkg -l</code>).',
@@ -120,7 +128,7 @@ return [
     'tip.notif_title' => 'How do notifications work?',
     'tip.notif_step1' => 'In-app notifications appear via the bell icon in the navigation bar.',
     'tip.notif_step2' => 'Filter by type (CVE, audit, security) or status (read / unread).',
-    'tip.notif_step3' => 'Email preferences are configured in <a href="/adm/admin_page.php" class="text-blue-600 underline">Admin > Access & Permissions</a>.',
+    'tip.notif_step3' => 'Email preferences are configured in <a href="' . $rwPortage . '/comptes" class="text-blue-600 underline">Admin > Access & Permissions</a>.',
 
     'tip.profile_title' => 'How to configure your profile?',
     'tip.profile_step1' => 'Add your <strong>email</strong> to receive notifications (CVE scan, security alerts).',

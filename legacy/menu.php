@@ -299,36 +299,35 @@ $sideLink = function(string $href, string $svg, string $label, string $title = '
     });
 })();
 
-// Global search
+// Global search — LA RECHERCHE VIVE EST RETIREE, ET VOICI POURQUOI
+//
+// Elle interrogeait l'API globale du legacy, ARCHIVEE (bloc d'extinction).
+// Cote portage, `/recherche` est un `view('recherche', ...)` : une PAGE HTML, pas
+// un `{results:[...]}`. Rebaser le `fetch` dessus ferait lever la lecture JSON.
+//
+// ⚠ ET LA PANNE ETAIT DEJA LA, MASQUEE PAR SON PROPRE REPLI : le `catch` se
+// contentait de cacher le panneau. Depuis l'archivage, chaque frappe partait,
+// echouait, et rien ne s'affichait — aucune erreur visible, aucun resultat jamais,
+// donc rien a quoi se cogner. **Un repli qui cache l'echec transforme une capacite
+// morte en capacite silencieuse**, et ce silence l'a fait survivre a son endpoint.
+//
+// L'iso-legacy est impossible : l'endpoint n'existe plus. Ce qui EXISTE est la page
+// de recherche du portage — donc on y mene, au lieu de simuler un panneau vide.
 let _searchTimeout;
 function globalSearch(query) {
     const container = document.getElementById('search-results');
     if (!container) return;
     clearTimeout(_searchTimeout);
     if (query.length < 2) { container.classList.add('hidden'); return; }
-    _searchTimeout = setTimeout(async () => {
-        try {
-            const r = await fetch('/adm/api/global_search.php?q=' + encodeURIComponent(query));
-            const d = await r.json();
-            if (!d.results || d.results.length === 0) {
-                container.innerHTML = '<div class="p-3 text-xs text-gray-400 text-center">Aucun resultat</div>';
-                container.classList.remove('hidden');
-                return;
-            }
-            const icons = {server:'&#128421;', user:'&#128100;', cve:'&#128274;'};
-            const colors = {online:'text-green-500', offline:'text-red-400', active:'text-green-500', inactive:'text-gray-400', critical:'text-red-600', high:'text-orange-500', medium:'text-yellow-500'};
-            container.innerHTML = d.results.map(r => `
-                <a href="${escHtml(r.url)}" class="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border-b border-gray-100 dark:border-gray-700 last:border-0">
-                    <span class="text-sm ${colors[r.status] || 'text-gray-400'}">${icons[r.type] || ''}</span>
-                    <div class="flex-1 min-w-0">
-                        <div class="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">${escHtml(r.label)}</div>
-                        <div class="text-[10px] text-gray-400 truncate">${escHtml(r.sub)}</div>
-                    </div>
-                    <span class="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-600 text-gray-500 dark:text-gray-400">${escHtml(r.type)}</span>
-                </a>
-            `).join('');
-            container.classList.remove('hidden');
-        } catch(e) { container.classList.add('hidden'); }
+    _searchTimeout = setTimeout(() => {
+        const base = <?= json_encode(rtrim(getenv('LARAVEL_URL') ?: 'http://localhost:8080', '/'), JSON_UNESCAPED_SLASHES) ?>;
+        const cible = base + '/recherche?q=' + encodeURIComponent(query);
+        container.innerHTML = '<a href="' + escHtml(cible) + '" class="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">'
+            + '<span class="text-sm text-gray-400">&#128269;</span>'
+            + '<div class="flex-1 min-w-0"><div class="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">'
+            + escHtml(query) + '</div>'
+            + '<div class="text-[10px] text-gray-400">Ouvrir la recherche</div></div></a>';
+        container.classList.remove('hidden');
     }, 250);
 }
 document.addEventListener('click', e => {
