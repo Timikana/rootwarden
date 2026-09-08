@@ -5,6 +5,106 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## Recherche vivante dans l'en-tête — l'écran manquait, pas l'endpoint
+
+Le legacy avait une recherche **instantanée dans son menu** ; le portage n'avait qu'une page.
+
+### ⚠ Ce qui manquait n'était PAS un endpoint
+
+    recherche.js:161        appelle('/search?q=…')  ->  GET /api/gateway/search
+    RoutesBackend:120/142   '/search' en liste blanche ET en ADMIN_ONLY
+    backend/routes/search.py:26  GET /search -> JSON
+
+**La page faisait déjà du direct en JSON.** Un second endpoint aurait donné deux chemins pour
+un seul geste — et *le premier à diverger aurait été la garde*. Le panneau appelle donc le
+**même** chemin.
+
+*Le contrat qui circulait (`{results:[{type,label,sub,url,status}]}`) était celui de
+`global_search.php`, endpoint ARCHIVÉ : la forme du consommateur mort. Le producteur vivant
+rend des catégories, et le champ de lien s'appelle `link`, pas `url`.*
+
+### La règle de sécurité a UNE seule copie, désormais
+
+`normalise()`/`resout()` quittent `recherche.js` pour `public/js/liens-legacy.js`, partagé par
+la page et le panneau. **Ce n'est pas un utilitaire de navigation : re-enraciner le chemin sur
+une base connue est CE QUI empêche un lien à schéma relatif de changer d'hôte.** Deux copies
+d'une règle de sécurité finissent par diverger — il n'y en a plus qu'une.
+
+Remesurée sur le code réel avant extraction, hrefs LUS à l'écran, puis **identiques après** :
+
+    //evil.example.com/x        ->  <legacy>/evil.example.com/x
+    https://evil.example.com/x  ->  <legacy>/https://evil.example.com/x
+    javascript:alert(1)         ->  <legacy>/javascript:alert(1)
+    TEMOIN /adm/audit_log.php   ->  <portage>/journal-audit      (DISCRIMINE)
+
+**Aucun validateur serveur ajouté** : la garde tient par construction, et un second garde là
+où le premier tient est un garde de plus à faire diverger.
+
+### La garde du panneau est celle de la route, relevée et non devinée
+
+`web.php:554` → `role:2` + `perm:can_admin_portal`. Le partiel porte la même condition.
+*Un champ offert à qui ne peut pas s'en servir n'est pas une capacité : c'est une panne
+promise à chaque frappe.* Mesuré sur `rw-test-admin` — **rôle 2 SANS la permission**, donc
+c'est la moitié PERMISSION du garde qui est exercée, pas seulement le rôle.
+
+### Sous le seuil, rien ne part
+
+Le backend rend `{results:{}, total:0}` sous deux caractères. Le panneau **n'émet donc
+aucune requête** en dessous, et l'annonce. *Apprendre la règle par une réponse vide ferait
+partir une requête par frappe, et rendrait « trop court » indiscernable de « aucun résultat ».*
+
+### ⚠ TREIZE ASSERTIONS VERTES, ET LE PANNEAU ÉTAIT INUTILISABLE
+
+Posé entre le titre et le groupe de droite, il s'ancrait par `right: 0` et **s'ouvrait vers la
+gauche, hors de l'écran** — libellés coupés au bord. Le chevron par défaut de `<details>`
+doublait la loupe, et la saisie restait étroite au milieu d'un panneau de 30rem.
+
+**Aucune des treize assertions ne pouvait le voir.** *C'est la troisième fois dans ce chantier
+qu'un défaut n'existe qu'à l'image.* Corrigé : panneau dans `.rw-entete__compte`, marqueur
+masqué, saisie pleine largeur. Vérifié à 1400 px **et** à 390 px, où le champ s'efface — c'est
+le CHAMP qui cède, pas les pastilles, parce que la recherche reste atteignable par son entrée
+de menu.
+
+### Deux pièges d'écriture payés
+
+**`lang/*/search.php` dans un commentaire de bloc JS.** La séquence ferme le commentaire :
+tout ce qui suivait devenait du code, et `node --check` désignait une ligne trente plus bas.
+*Même espèce que le `;` dans un commentaire de migration SQL.*
+
+**Deux jetons CSS inventés** (`--rw-bord`, `--rw-fond-carte`). Ils n'existent pas — et une
+variable CSS absente ne lève rien, elle rend la déclaration inerte. Les quatre jetons employés
+(`--rw-surface`, `--rw-bordure`, `--rw-rayon`, `--rw-ombre`) sont relevés dans le fichier.
+
+### ⚠ Compilés Blade appartenant à root : mesuré avant d'écrire
+
+    root  <-  composants/entrees-menu.blade.php
+    root  <-  layouts/portail.blade.php
+
+Éditer l'une ou l'autre = **500 sur toutes les pages** (le socle est inclus partout).
+`view:clear` aurait déclenché une recompilation pour toutes les sessions : geste chirurgical
+à la place, `chown www-data` sur ces deux fichiers — ce que l'entrypoint fait au démarrage.
+Portail vérifié au réseau après chaque écriture : `200`, témoin `/zzz` → `404`.
+
+**Il reste 7 compilés `root`** — mine latente pour qui éditera ces vues. Elle se ferme à la
+prochaine recréation du conteneur.
+
+### Mesure — 13 assertions, 0 échec, plus la non-régression de la page
+
+    garde     l'en-tete est rendue (temoin) · role 2 sans permission : AUCUN panneau
+    seuil     sous 2 car. : 0 requete emise · le seuil est annonce
+    nominal   a 2 car. la requete part · les resultats sont rendus
+    liens     aucun href hors des deux origines · aucun javascript:
+              TEMOIN le lien legitime est traduit en interne
+    reseau    0 requete vers un hote hostile
+    page      /recherche : hrefs IDENTIQUES avant et apres l'extraction
+
+**Couplage assumé** : la page `/recherche` lit `liens-legacy.js` chargé par le partiel du
+socle. Tout compte qui atteint la page a la permission qui rend le partiel, donc le module est
+là. Si le partiel disparaissait, `resout()` rendrait `null` et les libellés s'afficheraient
+**sans lien** plutôt qu'avec un `href="null"` — dégradation choisie, pas subie.
+
+---
+
 ## Liens morts du legacy — 21, pas 13, et les deux sondes etaient aveugles aux memes huit
 
 **2026-09-08.** Les pages encore servies du legacy pointaient vers 21 cibles archivees.

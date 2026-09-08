@@ -9,6 +9,10 @@ return [
     'placeholder' => 'A server, a user, a CVE, a ticket...',
     'tip_input'   => 'Cross-cutting search, two characters minimum.',
     'label'       => 'Search term',
+    /* Header search panel. Every other label is REUSED from this same list, so
+     * one state never gets two wordings. */
+    'menu_ouvrir' => 'Search',
+    'menu_voir_tout' => 'Open the full search',
 
     'guide_titre'  => 'What the search covers',
     'guide_portee' => 'Five sources: servers, users, CVEs, tickets and the audit log. Each category returns '
