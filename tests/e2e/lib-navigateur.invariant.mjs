@@ -33,7 +33,17 @@ import { fileURLToPath } from 'node:url';
 
 /* Etat mesure le 2026-09-08 par cet instrument. A DESCENDRE en meme temps que
  * les adoptions, jamais a monter. */
-export const REFERENCE = { population: 110, defautA: 62, defautB: 37 };
+export const REFERENCE = { population: 125, defautA: 70, defautB: 37 };
+
+/*
+ * ⛔ CETTE REFERENCE A ETE FAUSSE UNE FOIS, ET DANS LE SENS QUI DEDOUANE.
+ * Premiere version : { population: 110, defautA: 62, defautB: 37 } — calibree
+ * sur un predicat qui ne retenait que `puppeteer.launch` et manquait donc les
+ * 15 suites qui lancent par `launchBrowser()`. **Une regression chez elles
+ * aurait ete invisible : le cliquet n'aurait rien dit.** Un cliquet dont la
+ * POPULATION est trop etroite ne se signale pas d'elle-meme, et son vert
+ * rassure plus qu'une absence de cliquet. Releve par `gestion-ssh-key-c6`.
+ */
 
 /* Les fichiers de l'enveloppeur lui-meme : ils citent `puppeteer.launch` et
  * pollueraient la population qu'ils mesurent. */
@@ -101,10 +111,34 @@ export function corpsFinally(d) {
 /** Classe une source. Rend `null` si elle ne lance pas de navigateur. */
 export function classe(src) {
     const d = depouille(src);
-    const lan = d.indexOf('puppeteer.launch');
+    /*
+     * ⛔ LA POPULATION INCLUT LA FABRIQUE, et l'avoir oubliee a calibre une
+     * premiere version de ce cliquet sur 15 suites INVISIBLES. Une suite qui
+     * lance par `launchBrowser()` detient un navigateur exactement comme celle
+     * qui appelle `puppeteer.launch` : une regression chez elle ne devait pas
+     * passer sous le radar. Releve par `gestion-ssh-key-c6`.
+     */
+    const parDirect = d.indexOf('puppeteer.launch');
+    const parFabrique = d.search(/launchBrowser\s*\(/);
+    const lan = parDirect >= 0 ? parDirect : parFabrique;
     if (lan < 0) return null;
     const spans = corpsFinally(d);
-    const nav = [...d.matchAll(/\b(navigateur|browser|nav|b)\s*\.\s*close\s*\(/g)].map((m) => m.index);
+    /*
+     * ⚠ CE MOTIF EST DERIVE, PAS DEVINE. Recensement des receveurs de
+     * `.close(` sur la source depouillee de tout `tests/e2e/` :
+     *
+     *   ctx 151 · navigateur 121 · browser 30 · c 28 · page 11
+     *   ctxEn 4 · context 1
+     *
+     * `ctx`, `c`, `ctxEn`, `context` sont des CONTEXTES de navigateur et
+     * `page` une page : les compter comme une fermeture de navigateur
+     * EXONERERAIT une suite qui ferme ses contextes dans un `finally` et
+     * n'a jamais ferme le navigateur. Seuls `navigateur` et `browser` en
+     * designent un. *Une version anterieure listait aussi `nav` et `b` : ils
+     * n'apparaissent NULLE PART dans le recensement — inoffensifs, mais
+     * inventes.*
+     */
+    const nav = [...d.matchAll(/\b(navigateur|browser)\s*\.\s*close\s*\(/g)].map((m) => m.index);
     const exits = [...d.matchAll(/process\.exit\s*\(/g)].map((m) => m.index);
     const gouvernees = nav.filter((p) => spans.some(([a, z]) => a < p && p < z));
     const dernier = nav.length ? Math.max(...nav) : null;
@@ -124,19 +158,28 @@ export function classe(src) {
 // ── temoins forges : l'instrument doit les classer, sinon il ne mesure rien ──
 const TEMOINS = [
     ['BON — fermeture dans un finally',
-        'try { const b = await puppeteer.launch({}); } finally { await b.close(); }\nprocess.exit(0);',
+        'try { const navigateur = await puppeteer.launch({}); }'
+        + ' finally { await navigateur.close(); }\nprocess.exit(0);',
         { defautA: false, defautB: false }],
     ['MAUVAIS — le finally n\'existe QUE dans un commentaire',
-        '/* finally { await b.close(); } — et ce commentaire MENT */\n'
-        + 'const b = await puppeteer.launch({});\nawait b.close();',
+        '/* finally { await navigateur.close(); } — et ce commentaire MENT */\n'
+        + 'const navigateur = await puppeteer.launch({});\nawait navigateur.close();',
         { defautA: true, defautB: false }],
     ['MAUVAIS — un exit interpose',
-        'try { const b = await puppeteer.launch({}); process.exit(1); }'
-        + ' finally { await b.close(); }',
+        'try { const navigateur = await puppeteer.launch({}); process.exit(1); }'
+        + ' finally { await navigateur.close(); }',
         { defautA: false, defautB: true }],
     ['HORS POPULATION — puppeteer.launch seulement en commentaire',
-        '// const b = await puppeteer.launch({});\nconsole.log(1);',
+        '// const navigateur = await puppeteer.launch({});\nconsole.log(1);',
         null],
+    ['DANS LA POPULATION par la FABRIQUE — launchBrowser() sans fermeture',
+        'const navigateur = await launchBrowser();\nawait navigateur.newPage();',
+        { defautA: true, defautB: false }],
+    ['UN CONTEXTE FERME NE VAUT PAS UN NAVIGATEUR FERME',
+        'const navigateur = await puppeteer.launch({});\n'
+        + 'try { const ctx = await navigateur.createBrowserContext(); }'
+        + ' finally { await ctx.close(); }',
+        { defautA: true, defautB: false }],
 ];
 
 function fichiers(racine) {
@@ -171,12 +214,53 @@ for (const [nom, src, attendu] of TEMOINS) {
 }
 note('');
 
+/*
+ * ⚠ UN MOTIF DERIVE DE LA SOURCE D'AUJOURD'HUI NE COUVRE PAS LE CODE DE DEMAIN.
+ * Une suite neuve pourrait nommer son navigateur autrement et passer sous le
+ * radar sans que rien ne le signale. On RECENSE donc les receveurs a chaque
+ * execution et on REFUSE tout nom inconnu : la classification devient une
+ * decision explicite au lieu d'un oubli silencieux.
+ */
+export const RECEVEURS_CONNUS = {
+    navigateur: 'navigateur',
+    browser: 'navigateur',
+    ctx: 'contexte',
+    c: 'contexte',
+    ctxEn: 'contexte',
+    context: 'contexte',
+    page: 'page',
+};
+
+export function recense(sources) {
+    const compte = new Map();
+    for (const src of sources) {
+        const d = depouille(src);
+        for (const m of d.matchAll(/([A-Za-z_$][A-Za-z0-9_$]*)\s*\.\s*close\s*\(/g)) {
+            compte.set(m[1], (compte.get(m[1]) || 0) + 1);
+        }
+    }
+    return compte;
+}
+
 const racine = join(dirname(fileURLToPath(import.meta.url)));
 const pop = [];
 for (const f of fichiers(racine)) {
     const r = classe(readFileSync(f, 'utf8'));
     if (r) pop.push([basename(f), r]);
 }
+
+// ── le recensement, AVANT les comptes : un nom inconnu invalide les comptes ──
+const cens = recense(fichiers(racine).map((f) => readFileSync(f, 'utf8')));
+const inconnus = [...cens.entries()].filter(([nom]) => !(nom in RECEVEURS_CONNUS));
+note('  recensement des receveurs de .close( :');
+note(`      ${[...cens.entries()].sort((x, y) => y[1] - x[1])
+    .map(([n, v]) => `${n} ${v}`).join(' · ')}`);
+verifie('aucun receveur de .close( inconnu',
+    inconnus.length === 0,
+    `${inconnus.map(([n, v]) => `${n} (${v} fois)`).join(', ')} — `
+    + 'classer chaque nom dans RECEVEURS_CONNUS (navigateur / contexte / page) '
+    + 'AVANT de lire les comptes : un navigateur nomme autrement est invisible.');
+note('');
 
 const a = pop.filter(([, r]) => r.defautA);
 const b = pop.filter(([, r]) => r.defautB);
