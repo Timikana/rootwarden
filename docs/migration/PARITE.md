@@ -22610,6 +22610,19 @@ intergiciel Laravel porte la garde, alors qu'elle est sur le backend.
 **La ligne `['GET', 'api/gateway/{chemin?}', []]` (l.63) est deja la**, et son tableau vide **est une
 information** : la passerelle n'ajoute ni role ni permission cote Laravel. **Rien a inscrire de plus.**
 
+#### Le CRITERE, sous sa forme durable — retenu de la session 8 le 2026-09-08
+
+Elle a **accepte le refus et corrige la consigne**, en la reformulant mieux que je ne l'avais fait :
+
+> **La route est-elle dans `Routeur::getRoutes()` ?** *Si oui, inscription obligatoire dans le meme
+> commit. Si elle passe par la passerelle, ne pas inscrire — et dire pourquoi.*
+
+⚠ **Et elle avait donne la consigne fausse a TROIS sessions, en ne la corrigeant qu'aupres de moi.** *Une
+correction n'a pas de destinataire naturel* — deja inscrit dans la memoire du chantier, et c'est la
+deuxieme fois aujourd'hui : les deux autres sessions tiennent encore la version qui fait rougir
+`le_releve_ne_nomme_aucune_route_disparue`. **Signale, parce que le cout de ne pas le faire tombe sur le
+banc d'un autre.**
+
 ### Ce que je n'ai pas mesure, et je le dis
 
 Je n'ai pas ouvert la page au navigateur, et **je n'ai exerce aucun des deux gestes** : le POST
