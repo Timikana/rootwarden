@@ -14109,3 +14109,138 @@ appartient à l'exploitant, comme le geste.
 réfutées une heure plus tôt ; celle-ci est réelle, précise, et tient en une ligne de
 configuration.*
 
+
+---
+
+## ✅ E-476 — DEUX SONDES, DEUX ANGLES MORTS, LES MÊMES HUIT LIENS — ET LA DESTINATION FAUSSE QUE J'AI REFUSÉE
+
+**2026-09-08, 03:36 → 04:2x.** Relance de l'équipe. **Production depuis 02:35 : 7 commits,
+0 CODE.** Ratio doc/code infini — et le travail existait : *je l'avais nommé à 02:00 et pas
+fait.* Ce tour l'a fait.
+
+### ① Le compte des liens morts était 21, pas 13 — et aucun instrument ne voyait l'union
+
+```
+suite liens-morts-legacy.mjs     13   href= · fetch( · action= · sideLink( · window.location
+ma sonde ad hoc (head/footer)     9   toute chaine "/x.php" citee
+                                 ──
+UNION                            21   et les 27 autres sont dans _deprecated/, hors service
+```
+
+Les **huit** que la suite ratait vivaient dans une table de raccourcis clavier :
+
+```js
+const routes = {c: '/security/', a: '/adm/admin_page.php', A: '/ssh-audit/', ...};
+if (routes[e.key]) { window.location.href = routes[e.key]; }
+```
+
+Son motif `window.location` exigeait un **littéral** en partie droite. Ici la destination
+atteint bien `location.href` — mais **à l'exécution**, par une variable.
+
+> **Le grain de la sonde était le LITTÉRAL ; l'objet est la DESTINATION.**
+
+**Et deux de ces huit échappaient AUSSI à ma sonde**, qui voyait les six autres : elle
+excluait la ligne **entière** dès qu'elle y trouvait `LARAVEL_URL`, alors qu'une seule
+ligne portait un lien déjà rebasé **et** deux liens morts. *Exclusion par LIGNE, objet par
+LIEN* — [[feedback_grain_de_la_mesure]] une fois de plus, et du côté qui **dédouane**.
+
+> **Les deux instruments étaient aveugles aux mêmes liens, pour deux raisons différentes,
+> et aucun des deux ne le disait.** Une déclaration d'angle mort protège le lecteur ; deux
+> instruments qui déclarent chacun le leur **ne couvrent pas pour autant leur union**.
+
+*Ce qui a rendu l'écart trouvable : la suite du pair imprime ses formes lues à chaque
+exécution et dit « un vert ne dit pas aucun lien mort, il dit aucun dans ces formes-là ».
+C'est cette phrase qui m'a fait chercher.* **L'aveu d'un instrument est ce qui permet de
+l'auditer** — [[feedback_alarme_et_dedouanement]].
+
+### ② L'arbitrage qui m'appartenait : refuser une destination plausible
+
+19 des 21 se rebasent, destination prouvée route par route contre `laravel/routes/web.php`
+— jamais devinée depuis un nom. **Deux ne se rebasent pas.**
+
+**`/privacy.php` → RETIRÉ, pas redirigé.** Le portage n'a aucune politique de
+confidentialité : `cgu.blade.php` porte **0 occurrence** de « confidentialité », « RGPD »
+ou « données personnelles ». Les deux substitutions plausibles sont fausses :
+
+```
+/cgu                          ce sont les CONDITIONS, pas la politique
+/profil/donnees-personnelles  ExportRgpdController — l'export art. 20 :
+                              un GESTE de l'utilisateur, pas une NOTICE
+```
+
+> **Une destination fausse est pire qu'une destination absente : un lien légal qui mène
+> ailleurs atteste une conformité qui n'est pas là.**
+
+*Et les deux étaient tentantes exactement parce qu'elles sont du bon domaine.* La dette est
+inscrite **en place**, à l'endroit où le lien était — pas dans un dossier que personne
+n'ouvrira. **Assigné à `94`** : la page, la route publique, la parité FR/EN.
+
+**La recherche vive → menée à la page qui existe.** Son endpoint JSON est archivé et
+`/recherche` est un `view()` : rebaser le `fetch` ferait lever la lecture JSON. **Assigné à
+`c1`** pour l'endpoint ; en attendant, le panneau mène à `/recherche?q=`.
+
+⚠ **Et la panne était déjà là, masquée par son propre repli** :
+
+```js
+catch(e) { container.classList.add('hidden'); }
+```
+
+Depuis l'archivage, chaque frappe partait, échouait, et le menu cachait le panneau. Aucune
+erreur visible, aucun résultat jamais — **donc rien à quoi se cogner.**
+
+> **Un repli qui cache l'échec transforme une capacité morte en capacité SILENCIEUSE, et
+> c'est ce silence qui l'a fait survivre à son endpoint.**
+
+*Voisin de [[feedback_garde_par_construction]] — « un repli d'AFFICHAGE sur un chemin
+d'ÉCRITURE est un défaut ratifié par son propre commentaire ». Ici le repli est bien sur un
+chemin d'affichage, et c'est quand même lui qui a effacé la panne.*
+
+### ③ Ce que j'ai commis contre moi ce tour : quatre comptes faux, tous l'INSTRUMENT
+
+```
+1  « il reste global_search.php »   MA PROSE contenait le motif que je verifiais
+2  « r.json() ne doit plus etre la » asserte sur le FICHIER, propriete du BLOC
+3  6 echantillons attendus, 7 vus    la 7e vivait dans le includes() du test lui-meme
+4  6 attendus, 4 vus                 ma borne `};` matchait DANS UNE CHAINE
+```
+
+**Quatre fois de suite, et jamais le fichier.** *Chaque assertion a mordu avant l'écriture —
+c'est le seul point qui a bien fonctionné : le fichier n'a jamais été écrit sur un contrôle
+faux.* Mais [[feedback_controle_qui_ne_commande_pas]] compte désormais 13 occurrences de
+« le prédicat était faux, pas le fichier », et la cause est la même quatre fois : **je
+n'énumère pas ce que je viens d'écrire.**
+
+### ④ Et le motif que j'ai ajouté puis retiré
+
+J'avais ajouté, avec `table {k: "/x"}`, un motif `location = "/x"`. **Redondant** :
+`window.location` le couvrait déjà. Je l'avais ajouté **sans lire la liste à laquelle je
+l'ajoutais** — et ma mesure d'extraction, censée le valider, avait reproduit *mes trois
+motifs* en les nommant « les formes de la suite ».
+
+> **Reproduire un instrument pour le mesurer mesure la reproduction.**
+
+Le zéro qu'il rendait ne disait pas « cette forme est absente du parc » mais **« cette
+forme est déjà lue par sa voisine »** — deux causes indiscernables dans le même zéro,
+[[feedback_negatif_exige_un_temoin]].
+
+**Le correctif est structurel, pas une vigilance** : chaque forme doit désormais extraire
+son **propre échantillon forgé**, sinon la suite s'arrête à `2`. *Une forme qui n'extrait
+rien du parc n'est pas fausse ; elle est NON MESURÉE — et « non mesurée » se lit
+« couverte » dès qu'on l'imprime dans la liste des formes lues.*
+
+```
+base                0
+5 mutations         2   prediction scellee : 2, tenue sur les cinq
+lint php -l         5 fichiers propres, temoin+ en echec comme requis
+```
+
+### ⑤ Ce que ce tour NE dit pas
+
+**« Les sessions sans CODE depuis deux tours » n'est pas mesurable.** *Git ne porte aucune
+identité de session* — la règle que je me suis donnée après deux erreurs d'attribution.
+J'ai donc relancé sur **ce qui est assigné et non livré**, et sur les deux capacités que
+cette mesure a découvertes. **`c6` reste bloquée sur le mot du port SSH ; ce n'est pas une
+session sans production, c'est une session en attente de l'exploitant.**
+
+**Rien de neuf n'attend l'exploitant** au-delà des trois actes déjà écrits — plus
+`MAIL_MAILER` pour ⑤ (`E-475`). *Je ne crée pas de dossier pour les redire.*
