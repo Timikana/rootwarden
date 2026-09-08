@@ -137,6 +137,22 @@ def get_service_status(client, root_password: str, service: str) -> dict:
     """
     service = _validate_service_name(service)
     props = 'ActiveState,SubState,MainPID,MemoryCurrent,Description,LoadState,UnitFileState,ExecMainStartTimestamp'
+    #   `service` est passe par `_validate_service_name` a la ligne 138. Ce
+    #   validateur fait `.strip()` PUIS `_SERVICE_RE.fullmatch` (:52), sur
+    #   `^[a-zA-Z0-9@_:][a-zA-Z0-9@._:-]*$` — le jeu de caracteres legal d'un nom
+    #   d'unite systemd, et rien de plus.
+    #
+    #   EPREUVE du 2026-09-09, sur la fonction entiere et non sur le motif seul :
+    #     ACCEPTE  sshd · nginx.service · getty@tty1.service · user@1000.service
+    #     REFUSE   `sshd; id` · `sshd && id` · `sshd|id` · `$(id)` · backtick
+    #              · `sshd\nid` · `../etc/passwd` · `sshd id` · `-sshd` · `.sshd` · ''
+    #     NORMALISE `sshd\n` -> `sshd` : le `.strip()` precede le `fullmatch`,
+    #              donc le piege du `$` python (qui accepte un `\n` final) est
+    #              ferme DEUX fois ici.
+    #   C'est le REJET qui neutralise. `shlex.quote` serait redondant.
+    #   `props` (:139) est un litteral pose UNE ligne au-dessus : la liste des
+    #   proprietes systemd demandees. Aucune donnee de requete n'y entre.
+    # nosemgrep: rw-shell-fstring-execute-as-root
     out, _, _ = execute_as_root(
         client, f'systemctl show {service} --property={props}',
         root_password, timeout=10)
@@ -186,6 +202,11 @@ def start_service(client, root_password: str, service: str) -> tuple[str, str, i
     """Demarre un service systemd."""
     service = _validate_service_name(service)
     _check_protected(service)
+    #   `service` valide a la ligne 187 — meme validateur que les six autres
+    #   fonctions de controle de ce module, dont l'epreuve est detaillee au
+    #   premier site annote (`get_service_status`). Ce qui est propre a CE site :
+    #   la validation est bien PRESENTE, deux lignes avant l'appel.
+    # nosemgrep: rw-shell-fstring-execute-as-root
     return execute_as_root(
         client, f'systemctl start {service}',
         root_password, timeout=30)
@@ -195,6 +216,11 @@ def stop_service(client, root_password: str, service: str) -> tuple[str, str, in
     """Arrete un service systemd."""
     service = _validate_service_name(service)
     _check_protected(service)
+    #   `service` valide a la ligne 196 — meme validateur que les six autres
+    #   fonctions de controle de ce module, dont l'epreuve est detaillee au
+    #   premier site annote (`get_service_status`). Ce qui est propre a CE site :
+    #   la validation est bien PRESENTE, deux lignes avant l'appel.
+    # nosemgrep: rw-shell-fstring-execute-as-root
     return execute_as_root(
         client, f'systemctl stop {service}',
         root_password, timeout=30)
@@ -204,6 +230,11 @@ def restart_service(client, root_password: str, service: str) -> tuple[str, str,
     """Redemarre un service systemd."""
     service = _validate_service_name(service)
     _check_protected(service)
+    #   `service` valide a la ligne 205 — meme validateur que les six autres
+    #   fonctions de controle de ce module, dont l'epreuve est detaillee au
+    #   premier site annote (`get_service_status`). Ce qui est propre a CE site :
+    #   la validation est bien PRESENTE, deux lignes avant l'appel.
+    # nosemgrep: rw-shell-fstring-execute-as-root
     return execute_as_root(
         client, f'systemctl restart {service}',
         root_password, timeout=30)
@@ -213,6 +244,11 @@ def enable_service(client, root_password: str, service: str) -> tuple[str, str, 
     """Active un service au demarrage."""
     service = _validate_service_name(service)
     _check_protected(service)
+    #   `service` valide a la ligne 214 — meme validateur que les six autres
+    #   fonctions de controle de ce module, dont l'epreuve est detaillee au
+    #   premier site annote (`get_service_status`). Ce qui est propre a CE site :
+    #   la validation est bien PRESENTE, deux lignes avant l'appel.
+    # nosemgrep: rw-shell-fstring-execute-as-root
     return execute_as_root(
         client, f'systemctl enable {service}',
         root_password, timeout=15)
@@ -222,6 +258,11 @@ def disable_service(client, root_password: str, service: str) -> tuple[str, str,
     """Desactive un service au demarrage."""
     service = _validate_service_name(service)
     _check_protected(service)
+    #   `service` valide a la ligne 223 — meme validateur que les six autres
+    #   fonctions de controle de ce module, dont l'epreuve est detaillee au
+    #   premier site annote (`get_service_status`). Ce qui est propre a CE site :
+    #   la validation est bien PRESENTE, deux lignes avant l'appel.
+    # nosemgrep: rw-shell-fstring-execute-as-root
     return execute_as_root(
         client, f'systemctl disable {service}',
         root_password, timeout=15)
@@ -233,6 +274,14 @@ def get_service_logs(client, root_password: str, service: str, lines: int = 50) 
     """Lit les dernieres lignes du journal d'un service via journalctl."""
     service = _validate_service_name(service)
     lines = max(10, min(500, int(lines)))
+    #   `service` valide a la ligne 234 — meme validateur que les six autres
+    #   fonctions de controle de ce module, dont l'epreuve est detaillee au
+    #   premier site annote (`get_service_status`). Ce qui est propre a CE site :
+    #   la validation est bien PRESENTE, deux lignes avant l'appel.
+    #   `lines` (:235) est `max(10, min(500, int(lines)))` : `int()` LEVE sur
+    #   tout non-numerique et le clamp borne le reste. La valeur interpolee est
+    #   un ENTIER de [10, 500] — c'est le TYPE qui neutralise, pas un rejet.
+    # nosemgrep: rw-shell-fstring-execute-as-root
     out, _, _ = execute_as_root(
         client, f'journalctl -u {service} -n {lines} --no-pager',
         root_password, timeout=15)
