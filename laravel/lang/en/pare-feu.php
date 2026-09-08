@@ -179,6 +179,17 @@ return [
     'rb_conf_texte' => 'The current rules on :machine will be REPLACED by this archived version. The current state is archived before the write, so this rollback is itself reversible. No request has been sent yet.',
     'rb_conf_ok'    => 'Restore this version',
     'rb_conf_non'   => 'Cancel',
+    /*
+     * VALIDATION BEFORE ROLLBACK — TWO REFUSALS, TWO SENTENCES.
+     *
+     * « invalid » is an ACCUSATION: it is about the rules, and it must be true.
+     * « undecided » is an ADMISSION: nothing was verified. Both refuse; merging
+     * them would wear the guard down, because an operator who knows his ruleset
+     * is sound would learn that the guard is wrong.
+     */
+    'rb_valid_en_cours'   => 'Checking this version against the machine…',
+    'rb_valid_invalide'   => "⛔ This version is refused: the machine cannot load it. It may have been valid the day it was archived — restored now, it would overwrite the rules file without being able to load it, and the machine would come back up with no firewall. Nothing was applied.",
+    'rb_valid_indecidable' => "⚠ Rollback refused: the check did not complete, so nothing proves this version can be loaded. Reason: :motif. Nothing was applied.",
     'rb_en_cours'   => 'Restoring…',
     'rb_annule'     => 'Cancelled — no request was sent.',
 ];
