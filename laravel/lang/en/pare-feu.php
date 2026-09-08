@@ -67,14 +67,11 @@ return [
     'fichier_absent' => 'This file does not exist on the machine. The active rules will therefore not be restored on reboot.',
 
     // ── What I1 does not do, said on screen rather than silently absent ──
-    'suite_titre' => 'This page changes nothing',
     /* ⚠ Fixed 2026-09-02 (E-318) — see the FR catalogue for the full note.
      * Dry-run validation IS ported (`pare-feu.js:710` calls `/iptables-validate`);
      * only applying rules and its rollback remain on the old portal. The backend
      * reserve is kept and stated: `iptables.py` has not been reloaded by the
      * running process, so the call being wired does not mean it answers. */
-    'suite' => "Reading, the database copy, dry-run validation and APPLYING rules are all ported here. Only rollback — restoring an archived version — remains on the previous portal. The history above lists the versions; that is where rollback will start from once ported.",
-    'suite_lien' => 'Open the firewall on the old portal',
 
     // ── I2: the database copy ───────────────────────────────────────────
     'copie_titre' => 'Copy stored in the database',

@@ -5,6 +5,74 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## Le dernier fil — l'encart tombe, et le parcours de I6 est mesuré
+
+Deux choses que l'entrée précédente déclarait non faites.
+
+### ⚠ Le parcours de I6 est mesuré : 24 assertions, 0 échec
+
+La mémoire a rendu 1,4 Go et Chrome démarre. **Rejoué, et il a rougi trois fois — sur mon
+instrument, pas sur le code.**
+
+    apercu montre    *filter :INPUT DROP -A INPUT --dport 22 ACCEPT   <- l'ANCIEN jeu
+    lectures         0                                                <- rien n'est parti
+    verdict          « reste joignable »                              <- calcule sur l'ancien
+
+`p.click()` sur le bouton d'historique **n'a pas déclenché son écouteur, sans lever**. Le
+verdict Q2 portait donc sur le jeu précédent, et trois assertions accusaient le code.
+
+**Discriminant** : un clic **en page** (`element.click()`) déclenche la lecture, le verdict
+passe à `false`, le port est nommé. *Le module était juste tout du long* — vérifié aussi hors
+navigateur, sur les six formes de fermeture :
+
+    politique DROP + regle SSH        -> true
+    politique DROP, AUCUNE regle SSH  -> false     <- exactement mon cas d'epreuve
+    politique ACCEPT, aucune SSH      -> true
+    regle DROP explicite, aucune SSH  -> false
+    politique DROP seule              -> false
+    vide                              -> null
+
+> **Un clic qui n'atteint rien ferait aussi PASSER une assertion « 0 requête ».** C'est la
+> même sortie que « la garde a tenu ». Une assertion d'atteignabilité est donc ajoutée —
+> `elementFromPoint` au centre du bouton — et elle passe : rien ne le recouvre. *L'échec de
+> `p.click()` était une course avec le `scrollIntoView` du panneau de consentement, pas un
+> défaut de l'écran.*
+
+*Ce qui a évité la fausse correction : mesurer le module séparément avant de toucher au code.
+Trois rouges convergents désignaient le même endroit, et l'endroit était bon.*
+
+### L'encart « non porté » est retiré — c'était le DERNIER lien vivant
+
+Il portait deux énoncés devenus faux :
+
+    'suite_titre'  « Cette page ne modifie rien »    -> elle applique ET restaure
+    'suite'        « seul le retour arriere reste »  -> I6 l'a porte
+
+*Un encart qui envoie vers un portail qu'on démonte, pour un geste qui est sous les yeux de
+qui le lit, est pire qu'inutile.* Les trois clés `suite*` quittent les deux catalogues dans le
+même geste (113 = 113) : **une clé que personne ne cite se lit comme une capacité qui existe
+encore ailleurs.**
+
+**Et c'était le seul lien vivant du portage vers le legacy** — les six autres sites sont des
+branches `@else` jamais prises : `Navigation` ne porte plus aucune entrée `legacy` (0 contre
+33 `route`), et le prédicat `porteDuLegacy` rend `false` pour les trois rôles, avec un témoin
+montrant qu'il sait rendre `true` sur un menu forgé sans route.
+
+### Mesure du retrait — 7 assertions, 0 échec
+
+    ⛔ la page rend TOUJOURS 200 apres retrait de l'encart
+    ⛔ l'encart a disparu · ⛔ le lien vers l'ancien portail a disparu
+    les CINQ gestes sont presents (relever · copie · valid · appl · rb)
+    aucun identifiant de traduction a l'ecran (retrait SANS orphelin)
+    ⛔ plus aucun lien externe hors le pied de page
+    aucun debordement horizontal
+
+*Le `200` après retrait n'est pas une formalité : un `@if` déséquilibré ne se voit qu'au
+rendu, et `node --check` ne lit pas du Blade. C'est pourquoi ce geste attendait que la machine
+puisse lancer un navigateur.*
+
+---
+
 ## I6 — le retour arrière : porté, et pourquoi c'était le plus dangereux des cinq
 
 ### L'asymétrie qui décide, et elle renverse l'attente
