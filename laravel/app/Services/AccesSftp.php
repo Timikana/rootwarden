@@ -64,9 +64,25 @@ use Illuminate\Support\Facades\DB;
  * Comme en D9a, et pour les memes raisons : gardes completes aux trois niveaux
  * (page en `checkAuth([ROLE_SUPERADMIN])` — role 2 mesure a 403 —, `/policy/`
  * en prefixe d'administration du proxy, `@require_role(3)` sur les routes), et
- * geste distant sur — `sftp_manager` ecrit un temporaire, lance `sshd -t` pour
- * valider la configuration COMPLETE, et ne deplace qu'ensuite. Un bloc syntaxi-
- * quement invalide ne peut pas fermer l'acces SSH a la machine.
+ * ⚠ CORRECTION DU 2026-09-08 : CETTE PHRASE DISAIT L'ORDRE A L'ENVERS.
+ *
+ * Elle affirmait que `sftp_manager` « ecrit un temporaire, lance `sshd -t` […] et
+ * ne deplace qu'ensuite ». **L'ordre reel est l'inverse** (`sftp_manager.py`) :
+ *
+ *     :227  cp -a target backup          sauvegarde de l'ancien
+ *     :231  mv tmpfile target            LE FICHIER FAUTIF EST EN PLACE
+ *     :236  sshd -t                      validation GLOBALE, apres le deplacement
+ *     :240  mv backup target / rm        restauration si KO
+ *     :253  systemctl reload             seulement si OK
+ *
+ * `sudo_manager`, lui, valide le TEMPORAIRE avant de deplacer. **Les deux modules
+ * du meme depot n'ont pas le meme ordre, et le commentaire decrivait le bon.**
+ *
+ * Ce qui reste VRAI : le sshd en service n'est jamais recharge avec un bloc
+ * invalide — la validation precede le `reload`. Ce qui est FAUX : « ne deplace
+ * qu'ensuite ». **Entre `:231` et `:236` le fichier fautif est a son chemin
+ * definitif** : un `reload` declenche par ailleurs dans cette fenetre
+ * l'appliquerait, et un arret du processus le laisserait en place.
  *
  * ⚠ CE QUE CE COMMENTAIRE AFFIRMAIT, ET QUI ETAIT FAUX A MOITIE.
  *
@@ -88,8 +104,24 @@ use Illuminate\Support\Facades\DB;
  *
  * ⚠ CE N'EST PAS UNE INJECTION DE SHELL — le contenu part par un heredoc CITE.
  * C'est une injection dans `sshd_config` : un saut de ligne ecrit des directives
- * arbitraires dans le bloc `Match User`, et un `reload` suit. `sshd -t` valide la
- * SYNTAXE, pas l'intention : `AllowTcpForwarding yes` est syntaxiquement parfait.
+ * arbitraires dans le bloc `Match User`, et un `reload` suit.
+ *
+ * ⚠ ET LA PORTEE SE MESURE, elle ne se suppose pas. Eprouve le 2026-09-08 sur
+ * OpenSSH 9.2, dans un conteneur JETABLE `--network none` (aucune machine du parc
+ * jointe), avec `sshd -T -C user=bob` qui rend la configuration EFFECTIVE :
+ *
+ *     ForceCommand injecte EN DOUBLE   -> le PREMIER gagne : `internal-sftp -d`
+ *                                         reste effectif. Le contournement de
+ *                                         `sftp_only` NE FONCTIONNE PAS.
+ *     directive ABSENTE du bloc        -> PREND EFFET : `AllowTcpForwarding no`
+ *     (AllowTcpForwarding, PermitTunnel)  devient `yes`, `PermitTunnel` aussi.
+ *     sshd -t sur les deux             -> code 0, aucune sortie
+ *
+ * **Donc `sshd -t` ne rejette pas le doublon, et la directive la plus consequente
+ * de cet endroit — `ForceCommand` — est neutralisee par la regle du premier
+ * gagnant d'OpenSSH.** Le residu reel : un role 3 peut ACTIVER sur ce compte ce
+ * que le bloc ne fixait pas — redirection TCP, tunnel — c'est-a-dire elargir un
+ * compte SFTP restreint sans defaire son `ForceCommand`.
  *
  * ⚠ BORNE DE SEVERITE, pour ne ni dramatiser ni minimiser : la page est en
  * `ROLE_SUPERADMIN` et les routes en `@require_role(3)`. **Ce n'est donc pas une
