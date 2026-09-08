@@ -267,3 +267,62 @@ vérifient la réplication : `/tickets/index.php` → `/tickets/` et
 > enverra vers un hôte qui ne répond plus du tout. *Ce n'est pas une régression le jour
 > J : c'est un changement de la nature de l'échec, de « page déménagée » à « serveur
 > injoignable ».*
+
+
+---
+
+## 9. ⛔ CORRECTION DE MON §8.1 — le portage LIT bien un fichier du legacy
+
+**Mesuré le 2026-09-08 16:15 CEST.** Mon §8.1 concluait *« 0 lecture d'un FICHIER du
+legacy »* et donc *« le portage ne lit pas le legacy »*. **C'est faux, sur un fichier.**
+
+    docker-compose.yml:123      ./legacy/version.txt:/var/www/html/version.txt:ro
+    docker-compose.prod.yml:124 idem
+    App\Support\Version:81      $chemin = base_path('version.txt')
+                          :86      $brut = @file_get_contents($chemin)
+    dans le conteneur           /var/www/html/version.txt  present, 8 octets
+    consommateur                layouts/portail.blade.php:147 — le pied de CHAQUE page
+
+**Le portage lit `legacy/version.txt` à chaque rendu de page.**
+
+### 9.1 Pourquoi ma sonde ne pouvait pas le voir — **une SIXIÈME espèce**
+
+Mon §8.1 cherchait `require|include|file_get_contents|fopen|realpath` **à proximité du
+mot `legacy`**. Or le code PHP ne nomme jamais le legacy : il lit
+`base_path('version.txt')`. **La dépendance est créée par le MONTAGE, pas par le code.**
+
+| # | espèce | où elle vit |
+|---|---|---|
+| 1-3 | `require` · lien/redirection · lien entrant du portage | dans le code |
+| 4 | chemin construit par `glob()` | dans le code |
+| 5 | configuration du SERVEUR (`ErrorDocument`) | dans `.htaccess` |
+| — | URL composée pour un COURRIEL | dans le code, sans trace de lien |
+| **6** | **montage de conteneur** | **dans `docker-compose.yml`** |
+
+> **Aucune lecture du code, aussi complète soit-elle, ne peut voir la sixième.** Le
+> fichier lu s'appelle `version.txt` des deux côtés du montage ; rien dans le PHP ne
+> dit qu'il vient d'ailleurs. *Et c'est la deuxième fois que ce nom de base me piège :
+> `laravel/version.txt` existe AUSSI sur le disque, et le montage le recouvre.*
+
+### 9.2 La conséquence pour l'extinction
+
+**Supprimer `legacy/` casse l'affichage de version du portage** — il retombe sur
+`nav.version_inconnue`. Le commentaire de `Version.php:13-24` documente d'ailleurs
+l'intention inverse : *« le numéro reste donc à UN seul endroit »*, la source unique
+étant `legacy/version.txt`.
+
+> **Le remède contre une version qui disparaîtrait à l'extinction a été de MONTER le
+> fichier du legacy — ce qui recrée la dépendance qu'on cherchait à retirer.**
+
+**C'est le seul point où le portage dépend du legacy à l'exécution, et il est
+actionnable sans arbitrage** : `laravel/version.txt` existe déjà sur le disque. Déplacer
+la source et changer les deux lignes de montage suffit. *Ce n'est pas mon périmètre.*
+
+### 9.3 Ce que ça ajoute à l'ordre du §7
+
+L'étage 3 disait : `_sortie.php` part en dernier, avec le vhost. **Il faut y ajouter
+une précondition** :
+
+    AVANT de supprimer `legacy/`, deplacer la source de `version.txt`
+    et corriger `docker-compose.yml:123` et `docker-compose.prod.yml:124`
+    — sinon le portage perd son numero de version au meme instant.
