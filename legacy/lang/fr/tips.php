@@ -1,11 +1,19 @@
 <?php
+
+/*
+ * Les liens de ces astuces pointaient vers des pages ARCHIVEES du legacy.
+ * Ils sont rebases sur le portage — un catalogue est un `return [...]`, donc la
+ * concatenation, pas `<?= ?>`.
+ */
+$rwPortage = rtrim(getenv('LARAVEL_URL') ?: 'http://localhost:8080', '/');
+
 return [
     'tip.default_title' => 'Comment ca marche ?',
 
     // Page Cles SSH (deploy)
     'tip.ssh_title' => 'Comment deployer les cles SSH ?',
-    'tip.ssh_step1' => '<strong>Prerequis :</strong> ajoutez votre cle SSH publique dans <a href="/profile.php" class="text-blue-600 underline">votre profil</a>.',
-    'tip.ssh_step2' => '<strong>Scannez</strong> les utilisateurs du serveur dans <a href="/adm/server_users.php" class="text-blue-600 underline">Utilisateurs distants</a> et classifiez chaque compte.',
+    'tip.ssh_step1' => '<strong>Prerequis :</strong> ajoutez votre cle SSH publique dans <a href="' . $rwPortage . '/profil" class="text-blue-600 underline">votre profil</a>.',
+    'tip.ssh_step2' => '<strong>Scannez</strong> les utilisateurs du serveur dans <a href="' . $rwPortage . '/comptes-distants" class="text-blue-600 underline">Utilisateurs distants</a> et classifiez chaque compte.',
     'tip.ssh_step3' => '<strong>Cochez</strong> les serveurs cibles dans la liste ci-dessous.',
     'tip.ssh_step4' => '<strong>Cliquez</strong> sur "Deployer les cles" - le preflight verifie la connexion et affiche l\'inventaire des comptes.',
     'tip.ssh_step5' => 'Le deploiement ne <strong>supprime jamais</strong> de compte. Il deploie uniquement les cles SSH des utilisateurs autorises.',
@@ -23,7 +31,7 @@ return [
     'tip.admin_step2' => '<strong>Creez</strong> les utilisateurs dans l\'onglet "Utilisateurs" et attribuez leurs cles SSH.',
     'tip.admin_step3' => '<strong>Assignez</strong> les serveurs a chaque utilisateur dans "Acces & Permissions".',
     'tip.admin_step4' => '<strong>Configurez</strong> les notifications email dans "Acces & Permissions > Notifications".',
-    'tip.admin_step5' => 'Allez dans <a href="/adm/server_users.php" class="text-blue-600 underline">Utilisateurs distants</a> pour scanner et classifier les comptes existants.',
+    'tip.admin_step5' => 'Allez dans <a href="' . $rwPortage . '/comptes-distants" class="text-blue-600 underline">Utilisateurs distants</a> pour scanner et classifier les comptes existants.',
 
     // Page Scan CVE
     'tip.cve_title' => 'Comment fonctionne le scan CVE ?',
@@ -134,7 +142,7 @@ return [
     'tip.notif_title' => 'Comment fonctionnent les notifications ?',
     'tip.notif_step1' => 'Les notifications in-app apparaissent via l\'icone cloche dans la barre de navigation.',
     'tip.notif_step2' => 'Filtrez par type (CVE, audit, securite) ou par statut (lue / non lue).',
-    'tip.notif_step3' => 'Les preferences email se configurent dans <a href="/adm/admin_page.php" class="text-blue-600 underline">Admin > Acces & Permissions</a>.',
+    'tip.notif_step3' => 'Les preferences email se configurent dans <a href="' . $rwPortage . '/comptes" class="text-blue-600 underline">Admin > Acces & Permissions</a>.',
 
     // Page Profil
     'tip.profile_title' => 'Comment configurer votre profil ?',

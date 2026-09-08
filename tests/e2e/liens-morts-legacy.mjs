@@ -100,6 +100,43 @@ const FORMES = [
     { nom: 'href="/x"',       motif: /href\s*=\s*["'](\/[^"']*)["']/g },
     { nom: 'window.location', motif: /window\.location[^=;]*=\s*['"](\/[^'"]*)['"]/g },
     { nom: "fetch('/x')",     motif: /fetch\(\s*['"`](\/[^'"`?]*)/g },
+    /*
+     * ⚠ AJOUTEES LE 2026-09-08, APRES UN DEDOUANEMENT.
+     *
+     * Cette suite rendait 13 liens morts ; il y en avait 21. Les 8 manquants
+     * vivaient dans une TABLE DE ROUTES de raccourcis clavier :
+     *
+     *     const routes = {c: '/security/', a: '/adm/admin_page.php', ...};
+     *     if (routes[e.key]) { window.location.href = routes[e.key]; }
+     *
+     * La destination atteint bien `location.href` — mais A L'EXECUTION, jamais
+     * lexicalement comme `href="..."`. **Le grain de la sonde etait le LITTERAL
+     * `href=`, l'objet est la DESTINATION** : huit liens navigables ont donc ete
+     * declares propres par un instrument qui fonctionnait.
+     *
+     * Et l'autre sonde, qui les voyait, en a rate deux autres de la meme ligne :
+     * elle excluait la ligne ENTIERE des qu'elle contenait `LARAVEL_URL`, alors
+     * qu'une ligne porte un lien rebase ET deux liens morts. **Les deux
+     * instruments etaient aveugles aux memes liens, pour deux raisons
+     * differentes** — et aucun des deux ne le disait.
+     *
+     * > Une declaration d'angle mort protege le lecteur ; deux instruments qui
+     * > declarent chacun le leur ne couvrent pas pour autant leur union.
+     */
+    { nom: 'table {k: "/x"}',  motif: /[A-Za-z_$][\w$]*\s*:\s*['"](\/[A-Za-z0-9_.\/-]+)['"]/g },
+    /*
+     * ⚠ J'AI AJOUTE ICI UN MOTIF `location = "/x"` PUIS JE L'AI RETIRE.
+     *
+     * `window.location` (ci-dessus) le couvrait deja. Je l'avais ajoute sans lire
+     * la liste a laquelle je l'ajoutais — et ma mesure d'extraction avait reproduit
+     * MES TROIS motifs a moi en les nommant « les formes de la suite », donc elle
+     * ne pouvait pas me montrer les cinq qui existaient.
+     *
+     * > Reproduire un instrument pour le mesurer mesure la reproduction.
+     *
+     * Le zero qu'il rendait n'etait donc pas « cette forme est absente du parc » :
+     * c'etait « cette forme est deja lue par sa voisine ».
+     */
 ];
 
 const IGNORES = [/\/_deprecated\//, /\/node_modules\//, /\/vendor\//, /\/\.git\//];
@@ -140,6 +177,51 @@ function etat(chemin) {
 }
 
 const lus = fichiers(LEGACY).filter((f) => f !== MOI);
+/*
+ * ⚠ CHAQUE FORME DOIT PROUVER QU'ELLE MORD, SUR UN ECHANTILLON FORGE.
+ *
+ * Ajoute le 2026-09-08 : les deux formes venues d'un dedouanement ont ete
+ * mesurees juste apres leur ecriture. `table {k: "/x"}` extrayait 1 lien du parc
+ * — donc elle mord. **`location = "/x"` en extrayait ZERO.**
+ *
+ * Zero n'y prouvait rien : la forme du parc est `location.href = routes[e.key]`,
+ * une VARIABLE, pas un litteral. Le motif visait donc une forme qui n'existe
+ * nulle part aujourd'hui — legitime en prevention, **mais inverifiable**, et une
+ * sonde inerte annoncee comme couverture est exactement l'espece qui DEDOUANE.
+ *
+ * > Un motif qui ne matche rien dans le parc n'est pas faux ; il est NON MESURE.
+ * > Et « non mesure » se lit comme « couvert » des qu'on l'imprime dans la liste
+ * > des formes lues.
+ *
+ * D'ou cet echantillon : il ne mesure pas le parc, il mesure L'INSTRUMENT. Une
+ * forme qui n'extrait rien d'ici est cassee, et la suite s'arrete a 2 au lieu de
+ * rendre un vert que personne ne peut fonder.
+ */
+const ECHANTILLON = {
+    'href="/x"':        '<a href="/temoin-forge.php">x</a>',
+    "fetch('/x')":      "fetch('/temoin-forge.php?q=1')",
+    'action="/x"':      '<form action="/temoin-forge.php">',
+    'table {k: "/x"}':  "const r = {t: '/temoin-forge.php'};",
+    "sideLink('/x')":   "sideLink('/temoin-forge.php', 'x')",
+    'window.location':  "window.location.href = '/temoin-forge.php';",
+};
+const inertes = [];
+for (const forme of FORMES) {
+    const source = ECHANTILLON[forme.nom];
+    if (source === undefined) { inertes.push(`${forme.nom} : aucun echantillon forge`); continue; }
+    forme.motif.lastIndex = 0;
+    const vus = [...source.matchAll(forme.motif)].map((m) => m[1]);
+    if (! vus.includes('/temoin-forge.php')) {
+        inertes.push(`${forme.nom} : n'extrait pas son propre echantillon (${JSON.stringify(vus)})`);
+    }
+}
+if (inertes.length) {
+    console.log('\n⛔ FORME(S) QUI NE MORDENT PAS — l\'instrument ne mesure pas ce qu\'il annonce :');
+    for (const i of inertes) { console.log(`   ${i}`); }
+    console.log('   NE RIEN CONCLURE.');
+    process.exit(2);
+}
+
 console.log(`PORTEE DECLAREE : legacy/ (hors _deprecated) — ${lus.length} fichiers lus`);
 console.log(`FORMES LUES     : ${FORMES.map((f) => f.nom).join(' · ')}`);
 console.log('  un vert ne dit pas « aucun lien mort » : il dit « aucun, dans ces formes-la ».');

@@ -206,9 +206,9 @@ function toast(message, type = 'info', duration = 4000) {
         if (gPressed) {
             gPressed = false;
             const routes = {h: '/', s: '<?= rtrim(getenv('LARAVEL_URL') ?: 'http://localhost:8080', '/') ?>/services', S: '<?= rtrim(getenv('LARAVEL_URL') ?: 'http://localhost:8080', '/') ?>/cles-ssh', u: '<?= rtrim(getenv('LARAVEL_URL') ?: 'http://localhost:8080', '/') ?>/mises-a-jour',
-                           c: '/security/', a: '/adm/admin_page.php', A: '/ssh-audit/', i: '/iptables/',
-                           d: '/documentation.php', p: '/profile.php', r: '/security/compliance_report.php',
-                           k: '/adm/platform_keys.php', m: '/adm/server_users.php', v: '<?= rtrim(getenv('LARAVEL_URL') ?: 'http://localhost:8080', '/') ?>/supervision'};
+                           c: '<?= rtrim(getenv('LARAVEL_URL') ?: 'http://localhost:8080', '/') ?>/scan-cve', a: '<?= rtrim(getenv('LARAVEL_URL') ?: 'http://localhost:8080', '/') ?>/comptes', A: '<?= rtrim(getenv('LARAVEL_URL') ?: 'http://localhost:8080', '/') ?>/audit-ssh', i: '/iptables/',
+                           d: '<?= rtrim(getenv('LARAVEL_URL') ?: 'http://localhost:8080', '/') ?>/documentation', p: '<?= rtrim(getenv('LARAVEL_URL') ?: 'http://localhost:8080', '/') ?>/profil', r: '<?= rtrim(getenv('LARAVEL_URL') ?: 'http://localhost:8080', '/') ?>/rapport-conformite',
+                           k: '<?= rtrim(getenv('LARAVEL_URL') ?: 'http://localhost:8080', '/') ?>/cle-plateforme', m: '<?= rtrim(getenv('LARAVEL_URL') ?: 'http://localhost:8080', '/') ?>/comptes-distants', v: '<?= rtrim(getenv('LARAVEL_URL') ?: 'http://localhost:8080', '/') ?>/supervision'};
             if (routes[e.key]) { window.location.href = routes[e.key]; return; }
         }
 
@@ -252,6 +252,6 @@ function toast(message, type = 'info', duration = 4000) {
 <?php if (!empty($_SESSION['password_warn_days'])): ?>
 <div class="fixed top-0 left-0 right-0 z-[9998] bg-yellow-500 text-yellow-900 text-center text-sm py-1.5 font-medium">
     &#9888; Votre mot de passe expire dans <?= (int)$_SESSION['password_warn_days'] ?> jour<?= $_SESSION['password_warn_days'] > 1 ? 's' : '' ?>.
-    <a href="/profile.php" class="underline font-bold ml-1">Changer maintenant</a>
+    <a href="<?= rtrim(getenv('LARAVEL_URL') ?: 'http://localhost:8080', '/') ?>/profil" class="underline font-bold ml-1">Changer maintenant</a>
 </div>
 <?php endif; ?>

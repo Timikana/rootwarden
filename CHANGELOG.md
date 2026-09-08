@@ -5,6 +5,87 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## Liens morts du legacy — 21, pas 13, et les deux sondes etaient aveugles aux memes huit
+
+**2026-09-08.** Les pages encore servies du legacy pointaient vers 21 cibles archivees.
+Deux instruments existaient ; aucun ne voyait l'union.
+
+```
+suite liens-morts-legacy.mjs     13   href= · fetch( · action= · sideLink( · window.location
+sonde ad hoc (head/footer)        9   toute chaine "/x.php" citee
+                                 ──
+UNION                            21
+```
+
+Les **huit** qui manquaient a la suite vivaient dans une table de raccourcis clavier :
+
+```js
+const routes = {c: '/security/', a: '/adm/admin_page.php', A: '/ssh-audit/', ...};
+if (routes[e.key]) { window.location.href = routes[e.key]; }
+```
+
+La destination atteint bien `location.href`, mais **a l'execution** — jamais lexicalement
+comme `href="..."`. Le grain de la sonde etait le litteral, l'objet est la destination.
+
+Et **deux** de ces huit echappaient AUSSI a la sonde ad hoc : elle excluait la ligne
+ENTIERE des qu'elle y voyait `LARAVEL_URL`, alors qu'une seule ligne portait un lien
+deja rebase et deux liens morts. *Les deux instruments etaient aveugles aux memes liens,
+pour deux raisons differentes, et aucun des deux ne le disait.*
+
+### 19 liens rebases, destination prouvee route par route
+
+| legacy (archive) | portage |
+|---|---|
+| `/security/` | `/scan-cve` |
+| `/ssh-audit/` | `/audit-ssh` |
+| `/documentation.php` | `/documentation` |
+| `/profile.php` | `/profil` |
+| `/security/compliance_report.php` | `/rapport-conformite` |
+| `/adm/admin_page.php` | `/comptes` |
+| `/adm/platform_keys.php` | `/cle-plateforme` |
+| `/adm/server_users.php` | `/comptes-distants` |
+| `/index.php` | `/accueil` |
+| `/terms.php` | `/cgu` |
+
+`legacy/head.php` (9) · `legacy/lang/{fr,en}/tips.php` (4 + 4, parite tenue) ·
+`legacy/auth/verify.php` (1, page « acces refuse ») · `legacy/footer.php` (1).
+
+### 2 liens qui ne se rebasent pas, et pourquoi
+
+**`/privacy.php` — retire, pas redirige.** Le portage n'a aucune politique de
+confidentialite : `cgu.blade.php` porte 0 occurrence de « confidentialite », « RGPD » ou
+« donnees personnelles ». Les deux substitutions plausibles sont fausses — `/cgu` sont les
+conditions, et `/profil/donnees-personnelles` est `ExportRgpdController`, l'export art. 20 :
+un GESTE de l'utilisateur, pas une NOTICE. **Une destination fausse est pire qu'une
+destination absente : un lien legal qui mene ailleurs atteste une conformite qui n'est pas
+la.** La dette est inscrite en place, a l'endroit ou le lien etait.
+
+**La recherche vive du menu — menee a la page qui existe.** Elle interrogeait un endpoint
+archive ; `/recherche` est un `view('recherche', ...)`, une page HTML, donc rebaser le
+`fetch` ferait lever la lecture JSON. Et la panne etait **deja la, masquee par son propre
+repli** : `catch(e) { container.classList.add('hidden'); }`. Depuis l'archivage, chaque
+frappe partait, echouait, et le menu cachait le panneau — aucune erreur visible, aucun
+resultat jamais, donc rien a quoi se cogner. *Un repli qui cache l'echec transforme une
+capacite morte en capacite silencieuse, et ce silence l'a fait survivre a son endpoint.*
+
+### La suite ferme la forme manquante — et s'eprouve elle-meme
+
+`tests/e2e/liens-morts-legacy.mjs` lit desormais `table {k: "/x"}`. Le motif
+`location = "/x"` qu'on y avait ajoute avec lui a ete **retire** : `window.location` le
+couvrait deja. Il avait ete ajoute sans lire la liste a laquelle on l'ajoutait, et la
+mesure d'extraction qui devait le valider avait reproduit trois motifs en les nommant
+« les formes de la suite » — *reproduire un instrument pour le mesurer mesure la
+reproduction*. Le zero qu'il rendait ne disait pas « cette forme est absente du parc »
+mais « cette forme est deja lue par sa voisine ».
+
+Chaque forme prouve maintenant qu'elle mord, sur un echantillon forge : une forme qui
+n'extrait pas son propre echantillon arrete la suite a 2. **Les cinq mutations rendent 2,
+la base rend 0.**
+
+> Une declaration d'angle mort protege le lecteur ; deux instruments qui declarent chacun
+> le leur ne couvrent pas pour autant leur union.
+
+
 ## iptables — la réponse dit enfin si l'archive a eu lieu, et la garde passe en aval
 
 **Addendum 2 de `DOSSIER-47`**, sur deux points qu'une attestation indépendante a ouverts.

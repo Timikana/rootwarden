@@ -361,7 +361,7 @@ function checkPermission(string $permission, bool $die = true): bool
         echo '<h1 class="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-2">' . t('common.access_denied') . '</h1>';
         echo '<p class="text-sm text-gray-500 dark:text-gray-400 mb-4">' . t('common.permission_required') . ' <code class="bg-gray-200 dark:bg-gray-700 px-2 py-0.5 rounded text-xs">' . $permLabel . '</code></p>';
         echo '<p class="text-xs text-gray-400 mb-6">' . t('common.contact_admin') . '</p>';
-        echo '<a href="/index.php" class="inline-block bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium">' . t('common.back_dashboard') . '</a>';
+        echo '<a href="' . rtrim(getenv('LARAVEL_URL') ?: 'http://localhost:8080', '/') . '/accueil" class="inline-block bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium">' . t('common.back_dashboard') . '</a>';
         echo '</div></body></html>';
         exit();
     }
