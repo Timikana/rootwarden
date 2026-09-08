@@ -1,0 +1,82 @@
+diff --git a/docker-compose.yml b/docker-compose.yml
+index 529e577a..450c9a0e 100644
+--- a/docker-compose.yml
++++ b/docker-compose.yml
+@@ -5,69 +5,6 @@ services:
+   # ─────────────────────────────────────────────────────────────
+   # Frontend PHP + Apache
+   # ─────────────────────────────────────────────────────────────
+-  php:
+-    build:
+-      context: .
+-      dockerfile: ./php/Dockerfile
+-    container_name: rootwarden_php
+-    restart: unless-stopped
+-    security_opt:
+-      - no-new-privileges:true
+-    ports:
+-      # ══ 2026-09-06 : ces ports sont ceux que le PORTAGE occupait jusqu'ici.
+-      #    Le legacy les reprend, le portage passe sur 8080/8443 (bloc `laravel`).
+-      #    Le portail historique n'est plus a l'adresse que tout le monde connait :
+-      #    c'est le but, et il faut le dire aux utilisateurs avant, pas apres.
+-      - "${HTTP_PORT:-8444}:80"
+-      - "${HTTPS_PORT:-8446}:443"
+-    volumes:
+-      - php_sessions:/var/www/sessions
+-      - ./legacy:/var/www/html
+-      - ./legacy/logs:/var/www/html/logs
+-      - ./php/php.ini:/usr/local/etc/php/php.ini
+-      - ./certs:/var/www/certs          # Partagé avec l'entrypoint (certs auto ou custom)
+-      # - /etc/localtime:/etc/localtime:ro   # Linux only - désactivé sur Windows
+-      # - /etc/timezone:/etc/timezone:ro    # Linux only - désactivé sur Windows
+-    env_file:
+-      - srv-docker.env
+-    depends_on:
+-      db:
+-        condition: service_healthy
+-      python:
+-        condition: service_healthy
+-    healthcheck:
+-      # ⚠ LA SONDE VISAIT LA RACINE, ET L'EXTINCTION L'A EMPORTEE.
+-      # `legacy/index.php` est archive depuis `de9669c` (2026-09-05 12:46, vague 1).
+-      # La racine rend donc 403 — plus d'index, et le listage est interdit — et
+-      # `curl -f` traite un 403 comme une erreur : code 22, cinq echecs consecutifs,
+-      # conteneur UNHEALTHY depuis VINGT-ET-UNE HEURES pendant qu'il servait
+-      # parfaitement (`/auth/login.php` rend 200).
+-      # Une sonde de vie doit viser une page VIVANTE, pas une page dont on a
+-      # decide le retrait. Elle est desormais liee a l'ecran de connexion, qui
+-      # vit exactement aussi longtemps que ce conteneur a une raison d'exister.
+-      test: ["CMD", "curl", "-fsk", "https://localhost:443/auth/login.php", "-o", "/dev/null"]
+-      interval: 30s
+-      timeout: 5s
+-      retries: 5
+-      start_period: 20s
+-    deploy:
+-      resources:
+-        limits:
+-          memory: 512M
+-          cpus: '1.0'
+-        reservations:
+-          memory: 128M
+-    networks:
+-      internal:
+-      external:
+-
+-  # ─────────────────────────────────────────────────────────────
+-  # Frontend Laravel v2.0 (migration en cours)
+-  # Tourne EN PARALLÈLE du frontend legacy (service `php`), sur un port
+-  # distinct, pendant toute la durée de la migration. Le legacy reste la
+-  # référence tant que la parité d'un module n'est pas prouvée.
+-  # Racine documentaire sur public/ (front controller) et non sur la racine.
+-  # ─────────────────────────────────────────────────────────────
+   laravel:
+     build:
+       context: .
+@@ -350,7 +287,6 @@ services:
+ 
+ volumes:
+   db_data:
+-  php_sessions:
+   platform_ssh_keys:            # Keypair Ed25519 de la plateforme (persiste entre restarts)
+ 
+ networks:

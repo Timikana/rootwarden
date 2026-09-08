@@ -112,3 +112,76 @@ l'arbre. Conservés ici comme trace de la manœuvre, pas comme travail en attent
     06  scripts/rejouer-lot.sh         les deux bases + le controle d'ETAT du portail
 
 *Appliqués dans `fa1a409`, avec la recréation des conteneurs et le contrôle des quatre ports.*
+
+---
+
+## `07-retrait-du-service-php-NON-APPLIQUE.patch` — le dernier geste de l'extinction
+
+**Généré le 2026-09-08 09:0x, contre `HEAD`. `git apply --check` PASSE.** *Non appliqué, et il
+ne doit pas l'être par une session : l'appliquer exige une **recréation**, qui appartient à
+l'exploitant.*
+
+### CE QU'IL FAIT, ET RIEN D'AUTRE
+
+```
+0 ajout · 64 suppressions · un seul fichier : docker-compose.yml
+retire   le bloc de service `php` (lignes 8-70)
+retire   la declaration du volume `php_sessions` (elle n'avait qu'un usage)
+```
+
+**Vérifié — il ne touche PAS :**
+
+```
+./legacy/version.txt:/var/www/html/version.txt:ro   monte DANS le portage
+./legacy:/app                                        monte par composer, x2
+```
+
+*Ces deux-là survivent au retrait du service, et c'est voulu : `version.txt` est la source
+unique du numéro de version, lue par `laravel/app/Support/Version.php`.*
+
+### CE QUI JUSTIFIE QU'IL SOIT PRÊT MAINTENANT
+
+**Le legacy ne sert plus une seule page** — étapes ②→⑦ exécutées et vérifiées au réseau. Il
+reste treize fichiers sous `legacy/`, **zéro `.php`** : des actifs statiques, `composer.*`,
+`vendor/.htaccess`, `logs/.htaccess` et le `.htaccess` racine.
+
+**Et le conteneur est `unhealthy`** depuis que sa sonde de vie vise `/auth/login.php`,
+archivé à l'étape ⑤ : cinq échecs `exit=22`, `restarts=0`, et **rien ne dépend de `php` en
+`service_healthy`** (graphe vérifié). *L'`unhealthy` est le symptôme d'un service qui n'a plus
+d'objet — ce patch est ce qui le fait disparaître, et non une correction de la sonde.*
+
+### VALIDATION FAITE
+
+```
+docker compose -f <modifie> config --quiet     code 0
+services declares                              db · laravel · python
+                                                (`php` absent, les autres intacts)
+```
+
+⚠ *Validé avec `srv-docker.env` LIÉ et non copié : ce fichier porte des secrets et n'a jamais
+quitté le dépôt.*
+
+### ⛔ TROIS DÉCISIONS L'ACCOMPAGNENT, ET AUCUNE N'EST DANS LE PATCH
+
+**① `HTTP_PORT`, `HTTPS_PORT`, `URL_HTTP`, `URL_HTTPS` dans `srv-docker.env` perdent leur
+objet.** *Ce sont les ports du service retiré.* **Et `URL_HTTPS` alimente la liste blanche
+CORS du backend** — `backend/server.py:137`, `E-481` : elle ne contient aujourd'hui qu'une
+seule origine distincte, celle du legacy. **Après ce patch, elle nommera un portail qui
+n'existe plus.** *C'est le moment que `E-481` avait daté « à l'extinction ».*
+
+**② La sonde de vie part avec le service.** *Ne pas la déplacer une troisième fois : elle
+visait la racine, l'archivage de `index.php` l'a cassée — 21 h d'`UNHEALTHY` faux le
+2026-09-05 — puis elle a été liée à l'écran de connexion, que l'étape ⑤ vient d'archiver.*
+**Il n'existe plus de page du legacy dont la survie soit plus longue que celle du conteneur.**
+
+**③ Les quatre `<FilesMatch "^(db|menu|head|footer)\.php$">` du `.htaccess` gardent désormais
+des fichiers absents** — d'où un `403` là où un `404` serait juste. *Laissé en place
+volontairement : le reste du fichier protège encore réellement, et un `403` sur un chemin
+inexistant ne trompe personne sur une capacité.*
+
+### ⚠ CE QUE CE PATCH NE PEUT PAS SAVOIR
+
+**Si un consommateur externe — signet, clé d'API, script d'exploitation, supervision — vise
+encore `:8444` ou `:8446`.** *La mesure porte sur le dépôt ; elle ne voit pas les usages.*
+**Le journal d'accès dit qu'en une heure, les seules requêtes reçues étaient la sonde de vie
+elle-même — mais une heure n'est pas une semaine.**
