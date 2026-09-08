@@ -104,6 +104,42 @@ sales=$(git status --porcelain | wc -l)
 if [ "$sales" -eq 0 ]; then dire "  ✅ arbre propre"
 else dire "  ⛔ $sales fichier(s) en cours — une autre session écrit. REFUS"; git status --porcelain | sed 's/^/     /'; ko=$((ko+1)); fi
 
+# ══ CONTRÔLE 5 — LA SONDE DE VIE DU LEGACY VISE CE QU'ON ARCHIVE ════════════
+#
+# `docker-compose.yml:48` :
+#     test: ["CMD","curl","-fsk","https://localhost:443/auth/login.php","-o","/dev/null"]
+#
+# **L'étape ⑤ archive `legacy/auth/login.php`.** Après elle, `curl -f` reçoit 404,
+# cinq échecs consécutifs, et le conteneur passe UNHEALTHY.
+#
+# ⚠ CE DÉFAUT A DÉJÀ ÉTÉ PAYÉ, ET LE COMPOSE LE RACONTE. La sonde visait la
+# RACINE ; l'archivage de `legacy/index.php` l'a cassée — **conteneur UNHEALTHY
+# pendant VINGT-ET-UNE HEURES alors qu'il servait parfaitement.** Le remède fut de
+# la lier à l'écran de connexion, « qui vit exactement aussi longtemps que ce
+# conteneur a une raison d'exister ».
+#
+# > **La sonde a été déplacée d'une page archivée vers une page dont l'archivage
+# > était décidé. Le même défaut, un pas plus loin.**
+#
+# ✅ MAIS LA CONSÉQUENCE EST BORNÉE, ET MESURÉE : rien ne dépend de `php` en
+# `service_healthy` — le graphe est `php -> db`, `php -> python`, `laravel -> db`,
+# `python -> db`. Et `restart: unless-stopped` ne relance pas sur UNHEALTHY, seulement
+# sur sortie. Le conteneur resterait donc unhealthy SANS boucler.
+#
+# ⛔ DONC CE N'EST PAS UN REFUS : C'EST UN AVERTISSEMENT. Un UNHEALTHY inexpliqué
+# est exactement ce qui ferait annuler une extinction correcte.
+dire ""
+dire "══ contrôle 5 — la sonde de vie ══"
+if grep -qE 'test:.*auth/login\.php' docker-compose.yml; then
+    dire "  ⚠ le healthcheck de « php » vise /auth/login.php, que l'étape ⑤ archive"
+    dire "     APRÈS l'étape ⑤ : le conteneur passera UNHEALTHY — c'est ATTENDU, pas un symptôme"
+    dire "     rien ne dépend de php en service_healthy (vérifié), et unless-stopped"
+    dire "     ne relance pas sur unhealthy : il restera unhealthy sans boucler"
+    dire "     ⛔ ce déjà-vu a coûté 21 h d'UNHEALTHY faux, en 2026-09-05, pour la même raison"
+else
+    dire "  ✅ le healthcheck ne vise plus une cible de la séquence"
+fi
+
 # ══ CONTRÔLE 4 — LE BANC ════════════════════════════════════════════════════
 #
 # `ps` a rendu 3 puis 0 en quelques secondes, trois fois : à ce grain c'est un
