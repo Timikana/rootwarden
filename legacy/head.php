@@ -206,7 +206,7 @@ function toast(message, type = 'info', duration = 4000) {
         if (gPressed) {
             gPressed = false;
             const routes = {h: '/', s: '<?= rtrim(getenv('LARAVEL_URL') ?: 'http://localhost:8080', '/') ?>/services', S: '<?= rtrim(getenv('LARAVEL_URL') ?: 'http://localhost:8080', '/') ?>/cles-ssh', u: '<?= rtrim(getenv('LARAVEL_URL') ?: 'http://localhost:8080', '/') ?>/mises-a-jour',
-                           c: '<?= rtrim(getenv('LARAVEL_URL') ?: 'http://localhost:8080', '/') ?>/scan-cve', a: '<?= rtrim(getenv('LARAVEL_URL') ?: 'http://localhost:8080', '/') ?>/comptes', A: '<?= rtrim(getenv('LARAVEL_URL') ?: 'http://localhost:8080', '/') ?>/audit-ssh', i: '/iptables/',
+                           c: '<?= rtrim(getenv('LARAVEL_URL') ?: 'http://localhost:8080', '/') ?>/scan-cve', a: '<?= rtrim(getenv('LARAVEL_URL') ?: 'http://localhost:8080', '/') ?>/comptes', A: '<?= rtrim(getenv('LARAVEL_URL') ?: 'http://localhost:8080', '/') ?>/audit-ssh', i: '<?= rtrim(getenv('LARAVEL_URL') ?: 'http://localhost:8080', '/') ?>/pare-feu',
                            d: '<?= rtrim(getenv('LARAVEL_URL') ?: 'http://localhost:8080', '/') ?>/documentation', p: '<?= rtrim(getenv('LARAVEL_URL') ?: 'http://localhost:8080', '/') ?>/profil', r: '<?= rtrim(getenv('LARAVEL_URL') ?: 'http://localhost:8080', '/') ?>/rapport-conformite',
                            k: '<?= rtrim(getenv('LARAVEL_URL') ?: 'http://localhost:8080', '/') ?>/cle-plateforme', m: '<?= rtrim(getenv('LARAVEL_URL') ?: 'http://localhost:8080', '/') ?>/comptes-distants', v: '<?= rtrim(getenv('LARAVEL_URL') ?: 'http://localhost:8080', '/') ?>/supervision'};
             if (routes[e.key]) { window.location.href = routes[e.key]; return; }
