@@ -674,11 +674,23 @@ def custom_update():
                 if hold_cmd:
                     execute_as_root(client, hold_cmd, root_password, logger=logger)
 
+                #   `env_prefix` est un litteral pose 9 lignes plus haut (:668). Rien
+                #   d'autre n'est interpole dans cette commande.
+                # nosemgrep: rw-shell-fstring-execute-as-root
                 execute_as_root(client, f"{env_prefix} && apt-get update",
                                 root_password, logger=logger, timeout=120)
 
                 if selected_packages:
                     pkg_str = ' '.join(selected_packages)
+                    #   DEUX interpolations, deux origines :
+                    #     `env_prefix` litteral pose 9 lignes plus haut
+                    #     `pkg_str` = ' '.join(selected_packages), et `selected_packages` sort de
+                    #     `_validate_package_list` (:645), qui emploie `_SAFE_PKG.fullmatch`
+                    #   ⚠ C'EST LE SITE DE ee0ac1a0. Ce validateur employait `.match()`, et le
+                    #     `$` de python accepte un `\n` FINAL : ['nginx\n','reboot'] passait les
+                    #     DEUX, et le saut de ligne coupait CETTE commande en deux, la seconde
+                    #     s'executant en root. `fullmatch` l'a ferme le 2026-09-08.
+                    # nosemgrep: rw-shell-fstring-execute-as-root
                     output, _, _ = execute_as_root(
                         client,
                         f"{env_prefix} && apt-get install -y -o Dpkg::Options::='--force-confold' -o Dpkg::Options::='--force-confdef' {pkg_str}",
@@ -774,6 +786,11 @@ def schedule_advanced_update():
         encoded = base64.b64encode(cron_job.encode('utf-8')).decode('ascii')
         with ssh_session(ip, port, ssh_user, ssh_password, logger=logger, service_account=row.get('service_account_deployed', False)) as client:
             execute_as_root(client, f"printf '%s' '{encoded}' | base64 -d > {cron_file}", root_password)
+            #   `cron_file` est un litteral pose 4 lignes plus haut :
+            #   '/etc/cron.d/auto_update_advanced'. Le `printf … base64 -d` de la ligne
+            #   precedente ecrit dans le MEME chemin et n'est pas signale, lui, parce que
+            #   la regle exempte `base64 -d` — la charge y est encodee.
+            # nosemgrep: rw-shell-fstring-execute-as-root
             execute_as_root(client, f"chmod 0644 {cron_file}", root_password)
             execute_as_root(client, "systemctl restart cron 2>/dev/null || service cron restart 2>/dev/null || true", root_password)
         # ⚠ CETTE ROUTE N'ENREGISTRE RIEN, ET CE N'EST PAS UN OUBLI DE CODE.
@@ -935,6 +952,11 @@ def schedule_advanced_security_update():
         encoded = base64.b64encode(cron_job.encode('utf-8')).decode('ascii')
         with ssh_session(ip, port, ssh_user, ssh_password, logger=logger, service_account=row.get('service_account_deployed', False)) as client:
             execute_as_root(client, f"printf '%s' '{encoded}' | base64 -d > {cron_file}", root_password)
+            #   `cron_file` est un litteral pose 6 lignes plus haut :
+            #   '/etc/cron.d/auto_security_update_advanced'. La route soeur a le meme
+            #   dessin avec '/etc/cron.d/auto_update_advanced' — deux fichiers DISTINCTS,
+            #   deux litteraux distincts, aucune donnee de requete dans le chemin.
+            # nosemgrep: rw-shell-fstring-execute-as-root
             execute_as_root(client, f"chmod 0644 {cron_file}", root_password)
             execute_as_root(client, "systemctl restart cron 2>/dev/null || service cron restart 2>/dev/null || true", root_password)
 
