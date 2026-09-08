@@ -55,38 +55,6 @@ services:
       - ALL
     # Python n'a pas besoin de capabilities pour ses binds (Hypercorn 5000 = >1024)
 
-  php:
-    volumes:
-      # Retire ./legacy:/var/www/html (utilise l'image baked).
-      # Conserve uniquement les volumes runtime/upload :
-      - php_sessions:/var/www/sessions
-      - ./legacy/logs:/var/www/html/logs
-      # Patch : mount ./legacy/_ul retire (artefact : snapshot statique de la page
-      # login avec token CSRF en dur, non reference par le code).
-      - ./php/php.ini:/usr/local/etc/php/php.ini:ro
-      - ./certs:/var/www/certs:ro
-    # Patch A05-NEW-01/02/03 hardening
-    # PHP/Apache reste root pour bind 80/443 mais drop toutes les caps
-    # autres que NET_BIND_SERVICE + CHOWN/SETUID/SETGID (Apache fork).
-    read_only: true
-    tmpfs:
-      - /tmp:size=128M,mode=1777
-      - /var/run:size=8M
-      - /var/lock:size=8M
-      - /var/log/apache2:size=64M
-    # `security_opt: no-new-privileges` est deja declare dans la BASE pour ce
-    # service. Le re-declarer ici le DOUBLONNE : docker CONCATENE les listes en
-    # superposition, et rend « items at 0 and 1 are equal » -> fichier INVALIDE.
-    # Mesure du 2026-09-04 : c'est ce qui empechait cette superposition d'etre
-    # employee du tout.
-    cap_drop:
-      - ALL
-    cap_add:
-      - NET_BIND_SERVICE
-      - CHOWN
-      - SETUID
-      - SETGID
-      - DAC_OVERRIDE  # Apache lit /etc/apache2/* en user www-data
 
   db:
     # Patch A05-NEW-01/02/03 hardening minimal MySQL
