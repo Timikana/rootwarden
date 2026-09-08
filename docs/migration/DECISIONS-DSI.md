@@ -14815,3 +14815,102 @@ un domaine construit n'est pas énuméré, et nomme les sites concernés. *Une s
 un domaine se trompe dans les deux sens : elle signale des clés fantômes, et elle déclare
 atteintes des clés qui ne le sont pour aucune valeur réelle.* **Il vaut pour les cinq
 catalogues — donc pour les quatre autres, sans le réécrire.**
+
+---
+
+## ⚖ E-481 — LA FAMILLE DE L'ÉCHANGE DES PORTS COMPTE QUATRE MEMBRES, ET LE QUATRIÈME EST UNE LISTE CORS QUI A CONVERGÉ
+
+**2026-09-08, ~05:3x.** *La direction que je n'avais jamais mesurée : `backend/` → legacy.*
+
+### CE QUE J'AI CHERCHÉ, ET CE QUE J'AI TROUVÉ
+
+```
+LEGACY_URL dans backend/*.py     0
+api_proxy                        0
+:8446 · :8444 en dur             0
+URL absolue en .php              0
+URL_HTTPS                        1   -> backend/server.py:137
+```
+
+**Le backend n'appelle pas le legacy.** *Un seul point de contact, et c'est une liste CORS.*
+
+```python
+allowed_origin  = os.getenv("URL_HTTPS", "https://srv-docker:8443")
+https_port      = os.getenv("HTTPS_PORT", "8443")
+allowed_origins = [allowed_origin, f"https://localhost:{https_port}"]
+```
+
+### 🔴 RECONSTITUÉE DEPUIS L'ENVIRONNEMENT RÉEL DU CONTENEUR
+
+```
+URL_HTTPS   = https://localhost:8446        <- LE LEGACY
+HTTPS_PORT  = 8446                          <- LE LEGACY
+=> allowed_origins = ['https://localhost:8446', 'https://localhost:8446']
+   entrees DISTINCTES : 1
+
+le PORTAGE  https://localhost:8443        autorise ? NON
+le PORTAGE  https://192.168.0.245:8443    autorise ? NON
+le LEGACY   https://localhost:8446        autorise ? OUI
+```
+
+> **La liste blanche CORS du backend contient UNE seule origine distincte, et c'est le portail
+> qu'on démonte.** *Le portage y est refusé dans ses deux formes.*
+
+### ⚠ ET LA FORME DU DÉFAUT EST NEUVE : UNE REDONDANCE QUI A CONVERGÉ
+
+*La liste était écrite comme **deux choses différentes*** — l'origine configurée **plus** un
+repli `localhost`. **`LARAVEL_HTTPS_PORT` valant 8443 et `HTTPS_PORT` 8446, l'auteur visait
+deux valeurs ; l'échange les a fait converger.**
+
+> **Un filet de sécurité à deux mailles dont les deux mailles se réfèrent à la même variable
+> n'a jamais eu qu'une maille — et le jour où elle se déplace, il n'en a plus aucune.**
+
+*C'est la première fois que je vois cette forme : le défaut n'est pas qu'une valeur soit
+fausse, c'est que **deux valeurs censées différer se sont égalisées**, et qu'un compte
+d'entrées ne le montre pas — `len(allowed_origins)` vaut toujours 2.*
+
+### ✅ ET C'EST INERTE, MESURÉ
+
+```
+fetch() vers une URL ABSOLUE, dans tout le JS du portage ET du legacy :  0
+```
+
+**Aucun navigateur n'appelle le backend en cross-origin.** Le portage passe par sa propre
+passerelle (côté serveur), le legacy passait par `api_proxy.php` (côté serveur aussi).
+*Et la liste **échoue du bon côté** : une origine absente n'obtient simplement pas d'en-tête
+CORS.*
+
+### ⚖ CE QUE JE TRANCHE : CORRIGER AVEC L'EXTINCTION, PAS AVANT
+
+```
+pourquoi pas maintenant   c'est inerte, et toucher le socle du backend pendant que
+                          le dernier morceau du legacy s'ecrit n'achete rien
+pourquoi pas apres        `URL_HTTPS` et `HTTPS_PORT` designeront un portail MORT,
+                          et le premier qui ajoutera un appel navigateur -> backend
+                          depuis le portage recevra un refus CORS qui ressemblera
+                          a un defaut du backend
+la forme                  employer les variables DU PORTAGE — `LARAVEL_HTTPS_PORT`
+                          vaut deja 8443 dans le conteneur — et faire que les deux
+                          mailles soient VRAIMENT differentes, ou n'en garder qu'une
+```
+
+> **La date de ce correctif est celle de l'extinction, parce que sa valeur juste dépend de
+> quel portail survit.** *Le corriger avant demanderait de nommer le portage pendant que le
+> legacy sert encore ; le corriger après demanderait de s'en souvenir.* **Il appartient donc
+> à la liste d'extinction, pas à la liste des correctifs.**
+
+### LE RECENSEMENT DE LA FAMILLE, MAINTENANT COMPLET À MA CONNAISSANCE
+
+```
+1  laravel/docker-entrypoint.sh:86   LARAVEL_HTTPS_PORT:-8446   corrige (avant-hier)
+2  laravel/config/app.php:69         url_legacy => …:8443       corrige (38d366ef)
+3  laravel/.env:18                   APP_URL=…:8444             ⛔ exploitant, inerte
+4  backend/server.py:137             CORS -> une seule origine, le legacy   ⛔ a l'extinction
+```
+
+⚠ **« À ma connaissance » est le bon degré.** *Les quatre ont été trouvés un par un, par
+quatre chemins différents — l'arbre, une garde que j'ai écrite, une question sur les
+courriels, et une direction que je n'avais jamais mesurée.* **Aucun n'a été trouvé par un
+recensement ; le recensement est venu après.** *Et le seul instrument qui les aurait tous
+attrapés — une garde qui compare chaque défaut de port à l'attribution du compose — ne peut
+lire ni `.env` (gitignoré) ni l'environnement d'un conteneur.*
