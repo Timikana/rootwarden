@@ -434,8 +434,48 @@ jobs:
           python-version: "3.13"
       - name: Install semgrep
         run: pip install semgrep
+      # ⛔ CE PAS ETAIT ROUGE A CHAQUE EXECUTION, ET C'EST PIRE QU'INUTILE.
+      #    `--error` fait sortir semgrep en 1 des qu'il trouve QUELQUE CHOSE,
+      #    et le depot en contient 105 (mesure du 2026-09-08 : 6 regles,
+      #    370 cibles). Le job portait donc `continue-on-error: true` ET un
+      #    rouge permanent : **une porte qui refuse toujours, on cesse de la
+      #    regarder.**
+      #
+      #    C'est un CLIQUET desormais : il echoue si le compte CROIT, signale
+      #    quand il baisse, et n'echoue pas sur l'existant. La reference vit
+      #    dans `.semgrep/reference-trouvailles.txt`, un fichier SUIVI — toute
+      #    variation passe donc par une relecture.
+      #
+      #    ⚠ PERIMETRE INCHANGE : `--severity=ERROR` retenu, donc 6 des 10
+      #    regles. Les 4 regles WARNING (rw-subprocess-shell-true,
+      #    rw-php-equals-on-hash, rw-php-weak-random, rw-php-debug-leak) ne
+      #    sont TOUJOURS pas evaluees ici. Defaut separe : le corriger
+      #    changerait la reference, donc pas dans le meme geste. Voir E-523.
+      #
+      #    ⚠ Et « Rules run: 6 » n'a JAMAIS ete la preuve du defaut de
+      #    compilation que le job temoin decrit plus bas : 6 est exactement le
+      #    nombre de regles ERROR. Il aurait affiche 6 que les regles
+      #    compilent ou non. L'inference etait fausse ; la reparation, bonne.
       - name: Run custom rules (.semgrep/rules-rootwarden.yml)
-        run: semgrep --config=.semgrep/rules-rootwarden.yml --error --metrics=off --severity=ERROR .
+        run: |
+          set -o pipefail
+          semgrep --config=.semgrep/rules-rootwarden.yml --metrics=off \
+                  --severity=ERROR --json --quiet . > /tmp/semgrep.json
+          n=$(python3 -c "import json;print(len(json.load(open('/tmp/semgrep.json'))['results']))")
+          ref=$(tr -dc '0-9' < .semgrep/reference-trouvailles.txt)
+          echo "trouvailles : $n   ·   reference : $ref"
+          python3 -c "import json,collections;d=json.load(open('/tmp/semgrep.json'));c=collections.Counter(r['check_id'].split('.')[-1] for r in d['results']);[print(f'  {v:>4}  {k}') for k,v in c.most_common()]"
+          if [ -z "$ref" ]; then
+            echo "::error::.semgrep/reference-trouvailles.txt vide ou illisible — le cliquet ne mesure rien."
+            exit 1
+          fi
+          if [ "$n" -gt "$ref" ]; then
+            echo "::error::$n trouvailles contre $ref en reference : le compte a CRU de $((n - ref))."
+            exit 1
+          fi
+          if [ "$n" -lt "$ref" ]; then
+            echo "::warning::$n trouvailles contre $ref : descendre la reference a $n."
+          fi
 
   # ─────────────────────────────────────────────────────────────
   # Job 4.3 : SCA Python (safety + pip-audit - CVE sur dependencies)
