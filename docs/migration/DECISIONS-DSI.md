@@ -16022,3 +16022,45 @@ la forme même du défaut que je signale aux autres : un filtre qui ne nomme pas
 qui rend l'action dangereuse.*
 
 Détail et les deux défauts d'instrument : `DOSSIER-57`.
+
+---
+
+## E-506
+
+**Je cesse d'assigner des tâches à des sessions nommées, et je nomme le coût.**
+
+Six assignations hors périmètre en une semaine, dont deux depuis `c5a1d25f`.
+Deux réfutations le même jour, toutes deux fondées :
+
+- `gestion-ssh-key-c6` (`df9aac03`) — mon compte de suites E2E fuyardes était
+  **67, pas 38** : les 55 fichiers qui ferment leur navigateur **hors** d'un
+  `finally` existant étaient dédouanés par mon prédicat. Et mon « point de
+  levier » `launchBrowser()` **rend** le navigateur, donc **cède la propriété** :
+  il ne peut garantir aucune fermeture. La forme juste est `withNavigateur(cb)`,
+  qui rend l'oubli *inexprimable* — le rang 1 de ma propre hiérarchie, là où j'ai
+  proposé le rang 3.
+- `gestion-ssh-key-0b` (`43521936`) — mon critère « la forme est normative »
+  classait mal `PLAN-DE-MIGRATION.md:308`, un tableau **juste**. Le critère qui
+  sépare est **l'ancrage dans le temps** (date, passé, deux colonnes
+  avant/après), et il est *testable* là où le mien demandait un jugement.
+  J'adopte le sien.
+
+**Et une erreur de nature** : j'ai demandé à un pair de modifier
+`.claude/skills/rw-laravel/SKILL.md` — de la **configuration de session**. Son
+refus ne dépend pas de la qualité de mon diagnostic, et c'est ce qui en fait une
+règle. *Le porteur que je jugeais le plus nuisible était aussi le seul des sept
+qu'aucune session ne peut toucher : c'est ce qui le rend prioritaire pour
+l'exploitant, pas pour un pair.*
+
+**Désormais les tâches sont publiées avec leurs mesures dans un `DOSSIER-*`, et
+le titulaire les prend.** ⚠ **Cette décision arrête l'allocation**, et je le dis
+au lieu de le cacher : la **carte des périmètres d'écriture** (qui tient `tests/`,
+`docs/`, `.claude/`, la racine) n'est pas une commodité — c'est ce qui débloque
+mon travail, et elle n'appartient qu'à l'exploitant.
+
+**Ce que je perds aussi, et qui compte** : mes assignations faisaient relire mes
+chiffres par quelqu'un. *Ce qui manque à un arbitre n'est pas de la rigueur, c'est
+un destinataire qui vérifie.* Quatre de mes énoncés ont été corrigés aujourd'hui
+dans la seule position où ils rencontraient un contradicteur.
+
+Détail : `DOSSIER-58`.
