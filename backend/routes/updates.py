@@ -701,12 +701,19 @@ def schedule_advanced_update():
 
     # E-463 : la FORME est validee ICI, avant toute connexion. Une valeur forgee
     # est refusee sans qu'aucune machine ne soit jointe.
+    # E-463 bis : DEUX blocs, pour que le message dise LAQUELLE des deux valeurs
+    # est en cause. Un `try` commun disait « date ou heure », et l'appelant devait
+    # deviner — un refus qui n'instruit pas se fait contourner.
     try:
         _heure, _minute = _cron_heure_minute(time_)
+    except (ValueError, TypeError) as e:
+        return jsonify({'success': False,
+                        'message': f"Champ « time » invalide : {e}"}), 400
+    try:
         _annee, _mois, _jour = _cron_annee_mois_jour(date)
     except (ValueError, TypeError) as e:
         return jsonify({'success': False,
-                        'message': f'Date ou heure invalide : {e}'}), 400
+                        'message': f"Champ « date » invalide : {e}"}), 400
 
     try:
         with get_db_connection() as conn:
@@ -778,12 +785,19 @@ def schedule_advanced_security_update():
 
     # E-463 : la FORME est validee ICI, avant toute connexion (voir les
     # deriveurs en tete de module).
+    # E-463 bis : DEUX blocs, pour que le message dise LAQUELLE des deux valeurs
+    # est en cause. Un `try` commun disait « date ou heure », et l'appelant devait
+    # deviner — un refus qui n'instruit pas se fait contourner.
     try:
         _heure, _minute = _cron_heure_minute(time_)
+    except (ValueError, TypeError) as e:
+        return jsonify({'success': False,
+                        'message': f"Champ « time » invalide : {e}"}), 400
+    try:
         _annee, _mois, _jour = _cron_annee_mois_jour(date)
     except (ValueError, TypeError) as e:
         return jsonify({'success': False,
-                        'message': f'Date ou heure invalide : {e}'}), 400
+                        'message': f"Champ « date » invalide : {e}"}), 400
 
     try:
         # Récupération des infos SSH depuis la BDD
