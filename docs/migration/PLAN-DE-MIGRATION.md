@@ -196,7 +196,7 @@ repertoires qui ne portent aucune racine.
 
 ---
 
-## 2 ter. LES PORTS DES DEUX PORTAILS — **ÉCHANGÉS le 2026-09-06, PAS ENCORE APPLIQUÉS**
+## 2 ter. LES PORTS DES DEUX PORTAILS — **ÉCHANGÉS ET APPLIQUÉS le 2026-09-07 à 19:39**
 
 **Décision de l'exploitant** : *« je voulais les mêmes ports qu'avant, et on dégage les ports du legacy sur
 une autre plage »*. **Le portage prend les ports du portail historique ; le legacy prend ceux que le portage
