@@ -142,6 +142,21 @@ class Config:
     # Defaults a true pour ne pas casser les deploiements existants.
     WAZUH_ENABLED = os.getenv('WAZUH_ENABLED', 'true').lower() == 'true'
 
+    # ══ GEOIP_ENABLED : le SEUL effet sortant qui n'avait pas son interrupteur ══
+    #
+    # `fail2ban_manager.geoip_lookup` interroge `ip-api.com` — en HTTP CLAIR, le
+    # tier gratuit n'autorisant pas TLS (le code le dit et l'assume). Neuf autres
+    # effets sortants ont deja leur drapeau (APPROVAL, CHATOPS, CVE_ENRICH,
+    # NVD_ENRICHMENT, TICKETING, MAIL, WAZUH, WEBHOOK, BACKUP) ; celui-la n'en
+    # avait pas. Pour un outil auto-heberge en environnement clos, « aucun trafic
+    # sortant » n'etait donc pas exprimable sur ce geste, sauf a ne pas s'en servir.
+    #
+    # Defaut `'true'` : ISO-COMPORTEMENT. On ne change pas le produit sous les
+    # pieds de qui met a jour. (Les drapeaux a `'false'` — CHATOPS, TICKETING,
+    # MAIL — le sont parce qu'ils exigent une configuration pour fonctionner ;
+    # la geolocalisation, elle, marche sans reglage.)
+    GEOIP_ENABLED = os.getenv('GEOIP_ENABLED', 'true').lower() == 'true'
+
     # Clé d'API pour authentifier les requêtes du frontend - obligatoire
     API_KEY = _require_env('API_KEY')
 

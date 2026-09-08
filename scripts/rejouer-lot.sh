@@ -355,6 +355,21 @@ verifieBaseDeSuite() {   # $1 = cible ; $2 = base ; $3 = nom de la suite
 # Le +1 du legacy est la reprise posee dans la branche d'archivage, qui sort par
 # `process.exit()` — lequel NE JOUE PAS le `finally`. La fixture y a fui pour de
 # vrai avant d'etre reprise a cet endroit.
+# ══ DEUX REFERENCES REMISES A JOUR LE 2026-09-08 ═══════════════════════════
+#
+#     [go-adm-audit]            34 -> 22     posee le 2026-08-26 (e0174e65)
+#     [go-page-cle-plateforme]  29 -> 30     posee le 2026-09-03 (ea476f17)
+#
+# ⚠ CES DEUX CHIFFRES NE SONT PAS DE MOI. Ils viennent du LOT 4, releves par la
+# session qui tient le banc, et je les inscris SANS les avoir remesures : un
+# chiffre date et source se LIT, il ne se refait pas — rejouer ces deux suites
+# coute une fenetre de banc et un cycle TOTP a une autre session.
+#
+# Les deux ecarts ne sont PAS des regressions produit : ce sont ses propres
+# correctifs sur ces suites qui ont fait bouger le compte d'ancres.
+#
+# *Si un LOT les contredit, c'est cette provenance qu'il faut lire d'abord.*
+
 declare -A REF_LARAVEL=(
   # `go-socle-navigation` 64 -> 63 le 2026-08-27, mesuree SEULE AU REPOS apres le LOT.
   # Le -1 vient du retrait de `tickets`, et il REFUTE ENCORE la formule courte :
@@ -489,7 +504,7 @@ declare -A REF_LARAVEL=(
   # les fait se contredire — PARITE E-104). Cote legacy elles sont rendues en
   # INFO avec leur valeur mesuree, pas en FAIL : un ecart voulu n'est pas une
   # regression.
-  [go-adm-audit]=34
+  [go-adm-audit]=22
   # Sous-lot D2 de `adm/` : les notifications. 20 sur le portage contre 16 sur le
   # legacy. Les QUATRE assertions d'ecart sont des `verifiePortage`, une par
   # defaut ferme : la notification cliquee passe reellement lue (E-108), un GET
@@ -574,7 +589,7 @@ declare -A REF_LARAVEL=(
   # aurait mesure le presse-papier de l'auteur, pas le parc.
   # 21 -> 29 le 2026-09-03 00:28 (`b8fbd2a`), meme fenetre relevee aux deux bouts.
   # legacy INCHANGEE a 15.
-  [go-page-cle-plateforme]=29
+  [go-page-cle-plateforme]=30
   # `adm/` sous-lot D9a : droits sudo par compte distant.
   # 18 sur le portage contre 12 sur le legacy, et les six d'ecart portent tous
   # sur les deux defauts corriges : le prereglage par defaut qui ne donne plus
@@ -1581,7 +1596,23 @@ joue() {
   #    et une suite jouee sans reference EN EST UNE AUSSI. `joue` rend 0 pour le
   #    verdict « (pas de reference) » — donc elle ne compte pas comme ecart, donc
   #    « LOT conforme » s'imprime en l'englobant. Mesure du 2026-09-06 :
-  #    **53 des 167 executions du LOT n'ont AUCUNE reference** (27 laravel, 26 legacy).
+  #    ⛔ CE CHIFFRE ETAIT FAUX ET IL A CIRCULE DEPUIS CE COMMENTAIRE.
+  #
+  #    Il disait « 53 des 167 executions n'ont AUCUNE reference (27 laravel,
+  #    26 legacy) ». **La valeur est ZERO**, des deux cotes — mesure par `bash`
+  #    sourcant les quatre tableaux : SUITES_LARAVEL 85 contre REF_LARAVEL 85,
+  #    SUITES_LEGACY 82 contre REF_LEGACY 82. Retracte le 2026-09-07 dans
+  #    `PARITE.md` (E-452), **et laisse ici jusqu'au 2026-09-08**.
+  #
+  #    LA CAUSE : les lignes de reference portent PLUSIEURS CLES chacune
+  #    (`[go-socle-navigation]=75 [go-socle-i18n]=23 …`). Tout motif ancre sur
+  #    un DEBUT DE LIGNE n'en voit que la premiere — 58 au lieu de 85.
+  #
+  #    ⚠⚠ ET CE COMMENTAIRE A SERVI DE PREUVE. Le 2026-09-08, une session l'a
+  #    lu, a construit trois mesures pour le defendre — les trois ancrees sur
+  #    un debut de ligne, donc la MEME methode trois fois — et a demande un
+  #    durcissement sur cette base. *Une retractation qui reste au registre
+  #    pendant que l'artefact garde l'affirmation ne retracte rien.*
   #
   #    « LOT conforme » affirme alors une conformite sur des comptes qui n'ont ete
   #    compares a RIEN. On ne le corrige PAS en les comptant comme ecarts : la

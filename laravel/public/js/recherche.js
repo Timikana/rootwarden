@@ -57,25 +57,20 @@
         etat.className = 'rw-annonce' + (ton ? ' rw-annonce--' + ton : '');
     }
 
-    /** `/tickets/index.php` et `/tickets/` designent la meme partie. */
-    function normalise(chemin) {
-        let c = '/' + String(chemin || '').replace(/^\/+/, '').split('?')[0].split('#')[0];
-        c = c.replace(/\/index\.php$/, '/');
-        return c.endsWith('/') ? c : c + '/';
-    }
-
-    /**
-     * Ou envoyer quelqu'un qui suit ce lien ?
+    /*
+     * ⚠ `normalise` ET `resout` ONT DEMENAGE dans `liens-legacy.js`.
      *
-     * Le chemin d'origine est conserve pour l'ancien portail : `/adm/audit_log.php`
-     * n'est pas `/adm/audit_log/`.
+     * Ce ne sont pas de simples utilitaires de navigation : `resout()` RE-ENRACINE
+     * le chemin sur une base connue, et c'est CE QUI empeche un lien a schema
+     * relatif (`//exemple.com`) de changer d'hote. Le panneau de recherche de
+     * l'en-tete a besoin de la MEME regle. **Deux copies d'une regle de securite
+     * finissent par diverger** : il n'y en a plus qu'une.
      */
     function resout(chemin) {
-        const interne = table.remplacements[normalise(chemin)];
-        if (interne) return { url: interne, externe: false };
+        const cible = window.RwLiens && window.RwLiens.resout(chemin, table);
 
-        const origine = '/' + String(chemin || '').replace(/^\/+/, '');
-        return { url: table.base_legacy + origine, externe: true };
+        // Fail-closed : sans module ni table, on ne fabrique aucune URL.
+        return cible || { url: null, externe: false };
     }
 
     function vide(titre, aide) {
@@ -112,7 +107,9 @@
 
             const a = document.createElement('a');
             a.className = 'rw-resultat' + (cible.externe ? ' rw-resultat--externe' : '');
-            a.setAttribute('href', cible.url);
+            // `resout` peut rendre `null` (table illisible) : un `href="null"`
+            // serait un lien mort qui a l'air bon. On n'en pose alors aucun.
+            if (cible.url) { a.setAttribute('href', cible.url); }
             if (cible.externe) {
                 a.setAttribute('target', '_blank');
                 a.setAttribute('rel', 'noopener noreferrer');

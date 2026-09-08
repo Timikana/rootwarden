@@ -92,6 +92,16 @@ class ScanCveController extends Controller
             // bloc est sous `$role >= 2`. Un role 1 y emet un `GET /cve_schedules`
             // a chaque chargement de page, refuse en 403 et avale en silence.
             'peutPlanifier' => $role >= 2,
+            /*
+             * LISTE BLANCHE — meme seuil que la planification, et pour la meme
+             * raison : le bloc n'est pas rendu en dessous du role 2, donc le
+             * script ne s'initialise pas et aucun appel refuse n'est emis a
+             * l'affichage. Le backend garde ses trois routes en `role:2`
+             * (`cve.py:641`) ; l'ecran ne peut pas etre plus ouvert que ce
+             * qu'il commande.
+             */
+            'peutBlanchir' => $role >= 2,
+            'libellesListeBlanche' => $role >= 2 ? $this->libellesListeBlanche() : [],
             'tags'          => $role >= 2 ? $this->planifs->tagsDisponibles() : [],
             'machines'   => $machines,
             'derniers'   => $derniers,
@@ -238,6 +248,31 @@ class ScanCveController extends Controller
         }
         $libelles['url_planifs'] = route('scan-cve.planifs');
         $libelles['url_apercu'] = route('scan-cve.apercu-cron');
+        $libelles['langue'] = app()->getLocale();
+
+        return $libelles;
+    }
+
+    /**
+     * Les libelles de la liste blanche, plus l'adresse de ses routes.
+     *
+     * UNE SEULE adresse est transmise : le script derive la suppression en y
+     * ajoutant l'identifiant. Deux adresses transmises separement finissent par
+     * diverger — c'est ce que ce module a deja paye sur `url_planifs`.
+     *
+     * @return array<string,string>
+     */
+    private function libellesListeBlanche(): array
+    {
+        $cles = ['titre', 'description', 'poser', 'retirer', 'confirmer_retrait',
+                 'portee_globale', 'sans_echeance', 'echue', 'vide', 'posee',
+                 'retiree', 'err_reseau'];
+
+        $libelles = [];
+        foreach ($cles as $c) {
+            $libelles[$c] = __('liste_blanche.' . $c);
+        }
+        $libelles['url_liste'] = route('scan-cve.liste-blanche');
         $libelles['langue'] = app()->getLocale();
 
         return $libelles;

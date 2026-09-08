@@ -4,6 +4,7 @@ use App\Http\Controllers\ApprobationsController;
 use App\Http\Controllers\ChatopsController;
 use App\Http\Controllers\ClesApiController;
 use App\Http\Controllers\ClePlateformeController;
+use App\Http\Controllers\DeploiementClesController;
 use App\Http\Controllers\ClesSshController;
 use App\Http\Controllers\ExportRgpdController;
 use App\Http\Controllers\ComparaisonCveController;
@@ -34,6 +35,7 @@ use App\Http\Controllers\NotificationsController;
 use App\Http\Controllers\PasserelleController;
 use App\Http\Controllers\PareFeuController;
 use App\Http\Controllers\PermissionsController;
+use App\Http\Controllers\ListeBlancheCveController;
 use App\Http\Controllers\PlanificationsCveController;
 use App\Http\Controllers\PortailController;
 use App\Http\Controllers\RapportConformiteController;
@@ -366,8 +368,26 @@ Route::middleware(['memorisation', 'session.authentifiee', 'session.revoquee', '
      * K1 n'appelle AUCUNE route du backend.
      */
     Route::get('/cles-ssh', ClesSshController::class)
+
         ->middleware(['role:1', 'perm:can_deploy_keys'])
         ->name('cles-ssh');
+
+    /*
+     * K4 — LE DECLENCHEMENT DU DEPLOIEMENT DES CLES SSH.
+     *
+     * ⛔ Ce chemin ECRIT EN ROOT sur les machines transmises et peut REVOQUER
+     * des acces. Il est ecrit, il n'a jamais ete exerce.
+     *
+     * `role:2` ET NON `role:1` COMME LA PAGE, et c'est mesure : le backend pose
+     * `@require_role(2)` sur `/deploy` depuis E-191 (`backend/routes/ssh.py:393`).
+     * Offrir le declencheur au role 1 reproduirait la lettre du legacy en
+     * produisant un 403 systematique. La page reste ouverte au role 1 — il voit
+     * le parc et le preflight — le declenchement ne l'est pas.
+     *
+     * `perm:can_deploy_keys` reprend la permission de la page (`ssh/index.php:35`).
+     */
+    Route::post('/cles-ssh/deployer', DeploiementClesController::class)
+        ->middleware(['role:2', 'perm:can_deploy_keys'])->name('cles-ssh.deployer');
 
     /*
      * Supervision — module `supervision/`, sous-lot V1 : la page et ses quatre
@@ -633,6 +653,35 @@ Route::middleware(['memorisation', 'session.authentifiee', 'session.revoquee', '
         ->middleware(['role:2', 'perm:can_scan_cve'])->whereNumber('id')->name('scan-cve.planifs.supprimer');
     Route::get('/scan-cve/apercu-cron', [PlanificationsCveController::class, 'apercu'])
         ->middleware(['role:2', 'perm:can_scan_cve'])->name('scan-cve.apercu-cron');
+
+    /*
+     * LISTE BLANCHE DES CVE — portage a ISO-PERIMETRE, decision de l'exploitant.
+     *
+     * `legacy/security/index.php` a ete archive en acceptant la perte de cette
+     * capacite. Les TROIS routes backend etaient pourtant restees vivantes et
+     * passent deja la passerelle (`RoutesBackend.php:35` autorise le prefixe
+     * `/cve_`, verifie) : la capacite n'etait pas PERDUE, elle etait SANS
+     * INTERFACE. Ces routes lui en rendent une.
+     *
+     * MEME GARDE QUE LE BACKEND, et c'est deliberé : `cve.py:641` pose
+     * `@require_role(2)` sur les trois. `perm:can_scan_cve` s'y ajoute pour la
+     * meme raison qu'en S4 — la permission garde enfin l'ecriture, la ou le
+     * legacy ne gardait que le role.
+     *
+     * ⚠ ET ELLES NE SONT PAS AJOUTEES A `ADMIN_SEULEMENT`. Ce groupe reserve a la
+     * passerelle des gestes qui touchent une MACHINE (deploiement, revocation,
+     * scan d'utilisateurs distants) ; ici trois routes ecrivent une table, sans
+     * session SSH ni commande systeme. Le backend garde deja `role:2` et c'est
+     * l'autorite ; une seconde declaration ailleurs est precisement ce qui a
+     * diverge du code plusieurs fois dans ce depot.
+     */
+    Route::get('/scan-cve/liste-blanche', [ListeBlancheCveController::class, 'index'])
+        ->middleware(['role:2', 'perm:can_scan_cve'])->name('scan-cve.liste-blanche');
+    Route::post('/scan-cve/liste-blanche', [ListeBlancheCveController::class, 'store'])
+        ->middleware(['role:2', 'perm:can_scan_cve'])->name('scan-cve.liste-blanche.poser');
+    Route::delete('/scan-cve/liste-blanche/{id}', [ListeBlancheCveController::class, 'destroy'])
+        ->middleware(['role:2', 'perm:can_scan_cve'])->whereNumber('id')
+        ->name('scan-cve.liste-blanche.retirer');
 
     /*
      * Suivi de remediation — sous-lot S5.
@@ -1016,6 +1065,26 @@ Route::middleware(['memorisation', 'session.authentifiee', 'session.revoquee', '
 
     Route::post('/pare-feu/copie/enregistrer', [PareFeuController::class, 'enregistrer'])
         ->middleware(['role:1', 'perm:can_manage_iptables'])->name('pare-feu.copie.enregistrer');
+
+    /*
+     * I6 — LIRE UNE VERSION ARCHIVEE, pour la MONTRER avant de la consentir.
+     *
+     * Lecture seule, aucune machine jointe. Elle existe parce que le retour
+     * arriere est le seul des deux gestes ou l'humain ne peut pas se relire : a
+     * l'application il ECRIT les regles, au retour arriere il choisit une DATE.
+     * Et Q2 — « ce jeu laisse-t-il SSH ouvert ? » — ne se calcule pas sans le
+     * texte.
+     *
+     * `GET /iptables-history` cote backend ne rend PAS les regles (par volume) et
+     * le seul SELECT qui les lit est DANS la route qui les applique. Sans cette
+     * route-ci, montrer le texte exigerait de l'appliquer d'abord.
+     *
+     * Meme garde que la page. L'acces machine est verifie sur l'objet RESOLU, et
+     * le `WHERE` porte les DEUX identifiants : une version d'une autre machine
+     * rend `null`.
+     */
+    Route::post('/pare-feu/version', [PareFeuController::class, 'versionArchivee'])
+        ->middleware(['role:1', 'perm:can_manage_iptables'])->name('pare-feu.version');
 
     /*
      * I3 — L'HISTORIQUE. Declaration qui ATTENDAIT depuis quatre jours (E-244).

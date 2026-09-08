@@ -863,7 +863,7 @@ complet.
 
 ---
 
-## ⚠⚠ AVERTISSEMENT DE NUMEROTATION — **HUIT NUMEROS DESIGNENT DEUX CHOSES** (2026-09-07)
+## ⚠⚠ AVERTISSEMENT DE NUMEROTATION — **DIX NUMEROS DESIGNENT DEUX CHOSES** (2026-09-07, corrige le 08)
 
 **`E-452` a `E-459` existent DANS LES DEUX REGISTRES, avec des sujets differents.** Mesure :
 
@@ -885,6 +885,33 @@ meme numero :
 | 457 | deux scripts nommant chaque portail par l'autre | une suite hors lot postant un deploiement sudo |
 | 458 | B4 porte, le defaut de `mode` | **« deux numerotations pour un meme produit »** |
 | 459 | trois boutons vers un 404 | « ou vit la cible » |
+
+### ⟶ CORRECTION DU 2026-09-08 — **DIX, PAS HUIT. Et les deux de plus viennent de ma REGLE.**
+
+    collisions recentes : E-452 453 454 455 456 457 458 459 463 468
+                          ⚠ INSTANTANE DATE, NON AUTORITATIF (2026-09-08 05:50)
+
+**Cette liste est INDICATIVE et se remesure ; elle ne fait pas autorite.** *Un inventaire de numeros est une
+SECONDE liste a cote de l'arbre : il derive, et sa derive est INVISIBLE — rien ne rougit quand un inventaire
+oublie un numero.* **L'arbre EST le registre.** La commande qui tranche :
+
+    comm -12 <(grep -ohE '^#{1,6}[^0-9]*E-[0-9]+' docs/migration/PARITE.md      | grep -oE '[0-9]+' | sort -u) \
+             <(grep -ohE '^#{1,6}[^0-9]*E-[0-9]+' docs/migration/DECISIONS-DSI.md | grep -oE '[0-9]+' | sort -u)
+
+*Refus de registre emprunte a la session 8, qui l'a oppose a sa propre tentation d'en tenir un.*
+
+**E-463 et E-468 ont ete alloues APRES ma regle du 2026-09-07, et PAR elle.** Le motif que j'avais inscrit
+— `^#{1,6} +E-[0-9]+` — **exige que `E-` suive immediatement les diese et les espaces.** Or
+`DECISIONS-DSI.md` titre `## ⚖ E-480 — …` et `## ⛔ E-482 — …` : **un emoji s'interpose, et le motif ne le
+franchit pas.**
+
+> **Ma regle anti-collision a produit deux collisions de plus.** *Elle rendait « max 469 » le 2026-09-08 a
+> 05:45, quand le vrai maximum etait **482** — et `E-469` etait DEJA PRIS.* Rattrape avant commit par le
+> motif corrige (`^#{1,6}[^0-9]*E-`), pas par moi.
+
+**Troisieme fois qu'un de mes motifs suppose une forme** : un espace unique avant `=>` (E-420), une entree
+par ligne (E-452 retracte), et rien entre `##` et `E-`. *La forme supposee est toujours celle de MON propre
+fichier.*
 
 > **La cause est mienne et elle est simple : ma commande de remesure ne lit que CE fichier.** *« max E-459 »
 > etait juste pour `PARITE.md` et faux pour le chantier* — le vrai maximum etait **E-462**. J'ai alloue huit
@@ -21454,6 +21481,17 @@ zéro `$(` hors commentaire), sourcé sous `set -u` :
 **Trois méthodes indépendantes concordent** : `${#REF_LARAVEL[@]}`, un `grep -o '\[[a-z0-9-]+\]='` sur le
 bloc borné, et les différences d'ensembles. Témoins dans les deux sens.
 
+> ⚠ **CORRECTION DU 2026-09-08 — elles étaient DEUX, pas trois.** *Les différences d'ensembles étaient
+> calculées sur des fichiers écrits DEPUIS les tableaux sourcés par bash : elles partageaient le prédicat de
+> la première.* Seul le `grep -o` portait un prédicat différent — un MOTIF sur le texte contre un SOURÇAGE
+> par l'interprète. **Vérifié en cassant : une clé retirée du texte fait passer les deux de 85 à 84,
+> ensemble** — c'est ce que font deux instruments indépendants, et c'est ce que le troisième ne pouvait pas
+> faire puisqu'il dérivait du premier.
+>
+> *La conclusion — 85 — reste juste et corroborée par deux prédicats distincts. C'est le COMPTE de
+> corroborations qui était inflaté.* **Formulation de la session 7, qui a payé la version grave le même
+> jour** : trois enveloppes autour d'un seul prédicat, lues comme trois confirmations.
+
 **La cause.** Les lignes de référence portent **plusieurs clés chacune** —
 `[go-socle-navigation]=75 [go-socle-i18n]=23 [go-socle-passerelle]=10 [go-socle-auth]=14` — et mon `awk`
 faisait `match($0, /^[ \t]*\[[a-z0-9-]+\]=/)`, **qui n'imprime que la première de chaque ligne**. 58 au lieu
@@ -22018,4 +22056,248 @@ exactement celui que je viens de faire pour `bashrc`. Pour `adm/server_user_sftp
 ⚠ **Le contrôle est reproductible et vaut d'être posé au banc** : *pour chaque lien `url_legacy` du
 portage, la cible doit répondre autre chose qu'un `404`.* Trois lignes, et il mord aujourd'hui sur trois
 vues.
+
+---
+
+## E-463 — UN ECHEC DE RENDU DE POLITIQUE SUDO ECRIVAIT `NOPASSWD: ALL`
+
+**Releve et tranche par la session 8 (`DOSSIER-42`) ; le site d'implementation, la mesure avant/apres et la
+reserve sont d'ici.** Corrige le 2026-09-07 sur autorisation de l'exploitant.
+
+> **Plus l'intention etait etroite, plus le resultat etait large — et precisement quand quelque chose venait
+> de mal se passer.** *Quelqu'un demande une politique PRECISE, le rendu echoue, le produit accorde root sans
+> mot de passe sans restriction.*
+
+### L'asymetrie etait dans la meme fonction
+
+    username invalide  ->  return, RIEN n'est ecrit
+    policy   invalide  ->  `NOPASSWD: ALL` etait ECRIT
+
+**Mesure executee sur les DEUX versions**, `render_policy` forcee a lever, `execute_command_as_root`
+instrumentee :
+
+    AVANT   rendu en echec -> 3 commande(s)
+            CONTENU ECRIT : john ALL=(ALL:ALL) NOPASSWD: ALL
+    APRES   rendu en echec -> 0 commande(s)
+
+*Le defaut est donc mesure, pas deduit du code.*
+
+### ⚠ LE SITE COMPTE, ET L'AUTRE SITE DECIDAIT UNE QUESTION OUVERTE
+
+Le repli est atteint par **deux** chemins :
+
+    1. `:1051` avec une policy dont le rendu ECHOUE   -> `policy = None`, puis le repli
+    2. `:1056` appele SANS argument `policy`          -> le repli d'emblee
+       (branche `elif sudo:`, le booleen `users.sudo = 1`)
+
+**Le chemin 2 est une question distincte, laissee ouverte a dessein** — toute reponse autre que « tout »
+retire du sudo a des comptes qui en ont aujourd'hui. *Corriger la CONDITION du repli aurait tranche cette
+question sans le dire.* Le correctif est donc dans le `except`, **au site de l'echec, pas sur la condition
+qu'il partage**. Verifie : le chemin 2 envoie toujours ses 3 commandes.
+
+### Ce que le repli ne protegeait pas
+
+C'etait la question a poser avant d'ecrire — *un construct fautif protege souvent quelque chose qu'on ne
+voit pas.* Ici, non : **l'ecriture reelle n'a lieu qu'apres**, par `tmp` + `visudo -cf` + `mv` atomique.
+Rendre la main laisse donc le fichier existant **INTACT** — ce n'est pas une revocation deguisee en
+abstention. *Et aucune capacite n'est perdue : `all_nopasswd` est un PRESET qu'on choisit ; le repli ne
+l'ouvrait pas, il l'accordait par accident.*
+
+### ⚠ Deux reserves inscrites avec le correctif
+
+1. **l'`except` reste ETROIT** — `(ValueError, ImportError)`. Un `TypeError` ou un `KeyError` de
+   `render_policy` s'echappe toujours. « Un echec n'elargit jamais » vaut pour ces deux types ; la remontee
+   reste le sort des autres.
+2. **aucun test existant n'exerçait ce chemin** : `grep -cE 'ValueError|side_effect|raise'` rend **0** sur
+   les deux suites qui couvrent `add_to_sudoers`. *Leurs 17 verts ne disaient rien du chemin corrige* — la
+   preuve ci-dessus est une sonde ecrite pour l'occasion, pas un test du depot.
+
+### ⟶ LE TEST DE NON-REGRESSION, et la preuve qu'il MORD
+
+`backend/tests/test_sudo_fail_closed.py`, 5 tests. **Routage : la session 8 l'avait adresse a la session 7,
+qui a refuse sur le perimetre — `backend/tests/` n'est pas le sien — et elle avait raison.** *« La question
+n'est ni faut-il ce test, ni faut-il l'exercer, mais QUI L'ECRIT. Le perimetre ne se deplace pas parce que
+la cause est bonne. »*
+
+**Quatre proprietes, dont deux ne viennent pas de moi :**
+
+1. sur le chemin du rendu en echec, la fonction n'envoie **aucune** commande ;
+2. l'assertion porte sur **« RIEN n'est ecrit »**, pas sur « pas de `NOPASSWD ALL` » — *la seconde passerait
+   a vide si le repli revenait avec un autre contenu* (session 8) ;
+3. ⚠ un **TEMOIN POSITIF** exige que le chemin nominal ecrive : *sans lui, « 0 commande » passerait aussi
+   sur une fonction morte* (session 7, qui dit avoir pose un garde muet le matin meme) ;
+4. ⚠ le chemin `elif sudo:` **doit continuer d'ecrire** — pour que la question ouverte ne soit pas tranchee
+   depuis un test plutot que par une decision.
+
+**Prediction scellee avant de muter, puis mesuree — une mesure PAR PROCESSUS :**
+
+| version | chemin | commandes | verdict du test |
+|---|---|---|---|
+| servie | rendu en echec | **0** | `== []` vert |
+| servie | nominal | **4** | temoin vert |
+| **mutation A** — le `policy = None` d'avant | rendu en echec | **4** | `== []` **ROUGE** |
+| **mutation B** — fonction morte | nominal | **0** | temoin **ROUGE** |
+
+*Chaque mutation rougit dans un test different : le fail-closed et le temoin ne se recouvrent pas.*
+
+⚠ **Et ma premiere tentative de preuve etait fausse** : j'avais remplace `sys.modules['sudo_manager']` par
+un faux, puis fait `import sudo_manager as vrai` — **qui rend le faux**. Le temoin rendait donc `0` sur la
+version SERVIE, la ou pytest le voit passer. *Zero sur la sonde et zero sur le temoin : la mesure n'avait pas
+eu lieu.* Refaite avec **un processus par mesure**, plus rien a demeler.
+
+**Aucun redemarrage** : `add_to_sudoers` n'est appele que depuis `configure_servers.py`, lance en
+sous-processus neuf a chaque deploiement. *Verifie : `routes/ssh.py` n'importe de ce module que deux
+helpers de validation, et la seule autre mention de la fonction est un commentaire.*
+
+---
+
+## E-468 — Q1 : LES CINQ GABARITS SONT JUSTES, ET AUCUNE VUE NE LES CHARGE
+
+**Attestation independante du travail de la session 8 (`85b5809f`), qui ne pouvait pas se certifier
+elle-meme.** *La regle vaut contre l'ecrivain quel qu'il soit.*
+
+### Ce qui TIENT — verifie, pas ratifie
+
+| ce qu'elle affirme | mesure |
+|---|---|
+| 5 gabarits, port DERIVE au lieu de `22` en dur | ✅ `web` `db` `ssh_seul` `tout_fermer` `docker` |
+| l'epreuve rend 35 cas verts | ✅ 35 ok · 0 FAIL, 2 temoins negatifs + 1 positif |
+| la mutation rend **26** rouges | ✅ **26 pour 26 predits**, prediction scellee |
+| les 5 cas `port = 22` restent verts | ✅ *et c'est la preuve que la liste de ports contient le cas ou le legacy est juste PAR COINCIDENCE* |
+| les temoins tournent sur du code PROPRE | ✅ le juge (`pare-feu-ssh-ouvert.js`) est charge **hors** du bloc de mutation |
+
+⚠ **Et sa garde d'ancre MORD** — eprouvee sur une copie, l'ancre decalee d'une espace :
+*« la mutation n'a rien remplace — l'epreuve ne prouve RIEN »*, **code 2**. *Une mutation qui ne s'applique
+pas rendrait toute la course sans objet ; celle-ci refuse de rendre un verdict.*
+
+**Le renommage est SANS DANGER** : `ssh_only` → `ssh_seul` et `deny_all` → `tout_fermer`. Les anciens noms
+ne subsistent que dans **deux commentaires** qui decrivent le defaut du legacy — aucun code ne les
+reference.
+
+**Fausse piste refermee** : les cles `tpl_strict`/`moderate`/`permissive`/`custom` du legacy appartiennent
+a **`fail2ban`**, pas au pare-feu. Le `<select>` du legacy porte **cinq** gabarits, exactement les siens.
+
+### ⛔ CE QUI NE TIENT PAS : LA CAPACITE N'EST PAS ATTEIGNABLE
+
+    laravel/public/js/pare-feu-gabarits.js   charge par 0 vue
+    pare-feu.blade.php                        aucun <select> de gabarit
+    laravel/lang/{fr,en}/pare-feu.php         0 cle `tpl_*`
+    legacy/lang/{fr,en}/iptables.php          13 cles `tpl_*`, dont les 5 libelles
+    legacy/iptables/index.php:312             <select onchange="loadTemplate(...)">
+
+*Temoin : `choisir` rend 1 dans le catalogue du portage — la sonde lit bien.*
+
+> **Les cinq gabarits sont portes comme CODE, pas comme CAPACITE.** *Le legacy offre cinq gabarits
+> selectionnables ; le portage n'en offre aucun.* Il manque un `<select>`, cinq libelles, et le chargement
+> du fichier.
+
+**Ce n'est pas un defaut de son travail** — le geste demande etait de deriver le port, et il est juste. *Mais
+sous la directive d'ISO-PERIMETRE posee par l'exploitant le 2026-09-07, « ecrit » ne vaut pas « porte » :
+la mesure d'un portage cherche l'ARTEFACT ATTEIGNABLE, pas le fichier.*
+
+### ⟶ CORRECTION DU 2026-09-08 — **MA PRESCRIPTION ETAIT FAUSSE. LE CONSTAT TIENT.**
+
+*« Il manque un `<select>`, cinq libelles, et le chargement du fichier. »* **Cette phrase est a retirer, et
+c'est la session 8 qui l'a relevee.** Le constat — la capacite n'est pas atteignable — reste exact ; **le
+remede que j'en tirais casserait I4.**
+
+    pare-feu.blade.php:134-137, verbatim
+      « Elle porte sur LA COPIE EN BASE, et c'est la chaine coherente : I2
+        enregistre, I4 valide ce qui est enregistre, I5 appliquera la meme chose.
+        Le legacy validait le contenu d'une zone d'edition ; le portage n'en
+        offre pas, donc il valide l'objet qui existe. »
+
+> **Un gabarit n'est pas ce que la machine A — c'est une PROPOSITION.** *Le verser dans « la copie »
+> changerait ce que « la copie » signifie, et la phrase sur laquelle I4 repose cesserait d'etre vraie.*
+
+**Poser le `<select>` exigerait donc de trancher** : une zone d'edition neuve — que le portage a
+DELIBEREMENT refusee — ou bien redefinir la copie. **Les deux sont des arbitrages, et ils appartiennent a
+I5**, qui donnera au gabarit sa destination. *Tant qu'I5 n'existe pas, le gabarit n'en a pas.*
+
+⚠ **ET C'EST MA PROPRE REGLE, ENFREINTE DANS L'ATTESTATION OU JE L'APPLIQUAIS.** J'ai etabli le matin meme
+qu'**il faut mesurer le REMEDE et pas seulement le DEFAUT**, et la session 8 l'avait adoptee. J'ai mesure le
+defaut — le fichier n'a aucun consommateur, c'est juste — et **prescrit un remede que je n'avais pas
+mesure**. *Si personne ne m'avait reprise, quelqu'un aurait pose ce `<select>` et casse I4 en croyant finir
+Q1.*
+
+**Ce qui reste vrai, sans le remede** : la capacite n'est pas atteignable, « ecrit » ne vaut pas « porte »
+sous l'iso-perimetre, et le gabarit attend une destination — pas un selecteur.
+
+⚠ **Et le defaut que Q1 ferme n'est pas encore ferme EN SERVICE** : tant que rien ne charge ce fichier, les
+gabarits que l'operateur peut appliquer restent ceux du legacy, avec leur `--dport 22` en dur.
+
+---
+
+## E-483 — MON PORTAGE DE B4 A TUE LE COMPTEUR DE CIBLES : deux `function annonce()` dans une portee
+
+**Defaut que j'ai introduit, trouve et corrige par une autre session** (`52380be7`, 2026-09-07 21:46).
+*Je ne l'ai pas vu en le relisant ; elle l'a vu en ECRIVANT dans le meme fichier.*
+
+    1a67dc9e  08-26 20:47   + function annonce()                      <- le compteur de cibles
+    48262a5d  09-07 13:33   + function annonce(cible, texte, echec)   <- MOI, meme portee
+    52380be7  09-07 21:46   - function annonce()                       <- corrige par un tiers
+
+**En JavaScript, deux declarations `function` du meme nom dans une meme portee ne sont pas une erreur : la
+seconde ECRASE la premiere.** Mon ajout a donc silencieusement supprime le compteur — *« le compteur de
+cibles etait mort », dit son commit.*
+
+> ⚠ **`node --check` NE VOIT PAS une redeclaration.** *Il a rendu « propre » sur mes deux passages, et il
+> avait raison : ce n'est pas une faute de syntaxe, c'est une perte de fonction.* Mon controle de l'epoque —
+> `node --check` + un temoin negatif sur un fichier casse — mesurait la SYNTAXE, jamais l'existence de ce
+> que le fichier portait deja.
+
+**La parade, et elle est de meme nature que celles du reste du chantier** : avant d'ajouter une fonction a
+un fichier existant, **compter les declarations du nom choisi**. Un seul `grep -c "function <nom>"` avant
+ecriture, et un apres — *asserter en DELTA, comme pour tout le reste.*
+
+    grep -c 'function annonce' laravel/public/js/bashrc.js    # AVANT : 1  ->  choisir un autre nom
+
+**Et la lecon de flotte est la meme qu'ailleurs** : *qui ecrit un correctif ne certifie pas qu'il est la.*
+Ici, qui ecrit une fonction ne voit pas ce qu'elle recouvre — **il faut avoir a ECRIRE dans le fichier pour
+buter dessus**, ce qu'une relecture ne fait pas.
+
+---
+
+## E-490 — UNE MESURE PERIMEE CITEE A L'APPUI D'UN RAISONNEMENT, DANS UN COMMENTAIRE
+
+**Cinquieme membre de la famille de l'echange des ports, et le premier qui ne vive pas dans une VALEUR.**
+Releve par la session 8 le 2026-09-08, remesure ici.
+
+    laravel/apache-ssl.conf.tmpl:80-81
+      « Mesure sur profil Chrome PERSISTANT, deux processus : aucun surclassement.
+        `http://localhost:8444/connexion` rend 200, servi en clair. »
+
+    remesure du 2026-09-08 :
+      http://localhost:8444/connexion    301 -> https://localhost:8444/   (le LEGACY)
+      http://localhost:8080/connexion    301 -> https://localhost:8443/   (le PORTAGE) ✅
+      https://localhost:8446/connexion   404   (le legacy ne sert pas /connexion)
+
+**La mesure etait JUSTE le 2026-09-06** : `:8444` etait alors le port HTTP du PORTAGE. **L'echange du
+2026-09-07 a 19:39 en a inverse le sens sans toucher au texte.**
+
+> **Une VALEUR perimee casse, ou se signale. Une MESURE perimee citee a l'appui d'un raisonnement se relit
+> comme une PREUVE.** *Et celle-ci vit dans un commentaire : rien ne l'exerce, donc rien ne la contredit.*
+
+**Ce que ca ne renverse PAS** — et je le dis pour qu'un arbitrage clos ne soit pas rouvert : *la decision de
+ne pas poser HSTS sur le portage tient sur son propre argument* — une porte a sens unique mise en cache un
+an, sur un certificat auto-signe, se pose apres verification au reseau et sur decision. **La mesure perimee
+etayait une correction accessoire, pas la decision.**
+
+**Non corrige : le fichier est dans `laravel/`, hors de mon perimetre**, et son contenu est un COMMENTAIRE —
+donc inerte. *Signale a qui tient le vhost du portage.*
+
+### ⟶ LA FAMILLE DE L'ECHANGE COMPTE CINQ MEMBRES, DONT DEUX OUVERTS
+
+| # | membre | etat |
+|---|---|---|
+| 1 | `installer-sur-vm.sh` / `migrer-vers-vm.sh` — etiquettes inversees | ✅ ferme (E-457) |
+| 2 | `laravel/docker-entrypoint.sh:86` — repli `8446` | ✅ ferme (patch `05`) |
+| 3 | `scripts/rejouer-lot.sh:93-94` — les deux bases | ✅ ferme (patch `06`) |
+| 4 | `config/app.php:69` — `LEGACY_URL` nommait le portage | ✅ ferme (`38d366ef`, session 8) |
+| 5 | `apache-ssl.conf.tmpl:80` — **une mesure**, pas une valeur | ⛔ ouvert, inerte |
+| — | `laravel/.env` — `APP_URL` | ⛔ **ouvert, exploitant** |
+| — | `backend/server.py:137` — repli CORS | ⛔ ouvert, a l'extinction |
+
+*Les quatre premiers etaient des VALEURS ; le cinquieme est un ENONCE. C'est la meme cause — l'echange — et
+deux especes d'artefact.*
 

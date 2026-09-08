@@ -1,5 +1,27 @@
 /**
  * go.mjs - Test E2E COMPLET RootWarden v1.13.1
+ *
+ * HORS-LOT: balayage legacy v1.13, dont l'objet est ARCHIVE — 11 de ses routes
+ * sur 17 sont sous legacy/_deprecated/. Elle n'est pas enrolee, et le rouge
+ * qu'elle rendrait serait un « objet retire par decision », pas une regression.
+ *
+ * ⚠ ELLE N'ETAIT NI JOUEE NI SURVEILLEE. Absente de SUITES_LARAVEL comme de
+ * SUITES_LEGACY, elle echappait AUSSI a inventaire-hors-lot.mjs, dont la
+ * population etait `/^go-.*\.mjs$/` — un motif qui ne peut pas matcher `go.mjs`.
+ * Un seul fichier du depot tombait dans cet angle, et c'est celui-ci.
+ *
+ * ⚠ ET ELLE OUVRE /adm/health_check.php (ligne ~327), route sous consigne de ne
+ * pas etre ouverte. Le detecteur de l'inventaire cherche des ECRITURES ; ici
+ * c'est un GET, donc hors du champ du critere — aucun instrument ne le signale.
+ * La ligne est laissee en place : la retirer changerait ce que la suite affirme
+ * avoir couvert, et ce choix appartient a qui connait la suite.
+ *
+ * ROUTES ARCHIVEES, mesurees le 2026-09-08 :
+ *   /index.php  /ssh/  /fail2ban/  /services/  /ssh-audit/  /supervision/
+ *   /security/  /security/compliance_report.php  /notifications.php
+ *   /profile.php  /documentation.php
+ * ENCORE SERVIES : /iptables/  /adm/audit_log.php  /adm/platform_keys.php
+ *   /adm/server_users.php  /api/docs.php  /adm/health_check.php
  * Login + 2FA + password change + 28 pages + admin tabs debug + interactions
  * Navigateur visible 1440x900, reste ouvert. RIEN ne crash.
  *

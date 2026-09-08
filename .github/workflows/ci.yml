@@ -243,6 +243,51 @@ jobs:
           # Si le repo n'a pas de config, gitleaks utilise sa baseline par defaut
           GITLEAKS_ENABLE_UPLOAD_ARTIFACT: false
 
+      - name: Gitleaks — l'ARBRE ENTIER (MESURE, pas encore une porte)
+        # POURQUOI CE PAS EXISTE. Le pas precedent ne scanne pas l'arbre : il scanne
+        # une PLAGE de commits que `gitleaks-action` derive de l'evenement. La
+        # commande relevee dans le run 34201471220 porte `--no-merges
+        # --first-parent`. Or tout ce qui entre dans `main` par une fusion est en
+        # SECOND parent :
+        #
+        #     commits non-fusion dans main            1561
+        #     vus par --first-parent                   147
+        #     donc jamais scannes                     1414   (mesure le 2026-09-08)
+        #
+        # **Cinq jours de vert ne dedouanaient rien : la porte ne regardait pas.**
+        # Le defaut s'est vu au premier `pull_request` ouvert sur ce depot, parce que
+        # l'evenement change la plage — pas parce que le code avait change.
+        #
+        # CE PAS NE REMPLACE PAS LE PRECEDENT. `--no-git` scanne le CONTENU de
+        # l'arbre, independamment de tout evenement et de toute plage. Un secret
+        # retire de HEAD mais present dans l'historique reste une affaire de
+        # ROTATION, que seul le pas d'historique peut voir.
+        #
+        # ⛔ POURQUOI `continue-on-error` ALORS QUE CE DEPOT DIT « une porte qui ne
+        # bloque pas est un rapport, pas une porte » (ci.yml:132). Parce qu'on ne
+        # sait pas encore ce qu'un scan d'arbre rend : 37 fichiers de `tests/e2e/`
+        # portent un champ `secret:` — des TOTP de comptes `rw-test-*`. Rendre ce
+        # pas bloquant avant d'avoir INVENTORIE, c'est arreter les huit sessions sur
+        # un compte qu'on n'a pas fait. Ce pas mesure d'abord et son compte decide
+        # ensuite. **Cet etat est transitoire, et il l'est PAR ECRIT ici pour ne pas
+        # se perimer en silence.**
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          # Le binaire est celui que le pas precedent a installe et mis en cache :
+          # aucun telechargement de plus, donc aucune surface d'appro en plus, et la
+          # version reste celle que l'action epingle par son SHA.
+          BIN=$(command -v gitleaks || true)
+          if [ -z "$BIN" ]; then BIN=$(ls -1 /tmp/gitleaks-*/gitleaks 2>/dev/null | head -1 || true); fi
+          if [ -z "$BIN" ] || [ ! -x "$BIN" ]; then
+            echo "::error::binaire gitleaks introuvable — le pas precedent a change de place."
+            echo "Ce controle ECHOUE plutot que de passer sans avoir mesure."
+            exit 1
+          fi
+          "$BIN" version
+          "$BIN" detect --no-git --source . --config .gitleaks.toml \
+            --redact --verbose --exit-code=1
+
   # ─────────────────────────────────────────────────────────────
   # Job 4.2 : Bandit - SAST Python (SQL inj, shell inj, hardcoded secrets)
   # ─────────────────────────────────────────────────────────────

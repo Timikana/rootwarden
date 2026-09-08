@@ -20,10 +20,11 @@
  *   node go-socle-i18n.mjs
  */
 import puppeteer from 'puppeteer';
+import { baseDeclaree } from './lib-cible.mjs';
 import { execFileSync } from 'child_process';
 import { createHmac } from 'crypto';
 
-const BASE = process.env.E2E_BASE || 'http://localhost:8444';
+const BASE = baseDeclaree('http://localhost:8444');
 const MDP = process.env.E2E_TEST_PASS || 'RootWarden@2026-Test!';
 const COMPTE = 'rw-test-super';
 const SECRET = 'MZXW6YTBOJSXG5BAMZXW6YTBOJSXG5BAMZXW6YTBOJSXG5BAMZXW';

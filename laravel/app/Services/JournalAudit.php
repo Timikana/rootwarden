@@ -321,21 +321,55 @@ class JournalAudit
      * session s'appretait a refaire le travail sur sa foi. **Un avertissement
      * qui survit a sa cause envoie refaire ce qui est fait.**
      *
-     * Reste `MotDePasse`, ecriture NUE et ASSUMEE, qui documente son choix.
-     * En ecrire une copie de plus etait la solution la moins couteuse et la plus
-     * mauvaise : ce depot a paye trois copies du garde SSRF et trois compteurs 2FA.
+     * ⚠ CE DOCBLOC PORTAIT SA PROPRE MISE EN GARDE ET S'Y EST FAIT PRENDRE.
      *
-     * ⚠ ET LES TROIS COPIES EXISTANTES OMETTENT LE VERROU. Elles lisent la tete
-     * de chaine par un simple `orderByDesc('id')->value('self_hash')`, hors
-     * transaction. Le legacy, lui, le fait dans une transaction avec
-     * `FOR UPDATE` (`adm/includes/audit_log.php:107-116`) — et ce verrou n'est
-     * pas decoratif : **deux ecritures concurrentes qui lisent la meme tete
+     * Trois paragraphes le concluaient encore le 2026-09-07 : « Reste
+     * `MotDePasse`, ecriture NUE et ASSUMEE », « LES TROIS COPIES EXISTANTES
+     * OMETTENT LE VERROU », et « **Les trois copies restent a migrer** — ce
+     * n'est pas fait ici, et c'est declare ». **Les trois etaient faux, et le
+     * dernier contredisait le tableau vingt lignes plus haut, dans le meme
+     * commentaire.** Remesure du 2026-09-07 21:55 :
+     *
+     *     ComptesController      INSERT direct dans user_logs : 0   ->ajoute( : :93
+     *     PermissionsController  INSERT direct dans user_logs : 0   ->ajoute( : :70
+     *     ServeursController     INSERT direct dans user_logs : 0   ->ajoute( : :141
+     *     MotDePasse             INSERT direct dans user_logs : 0   ->ajoute( : :591
+     *     temoin : 295 fichiers .php suivis sous laravel/ lus
+     *     ecrivains du journal : 9   (le compte BRUT de `->ajoute(` est 11 ; deux
+     *     sont des HOMONYMES qui ajoutent un SERVEUR — ServeursController:77 et
+     *     Serveurs.php:457. J'avais publie « 11 » en listant les neuf bons : le
+     *     nombre et la liste se contredisaient dans le meme message.)
+     *
+     * Leur seule mention de `self_hash` est desormais une PROSE DE DOCBLOC qui
+     * decrit ce qu'elles faisaient avant. **Un motif qui cherche `self_hash`
+     * pour trouver un ecrivain trouve donc le recit de sa disparition** — c'est
+     * un faux positif qui alarme, et il fallait compter les `insert`.
+     *
+     * ══ ET LE VERROU, LUI, EST BIEN ICI ──────────────────────────────────────
+     *
+     * `DB::transaction` + `lockForUpdate()` ci-dessous, comme le legacy le fait
+     * avec `FOR UPDATE` (`adm/includes/audit_log.php:107-116`). Il n'est pas
+     * decoratif : **deux ecritures concurrentes qui lisent la meme tete
      * produisent deux lignes portant le MEME `prev_hash`, donc une chaine
      * FOURCHUE**, que `verifie()` signalera comme rompue sans pouvoir dire
-     * laquelle des deux branches est la bonne.
+     * laquelle des deux branches est la bonne. Il n'y a plus qu'un ecrivain a
+     * proteger, et c'est celui-ci.
      *
-     * Cette methode reprend donc le verrou du legacy. **Les trois copies
-     * restent a migrer** — ce n'est pas fait ici, et c'est declare.
+     * ══ NE PAS CONFONDRE CETTE METHODE AVEC `scelle()` ───────────────────────
+     *
+     * `scelle()` rend `scellement_possible => false`, et une session en a
+     * conclu le 2026-09-07 que « le portage ne porte pas le scellement ».
+     * **Ce sont deux operations differentes :**
+     *
+     *     ajoute()   sceller A L'INSERTION      PORTE, c'est cette methode
+     *     scelle()   sceller RETROACTIVEMENT    impossible PAR CONSTRUCTION
+     *
+     * Le second n'est pas une lacune : `backend/audit_chain.py` en porte la
+     * demonstration — remettre les 1484 lignes nues dans la chaine exigerait de
+     * reecrire le `prev_hash` des 4787 scellees, c'est-a-dire de detruire la
+     * seule propriete que la chaine apporte. **Une methode qui rend « impossible »
+     * peut declarer une impossibilite JUSTE ; sa valeur de retour ne dit pas si
+     * la capacite est portee.**
      */
     public function ajoute(int $auteur, string $action): void
     {

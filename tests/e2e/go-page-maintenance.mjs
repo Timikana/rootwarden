@@ -44,12 +44,13 @@
  *   cd tests/e2e && node go-page-maintenance.mjs
  */
 import puppeteer from 'puppeteer';
+import { baseDeclaree } from './lib-cible.mjs';
 import { createHmac } from 'crypto';
 import { litEnBase, compteEnBase } from './lib-base.mjs';
 import { execFileSync } from 'node:child_process';
 import { constateArchivage, verifieMenuLegacy } from './archive.mjs';
 
-const BASE = process.env.E2E_BASE || 'https://localhost:8443';
+const BASE = baseDeclaree('https://localhost:8443');
 const CIBLE = (() => {
     /*
      * ══ LA CIBLE VIENT DE L'ENVIRONNEMENT, L'URL N'EST QU'UN REPLI ════════

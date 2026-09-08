@@ -371,9 +371,45 @@ def add_to_sudoers(channel, username: str, logger=None, policy: dict = None):
             }
             content = sudo_manager.render_policy(policy_full)
         except (ValueError, ImportError) as e:
+            # ══ UN ECHEC DE RENDU N'ELARGIT PLUS LE PRIVILEGE ═══════════════
+            #
+            # Cette branche posait `policy = None`, ce qui faisait tomber dans
+            # le repli ci-dessous et ECRIVAIT `ALL=(ALL:ALL) NOPASSWD: ALL`.
+            #
+            # **Plus l'intention etait etroite, plus le resultat etait large** —
+            # et precisement quand quelque chose venait de mal se passer :
+            # quelqu'un demande une politique PRECISE, le rendu echoue, le
+            # produit accorde root sans mot de passe sans restriction.
+            #
+            # L'ASYMETRIE ETAIT DANS CETTE MEME FONCTION :
+            #
+            #     username invalide (plus haut)  ->  return, RIEN n'est ecrit
+            #     policy   invalide (ici)        ->  NOPASSWD: ALL etait ECRIT
+            #
+            # Aucune capacite n'est perdue : `sudo_manager` enregistre
+            # `all_nopasswd` comme PRESET. Qui veut ce pouvoir le CHOISIT ; le
+            # repli ne le rendait pas accessible, il l'accordait par accident.
+            #
+            # ⚠ POURQUOI ICI ET PAS SUR LA CONDITION DU REPLI. Ce repli est
+            # atteint par DEUX chemins : celui-ci, et l'appel SANS argument
+            # `policy` (branche `elif sudo:` de l'appelant, le booleen
+            # `users.sudo = 1`). Corriger la CONDITION tuerait les deux, donc
+            # retirerait du sudo a des comptes qui en ont aujourd'hui — une
+            # question distincte, laissee ouverte a dessein. **On corrige le
+            # site de l'ECHEC, pas la condition qu'il partage.**
+            #
+            # Le fichier existant reste INTACT : l'ecriture reelle n'a lieu
+            # qu'apres, par `tmp` + `visudo -cf` + `mv` atomique. Rendre la
+            # main ne revoque donc rien, cela laisse l'etat precedent.
+            #
+            # ⚠ RESERVE : cet `except` reste ETROIT. Un `TypeError` ou un
+            # `KeyError` de `render_policy` s'echappe toujours de la fonction.
+            # « Un echec n'elargit jamais » est donc vrai pour ces deux types
+            # d'exception, et la remontee reste le sort des autres.
             if logger:
-                logger.error(f"[{username}] Render sudo policy invalide ({e}), fallback NOPASSWD ALL")
-            policy = None  # Force fallback ci-dessous
+                logger.error(f"[{username}] Render sudo policy invalide ({e}) : "
+                             "AUCUN sudoers ecrit, la politique precedente est conservee")
+            return
 
     # Fallback historique (preset absent ou render KO) : NOPASSWD ALL
     if not policy or not policy.get('preset'):

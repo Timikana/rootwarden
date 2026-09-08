@@ -42,6 +42,7 @@
  *   E2E_BASE=https://localhost:8443 node go-page-conformite.mjs   (legacy)
  */
 import puppeteer from 'puppeteer';
+import { baseDeclaree } from './lib-cible.mjs';
 import { createHmac } from 'crypto';
 import { compteEnBase } from './lib-base.mjs';
 import { constateArchivage, verifieMenuLegacy } from './archive.mjs';
@@ -61,7 +62,7 @@ function parcEnBase() {
     return compteEnBase('SELECT COUNT(*) FROM rootwarden.machines');
 }
 
-const BASE = process.env.E2E_BASE || 'http://localhost:8444';
+const BASE = baseDeclaree('http://localhost:8444');
 const MDP = process.env.E2E_TEST_PASS || 'RootWarden@2026-Test!';
 const CIBLE = (() => {
     /*

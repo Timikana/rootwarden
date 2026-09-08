@@ -154,7 +154,32 @@ class AppelantsDuBackendTest extends TestCase
             // Une liste qui se raccourcit se relit aussi attentivement qu'une
             // liste qui s'allonge : un site qui sort peut être corrigé, ou
             // simplement devenu invisible à l'analyseur.
-            'journal-audit.js:73',        // routes Laravel
+            /*
+             * K4, ajoute le 2026-09-07. `[ignore]` est le verdict JUSTE et non un
+             * defaut : `declenche()` ne vise PAS la passerelle mais
+             * `POST /cles-ssh/deployer`, une route DU PORTAGE qui exige le
+             * preflight cote serveur avant de relayer.
+             *
+             * *Viser `/api/gateway/deploy` d'ici rendrait ce garde contournable
+             * d'un clic — c'est exactement ce que fait le legacy.* L'analyseur
+             * cherche des chemins de passerelle ; il a raison de ne pas en trouver.
+             */
+            'cles-ssh.js:491',
+            'journal-audit.js:73',
+            /*
+             * AJOUTE le 2026-09-07 avec le portage de la liste blanche des CVE.
+             *
+             * Meme verdict et meme raison que `planification-cve.js:204` : le
+             * verdict est CONSERVATEUR. L'analyseur cherche `success` et ne le
+             * trouve pas ; l'appelant lit `r.ok`, qui est un discriminant VALIDE
+             * ici parce que le controleur porte un vrai statut sur chaque refus
+             * (400 sur validation, 404 sur entree absente) — et non un 200
+             * accompagne de `success: false`.
+             *
+             * « Sans lecteur » nomme l'absence d'UN lecteur, pas l'absence de
+             * lecture.
+             */
+            'liste-blanche-cve.js:59',        // routes Laravel
             'planification-cve.js:78',    // route Laravel
             /*
              * :180 -> :204 le 2026-09-06. DECALAGE DE LIGNE, pas site neuf :

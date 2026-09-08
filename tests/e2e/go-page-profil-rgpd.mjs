@@ -48,11 +48,12 @@
  * classe qui a fait tomber ~61 suites le 2026-09-01. Non mesure, et DIT.
  */
 import puppeteer from 'puppeteer';
+import { baseDeclaree } from './lib-cible.mjs';
 import { createHmac } from 'crypto';
 import { mkdirSync, readFileSync } from 'fs';
 import { litEnBase } from './lib-base.mjs';
 
-const BASE = process.env.E2E_BASE || 'http://localhost:8444';
+const BASE = baseDeclaree('http://localhost:8444');
 const MDP = process.env.E2E_TEST_PASS || 'RootWarden@2026-Test!';
 const CIBLE = (() => {
     /*

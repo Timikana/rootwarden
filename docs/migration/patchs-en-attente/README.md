@@ -112,3 +112,119 @@ l'arbre. Conservés ici comme trace de la manœuvre, pas comme travail en attent
     06  scripts/rejouer-lot.sh         les deux bases + le controle d'ETAT du portail
 
 *Appliqués dans `fa1a409`, avec la recréation des conteneurs et le contrôle des quatre ports.*
+
+---
+
+## `07-retrait-du-service-php-NON-APPLIQUE.patch` — le dernier geste de l'extinction
+
+**Généré le 2026-09-08 09:0x, contre `HEAD`. `git apply --check` PASSE.** *Non appliqué, et il
+ne doit pas l'être par une session : l'appliquer exige une **recréation**, qui appartient à
+l'exploitant.*
+
+### CE QU'IL FAIT, ET RIEN D'AUTRE
+
+```
+0 ajout · 64 suppressions · un seul fichier : docker-compose.yml
+retire   le bloc de service `php` (lignes 8-70)
+retire   la declaration du volume `php_sessions` (elle n'avait qu'un usage)
+```
+
+**Vérifié — il ne touche PAS :**
+
+```
+./legacy/version.txt:/var/www/html/version.txt:ro   monte DANS le portage
+./legacy:/app                                        monte par composer, x2
+```
+
+*Ces deux-là survivent au retrait du service, et c'est voulu : `version.txt` est la source
+unique du numéro de version, lue par `laravel/app/Support/Version.php`.*
+
+### CE QUI JUSTIFIE QU'IL SOIT PRÊT MAINTENANT
+
+**Le legacy ne sert plus une seule page** — étapes ②→⑦ exécutées et vérifiées au réseau. Il
+reste treize fichiers sous `legacy/`, **zéro `.php`** : des actifs statiques, `composer.*`,
+`vendor/.htaccess`, `logs/.htaccess` et le `.htaccess` racine.
+
+**Et le conteneur est `unhealthy`** depuis que sa sonde de vie vise `/auth/login.php`,
+archivé à l'étape ⑤ : cinq échecs `exit=22`, `restarts=0`, et **rien ne dépend de `php` en
+`service_healthy`** (graphe vérifié). *L'`unhealthy` est le symptôme d'un service qui n'a plus
+d'objet — ce patch est ce qui le fait disparaître, et non une correction de la sonde.*
+
+### VALIDATION FAITE
+
+```
+docker compose -f <modifie> config --quiet     code 0
+services declares                              db · laravel · python
+                                                (`php` absent, les autres intacts)
+```
+
+⚠ *Validé avec `srv-docker.env` LIÉ et non copié : ce fichier porte des secrets et n'a jamais
+quitté le dépôt.*
+
+### ⛔ TROIS DÉCISIONS L'ACCOMPAGNENT, ET AUCUNE N'EST DANS LE PATCH
+
+**① `HTTP_PORT`, `HTTPS_PORT`, `URL_HTTP`, `URL_HTTPS` dans `srv-docker.env` perdent leur
+objet.** *Ce sont les ports du service retiré.* **Et `URL_HTTPS` alimente la liste blanche
+CORS du backend** — `backend/server.py:137`, `E-481` : elle ne contient aujourd'hui qu'une
+seule origine distincte, celle du legacy. **Après ce patch, elle nommera un portail qui
+n'existe plus.** *C'est le moment que `E-481` avait daté « à l'extinction ».*
+
+**② La sonde de vie part avec le service.** *Ne pas la déplacer une troisième fois : elle
+visait la racine, l'archivage de `index.php` l'a cassée — 21 h d'`UNHEALTHY` faux le
+2026-09-05 — puis elle a été liée à l'écran de connexion, que l'étape ⑤ vient d'archiver.*
+**Il n'existe plus de page du legacy dont la survie soit plus longue que celle du conteneur.**
+
+**③ Les quatre `<FilesMatch "^(db|menu|head|footer)\.php$">` du `.htaccess` gardent désormais
+des fichiers absents** — d'où un `403` là où un `404` serait juste. *Laissé en place
+volontairement : le reste du fichier protège encore réellement, et un `403` sur un chemin
+inexistant ne trompe personne sur une capacité.*
+
+### ⚠ CE QUE CE PATCH NE PEUT PAS SAVOIR
+
+**Si un consommateur externe — signet, clé d'API, script d'exploitation, supervision — vise
+encore `:8444` ou `:8446`.** *La mesure porte sur le dépôt ; elle ne voit pas les usages.*
+**Le journal d'accès dit qu'en une heure, les seules requêtes reçues étaient la sonde de vie
+elle-même — mais une heure n'est pas une semaine.**
+
+### ✅ LE RISQUE « CONSOMMATEUR EXTERNE » EST LEVÉ — 38 HEURES, ET VOICI SES LIMITES
+
+*J'avais écrit : « une heure n'est pas une semaine ». Le journal du conteneur en couvre **38
+heures**, du 2026-09-06 19:40 au 2026-09-08 09:18. Mesuré, pas supposé.*
+
+```
+4782 lignes · 4499 requetes de 127.0.0.1 (la sonde) · 274 de 172.18.0.1 (l'hote)
+                                                     ·   4 de 192.168.0.245
+
+agents : curl/8.14.1 4753 · "-" 15 · Chrome/131 7 · HeadlessChrome 2
+```
+
+**Les trois catégories non-sonde, identifiées une par une :**
+
+```
+7  Chrome NON headless   06/09 19:45:42 -> :47, UN SEUL passage de 5 secondes,
+                         depuis l'HOTE : GET login.php 200 · POST login.php 302
+                         · verify_2fa.php 200 · adm/admin_page.php 404
+                         -> une authentification REUSSIE, il y a 38 heures
+4  192.168.0.245         08/09 05:04-05:52, curl, dont `/reinitialiser` — une
+                         route du PORTAGE : ce sont MES propres mesures de ce
+                         matin, arrivees par l'IP LAN de l'hote
+15 agent "-"             des octets de poignee TLS (\x16\x03\x01...) sur le port
+                         HTTP : mes `curl -k https://...:8444`
+```
+
+> **Aucun consommateur humain externe en 38 heures.** *Le seul passage d'un vrai navigateur
+> date du 06/09, depuis cette machine, et le flux qu'il a emprunté — connexion puis second
+> facteur — est porté.*
+
+⛔ **CE QUE CETTE MESURE NE COUVRE PAS, ET IL FAUT LE DIRE :**
+
+```
+38 heures, pas une semaine ni un mois
+le journal ne voit que ce qui ATTEINT ce conteneur — un client qui a renonce il y
+   a des mois, ou qui n'interroge qu'une fois par semaine, n'y figure pas
+et il ne voit pas un signet non ouvert, une cle d'API non employee, un script
+   planifie a une cadence plus longue que la fenetre
+```
+
+*C'est la seule inconnue qui reste, et elle est bornée : appliquer le patch ne détruit rien
+— `_deprecated/` garde 214 fichiers, et le bloc retiré est un `git revert` de distance.*

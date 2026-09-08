@@ -77,6 +77,32 @@ class PareFeuController extends Controller
             'valid_sans_copie', 'valid_v4_vide', 'valid_en_cours', 'valid_ok',
             'valid_invalide_titre', 'valid_invalide', 'valid_invalide_court',
             'valid_echec_titre', 'valid_echec', 'valid_sortie',
+            /*
+             * ⚠ LE TROISIEME ENDROIT. Ces cles existent dans les deux catalogues ;
+             * sans cette liste elles ne VOYAGENT pas jusqu'au JS, et `t()` rend
+             * alors le NOM DE LA CLE. Pour les huit titres de Q3 ce serait pire
+             * qu'un vide : le module rend un titre PAR CONSTRUCTION, donc l'ecran
+             * afficherait `ipt_retour_succes` a la place d'une phrase — en ayant
+             * l'air de fonctionner.
+             */
+            'ipt_retour_succes', 'ipt_retour_regles_invalides', 'ipt_retour_refus',
+            'ipt_retour_erreur_serveur', 'ipt_retour_corps_illisible',
+            'ipt_retour_inabouti', 'ipt_retour_doute_marqueur',
+            'ipt_retour_contrat_inconnu',
+            'appl_titre', 'appl_intro', 'appl_gabarit', 'appl_gabarit_aide',
+            'appl_apercu', 'appl_ssh_ouvert', 'appl_ssh_ferme', 'appl_ssh_doute',
+            'appl_bouton', 'appl_en_cours', 'appl_conf_titre', 'appl_conf_texte',
+            'appl_conf_ok', 'appl_conf_non', 'appl_annule',
+            /*
+             * I6. `rb_version_absente` et `rb_version_introuvable` sont ABSENTES
+             * de cette liste a dessein : le serveur les rend deja comme `message`
+             * dans sa reponse JSON. Les transmettre AUSSI ferait deux sources pour
+             * la meme phrase, et c'est la copie qui divergerait.
+             */
+            'rb_titre', 'rb_bouton', 'rb_lecture', 'rb_lecture_echec', 'rb_apercu',
+            'rb_archive_le', 'rb_ssh_ouvert', 'rb_ssh_ferme', 'rb_ssh_doute',
+            'rb_conf_titre', 'rb_conf_texte', 'rb_conf_ok', 'rb_conf_non',
+            'rb_en_cours', 'rb_annule',
         ] as $cle) {
             $textes[$cle] = __('pare-feu.' . $cle);
         }
@@ -279,6 +305,64 @@ class PareFeuController extends Controller
      * Un seul point de resolution pour les deux gestes : deux copies de ce
      * controle finiraient par diverger, et c'est un controle d'acces.
      */
+    // ══════════════════════════════════════════════════════════════════════
+    //  SOUS-LOT I6 — LE RETOUR ARRIERE : LIRE LA VERSION AVANT DE LA CONSENTIR
+    // ══════════════════════════════════════════════════════════════════════
+
+    /**
+     * Rend le texte d'une version archivee, pour que l'ecran puisse le MONTRER et
+     * repondre a Q2 avant tout geste.
+     *
+     * Lecture seule, rien n'est joint. La garde de la route est celle de la page
+     * (`role:1` + `perm:can_manage_iptables`) et l'acces machine est verifie sur
+     * l'objet RESOLU par `machineDeLaRequete()`.
+     */
+    public function versionArchivee(Request $requete): JsonResponse
+    {
+        $machine = $this->machineDeLaRequete($requete);
+        if ($machine === null) {
+            return response()->json([
+                'success' => false,
+                'message' => __('pare-feu.machine_refusee'),
+            ], 403);
+        }
+
+        /*
+         * ⚠ `ConvertEmptyStringsToNull` rend « vide » indiscernable d'« absent ».
+         * On exige donc un entier STRICTEMENT positif plutot que de tester le
+         * `null` : un `version_id` vide ne doit pas ressembler a un identifiant.
+         */
+        $version = (int) $requete->input('version_id', 0);
+        if ($version <= 0) {
+            return response()->json([
+                'success' => false,
+                'message' => __('pare-feu.rb_version_absente'),
+            ], 400);
+        }
+
+        $ligne = $this->iptables->reglesArchivees((int) $machine->id, $version);
+        if ($ligne === null) {
+            // Version inconnue OU appartenant a une autre machine : une seule
+            // reponse pour les deux, sinon l'ecart des messages enumere le parc.
+            return response()->json([
+                'success' => false,
+                'message' => __('pare-feu.rb_version_introuvable'),
+            ], 404);
+        }
+
+        return response()->json([
+            'success'    => true,
+            'version_id' => (int) $ligne->id,
+            'rules_v4'   => (string) ($ligne->rules_v4 ?? ''),
+            'rules_v6'   => (string) ($ligne->rules_v6 ?? ''),
+            'created_at' => (string) ($ligne->created_at ?? ''),
+            // Le port ACTUEL de la machine, jamais celui de l'archive : la table
+            // n'en porte pas, et c'est le port d'aujourd'hui qui decide si la
+            // restauration ferme l'acces.
+            'port_ssh'   => (int) ($machine->port ?? 22),
+        ]);
+    }
+
     private function machineDeLaRequete(Request $requete): ?object
     {
         $id = (int) $requete->input('machine_id', 0);

@@ -93,12 +93,13 @@
  * confirmation qui ne l'est pas.
  */
 import puppeteer from 'puppeteer';
+import { baseDeclaree } from './lib-cible.mjs';
 import { createHmac } from 'crypto';
 import { litEnBase, compteEnBase } from './lib-base.mjs';
 import { mkdirSync, readFileSync } from 'node:fs';
 import { constateArchivage } from './archive.mjs';
 
-const BASE = process.env.E2E_BASE || 'http://localhost:8444';
+const BASE = baseDeclaree('http://localhost:8444');
 const CIBLE = (() => {
     /*
      * ══ LA CIBLE VIENT DE L'ENVIRONNEMENT, L'URL N'EST QU'UN REPLI ════════

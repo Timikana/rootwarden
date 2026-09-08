@@ -299,6 +299,46 @@ class Iptables
     }
 
     /**
+     * Les regles d'UNE version archivee, ou `null`.
+     *
+     * ══ POURQUOI CE SELECT EXISTE ALORS QUE LE LISTING LES EXCLUT ════════════
+     *
+     * `historique()` ne transporte AUCUNE regle, et c'est un choix de VOLUME :
+     * vingt versions completes pour une liste de vingt lignes est un cout sans
+     * contrepartie. Ce choix ne dit rien contre la lecture d'UNE version a la
+     * demande — et le retour arriere en a besoin pour deux raisons distinctes :
+     *
+     *   1. MONTRER le texte avant de le consentir. A l'application, l'operateur
+     *      ECRIT les regles et les a sous les yeux ; au retour arriere il choisit
+     *      une DATE. C'est le seul des deux gestes ou l'humain ne peut pas se
+     *      relire, donc le seul ou l'ecran doit lui rendre l'objet.
+     *   2. Repondre a Q2 — « ce jeu laisse-t-il le port SSH ouvert ? » ne se
+     *      calcule pas sans le texte.
+     *
+     * ══ LES DEUX IDENTIFIANTS SONT DANS LE MEME `WHERE`, ET C'EST LA GARDE ═══
+     *
+     * `id = ? AND server_id = ?` : une version qui appartient a une AUTRE machine
+     * rend `null`, meme si le demandeur a acces a la machine qu'il annonce. La
+     * verification porte donc sur l'objet ATTEINT, jamais sur le parametre recu —
+     * la meme regle que `/iptables-rollback` cote backend, qui controle l'acces
+     * APRES avoir resolu la version.
+     *
+     * *Sans le `server_id`, un `history_id` forge suffirait a lire le pare-feu
+     * d'une machine interdite — et, une fois le retour arriere pose, a l'y
+     * appliquer.*
+     */
+    public function reglesArchivees(int $machineId, int $versionId): ?object
+    {
+        $lignes = DB::select(
+            'SELECT id, rules_v4, rules_v6, created_at FROM iptables_history '
+            . 'WHERE id = ? AND server_id = ? LIMIT 1',
+            [$versionId, $machineId]
+        );
+
+        return $lignes[0] ?? null;
+    }
+
+    /**
      * L'auteur d'une version, rendu lisible.
      *
      * `changed_by` est deja un NOM cote backend — contrairement a
