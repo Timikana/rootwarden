@@ -95,10 +95,23 @@ la même cause : l'étape ⑤ a archivé la cible de la sonde.
 **⚠ Et il ne bloque rien — mesuré, avec témoin :**
 
 ```
-services declarant depends_on php          0
-  temoin : depends_on db  ->  3 trouves (php, laravel, python)
-  laravel depend de db seul · python de db seul
+sur la configuration FUSIONNEE (-f base -f prod), qui est celle qui s'applique :
+  depends_on conserves            3
+  laravel -> db, resources    php -> db, python, resources    python -> db, resources
+  cibles nommant « php »          0
 ```
+
+⚠ **Et une borne que je dois à `0b` (`131e886c`), parce qu'elle change ce que la
+mesure PROUVE sans changer la conclusion.** Mon premier relevé disait « 0
+`depends_on php` » en s'appuyant sur un témoin (`db` -> 3) pris dans le SEUL
+`docker-compose.yml`. Or **`docker-compose.prod.yml` ne contient AUCUN
+`depends_on`, toutes cibles confondues** : l'affirmation y était vraie **à vide**,
+et un lecteur l'aurait prise pour une garantie sur la production.
+
+*C'est l'universelle négative vraie à vide, appliquée à ma propre mesure.* **La
+forme qui referme est celle ci-dessus : mesurer la configuration FUSIONNÉE**, où
+`depends_on` est conservé et le témoin réel — l'énoncé ne dépend plus de quel
+fichier déclare quoi. `prod.yml` est un calque, pas un fichier autonome.
 
 > **Donc `./maj.sh` et tout redémarrage démarreraient.** *Un `unhealthy` qui ne
 > gouverne aucune dépendance coûte de l'attention, pas de la disponibilité — et
