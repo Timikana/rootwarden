@@ -13983,3 +13983,62 @@ fichier qui les décide.**
 et faisant AUTORITÉ, le lire vaut mieux que le parser.* **Un analyseur se trompe en silence ;
 51 lignes ne se trompent pas.**
 
+---
+
+## Relevé de supervision — 2026-09-08 02:35
+
+```
+production 01:35 -> 02:35   8 commits · 4 de CODE · 4 de doc
+doc/code = 1,00             ✅ le meilleur ratio de la session
+```
+
+### ⚠ Mais la mesure a une faille, et elle est dans sa DÉFINITION
+
+**La consigne compte comme CODE ce qui touche `laravel/` ou `backend/`. Deux des quatre
+commits de cette heure touchent `legacy/` :**
+
+```
+f4a16389   legacy/adm/includes/.htaccess     un refus qui retire 2 racines servies
+8947e44d   legacy/menu.php                   33 liens morts rebascules, 1 retire
+```
+
+**C'est du CODE SERVI** — un `.htaccess` décide ce qu'Apache rend, et `menu.php` s'affiche
+sur la dernière page legacy. *Selon la lettre de la règle, ces deux-là ne sont pas du code ;
+selon ce que la règle veut mesurer — « l'équipe porte-t-elle, ou écrit-elle sur ses
+mesures ? » — ce sont exactement du travail livré.*
+
+> **Un compte sans sa définition n'est pas une mesure** — et ici la définition exclut le
+> répertoire où vit tout ce qui reste à éteindre. *La règle a été écrite quand le travail
+> était dans `laravel/` ; il est désormais aussi dans `legacy/`.*
+
+⚠ **Je ne la modifie pas** : elle n'est pas de moi. **Je la déclare**, et je compte les deux
+manières à chaque relevé désormais — *sinon l'heure où l'on ne fait plus que retirer du
+legacy s'affichera comme une heure sans code.*
+
+### ② Deux relances, aucune sur la liste close
+
+```
+la session des SUITES     rendre PERMANENTE l'interdiction du lien mort
+                          (33 liens corriges A LA MAIN cette heure ;
+                           un `git diff` relu ne tient pas entre les tours)
+la session de la CARTE    CONTREDIRE la sequence de DOSSIER-48, en lecture seule
+```
+
+*La seconde n'est pas du portage : c'est une contre-épreuve, et je la demande parce que mes
+chiffres ont été faux TROIS FOIS cette nuit sur cette exacte question.* **Une séquence
+attestée vaut mieux qu'une séquence non contredite, et ce n'est pas la même chose.**
+
+### ③ Déclaration d'état
+
+```
+tests/e2e/jetons-interdits.mjs   code 0
+```
+
+### ④ Arbitrages
+
+**Rendus ce tour** : la séquence d'extinction (`DOSSIER-48`), dont ⑤ — *la chaîne d'auth
+s'archive et ne se dénie pas.* **Corrigé ce tour** : `E-474`, mon compte de racines.
+
+**Rien de neuf n'attend l'exploitant** au-delà des trois actes déjà écrits, et je ne crée pas
+de dossier pour les redire.
+
