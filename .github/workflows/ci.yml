@@ -476,6 +476,27 @@ jobs:
           if [ "$n" -lt "$ref" ]; then
             echo "::warning::$n trouvailles contre $ref : descendre la reference a $n."
           fi
+          # ── MESURE INFORMATIVE : ce que les 4 regles WARNING trouveraient ──
+          #
+          # Dix regles sont declarees, SIX seulement sont evaluees : le filtre
+          # `--severity=ERROR` ci-dessus ecarte rw-subprocess-shell-true,
+          # rw-php-equals-on-hash, rw-php-weak-random et rw-php-debug-leak. Elles
+          # compilent, elles sont maintenues, et rien ne les execute.
+          #
+          # Ce pas les fait tourner SANS GARDE, uniquement pour rendre leur compte.
+          # On ne peut pas poser un cliquet sur un nombre qu'on ne connait pas — et
+          # l'estimer au `grep` serait exactement le substitut qui s'est trompe sept
+          # fois aujourd'hui. Le nombre lu ici deviendra la reference du cliquet
+          # « toutes severites », dans un second geste. Voir E-523.
+          semgrep --config=.semgrep/rules-rootwarden.yml --metrics=off \
+                  --json --quiet . > /tmp/semgrep-tout.json || true
+          tout=$(python3 -c "import json;print(len(json.load(open('/tmp/semgrep-tout.json'))['results']))" 2>/dev/null || echo ILLISIBLE)
+          echo "toutes severites : $tout   (dont $n en ERROR, sous cliquet)"
+          python3 -c "import json,collections;d=json.load(open('/tmp/semgrep-tout.json'));c=collections.Counter(r['check_id'].split('.')[-1] for r in d['results']);[print(f'  {v:>4}  {k}') for k,v in c.most_common()]" 2>/dev/null || echo "  (compte par regle illisible)"
+          # `grep -c` rend 1 quand le compte est ZERO, et GitHub lance ce pas sous
+          # `bash -e` : sans le `|| true`, un fichier de regles vide AVORTERAIT le
+          # pas au lieu de le signaler. Le repli « ? » se voit, un avortement non.
+          echo "regles declarees dans le fichier : $(grep -c '^ *- id:' .semgrep/rules-rootwarden.yml || echo '?')"
 
   # ─────────────────────────────────────────────────────────────
   # Job 4.3 : SCA Python (safety + pip-audit - CVE sur dependencies)
