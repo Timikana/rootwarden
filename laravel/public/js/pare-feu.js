@@ -1193,6 +1193,59 @@
         if (rbConf && rbConf.scrollIntoView) { rbConf.scrollIntoView({ block: 'center' }); }
     }
 
+    /** Rend une sortie brute dans la zone d'etat du retour arriere. */
+    function rbDetail(texte) {
+        if (!rbEtatZone || !texte) { return; }
+        var pre = document.createElement('pre');
+        pre.className = 'rw-fichier';
+        pre.textContent = String(texte);
+        rbEtatZone.appendChild(pre);
+    }
+
+    /*
+     * ══ LA VALIDATION AVANT LE RETOUR ARRIERE ════════════════════════════════
+     *
+     * `apply` validait, `restaure` ne validait pas, et les DEUX appellent
+     * `apply_iptables_rules()` en aval. Ce n'etait pas « une validation en
+     * moins » mais un defaut A RETARDEMENT :
+     *
+     *     iptables_manager.apply_iptables_rules()
+     *       1. _write_rules_safe(...)  ->  ECRIT /etc/iptables/rules.v4
+     *       2. iptables-restore < ...  ->  CHARGE
+     *
+     * Le fichier est ecrit AVANT d'etre charge. Un jeu illisible ecrase le
+     * fichier persistant puis echoue : la machine garde ses regles **jusqu'au
+     * prochain redemarrage**, et se releve SANS PARE-FEU. *Charger d'abord et
+     * n'ecrire qu'au succes rendrait cette classe inoffensive — c'est le backend,
+     * donc l'exploitant. En attendant, on ferme par le haut.*
+     *
+     * ⚠ CE QUI A TENU CETTE CORRECTION FERMEE UNE NUIT : « ne compose aucune
+     * requete de plus sous `/iptables-`, la fermeture est PAR L'ABSENCE ». Juste
+     * comme regle, inapplicable ici — ce script compose DEJA `/iptables`,
+     * `/iptables-validate`, `/iptables-apply` et `/iptables-rollback`. La
+     * fermeture porte sur QUELS points d'acces sont atteints, pas sur combien de
+     * fois. Un cinquieme site vers un point deja atteint n'elargit rien.
+     *
+     * ══ REFUSER DANS LES DEUX CAS, AVEC DEUX MESSAGES ════════════════════════
+     *
+     *     verdict « invalide »          -> REFUS, une ACCUSATION, qui doit etre vraie
+     *     aucun verdict possible        -> REFUS, un AVEU : « je n'ai pas verifie »
+     *
+     * Les deux se traitent en refus ; **c'est le message qui differe**, et cette
+     * distinction est exactement celle que Q2 a fait payer trois rondes. Un refus
+     * qui accuse a tort s'use plus vite qu'un garde absent : celui qui sait son
+     * jeu bon apprend que le garde se trompe.
+     *
+     * ⛔ ET AUCUNE ECHAPPATOIRE. Offrir un contournement, meme derriere un second
+     * consentement, revient a rouvrir le chemin non valide — donc a n'avoir rien
+     * ferme.
+     *
+     * *L'objection « refuser sur une machine injoignable retire une capacite de
+     * REPRISE » ne tient pas : le seul canal est SSH, et `/iptables-rollback`
+     * passe par lui. Si `validate` echoue faute de machine, l'`apply` echouerait
+     * pour la meme raison. Refuser n'enleve rien — il rend explicite un echec qui
+     * allait arriver.*
+     */
     function restaure() {
         if (!versionCourante) { return; }
         var id = selecteur ? selecteur.value : '';
@@ -1201,11 +1254,70 @@
         fermeRbConsentement();
         var repos = rbBouton.textContent;
         rbBouton.disabled = true;
-        rbBouton.textContent = t('rb_en_cours');
-        rbDire(t('rb_en_cours'));
+        rbBouton.textContent = t('rb_valid_en_cours');
+        rbDire(t('rb_valid_en_cours'));
         if (rbEtatZone) { rbEtatZone.replaceChildren(); }
 
-        appelle('/iptables-rollback', { history_id: versionCourante.id }).then(function (r) {
+        /*
+         * ⚠ LE MEME JETON QU'A LA LECTURE, ET POUR LA MEME RAISON. Entre cette
+         * validation et le retour arriere il y a une attente reseau : l'operateur
+         * peut cliquer une autre version, et `rbRemetAZero()` incremente alors le
+         * jeton. Sans cette capture, une validation tardive relancerait le geste
+         * sur une version que l'ecran ne montre plus. *C'est le defaut que le
+         * jeton vient de fermer un cran plus haut ; il n'y avait aucune raison de
+         * le reintroduire un cran plus bas.*
+         */
+        var mien = jetonLecture;
+        var version = versionCourante;
+
+        appelle('/iptables-validate', {
+            machine_id: Number(id),
+            rules_v4: version.regles
+        }).then(function (rv) {
+            if (mien !== jetonLecture) { return; }
+
+            var cv = rv.corps || {};
+            rbBouton.disabled = false;
+            rbBouton.textContent = repos;
+
+            // 1. Rien n'est parti : ni valide, ni invalide. AVEU.
+            if (rv.statut === 0) {
+                rbDire(t('rb_valid_indecidable', { motif: t('echec_reseau') }), 'attention');
+                return;
+            }
+
+            // 2. Partie, mais pas de verdict sur les REGLES : identifiants
+            //    irresolus, regles vides, erreur interne. AVEU, pas accusation.
+            if (rv.statut !== 200) {
+                rbDire(t('rb_valid_indecidable', {
+                    motif: String(cv.message || t('echec'))
+                }), 'attention');
+                rbDetail(cv.output);
+                return;
+            }
+
+            // 3. Un verdict, et il refuse. ACCUSATION — elle porte sur les regles.
+            if (cv.success !== true) {
+                rbDire(t('rb_valid_invalide'), 'echec');
+                rbDetail(cv.output);
+                return;
+            }
+
+            // 4. Valide. C'est le SEUL chemin qui applique.
+            appliqueLeRetour(version, repos);
+        });
+    }
+
+    /** Le geste lui-meme. Atteint UNIQUEMENT apres un verdict `valide`. */
+    function appliqueLeRetour(version, repos) {
+        var mien = jetonLecture;
+        rbBouton.disabled = true;
+        rbBouton.textContent = t('rb_en_cours');
+        rbDire(t('rb_en_cours'));
+
+        appelle('/iptables-rollback', { history_id: version.id }).then(function (r) {
+            if (mien !== jetonLecture) { return; }
+
             rbBouton.disabled = false;
             rbBouton.textContent = repos;
 

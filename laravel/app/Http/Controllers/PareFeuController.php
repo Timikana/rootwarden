@@ -103,6 +103,7 @@ class PareFeuController extends Controller
             'rb_archive_le', 'rb_ssh_ouvert', 'rb_ssh_ferme', 'rb_ssh_doute',
             'rb_conf_titre', 'rb_conf_texte', 'rb_conf_ok', 'rb_conf_non',
             'rb_en_cours', 'rb_annule',
+            'rb_valid_en_cours', 'rb_valid_invalide', 'rb_valid_indecidable',
         ] as $cle) {
             $textes[$cle] = __('pare-feu.' . $cle);
         }
