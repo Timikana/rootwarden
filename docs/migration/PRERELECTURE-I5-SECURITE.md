@@ -132,3 +132,54 @@ propriété est déjà écrite, et les données sont déjà en base.**
     NON LU       je n'ai pas relu le detail des quatre fichiers JS d'I5 ;
                  cette note repond aux TROIS QUESTIONS posees, elle n'est pas
                  la relecture ligne a ligne du lot
+
+---
+
+## 6. « Le crible peut-il attendre ? » — OUI, et la raison est PORTANTE
+
+**Question posée directement plutôt que supposée partagée. Réponse : oui, et pas
+parce que c'est mineur — parce que l'écran ne MENT pas dessus.**
+
+### 6.1 La liste de machines reflète le crible EXACTEMENT
+
+`App\Services\Iptables::machines()` :
+
+```
+role >= 2   SELECT … FROM machines WHERE lifecycle_status != 'archived'      TOUTES
+role 1      INNER JOIN user_machine_access uma ON … WHERE uma.user_id = ?    les siennes
+```
+
+> **Le cloisonnement de l'écran est le même que celui du backend, à la ligne
+> près.** *Un rôle 2 voit toutes les machines PARCE QU'il peut agir sur toutes.*
+> **Il n'y a pas de fausse restriction — et c'est la fausse restriction qui serait
+> le vrai danger.**
+
+*Et l'avertissement « machine sensible » est rendu AVANT le bouton, avec
+`OTHER`/vide comptés comme sensibles : un environnement inconnu ne se range pas
+du côté sûr.*
+
+### 6.2 Donc le correctif du socle est un DOSSIER À PART, et je le dis sans réserve
+
+    le crible est PREEXISTANT — I5 ne le cree pas, il l'OFFRE
+    l'ecran ne promet pas plus etroit qu'il n'est
+    la trace existe : `changed_by` vient de `get_current_user()`, recharge en base
+    resserrer `check_machine_access` touche TOUS les modules, pendant que le
+      dernier morceau du legacy s'ecrit
+
+> **Le risque du correctif, ce soir, dépasse le risque de l'écart.** *Et ce n'est
+> pas une supposition de ma part : c'est une réponse à une question posée.*
+
+### 6.3 ⚠ MAIS LA RAISON EST PORTANTE, DONC ELLE DOIT ÊTRE ÉCRITE
+
+**Ce qui rend l'attente acceptable est l'HONNÊTETÉ de la liste — pas la petitesse
+de l'écart.**
+
+> ⛔ **Si quelqu'un filtre un jour cette liste pour une raison d'ergonomie —
+> « n'affichons que ses machines » — l'écart devient un PIÈGE** : l'opérateur
+> croirait à un cloisonnement que le backend n'exerce pas, et un rôle 2 qui
+> compose une requête atteindrait des machines que son écran lui cachait.
+
+**`Iptables::machines()` au rôle ≥ 2 est donc une décision de SÉCURITÉ déguisée
+en requête d'affichage.** *Le jour où le crible du socle sera resserré, les deux
+devront bouger ENSEMBLE — et dans cet ordre : le backend d'abord, l'écran
+ensuite.*
