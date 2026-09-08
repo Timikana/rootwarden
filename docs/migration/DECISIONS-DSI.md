@@ -15899,3 +15899,72 @@ donc rien n'échoue bruyamment.
 **Repointer vers `_deprecated/` ressusciterait 16 fiches décrivant du code
 mort : le bon geste est de RETIRER la cartographie, et c'est une décision sur le
 coffre de documentation de quelqu'un, pas la mienne.**
+
+
+## E-503 — La dernière trace du legacy est en BASE, et elle est vide
+
+**Septième espèce de dépendance de ma propre liste — « seul écrivain dans la
+base » — la seule que je n'avais jamais mesurée.** Mesuré le 2026-09-08 14:0x.
+
+    65 tables CREATE dans le schema
+    63 citees par backend/ ou laravel/
+     2 JAMAIS citees   ->  linux_versions · package_exclusions
+
+    TEMOIN : users 33/26 · machines 44/53 · api_keys 5/5 — la sonde voit
+
+### Les deux ne se traitent pas pareil
+
+**`linux_versions`** — `id, machine_id, version, last_checked`. Citée par **5
+fichiers ARCHIVÉS** (`update/functions/machines.php`, `update/js/apiCalls.js`,
+`documentation.php`, les deux catalogues `js.php`) et par `ARCHITECTURE.md`.
+**Zéro dans le portage. Zéro ligne en base.** *C'était un cache de version par
+machine, alimenté par le legacy, orphelin depuis l'extinction.*
+
+**`package_exclusions`** — `id, package_name, added_by, added_at`. Citée **nulle
+part**, pas même dans l'archive. **Deux lignes en base** : `php` et `docker`, par
+`admin`, au même horodatage à la seconde.
+
+### ⚠ CE QUE J'AI FAILLI PUBLIER, ET QUI ÉTAIT FAUX
+
+J'allais écrire que **quelqu'un avait délibérément exclu `php` et `docker` des
+mises à jour et que le portage ignorait silencieusement sa décision** — un choix
+opérationnel sensé (ne pas mettre à jour PHP ou Docker sous une pile qui tourne),
+devenu inopérant.
+
+**C'est faux. Ce sont des données d'amorçage** : `mysql/init.sql:247-249` insère
+`('php','admin'), ('docker','admin')`, et l'horodatage n'était que le
+`DEFAULT CURRENT_TIMESTAMP` du wipe du 2026-05-26.
+
+> **Une donnée porteuse d'un `added_by` et d'un `added_at` ressemble trait pour
+> trait à un geste humain.** Ce qui l'a démentie n'est pas une relecture : c'est
+> d'avoir cherché l'`INSERT` avant d'écrire la phrase.
+
+*Et l'alarme allait dans le sens qui effraie : « une décision d'exploitation
+silencieusement annulée » se relaie mieux que sa réfutation.*
+
+### Ce qui existe à la place, et qui n'est pas la même chose
+
+Les exclusions **fonctionnent** aujourd'hui, par un autre mécanisme :
+`updates.py:538` lit `exclusions` **dans le corps de la requête**, puis `:573-574`
+posent `apt-mark hold` / `unhold`. **Per-requête et transitoire**, là où la table
+était **persistante**. Ce n'est pas un portage de la capacité : c'est un dessin
+différent, et le dessin persistant n'a jamais eu de lecteur.
+
+### ⛔ Décision : je ne supprime rien
+
+Un `DROP TABLE` est une **migration**, explicitement dans mes interdits, et il
+est irréversible. Deux choses le rendent moins simple qu'il n'y paraît :
+
+**① `init.sql:247` insère ENCORE dans `package_exclusions`.** Un `DROP` sans
+toucher l'`INSERT` **casserait une installation neuve.** Le retrait est un
+changement *couplé* — la `CREATE`, l'`INSERT`, et la table.
+
+**② `db_backup.py:233` itère `SHOW TABLES`**, donc les deux tables **sont
+sauvegardées**. Leur suppression n'est pas sans effet sur les sauvegardes
+existantes.
+
+**Ce que je rends à l'exploitant** : les deux tables sont vides de sens —
+`linux_versions` a zéro ligne, `package_exclusions` n'a que ses deux lignes
+semées, qu'`init.sql` recréerait. **Aucune donnée n'est perdue en les retirant.**
+Mais c'est une migration, et elle demande de retirer la `CREATE` **et** l'`INSERT`
+dans le même geste.
