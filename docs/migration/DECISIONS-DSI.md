@@ -15584,3 +15584,40 @@ compte honnete      4 documents · 3 code (scripts/eteindre-le-legacy.sh)  ->  1
 *Les sept sont de moi ; aucun pair n'a produit dans cette fenêtre.* **Et l'étape ② n'a
 toujours pas de cible : cinquième remesure de la liste des onze, toutes appelées ou sans
 endpoint.**
+
+### ⚡ CONFIRMATION DE `E-491` — LA FENÊTRE SUIVANTE A NOTÉ L'EXTINCTION À ZÉRO
+
+**Relance du 2026-09-08 08:35, fenêtre 07:35 → 08:35.** *C'est la démonstration que
+`E-491` ne pouvait pas fabriquer.*
+
+```
+DEFINITION (feat|fix ∩ laravel|backend)   CODE 0 · autre 10   ->  ratio ∞
+HONNETE    (feat|fix|chore|test ∩ non-.md) CODE 8 · doc 2      ->  ratio 0,25
+```
+
+**Ce que cette fenêtre contient réellement :**
+
+```
+c7f3608d  etape ② — legacy/iptables/ archive        legacy/
+a8e32f0c  3 liens morts crees par ②, rebases        legacy/
+ad584c49  etape ③ — adm/api/notifications.php       legacy/
+a6bd870b  4 references mortes, dont 2 invisibles    legacy/
+626da493  etape ④ — api_proxy.php archive           legacy/
+c4af123c  controle 5 du script d'extinction         scripts/
+12edcd2f  hx-* ajoute a la suite des liens          tests/
+3d55c217  le temoin exigeait un parc PLEIN          legacy/ tests/
+```
+
+> ⛔ **La fenêtre où le legacy a réellement commencé à s'éteindre est notée ZÉRO PROGRÈS sur
+> l'extinction du legacy.** *Trois archivages exécutés et vérifiés au réseau, six liens
+> rebasés, deux gardes durcis — et le compteur rend `∞` parce qu'aucun de ces gestes ne
+> touche `laravel/` ni `backend/`.*
+
+**Ce n'est plus un angle mort : c'est une inversion.** *Le critère mesure la production dans
+les deux répertoires où le travail d'extinction ne peut PAS avoir lieu, puisque l'extinction
+consiste à retirer des fichiers de `legacy/`.*
+
+⚠ **Et l'étape ② de la relance n'a pas de cible, par DÉRIVATION et non par recomptage** :
+les onze items vivent tous dans le portage, et **aucun commit de cette fenêtre ne touche
+`laravel/`**. *Une liste dont les objets n'ont pas bougé ne peut pas avoir changé — c'est
+plus sûr que de rejouer le même `grep`, et ça ne coûte rien.*
