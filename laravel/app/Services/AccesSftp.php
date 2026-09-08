@@ -110,12 +110,32 @@ use Illuminate\Support\Facades\DB;
  * OpenSSH 9.2, dans un conteneur JETABLE `--network none` (aucune machine du parc
  * jointe), avec `sshd -T -C user=bob` qui rend la configuration EFFECTIVE :
  *
- *     ForceCommand injecte EN DOUBLE   -> le PREMIER gagne : `internal-sftp -d`
- *                                         reste effectif. Le contournement de
- *                                         `sftp_only` NE FONCTIONNE PAS.
- *     directive ABSENTE du bloc        -> PREND EFFET : `AllowTcpForwarding no`
- *     (AllowTcpForwarding, PermitTunnel)  devient `yes`, `PermitTunnel` aussi.
- *     sshd -t sur les deux             -> code 0, aucune sortie
+ * ⚠ ET LE PERIMETRE SE LIT DANS L'ORDRE D'EMISSION, PAS DANS LE CONTENU.
+ *
+ * Mon premier essai portait un bloc ECRIT A LA MAIN : il mesurait ma
+ * reconstruction, pas le produit — et la propriete qui decide ici est l'ORDRE des
+ * lignes, c'est-a-dire exactement ce qu'une reconstruction ne preserve pas.
+ * Refait en rendant le bloc par `render_policy()` LUI-MEME, `working_dir` porteur
+ * de sauts de ligne, verdict par `sshd -T -C user=bob` :
+ *
+ *     directive                    propre  injecte   verdict
+ *     forcecommand                 idem    idem      PROTEGE  (premier gagne)
+ *     allowtcpforwarding           no      no        PROTEGE  (emis AVANT :153)
+ *     chrootdirectory              idem    idem      PROTEGE  (emis AVANT)
+ *     permittunnel                 no      YES       FLIPPE   (emis APRES :153)
+ *     permittty                    no      YES       FLIPPE   (emis APRES)
+ *     gatewayports                 no      YES       FLIPPE   (ABSENTE du bloc)
+ *     sshd -t sur les deux         code 0, aucune sortie
+ *
+ * **Les cinq directives emises AVANT le point d'injection sont protegees par la
+ * regle du premier gagnant ; seules celles qui SUIVENT et celles qui MANQUENT
+ * sont retournables.** Mon essai a la main annoncait `AllowTcpForwarding` comme
+ * retournable : c'est FAUX avec ce generateur, qui l'emet onze lignes plus haut.
+ *
+ * ⚠ ET UNE TROUVAILLE INCIDENTE, qui n'est pas le defaut d'injection : dans le
+ * bloc PROPRE, `allowstreamlocalforwarding` vaut deja `yes`. Le profil « SFTP
+ * restreint » ne ferme donc pas la redirection de sockets Unix — ce n'est pas
+ * retourne par l'injection, c'est absent du profil.
  *
  * **Donc `sshd -t` ne rejette pas le doublon, et la directive la plus consequente
  * de cet endroit — `ForceCommand` — est neutralisee par la regle du premier
