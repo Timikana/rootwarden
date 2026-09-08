@@ -81,6 +81,14 @@ rules:
       - pattern-either:
           - pattern: $X === $Y
           - pattern: $X == $Y
+          # ⚠ LES FORMES NEGATIVES MANQUAIENT, ET C'ETAIT LA MOITIE DU DOMAINE.
+          #    `laravel/app/Services/JournalAudit.php:192` porte
+          #    `$l->prev_hash !== $tete` — une comparaison de hachage que cette
+          #    regle ne voyait pas. Une regle qui ne couvre que `===` laisse
+          #    passer tout ce qui s'ecrit « si ca NE correspond PAS », et c'est
+          #    la forme la plus naturelle d'une verification.
+          - pattern: $X !== $Y
+          - pattern: $X != $Y
       - metavariable-regex:
           metavariable: $X
           regex: '.*(token|hash|csrf|api_key).*'
@@ -89,8 +97,18 @@ rules:
       # pas vulnerables au timing puisque les deux cotes viennent du serveur.
       - pattern-not: $X === $_SESSION[...]
       - pattern-not: $_SESSION[...] === $X
+      # ⚠ UN TEST DE NULLITE N'EST PAS UNE COMPARAISON DE HACHAGE.
+      #    `JournalAudit.php:178` porte `if ($l->self_hash === null)`. La regle
+      #    l'accusait parce que le NOM de la variable contient « hash » — elle
+      #    apparie le nom, pas la nature de l'operande droite. Il n'y a aucune
+      #    fuite de temps a comparer a `null` : la valeur secrete n'est pas du
+      #    cote droit, il n'y a pas de valeur du tout.
+      - pattern-not: $X === null
+      - pattern-not: $X !== null
+      - pattern-not: $X == null
+      - pattern-not: $X != null
     message: |
-      Comparaison de token/hash/csrf avec == ou === = timing attack potentielle.
+      Comparaison de token/hash/csrf avec == === != !== = timing attack potentielle.
       Utiliser hash_equals($a, $b) pour comparaison constant-time.
       Si la comparaison est legitime (deux valeurs serveur-side), ajouter en
       commentaire : // nosemgrep: rw-php-equals-on-hash
