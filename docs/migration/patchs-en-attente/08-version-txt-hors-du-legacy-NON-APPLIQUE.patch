@@ -1,0 +1,127 @@
+--- a/scripts/ecrire-version.sh
++++ b/scripts/ecrire-version.sh
+@@ -30,7 +30,7 @@
+ set -uo pipefail
+ 
+ RACINE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+-CIBLE="$RACINE/legacy/version.txt"
++CIBLE="$RACINE/laravel/version.txt"
+ 
+ if "$RACINE/scripts/version.sh" --ecrire >/dev/null 2>&1; then
+     printf '  version derivee du depot : %s\n' "$(cat "$CIBLE")"
+--- a/scripts/version.sh
++++ b/scripts/version.sh
+@@ -52,7 +52,7 @@
+ 
+ RACINE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ FICHIER_JALON="VERSION-JALON"
+-FICHIER_PRODUIT="legacy/version.txt"
++FICHIER_PRODUIT="laravel/version.txt"
+ 
+ derive() {
+     local depot="${1:-$RACINE}"
+@@ -218,22 +218,44 @@
+         # affichaient « Version inconnue » sans qu'aucune erreur ne soit levee.
+         # Le correctif d'atomicite avait donc introduit son propre defaut.
+         printf '%s\n' "$v" > "$tmp" || { echo "version.sh : ecriture du tampon impossible" >&2; rm -f "$tmp"; exit 1; }
+-        # ⚠ ON N'UTILISE PAS `mv`. IL CHANGE L'INODE, ET LE MONTAGE LE SUIT PAS.
++        # ══ `mv` EST REDEVENU LE BON GESTE, ET SEULEMENT PARCE QUE LE MONTAGE
++        #    DE FICHIER A DISPARU ════════════════════════════════════════════
+         #
+-        # `docker-compose.yml` monte ce fichier UN PAR UN
+-        # (`./legacy/version.txt:/var/www/html/version.txt:ro`). Un montage de
+-        # FICHIER est epingle a l'inode present au demarrage du conteneur : tout
+-        # `mv`, `git checkout` ou reecriture par renommage le DETACHE, et le
+-        # conteneur continue de servir l'ancien contenu depuis un inode que plus
+-        # rien ne reference. Mesure du 2026-09-05 :
+-        #
+-        #     inode hote       1998793
+-        #     inode conteneur  2013478      <- orphelin, fige a 2.0.94
+-        #
+-        # Le seul remede a un montage detache est de RECREER le conteneur, ce
+-        # qui n'appartient pas a ce script. On ecrit donc EN PLACE : la
+-        # redirection tronque et remplit l'inode existant, le montage tient.
+-        cat "$tmp" > "$RACINE/$FICHIER_PRODUIT" && rm -f "$tmp"
++        # HISTORIQUE, garde parce qu'il explique DEUX revirements. Tant que
++        # `docker-compose.yml` montait ce fichier UN PAR UN, `mv` etait INTERDIT :
++        # un montage de FICHIER est epingle a l'inode present au demarrage du
++        # conteneur, donc tout `mv`, `git checkout` ou reecriture par renommage le
++        # DETACHE, et seule une RECREATION du conteneur le repare.
++        #   mesure du 2026-09-05 : inode hote 1998793, inode conteneur 2013478
++        #                          orphelin, fige a 2.0.94
++        #   mesure du 2026-09-08 : le meme defaut en SENS INVERSE — un `mv` a fait
++        #                          suivre au conteneur le fichier SOUS-JACENT
++        #
++        # LE MONTAGE EST RETIRE (voir docker-compose.yml). `laravel/` est monte sur
++        # `/var/www/html`, donc `laravel/version.txt` y apparait de lui-meme et plus
++        # rien n'est epingle a un inode. `mv` ne peut donc plus rien detacher.
++        #
++        # ⚠ ET IL EST DESORMAIS NECESSAIRE, pas seulement permis. `cat "$tmp" >
++        #    "$FICHIER"` exige l'ecriture sur LE FICHIER ; or celui-ci peut etre
++        #    recree en `root:root 0644` par l'entrypoint du conteneur — mesure du
++        #    2026-09-08 : `laravel/version.txt` etait `-rw-r--r-- root:root` et
++        #    l'utilisateur de l'hote ne pouvait PAS y ecrire. `mv` n'exige que
++        #    l'ecriture sur LE REPERTOIRE, que l'utilisateur possede.
++        #    Sans ce changement `ecrire-version.sh` echouerait — et `maj.sh:214`
++        #    comme `start.sh:139` l'appellent avec `|| true`, donc l'echec serait
++        #    AVALE et le pied de page afficherait « Version inconnue » en silence.
++        #
++        # `mv` sur le meme systeme de fichiers reste un `rename(2)` : remplacement
++        # atomique, aucune fenetre a zero octet.
++        #
++        # ⚠ `mktemp` CREE EN 0600 ET `mv` CONSERVE CE MODE. Le serveur web tourne
++        #    en `www-data` et doit LIRE ce fichier : on repose le mode
++        #    explicitement. Mesure du 2026-09-05 : sans cela `is_file()` rendait
++        #    vrai, `is_readable()` faux, et LES DEUX portails affichaient
++        #    « Version inconnue » sans qu'aucune erreur ne soit levee.
++        chmod 0644 "$tmp" || { echo "version.sh : chmod du tampon impossible" >&2; rm -f "$tmp"; exit 1; }
++        mv -f "$tmp" "$RACINE/$FICHIER_PRODUIT" \
++            || { echo "version.sh : REMPLACEMENT IMPOSSIBLE de $FICHIER_PRODUIT" >&2; rm -f "$tmp"; exit 1; }
+         echo "$v -> $FICHIER_PRODUIT"
+         ;;
+     "") derive ;;
+--- a/docker-compose.yml
++++ b/docker-compose.yml
+@@ -51,13 +51,25 @@
+       # les deux portails. Rien a generer — et si le repertoire est vide, c'est
+       # l'entrypoint qui produit un auto-signe, avec le nommage du legacy.
+       - ./certs:/var/www/certs
+-      # Le numéro de version a UNE seule source : legacy/version.txt, écrit par le
+-      # mécanisme de bump. Le portage le LIT, en lecture seule, et n'en tient pas de
+-      # copie — une seconde copie dériverait, et ce chiffre a déjà dérivé deux fois
+-      # le 2026-08-27 (resté à 1.38.17 pendant deux bumps, puis trois commits sur le
+-      # même numéro). Le chemin reste `legacy/` tant que le legacy est servi ; son
+-      # emplacement à l'extinction du legacy est une question ouverte (§4.1 ter).
+-      - ./legacy/version.txt:/var/www/html/version.txt:ro
++      # ══ LE MONTAGE DE version.txt EST RETIRÉ, ET IL N'A PAS DE REMPLAÇANT ══
++      #
++      # La question ouverte du §4.1 ter — « où vit version.txt à l'extinction du
++      # legacy ? » — est tranchée : NULLE PART DE PARTICULIER. `laravel/` est déjà
++      # monté sur `/var/www/html` (ci-dessus), donc `laravel/version.txt` y
++      # apparaît de lui-même. Ce montage ne faisait que le RECOUVRIR :
++      #
++      #   mesure du 2026-09-08, docker inspect + stat :
++      #     legacy/version.txt   inode 1998793, 8 octets   <- monté PAR-DESSUS
++      #     laravel/version.txt  inode 2011193, 0 octet    <- recouvert
++      #
++      # Et il n'y a jamais eu deux sources : `VERSION-JALON` (SUIVI) porte
++      # MAJEUR.MINEUR, et `scripts/version.sh` DÉRIVE le correctif du nombre de
++      # commits. Les deux `version.txt` sont des PRODUITS, ignorés par git à bon
++      # droit. La dérive du 2026-08-27 venait d'une version ASSIGNÉE ; elle ne peut
++      # plus se produire depuis qu'elle se dérive (INF-004).
++      #
++      # `scripts/ecrire-version.sh` écrit désormais dans `laravel/version.txt`,
++      # avant que les conteneurs montent — donc le fichier existe déjà au démarrage.
+     env_file:
+       - srv-docker.env
+     depends_on:
+--- a/docker-compose.prod.yml
++++ b/docker-compose.prod.yml
+@@ -89,7 +89,6 @@
+       # C'est dans ce fichier qu'on a lu les 28 `Utime failed` du 2026-09-03.
+       - ./laravel/storage/logs:/var/www/html/storage/logs
+       # Le numero de version garde sa source unique, en lecture seule.
+-      - ./legacy/version.txt:/var/www/html/version.txt:ro
+ 
+     read_only: true
+ 
