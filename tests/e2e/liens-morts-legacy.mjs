@@ -406,9 +406,11 @@ if (lus.length === 0) {
 const morts = [];
 const inconnus = [];
 let vivants = 0;
+let octetsLus = 0;
 for (const f of lus) {
     let t;
     try { t = readFileSync(f, 'utf8'); } catch { continue; }
+    octetsLus += t.length;
     for (const forme of FORMES) {
         forme.motif.lastIndex = 0;
         let m;
@@ -455,14 +457,48 @@ for (const f of lus) {
  *
  * Le compte des vivants reste imprime : il informe, il ne juge plus.
  */
+/*
+ * ⚠ LE TEMOIN DE LECTURE MESURE DES OCTETS, PLUS DES LIENS — 2026-09-08.
+ *
+ * Il exigeait « au moins un lien extrait, d'aucune espece ». Un pair a propose
+ * de le RETIRER, mon temoin forge le couvrant desormais. Mesure : il ne le
+ * couvre pas.
+ *
+ * Epreuve — la lecture rendue muette (`t = ''`, fichiers toujours comptes) :
+ *
+ *     echantillons de formes    PASSENT   ils testent des chaines en memoire
+ *     temoin forge du classeur  PASSE     il teste etat() sur des chemins
+ *     ce temoin-ci              ROUGIT    seul
+ *
+ * Les deux autres mesurent L'INSTRUMENT ; celui-ci est le seul a mesurer que le
+ * PARC a ete lu. Trois temoins, trois axes, et deux d'entre eux passent sur un
+ * fichier dont le contenu s'est evapore.
+ *
+ * > Deux temoins qui rendent vert ensemble ne se couvrent pas l'un l'autre : il
+ * > faut regarder ce qui les fait ROUGIR, pas ce qui les fait passer.
+ *
+ * ══ MAIS SA PREMISSE EXPIRAIT, ELLE AUSSI ═════════════════════════════════
+ *
+ * « au moins un lien » depend de l'existence de LIENS — et l'extinction les
+ * retire. Apres l'archivage de `legacy/auth`, les six derniers liens d'actifs
+ * statiques partent, et ce temoin redevenait muet sur un parc mesurable : le
+ * meme defaut que celui deja corrige un cran plus haut, a un cran de distance.
+ *
+ * D'ou le changement de METRIQUE, sans changement d'axe. La question est « la
+ * sonde a-t-elle LU ? » ; sa mesure honnete est le VOLUME LU, pas le nombre de
+ * liens trouves dedans. Un parc sans aucun lien reste un parc lisible.
+ *
+ * Le compte de liens reste imprime : il informe, il ne juge plus — exactement
+ * ce qu'on a fait du compte de vivants.
+ */
 const extraites = vivants + morts.length + inconnus.length;
-console.log(`\nTEMOIN POSITIF  : ${extraites} lien(s) extrait(s) du parc` +
-            `  (dont ${vivants} vers une cible VIVANTE)`);
-if (extraites === 0) {
-    console.log('⛔ TEMOIN MUET — la sonde n\'a extrait AUCUN lien, d\'aucune espece,');
-    console.log('   sur les fichiers lus. Ce n\'est pas une extinction avancee : c\'est un');
-    console.log('   instrument qui ne lit pas.');
-    console.log('   Ses motifs ne mordent pas, ou la portee a change. NE RIEN CONCLURE.');
+console.log(`\nTEMOIN DE LECTURE : ${octetsLus} caractere(s) lus sur ${lus.length} fichiers`);
+console.log(`                    ${extraites} lien(s) extrait(s), dont ${vivants} vers une cible VIVANTE`);
+if (octetsLus === 0) {
+    console.log('⛔ TEMOIN MUET — les fichiers sont comptes et leur contenu est VIDE.');
+    console.log('   Ce n\'est pas une extinction avancee : c\'est un instrument qui ne lit');
+    console.log('   pas. Les echantillons de formes et le temoin forge PASSERAIENT ici :');
+    console.log('   ils mesurent l\'instrument, pas le parc. NE RIEN CONCLURE.');
     process.exit(2);
 }
 
