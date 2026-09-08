@@ -347,7 +347,94 @@ d636e70d   2026-09-07 22:15:09   cette ligne : « SEC-015 est toujours OUVERT »
                                  interpole BRUT dans une commande root
 ```
 
-**`shlex.quote(dest_path)` est en place. `shlex` est importé. SEC-015 est FERMÉ.**
+**`shlex.quote(dest_path)` est en place. `shlex` est importé.**
+
+⛔ **ET C'EST FERMÉ DANS L'ARBRE SEULEMENT — rectification du 2026-09-08.**
+
+```
+backend/hypercorn_config.py:14   workers = 4
+                          :17   use_reloader = False       <- verifie par moi
+266f21a2                        2026-09-07 21:31:56 UTC    <- verifie par moi
+demarrage des workers           2026-09-07 12:53:00 UTC    <- RELAYE, PAS verifie
+                                (socket docker : permission refusee)
+```
+
+**Un `.py` est lu au DÉMARRAGE. Si l'heure relayée est juste, le correctif a été
+écrit 8 h 39 après, donc `dest_path` est TOUJOURS interpolé brut dans le processus
+qui tourne.**
+
+> ⚠ **« SEC-015 est FERMÉ » était une affirmation SANS SON RÉGIME** — et j'ai
+> cette règle en mémoire depuis des jours : *« arbre, service, ou moteur de base :
+> nommer le régime ; une affirmation sans son régime est invérifiable ».*
+> **Je l'ai enfreinte le jour même où je corrigeais des tiers pour des faits
+> périmés.**
+
+⛔ **Et le piège de vérification est réel** : *`backend/` est monté en BIND sur
+`/app`. Un `grep` DANS le conteneur trouve le correctif à l'identique de l'arbre
+— et rend le MAUVAIS verdict.* **Un fichier partagé ne fait pas un code partagé :
+le montage synchronise l'octet, pas la mémoire du processus qui l'a lu.** *Un
+`docker exec … python -c` ne sert pas davantage : il ouvre un nouveau processus.*
+
+⚠ **Deux horloges, et elles sont armées sur cette mesure** : *les `mtime` sont en
+CEST, `StartedAt` en UTC.* **Comparés naïvement, `12:16 < 12:53` conclut « le
+fichier précède le démarrage » — l'inverse du vrai. J'ai ramené les deux en UTC
+dans la même commande.**
+
+### 8.2 bis ⛔ RETRAIT — ma conséquence était fausse sur la moitié SEC-015
+
+**J'avais écrit : « le service porte AUJOURD'HUI les deux défauts à la fois, et
+le second masque le premier ». C'est faux, et je l'ai vérifié moi-même parce que
+c'est un DÉDOUANEMENT — la seule classe de résultat que personne ne relit contre
+son auteur.**
+
+**Le commit EN SERVICE est `5a2d131a` (2026-04-21), dernier de ce fichier avant le
+démarrage. Mesuré au dépôt entier à ce commit :**
+
+```
+git grep -n "_write_rules_safe" 5a2d131a -- 'backend/*.py'
+  :110  def _write_rules_safe(… dest_path: str)
+  :156  _write_rules_safe(…, rules_v4, "/etc/iptables/rules.v4")   ← LITTERAL
+  :160  _write_rules_safe(…, rules_v6, "/etc/iptables/rules.v6")   ← LITTERAL
+dest_path : 3 occurrences — signature, docstring, interpolation. JAMAIS une variable.
+temoin negatif : un nom forge rend zero au meme commit  ->  la sonde discrimine
+```
+
+> **Dans le service, `dest_path` ne reçoit que des littéraux. Il n'y a donc NI la
+> vulnérabilité NI le remède — et rien à masquer.** *L'appelant variable
+> (`_charge_puis_ecrit`) et le correctif sont TOUS DEUX postérieurs au démarrage.*
+
+**`StartedAt` : `2026-09-07T12:53:00.360665318Z`** — *mesuré par `gestion-ssh-key-4f`
+avec `sudo docker inspect -f '{{.State.StartedAt}}' rootwarden_python`, commande
+citée. Le socket docker m'est refusé ; je l'attribue plutôt que de l'absorber.*
+
+### 8.2 ter ✅ SEC-017, LUI, EST CONFIRMÉ DANS LE SERVICE
+
+**Vérifié par moi au code en service :**
+
+```
+5a2d131a:157  execute_as_root(… "iptables-restore < …")    VALEUR JETEE
+5a2d131a:161  execute_as_root(… "ip6tables-restore < …")   VALEUR JETEE
+occurrences du mot `code`                                   0
+temoin : 10 appels a execute_as_root au meme commit  ->  la sonde lit bien
+```
+
+**Donc mon argument garde sa FORME sur un objet plus ÉTROIT** : *le service ne
+perd pas la capacité de signaler qu'il manque SEC-015 — il perd la capacité de
+signaler **tout** échec d'`iptables-restore`, quelle qu'en soit la cause.*
+**Moins spectaculaire, et ça se défend mieux.**
+
+### 8.2 quater ⚠ POURQUOI JE M'Y SUIS TROMPÉE
+
+**`266f21a2` m'a été transmis dans une liste de « correctifs root absents du
+service ». C'est vrai du CORRECTIF et trompeur sur le RISQUE.**
+
+> **J'ai rangé SEC-015 avec les défauts vivants parce qu'il était listé avec
+> eux.** *C'est ma propre règle — « le fait est juste, c'est l'EMBALLAGE qui
+> trompe : une liste donnée pour close fait ranger par RESSEMBLANCE » — et je m'y
+> suis fait prendre le lendemain de l'avoir citée.*
+
+**Trois correctifs root manquent au service, pas quatre.** *SEC-015 en sort parce
+que son DÉFAUT en sort aussi.*
 
 > **J'avais raison en l'écrivant, et ma note est fausse 76 minutes plus tard.**
 > *Le pire est que je l'ai RECITÉE aujourd'hui comme un fait courant, pour fonder

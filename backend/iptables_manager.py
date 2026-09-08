@@ -19,6 +19,7 @@ Note de sécurité :
 
 import base64
 import logging
+import secrets
 import re
 import shlex
 
@@ -149,6 +150,142 @@ def _write_rules_safe(client, root_password: str, rules: str, dest_path: str) ->
         root_password)
 
 
+def _charge_puis_ecrit(client, root_password: str, rules: str,
+                       dest_path: str, restore_cmd: str) -> None:
+    """VALIDE d'abord, INSTALLE ensuite. Leve `RuntimeError` sur tout echec.
+
+    ══ SEC-017 : L'ORDRE ETAIT ECRIRE PUIS CHARGER, ET L'ECHEC ETAIT MUET ══════
+
+    L'ancienne sequence ecrasait `rules.v4` — le fichier de DEMARRAGE — puis
+    lancait `iptables-restore` **en jetant son code de retour**, et journalisait
+    « appliquees avec succes » de facon INCONDITIONNELLE. Un jeu illisible
+    laissait donc :
+
+        le noyau     ses anciennes regles       -> la machine a l'air saine
+        le disque    le jeu qui ne charge pas   -> au prochain REDEMARRAGE elle
+                                                   se releve SANS PARE-FEU
+        l'appelant   un succes                  -> personne ne relie l'incident
+                                                   au changement
+
+    Le defaut ne se manifestait pas au moment du geste mais des SEMAINES plus
+    tard, deconnecte de sa cause. *Specification : `3128e1d2`.*
+
+    ══ CINQ CONTROLES, ET CHACUN INSPECTE SON CODE DE SORTIE ══════════════════
+
+    Aucun appel de ce fichier ne regardait un code de retour — le mot `code` n'y
+    figurait pas une seule fois. **Il n'y avait donc aucun motif correct a imiter
+    ICI : le traitement juste est INTRODUIT, pas copie.** *Le dessin vient de
+    `sudo_manager` — valider un temporaire, n'installer qu'apres — mais trois de
+    ses pieces ne se recopient pas.*
+
+    ══ LES TROIS PIEGES DU MODELE ═════════════════════════════════════════════
+
+    1. `sudo_manager._write_to_remote` JETTE sa valeur de retour. Si l'ecriture
+       echoue partiellement, la validation porte sur un temporaire tronque — et
+       une validation de syntaxe sur un fichier VIDE REUSSIT. *Le modele est bon
+       dans son ORDRE et incomplet dans son PREMIER PAS.* D'ou le controle 2 bis
+       ci-dessous, qui n'existe pas dans le modele.
+    2. Le mode est **0640**, pas 0440. *`rules.v4` est a 0640 aujourd'hui ;
+       `sudo_manager` emploie 0440 parce que `sudoers` l'EXIGE. Copier le mode
+       changerait les droits en croyant copier le dessin.*
+    3. Le temporaire vit dans **`/etc/iptables/`**, pas dans `/tmp`. *`mv` n'est
+       atomique que sur le MEME systeme de fichiers ; `/tmp` et `/etc` peuvent
+       etre des montages distincts, et le `mv` degenererait en copie — donc en
+       fenetre ou le fichier de demarrage est incomplet.*
+
+    ⚠ **Le temoin qui prouve la propriete porte sur l'EMPREINTE, pas sur le code
+    rendu** : `md5sum` de la cible avant, appliquer un jeu illisible, `md5sum`
+    apres — il DOIT etre identique. *Un correctif qui rendrait un echec en ayant
+    quand meme ecrit passerait un test qui ne lit que le code de retour.*
+    """
+    rand = secrets.token_hex(8)
+    tmp = f"/etc/iptables/.rootwarden-ipt-{rand}.tmp"
+    try:
+        # 1. Mode et proprietaire poses A LA CREATION : aucune fenetre ou le
+        #    fichier existe avec des droits plus larges.
+        # nosemgrep: rw-shell-fstring-execute-as-root
+        out, err, code = execute_as_root(
+            client, f"install -m 0640 -o root -g root /dev/null {tmp}",
+            root_password, timeout=10)
+        if code != 0:
+            # `err or out` : le transport `su` fusionne parfois stderr dans stdout,
+            # et un refus qui nomme l'etape sans la CAUSE n'instruit pas.
+            raise RuntimeError(
+                f"creation du temporaire impossible (code {code}) : "
+                f"{((err or out) or 'aucune sortie').strip()[:200]}")
+
+        # 2. Ecrire dans le TEMPORAIRE, jamais dans la cible a ce stade.
+        _write_rules_safe(client, root_password, rules, tmp)
+
+        # 2 bis. VERIFIER que l'ecriture a abouti — le pas que le modele omet.
+        #        Une validation de syntaxe sur un fichier vide ne dirait rien :
+        #        un jeu vide est syntaxiquement valide.
+        # nosemgrep: rw-shell-fstring-execute-as-root
+        out, err, code = execute_as_root(
+            client, f"wc -c < {tmp}", root_password, timeout=10)
+        if code != 0 or not out.strip().isdigit() or int(out.strip()) == 0:
+            raise RuntimeError("le temporaire est vide ou illisible apres ecriture")
+
+        # 3. VALIDER. En cas d'echec la cible n'a PAS ete touchee.
+        # nosemgrep: rw-shell-fstring-execute-as-root
+        out, err, code = execute_as_root(
+            client, f"{restore_cmd} --test < {tmp}", root_password, timeout=20)
+        if code != 0:
+            raise RuntimeError(
+                f"jeu de regles refuse par {restore_cmd} --test : {(err or out)[:300]}")
+
+        # ══ 4. CHARGER DEPUIS LE TEMPORAIRE — et c'est l'ordre qui compte ═══
+        #
+        # ⚠ CORRECTION DE LA SPECIFICATION, ETABLIE PAR LE TEMOIN SUR LA MACHINE 3.
+        # Elle listait : `--test`, puis `mv`, puis charger. Son TITRE disait
+        # « charger puis ecrire » et ses etapes faisaient l'inverse ; j'ai
+        # implemente les etapes, et le temoin a refuse.
+        #
+        # Mesure du 2026-09-08, jeu `-A INPUT -j CETTE_CIBLE_NEXISTE_PAS` :
+        #
+        #     iptables-restore --test < tmp   ->  code 0   ACCEPTE
+        #     iptables-restore     < tmp      ->  code 2   REFUSE
+        #
+        # **`--test` valide l'ANALYSE, pas l'existence des cibles.** Un jeu qui
+        # passe `--test` peut donc echouer au chargement reel — et si le `mv` a
+        # eu lieu entre les deux, le fichier de DEMARRAGE porte deja le jeu qui
+        # ne charge pas. C'etait exactement SEC-017, reintroduit par un correctif
+        # qui suivait une specification contredisant son propre titre.
+        #
+        # Le seul gage suffisant est le chargement REEL. On charge donc depuis le
+        # temporaire, et on n'installe qu'apres.
+        # nosemgrep: rw-shell-fstring-execute-as-root
+        out, err, code = execute_as_root(
+            client, f"{restore_cmd} < {tmp}", root_password, timeout=30)
+        if code != 0:
+            raise RuntimeError(
+                f"{restore_cmd} a refuse le jeu (code {code}) : "
+                f"{((err or out) or 'aucune sortie').strip()[:300]} "
+                f"— {dest_path} est INTACT")
+
+        # ══ 5. INSTALLER, une fois le chargement PROUVE ══════════════════════
+        # `mv` sur le meme systeme de fichiers : atomique. A ce stade le noyau
+        # porte deja ces regles, donc le fichier de demarrage ne peut plus
+        # diverger du comportement observe.
+        # nosemgrep: rw-shell-fstring-execute-as-root
+        out, err, code = execute_as_root(
+            client,
+            f"mv {tmp} {dest_path} && chown root:root {dest_path} "
+            f"&& chmod 0640 {dest_path}",
+            root_password, timeout=10)
+        if code != 0:
+            raise RuntimeError(
+                f"regles CHARGEES mais installation de {dest_path} impossible "
+                f"(code {code}) : {((err or out) or 'aucune sortie').strip()[:200]} "
+                f"— le noyau et le fichier de demarrage DIVERGENT")
+        _log.info("%s : valide, installe et charge.", dest_path)
+    finally:
+        # Le temporaire ne survit jamais, meme sur un chemin d'exception. Apres un
+        # `mv` reussi il n'existe plus : `rm -f` est alors sans effet.
+        # nosemgrep: rw-shell-fstring-execute-as-root
+        execute_as_root(client, f"rm -f {tmp}", root_password, timeout=10)
+
+
 def apply_iptables_rules(client, root_password: str,
                          rules_v4: str, rules_v6: str = None) -> None:
     """
@@ -172,19 +309,12 @@ def apply_iptables_rules(client, root_password: str,
     try:
         _log.info("Application des règles iptables.")
 
-        for path in ("/etc/iptables/rules.v4", "/etc/iptables/rules.v6"):
-            # `path` itere sur un TUPLE LITTERAL, deux lignes au-dessus : il ne peut valoir
-            # que l'un des deux chemins ecrits ici. La garde est par CONSTRUCTION — la
-            # valeur est inexprimable autrement — et non par controle.
-            # nosemgrep: rw-shell-fstring-execute-as-root
-            execute_as_root(client, f"touch {path} && chmod 640 {path}", root_password)
-
-        _write_rules_safe(client, root_password, rules_v4, "/etc/iptables/rules.v4")
-        execute_as_root(client, "iptables-restore < /etc/iptables/rules.v4", root_password)
+        _charge_puis_ecrit(client, root_password, rules_v4,
+                           "/etc/iptables/rules.v4", "iptables-restore")
 
         if rules_v6:
-            _write_rules_safe(client, root_password, rules_v6, "/etc/iptables/rules.v6")
-            execute_as_root(client, "ip6tables-restore < /etc/iptables/rules.v6", root_password)
+            _charge_puis_ecrit(client, root_password, rules_v6,
+                               "/etc/iptables/rules.v6", "ip6tables-restore")
 
         _log.info("Règles iptables appliquées avec succès.")
     except Exception as e:
