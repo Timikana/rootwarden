@@ -146,4 +146,18 @@ return [
     /* La liste des sauvegardes, lue AVANT la confirmation de restauration. */
     'restore_lecture' => 'Lecture des sauvegardes de :compte…',
     'restore_aucune' => 'Aucune sauvegarde pour :compte — il n\'y a rien a restaurer. Une sauvegarde est creee a chaque deploiement.',
+
+    /*
+     * ══ L'INSTALLATION DE figlet — ISO-PERIMETRE ═════════════════════
+     *
+     * Le legacy l'offrait. Elle avait ete perdue par un arbitrage que
+     * l'exploitant a annule. Le SIGNAL existait deja (`figlet_absent`) ;
+     * ce qui manquait etait le geste.
+     */
+    'figlet_installer' => "Installer figlet",
+    'figlet_confirme' => "Installer figlet sur cette machine ?\n\nLe paquet sera installé par le gestionnaire de paquets de la machine. L'opération ne se défait pas depuis cet écran.",
+    'figlet_en_cours' => "Installation de figlet en cours…",
+    'figlet_fait' => "figlet est installé. La liste des comptes est rechargée pour le vérifier.",
+    'figlet_echec' => "L'installation de figlet a échoué. Le paquet n'est pas présent sur la machine.",
+
 ];

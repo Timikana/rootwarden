@@ -138,9 +138,36 @@ ls legacy/_deprecated/                                   # parties archivees
   #    numeros (E-452..E-459) designaient deux ecarts DIFFERENTS. Pour COMPTER
   #    les ecarts de parite, la ligne ci-dessous est juste ; pour ALLOUER un
   #    numero neuf, prendre le maximum des DEUX (vrai max au 2026-09-07 : 462) :
-  #      cat <(grep -ohE '^#{1,6} +E-[0-9]+' docs/migration/PARITE.md) \
-  #          <(grep -ohE '^#{1,6} +E-[0-9]+' docs/migration/DECISIONS-DSI.md) \
-  #        | grep -oE '[0-9]+' | sort -n | tail -1
+  #      grep -rhoE '\bE-[0-9]+\b' docs/ | grep -oE '[0-9]+' | sort -n | tail -1
+  #
+  # ⚠⚠ LA PARADE N'EST PAS UN MEILLEUR MOTIF : C'EST UN SENS D'ERREUR.
+  #
+  #    Formulee par la session 8, et elle vaut mieux que ma correction :
+  #    **quand une mesure alimente une ALLOCATION, il faut se tromper LARGE.**
+  #    Un motif trop large ne peut que pousser le numero plus haut — il
+  #    GASPILLE des numeros. Un motif trop etroit fait COLLISION. *Les deux
+  #    erreurs ne se paient pas dans la meme monnaie.*
+  #
+  #    C'est pourquoi la commande ci-dessus ne lit plus les TITRES mais TOUTE
+  #    mention de `E-nnn` dans `docs/` — citations comprises. Elle surestime par
+  #    construction, et c'est exactement ce qu'on veut d'un compteur.
+  #
+  #    Demonstration sur l'artefact, le 2026-09-08 :
+  #      motif ETROIT  max 467  ->  propose 468  ->  468 DEJA EMPLOYE   ⛔
+  #      motif LARGE   max 482  ->  propose 483  ->  483 libre          ✅
+  #
+  #    *Mon `^#{1,6}[^0-9]*E-` etait juste et restait DANGEREUX : il ratait 33
+  #    des 102 titres de `DECISIONS-DSI.md`, parce qu'un motif ecrit sur ses
+  #    propres fichiers ne mesure pas un depot — il mesure un AUTEUR.*
+  #
+  # ⚠⚠ LE `[^0-9]*` N'EST PAS DECORATIF, ET LA PREMIERE FORME A COLLISIONNE DEUX
+  #    FOIS DE PLUS. `DECISIONS-DSI.md` titre ses entrees `## ⚖ E-480 — …` et
+  #    `## ⛔ E-482 — …` : un EMOJI separe les diese du `E-`, et `^#{1,6} +E-`
+  #    ne le franchit pas. Le 2026-09-08 a 05:45, mon motif rendait « max 469 »
+  #    quand le vrai maximum etait **482** — et E-469 etait DEJA PRIS. J'ai
+  #    renumerote avant de committer, mais c'est le motif corrige qui l'a vu.
+  #    *Troisieme fois qu'un de mes motifs suppose une forme : un espace unique
+  #    avant `=>`, une entree par ligne, et maintenant rien entre `##` et `E-`.*
 python3 -c "import re;t=re.findall(r'^#{1,6} +(E-\\d+[a-z]*)',open('docs/migration/PARITE.md').read(),re.M);n=sorted({int(re.match(r'E-(\\d+)',x).group(1)) for x in t});print(len(set(t)),'ecarts, max E-%d'%n[-1],'jamais servis:',[x for x in range(n[0],n[-1]+1) if x not in set(n)])"
 git fetch origin && git rev-list --left-right --count @{u}...HEAD
 sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
@@ -148,7 +175,106 @@ sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
 
 ---
 
-## 2 ter. LES PORTS DES DEUX PORTAILS — **ÉCHANGÉS le 2026-09-06, PAS ENCORE APPLIQUÉS**
+## 2 quinquies. LA LISTE DES « 11 PORTABLES » EST **FERMEE** — et c'est la QUATRIEME fermeture
+
+**Mesure du %s. Trois raisons de cloture, et elles ne se resument pas l'une a l'autre.**
+
+| # | item | cloture | preuve |
+|---|---|---|---|
+| 1 | les 5 catalogues | **DEJA PORTE** | 13 sites appaires, 0 cle manquante |
+| 2 | `ssh_audit` releve planifie | **DEJA PORTE** | `/ssh-audit/schedules` — CRUD complet |
+| 3 | `ssh_audit` `sshd_config` en lecture | **DEJA PORTE** | `/ssh-audit/config` |
+| 4 | `ssh_audit` relever un serveur | **DEJA PORTE** | `/ssh-audit/scan`, `audit-ssh.js:176` |
+| 5 | `groups` creer un groupe | **DEJA PORTE** | 12 occurrences |
+| 6 | `groups` scan de derive de masse | **DEJA PORTE** | `/drift/scan` |
+| 7 | `fail2ban` desactiver une jail | **DEJA PORTE** | `/fail2ban/jail` |
+| 8 | `fail2ban` geolocaliser une adresse | **DEJA PORTE** | `/fail2ban/geoip` |
+| 9 | `superv` les 2 capacites « PERDUES » | **AUDITE INEXISTANT** | *« il n'y en a aucune »* — audit dedie |
+| 10 | `serveurs` test de connexion | ⛔ **PAS UN PORTAGE** | **aucun endpoint backend** |
+| 11 | `serveurs` import CSV | ⛔ **PAS UN PORTAGE** | **aucun endpoint backend** |
+
+**Les six chemins des items 2 a 8 sont verifies par `./scripts/geste-porte.py`** — six `APPELE`, avec les
+temoins du jeu. *Releve par la session 8, remesure ici avec un autre instrument que le sien.*
+
+**Et les deux « aucun endpoint » sont verifies independamment**, motif + temoin :
+
+    routes du backend contenant `test`   /cve_test_connection · /graylog/test
+                                         /test · /test_platform_key
+                                         -> aucune n'est un test de connexion serveur
+    routes contenant `import` ou `csv`   0
+    TEMOIN                               229 routes lues au total — le motif LIT
+
+> **Les items 10 et 11 ne sont pas des portages non faits : ce sont des DEVELOPPEMENTS NEUFS.** *Demander
+> « ce chemin est-il appele » quand le chemin n'existe pas assigne un fantome.*
+
+### ⚠⚠ C'EST LA QUATRIEME FERMETURE, ET C'EST LE FAIT LE PLUS IMPORTANT DE CETTE SECTION
+
+`E-464` en avait ferme **6 sur 9**, mesure trois fois. **La liste se reemet a chaque tour de relance**, et
+*une relance qui reconduit une liste fermee FABRIQUE le ratio doc/code qu'elle denonce.*
+
+**Un fait repete dans une relance se perime au tour suivant ; un fait inscrit avec sa date de mesure ne se
+perime qu'avec l'artefact.** C'est pourquoi la cloture est ici et pas dans une consigne.
+
+### Deux arbitrages rendus, inscrits comme tels
+
+- **test de connexion : NE PAS DEVELOPPER.** `/ssh-audit/scan` ouvre une session et rend le `sshd_config` —
+  *l'echec du releve EST le test.* Un bouton « tester » a cote d'un bouton qui teste **en faisant quelque
+  chose d'utile** ajoute un chemin sans ajouter une capacite.
+- **import CSV : NE PAS PORTER.** Fichier absent du disque, 403 au reseau, aucun endpoint, quatre tables
+  ecrites, trois arbitrages non rendus. *Rien ne regresse en ne le portant pas.* **Un import de masse dont
+  les regles ne sont pas decidees ne se porte pas : il se SPECIFIE.**
+
+---
+
+## 2 quater. L'ETAT DU LEGACY SERVI — et pourquoi ce compte NE SE MESURE PAS PAR MOTIF
+
+**Releve par la session 8 le %s ; le point qui portait son erreur est verifie ici.**
+
+    100 .php servis · 76 catalogues lang · 24 metier
+     11 racines atteignables par un navigateur
+        7  chaine d'auth   PORTEE  (/connexion /deconnexion /second-facteur
+                           /mot-de-passe-oublie /reinitialiser /profil/step-up ;
+                           `SessionAuthentifiee.php` remplace `verify.php` ;
+                           relais `/auth/login.php` et `/auth/verify_2fa.php`)
+        2  `api_proxy.php` + `adm/api/notifications.php` — ils servent le JS du
+           legacy en MEME ORIGINE, donc ils meurent AVEC le vhost, pas avant
+        1  `_sortie.php`   l'ErrorDocument du vhost
+        1  `iptables/index.php` — I5 porte, seul le RETOUR ARRIERE reste
+
+⚠ **LES 11 NE S'ETEIGNENT PAS UNE PAR UNE.** `menu.php` appelle ses deux points d'entree en `fetch` MEME
+ORIGINE : *un lien peut traverser une origine, un XHR authentifie non.* **C'est un bloc.**
+
+### ⚠⚠ CE COMPTE NE SE MESURE PAS PAR MOTIF — il se mesure en LISANT les `.htaccess`
+
+**Le compte de la session 8 a ete faux QUATRE fois avant d'etre juste, dont une fois a « 2 », du cote
+favorable.** Deux causes, et j'ai verifie la seconde :
+
+    graphe d'inclusion  ne lisait que les litteraux ; `head`/`menu`/`db` sont
+                        inclus par `__DIR__ . '/head.php'`, donc invisibles
+    refus SCOPE lu
+    comme GLOBAL        ⚠ VERIFIE ICI : `legacy/auth/.htaccess:6` porte bien
+                        `Require all denied`, mais DANS
+                        `<FilesMatch "^(functions|password_policy|migrate_crypto|migrate_totp)\.php$">`
+                        — quatre fichiers nommes, PAS le repertoire.
+
+**Temoin au reseau, qui tranche sans lire le fichier** :
+
+    :8446/auth/login.php    200      <- servi
+    :8446/auth/verify.php   200      <- servi
+    :8446/auth/db.php       403      <- refuse, mais par le `.htaccess` RACINE (`^(db|menu|head|footer)`)
+
+> **Chercher `Require all denied` « quelque part dans un `.htaccess` » rend un refus de REPERTOIRE la ou il
+> n'y a qu'un refus de FICHIERS.** *Et l'erreur va du cote qui rassure : elle fait croire le legacy plus
+> eteint qu'il n'est.*
+
+**Precision de comptage** : le depot porte **sept** `.htaccess` hors archives, pas quatre. Les quatre qui
+portent sur l'atteignabilite du contenu servi sont `legacy/` (51 l.), `auth/` (7), `includes/` (4) et
+`adm/includes/` (28) ; les trois autres — `lang/`, `logs/`, `vendor/` — refusent globalement des
+repertoires qui ne portent aucune racine.
+
+---
+
+## 2 ter. LES PORTS DES DEUX PORTAILS — **ÉCHANGÉS ET APPLIQUÉS le 2026-09-07 à 19:39**
 
 **Décision de l'exploitant** : *« je voulais les mêmes ports qu'avant, et on dégage les ports du legacy sur
 une autre plage »*. **Le portage prend les ports du portail historique ; le legacy prend ceux que le portage
@@ -161,7 +287,28 @@ abandonne.** Échange PUR — aucun port neuf à ouvrir, les deux valeurs sont d
 
 *Le second de chaque paire est le HTTPS, et c'est celui qu'il faut employer.*
 
-### ⚠ ÉTAT AU MOMENT OÙ CECI EST ÉCRIT : PRÉPARÉ, **NON APPLIQUÉ**
+### ✅ APPLIQUÉ le 2026-09-07 à 19:39 — **ce qui suit décrit l'état d'AVANT**
+
+> ⚠ **Tout le bloc ci-dessous a été écrit AVANT l'application, et il en garde le temps.** Il est conservé
+> parce que sa marche à suivre et ses trois pièges restent la référence du geste ; **mais aucune de ses
+> phrases au présent n'est vraie aujourd'hui.**
+
+**État mesuré au réseau, par l'ÉTAT et jamais par le numéro** :
+
+    :8443  /up 200  ->  PORTAGE          rootwarden_laravel  8080->80 · 8443->443
+    :8446  /up 404  ->  LEGACY           rootwarden_php      8444->80 · 8446->443
+
+**Les deux patchs sont DANS L'ARBRE**, et c'est prouvé et non affirmé : `git apply --check --reverse` passe
+sur `05-echange-des-ports-entrypoint.patch` et sur `06-echange-des-ports-runner.patch`. *Le répertoire
+`patchs-en-attente/` existe toujours et porte huit fichiers — une session l'a cru disparu.*
+
+**Et `laravel/docker-entrypoint.sh:86` porte désormais `${LARAVEL_HTTPS_PORT:-8443}`** : le défaut nommé
+plus bas comme « le risque qui ne se signale pas » **est fermé**. *L'avertissement est gardé, pas effacé :
+il fait hésiter, là où un chiffre périmé fait se tromper. Et la CLASSE de défaut n'est pas fermée — une
+deuxième occurrence a été trouvée le 2026-09-08 dans `config/app.php:69`, où la clé nommait le legacy et le
+port nommait le portage.*
+
+### ⚠ ÉTAT AU MOMENT OÙ CECI A ÉTÉ ÉCRIT : PRÉPARÉ, **NON APPLIQUÉ**
 
 Le LOT 4 tourne depuis 16:35 sur le portage. **Recréer le conteneur maintenant tuerait une mesure de
 plusieurs heures qui n'a jamais été faite en entier** — l'exploitant a tranché : à la fermeture du lot.
@@ -1367,6 +1514,19 @@ ce qui vit :
 ```bash
 # dans un appel SEPARE, qui ne cite AUCUN nom de suite ailleurs dans la commande
 ps -eo pid,etime,cmd | grep -E "[r]ejouer-lot-[A-Za-z0-9]+\.sh|[g]o-[a-z0-9-]+\.mjs" | grep -v grep
+
+# ⚠ ET `ps` SEUL NE SUFFIT PAS — voir plus bas « UN `ps` NE REPOND PAS AUX
+#   BONNES QUESTIONS ». Mesure du 2026-09-08 : `ps` a rendu 3 processus puis 0 en
+#   quelques secondes, et l'enumeration ne montrait que du MCP puppeteer vieux
+#   de onze jours. **A ce grain, c'est un signal de bruit.**
+#
+#   Le signal qui TIENT est une ECRITURE, pas un processus — et il porte son
+#   temoin :
+#     find tests/e2e/screenshots -type f -newermt "$(date -d '3 minutes ago' '+%Y-%m-%d %H:%M:%S')" | wc -l
+#     find tests/e2e/screenshots -type f -newermt "$(date -d '30 days ago'  '+%Y-%m-%d %H:%M:%S')" | wc -l   # TEMOIN : doit etre > 0
+#   Mesure du 2026-09-08 : 0 sur trois minutes, 645 sur trente jours — la sonde lit,
+#   et le banc est au repos. **Zero sans le temoin ne distingue pas « rien ne
+#   tourne » de « la sonde ne mesure rien ».**
 ```
 
 > **⚠ La commande que ce document donnait était PÉRIMÉE, et dans le mauvais sens.** Elle disait
@@ -5439,6 +5599,19 @@ n'importe qui**.
 
     repertoire   laravel/storage/framework/views   www-data:www-data  mode 755
     compiles     151 gabarits, dont 111 appartenant a root:root
+                 ⚠ PERIME. Remesure le 2026-09-08 04:46:08 CEST :
+                     24 compiles, dont 7 a root — et les 7 sont NOMMES :
+                     403 · comptes · cles-ssh · minimal
+                     composants/profil · composants/theme · composants/onglets-adm
+                 Les trois `composants/` sont les dangereuses : incluses
+                 ailleurs, donc en editer une casse toutes ses pages.
+
+                 ⚠⚠ UN CHIFFRE DE CACHE NE SE RELAIE PAS SANS SON HORODATAGE.
+                 Trois sessions ont mesure 22/7, 21/9 et 24/7 a quelques
+                 minutes d'intervalle : LES TROIS SONT JUSTES, un etat de
+                 cache change a chaque requete servie. Le transmettre comme
+                 une propriete du depot est la meme faute que celle de §2 ter,
+                 en plus petit — et ce chiffre-ci l'a portee deux fois.
     source       layouts/portail.blade.php          utilisateur:utilisateur  664
     ecriture dans le repertoire, depuis mon compte : REFUSEE (temoin pose et nettoye)
 

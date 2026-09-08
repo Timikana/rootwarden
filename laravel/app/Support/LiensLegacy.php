@@ -143,6 +143,79 @@ class LiensLegacy
          */
         '/adm/admin_page.php/' => 'comptes',
         '/security/'           => 'scan-cve',
+
+        /*
+         * ⚠ `/ssh-audit/` : la SEULE valeur emise par le backend qui tombait
+         * dans le repli, et le repli menait a un 404.
+         *
+         *     backend/routes/ssh_audit.py:156 et :164   link='/ssh-audit/'
+         *     legacy/ssh-audit/                          ARCHIVE (2 fichiers
+         *                                                dans _deprecated/)
+         *
+         * Le repli construisait `url_legacy . '/ssh-audit/'`, c'est-a-dire
+         * l'ancien portail, ou le repertoire n'existe plus. **Une notification
+         * du planificateur d'audit SSH menait dans le vide.**
+         *
+         * Et le portage avait DEJA tout ce qu'il fallait : la page
+         * (`->name('audit-ssh')`, web.php:301) et meme la redirection
+         * (`web.php:1202`, `GET /ssh-audit/` -> `audit-ssh`). Mais cette
+         * redirection attrape `/ssh-audit/` sur LE PORTAGE, alors que le lien
+         * emis pointait sur LE LEGACY. **La cible existait, la redirection
+         * existait, et le lien passait a cote des deux — parce qu'il n'etait
+         * pas sur le meme hote.**
+         *
+         * ══ ET LA DONNEE NE POUVAIT PAS LE DIRE ═══════════════════════════
+         *
+         * La table `notifications` ne porte aujourd'hui qu'UNE valeur distincte,
+         * `/security/`, qui est couverte. **Mesurer la DONNEE aurait rendu
+         * « rien d'expose, rien a faire ».** C'est en croisant les valeurs que
+         * le CODE peut composer contre cette table que le defaut apparait.
+         *
+         * > **Une table qui ne contient pas encore le cas dangereux ne dit rien
+         * > de ce que le code peut y mettre.**
+         */
+        '/ssh-audit/'          => 'audit-ssh',
+
+        /*
+         * ══ ONZE ENTREES MANQUANTES, MESUREES LE 2026-09-08 ══════════════════
+         *
+         * `legacy/menu.php` porte 18 liens vers le legacy. DIX-SEPT visent une
+         * cible ARCHIVEE ; seul `/iptables/` est encore vivant. Et DOUZE de ces
+         * dix-sept n'avaient AUCUNE entree ici — alors que le portage porte la
+         * page correspondante, verifiee par son nom de route.
+         *
+         * **La table qui existe pour rediriger les chemins legacy etait donc
+         * muette sur exactement les chemins qu'un utilisateur clique.** Son
+         * repli construisait `url_legacy . <chemin>`, c'est-a-dire une adresse
+         * archivee : un 404 rendu par une table dont c'est le role de l'eviter.
+         *
+         * ⛔ ET LA DOUZIEME N'EST PAS ICI, DELIBEREMENT. `/api/docs.php` est la
+         * console d'API : `E-234` a decide qu'elle NE SE PORTE PAS, et
+         * `DOSSIER-10` le dit — « le portage n'a pas de console ». La mapper
+         * vers `cles-api` enverrait qui cherche une console vers une page de
+         * CLES : deux choses differentes, et le lecteur croirait avoir trouve.
+         * **Une capacite refusee n'a pas d'equivalent ; lui en inventer un est
+         * pire que le lien mort.**
+         */
+        '/fail2ban/'           => 'fail2ban',
+        '/bashrc/'             => 'bashrc',
+        '/graylog/'            => 'graylog',
+        '/wazuh/'              => 'wazuh',
+        '/groups/'             => 'groupes',
+        '/adm/server_users.php/'      => 'comptes-distants',
+        '/adm/platform_keys.php/'     => 'cle-plateforme',
+        '/adm/server_user_sudo.php/'  => 'politiques',
+        '/adm/server_user_sftp.php/'  => 'acces-sftp',
+        '/security/compliance_report.php/' => 'rapport-conformite',
+        '/documentation.php/'  => 'documentation',
+        /*
+         * ⚠ TROUVEE EN REBASCULANT LE MENU, pas en relisant la table. Le legacy
+         * porte `/notifications.php` en lien de la cloche (`menu.php:181`), et
+         * le portage a la route `notifications` (`web.php:737`) — mais rien ne
+         * les reliait ici. **Une table de correspondance ne se verifie pas en la
+         * lisant : elle se verifie contre ce que les pages POINTENT.**
+         */
+        '/notifications.php/'  => 'notifications',
         '/profile.php/'        => 'profil',
         '/'                    => 'accueil',
     ];

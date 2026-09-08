@@ -5,6 +5,1379 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## Le dernier fil — l'encart tombe, et le parcours de I6 est mesuré
+
+Deux choses que l'entrée précédente déclarait non faites.
+
+### ⚠ Le parcours de I6 est mesuré : 24 assertions, 0 échec
+
+La mémoire a rendu 1,4 Go et Chrome démarre. **Rejoué, et il a rougi trois fois — sur mon
+instrument, pas sur le code.**
+
+    apercu montre    *filter :INPUT DROP -A INPUT --dport 22 ACCEPT   <- l'ANCIEN jeu
+    lectures         0                                                <- rien n'est parti
+    verdict          « reste joignable »                              <- calcule sur l'ancien
+
+`p.click()` sur le bouton d'historique **n'a pas déclenché son écouteur, sans lever**. Le
+verdict Q2 portait donc sur le jeu précédent, et trois assertions accusaient le code.
+
+**Discriminant** : un clic **en page** (`element.click()`) déclenche la lecture, le verdict
+passe à `false`, le port est nommé. *Le module était juste tout du long* — vérifié aussi hors
+navigateur, sur les six formes de fermeture :
+
+    politique DROP + regle SSH        -> true
+    politique DROP, AUCUNE regle SSH  -> false     <- exactement mon cas d'epreuve
+    politique ACCEPT, aucune SSH      -> true
+    regle DROP explicite, aucune SSH  -> false
+    politique DROP seule              -> false
+    vide                              -> null
+
+> **Un clic qui n'atteint rien ferait aussi PASSER une assertion « 0 requête ».** C'est la
+> même sortie que « la garde a tenu ». Une assertion d'atteignabilité est donc ajoutée —
+> `elementFromPoint` au centre du bouton — et elle passe : rien ne le recouvre. *L'échec de
+> `p.click()` était une course avec le `scrollIntoView` du panneau de consentement, pas un
+> défaut de l'écran.*
+
+*Ce qui a évité la fausse correction : mesurer le module séparément avant de toucher au code.
+Trois rouges convergents désignaient le même endroit, et l'endroit était bon.*
+
+### L'encart « non porté » est retiré — c'était le DERNIER lien vivant
+
+Il portait deux énoncés devenus faux :
+
+    'suite_titre'  « Cette page ne modifie rien »    -> elle applique ET restaure
+    'suite'        « seul le retour arriere reste »  -> I6 l'a porte
+
+*Un encart qui envoie vers un portail qu'on démonte, pour un geste qui est sous les yeux de
+qui le lit, est pire qu'inutile.* Les trois clés `suite*` quittent les deux catalogues dans le
+même geste (113 = 113) : **une clé que personne ne cite se lit comme une capacité qui existe
+encore ailleurs.**
+
+**Et c'était le seul lien vivant du portage vers le legacy** — les six autres sites sont des
+branches `@else` jamais prises : `Navigation` ne porte plus aucune entrée `legacy` (0 contre
+33 `route`), et le prédicat `porteDuLegacy` rend `false` pour les trois rôles, avec un témoin
+montrant qu'il sait rendre `true` sur un menu forgé sans route.
+
+### Mesure du retrait — 7 assertions, 0 échec
+
+    ⛔ la page rend TOUJOURS 200 apres retrait de l'encart
+    ⛔ l'encart a disparu · ⛔ le lien vers l'ancien portail a disparu
+    les CINQ gestes sont presents (relever · copie · valid · appl · rb)
+    aucun identifiant de traduction a l'ecran (retrait SANS orphelin)
+    ⛔ plus aucun lien externe hors le pied de page
+    aucun debordement horizontal
+
+*Le `200` après retrait n'est pas une formalité : un `@if` déséquilibré ne se voit qu'au
+rendu, et `node --check` ne lit pas du Blade. C'est pourquoi ce geste attendait que la machine
+puisse lancer un navigateur.*
+
+---
+
+## I6 — le retour arrière : porté, et pourquoi c'était le plus dangereux des cinq
+
+### L'asymétrie qui décide, et elle renverse l'attente
+
+    APPLIQUER       l'operateur ECRIT les regles : il les a sous les yeux
+    RETOUR ARRIERE  l'operateur choisit une DATE : il ne peut pas se relire
+
+Le legacy y met un `confirm()` de navigateur et rien d'autre — ni Q1, ni Q2. **Laisser ce
+geste là-bas n'était pas de la prudence : c'était laisser le plus dangereux des cinq sans
+aucune garde pendant que le portail gardé prenait les quatre plus sûrs.**
+
+### Q2 se calcule sur le port ACTUEL, jamais sur celui de l'archive
+
+`iptables_history` ne porte **aucun port**. Une version archivée était valide **le jour de son
+archivage** : si le port SSH a changé depuis — c'est-à-dire *si quelqu'un a suivi le
+durcissement qu'on prescrit* — la restaurer ferme l'accès. Et la reprise passerait elle aussi
+par SSH.
+
+*Aucune colonne de port n'a été ajoutée à `iptables_history` : elle n'expliquerait qu'un refus
+après coup, là où Q2 sur le port actuel le prévient.*
+
+### Montrer le texte n'est pas un confort
+
+`GET /iptables-history` ne rend pas les règles (par volume), et le seul `SELECT` qui les lit
+est **dans la route qui les applique**. Sans une lecture séparée, montrer le texte exigerait de
+l'appliquer d'abord. D'où `POST /pare-feu/version` — lecture seule, aucune machine jointe.
+
+> **Un geste dont on ne voit pas l'objet ne se consent pas : il s'accepte.**
+
+### La garde est dans le `WHERE`, sur l'objet atteint
+
+    SELECT ... FROM iptables_history WHERE id = ? AND server_id = ?
+
+Une version appartenant à une **autre** machine rend `null`, même si le demandeur a accès à
+celle qu'il annonce. *Sans le `server_id`, un `history_id` forgé suffirait à lire le pare-feu
+d'une machine interdite — et, le retour arrière posé, à l'y appliquer.* Même règle que
+`/iptables-rollback` côté backend, qui contrôle l'accès **après** avoir résolu la version.
+
+### Mesure — la moitié serveur : 7 assertions, 0 échec, table INTACTE
+
+`iptables_history` est **vide** : une assertion de cloisonnement y serait vacante. La mesure
+insère donc une version **dans une transaction annulée** — nothing persists — pour disposer
+d'un **témoin positif** :
+
+    TEMOIN POSITIF  la version est lue pour SA machine
+    ⛔ la MEME version est REFUSEE pour une autre machine
+    ⛔ refusee aussi pour la production (machine 1)
+    un id inexistant rend null
+    les REGLES sont bien rendues (non vides)
+    le LISTING, lui, ne transporte AUCUNE regle
+    ⛔ APRES ANNULATION la table est intacte (0 ligne)
+
+*Sans le témoin positif, les quatre refus seraient indiscernables d'une table vide. Et on ne
+fabrique pas la condition d'une mesure sur une donnée partagée : la transaction annulée est ce
+qui permet les deux à la fois.*
+
+### ⚠ CE QUI N'EST PAS MESURÉ, ET POURQUOI — À NE PAS LIRE COMME VÉRIFIÉ
+
+**Le parcours au navigateur de I6 n'a pas pu être exercé.** La machine est à bout :
+
+    load average 13,57  ·  RAM 5783/5958 Mo  ·  SWAP 3702/3702 Mo (100 %)
+    memoire disponible 140 Mo  ·  Chrome : « Timed out waiting for the WS endpoint »
+
+Deux tentatives, même échec. **Ce n'est pas un défaut du code : c'est l'impossibilité de
+lancer un navigateur.** Restent donc non mesurés à l'écran : le bouton par ligne
+d'historique, la quatrième colonne, l'aperçu, le verdict Q2 rendu, le panneau de consentement,
+et **Q4 au réseau** — `0` requête avant consentement, `1` après.
+
+*Ce qui EST vérifié sans navigateur : `node --check`, `php -l`, la parité FR/EN (116 = 116),
+le trajet des 15 clés par la liste curatée du contrôleur, et les 13 classes CSS relevées dans
+`rw.css`. Cela ne remplace pas le parcours.*
+
+**À rejouer dès que la machine respire** : `i6-rollback.mjs` est écrit et prêt (bac à sable),
+et il stubbe `/api/gateway/` **et** `/pare-feu/*`, donc ni machine jointe ni base touchée.
+
+---
+
+## I5 — appliquer un jeu de règles : l'écran, le consentement, et les quatre propriétés
+
+### ⚠ Ce que I5 crée, et ce qu'il ne crée pas
+
+    RoutesBackend:114   '/iptables-'   et la comparaison est PAR PREFIXE
+    -> /iptables-apply traversait DEJA la passerelle, sans cet ecran
+
+**I5 ne crée pas l'atteignabilité du geste : il crée l'ÉCRAN.** Un geste qui n'était
+atteignable que par requête forgée devient un bouton. *C'est pour cela que Q1–Q4 ne sont pas
+négociables — elles n'encadrent pas un geste nouveau, elles encadrent un geste qui existait
+sans garde-fou visible.*
+
+### Q1 — le port SSH vient de la machine
+
+La table `ipt-ports` est remplie **en base** par le serveur. Sans elle, aucun jeu n'est
+composé : **fail-closed**, parce que le repli évident (`22`) est exactement ce que Q1 corrige
+et qu'il enfermerait dehors quiconque a changé son port.
+
+⚠ **Les trois machines du parc sont à 22** : le parc ne peut donc pas distinguer « lu » de
+« supposé ». Q1 est mesurée **au module**, avec un port discriminant (2222), et le témoin
+montre que le même gabarit à 22 rend autre chose. *Une mesure sur le parc aurait été verte et
+vide.*
+
+### Q2 — le doute compte comme un refus
+
+`rwLaisseLeSshOuvert` rend trois valeurs. **`true` seul active le bouton** ; `false` et `null`
+l'interdisent, avec un message distinct. *Un doute sur « ce jeu ferme-t-il SSH ? » se paie en
+accès perdu et en console physique : on refuse plutôt que de parier.* Le verdict s'affiche
+**avant** le bouton — un jeu qui fermerait SSH doit se lire avant qu'on ait envie de cliquer.
+
+### Q3 — les huit titres existaient, les huit clés non
+
+`rwRetourPareFeu()` rend `titre: 'ipt_retour_succes'` — un **nom de clé**. Mesure : **8 titres
+cités, 0 au catalogue.** Q3 est « totale » et elle l'est ; c'est précisément ce qui rendait le
+défaut invisible — *un titre non vide qui ne DÉSIGNE rien satisfait toute assertion de forme.*
+
+Posées dans les **trois** endroits : `lang/fr`, `lang/en` (99 = 99) et la liste curatée de
+`PareFeuController` — sans laquelle elles ne voyagent pas et l'écran afficherait
+`ipt_retour_succes` en ayant l'air de fonctionner.
+
+**Quatre des huit portent `sur: false`** : leurs libellés disent *« je ne sais pas »*, jamais
+*« ça a échoué »*, et invitent à relever l'état de la machine.
+
+### Q4 — avant consentement, aucune requête
+
+`demandeConsentement()` ne contient aucun appel : elle remplit et affiche. **Mesuré au réseau,
+avec son témoin** — `0` requête vers `/iptables-apply` à l'ouverture du panneau, **exactement
+1** après confirmation.
+
+### ⚠ Vu à l'image, invisible à l'assertion
+
+Le panneau de consentement s'ouvrait **sous le bouton, hors de l'écran** sur une page longue.
+`hidden = false`, correctement rempli, et invisible. *Un clic qui ne montre rien se lit comme
+un bouton mort : on reclique, ou on conclut que le geste a échoué.* Il est désormais amené
+sous les yeux.
+
+**Et deux classes CSS inventées** (`rw-bloc-code`, `rw-bouton--fantome`) attrapées avant
+écriture par le contrôle « les classes employées existent-elles ? ». Les 17 classes de la
+section sont relevées dans `rw.css`.
+
+### Le panneau « non porté » est CORRIGÉ, pas retiré
+
+`pare-feu.suite` annonçait que *l'application et le retour arrière* restaient sur l'ancien
+portail. **L'application est portée ; le retour arrière ne l'est pas.** Le texte le dit
+maintenant exactement — *une capacité qui reste ailleurs doit être déclarée, et une capacité
+portée ne doit plus être annoncée comme absente.*
+
+### Mesure — 30 assertions, 0 échec, aucune machine jointe
+
+    ⛔ SURETE PAR CONSTRUCTION : toute requete vers /api/gateway/ est STUBBEE et
+    jamais transmise. Aucun appel ne peut atteindre le backend, meme si un motif
+    etait faux — on ne s'appuie pas sur « je ne clique pas sur le bouton ».
+
+    Q1  port 2222 present · 22 absent · TEMOIN le meme gabarit a 22 differe
+    Q2  ouvre -> true · ferme -> false · TEMOIN les trois entrees different
+    Q3  cinq retours (succes, success:false, 500, 403, requete avortee)
+        chacun VISIBLE, aucun identifiant nu, TEMOIN >= 3 messages distincts
+    Q4  0 requete avant consentement · EXACTEMENT 1 apres
+
+*L'assertion « pas un identifiant nu » est celle qui aurait attrapé les huit clés manquantes :
+`t()` rend le nom de la clé quand elle ne voyage pas.*
+
+---
+
+## Recherche vivante dans l'en-tête — l'écran manquait, pas l'endpoint
+
+Le legacy avait une recherche **instantanée dans son menu** ; le portage n'avait qu'une page.
+
+### ⚠ Ce qui manquait n'était PAS un endpoint
+
+    recherche.js:161        appelle('/search?q=…')  ->  GET /api/gateway/search
+    RoutesBackend:120/142   '/search' en liste blanche ET en ADMIN_ONLY
+    backend/routes/search.py:26  GET /search -> JSON
+
+**La page faisait déjà du direct en JSON.** Un second endpoint aurait donné deux chemins pour
+un seul geste — et *le premier à diverger aurait été la garde*. Le panneau appelle donc le
+**même** chemin.
+
+*Le contrat qui circulait (`{results:[{type,label,sub,url,status}]}`) était celui de
+`global_search.php`, endpoint ARCHIVÉ : la forme du consommateur mort. Le producteur vivant
+rend des catégories, et le champ de lien s'appelle `link`, pas `url`.*
+
+### La règle de sécurité a UNE seule copie, désormais
+
+`normalise()`/`resout()` quittent `recherche.js` pour `public/js/liens-legacy.js`, partagé par
+la page et le panneau. **Ce n'est pas un utilitaire de navigation : re-enraciner le chemin sur
+une base connue est CE QUI empêche un lien à schéma relatif de changer d'hôte.** Deux copies
+d'une règle de sécurité finissent par diverger — il n'y en a plus qu'une.
+
+Remesurée sur le code réel avant extraction, hrefs LUS à l'écran, puis **identiques après** :
+
+    //evil.example.com/x        ->  <legacy>/evil.example.com/x
+    https://evil.example.com/x  ->  <legacy>/https://evil.example.com/x
+    javascript:alert(1)         ->  <legacy>/javascript:alert(1)
+    TEMOIN /adm/audit_log.php   ->  <portage>/journal-audit      (DISCRIMINE)
+
+**Aucun validateur serveur ajouté** : la garde tient par construction, et un second garde là
+où le premier tient est un garde de plus à faire diverger.
+
+### La garde du panneau est celle de la route, relevée et non devinée
+
+`web.php:554` → `role:2` + `perm:can_admin_portal`. Le partiel porte la même condition.
+*Un champ offert à qui ne peut pas s'en servir n'est pas une capacité : c'est une panne
+promise à chaque frappe.* Mesuré sur `rw-test-admin` — **rôle 2 SANS la permission**, donc
+c'est la moitié PERMISSION du garde qui est exercée, pas seulement le rôle.
+
+### Sous le seuil, rien ne part
+
+Le backend rend `{results:{}, total:0}` sous deux caractères. Le panneau **n'émet donc
+aucune requête** en dessous, et l'annonce. *Apprendre la règle par une réponse vide ferait
+partir une requête par frappe, et rendrait « trop court » indiscernable de « aucun résultat ».*
+
+### ⚠ TREIZE ASSERTIONS VERTES, ET LE PANNEAU ÉTAIT INUTILISABLE
+
+Posé entre le titre et le groupe de droite, il s'ancrait par `right: 0` et **s'ouvrait vers la
+gauche, hors de l'écran** — libellés coupés au bord. Le chevron par défaut de `<details>`
+doublait la loupe, et la saisie restait étroite au milieu d'un panneau de 30rem.
+
+**Aucune des treize assertions ne pouvait le voir.** *C'est la troisième fois dans ce chantier
+qu'un défaut n'existe qu'à l'image.* Corrigé : panneau dans `.rw-entete__compte`, marqueur
+masqué, saisie pleine largeur. Vérifié à 1400 px **et** à 390 px, où le champ s'efface — c'est
+le CHAMP qui cède, pas les pastilles, parce que la recherche reste atteignable par son entrée
+de menu.
+
+### Deux pièges d'écriture payés
+
+**`lang/*/search.php` dans un commentaire de bloc JS.** La séquence ferme le commentaire :
+tout ce qui suivait devenait du code, et `node --check` désignait une ligne trente plus bas.
+*Même espèce que le `;` dans un commentaire de migration SQL.*
+
+**Deux jetons CSS inventés** (`--rw-bord`, `--rw-fond-carte`). Ils n'existent pas — et une
+variable CSS absente ne lève rien, elle rend la déclaration inerte. Les quatre jetons employés
+(`--rw-surface`, `--rw-bordure`, `--rw-rayon`, `--rw-ombre`) sont relevés dans le fichier.
+
+### ⚠ Compilés Blade appartenant à root : mesuré avant d'écrire
+
+    root  <-  composants/entrees-menu.blade.php
+    root  <-  layouts/portail.blade.php
+
+Éditer l'une ou l'autre = **500 sur toutes les pages** (le socle est inclus partout).
+`view:clear` aurait déclenché une recompilation pour toutes les sessions : geste chirurgical
+à la place, `chown www-data` sur ces deux fichiers — ce que l'entrypoint fait au démarrage.
+Portail vérifié au réseau après chaque écriture : `200`, témoin `/zzz` → `404`.
+
+**Il reste 7 compilés `root`** — mine latente pour qui éditera ces vues. Elle se ferme à la
+prochaine recréation du conteneur.
+
+### Mesure — 13 assertions, 0 échec, plus la non-régression de la page
+
+    garde     l'en-tete est rendue (temoin) · role 2 sans permission : AUCUN panneau
+    seuil     sous 2 car. : 0 requete emise · le seuil est annonce
+    nominal   a 2 car. la requete part · les resultats sont rendus
+    liens     aucun href hors des deux origines · aucun javascript:
+              TEMOIN le lien legitime est traduit en interne
+    reseau    0 requete vers un hote hostile
+    page      /recherche : hrefs IDENTIQUES avant et apres l'extraction
+
+**Couplage assumé** : la page `/recherche` lit `liens-legacy.js` chargé par le partiel du
+socle. Tout compte qui atteint la page a la permission qui rend le partiel, donc le module est
+là. Si le partiel disparaissait, `resout()` rendrait `null` et les libellés s'afficheraient
+**sans lien** plutôt qu'avec un `href="null"` — dégradation choisie, pas subie.
+
+---
+
+## Liens morts du legacy — 21, pas 13, et les deux sondes etaient aveugles aux memes huit
+
+**2026-09-08.** Les pages encore servies du legacy pointaient vers 21 cibles archivees.
+Deux instruments existaient ; aucun ne voyait l'union.
+
+```
+suite liens-morts-legacy.mjs     13   href= · fetch( · action= · sideLink( · window.location
+sonde ad hoc (head/footer)        9   toute chaine "/x.php" citee
+                                 ──
+UNION                            21
+```
+
+Les **huit** qui manquaient a la suite vivaient dans une table de raccourcis clavier :
+
+```js
+const routes = {c: '/security/', a: '/adm/admin_page.php', A: '/ssh-audit/', ...};
+if (routes[e.key]) { window.location.href = routes[e.key]; }
+```
+
+La destination atteint bien `location.href`, mais **a l'execution** — jamais lexicalement
+comme `href="..."`. Le grain de la sonde etait le litteral, l'objet est la destination.
+
+Et **deux** de ces huit echappaient AUSSI a la sonde ad hoc : elle excluait la ligne
+ENTIERE des qu'elle y voyait `LARAVEL_URL`, alors qu'une seule ligne portait un lien
+deja rebase et deux liens morts. *Les deux instruments etaient aveugles aux memes liens,
+pour deux raisons differentes, et aucun des deux ne le disait.*
+
+### 19 liens rebases, destination prouvee route par route
+
+| legacy (archive) | portage |
+|---|---|
+| `/security/` | `/scan-cve` |
+| `/ssh-audit/` | `/audit-ssh` |
+| `/documentation.php` | `/documentation` |
+| `/profile.php` | `/profil` |
+| `/security/compliance_report.php` | `/rapport-conformite` |
+| `/adm/admin_page.php` | `/comptes` |
+| `/adm/platform_keys.php` | `/cle-plateforme` |
+| `/adm/server_users.php` | `/comptes-distants` |
+| `/index.php` | `/accueil` |
+| `/terms.php` | `/cgu` |
+
+`legacy/head.php` (9) · `legacy/lang/{fr,en}/tips.php` (4 + 4, parite tenue) ·
+`legacy/auth/verify.php` (1, page « acces refuse ») · `legacy/footer.php` (1).
+
+### 2 liens qui ne se rebasent pas, et pourquoi
+
+**`/privacy.php` — retire, pas redirige.** Le portage n'a aucune politique de
+confidentialite : `cgu.blade.php` porte 0 occurrence de « confidentialite », « RGPD » ou
+« donnees personnelles ». Les deux substitutions plausibles sont fausses — `/cgu` sont les
+conditions, et `/profil/donnees-personnelles` est `ExportRgpdController`, l'export art. 20 :
+un GESTE de l'utilisateur, pas une NOTICE. **Une destination fausse est pire qu'une
+destination absente : un lien legal qui mene ailleurs atteste une conformite qui n'est pas
+la.** La dette est inscrite en place, a l'endroit ou le lien etait.
+
+**La recherche vive du menu — menee a la page qui existe.** Elle interrogeait un endpoint
+archive ; `/recherche` est un `view('recherche', ...)`, une page HTML, donc rebaser le
+`fetch` ferait lever la lecture JSON. Et la panne etait **deja la, masquee par son propre
+repli** : `catch(e) { container.classList.add('hidden'); }`. Depuis l'archivage, chaque
+frappe partait, echouait, et le menu cachait le panneau — aucune erreur visible, aucun
+resultat jamais, donc rien a quoi se cogner. *Un repli qui cache l'echec transforme une
+capacite morte en capacite silencieuse, et ce silence l'a fait survivre a son endpoint.*
+
+### La suite ferme la forme manquante — et s'eprouve elle-meme
+
+`tests/e2e/liens-morts-legacy.mjs` lit desormais `table {k: "/x"}`. Le motif
+`location = "/x"` qu'on y avait ajoute avec lui a ete **retire** : `window.location` le
+couvrait deja. Il avait ete ajoute sans lire la liste a laquelle on l'ajoutait, et la
+mesure d'extraction qui devait le valider avait reproduit trois motifs en les nommant
+« les formes de la suite » — *reproduire un instrument pour le mesurer mesure la
+reproduction*. Le zero qu'il rendait ne disait pas « cette forme est absente du parc »
+mais « cette forme est deja lue par sa voisine ».
+
+Chaque forme prouve maintenant qu'elle mord, sur un echantillon forge : une forme qui
+n'extrait pas son propre echantillon arrete la suite a 2. **Les cinq mutations rendent 2,
+la base rend 0.**
+
+> Une declaration d'angle mort protege le lecteur ; deux instruments qui declarent chacun
+> le leur ne couvrent pas pour autant leur union.
+
+
+## iptables — la réponse dit enfin si l'archive a eu lieu, et la garde passe en aval
+
+**Addendum 2 de `DOSSIER-47`**, sur deux points qu'une attestation indépendante a ouverts.
+
+### ⛔ Le défaut que ce correctif existait pour fermer, recréé par un hoquet de la base
+
+    except Exception as hist_err:  logger.warning(...)
+    apply_iptables_rules(...)
+    return jsonify({"success": True, "message": message})
+
+**Base injoignable → l'archivage échoue → l'application a lieu → la réponse était octet pour
+octet celle du succès.** Aucun champ ne la distinguait, aucun test ne l'exerçait.
+
+*Ce fichier dit lui-même qu'une archive avec un trou est plus dangereuse qu'une archive
+absente, parce que le trou se lit comme une continuité.* **Le chemin d'exception en fabriquait
+un, en silence** — et c'est sur `rollback` que ça coûte le plus, la route dont tout l'argument
+est la réversibilité.
+
+**On ne bloque pas, et ce n'est pas un compromis** : l'archive sert la traçabilité,
+l'application sert la **disponibilité**. Rendre un pare-feu inmodifiable parce qu'une table de
+journal est injoignable ferait de la garde la chose qui empêche de se rétablir — et sur
+`rollback`, bloquer enfermerait l'opérateur dans l'état cassé qu'il cherche à quitter.
+
+**Mais que l'appelant ne puisse pas le savoir n'est défendable en rien.**
+
+    reponse   {"success": true, "message": …, "archive": true}
+              {"success": true, …, "archive": false, "archive_motif": "echec_archivage"}
+              {"success": true, …, "archive": false, "archive_motif": "etat_precedent_vide"}
+
+*Deux non-archives, deux motifs : « rien à archiver » n'est pas « ça a raté ».*
+
+⚠ **Ce champ doit être LU côté portage.** Un `archive: false` qu'aucun écran n'affiche laisse le
+défaut entier — la moitié écran reste à faire.
+
+### La garde de vacuité passe EN AVAL
+
+Le contrôle vivait **sous** la lecture par défaut : il ne gardait que les deux routes
+`action="apply"`. `restore` et `rollback` contrôlent en amont — l'angle mort était **dormant**,
+mais sûr par **convention**, et une cinquième porte n'aurait été forcée par rien.
+
+> **Deux gardes en amont valent moins qu'une garde en aval : il faut les répéter, et on ne
+> répète pas ce qu'on ne voit pas.**
+
+### Les tests commencent par le cas qui MARCHE
+
+Six tests ajoutés. Le premier est le **témoin positif** — sans lui, `archive: false` ne
+prouverait pas que le champ sait dire `true`. Puis la base est cassée et l'on vérifie que la
+réponse **change**, que l'application a **quand même** eu lieu, et que le motif distingue les
+deux non-archives. Trois de plus mesurent que des règles vides sont refusées avant toute
+application.
+
+    backend   683 passed · 5 skipped · 2 xfailed
+
+### Ce que ce cycle a montré
+
+**Les quatre propriétés arbitrées portaient sur ce que le code FAIT quand tout va bien. Aucune
+ne demandait ce qu'il DIT quand une partie échoue.** Le cinquième point est venu d'une session
+qui n'avait écrit ni le code ni les propriétés — *la boucle écrire / attester / arbitrer a
+trouvé le défaut le plus grave au troisième passage, pas au premier.*
+
+⛔ **Inerte jusqu'à la recréation du conteneur.** L'attestation s'est bornée elle-même sur ce
+point : elle atteste que le code **sur le disque** porte les propriétés ; *aucune lecture ne
+peut attester que le service les exécute.* Le process a démarré à 14:53, ces commits sont de
+23:44 et après.
+
+⛔ **Rien n'a été exercé** : aucune règle appliquée, aucune machine jointe, aucune requête.
+
+## E-467 — éteint, il n'y a pas de consentement à demander : il y a un état à annoncer
+
+`geo_conf_texte` prévient que l'adresse « sera transmise à ip-api.com **EN CLAIR** ».
+**Interrupteur `GEOIP_ENABLED` éteint, cette phrase est fausse** : rien ne part.
+
+Et elle se trompe **du côté prudent**, ce qui la rend nuisible : l'exploitant consent, rien ne
+part, et il apprend que l'avertissement est du théâtre. *Ce qui s'use alors n'est pas cette
+phrase-là, c'est la crédibilité de toutes les autres.*
+
+### La source est `/settings/announceable`, pas `env()`
+
+    printenv GEOIP_ENABLED  dans rootwarden_laravel  ->  VIDE
+
+**Le conteneur du portage ne porte pas cette variable.** Un `env('GEOIP_ENABLED', true)`
+rendrait donc **toujours** `true` et mentirait dès que l'exploitant l'éteint — le piège que
+`config/rootwarden.php:131` documente déjà pour `HIBP_ENABLED`. La route rend la valeur
+**effective du process qui exécute la garde**, donc aussi la bonne réponse quand le backend n'a
+pas encore été recréé.
+
+### Trois décisions de sûreté, toutes dans le même sens
+
+**Lecture au moment du CLIC, jamais mise en cache.** Un drapeau gardé pourrait annoncer
+« désactivée » alors que le réglage a été rallumé — donc **promettre que rien ne part pendant
+que des requêtes sortent**. L'inverse ne fait qu'avertir de trop.
+
+**L'inconnu se comporte comme ALLUMÉ.** Le consentement n'est supprimé que si le drapeau vaut
+**explicitement** `false` ; `litGet` rend `null` en cas d'échec et le backend distingue « faux »
+de « je n'ai pas su lire » (`non_resolus`). *Dans le doute, l'avertissement est la phrase
+honnête, parce que la requête peut très bien partir.*
+
+**Éteint, on annonce — on ne se taît pas.** Le panneau s'ouvre avec `{bloque: true}` :
+confirmation désactivée, il n'y a rien à autoriser. *Un bouton qui ne fait rien sans dire
+pourquoi se lit comme une panne, la confusion même que ce geste corrige.*
+
+### La clé devait encore aller dans TROIS endroits
+
+    lang/fr/fail2ban.php · lang/en    `geo_off_titre` + `geo_off_texte`   (203 = 203)
+    Fail2banController                le TRAJET par la liste curatee
+
+### Mesure — 13 assertions, 0 échec, aucune machine jointe, aucun appel sortant
+
+**Le chemin de CLIC complet est exercé cette fois** : machine d'essai (id 3), relevé, jail,
+bouton de géolocalisation, panneau. Tous les `/fail2ban/*` sont interceptés et **stubbés — aucune
+machine n'est jointe** ; toute tentative vers `ip-api.com` est comptée puis avortée : zéro.
+
+    TEMOIN allume  un panneau s'ouvre · il AVERTIT de la transmission en clair
+                   le consentement est OFFERT (confirmer actif)
+    ETEINT         panneau ouvert · titre « desactivee » · le texte NIE la transmission
+                   il NOMME le reglage · AUCUN consentement offert
+                   AUCUN appel a /fail2ban/geoip
+    TEMOIN         les deux etats rendent des textes DIFFERENTS
+
+*Le cas allumé n'est pas décoratif : sans lui, « le panneau de consentement est absent » et « ma
+sonde ne voit pas le panneau » sont la même sortie. Et l'assertion qui compte le plus est
+l'absence d'appel à `/fail2ban/geoip` : la propriété est qu'aucune requête n'est **émise**, pas
+qu'un autre texte s'affiche.*
+
+### ⚠ Régime
+
+La garde backend reste **inerte jusqu'à la recréation du conteneur**. Tant qu'elle ne tourne pas,
+`/settings/announceable` rend `geoip_enabled: true` — donc le panneau de consentement, ce qui est
+**le comportement correct** : la requête partirait bel et bien.
+
+---
+
+## iptables — les QUATRE portes archivent, et `rollback` cesse de promettre le faux
+
+**Addendum `DOSSIER-47`.** Le lot précédent faisait converger les deux routes portant
+`action="apply"`. **Il en restait deux**, que le motif de mesure ne pouvait pas voir :
+
+    /iptables-restore    appliquait SANS archiver
+    /iptables-rollback   appliquait SANS archiver
+
+> *Le grain de la mesure doit égaler la question* : elle était « quels chemins **appliquent** »,
+> pas « quelles routes portent `action=apply` ».
+
+### `rollback` est celui qui décidait
+
+    etat courant --rollback--> etat archive N
+    l'etat courant n'est conserve NULLE PART
+    => on revient en arriere, JAMAIS EN AVANT
+
+**Une porte à sens unique habillée en porte réversible est pire qu'une porte à sens unique** —
+l'opérateur clique *parce que* le nom lui promet qu'il pourra défaire. Ce n'est pas une
+fonctionnalité manquante, c'est une **promesse fausse**.
+
+### Un seul chemin, et il archive l'état QUITTÉ
+
+Les quatre routes passent par `_archive_puis_applique()`. Les deux routes `apply` lisent leurs
+règles dans le corps ; `restore` les lit dans `iptables_rules`, `rollback` dans
+`iptables_history` — **elles les passent explicitement, le helper ne devine rien.**
+
+    /iptables            ✅ archive        /iptables-restore    ✅ archive
+    /iptables-apply      ✅ archive        /iptables-rollback   ✅ archive
+
+⚠ **L'archive enregistre l'état QUITTÉ, jamais l'état restauré.** Enregistrer l'état vers
+lequel on va dupliquerait une entrée déjà présente et rendrait la chaîne illisible : *on ne
+saurait plus distinguer « voici où j'étais » de « voici où je vais ».* Deux assertions le
+mesurent nommément.
+
+### Les tests commencent par le chemin qui MARCHE
+
+Les tests historiques de `restore` et `rollback` exercent les gardes, le `history_id` absent et
+la version introuvable — **aucun n'appliquait**. C'est exactement ce qui avait laissé passer un
+`NameError` sur les deux portes `apply` dans le lot précédent.
+
+Deux tests ajoutés qui appliquent pour de vrai, avec témoin positif et **contre-épreuve** : le
+même harnais rend `inserts == []` sur une version vide et `1` sur le chemin nominal — donc
+« zéro archive » n'est pas « zéro mesure ».
+
+    backend   677 passed · 5 skipped · 2 xfailed
+
+⚠ *Cette ligne portait « 675 » — le compte d'AVANT les deux tests de ce lot. Message composé
+dans la commande qui mesurait, pour la sixième fois. Attrapé avant le commit cette fois : la
+parade reste d'exécuter, LIRE, puis écrire dans une commande séparée.*
+
+⚠ **Un piège d'instrument rencontré en écrivant ces tests** : patcher
+`mysql.connector.connect` **globalement** cassait `get_current_user`, qui passe par la même
+fonction — la permission était refusée et le test échouait *pour une raison étrangère à ce
+qu'il mesure*. Seule la référence **du module** est remplacée.
+
+⚠ **Ces tests restent la vérification de l'auteur.** Une attestation indépendante reste due,
+sur ce lot comme sur `be5a30ef`.
+
+⛔ **Inerte jusqu'à la recréation du conteneur** — les `.py` sont lus au démarrage. Le service
+exécute encore l'ancien code ; `pytest` lit le disque.
+
+⛔ **Rien n'a été exercé** : aucune règle appliquée, aucune machine jointe, aucune requête.
+
+## E-460 (queue portage) — `GEOIP_ENABLED` : « désactivée » ne doit pas se lire « en panne »
+
+Le backend (`f73e28a5`) a posé l'interrupteur du **seul effet sortant qui n'en avait pas** :
+`geoip_lookup` interroge `ip-api.com` **en HTTP clair** (le tier gratuit n'autorise pas HTTPS,
+le code le dit et l'assume). Huit autres effets sortants ont leur `*_ENABLED` ; celui-là non.
+
+Éteint, il rend `{'country': 'Desactive', 'countryCode': 'OFF'}`. **Cette entrée-ci est la
+moitié portage : afficher cet état pour ce qu'il est.**
+
+### Pourquoi un code NEUF, et surtout pas `??`
+
+Le portage traduit la géolocalisation **par code**, jamais par nom de pays :
+
+    fail2ban.js   'LO'  -> geo_locale     « adresse locale, aucune requete n'est partie »
+                  '??'  -> geo_inconnu    « le service n'a pas su repondre »
+                  'OFF' -> geo_desactivee  ← AJOUTE ICI
+
+**Réutiliser `??` aurait fait passer un réglage délibéré pour une panne du tiers** : on aurait
+cherché une panne inexistante, ou rallumé l'interrupteur en croyant réparer. La branche `OFF`
+est donc placée **à côté de `LO`** — les deux cas où *rien n'est parti* — et non à côté de `??`,
+qui dit l'inverse : une requête a bien été émise.
+
+### La clé devait aller dans TROIS endroits, pas deux
+
+    laravel/lang/fr/fail2ban.php        le libelle
+    laravel/lang/en/fail2ban.php        sa parite, meme commit
+    Fail2banController                  la LISTE des cles transmises au JS
+
+`$textes` est une liste **curatée** de 127 clés, pas le catalogue entier. **Une clé présente
+dans les deux catalogues mais absente de cette liste rend du VIDE au navigateur, sans aucune
+erreur** — et un vide se lit exactement comme « la géolocalisation est cassée », c'est-à-dire
+le contraire de ce que la clé existe pour dire. Mesuré : la clé voyage jusqu'au navigateur.
+
+### Le libellé NOMME la variable
+
+Sur un portail d'administration, savoir **quoi changer** fait la différence entre un état subi
+et un état choisi. Le texte nie aussi la panne explicitement (« ce n'est pas une panne du
+service »), parce que c'est la confusion que ce geste corrige.
+
+### ⚠ LE BACKEND EST INERTE JUSQU'À LA RECRÉATION DU CONTENEUR
+
+Les `.py` sont lus au **démarrage** du process. Mesuré, pas supposé :
+
+    process rootwarden_python demarre   2026-09-07 14:53:00 CEST
+    correctif f73e28a5 ecrit            2026-09-07 23:40:30 CEST
+    -> le process porte le code d'AVANT : la garde ne s'execute pas encore
+
+**Conséquence pour qui testerait maintenant** : le service rendra une géolocalisation réelle ou
+`??`, jamais `OFF`. *On mesurerait la branche `geo_inconnu` en croyant mesurer `OFF`, et le vert
+serait indiscernable du vrai.* **La moitié portage, elle, est servie immédiatement** — le JS et
+le catalogue sont montés depuis l'hôte, aucune recréation n'est nécessaire de ce côté.
+
+### Mesure — 12 assertions, 0 échec, aucun appel sortant
+
+La charge `#f2b-textes` réellement servie au navigateur est lue, puis le **même ternaire** que
+`fail2ban.js` est évalué dessus. La mesure **ne dépend donc pas du service**, qui ne peut pas
+encore rendre `OFF`.
+
+    la cle geo_desactivee VOYAGE jusqu'au navigateur
+    OFF rend un texte non vide, qui dit « desactivee », « aucune requete n'est partie »
+        et NIE la panne
+    TEMOINS POSITIFS   OFF != '??'   OFF != 'LO'   un vrai pays rend son resultat
+                       un code INCONNU tombe dans le cas general
+    FILET RESEAU       0 requete vers ip-api.com (interception, abort si tentative)
+
+*Les témoins ne sont pas décoratifs : sans eux, « OFF rend geo_desactivee » serait vrai à vide
+si le ternaire captait tout. Le code inconnu prouve qu'il ne capte pas tout.*
+
+### Ce que cette entrée NE couvre pas
+
+Le chemin de **clic** complet — bouton « Géolocaliser », panneau de confirmation, réponse du
+backend — n'est pas exercé : il exige une machine avec des adresses bannies **et** un backend
+recréé. Déclaré plutôt que sous-entendu.
+
+**Et un défaut voisin, signalé et non corrigé** : `geo_conf_texte` prévient que l'adresse « sera
+transmise à ip-api.com EN CLAIR ». **Quand l'interrupteur est éteint, cet avertissement est
+faux** — la requête ne part pas. Le corriger demanderait que la page lise `geoip_enabled`
+(exposé par `backend/routes/settings.py:104`) avant d'afficher le panneau. Hors de ce geste.
+
+---
+
+## iptables — les deux portes d'application convergent, l'archive redevient contiguë
+
+**Arbitrage `DOSSIER-47`.** `backend/routes/iptables.py` portait **deux routes qui appliquent
+des règles de pare-feu**, mêmes gardes à la ligne près, même effet distant — **une seule
+archivait**.
+
+    POST /iptables         action="apply"   ->  appliquait SANS archiver
+    POST /iptables-apply   action="apply"   ->  archivait puis appliquait
+
+### Ce que le trou coûtait, et ce n'est pas « on ne sait pas qui »
+
+    etat 0 --/iptables--------> etat 1   rien n'est archive : l'etat 0 est PERDU
+    etat 1 --/iptables-apply--> etat 2   l'etat 1 est archive
+    rollback depuis l'etat 2             restaure l'etat 1, PAS l'etat 0
+
+**L'archive devenait non contiguë, et rien ne le disait.** *Une archive avec un trou est plus
+dangereuse qu'une archive absente : l'absence se voit, le trou se lit comme une continuité.*
+Et `/iptables-rollback` **applique** ce qu'il restaure — le trou était actionnable.
+
+### Délégation, jamais duplication
+
+Le verbe **n'est pas retiré** : `ClesApi.php:60` donne aux clés d'API une portée à préfixe sur
+`^/iptables`, et cette liste ne s'énumère pas. *« Le backend l'expose aujourd'hui » fonde une
+obligation de compatibilité, là où « le legacy l'expose déjà » n'en fonde aucune.*
+
+Le bloc d'archivage a été **déplacé** dans `_archive_puis_applique()` — pas recopié. Les deux
+routes l'appellent.
+
+    appels a `_archive_puis_applique`        2 (+ sa definition)
+    controles « Regles IPv4 manquantes »     1
+
+> **La trace manquante était le symptôme ; deux implémentations du même geste irréversible
+> était la cause.** Une seconde copie du bloc aurait divergé en silence, les deux portes
+> continuant de « marcher ».
+
+### ⛔ CE QUE CE LOT NE FERME PAS
+
+**Deux des quatre portes qui appliquent restent sans archive** :
+
+    /iptables            ✅ archive
+    /iptables-apply      ✅ archive
+    /iptables-restore    ⛔ APPLIQUE SANS ARCHIVER
+    /iptables-rollback   ⛔ APPLIQUE SANS ARCHIVER
+
+*L'archive reste donc non contiguë à travers ces deux-là.* Hors du périmètre arbitré : signalé,
+pas corrigé.
+
+**Et le correctif est INERTE jusqu'à la recréation du conteneur** — les `.py` sont lus au
+démarrage. Le service exécute encore l'ancien code ; `pytest` lit le disque, donc la mesure
+ci-dessous porte sur le fichier, pas sur le service.
+
+### ⚠ MON REFACTOR ÉTAIT CASSÉ, ET MON PROPRE TEST L'A ATTRAPÉ
+
+Le premier jet du helper comptait sur `rules_v4` défini dans la route appelante : **les deux
+portes levaient `NameError`**. La suite de 672 tests est restée **verte** — parce qu'**aucun
+n'exerçait la branche `apply`** avec des règles valides.
+
+*Une suite qui couvre les gardes et les paramètres absents peut être verte sur une route dont
+le chemin nominal ne s'exécute pas.*
+
+Trois tests ajoutés, qui mesurent **l'effet et non le message** : un `INSERT` dans
+`iptables_history` a-t-il eu lieu, pour **chacune** des deux portes ; et une version vide
+n'est pas archivée — elle rendrait le rollback destructeur. Avec témoin positif : le harnais
+sait voir une application, donc « zéro insert » n'est pas « zéro mesure ».
+
+    backend   675 passed · 5 skipped · 2 xfailed
+
+⚠ **Ces tests sont la vérification de l'auteur, pas une certification.** Celui qui écrit un
+correctif ne devrait pas être celui qui atteste qu'il est là — une attestation indépendante
+reste due.
+
+⛔ **Rien n'a été exercé** : aucune règle appliquée, aucune machine jointe, aucune requête vers
+`/iptables` ni `/iptables-apply`. Mesure entièrement statique et harnais entièrement doublé.
+
+## K4 — le déploiement des clés SSH : le chemin est écrit, le garde a changé d'étage
+
+**Autorisation de l'exploitant, 2026-09-07** : porter le chemin, `(A)` documenté, **jamais
+l'exercer**. Rien n'a été déclenché — aucune suite, aucun `curl`, aucun banc.
+
+### Le garde n'est pas ajouté, il est DÉPLACÉ
+
+Le legacy enchaîne `/preflight_check` puis `/deploy` dans la **même chaîne `fetch`**
+(`legacy/ssh/js/main.js:110` puis `:194`). Mesure sur `backend/routes/ssh.py` :
+
+    /deploy, 93 lignes de code
+      « preflight »        ABSENT
+      « users_with_keys »  ABSENT
+      « scan_required »    ABSENT
+
+**Le backend ne vérifie rien.** Le garde qui empêche une révocation générale est un `.then()`
+de navigateur — et `MODULE-SSH.md:280` dit ce qu'il empêche : sans lui, un déploiement
+**révoquerait les clés de toutes les machines cochées**.
+
+> **La capacité existe dans le legacy ; c'est son EMPLACEMENT qui ne tient pas.** Un garde côté
+> client ne garde que ceux qui passent par le client. *L'iso-périmètre porte des capacités, pas
+> des implémentations* — porter le bouton avec son `.then()` aurait offert un chemin de
+> révocation que la page du legacy n'offre pas.
+
+`App\Services\DeploiementCles` appelle donc le preflight **côté serveur** et vérifie
+`ssh_ok` **et** `users_with_keys > 0` pour chaque machine.
+
+### La garde est par CONSTRUCTION
+
+`deploie()` n'accepte pas une liste de machines : elle accepte un `PreflightConcluant`, que
+seul `preflight()` fabrique, et seulement si **toutes** les machines passent. *Il n'existe
+aucun chemin d'appel qui déploie sans preflight — pas parce qu'on y pense, parce que c'est
+inexprimable.*
+
+Trois refus supplémentaires, chacun mesuré : liste de résultats **vide** traitée comme une
+mesure qui n'a pas eu lieu ; **tout ou rien** avec la machine fautive nommée (comportement du
+legacy, `main.js:186-191`) ; et `role:2` sur la route, parce que le backend l'exige depuis
+E-191 — offrir le déclencheur au rôle 1 produirait un 403 systématique.
+
+### ⛔ CE QUE CE LOT NE FERME PAS
+
+- **`/deploy` reste joignable directement avec une clé d'API.** Ce trou existe aujourd'hui, ce
+  portage ne le creuse pas et ne le referme pas : le refermer demande une garde **dans
+  `ssh.py`**, décision sur le backend, hors de ce lot.
+- **Le déclencheur n'est pas câblé à l'écran.** La vue porte déjà le bouton né `disabled` et le
+  panneau de décision ; sa dernière action est encore un lien vers l'ancien portail. Le
+  remplacer demande **une ligne dans une vue Blade existante**, que la consigne interdit.
+  *Mesuré : 8 compilés sur 62 appartiennent à root, et `cles-ssh` n'en a AUCUN — le danger
+  invoqué ne s'applique pas à cette vue.* Signalé, pas contourné.
+- **Le panneau de décision** exigé par `MODULE-SSH.md:159` **existe déjà** (K2) : nommer les
+  machines, annoncer la révocation, naître `disabled`. Rien à ajouter.
+
+### ⚠ UN DÉFAUT MESURÉ EN CHEMIN, NON CORRIGÉ
+
+`ClesSshController:52` lit `user_id`, **une clé que rien ne pose en session** —
+`SecondFacteurController:289` pose `utilisateur_id`, lue par 27 autres endroits. `$idCompte`
+vaut donc **toujours 0**, et `machinesVisibles(0, 1)` ne rend aucune machine à un rôle 1.
+`MisesAJourController:33` et `SupervisionController:285` sont dans le même cas. *Le corriger
+change ce qu'un rôle 1 VOIT : geste à part, avec sa propre mesure.*
+
+### Et un docbloc qui annonçait une faille COMBLÉE
+
+`ClesSshController:18` affirmait que `POST /deploy` n'a « ni rôle ni permission ». Mesuré :
+`@require_api_key`, `@require_role(2)`, `@require_machine_access` depuis E-191. *Un docbloc qui
+annonce un trou refermé envoie refaire le travail — ou, pire, écrire une garde de rattrapage
+qui double celle qui existe.* Corrigé avec sa remesure datée.
+
+    suite entiere   406 tests · 1412 assertions · 1 echec
+                    le rouge est l'instantane des appelants JS, pour `bashrc.js` et
+                    `fail2ban.js` — deux fichiers d'une AUTRE session. Non rafraichi
+                    ici : le faire masquerait leur signal.
+
+## [2.0.303] - 2026-09-08
+
+### Securite - E-462 : `APP_URL` n'etait declaree NULLE PART, donc gardee par rien
+
+**Le defaut.** `APP_URL` compose le lien de reinitialisation de mot de passe que
+le portage envoie **par courriel, avec un jeton**. C'est la **seule** variable de
+la configuration qui fabrique une URL destinee a **quitter la machine**.
+
+**Elle ne vivait que dans `laravel/.env`, ignore par git** (`laravel/.gitignore:3`)
+— donc :
+
+    APP_URL dans srv-docker.env.example   0
+    APP_URL dans srv-docker.env           0
+    laravel/.env                          hors de l'arbre
+
+**Aucune garde fondee sur l'arbre ne POUVAIT la lire**, et `env-merge.sh` ne la
+propageait pas. *Trois inversions de port ont ete rattrapees dans l'arbre ces
+jours-ci ; celle-ci a survecu parce qu'elle etait invisible aux instruments, pas
+parce qu'elle etait plus difficile.*
+
+**Ce que ce commit repare : l'ABSENCE DE GARDIEN.** `APP_URL` est desormais
+declaree dans `srv-docker.env.example`, donc propagee par `env-merge` et
+**lisible par une garde de l'arbre**.
+
+### ⚠ Ce n'est PAS une simple declaration — precedence MESUREE
+
+    docker exec -e APP_URL=https://EPREUVE.invalid:9999 rootwarden_laravel       php artisan tinker --execute='echo config("app.url");'
+      -> https://EPREUVE.invalid:9999          <- l'injection l'emporte
+    TEMOIN, sans injection
+      -> http://192.168.0.245:8444             <- la valeur de laravel/.env
+
+**L'environnement du conteneur l'emporte sur `laravel/.env`** (le service porte
+`env_file: - srv-docker.env`). **Renseigner cette ligne CORRIGE donc la valeur en
+service**, a la recreation du conteneur. *Ecrit ici parce qu'un correctif qui
+change un etat d'exploitation par un chemin que personne n'a choisi doit
+s'annoncer.*
+
+### ⚠ Valeur DERIVEE, pas assignee
+
+    APP_URL=https://${SERVER_NAME}:${LARAVEL_HTTPS_PORT}
+
+**Ma premiere redaction codait `192.168.0.245:8443` en dur.** *C'est un fichier
+d'EXEMPLE que les deploiements copient : une IP en dur y est fausse partout
+ailleurs qu'ici, et se perime au premier changement de port — le defaut meme
+qu'on repare.* La forme `\${VAR}` a un precedent dans ce fichier
+(`LARAVEL_URL`), donc `env-merge` la traite deja.
+
+### ⚠ Le sens de `8444` s'est INVERSE le 2026-09-06
+
+L'echange de ports a donne `8080/8443` au portage et `8444/8446` au legacy.
+**Avant cette date, `:8444` designait le PORTAGE ; depuis, il designe le
+LEGACY.** *La valeur de `laravel/.env` etait juste a l'ecriture et son sens s'est
+inverse sous elle, sans que rien ne la touche.* **Dater avant d'interpreter une
+trace de `8444`** — l'avertissement est inscrit dans le fichier d'exemple.
+
+### Ce qui n'est PAS fait ici
+
+**La valeur en service** (`laravel/.env`) reste a l'exploitante : le fichier est
+hors de l'arbre, root dans le conteneur, et c'est l'etat d'exploitation d'un
+service vivant. **L'extension de `ports-des-deux-portails.mjs` a `APP_URL`**
+appartient a la session qui tient `laravel/tests/` — et elle devient POSSIBLE
+seulement maintenant, la variable etant enfin dans l'arbre.
+
+⛔ **Aucun formulaire soumis.** Soumettre `/mot-de-passe-oublie` enverrait un
+courriel reel a une personne reelle. Tout est mesure par `artisan tinker` et par
+lecture.
+
+---
+
+## [2.0.279] - 2026-09-08
+
+### Correction - E-461 : deux routes lisaient des FRAGMENTS comme des LIGNES
+
+**Cause commune.** `execute_as_root_stream` fait `stdout.channel.recv(4096)` et
+cede le texte tel quel (`ssh_utils.py:693-698`) : **il rend des fragments, pas
+des lignes.** Deux routes materialisaient ce flux dans une variable nommee
+`output_lines` — **un nom qui AFFIRMAIT la propriete que le generateur ne
+fournit pas, et c'est ce nom qui a fait tenir les deux defauts.**
+
+**① `POST /iptables-validate` — un jeu de regles VALIDE declare invalide**
+
+`EXIT_CODE=0` fait 12 octets. A cheval sur une frontiere de 4096, **aucun
+fragment ne le contient** : le `any(...)` rendait `False` et la route repondait
+« Erreur de syntaxe » sur des regles correctes. *Et le `'
+'.join` aggravait le
+cas — il inserait un saut de ligne au milieu du marqueur, donc meme la chaine
+recollee ne le portait plus.*
+
+Corrige : recoller les fragments (`''.join`) **puis** decouper en lignes, et
+comparer la **derniere** ligne `EXIT_CODE=` **en entier**. *Chercher la
+sous-chaine n'importe ou accepterait un `EXIT_CODE=0` present dans un message
+d'erreur d'`iptables-restore`, lequel peut citer une ligne des regles fournies
+par l'appelant.*
+
+**② `POST /pending_packages` — la liste des mises a jour SOUS-RAPPORTAIT**
+
+La boucle parsait chaque element comme une ligne de paquet
+(`nom/source version arch`). Applique a un fragment qui en contient des
+dizaines, `split('/')` ne rend que le **premier** nom et colle tout le reste.
+
+    mesure : 3 paquets disponibles dans un seul fragment -> 1 rapporte
+             et AUCUN message
+
+**Un exploitant lisant cette page croyait qu'un paquet attendait une mise a jour
+quand trois en attendaient — dont, le cas echeant, des correctifs de securite.**
+*C'est le defaut le plus silencieux des deux : le premier refuse a tort et se
+voit, le second sous-rapporte et se lit comme une bonne nouvelle.*
+
+### Mesure — logique EXTRAITE des fichiers, pas retapee
+
+    fragment unique, marqueur entier      -> 0   (attendu 0)
+    marqueur A CHEVAL sur 2 fragments     -> 0   (attendu 0)   <- le defaut
+    TEMOIN echec reel                     -> 1   (attendu 1)
+    TEMOIN injection dans un message      -> 1   (attendu 1)   <- pas de faux valide
+    3 paquets dans UN fragment            -> 3   (valait 1)
+
+### Ce qui n'est PAS touche
+
+Les onze autres appels a `execute_as_root_stream` (`supervision.py`,
+`updates.py:295/363/907`) emploient `yield from` et lisent la **valeur de
+retour** du generateur, pas ses fragments : ils ne portent pas ce defaut.
+**Balaye, pas suppose.**
+
+**Notes d'exploitation.** `backend/**.py` est lu au demarrage : **inerte jusqu'a
+la recreation du conteneur.**
+
+**Tests.** Import reel des deux modules, **683 passed, 5 skipped, 2 xfailed,
+0 FAILED**.
+
+---
+
+## [2.0.233] - 2026-09-07
+
+### Securite - E-460 : `GEOIP_ENABLED`, le seul effet sortant sans interrupteur
+
+**Symptome.** `fail2ban_manager.geoip_lookup` interroge `ip-api.com` **en HTTP
+CLAIR** (`:397` — le tier gratuit n'autorise pas TLS, le code le dit et
+l'assume). **Neuf autres effets sortants ont deja leur drapeau** — APPROVAL,
+CHATOPS, CVE_ENRICH, NVD_ENRICHMENT, TICKETING, MAIL, WAZUH, WEBHOOK, BACKUP —
+**celui-la n'en avait pas.** Pour un outil auto-heberge en environnement clos,
+« aucun trafic sortant » n'etait donc pas exprimable sur ce geste, sauf a ne pas
+s'en servir. *Ce n'est pas un standard importe : c'est la convention du depot,
+appliquee neuf fois et manquante une.*
+
+**Correctif, quatre fichiers.**
+
+- `config.py` — `GEOIP_ENABLED = os.getenv('GEOIP_ENABLED', 'true').lower() == 'true'`
+- `fail2ban_manager.py` — la garde, **apres** le controle d'adresse privee
+- `routes/settings.py` — expose `geoip_enabled` comme les neuf autres (13 reglages)
+- `srv-docker.env.example` — la variable, sans quoi personne ne la decouvre
+
+**⚠ Defaut `'true'` : ISO-COMPORTEMENT**, on ne change pas le produit sous les
+pieds de qui met a jour. *Contrairement a ce qu'annoncait la consigne, les
+defauts ne sont PAS tous `'true'`.* **Releve complet, tous fichiers du backend :**
+
+    'true'  (5)  WAZUH · GEOIP · NVD_ENRICHMENT · CVE_ENRICH · APPROVAL
+    'false' (4)  CHATOPS · TICKETING · MAIL · WEBHOOK
+
+**Ceux a `'false'` exigent une CONFIGURATION pour fonctionner** — sans reglage ils
+ne peuvent rien. **La geolocalisation marche sans reglage : `'true'` est donc
+l'iso pour celui-ci, pour cette raison et non par uniformite.**
+
+**⚠ Correction de cette entree (posee a 2.0.233, corrigee ici) : j'avais ecrit
+TROIS drapeaux a `'false'`. Il y en a QUATRE.** `WEBHOOK_ENABLED` vit dans
+`webhooks.py`, pas dans `config.py` — et ma sonde ne balayait que `config.py`.
+*Meme faute que deux commits plus tot, ou ma population etait « les routes du
+backend » alors qu'un `fetch` relatif vise Laravel : une MOITIE de la population,
+rapportee comme le tout.* **Et `routes/settings.py:99` porte
+`_depuis_module('webhooks', 'WEBHOOK_ENABLED', bool)` — je l'avais lu une
+commande plus tot, dans cette meme session.**
+
+**⚠ LE PLACEMENT DE LA GARDE N'EST PAS INDIFFERENT.** Elle vient **apres** le
+controle d'adresse privee, qui rend `Local`/`LO` **sans aucun trafic** : c'est
+une reponse EXACTE, pas un repli. Placee avant, elle dirait « desactive » pour
+une adresse locale — *on perdrait une information juste, sur le cas le plus
+frequent en reseau clos, et pour rien.*
+
+**⚠ CODE NEUF `'OFF'`, ET PAS `'??'`.** L'ecran traduit **par code**
+(`fail2ban.js:1111-1114` : `'LO'` -> `geo_locale`, `'??'` -> `geo_inconnu`,
+« le service n'a pas su repondre »). **Reutiliser `'??'` afficherait un reglage
+DELIBERE comme une panne du tiers** — quelqu'un chercherait un incident
+inexistant, ou rallumerait l'interrupteur en croyant reparer.
+
+### Mesure de la propriete — au reseau, avec temoin, et sans trafic reel
+
+Transport remplace : l'URL n'est jamais atteinte, **aucune requete ne part**.
+
+    garde-fou   8.8.8.8 franchit le controle d'adresse privee
+                -> la garde sera ATTEINTE
+    ETEINT      {'country':'Desactive','countryCode':'OFF'}   appels sortants : 0
+    ALLUME      {'country':'Testland','countryCode':'TL'}     appels sortants : 1  <- TEMOIN
+
+**⚠ Ma premiere mesure employait `203.0.113.9` (TEST-NET-3) comme adresse
+« publique ». Python la classe `is_reserved` : les deux passages sortaient par
+la branche `Local` AVANT d'atteindre la garde, et rendaient `0` appel des deux
+cotes.** *Le temoin positif a refuse la mesure — sans lui, je publiais un vert
+obtenu sans que la garde ait ete exercee une seule fois.* **Le garde-fou sur
+l'adresse est desormais dans la sonde.**
+
+### ⛔ La moitie portage n'est PAS livree ici, et c'est deliberé
+
+`fail2ban.js` (branche `'OFF'`) et `lang/{fr,en}/fail2ban.php` (cle
+`geo_desactivee`) appartiennent a la session qui tient ce perimetre. **Une
+branche `'OFF'` que le backend ne pourrait pas produire serait un ecran sans
+capacite** — et une session qui mesurerait « la desactivation est-elle geree ? »
+trouverait du code et conclurait que oui. *Le backend d'abord, l'ecran ensuite.*
+
+**Notes d'exploitation.** `backend/**.py` est lu au demarrage : **l'arbre est
+corrige, le service ne l'est pas** tant que le conteneur n'est pas recree.
+
+**Tests.** Import reel des trois modules, **672 passed, 5 skipped, 2 xfailed,
+0 FAILED**. Aucun appel reel a `ip-api.com`.
+
+---
+
+## [2.0.106] - 2026-09-07
+
+### `legacy/ssh/` est ARCHIVE — il ne reste qu'UNE page servie
+
+**K4 porte, donc le module s'eteint.** *Contrôle avant le `git mv`, geste par geste,
+avec témoin négatif :*
+
+```
+/preflight_check   3 sites EN CODE dans laravel/   PORTE
+                   ClesSshController:120 · DeploiementCles:75 · RoutesBackend:36
+/deploy            2 sites EN CODE dans laravel/   PORTE
+                   DeploiementCles:132 · RoutesBackend:36
+TEMOIN /zzz-temoin 0 site                          ABSENT — l'instrument discrimine
+```
+
+⚠ **`scripts/geste-porte.py` rend `ABSENT` sur `/deploy`, et c'est un artefact de
+DOMAINE.** *Il mesure « ce chemin de passerelle est-il appelé par le JS du portage » ;
+or K4 ne vise PAS la passerelle depuis le navigateur — `cles-ssh.js` poste sur
+`POST /cles-ssh/deployer`, une route du portage, qui appelle le preflight côté serveur
+et relaie ensuite depuis PHP (`DeploiementCles:132`).*
+
+> **Un instrument juste appliqué à un objet hors de son domaine rend un verdict sans
+> valeur — et celui-ci rendait un verdict FAVORABLE au refus d'archiver.** *Nommer
+> l'outil ne suffit pas : il faut nommer son domaine.*
+
+### ⛔ RECTIFICATION — `fd54c99` NE CONTIENT PAS ce que son message décrit
+
+*Inscrit ici parce qu'un message de commit faux ne se corrige pas en le réécrivant.*
+
+```
+fd54c99  ce que le message annonce   les 3 liens reecrits · le CHANGELOG · le controle
+         ce qu'il CONTIENT           2 fichiers, 0 insertion, 0 suppression
+                                     — les deux renommages, et RIEN d'autre
+```
+
+**La cause : `git add -A … legacy/ssh …` sur un chemin que le `git mv` venait de faire
+disparaître.** *`git` répond `fatal: le chemin … ne correspond à aucun fichier` **et abandonne
+l'add entier** — pas seulement le mauvais chemin.* **Et j'avais mis `2>/dev/null` dessus.**
+
+Le commit a réussi quand même : les renommages étaient déjà dans l'index, posés par
+`git mv`. **Un commit qui réussit avec un `add` qui a échoué est indiscernable d'un commit
+complet** — c'est `git status` qui le disait, avec un espace devant le `M`, et je ne l'ai
+pas lu.
+
+**Les trois liens réécrits ont finalement été commités dans `c236dd1`**, qui parle d'autre
+chose. *Ce jalon décrit donc un travail réparti sur deux commits dont aucun ne le dit
+correctement.*
+
+> **`2>/dev/null` sur une commande dont l'échec est ce qu'on doit détecter.** *Dixième fois
+> dans ce dépôt, et la première où il masque une faute d'ÉCRITURE et non de mesure : les
+> neuf autres rendaient un faux zéro, celui-ci a rendu un faux commit.*
+
+### Trois liens du socle réécrits AVANT le retrait, pas après
+
+*`MODULE-ARCHIVAGE-RESTANT.md:119` laissait deux voies : attendre K4, ou réécrire le
+lien au moment du `git mv`. K4 étant porté, les deux étaient ouvertes — j'ai fait les
+deux.*
+
+```
+menu.php:73    $sideLink('/ssh/', …)      -> LARAVEL_URL . '/cles-ssh'
+menu.php:234   <a href="/ssh/">           -> <a href="<?= LARAVEL_URL ?>/cles-ssh">
+head.php:208   raccourci clavier S        -> LARAVEL_URL . '/cles-ssh'
+```
+
+**L'idiome n'est pas de moi : il est employé 16 fois dans `menu.php`** pour les modules
+déjà portés (`mises-a-jour`, `services`, `supervision`, `docker`, `taches`,
+`maintenance`). *Copier une forme qui marche dans le même fichier vaut mieux
+qu'écrire la sienne.*
+
+**Sans cette réécriture, l'archivage aurait ajouté TROIS liens morts aux onze que le
+socle porte déjà** — et les liens morts du socle s'affichent sur *chaque* page legacy,
+puisque `menu.php` et `head.php` sont inclus partout.
+
+### ⚠ Ce que l'archivage EMPORTE, et que je nomme plutôt que de le corriger
+
+**Cinq suites E2E référencent `/ssh/` dans leur branche `CIBLE === 'legacy'`** :
+`go-page-ssh-flux`, `go-page-ssh-parc`, `go-page-ssh-preflight`, `go-sec-v1.23`,
+`go.mjs`. *Leur cible legacy n'existe plus ; leur cible `laravel` est intacte.* **C'est
+`tests/e2e/` — je le signale, je n'y touche pas.**
+
+### Le décompte
+
+```
+.php suivis sous legacy/     178
+  archives                    78   (+1 module : ssh/)
+  vifs                       100
+    catalogues lang           74
+    >>> LE NOMBRE QUI DECIDE  26   (etait 27)
+```
+
+**Et sur ces 26, UNE SEULE est une page servie : `legacy/iptables/index.php`.** *Les
+25 autres sont le socle, qui tombe d'un bloc derrière elle.*
+
+---
+
+## [2.0.105] - 2026-09-07
+
+### Iso-perimetre — `/bashrc/prerequisites` est PORTE (ma 3e dette, la derniere)
+
+*Le legacy offrait d'installer `figlet` quand il manquait. Le portage AFFICHAIT
+qu'il manque et n'offrait rien : il avait garde le signal et perdu le geste.*
+
+```
+/bashrc/prerequisites  ->  laravel/public/js/bashrc.js:262
+TEMOIN /bashrc/zzz-temoin   ABSENT
+mesure : scripts/geste-porte.py, l'outil calibre du depot
+i18n   : fr 92 = en 92, 0 cle orpheline de part et d'autre
+```
+
+**Le bouton est POSE DANS L'AVERTISSEMENT**, pas a cote. *Un bouton
+« installer figlet » visible en permanence serait offert 99 fois sur 100 a des
+machines qui l'ont deja. Il n'a de sens que dans l'etat que l'avertissement
+decrit, donc il vit dedans et disparait avec lui.*
+
+**ET C'EST LE RELEVE QUI LE FERME, JAMAIS LA REPONSE DE L'INSTALLATEUR.** *Le
+geste reussi rappelle `chargeComptes()`, qui relit `/bashrc/users` et sa cle
+`figlet_present`. « Installe » annonce par celui qui installe n'est pas une
+reussite verifiee — c'est une intention.*
+
+**Les 4 phrases composees par le JS voyagent par le blob du controleur.** *Sans
+ce voyage la confirmation s'ouvrirait VIDE, et un vide ne ressemble pas a un
+defaut de traduction : il ressemble a une fenetre de confirmation normale.*
+
+⛔ **Aucune suite n'exerce ce chemin** : il passe par le gestionnaire de paquets
+d'une machine reelle. Le chemin est ecrit, il n'est pas declenche.
+
+### ⚠ Le compteur de cibles etait MORT depuis qu'il existe — deux `annonce`
+
+*Trouve en ecrivant dans ce scope, pas en le relisant.*
+
+```
+bashrc.js:58   function annonce()                     <- le compteur
+bashrc.js:325  function annonce(cible, texte, echec)  <- les etats de geste
+             MEME scope (l'IIFE de :23 ne se referme qu'a la fin du fichier)
+```
+
+**Deux `function nom()` dans un meme scope ne se relaient pas selon la position
+de l'appel : la DERNIERE gagne partout, du premier caractere au dernier.** Donc
+`annonce()` de `:78` appelait la version a trois arguments avec
+`cible === undefined`, laquelle commence par `if (! cible) { return; }` ; et
+l'ecouteur de `:77` lui passait l'Event comme `cible`, posant `textContent` sur
+un objet Event.
+
+    compteur au chargement   jamais ecrit
+    compteur au `change`     jamais ecrit
+    erreur levee             aucune
+    trace                    aucune
+
+*La ligne restait telle que le gabarit l'avait rendue — c'est-a-dire plausible.*
+**La premiere capacite que l'en-tete de ce fichier declare — « le compteur
+s'ENONCE », le `0` et l'alerte quand une machine de production est cochee —
+etait donc morte, et le fichier lui-meme affirmait le contraire.**
+
+Mesure avec temoin positif :
+
+```
+AVEC collision (etat livre)     compteur=(jamais ecrit) | etat=EN COURS
+SANS collision (apres renommage) compteur=AUCUNE CIBLE   | etat=EN COURS
+```
+
+*La seconde ligne montre que l'instrument SAIT rendre un compteur ecrit : le
+« jamais ecrit » de la premiere n'est pas un artefact de la mesure.*
+
+Correctif entier : `annonce` de `:58` devient `enonceCompteur`. **Sonde passee
+sur les 35 fichiers JS du portage — c'etait la seule collision**, et la sonde
+mord encore sur un fichier ou l'on reforge la collision expres.
+
+> **Un `hidden` faux se voit ; une fonction qui rend la main sans rien faire ne
+> se voit pas.** *Ce defaut n'a pas ete trouve par relecture — il a ete trouve
+> parce que j'ecrivais un appel dans ce scope et que j'ai verifie QUELLE
+> declaration mon appel allait atteindre.*
+
+### ⚠ TROIS numeros de version, et aucun ne coincide
+
+*Constat de bord, non corrige dans ce jalon — l'arbitrage suit.*
+
+```
+pied de page (legacy/version.txt)   2.0.11    ecrit le 2026-09-05, 167 commits en arriere
+en-tete de ce journal               2.0.104   assigne a la main, jalon apres jalon
+scripts/version.sh (la regle)       2.0.178   epreuve verte, 9 proprietes sur 9
+```
+
+**`scripts/version.sh --ecrire` n'a AUCUN appelant** — ni `start.sh`, ni
+`maj.sh`, ni `docker-entrypoint.sh`, ni la CI. *L'instrument existe, son epreuve
+passe, la CI s'en sert pour etiqueter — et le fichier que le portail LIT n'est
+ecrit par personne.* La decision etait pourtant deja prise
+(`DECISIONS-DSI.md:12718`). **Une decision qui n'est cablee a rien est une
+intention**, et c'est ainsi qu'un numero derive redevient un numero assigne.
+
+---
+
+## [2.0.104] - 2026-09-07
+
+### Iso-perimetre — les deux gestes `fail2ban` par machine sont PORTES
+
+**Ma dette, et je la paie moi-meme.** *J'avais archive `legacy/fail2ban/` en
+acceptant la perte de ces deux gestes. L'exploitant a impose le portage a
+ISO-PERIMETRE : « perte acceptee » n'est plus une issue d'arbitrage.*
+
+```
+/fail2ban/install    26 l. backend   ->  fail2ban.js:1198
+/fail2ban/restart    24 l. backend   ->  fail2ban.js:1209
+TEMOIN /fail2ban/zzz-temoin              ABSENT
+mesure : scripts/geste-porte.py, l'outil calibre du depot
+```
+
+**EXCLUSION MUTUELLE, et elle vient du RELEVE** : « installer » ne s'affiche que
+si le service est absent, « redemarrer » que s'il est present. *Proposer
+d'installer ce qui est deja la serait offrir un echec, et un bouton qui echoue
+toujours au meme endroit apprend a l'operateur que les echecs sont normaux.*
+
+### ⚠ Trois choses que l'ecriture a corrigees d'elle-meme
+
+**① `releve()` n'existait pas.** *Mon premier jet l'appelait pour rafraichir
+l'etat apres le geste.* **Le bouton « relever » etait branche sur une fonction
+ANONYME** — extraite en `faitReleve()`, sans changement de comportement pour le
+clic. *L'etat affiche vient donc d'un releve, jamais de la reponse de celui qui
+vient d'agir : « installe » annonce par l'installateur n'est pas une reussite
+verifiee.*
+
+**② Le chemin est ecrit DANS chaque geste, deliberement.** *Mon premier jet
+passait par un helper commun recevant le chemin en argument. Le code marchait —
+et `geste-porte.py` rendait `ABSENT` pour les deux : il derive UN saut de
+helper, et il y en avait DEUX.*
+
+> **Un geste invisible a l'instrument du projet sera re-signale comme un trou
+> par la prochaine mesure.** *La lisibilite par l'instrument fait partie du
+> travail.*
+
+**③ L'encart « ce que cet onglet ne fait pas » est retire**, avec ses deux cles
+dans les DEUX catalogues. *Il annonçait ces gestes comme absents : vrai jusqu'a
+ce commit, faux depuis.* **Un encart qui annonce une absence comblee envoie
+l'operateur ailleurs pour un geste qui est sous ses yeux.**
+
+*Et les quatre cles de confirmation VOYAGENT dans le blob `$textes` du
+controleur — sans ce voyage le panneau s'ouvrirait VIDE, et un vide ne ressemble
+pas a un defaut de traduction.*
+
+```
+i18n   fr=200  en=200   jeux IDENTIQUES   ·   non_porte_* retirees des deux
+JS     node --check passe · toutes les fonctions appelees sont definies
+vue    @if 7 / @endif 7 · commentaires Blade equilibres 24/24
+```
+
+⛔ **AUCUN EXERCICE.** *`install` passe par le gestionnaire de paquets de la
+machine, `restart` interrompt le service. Aucune suite ne doit les declencher ;
+si un banc doit les toucher, c'est la machine d'essai et sur le mot de
+l'exploitant.*
+
+---
+
+## [2.0.103] - 2026-09-07
+
+### Extinction du legacy - bloc 5 : `security/` archive, et **S7b etait DEJA PORTE**
+
+**Le blocage que je portais depuis des jours n'existait pas.** *`S7b — le scan
+qui ABOUTIT` etait rangé comme « non porté, bloqué par une autorisation ».
+Mesuré :*
+
+```
+ScanCveController.php:164   'url_scan' => url('/api/gateway/cve_scan')
+public/js/scan-cve.js:488   async function lanceScan(mid)
+public/js/groupes.js:540    l'action groupee ENVOIE DE VRAIS COURRIELS, un par machine
+```
+
+> **Le portage l'atteint déjà, depuis DEUX écrans.** *Le blocage portait sur
+> l'EXERCER sur le banc, pas sur le porter — et les deux avaient été confondus.*
+
+### ⚠ MA LISTE DE GESTES ÉTAIT TRONQUÉE, et c'est ce qui cachait S7b
+
+*Le JS construit `` `${API_URL}/cve_${endpoint}` `` — une variable AU MILIEU du
+chemin.* **Mon extraction s'arrêtait au `${`.** *Résolu par ses sites d'appel :*
+
+```
+runScan(endpoint, ...)  appele 2 fois, les DEUX avec le litteral "scan"
+   ->  /cve_scan, et RIEN D'AUTRE
+   (confirme independamment a l'AST par la session 5f, 03f2e6e)
+```
+
+**NEUVIÈME instance de cette famille, et la première où le défaut portait sur le
+DOMAINE et non sur la mesure.** *Formulation de 5f, reprise : « une liste reçue
+ne porte pas sa propre complétude ».*
+
+### Le croisement des dix gestes — AUCUN n'est perdu
+
+```
+7 reimplementes en Laravel (forme 4, croises par TABLE)
+2 exceptions passerelle PAR DECISION   /tickets · /cve_reprioritize
+                                       toutes deux vers des services EXTERNES
+1 sans interface                       /cve_whitelist
+```
+
+### DÉCISION — `/cve_whitelist` : **PERTE ACCEPTÉE**
+
+| pour garder | contre |
+|---|---|
+| `reason`, `whitelisted_by`, `expires_at` — trois colonnes qui n'existent que pour rendre l'oubli impossible | **0 ligne en base** sur toute la vie du produit |
+| une liste blanche sans expiration est une dette | aucun écran nulle part, dans aucun des deux portails |
+
+> **Un garde-fou jamais employé ne protège de rien**, et laisser une capacité
+> *atteignable mais invisible* est la pire des trois voies. *(cadrage de 5f)*
+
+**Réversible** : *les trois routes backend existent toujours ; le jour où
+quelqu'un en a besoin, l'écran est un petit portage.* **Ce qui reste à faire est
+de les retirer de la portée du préfixe `/cve_` de la liste blanche** — sinon la
+capacité reste atteignable sans interface, ce qu'on vient de refuser.
+
+```
+controle 1  graphe d'inclusion                    0 appelant -> FEUILLE
+controle 2  liens VIVANTS du portage vers /security/  0
+controle 3  ecran de liste blanche CVE dans le portage  0
+            (les 2 vues qui disent « liste blanche » parlent de la PASSERELLE)
+controle 4  `security/js` en code   1 reference, depuis la page elle-meme
+
+au reseau, avant -> apres
+  /security/  302 -> 404    ·    /security/js/main.js  200 -> 404
+  TEMOIN vivant /auth/login.php  200 inchange
+  le PORTAGE    /scan-cve        302, repond
+```
+
+**24 fichiers legacy servis.** *Il ne reste que `iptables/` et `ssh/`, tous deux
+DÉCIDÉS À PORTER (`DOSSIER-40`, `DOSSIER-41`).*
+
+---
+
 ## [2.0.102] - 2026-09-07
 
 ### Extinction du legacy - bloc 4 : `bashrc/` archive, apres B4 et un arbitrage RENDU

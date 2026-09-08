@@ -1,0 +1,432 @@
+# DOSSIER-47 — Deux portes pour le même geste, une seule laisse une trace
+
+**Mesuré le 2026-09-07 entre 22:33 et 22:40 (hôte, CEST).** Branche `Migration-Laravel`.
+Signalé par la session sécurité comme *« un défaut de TRACE du portage ACTUEL, qui ne
+demande ni I5, ni l'extinction, ni le port SSH »*. Vérifié ici avant d'être tranché.
+
+---
+
+## 1. Le fait
+
+`backend/routes/iptables.py` porte **deux routes qui appliquent des règles de pare-feu sur
+une machine**, avec le même effet distant et les mêmes gardes. **Une seule archive.**
+
+```
+A   POST /iptables         action="apply"   :29   apply_iptables_rules(...)          RIEN
+B   POST /iptables-apply   action="apply"   :90   INSERT INTO iptables_history (:148)
+                                                  puis apply_iptables_rules(...)
+```
+
+Les gardes sont **identiques, à la ligne près** :
+
+```
+@require_api_key · @require_permission('can_manage_iptables') · @require_machine_access
+@threaded_route
+```
+
+**Rien, vu du dehors, ne distingue les deux portes.** Même verbe dans le corps, même
+permission, même effet sur la machine. *La seule différence est que l'une inscrit
+l'état précédent dans `iptables_history` et l'autre non.*
+
+## 2. Ce que la trace manquante coûte, précisément
+
+Ce n'est pas seulement « on ne sait pas qui a fait quoi ». **C'est que l'archive devient
+non contiguë**, et rien ne le dit :
+
+```
+etat 0  --A-->  etat 1        A n'archive pas : l'etat 0 est PERDU
+etat 1  --B-->  etat 2        B archive l'etat 1
+
+/iptables-rollback depuis l'etat 2  ->  restaure l'etat 1
+                                        et NON l'etat 0, qui n'existe plus nulle part
+```
+
+**L'opérateur qui déroule l'historique croit remonter le fil des changements. Il remonte
+le fil des changements *tracés*.** *Une archive avec un trou est plus dangereuse qu'une
+archive absente : l'absence se voit, le trou se lit comme une continuité.*
+
+Et `/iptables-rollback` **applique** ce qu'il restaure. Le trou n'est donc pas
+documentaire : il est actionnable.
+
+## 3. ⚠ MAIS LE DÉFAUT EST DORMANT, et c'est ce qui décide de sa forme
+
+**Personne n'emprunte la porte A.** Balayage complet des fichiers suivis, hors documentation
+et hors le fichier de routes lui-même :
+
+```
+sites posant `action: "apply"`                    3
+  legacy/iptables/js/main.js:139     -> vers /iptables-apply  (:135), donc la porte B
+  PareFeuController.php:25           -> une PROSE de docbloc
+  tests/e2e/go-page-pare-feu.mjs:145 -> une PROSE de commentaire
+
+appels a POST /iptables dans le portage           1
+  pare-feu.js:307   appelle('/iptables', { action: 'get' })   <- LECTURE seulement
+```
+
+**Aucun client, legacy ou portage, n'envoie `action="apply"` vers `/iptables`.** Le legacy
+lui-même, qui a écrit les deux routes, n'utilise que celle qui archive.
+
+> **C'est un élargissement DORMANT : zéro appelant aujourd'hui, effectif au premier qui
+> l'emprunte.** *La même forme que l'octroi de permission sans compte concerné — la
+> mesure d'usage rend zéro, et le zéro ne dit rien de ce que le code permet.*
+
+**Elle est atteignable.** `RoutesBackend.php:114` porte `'/iptables', '/iptables-'`, et
+`:446` compare par `str_starts_with` : la passerelle du portage relaie donc `/iptables`
+comme le reste. Une requête forgée par un porteur de `can_manage_iptables` ayant l'accès à
+la machine passe les deux gardes — **et ce sont exactement les mêmes gardes que la porte
+qui trace.**
+
+## 4. L'arbitrage que je rends
+
+*Question produit : `POST /iptables` doit-il conserver un verbe `apply` en v2.0 ?*
+
+### ⛔ Ce que je NE retiens pas : supprimer le verbe
+
+C'est la garde par construction — un verbe qui n'existe pas ne s'appelle pas — et j'ai
+d'abord penché pour elle. **Elle est mauvaise ici, pour une raison mesurable :**
+
+```
+laravel/app/Services/ClesApi.php:60   'iptables' => ['^/iptables']
+```
+
+**Les clés d'API portent une portée par module, et celle d'`iptables` est un préfixe.**
+Un détenteur de clé externe peut donc appeler `POST /iptables` aujourd'hui, légitimement.
+*Retirer le verbe casserait un consommateur que je ne peux pas énumérer* — le backend
+survit à la migration, et sa surface n'est pas un objet de portage.
+
+> **« Le legacy l'expose déjà » ne fonde aucun choix de portage — mais « le backend
+> l'expose aujourd'hui » fonde une obligation de compatibilité.** *Ce ne sont pas les
+> mêmes objets : le legacy meurt, le backend reste.*
+
+### ⚠ AMENDEMENT 22:50 — ma prémisse était vraie et trop forte, et un second garde la borne
+
+*Vérifié par la session sécurité, qui a cherché à se contredire.* **« Les clés d'API ont une
+portée à préfixe sur `^/iptables` » se relit trop facilement en « une clé d'API peut
+appliquer des règles ». Ce n'est pas vrai.**
+
+```
+get_current_user()   lit X-User-ID, puis RECHARGE role_id EN BASE
+                     echoue en FERMETURE : en-tete absent · compte inactif
+                     · base injoignable  ->  (0, 0)
+=> require_permission('can_manage_iptables') refuse : 403
+```
+
+**La portée de clé est un SECOND filtre trop large, pas un chemin indépendant.** *Il faut
+encore fournir un `X-User-ID` nommant un compte ACTIF porteur de la permission.* Le
+docblock de la fonction documente la faille qui a produit cette conception : le backend
+lisait `X-User-Role` **en en-tête**, et tout porteur de clé pouvait forger `role=3`.
+Refermé.
+
+**Mon arbitrage ne bouge pas** — converger plutôt que retirer reste juste, et pour la même
+raison : *un consommateur légitime, porteur d'une clé ET d'un compte habilité, appelle
+`POST /iptables` aujourd'hui sans que je puisse l'énumérer.*
+
+### ⚠ Et une exception de convention, que la vérification a mise au jour
+
+```
+portees de type espace-de-noms, toutes terminees par un SEPARATEUR :
+  ^/fail2ban/  ^/services/  ^/ssh-audit/  ^/supervision/  ^/bashrc/
+  ^/graylog/   ^/wazuh/     ^/admin/      ^/cve_  ^/apt_  ^/schedule_  ^/server_user_
+l'exception :
+  ^/iptables        ni `$`, ni separateur — couvre les SEPT routes du module
+```
+
+**La convention est suivie douze fois et manquante sur le seul module qui contient un geste
+capable de couper RootWarden d'une machine définitivement.**
+
+*Ce n'est pas une faille — le second garde tient. C'est une portée qui **ne sait pas dire
+« lecture seule »** là où ça vaudrait le plus la peine : une clé destinée à lire le
+pare-feu porte aussi `apply`, `restore` et `rollback` dans sa portée, alors que la
+granularité existe douze fois ailleurs dans la même table.*
+
+> **Même classe que l'interrupteur `*_ENABLED` manquant sur la géolocalisation : le
+> mécanisme existe dans le dépôt, et il manque à l'endroit qui compte.** *Une convention
+> tenue partout sauf au point sensible n'est pas une convention — c'est une habitude.*
+
+### ✅ CE QUE JE RETIENS : faire converger les deux portes
+
+**`action="apply"` sur `/iptables` doit archiver, en DÉLÉGUANT au chemin de
+`/iptables-apply` — pas en recopiant son bloc.**
+
+| | |
+|---|---|
+| capacité | **inchangée** — aucun consommateur ne casse |
+| trace | **acquise** — l'archive redevient contiguë |
+| forme | **délégation**, jamais duplication |
+
+*Le second point n'est pas un détail de style : ce dépôt a payé **trois copies** du garde
+SSRF et **trois** compteurs 2FA. Une deuxième copie du bloc d'archivage divergerait, et
+elle divergerait silencieusement — les deux portes continueraient de « marcher ».*
+
+**Corollaire, à écrire dans le code et pas seulement ici :** si les deux portes doivent
+rester, **la duplication du verbe est le défaut**, pas la trace manquante. Le remède
+durable est qu'il n'existe qu'**un seul** chemin d'application, que les deux routes
+appellent. *La trace manquante était le symptôme ; deux implémentations du même geste
+irréversible est la cause.*
+
+## 5. Ce qui n'est pas de moi
+
+**L'écriture.** `backend/routes/iptables.py` est du code de service, hors de mon périmètre
+d'écriture (`docs/migration/DECISIONS-DSI.md` et `DOSSIER-*.md`). *La session sécurité me
+l'a signalé et le tient ; je rends la décision, elle rend le code.*
+
+⛔ **Et rien de ceci n'autorise à exercer quoi que ce soit.** *Aucune règle appliquée,
+aucune machine jointe, aucune requête émise vers `/iptables` ni `/iptables-apply` pendant
+cette mesure.* Le relevé est entièrement statique.
+
+## 6. Ce que ce dossier a failli être
+
+**Ma première formulation était « `action:"apply"` applique sans archiver, donc il faut le
+retirer ».** Deux mesures l'ont retournée, dans les deux sens :
+
+```
+« il faut le retirer »      -> ClesApi.php:60 : une cle d'API peut l'appeler.
+                               Le retrait casse un consommateur non enumerable.
+« c'est un trou beant »     -> 0 appelant, mesure avec temoin.
+                               C'est un elargissement DORMANT, pas une fuite.
+```
+
+**Les deux corrections vont dans des directions opposées, et elles se seraient annulées si
+je n'avais mesuré qu'une seule.** *Mesurer l'exposition sans mesurer l'usage donne une
+alarme ; mesurer l'usage sans mesurer l'exposition donne un dédouanement. Il fallait les
+deux pour que le remède — converger plutôt que retirer — devienne visible.*
+
+---
+
+**Voir aussi** DOSSIER-40 (les quatre gestes `iptables`, et `/iptables-logs` qui ne se
+porte pas) · `E-463` (l'arbitrage I5, rendu par l'exploitant, Q1–Q4 obligatoires) ·
+`SPEC-MESURE-Q2-REFUS-AVANT-ENVOI.md` (Q2 est un garde d'INTERFACE, pas une impossibilité).
+
+---
+
+# ⚠ ADDENDUM 23:50 — ELLES SONT QUATRE, ET DEUX RESTENT SANS TRACE
+
+**La convergence est faite** (`be5a30ef`) : `_archive_puis_applique()` porte le bloc, il n'a
+pas été recopié, et il ne reste qu'**un** `INSERT INTO iptables_history` dans le fichier.
+Vérifié.
+
+**Mais mon dossier ne parlait que de deux portes. Il y en a quatre.**
+
+```
+/iptables            :132   ✅ archive
+/iptables-apply      :192   ✅ archive
+/iptables-restore    :224   ⛔ APPLIQUE SANS ARCHIVER
+/iptables-rollback   :284   ⛔ APPLIQUE SANS ARCHIVER
+```
+
+*J'ai mesuré les deux routes qui portaient le même verbe `apply` et j'ai cru avoir mesuré
+les chemins d'application.* **`restore` et `rollback` appliquent aussi — par d'autres verbes,
+donc mon motif ne les a pas vues.** C'est la forme que je corrige chez les autres depuis
+deux jours : *le grain de la mesure doit égaler la question.* La question était « quels
+chemins appliquent », pas « quelles routes portent `action=apply` ».
+
+## ✅ L'ARBITRAGE : les quatre archivent, par le MÊME chemin
+
+**Et `rollback` est le cas qui décide, parce qu'il se présente comme réversible.**
+
+```
+etat courant  --rollback--> etat archive N
+              l'etat courant n'est conserve NULLE PART
+=> on peut revenir en arriere, jamais revenir EN AVANT
+```
+
+> **Une porte à sens unique habillée en porte réversible est pire qu'une porte à sens
+> unique** — l'opérateur clique parce que le nom promet qu'il pourra défaire.
+
+*L'iso-périmètre ne l'exige pas : le legacy n'archive pas davantage sur ces deux chemins.*
+**Mais la règle de l'exploitant dit « ou debug », et c'en est un** : la capacité annonce une
+réversibilité qu'elle n'a pas. Ce n'est pas une fonctionnalité manquante, c'est une promesse
+fausse.
+
+⚠ **Contrainte de conception, à écrire avec le geste :** l'archive doit enregistrer l'état
+**QUITTÉ**, jamais l'état restauré. *Enregistrer l'état restauré dupliquerait une entrée déjà
+présente et rendrait la chaîne illisible — on ne saurait plus distinguer « voici où j'étais »
+de « voici où je vais ».*
+
+## ⚠ ET LE FAIT LE PLUS INSTRUCTIF DU LOT N'EST PAS L'ARCHIVE
+
+**Le premier jet du refactor levait `NameError` sur LES DEUX portes. La suite est restée
+entièrement verte — 672 tests.**
+
+```
+seize tests couvrent `iptables`   les gardes · les parametres absents
+le chemin nominal `apply` avec des regles valides   JOUE PAR PERSONNE
+```
+
+> **Une suite qui couvre les gardes et les paramètres absents peut être verte sur une route
+> dont le chemin nominal ne s'exécute pas.**
+
+**C'est exactement la forme du défaut `user_id` de ce soir** — invisible au rôle 2 parce que
+la jointure est sautée au-dessus. *Dans les deux cas la couverture ne manquait pas : elle
+regardait ailleurs.* **Et dans les deux cas, ce qui manquait était le cas le plus banal.**
+
+## ⛔ Ce qui reste dû
+
+**Les trois tests écrits avec ce lot sont une vérification d'AUTEUR, pas une certification.**
+*La règle de flotte vaut contre son auteur comme contre tout le monde : qui écrit un
+correctif ne certifie pas qu'il est là.* Une attestation indépendante reste due sur
+`be5a30ef`.
+
+**Et le service exécute encore l'ancien code** : `pytest` lit le disque, donc les 675 verts
+portent sur le fichier. La recréation appartient à l'exploitant.
+
+---
+
+# ⛔ ADDENDUM 2 — L'ÉCHEC D'ARCHIVAGE EST INVISIBLE, ET C'EST LE DÉFAUT QUE CE DOSSIER FERMAIT
+
+**Trouvé par l'attestation indépendante** (`71ba8a7a`), sur du code que son auteur n'avait
+pas écrit. *Les quatre propriétés que j'avais demandées tiennent ; c'est un cinquième point,
+que je n'avais pas su demander.*
+
+```
+except Exception as hist_err:
+    logger.warning("Iptables history save failed: %s", hist_err)
+apply_iptables_rules(...)
+return jsonify({"success": True, "message": message})     <- :139
+```
+
+**Base injoignable → l'archivage échoue → l'application A LIEU → la réponse est octet pour
+octet celle du succès.** Aucun champ ne la distingue, et aucun test n'exerce ce chemin.
+
+> **C'est exactement le trou que ce correctif existait pour supprimer**, recréé par un hoquet
+> de la base. *Mon propre docblock : « une archive avec un trou est plus dangereuse qu'une
+> archive absente : l'absence se voit, le trou se lit comme une continuité. »* **Le chemin
+> d'exception en fabrique un, en silence.**
+
+⚠ **Et c'est sur `rollback` que ça coûte le plus — la route dont TOUT l'argument est la
+réversibilité.** *Un rollback dont l'archivage a échoué redevient une porte à sens unique, et
+l'écran annonce « Règles restaurées ».*
+
+## ✅ ARBITRAGE : SIGNALER, JAMAIS BLOQUER
+
+**Ne pas bloquer l'application est le bon choix, et il n'est pas un compromis :**
+
+*L'archive sert la TRAÇABILITÉ ; l'application sert la DISPONIBILITÉ.* **Rendre un pare-feu
+inmodifiable parce qu'une table de journal est injoignable ferait de la garde la chose qui
+empêche de se rétablir.** *Et sur `rollback`, bloquer enfermerait l'opérateur dans l'état
+cassé qu'il cherche précisément à quitter — le remède serait pire que le mal qu'il traite.*
+
+**Mais que l'appelant ne puisse pas le SAVOIR n'est défendable en rien.**
+
+```
+la reponse porte `archive: false` quand l'archivage a echoue
+l'ecran le DIT — pas dans un journal, dans la reponse au geste
+```
+
+*C'est un champ, pas une refonte.* **Et il doit être lu côté portage : un `archive: false`
+qu'aucun écran n'affiche laisse le défaut entier.**
+
+## ✅ ARBITRAGE : rendre le second angle mort INEXPRIMABLE
+
+**Le contrôle de vacuité vit SOUS le `if rules_v4 is None`.** Un appelant passant
+`rules_v4=''` explicitement l'évite, et applique un jeu vide — ce qui viderait le pare-feu.
+
+```
+/iptables-restore   :262   controle avant de deleguer   ✔
+/iptables-rollback  :350   controle avant de deleguer   ✔
+=> DORMANT aujourd'hui
+```
+
+**Sûr par CONVENTION, pas par construction — la forme exacte de `dest_path` en SEC-015 :
+une cinquième porte ne serait forcée par rien.** *Un `if not (rules_v4 or '').strip():
+return 400` en TÊTE du délégué, hors du `if`, le rend inexprimable.*
+
+> **Deux gardes en amont valent moins qu'une garde en aval, parce qu'il faut les répéter et
+> qu'on ne répète pas ce qu'on ne voit pas.**
+
+## Ce que l'attestation a établi et que je n'avais pas su demander
+
+**Mes quatre propriétés portaient sur ce que le code FAIT quand tout va bien.** *Aucune ne
+demandait ce qu'il DIT quand une partie échoue.* **Le cinquième point est de la session qui
+a attesté, et il vaut les quatre autres réunis.**
+
+⚠ **Et son attestation est STATIQUE, elle le déclare** : elle atteste que le code **sur le
+disque** porte les quatre propriétés. *Qu'aucune lecture ne peut attester : que le service
+les exécute.* **Le process backend a démarré à 14:53 ; ces commits sont de 23:44 et après.**
+
+---
+
+# ⛔ ADDENDUM 3 — LA MOITIÉ ÉCRAN N'A PAS D'OBJET, ET LE MOTIF EST PIRE QUE PRÉVU
+
+**J'avais demandé au portage d'afficher `archive: false`. Le portage ne reçoit jamais cette
+réponse.** *Refus mesuré, et il est juste :*
+
+```
+pare-feu.js, tous les sites d'appel :
+  :307  /iptables action=get      LECTURE
+  :710  /iptables-validate        essai a blanc
+  :395 :475 :548                  trois routes DU PORTAGE
+TEMOIN  -apply · -restore · -rollback  ABSENTS du portage · /zzz-temoin ABSENT
+```
+
+**Les quatre routes qui appliquent ne sont appelées que par le legacy.** *Ce n'est pas un
+oubli d'affichage : c'est un geste qui n'est pas porté.* **J'ai assigné du travail sans
+mesurer qu'il avait un objet — la faute d'`E-464`, refaite.**
+
+## ⚠ Et la prémisse du refus est fausse, dans le sens qui aggrave
+
+*L'argument avancé était : « I5 est en cours d'écriture, ce code serait jeté dans les heures
+qui viennent ».* **Mesuré :**
+
+```
+derniers commits touchant `pare-feu` : 5, tous de Q2, tous a moi
+/iptables-apply · -restore · -rollback cote portage : ABSENTS
+```
+
+**I5 n'est pas en cours d'écriture. Il est bloqué sur l'arbitrage du port SSH.** *La fenêtre
+n'est donc pas « quelques heures » : elle est ouverte sans terme.*
+
+## ✅ L'ARBITRAGE : ne PAS réparer le legacy — et le motif n'est pas celui qu'on croit
+
+**Ce n'est pas « il meurt bientôt » : il ne meurt pas bientôt.** C'est ceci :
+
+```
+legacy/iptables/js/main.js  ·  12 appels a showNotification
+la cible `#notifications`   ·  0 occurrence dans les QUATRE fichiers servis
+                               (iptables/index.php · head.php · menu.php · footer.php)
+=> les 12 appels levent une TypeError, `catch` compris
+```
+
+> **L'écran legacy ne dit NI le succès, NI l'erreur, NI la trace manquante. Il ne dit rien
+> déjà.** *Y brancher `archive: false` demanderait d'abord de réparer `showNotification` —
+> c'est-à-dire de réparer correctement un module condamné, pour rendre lisible un geste
+> irréversible sur une page que personne ne devrait employer pour ça.*
+
+**Le remède serait plus gros que la fenêtre qu'il couvre, et il laisserait le vrai défaut
+intact.**
+
+## ⛔ CE QUE ÇA REND À L'EXPLOITANT, ET C'EST L'ARGUMENT QUE JE N'AVAIS PAS FORMULÉ
+
+**Aujourd'hui, la seule interface qui applique des règles de pare-feu est une page qui ne
+rend aucun compte.** *Elle est atteignable : `menu.php:83` et le raccourci clavier de
+`head.php:209` l'offrent depuis n'importe quelle page legacy.*
+
+```
+appliquer des regles   ->  l'ecran ne dit rien
+l'archivage echoue     ->  l'ecran ne dit rien
+la commande echoue     ->  l'ecran ne dit rien
+```
+
+> **L'argument pour I5 n'est pas l'archive : c'est que l'interface actuelle est MUETTE sur
+> un geste qui peut couper l'accès à une machine.** *Q3 — « tout retour produit un message
+> visible » — n'était pas une exigence de confort dans le cahier des charges. C'était la
+> réparation du défaut principal, et je l'avais rangée troisième.*
+
+## Les cinq critères pour I5, à reprendre tels quels
+
+*Écrits par la session qui a refusé, mes deux exigences comprises. Ce sont des propriétés,
+pas une implémentation.*
+
+```
+A1  le champ se voit QUAND LE GESTE REUSSIT — succes, ecran vert, trace manquante.
+    Un avertissement replie, un badge d'onglet, un console.warn ne satisfont pas A1.
+A2  les deux motifs se disent DIFFEREMMENT — `etat_precedent_vide` est une
+    information, `echec_archivage` un incident, et les reactions sont opposees.
+A3  le message dit CE QUI MANQUE : « l'etat que vous venez de quitter n'est plus
+    archive — un retour en avant n'est plus possible ».
+A4  la mesure ne depend pas du service : construire les trois reponses soi-meme.
+    Un test qui exige un service redemarre n'est pas un test, c'est une attente.
+A5  TEMOIN POSITIF EN PREMIER : sans lui, « le message ne s'affiche pas » et
+    « l'ecran ne sait pas l'afficher » sont la meme sortie.
+```
+

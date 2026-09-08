@@ -75,6 +75,12 @@ class TableDesGardes
             ['POST', 'cles-api', ['role:3', 'perm:can_manage_api_keys']],
             ['POST', 'cles-api/{id}/revoquer', ['role:3', 'perm:can_manage_api_keys']],
             ['GET', 'cles-ssh', ['role:1', 'perm:can_deploy_keys']],
+            /*
+             * K4 — LE DECLENCHEMENT (2026-09-07). `role:2` ET NON `role:1` comme
+             * la page : le backend pose `@require_role(2)` sur `/deploy` depuis
+             * E-191. Offrir le declencheur au role 1 produirait un 403 systematique.
+             */
+            ['POST', 'cles-ssh/deployer', ['role:2', 'perm:can_deploy_keys']],
             ['GET', 'comptes', ['role:2', 'perm:can_admin_portal']],
             ['POST', 'comptes', ['role:2', 'perm:can_admin_portal']],
             ['GET', 'comptes-distants', ['role:2', 'perm:can_manage_remote_users']],
@@ -116,6 +122,11 @@ class TableDesGardes
             // lecture : l'identifiant voyage dans le CORPS, pas dans l'URL ni dans
             // les journaux d'acces. Le controle porte sur l'objet RESOLU.
             ['POST', 'pare-feu/historique', ['role:1', 'perm:can_manage_iptables']],
+            // I6 — le retour arriere, declare par 63caeb24. Meme garde que la page et
+            // que ses voisines. `POST` malgre la lecture : `version_id` voyage dans le
+            // CORPS. L'acces est verifie sur l'objet RESOLU, et le `WHERE` porte les
+            // DEUX identifiants — une version d'une autre machine rend `null`.
+            ['POST', 'pare-feu/version', ['role:1', 'perm:can_manage_iptables']],
             // Fermer une session ACTIVE : l'objet est une session de l'utilisateur
             // lui-meme, resolue depuis la sienne. Aucun role ni permission a
             // exiger — un compte quelconque doit pouvoir fermer les siennes.
@@ -198,6 +209,22 @@ class TableDesGardes
             ['GET', 'sauvegardes', ['role:2', 'perm:can_admin_portal']],
             ['GET', 'scan-cve', ['role:1', 'perm:can_scan_cve']],
             ['GET', 'scan-cve/apercu-cron', ['role:2', 'perm:can_scan_cve']],
+            /*
+             * LISTE BLANCHE DES CVE — portage a ISO-PERIMETRE (2026-09-07).
+             *
+             * `legacy/security/index.php` a ete archive en acceptant la perte de
+             * cette capacite ; l'exploitant a tranche pour un portage a
+             * iso-perimetre. Les trois routes backend etaient restees VIVANTES et
+             * passaient deja la passerelle : la capacite n'etait pas perdue, elle
+             * etait SANS INTERFACE.
+             *
+             * `role:2` reprend la garde du backend (`cve.py:641`,
+             * `@require_role(2)` sur les trois) ; `perm:can_scan_cve` s'y ajoute
+             * comme sur le reste du module — le legacy ne gardait que le role.
+             */
+            ['GET', 'scan-cve/liste-blanche', ['role:2', 'perm:can_scan_cve']],
+            ['POST', 'scan-cve/liste-blanche', ['role:2', 'perm:can_scan_cve']],
+            ['DELETE', 'scan-cve/liste-blanche/{id}', ['role:2', 'perm:can_scan_cve']],
             ['GET', 'scan-cve/comparaison', ['role:1', 'perm:can_scan_cve']],
             ['GET', 'scan-cve/planifications', ['role:2', 'perm:can_scan_cve']],
             ['POST', 'scan-cve/planifications', ['role:2', 'perm:can_scan_cve']],

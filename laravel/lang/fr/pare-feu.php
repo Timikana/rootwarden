@@ -65,7 +65,6 @@ return [
     'fichier_absent' => 'Ce fichier n\'existe pas sur la machine. Les règles actives ne seront donc pas rétablies au redémarrage.',
 
     // ── Ce que I1 ne fait pas, dit à l'écran plutôt qu'absent en silence ──
-    'suite_titre' => 'Cette page ne modifie rien',
     /*
      * ⚠ CORRIGE le 2026-09-02 (E-318). Ce libelle declarait la validation a blanc
      * NON PORTEE. Elle l'est : `pare-feu.js:710` appelle `/iptables-validate`, et
@@ -83,8 +82,6 @@ return [
      * modules que le processus servi n'a pas recharges, donc que le JS appelle la
      * route ne dit pas qu'elle repond. A remesurer apres le redemarrage.
      */
-    'suite' => 'Le relevé, la copie en base et la validation à blanc ne touchent aucune machine — la validation est portée ici. Seules l\'application des règles et son retour arrière restent sur l\'ancien portail. La validation n\'a pas encore été exercée depuis le redémarrage du service : si elle ne répond pas, l\'ancien portail reste la voie éprouvée.',
-    'suite_lien' => 'Ouvrir le pare-feu sur l\'ancien portail',
 
     // ── I2 : la copie en base ───────────────────────────────────────────
     'copie_titre' => 'Copie enregistrée en base',
@@ -152,4 +149,75 @@ return [
      * coup, c'est une excuse.
      */
     'copie_jamais_exercee' => "L'enregistrement d'une copie de règles n'a encore jamais été exercé depuis cette interface : le geste est câblé et confirmé, mais son aboutissement n'a pas été observé sur une machine. L'ancien portail reste la seule voie éprouvée.",
+
+    /* ══ Q3 — LES HUIT TITRES QUE `rwRetourPareFeu()` RENVOIE ══════════════════
+     *
+     * ⚠ CES HUIT CLES ETAIENT CITEES PAR `pare-feu-retour-visible.js` ET
+     * N'EXISTAIENT NULLE PART. Mesure du 2026-09-08 : 8 citees, 0 au catalogue.
+     * Q3 est « totale » — elle rend toujours un titre — mais un titre qui ne
+     * DESIGNE rien satisfait toute assertion de forme tout en s'affichant nu.
+     *
+     * Chaque libelle DECRIT LE CALCUL de son cas, pas l'humeur du moment :
+     *   inabouti / refus / erreur_serveur / corps_illisible  ->  `sur: false`
+     *   -> ces quatre disent « je ne sais pas », JAMAIS « ca a echoue ».
+     */
+    'ipt_retour_succes'           => 'Les règles ont été appliquées.',
+    'ipt_retour_regles_invalides' => "Le serveur a refusé ces règles : rien n'a été appliqué, et l'état de la machine n'a pas changé.",
+    'ipt_retour_refus'            => "La demande a été refusée avant tout contrôle des règles. Rien n'a été appliqué — et on ne sait pas si ces règles sont valides.",
+    'ipt_retour_erreur_serveur'   => "Le serveur a échoué avant de répondre. Rien ne permet de dire si les règles ont été appliquées : relevez l'état de la machine avant de réessayer.",
+    'ipt_retour_corps_illisible'  => "Le serveur a répondu, mais sa réponse est illisible. Le geste est peut-être passé : relevez l'état de la machine avant de réessayer.",
+    'ipt_retour_inabouti'         => "La demande n'est pas partie. Rien n'a été appliqué.",
+    'ipt_retour_doute_marqueur'   => "Le serveur signale que son verdict n'est pas fondé. Ne le lisez ni comme un succès ni comme un échec : relevez l'état de la machine.",
+    'ipt_retour_contrat_inconnu'  => "La réponse ne correspond à aucun cas prévu. Relevez l'état de la machine plutôt que de supposer.",
+
+    /* ══ I5 — L'ECRAN D'APPLICATION ════════════════════════════════════════════ */
+    'appl_titre'      => 'Appliquer un jeu de règles',
+    'appl_intro'      => "Le jeu choisi REMPLACE toutes les règles de la machine d'un seul geste : `iptables-restore` écrase les tables, il n'ajoute rien. La version précédente est archivée avant l'écriture.",
+    'appl_gabarit'    => 'Jeu de règles',
+    'appl_gabarit_aide' => "Le port SSH est lu sur la machine choisie, jamais supposé à 22 — c'est ce qui empêche un gabarit de vous enfermer dehors.",
+    'appl_apercu'     => 'Ce qui sera appliqué',
+    'appl_ssh_ouvert' => 'Le port SSH :port reste joignable avec ce jeu.',
+    'appl_ssh_ferme'  => "⛔ Ce jeu FERME le port SSH :port. Appliqué, il vous couperait l'accès à la machine — et il faudrait une console physique pour revenir.",
+    'appl_ssh_doute'  => "⛔ Impossible de dire si le port SSH :port reste ouvert avec ce jeu. On refuse plutôt que de parier : un doute sur cette question se paie en accès perdu.",
+    'appl_bouton'     => 'Appliquer sur la machine',
+    'appl_en_cours'   => 'Application en cours…',
+    'appl_conf_titre' => 'Remplacer les règles de :machine ?',
+    'appl_conf_texte' => "Toutes les règles actuelles de :machine seront REMPLACÉES par le jeu « :gabarit ». La version précédente est archivée et reste restaurable depuis l'historique. Aucune requête n'a encore été envoyée.",
+    'appl_conf_ok'    => 'Remplacer les règles',
+    'appl_conf_non'   => 'Annuler',
+    'appl_annule'     => "Annulé — aucune requête n'a été envoyée.",
+
+    /* ══ I6 — LE RETOUR ARRIERE ════════════════════════════════════════════════
+     *
+     * ⚠ POURQUOI CE GESTE EST PLUS DANGEREUX QUE L'APPLICATION, ET NON MOINS.
+     *
+     *   APPLIQUER       l'operateur ECRIT les regles : il les a sous les yeux
+     *   RETOUR ARRIERE  l'operateur choisit une DATE : il ne peut pas se relire
+     *
+     * `iptables_history` ne porte AUCUN port, et une version archivee etait valide
+     * LE JOUR DE SON ARCHIVAGE. Si le port SSH a change depuis — c'est-a-dire si
+     * quelqu'un a suivi le durcissement qu'on prescrit — la restaurer FERME
+     * l'acces. Q2 se calcule donc sur le port ACTUEL, jamais sur celui de
+     * l'archive.
+     *
+     * Les deux premieres cles sont rendues par le SERVEUR (message JSON) : elles
+     * n'ont pas a voyager jusqu'au JS.
+     */
+    'rb_version_absente'     => 'Aucune version désignée.',
+    'rb_version_introuvable' => "Cette version est introuvable pour cette machine.",
+    'rb_titre'      => 'Retour arrière',
+    'rb_bouton'     => 'Revenir à cette version',
+    'rb_lecture'    => 'Lecture de la version archivée…',
+    'rb_lecture_echec' => "La version n'a pas pu être lue. Rien n'a été restauré.",
+    'rb_apercu'     => 'Ce qui sera restauré',
+    'rb_archive_le' => 'Version archivée le :date',
+    'rb_ssh_ouvert' => 'Le port SSH :port — celui de la machine AUJOURD\'HUI — reste joignable avec cette version.',
+    'rb_ssh_ferme'  => "⛔ Cette version FERME le port SSH :port, qui est celui de la machine aujourd'hui. Elle était peut-être valide le jour de son archivage : restaurée maintenant, elle vous couperait l'accès.",
+    'rb_ssh_doute'  => "⛔ Impossible de dire si cette version laisse le port SSH :port ouvert. On refuse plutôt que de parier — et la reprise passerait elle aussi par SSH.",
+    'rb_conf_titre' => 'Restaurer la version du :date sur :machine ?',
+    'rb_conf_texte' => "Les règles actuelles de :machine seront REMPLACÉES par cette version archivée. L'état actuel est archivé avant l'écriture, donc ce retour arrière est lui-même réversible. Aucune requête n'a encore été envoyée.",
+    'rb_conf_ok'    => 'Restaurer cette version',
+    'rb_conf_non'   => 'Annuler',
+    'rb_en_cours'   => 'Restauration en cours…',
+    'rb_annule'     => "Annulé — aucune requête n'a été envoyée.",
 ];

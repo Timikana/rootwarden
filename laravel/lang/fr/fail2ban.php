@@ -63,7 +63,6 @@ return [
      * backend, pas deduits : `install`, `restart` et `geoip` ne sont appeles
      * par aucun script du portage.
      */
-    'non_porte_titre' => "Ce que cet onglet ne fait pas",
     /*
      * ⚠ L'ENUMERATION PERD UN ELEMENT, ET C'EST TOUT CE QU'ELLE PERD.
      *
@@ -73,7 +72,6 @@ return [
      * gestes » ne se corrige pas en « trois », il se remplace par
      * l'enumeration, qui est la seule source.
      */
-    'non_porte_texte' => "Installer Fail2ban sur UNE machine et redémarrer le service ne sont pas dans le portail : ces deux gestes se font en SSH (`apt install fail2ban`, `systemctl restart fail2ban`). L'installation sur tout le parc, elle, est ici.",
 
     // ══ F8 — LA GEOLOCALISATION D'UNE ADRESSE BANNIE ══════════════════════
     //
@@ -118,6 +116,33 @@ return [
     'geo_resultat'   => ':pays (:code)',
     'geo_locale'     => 'adresse locale, aucune requête n\'est partie.',
     'geo_inconnu'    => 'le service n\'a pas su répondre.',
+    /*
+     * ⚠ « DESACTIVEE » N'EST PAS « EN PANNE », ET C'EST TOUT L'OBJET DE CETTE CLE.
+     * Le backend rend le code `OFF` (`fail2ban_manager.py:399`) et JAMAIS `??`,
+     * qui signifie deja « le service n'a pas su repondre ». Reutiliser `??`
+     * ferait passer un reglage delibere pour une panne du tiers : on
+     * chercherait une panne inexistante, ou on rallumerait l'interrupteur
+     * en croyant reparer.
+     *
+     * Le libelle NOMME la variable : sur un portail d'administration, savoir
+     * QUOI changer fait la difference entre un etat subi et un etat choisi.
+     */
+    'geo_desactivee' => "la géolocalisation est désactivée sur ce portail (GEOIP_ENABLED), "
+        . "aucune requête n'est partie — ce n'est pas une panne du service.",
+    /*
+     * ⚠ ETEINT, IL N'Y A PAS DE CONSENTEMENT A DEMANDER — IL Y A UN ETAT A DIRE.
+     * `geo_conf_texte` annonce que l'adresse « sera transmise a ip-api.com EN
+     * CLAIR ». Interrupteur eteint, cette phrase est FAUSSE : rien ne part.
+     *
+     * Et elle se trompe du cote PRUDENT, ce qui est precisement ce qui la rend
+     * nuisible : l'exploitant consent, rien ne part, et il apprend que
+     * l'avertissement est du theatre. Ce qui s'use alors n'est pas cette
+     * phrase-la, c'est la credibilite de toutes les autres.
+     */
+    'geo_off_titre' => 'Géolocalisation désactivée',
+    'geo_off_texte' => "Ce portail n'interrogera pas ip-api.com : la géolocalisation est "
+        . "désactivée (GEOIP_ENABLED). Il n'y a donc rien à autoriser — aucune adresse ne "
+        . "sera transmise. Pour la réactiver, changez ce réglage côté serveur.",
     'geo_journal'    => ':ip — :detail',
     'geo_echec'      => "La géolocalisation a échoué. :message",
 
@@ -308,4 +333,20 @@ return [
     // `user_logs` (temoin : 5 920 lignes au total). Le dire plutot que de
     // laisser croire que le chemin est eprouve.
     'desact_jamais_exercee' => "Ce geste n'a encore jamais été exercé depuis cette interface.",
+
+    /*
+     * ══ LES DEUX GESTES PAR MACHINE — ISO-PERIMETRE ══════════════════
+     *
+     * Le legacy les offrait ; ils avaient ete perdus par un arbitrage que
+     * l'exploitant a annule (« portage a iso-perimetre »). `install_all`
+     * etait deja porte : le geste le plus LARGE existait, le plus ETROIT
+     * manquait — l'inverse de l'ordre de risque.
+     */
+    'installer' => "Installer Fail2ban",
+    'redemarrer' => "Redémarrer le service",
+    'conf_titre_install' => "Installer Fail2ban sur :machine ?",
+    'conf_texte_install' => "Le paquet sera installé sur :machine, et sur elle seule. L'installation passe par le gestionnaire de paquets de la machine : elle peut prendre une minute et elle ne se défait pas depuis cet écran.",
+    'conf_titre_restart' => "Redémarrer Fail2ban sur :machine ?",
+    'conf_texte_restart' => "Le service sera redémarré sur :machine, et sur elle seule. Pendant le redémarrage, aucune adresse n'est bannie ni débannie ; la configuration est relue depuis le disque.",
+
 ];

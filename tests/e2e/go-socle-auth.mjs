@@ -22,9 +22,10 @@
  *   node go-socle-auth.mjs
  */
 import puppeteer from 'puppeteer';
+import { baseDeclaree } from './lib-cible.mjs';
 import { createHmac } from 'crypto';
 
-const BASE = process.env.E2E_BASE || 'https://localhost:8443';
+const BASE = baseDeclaree('https://localhost:8443');
 const MDP = process.env.E2E_TEST_PASS || 'RootWarden@2026-Test!';
 
 const COMPTES = [

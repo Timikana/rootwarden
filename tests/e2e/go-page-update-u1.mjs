@@ -26,11 +26,12 @@
  *   E2E_BASE=https://localhost:8443 node go-page-update-u1.mjs   (legacy)
  */
 import puppeteer from 'puppeteer';
+import { baseDeclaree } from './lib-cible.mjs';
 import { createHmac } from 'crypto';
 import { constateArchivage, verifieMenuLegacy } from './archive.mjs';
 import { litEnBase, compteEnBase } from './lib-base.mjs';
 
-const BASE = process.env.E2E_BASE || 'http://localhost:8444';
+const BASE = baseDeclaree('http://localhost:8444');
 const MDP = process.env.E2E_TEST_PASS || 'RootWarden@2026-Test!';
 const CIBLE = (() => {
     /*

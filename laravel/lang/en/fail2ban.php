@@ -54,10 +54,8 @@ return [
     'vide_action' => 'Open servers',
     // The count is REMOVED, not reduced — see fr. The three remaining are
     // appaired one by one against the backend's 19 routes.
-    'non_porte_titre' => "What this tab does not do",
     // F8 removes ONE item from the enumeration and only that one — see the
     // note in `lang/fr/fail2ban.php`.
-    'non_porte_texte' => "Installing Fail2ban on ONE machine and restarting the service are not in the portal: both are done over SSH (`apt install fail2ban`, `systemctl restart fail2ban`). Installing across the whole fleet is here.",
 
     // F8 — geolocating a banned address. THIS IS AN OUTGOING CALL TO A THIRD
     // PARTY, IN CLEAR. The panel names the third party AND the absence of
@@ -78,6 +76,18 @@ return [
     'geo_resultat'   => ':pays (:code)',
     'geo_locale'     => 'local address, no request was sent.',
     'geo_inconnu'    => 'the service could not answer.',
+    /* See the French catalogue: `OFF` means DISABLED, never `??` (which already
+     * means "the service could not answer"). Naming the variable is deliberate. */
+    'geo_desactivee' => "geolocation is disabled on this portal (GEOIP_ENABLED); "
+        . "no request was sent — this is not a service failure.",
+    /* Disabled, there is no consent to ask for — there is a state to state.
+     * `geo_conf_texte` would otherwise promise a transmission that will not
+     * happen, and a warning that cries wolf spends the credibility of every
+     * other warning, not just its own. */
+    'geo_off_titre' => 'Geolocation disabled',
+    'geo_off_texte' => "This portal will not query ip-api.com: geolocation is disabled "
+        . "(GEOIP_ENABLED). There is nothing to authorise — no address will be sent. "
+        . "To re-enable it, change that setting on the server.",
     'geo_journal'    => ':ip — :detail',
     'geo_echec'      => 'Geolocation failed. :message',
 
@@ -258,4 +268,20 @@ return [
     'conf_titre_desact' => "Disable :jail on :machine?",
     'conf_texte_desact' => "The :jail jail will stop watching :machine: failed authentication attempts will no longer be banned. The action opens an SSH session on the machine. It is restored by « Activer », and no already-banned address is released.",
     'desact_jamais_exercee' => "This action has never yet been performed from this interface.",
+
+    /*
+     * ══ LES DEUX GESTES PAR MACHINE — ISO-PERIMETRE ══════════════════
+     *
+     * Le legacy les offrait ; ils avaient ete perdus par un arbitrage que
+     * l'exploitant a annule (« portage a iso-perimetre »). `install_all`
+     * etait deja porte : le geste le plus LARGE existait, le plus ETROIT
+     * manquait — l'inverse de l'ordre de risque.
+     */
+    'installer' => "Install Fail2ban",
+    'redemarrer' => "Restart the service",
+    'conf_titre_install' => "Install Fail2ban on :machine?",
+    'conf_texte_install' => "The package will be installed on :machine, and on that host only. Installation goes through the machine's package manager: it may take a minute, and it cannot be undone from this screen.",
+    'conf_titre_restart' => "Restart Fail2ban on :machine?",
+    'conf_texte_restart' => "The service will be restarted on :machine, and on that host only. While it restarts, no address is banned or unbanned; the configuration is re-read from disk.",
+
 ];

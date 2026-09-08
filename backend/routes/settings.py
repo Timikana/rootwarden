@@ -101,6 +101,7 @@ _ANNONCABLES = (
     ('wazuh_enabled',          lambda: _depuis_config('WAZUH_ENABLED', bool)),
     ('cve_enrich_enabled',     lambda: _depuis_config('CVE_ENRICH_ENABLED', bool)),
     ('nvd_enrichment_enabled', lambda: _depuis_config('NVD_ENRICHMENT_ENABLED', bool)),
+    ('geoip_enabled',          lambda: _depuis_config('GEOIP_ENABLED', bool)),
 )
 
 

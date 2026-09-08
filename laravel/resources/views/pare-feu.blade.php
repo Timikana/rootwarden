@@ -183,6 +183,10 @@
                     <th>{{ __('pare-feu.histo_col_date') }}</th>
                     <th>{{ __('pare-feu.histo_col_auteur') }}</th>
                     <th>{{ __('pare-feu.histo_col_motif') }}</th>
+                    {{-- I6 : la colonne d'ACTION. Elle ne cede jamais la place —
+                         c'est l'appoint qui s'efface, jamais la colonne
+                         actionnable (regle de largeur du chantier). --}}
+                    <th>{{ __('pare-feu.rb_titre') }}</th>
                 </tr>
             </thead>
             <tbody data-rw="ipt-histo-corps"></tbody>
@@ -192,13 +196,127 @@
     <div data-rw="ipt-histo-etat"></div>
 </div>
 
-<div class="rw-encart" data-rw="ipt-non-porte">
-    <p class="rw-sous-titre-fort">{{ __('pare-feu.suite_titre') }}</p>
-    <p class="rw-prose">{{ __('pare-feu.suite') }}</p>
-    <a class="rw-bouton" data-rw="ipt-lien-legacy"
-       href="{{ rtrim(config('app.url_legacy'), '/') }}/iptables/"
-       target="_blank" rel="noopener">{{ __('pare-feu.suite_lien') }} ↗</a>
+{{-- ══ I6 — LE RETOUR ARRIERE ═══════════════════════════════════════════════
+
+     ⚠ PLUS DANGEREUX QUE L'APPLICATION, ET NON MOINS.
+
+       APPLIQUER       l'operateur ECRIT les regles : il les a sous les yeux
+       RETOUR ARRIERE  l'operateur choisit une DATE : il ne peut pas se relire
+
+     C'est le seul des deux gestes ou l'humain ne voit pas son objet — d'ou
+     l'apercu ci-dessous, qui n'est pas un confort : *un geste dont on ne voit pas
+     l'objet ne se consent pas, il s'accepte.*
+
+     Et `iptables_history` ne porte AUCUN port : une version etait valide LE JOUR
+     DE SON ARCHIVAGE. Q2 se calcule donc sur le port ACTUEL de la machine.
+--}}
+<div class="rw-section" data-rw="ipt-rb" hidden>
+    <h2 class="rw-sous-titre">{{ __('pare-feu.rb_titre') }}</h2>
+    <p class="rw-aide" data-rw="ipt-rb-archive"></p>
+
+    <p class="rw-sous-titre-fort">{{ __('pare-feu.rb_apercu') }}</p>
+    <pre class="rw-fichier" data-rw="ipt-rb-apercu"></pre>
+
+    <p class="rw-annonce" role="status" aria-live="polite" data-rw="ipt-rb-ssh"></p>
+
+    <div class="rw-actions">
+        <button type="button" class="rw-bouton rw-bouton--danger"
+                data-rw="ipt-rb-bouton" disabled>{{ __('pare-feu.rb_conf_ok') }}</button>
+    </div>
+
+    <p class="rw-annonce" role="status" aria-live="polite" data-rw="ipt-rb-annonce"></p>
+    <div data-rw="ipt-rb-etat"></div>
 </div>
+
+<div class="rw-section" data-rw="ipt-rb-conf" hidden>
+    <p class="rw-sous-titre-fort" data-rw="ipt-rb-conf-titre"></p>
+    <p class="rw-prose" data-rw="ipt-rb-conf-texte"></p>
+    <div class="rw-actions">
+        <button type="button" class="rw-bouton rw-bouton--discret"
+                data-rw="ipt-rb-conf-non">{{ __('pare-feu.rb_conf_non') }}</button>
+        <button type="button" class="rw-bouton rw-bouton--danger"
+                data-rw="ipt-rb-conf-ok" disabled>{{ __('pare-feu.rb_conf_ok') }}</button>
+    </div>
+</div>
+
+{{-- ══ I5 — APPLIQUER UN JEU DE REGLES ═══════════════════════════════════════
+
+     ⚠ CE QUE CET ECRAN CREE, ET CE QU'IL NE CREE PAS.
+
+     `RoutesBackend:114` porte `/iptables-` et la comparaison est PAR PREFIXE :
+     `/iptables-apply` passe donc DEJA la passerelle, aujourd'hui, sans cet ecran.
+     **I5 ne cree pas l'atteignabilite — il cree l'ECRAN.** Un geste qui n'etait
+     atteignable que par requete forgee devient un bouton. C'est precisement pour
+     cela que Q1 a Q4 ne sont pas negociables : ils ne protegent pas d'un geste
+     nouveau, ils encadrent un geste qui existait sans garde-fou visible.
+
+     Q1  le port SSH vient de la MACHINE (`ipt-ports`, lu en base), jamais de `22`
+     Q2  un jeu qui fermerait SSH est REFUSE avant tout envoi — et le doute aussi
+     Q3  tout retour produit un message visible, succes comme echec comme doute
+     Q4  avant consentement, AUCUNE requete n'est emise
+--}}
+<div class="rw-section" data-rw="ipt-appl" hidden>
+    <h2 class="rw-sous-titre">{{ __('pare-feu.appl_titre') }}</h2>
+    <p class="rw-prose rw-aide" data-rw="ipt-appl-intro">{{ __('pare-feu.appl_intro') }}</p>
+
+    <div class="rw-champ">
+        <label class="rw-etiquette" for="ipt-appl-gabarit">{{ __('pare-feu.appl_gabarit') }}</label>
+        <select class="rw-saisie" id="ipt-appl-gabarit" data-rw="ipt-appl-gabarit"></select>
+        <p class="rw-aide rw-prose" data-rw="ipt-appl-gabarit-aide">{{ __('pare-feu.appl_gabarit_aide') }}</p>
+    </div>
+
+    {{-- L'APERCU N'EST PAS UN CONFORT : c'est ce qui rend le geste verifiable
+         avant d'etre consenti. On applique ce qu'on a lu. --}}
+    <p class="rw-sous-titre-fort">{{ __('pare-feu.appl_apercu') }}</p>
+    <pre class="rw-fichier" data-rw="ipt-appl-apercu"></pre>
+
+    {{-- Le verdict Q2, AVANT le bouton. Un jeu qui ferme SSH doit se lire avant
+         qu'on ait envie de cliquer, pas apres. --}}
+    <p class="rw-annonce" role="status" aria-live="polite" data-rw="ipt-appl-ssh"></p>
+
+    <div class="rw-actions">
+        <button type="button" class="rw-bouton rw-bouton--danger"
+                data-rw="ipt-appl-bouton" disabled>{{ __('pare-feu.appl_bouton') }}</button>
+    </div>
+
+    <p class="rw-annonce" role="status" aria-live="polite" data-rw="ipt-appl-annonce"></p>
+    <div data-rw="ipt-appl-etat"></div>
+</div>
+
+{{-- LE PANNEAU DE CONSENTEMENT. Hors du bloc ci-dessus pour qu'il ne depende pas
+     de son `hidden`. Le bouton de confirmation nait DESACTIVE et ne s'active que
+     lorsque le panneau s'ouvre : un panneau ferme ne doit rien pouvoir declencher. --}}
+<div class="rw-section" data-rw="ipt-appl-conf" hidden>
+    <p class="rw-sous-titre-fort" data-rw="ipt-appl-conf-titre"></p>
+    <p class="rw-prose" data-rw="ipt-appl-conf-texte"></p>
+    <div class="rw-actions">
+        <button type="button" class="rw-bouton rw-bouton--discret"
+                data-rw="ipt-appl-conf-non">{{ __('pare-feu.appl_conf_non') }}</button>
+        <button type="button" class="rw-bouton rw-bouton--danger"
+                data-rw="ipt-appl-conf-ok" disabled>{{ __('pare-feu.appl_conf_ok') }}</button>
+    </div>
+</div>
+
+{{-- ⚠ L'ENCART « NON PORTE » A ETE RETIRE, ET C'ETAIT LE DERNIER FIL.
+
+     Il portait deux enonces devenus FAUX, et un lien `/iptables/` en dur :
+
+       'suite_titre'  « Cette page ne modifie rien »   -> elle applique et restaure
+       'suite'        « seul le retour arriere reste » -> I6 l'a porte
+
+     Les cinq gestes du pare-feu sont ici : relever, copier, valider, appliquer,
+     revenir. Un encart qui envoie vers un portail qu'on demonte, pour un geste
+     qui est sous les yeux de qui le lit, est pire qu'inutile.
+
+     ⚠ ET C'ETAIT LE SEUL LIEN VIVANT DU PORTAGE VERS LE LEGACY. Les six autres
+     sites sont des branches `@else` jamais prises : `Navigation` ne porte plus
+     AUCUNE entree `legacy` (0 occurrence contre 33 `route`), et le predicat
+     `porteDuLegacy` rend `false` pour les trois roles — avec un temoin qui
+     montre qu'il SAIT rendre `true` sur un menu forge sans route.
+
+     Les trois cles `suite*` sont retirees des deux catalogues dans le meme
+     geste : une cle que personne ne cite est un orphelin, et un orphelin se lit
+     comme une capacite qui existe encore ailleurs. --}}
 @endif
 
     {{-- `@json` reste sur UNE ligne : multiligne, il casse le PHP compile. --}}
@@ -206,5 +324,20 @@
     {{-- Le port SSH par machine, lu en BASE. Les gabarits du legacy supposent
          22 ; cette table existe pour que le portage n'ait jamais a le supposer. --}}
     <script id="ipt-ports" type="application/json">@json($portsSsh)</script>
+    {{-- ⚠ LES TROIS MODULES DE I5 SE CHARGENT AVANT `pare-feu.js`, qui les
+         consomme par `window.rw*`. Chacun porte UNE propriete, et le code de la
+         page les APPELLE plutot que de les reimplementer :
+
+           Q1  rwGabaritPareFeu(nom, port)             le port vient de la machine
+           Q2  rwLaisseLeSshOuvert(regles, port)       true / false / null
+           Q3  rwRetourPareFeu(corps, statut, erreur)  huit cas, dont QUATRE
+                                                       portent `sur: false`
+
+         `pare-feu.js` teste leur presence avant usage : modules absents, il ne
+         compose AUCUN jeu et le DIT — plutot que de retomber sur un gabarit qui
+         supposerait le port 22, ce que Q1 existe precisement pour empecher. --}}
+    <script src="/js/pare-feu-gabarits.js?v={{ @filemtime(public_path('js/pare-feu-gabarits.js')) ?: '0' }}"></script>
+    <script src="/js/pare-feu-ssh-ouvert.js?v={{ @filemtime(public_path('js/pare-feu-ssh-ouvert.js')) ?: '0' }}"></script>
+    <script src="/js/pare-feu-retour-visible.js?v={{ @filemtime(public_path('js/pare-feu-retour-visible.js')) ?: '0' }}"></script>
     <script src="/js/pare-feu.js?v={{ @filemtime(public_path('js/pare-feu.js')) ?: '0' }}"></script>
 @endsection

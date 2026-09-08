@@ -10,6 +10,12 @@ return [
     'placeholder' => 'Un serveur, un utilisateur, une CVE, un ticket...',
     'tip_input'   => 'Recherche transverse, deux caracteres au minimum.',
     'label'       => 'Terme recherche',
+    /* Le panneau de recherche de l'en-tete. Le reste de ses libelles est REPRIS
+     * de cette meme liste (`placeholder`, `label`, `hint_min`, `searching`,
+     * `no_results`, `err`, `cat_*`) : deux formulations pour un meme etat
+     * finiraient par se contredire. */
+    'menu_ouvrir' => 'Rechercher',
+    'menu_voir_tout' => 'Ouvrir la recherche complète',
 
     'guide_titre'  => 'Ce que la recherche couvre',
     'guide_portee' => 'Cinq sources : serveurs, utilisateurs, CVE, tickets et journal d\'audit. '

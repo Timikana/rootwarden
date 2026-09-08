@@ -15,10 +15,11 @@
  *   node go-captures-socle.mjs [compte]      (defaut : rw-test-super)
  */
 import puppeteer from 'puppeteer';
+import { baseDeclaree } from './lib-cible.mjs';
 import { createHmac } from 'crypto';
 import { mkdirSync } from 'fs';
 
-const BASE = process.env.E2E_BASE || 'http://localhost:8444';
+const BASE = baseDeclaree('http://localhost:8444');
 const MDP = process.env.E2E_TEST_PASS || 'RootWarden@2026-Test!';
 const SORTIE = './screenshots/socle';
 

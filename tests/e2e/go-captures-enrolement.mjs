@@ -22,10 +22,11 @@
  *   cd tests/e2e && node go-captures-enrolement.mjs
  */
 import puppeteer from 'puppeteer';
+import { baseDeclaree } from './lib-cible.mjs';
 import { mkdirSync } from 'node:fs';
 import { litEnBase } from './lib-base.mjs';
 
-const BASE = process.env.E2E_BASE || 'http://localhost:8444';
+const BASE = baseDeclaree('http://localhost:8444');
 const COMPTE = 'rw-test-super';
 const MDP = process.env.E2E_TEST_PASS || 'RootWarden@2026-Test!';
 const SORTIE = './screenshots/enrolement';

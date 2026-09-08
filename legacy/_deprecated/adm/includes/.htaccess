@@ -1,0 +1,28 @@
+# Les deux fichiers restants de adm/includes/ sont des INCLUS serveur, pas des
+# pages : `require_once` depuis auth/login.php (:18 et :19) et depuis le seed du
+# conteneur de test. Aucun acces HTTP direct legitime.
+#
+# ⚠ POURQUOI CE REFUS N'ETAIT PAS LA, ET POURQUOI IL PEUT L'ETRE AUJOURD'HUI
+#
+# Il manquait — seul repertoire de son espece sans refus, la ou `includes/` et
+# `lang/` en portaient un. La raison etait bonne : `adm/includes/server_actions.php`
+# etait appele par `fetch()`, donc un refus GLOBAL l'aurait casse.
+#
+# Ce fichier est archive depuis. L'objection est tombee, et je ne l'avais pas
+# remesuree avant de la reconduire — une objection juste se perime comme un
+# chiffre.
+#
+# Mesure du 2026-09-08, sur DEUX axes independants (par forme d'appel, puis par
+# nom de fichier) :
+#
+#     audit_log.php   127 l · 0 sortie HTML · 4 fonctions
+#     crypto.php      308 l · 0 sortie HTML · 12 fonctions
+#     appels HTTP vers l'un ou l'autre : 0
+#     TEMOIN+ : les deux sondes voient les hx-post vers adm/api/notifications.php
+#
+# Et le depot les avait deja mesures SERVIS : INVENTAIRE.md:200-201 porte
+# « 200, 0 octet » pour les deux — deux fichiers qui repondent sans rien rendre.
+#
+# ⚠ `require_once` lit le SYSTEME DE FICHIERS, pas HTTP : la page de connexion
+# legacy — mesuree vivante a 200 ce soir — n'est pas affectee.
+Require all denied

@@ -1,0 +1,198 @@
+<?php
+
+/*
+ * Les liens de ces astuces pointaient vers des pages ARCHIVEES du legacy.
+ * Ils sont rebases sur le portage — un catalogue est un `return [...]`, donc la
+ * concatenation, pas `<?= ?>`.
+ */
+$rwPortage = rtrim(getenv('LARAVEL_URL') ?: 'http://localhost:8080', '/');
+
+return [
+    'tip.default_title' => 'How does it work?',
+
+    'tip.ssh_title' => 'How to deploy SSH keys?',
+    'tip.ssh_step1' => '<strong>Prerequisite:</strong> add your SSH public key in <a href="' . $rwPortage . '/profil" class="text-blue-600 underline">your profile</a>.',
+    'tip.ssh_step2' => '<strong>Scan</strong> server users in <a href="' . $rwPortage . '/comptes-distants" class="text-blue-600 underline">Remote Users</a> and classify each account.',
+    'tip.ssh_step3' => '<strong>Check</strong> the target servers in the list below.',
+    'tip.ssh_step4' => '<strong>Click</strong> "Deploy keys" - the preflight checks connectivity and shows the account inventory.',
+    'tip.ssh_step5' => 'Deployment <strong>never deletes</strong> any account. It only deploys SSH keys for authorized users.',
+
+    'tip.users_title' => 'Account classification workflow',
+    'tip.users_step1' => '<strong>Scan</strong> a server to discover all existing Linux accounts.',
+    'tip.users_step2' => '<strong>Classify</strong> each account: <span class="text-green-600 font-medium">Managed</span> (RootWarden deploys keys), <span class="text-blue-600 font-medium">Excluded</span> (never touched), or <span class="text-gray-500 font-medium">Unmanaged</span> (ignored).',
+    'tip.users_step3' => 'As long as accounts are <span class="text-orange-600 font-medium">pending review</span>, SSH deployment is blocked.',
+    'tip.users_step4' => 'Account deletion is <strong>only</strong> done via the "Delete" button (explicit action, never automatic).',
+
+    'tip.admin_title' => 'First setup - steps',
+    'tip.admin_step1' => '<strong>Add</strong> your servers in the "Servers" tab (IP, port, SSH credentials).',
+    'tip.admin_step2' => '<strong>Create</strong> users in the "Users" tab and assign their SSH keys.',
+    'tip.admin_step3' => '<strong>Assign</strong> servers to each user in "Access & Permissions".',
+    'tip.admin_step4' => '<strong>Configure</strong> email notifications in "Access & Permissions > Notifications".',
+    'tip.admin_step5' => 'Go to <a href="' . $rwPortage . '/comptes-distants" class="text-blue-600 underline">Remote Users</a> to scan and classify existing accounts.',
+
+    'tip.cve_title' => 'How does CVE scanning work?',
+    'tip.cve_step1' => 'The scan connects via SSH and lists installed packages (<code class="text-xs bg-gray-200 dark:bg-gray-700 px-1 rounded">dpkg -l</code>).',
+    'tip.cve_step2' => 'Packages are compared against the <strong>OpenCVE</strong> database for known vulnerabilities.',
+    'tip.cve_step3' => 'Filter by CVSS severity (configurable threshold) and export to CSV.',
+    'tip.cve_step4' => 'Schedule automatic scans in the "Scheduled scans" section.',
+
+    'guide.title' => 'Getting Started',
+    'guide.intro' => 'Follow these steps to configure RootWarden after installation.',
+    'guide.step1_title' => '1. Login and secure your account',
+    'guide.step1_text' => 'Log in with the credentials generated at first startup (shown in Docker logs). Change your password and configure mandatory 2FA.',
+    'guide.step2_title' => '2. Add your servers',
+    'guide.step2_text' => 'In <strong>Admin > Servers</strong>, add each Linux server with its IP, SSH port, username and password. Credentials are AES-256 encrypted in the database.',
+    'guide.step3_title' => '3. Scan remote users',
+    'guide.step3_text' => 'In <strong>Remote Users</strong>, scan each server to discover existing accounts. Classify each account (managed / excluded / unmanaged). This step is <strong>mandatory</strong> before any deployment.',
+    'guide.step4_title' => '4. Configure your SSH key',
+    'guide.step4_text' => 'In <strong>My Profile</strong>, paste your SSH public key (ed25519 or RSA). It will be deployed on assigned servers.',
+    'guide.step5_title' => '5. Assign access',
+    'guide.step5_text' => 'In <strong>Admin > Access & Permissions</strong>, assign servers to each user and configure functional permissions (deployment, updates, iptables, etc.).',
+    'guide.step6_title' => '6. Deploy SSH keys',
+    'guide.step6_text' => 'In <strong>SSH Keys</strong>, check the servers and click "Deploy". The preflight checks connectivity and shows the account inventory. No account is ever deleted automatically.',
+    'guide.step7_title' => '7. Configure notifications',
+    'guide.step7_text' => 'In <strong>Admin > Access & Permissions > Email notifications</strong>, configure who receives alerts for each event type (CVE scan, SSH audit, etc.).',
+    'guide.security_title' => 'Security principles',
+    'guide.sec_1' => 'No password is stored in plain text - AES-256 + libsodium encryption.',
+    'guide.sec_2' => 'Deployment <strong>never</strong> automatically deletes accounts.',
+    'guide.sec_3' => 'Every action is logged in the audit trail.',
+    'guide.sec_4' => '2FA authentication (TOTP) is mandatory for all accounts.',
+    'guide.sec_5' => 'Server accounts must be classified before any deployment.',
+
+    'tip.updates_title' => 'How do updates work?',
+    'tip.updates_step1' => '<strong>Select</strong> the servers to update by checking the boxes.',
+    'tip.updates_step2' => '<strong>APT Update</strong> runs a full <code class="text-xs bg-gray-200 dark:bg-gray-700 px-1 rounded">apt update && apt upgrade</code>.',
+    'tip.updates_step3' => '<strong>Security Update</strong> installs security patches only (<code class="text-xs bg-gray-200 dark:bg-gray-700 px-1 rounded">unattended-upgrades</code>).',
+    'tip.updates_step4' => '<strong>Schedule</strong> allows you to set up automatic updates via cron.',
+
+    'tip.iptables_title' => 'How to manage iptables rules?',
+    'tip.iptables_step1' => '<strong>Select</strong> a server from the dropdown.',
+    'tip.iptables_step2' => '<strong>Load</strong> fetches the current IPv4/IPv6 rules from the server.',
+    'tip.iptables_step3' => 'Edit the rules in the editor, then <strong>Validate</strong> checks syntax without applying.',
+    'tip.iptables_step4' => '<strong>Apply</strong> sends rules to the server. <strong>Save</strong> persists them in DB for restoration.',
+
+    'tip.fail2ban_title' => 'How to manage Fail2ban?',
+    'tip.fail2ban_step1' => '<strong>Select</strong> a server and click "Load status".',
+    'tip.fail2ban_step2' => 'View <strong>active jails</strong>, banned IPs and ban history.',
+    'tip.fail2ban_step3' => 'Unban an IP or add it to the whitelist directly from the interface.',
+
+    'tip.services_title' => 'How to manage systemd services?',
+    'tip.services_step1' => '<strong>Select</strong> a server and click "Load services".',
+    'tip.services_step2' => 'View the state of each service (active, inactive, failed).',
+    'tip.services_step3' => '<strong>Start</strong>, <strong>stop</strong> or <strong>restart</strong> a service with one click.',
+
+    'tip.audit_title' => 'How does SSH audit work?',
+    'tip.audit_step1' => 'The scan analyzes <code class="text-xs bg-gray-200 dark:bg-gray-700 px-1 rounded">sshd_config</code> on each server.',
+    'tip.audit_step2' => 'Each parameter is evaluated and a <strong>security score</strong> (A to F) is assigned.',
+    'tip.audit_step3' => '<strong>Audit policies</strong> allow you to customize thresholds per parameter.',
+    'tip.audit_step4' => '<strong>Scan all</strong> runs the audit across your entire fleet at once.',
+
+    'tip.supervision_title' => 'How to deploy monitoring agents?',
+    'tip.supervision_step1' => '<strong>Choose</strong> the platform (Zabbix, Centreon, Prometheus, Telegraf) in the top right.',
+    'tip.supervision_step2' => 'In the <strong>Configuration</strong> tab, set the global template (server, port, TLS).',
+    'tip.supervision_step3' => 'Create your <strong>Profiles</strong> (LinuxInternal, LinuxExternal...) with HostMetadata for Zabbix auto-registration, then assign them per server in the Deployment tab.',
+    'tip.supervision_step4' => 'Select servers and <strong>deploy the agent</strong>. The remote config editor allows per-server tuning.',
+
+    // Bashrc page
+    'tip.bashrc_title' => 'How to deploy a standardized bashrc?',
+    'tip.bashrc_step1' => 'Select <strong>target servers</strong> and <strong>Linux users</strong> (UID >= 1000 or root, interactive shells only).',
+    'tip.bashrc_step2' => 'Click <strong>Preview</strong> to see a colored diff before deployment - nothing is modified at this stage.',
+    'tip.bashrc_step3' => 'Pick mode: <strong>Overwrite</strong> replaces everything (auto backup), <strong>Merge</strong> preserves <code>&gt;&gt;&gt; USER CUSTOM &gt;&gt;&gt;</code> blocks into <code>~/.bashrc.local</code>.',
+    'tip.bashrc_step4' => '<strong>Restore</strong> rolls back to the last backup in 1 click. Idempotent via sha256: skip if already deployed.',
+
+    // Graylog page
+    'tip.graylog_title' => 'How to deploy the Graylog Sidecar?',
+    'tip.graylog_step1' => 'Configure the <strong>Graylog server</strong> URL + API token in the Configuration tab (token encrypted in DB).',
+    'tip.graylog_step2' => 'Edit <strong>collectors</strong> (filebeat / nxlog / winlogbeat): reusable YAML/XML templates, backend YAML validation.',
+    'tip.graylog_step3' => 'Select servers and click <strong>Install</strong>: repo added, package installed, automatic enrolment with the manager.',
+    'tip.graylog_step4' => 'The <strong>Sidecars</strong> tab shows status per machine (running / stopped / version). Remote restart available.',
+
+    // Wazuh page
+    'tip.wazuh_title' => 'How to deploy the Wazuh agent?',
+    'tip.wazuh_step1' => 'Set the <strong>Wazuh manager</strong> (IP/port), the <strong>enrolment password</strong> (encrypted), and the default group.',
+    'tip.wazuh_step2' => 'Define <strong>rules / decoders / CDB lists</strong>: XML textarea validated by <code>xmllint --noout</code>, CDB in plain text.',
+    'tip.wazuh_step3' => 'Configure <strong>per-server options</strong> (FIM paths, active response, SCA, rootcheck, log_format, syscheck_frequency 60-604800s).',
+    'tip.wazuh_step4' => 'Install the agent: automatic enrolment via <code>agent-auth</code>, agent_id retrieved from <code>/var/ossec/etc/client.keys</code>.',
+
+    'tip.platform_title' => 'How does the platform key work?',
+    'tip.platform_step1' => 'The <strong>Ed25519 keypair</strong> is auto-generated and persistently stored.',
+    'tip.platform_step2' => '<strong>Deploy keypair</strong> installs the public key on selected servers.',
+    'tip.platform_step3' => 'Once deployed, RootWarden connects <strong>without password</strong> (key authentication).',
+    'tip.platform_step4' => '<strong>Remove password</strong> disables password authentication on the server (more secure).',
+
+    'tip.compliance_title' => 'What is the compliance report for?',
+    'tip.compliance_step1' => 'The report aggregates security data across your fleet: CVEs, SSH, 2FA, keys.',
+    'tip.compliance_step2' => '<strong>PDF Export</strong> generates an A4 landscape document with SHA-256 hash (integrity proof).',
+    'tip.compliance_step3' => '<strong>CSV Export</strong> allows import into third-party tools (SIEM, spreadsheets).',
+
+    'tip.notif_title' => 'How do notifications work?',
+    'tip.notif_step1' => 'In-app notifications appear via the bell icon in the navigation bar.',
+    'tip.notif_step2' => 'Filter by type (CVE, audit, security) or status (read / unread).',
+    'tip.notif_step3' => 'Email preferences are configured in <a href="' . $rwPortage . '/comptes" class="text-blue-600 underline">Admin > Access & Permissions</a>.',
+
+    'tip.profile_title' => 'How to configure your profile?',
+    'tip.profile_step1' => 'Add your <strong>email</strong> to receive notifications (CVE scan, security alerts).',
+    'tip.profile_step2' => 'Paste your <strong>SSH public key</strong> (ed25519 or RSA) - it will be deployed on your assigned servers.',
+    'tip.profile_step3' => 'Change your <strong>password</strong> regularly (expiration policy configurable by admin).',
+
+    // Docker (container monitoring)
+    'tip.docker_title' => 'How to monitor Docker containers?',
+    'tip.docker_step1' => '<strong>RootWarden auto-detects</strong> the Docker containers running on each server (over SSH).',
+    'tip.docker_step2' => '<strong>Scanning</strong> a server (or "Scan all") compares each container\'s local image with the registry: the <em>Image update</em> column shows whether a newer version exists.',
+    'tip.docker_step3' => 'The <em>Git</em> column flags, for containers built from a repository, whether upstream commits are available (with the related changelog).',
+    'tip.docker_step4' => 'No update is applied automatically: the page is read-only, it only tells you what to update.',
+
+    // Server groups
+    'tip.groups_title' => 'What are server groups for?',
+    'tip.groups_step1' => '<strong>Create a group</strong> to gather servers that are alike (same role, environment or customer).',
+    'tip.groups_step2' => 'From a group, run <strong>bulk</strong> actions: check configuration drift or scan CVEs across all members at once.',
+    'tip.groups_step3' => 'The <strong>Members</strong> button lets you add or remove servers from the group.',
+    'tip.groups_step4' => '<strong>Deleting</strong> a group never removes the servers: only the grouping disappears.',
+
+    // Maintenance windows
+    'tip.maint_title' => 'What are maintenance windows for?',
+    'tip.maint_step1' => 'A <strong>maintenance window</strong> is a time range (days + hours) during which sensitive actions (updates, reboot) are allowed.',
+    'tip.maint_step2' => '<strong>Outside</strong> these ranges, the backend blocks those actions to avoid intervening during production hours.',
+    'tip.maint_step3' => 'A window can be <strong>global</strong> (whole fleet) or targeted at a specific <strong>machine</strong>.',
+    'tip.maint_step4' => 'The <strong>superadmin</strong> keeps priority and can act outside windows in an emergency.',
+
+    // Approvals (4-eyes)
+    'tip.appr_title' => 'How does 4-eyes approval work?',
+    'tip.appr_step1' => 'Some destructive actions (account deletion, reboot...) create an <strong>approval request</strong> instead of running immediately.',
+    'tip.appr_step2' => 'A <strong>second administrator</strong> must approve the request. You cannot approve your own (4-eyes rule).',
+    'tip.appr_step3' => '<strong>Approve</strong> triggers the action; <strong>Reject</strong> cancels it (a reason can be entered).',
+    'tip.appr_step4' => '<strong>Superadmins</strong> are exempt from approval (useful when a single admin runs the platform).',
+
+    // Command log
+    'tip.cmdlog_title' => 'What is the command log for?',
+    'tip.cmdlog_step1' => 'This log records, <strong>bastion</strong>-style, every privileged command actually run by RootWarden on your servers.',
+    'tip.cmdlog_step2' => 'For each entry you see <strong>who, what, where, when</strong> and the result (success / failure).',
+    'tip.cmdlog_step3' => 'Filter by <strong>machine</strong> or <strong>context</strong> to find a specific action.',
+    'tip.cmdlog_step4' => 'The page is <strong>read-only</strong>: it is audit evidence, nothing can be edited.',
+
+    // ChatOps
+    'tip.chatops_title' => 'How to drive RootWarden from chat?',
+    'tip.chatops_step1' => '<strong>ChatOps</strong> lets you check fleet status and approve/reject requests from Slack or Teams.',
+    'tip.chatops_step2' => 'Set the inbound <strong>webhook URL</strong> in your Slack/Teams and the matching secret/token (shown above).',
+    'tip.chatops_step3' => 'Map each <strong>chat ID</strong> to a RootWarden user so their commands are authenticated.',
+    'tip.chatops_step4' => 'Available commands: <code>status</code>, <code>approvals</code>, <code>approve &lt;id&gt;</code>, <code>reject &lt;id&gt;</code>, <code>help</code>.',
+
+    // Tickets (ITSM)
+    'tip.tickets_title' => 'How does ITSM ticketing work?',
+    'tip.tickets_step1' => 'RootWarden can create <strong>tickets</strong> in your ITSM tool (GLPI, Jira, ServiceNow or a generic webhook) from findings, notably CVEs.',
+    'tip.tickets_step2' => 'If no provider is configured, tickets stay <strong>local</strong> (simple tracking inside RootWarden).',
+    'tip.tickets_step3' => 'The <strong>New ticket</strong> button opens a manual creation form (summary, machine, description).',
+    'tip.tickets_step4' => 'Duplicates are <strong>deduplicated</strong> automatically so you don\'t get several tickets for the same alert.',
+
+    // Global search
+    'tip.search_title' => 'How to use global search?',
+    'tip.search_step1' => 'Type at least <strong>2 characters</strong> to run a cross-cutting search.',
+    'tip.search_step2' => 'The search covers, in one place: <strong>servers, users, CVEs, tickets</strong> and the <strong>audit log</strong>.',
+    'tip.search_step3' => 'Results are grouped by category; click a result to open the matching page.',
+
+    // Database backups
+    'tip.backup_title' => 'How to manage database backups?',
+    'tip.backup_step1' => '<strong>Create a backup</strong> immediately generates a full database export, with a sha256 checksum to guarantee its integrity.',
+    'tip.backup_step2' => '<strong>Verify</strong> reloads the backup into a temporary database (non-destructive test) to confirm it is usable.',
+    'tip.backup_step3' => '<strong>Restore</strong> is <span class="text-rose-600 font-medium">destructive</span>: it overwrites the current database. A safety backup is taken first, and the action is superadmin-only.',
+];

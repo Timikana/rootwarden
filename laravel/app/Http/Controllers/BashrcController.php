@@ -106,6 +106,13 @@ class BashrcController extends Controller
             //    defaut de traduction. Mesure du 2026-09-07 : les onze cles
             //    ci-dessous manquaient au premier jet, croisees par script.
             'deploy_confirme'   => __('bashrc.deploy_confirme'),
+            // Composees a l'execution par le JS : sans ce voyage, la
+            // confirmation s'ouvrirait VIDE — et un vide ne ressemble pas a un
+            // defaut de traduction.
+            'figlet_confirme'   => __('bashrc.figlet_confirme'),
+            'figlet_en_cours'   => __('bashrc.figlet_en_cours'),
+            'figlet_fait'       => __('bashrc.figlet_fait'),
+            'figlet_echec'      => __('bashrc.figlet_echec'),
             'deploy_en_cours'   => __('bashrc.deploy_en_cours'),
             'deploy_fait'       => __('bashrc.deploy_fait'),
             'deploy_echec'      => __('bashrc.deploy_echec'),

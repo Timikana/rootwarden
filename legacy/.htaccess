@@ -40,7 +40,11 @@ RedirectMatch 404 ^/_deprecated/
 #
 # `_sortie.php` ne fait ni `require`, ni base, ni session : une page d'erreur
 # qui leve une erreur ne laisse plus aucune sortie.
-ErrorDocument 404 /_sortie.php
+# ⛔ `ErrorDocument 404 /_sortie.php` RETIRE avec l'etape ⑥ : la cible est
+# archivee, et une directive qui pointe vers rien fait retomber Apache sur sa
+# page par defaut — le meme resultat, avec une ligne qui ment.
+# Le reste de ce fichier garde encore : `Options -Indexes`, le refus des
+# fichiers de test/.env, et les <FilesMatch> de db|menu|head|footer jusqu'a ⑦.
 
 # Bloquer l'acces a version.txt (info disclosure - pentest 2026-05-20)
 <Files "version.txt">
