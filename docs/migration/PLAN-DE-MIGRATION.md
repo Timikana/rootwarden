@@ -138,9 +138,18 @@ ls legacy/_deprecated/                                   # parties archivees
   #    numeros (E-452..E-459) designaient deux ecarts DIFFERENTS. Pour COMPTER
   #    les ecarts de parite, la ligne ci-dessous est juste ; pour ALLOUER un
   #    numero neuf, prendre le maximum des DEUX (vrai max au 2026-09-07 : 462) :
-  #      cat <(grep -ohE '^#{1,6} +E-[0-9]+' docs/migration/PARITE.md) \
-  #          <(grep -ohE '^#{1,6} +E-[0-9]+' docs/migration/DECISIONS-DSI.md) \
-  #        | grep -oE '[0-9]+' | sort -n | tail -1
+  #      cat <(grep -ohE '^#{1,6}[^0-9]*E-[0-9]+' docs/migration/PARITE.md) \
+  #          <(grep -ohE '^#{1,6}[^0-9]*E-[0-9]+' docs/migration/DECISIONS-DSI.md) \
+  #        | grep -oE 'E-[0-9]+' | grep -oE '[0-9]+' | sort -n | tail -1
+  #
+  # ⚠⚠ LE `[^0-9]*` N'EST PAS DECORATIF, ET LA PREMIERE FORME A COLLISIONNE DEUX
+  #    FOIS DE PLUS. `DECISIONS-DSI.md` titre ses entrees `## ⚖ E-480 — …` et
+  #    `## ⛔ E-482 — …` : un EMOJI separe les diese du `E-`, et `^#{1,6} +E-`
+  #    ne le franchit pas. Le 2026-09-08 a 05:45, mon motif rendait « max 469 »
+  #    quand le vrai maximum etait **482** — et E-469 etait DEJA PRIS. J'ai
+  #    renumerote avant de committer, mais c'est le motif corrige qui l'a vu.
+  #    *Troisieme fois qu'un de mes motifs suppose une forme : un espace unique
+  #    avant `=>`, une entree par ligne, et maintenant rien entre `##` et `E-`.*
 python3 -c "import re;t=re.findall(r'^#{1,6} +(E-\\d+[a-z]*)',open('docs/migration/PARITE.md').read(),re.M);n=sorted({int(re.match(r'E-(\\d+)',x).group(1)) for x in t});print(len(set(t)),'ecarts, max E-%d'%n[-1],'jamais servis:',[x for x in range(n[0],n[-1]+1) if x not in set(n)])"
 git fetch origin && git rev-list --left-right --count @{u}...HEAD
 sudo -n docker exec rootwarden_python sh -c "cd /app && python -m pytest -q"
