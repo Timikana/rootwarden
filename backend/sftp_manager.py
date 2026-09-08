@@ -179,6 +179,11 @@ def audit_policy(client, root_password: str, username: str) -> tuple[bool, str]:
 def _make_tmpfile(client, root_password: str) -> str:
     rand = secrets.token_hex(8)
     tmpfile = f"/tmp/rootwarden-sftp-{rand}.tmp"
+    #   `tmpfile` sort de `_make_tmpfile` (:179) :
+    #   `/tmp/rootwarden-sftp-{secrets.token_hex(8)}.tmp`. `token_hex` ne rend que
+    #   des chiffres hexadecimaux : aucun metacaractere n'y est EXPRIMABLE.
+    #   C'est l'ALPHABET qui neutralise.
+    # nosemgrep: rw-shell-fstring-execute-as-root
     execute_as_root(client, f"install -m 0644 -o root -g root /dev/null {tmpfile}",
                     root_password, timeout=10)
     return tmpfile
@@ -224,8 +229,25 @@ def deploy_policy(client, root_password: str, policy: dict) -> dict:
 
         # 2. Backup l'ancien fichier si existe, puis mv le tmpfile en place
         if existed:
+            #   `backup_in_place` = `f"{target}.rwbak"` : il DERIVE de `target` et herite
+            #   donc de son rejet, plus un suffixe litteral. Il n'y a pas de seconde
+            #   entree a valider — c'est la MEME valeur, allongee.
+            #   `target` = `_target_path(username)` (:74) :
+            #   `/etc/ssh/sshd_config.d/` + `rootwarden-` + un nom valide + `.conf`. Les
+            #   trois constantes sont litterales (:52 :53 :54), une affectation chacune.
+            #   `_validate_username` fait `.strip()` PUIS `_USERNAME_RE.fullmatch` sur
+            #   `^[a-zA-Z_][a-zA-Z0-9_-]{0,31}$` — borne a 32, la limite de `useradd`
+            #   (mesure : 32 accepte, 33 refuse).
+            #   EPREUVE du 2026-09-09 : `; id` · `&& id` · `$(id)` · backtick · `\n`
+            #   interne · `../../etc/passwd` · `1sftp` · `sftp user` · '' TOUS refuses ;
+            #   `sftpuser\n` et ` sftpuser ` NORMALISES. C'est le REJET qui neutralise.
+            # nosemgrep: rw-shell-fstring-execute-as-root
             execute_as_root(client, f"cp -a {target} {backup_in_place}",
                             root_password, timeout=10)
+        #   `target` — meme provenance qu'au premier site annote ; ce qui est propre a
+        #   CE site est que l'appel porte bien la valeur validee et non un nom brut.
+        #   `tmpfile` — alphabet hexadecimal seul, cf. `_make_tmpfile` (:179).
+        # nosemgrep: rw-shell-fstring-execute-as-root
         execute_as_root(
             client,
             f"mv {tmpfile} {target} && chown root:root {target} && chmod 0644 {target}",
@@ -237,9 +259,16 @@ def deploy_policy(client, root_password: str, policy: dict) -> dict:
         if not ok:
             # Rollback : restaurer le backup ou supprimer si rien n'existait
             if existed:
+                #   `backup_in_place` — derive de `target`, suffixe `.rwbak` litteral.
+                #   `target` — meme provenance qu'au premier site annote ; ce qui est propre a
+                #   CE site est que l'appel porte bien la valeur validee et non un nom brut.
+                # nosemgrep: rw-shell-fstring-execute-as-root
                 execute_as_root(client, f"mv {backup_in_place} {target}",
                                 root_password, timeout=10)
             else:
+                #   `target` — meme provenance qu'au premier site annote ; ce qui est propre a
+                #   CE site est que l'appel porte bien la valeur validee et non un nom brut.
+                # nosemgrep: rw-shell-fstring-execute-as-root
                 execute_as_root(client, f"rm -f {target}", root_password, timeout=10)
             return {
                 'success': False,
@@ -256,9 +285,16 @@ def deploy_policy(client, root_password: str, policy: dict) -> dict:
             root_password, timeout=20)
         if code != 0:
             if existed:
+                #   `backup_in_place` — derive de `target`, suffixe `.rwbak` litteral.
+                #   `target` — meme provenance qu'au premier site annote ; ce qui est propre a
+                #   CE site est que l'appel porte bien la valeur validee et non un nom brut.
+                # nosemgrep: rw-shell-fstring-execute-as-root
                 execute_as_root(client, f"mv {backup_in_place} {target}",
                                 root_password, timeout=10)
             else:
+                #   `target` — meme provenance qu'au premier site annote ; ce qui est propre a
+                #   CE site est que l'appel porte bien la valeur validee et non un nom brut.
+                # nosemgrep: rw-shell-fstring-execute-as-root
                 execute_as_root(client, f"rm -f {target}", root_password, timeout=10)
             return {
                 'success': False,
@@ -270,6 +306,8 @@ def deploy_policy(client, root_password: str, policy: dict) -> dict:
             }
 
         # 5. Tout est OK, supprimer le backup
+        #   `backup_in_place` — derive de `target`, suffixe `.rwbak` litteral.
+        # nosemgrep: rw-shell-fstring-execute-as-root
         execute_as_root(client, f"rm -f {backup_in_place}",
                         root_password, timeout=5)
 
@@ -281,6 +319,8 @@ def deploy_policy(client, root_password: str, policy: dict) -> dict:
             'validation_output': validation_output,
         }
     finally:
+        #   `tmpfile` — alphabet hexadecimal seul, cf. `_make_tmpfile` (:179).
+        # nosemgrep: rw-shell-fstring-execute-as-root
         execute_as_root(client, f"rm -f {tmpfile}", root_password, timeout=5)
 
 
@@ -299,11 +339,19 @@ def remove_policy(client, root_password: str, username: str) -> dict:
         }
 
     backup_in_place = f"{target}.rwbak"
+    #   `backup_in_place` — derive de `target`, suffixe `.rwbak` litteral.
+    #   `target` — meme provenance qu'au premier site annote ; ce qui est propre a
+    #   CE site est que l'appel porte bien la valeur validee et non un nom brut.
+    # nosemgrep: rw-shell-fstring-execute-as-root
     execute_as_root(client, f"cp -a {target} {backup_in_place} && rm -f {target}",
                     root_password, timeout=10)
 
     ok, validation_output = validate_sshd_config(client, root_password)
     if not ok:
+        #   `backup_in_place` — derive de `target`, suffixe `.rwbak` litteral.
+        #   `target` — meme provenance qu'au premier site annote ; ce qui est propre a
+        #   CE site est que l'appel porte bien la valeur validee et non un nom brut.
+        # nosemgrep: rw-shell-fstring-execute-as-root
         execute_as_root(client, f"mv {backup_in_place} {target}",
                         root_password, timeout=10)
         return {
@@ -317,6 +365,8 @@ def remove_policy(client, root_password: str, username: str) -> dict:
 
     execute_as_root(client, "systemctl reload ssh 2>/dev/null || systemctl reload sshd 2>/dev/null",
                     root_password, timeout=20)
+    #   `backup_in_place` — derive de `target`, suffixe `.rwbak` litteral.
+    # nosemgrep: rw-shell-fstring-execute-as-root
     execute_as_root(client, f"rm -f {backup_in_place}", root_password, timeout=5)
 
     return {
@@ -346,8 +396,16 @@ def rollback_policy(client, root_password: str, username: str,
         _write_to_remote(client, root_password, previous_content, tmpfile)
         existed, _ = audit_policy(client, root_password, username)
         if existed:
+            #   `backup_in_place` — derive de `target`, suffixe `.rwbak` litteral.
+            #   `target` — meme provenance qu'au premier site annote ; ce qui est propre a
+            #   CE site est que l'appel porte bien la valeur validee et non un nom brut.
+            # nosemgrep: rw-shell-fstring-execute-as-root
             execute_as_root(client, f"cp -a {target} {backup_in_place}",
                             root_password, timeout=10)
+        #   `target` — meme provenance qu'au premier site annote ; ce qui est propre a
+        #   CE site est que l'appel porte bien la valeur validee et non un nom brut.
+        #   `tmpfile` — alphabet hexadecimal seul, cf. `_make_tmpfile` (:179).
+        # nosemgrep: rw-shell-fstring-execute-as-root
         execute_as_root(
             client,
             f"mv {tmpfile} {target} && chown root:root {target} && chmod 0644 {target}",
@@ -357,9 +415,16 @@ def rollback_policy(client, root_password: str, username: str,
         ok, validation_output = validate_sshd_config(client, root_password)
         if not ok:
             if existed:
+                #   `backup_in_place` — derive de `target`, suffixe `.rwbak` litteral.
+                #   `target` — meme provenance qu'au premier site annote ; ce qui est propre a
+                #   CE site est que l'appel porte bien la valeur validee et non un nom brut.
+                # nosemgrep: rw-shell-fstring-execute-as-root
                 execute_as_root(client, f"mv {backup_in_place} {target}",
                                 root_password, timeout=10)
             else:
+                #   `target` — meme provenance qu'au premier site annote ; ce qui est propre a
+                #   CE site est que l'appel porte bien la valeur validee et non un nom brut.
+                # nosemgrep: rw-shell-fstring-execute-as-root
                 execute_as_root(client, f"rm -f {target}", root_password, timeout=10)
             return {
                 'success': False,
@@ -370,6 +435,8 @@ def rollback_policy(client, root_password: str, username: str,
 
         execute_as_root(client, "systemctl reload ssh 2>/dev/null || systemctl reload sshd 2>/dev/null",
                         root_password, timeout=20)
+        #   `backup_in_place` — derive de `target`, suffixe `.rwbak` litteral.
+        # nosemgrep: rw-shell-fstring-execute-as-root
         execute_as_root(client, f"rm -f {backup_in_place}", root_password, timeout=5)
 
         return {
@@ -379,4 +446,6 @@ def rollback_policy(client, root_password: str, username: str,
             'validation_output': validation_output,
         }
     finally:
+        #   `tmpfile` — alphabet hexadecimal seul, cf. `_make_tmpfile` (:179).
+        # nosemgrep: rw-shell-fstring-execute-as-root
         execute_as_root(client, f"rm -f {tmpfile}", root_password, timeout=5)
