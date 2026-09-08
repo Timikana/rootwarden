@@ -322,6 +322,11 @@ def deploy():
                                 'stderr': (err2 or '')[-1500:]}), 500
 
             # Nettoyer anciens snippets RootWarden puis pousser ceux enabled
+            #   `_RW_CONF_PREFIX` est une constante de module (:58,
+            #   '/etc/rsyslog.d/50-rootwarden-') avec UNE seule affectation dans tout
+            #   `backend/`. Le `*` du glob est litteral dans la f-string, pas une
+            #   valeur interpolee.
+            # nosemgrep: rw-shell-fstring-execute-as-root
             execute_as_root(client, f"rm -f {_RW_CONF_PREFIX}*.conf",
                             root_pwd, logger=logger, timeout=5)
 
@@ -407,6 +412,15 @@ def test_forward():
         msg = shlex.quote(f"ping depuis RootWarden {row['name']}")
         tag_q = shlex.quote(tag)
         with ssh_session(ip, port, ssh_user, pwd, logger, service_account=svc) as client:
+            #   Les DEUX operandes sont DEJA passees par `shlex.quote`, trois lignes
+            #   plus haut (`msg` et `tag_q`), et le commentaire de :404 documente ce
+            #   patch. La regle les signale quand meme parce que sa
+            #   `pattern-not-regex: shlex\.quote` ne regarde que les lignes APPARIEES —
+            #   elle est aveugle a une protection posee en amont.
+            #   ⚠ C'est une limite de l'INSTRUMENT, pas du code : `tag` est genere par
+            #     le serveur (`rootwarden-test-` + horodatage) et `msg` contient
+            #     `row['name']`, influence par l'utilisateur — mais quote.
+            # nosemgrep: rw-shell-fstring-execute-as-root
             _, err_out, code = execute_as_root(client,
                 f"logger -t {tag_q} {msg}",
                 root_pwd, logger=logger, timeout=5)
@@ -447,6 +461,12 @@ def uninstall():
         # fait perdre des journaux ; un retrait rate fait croire qu'on a cesse
         # d'en envoyer.
         with ssh_session(ip, port, ssh_user, pwd, logger, service_account=svc) as client:
+            #   Les DEUX interpolations sont des constantes de module, chacune avec UNE
+            #   SEULE affectation dans tout `backend/` (mesure du 2026-09-08) :
+            #     :58  _RW_CONF_PREFIX  = '/etc/rsyslog.d/50-rootwarden-'
+            #     :59  _RW_FORWARD_CONF = '/etc/rsyslog.d/99-rootwarden-graylog-forward.conf'
+            #   Aucune donnee de requete ne les atteint. C'est l'ORIGINE qui neutralise.
+            # nosemgrep: rw-shell-fstring-execute-as-root
             _, err_out, code = execute_as_root(client,
                 f"rm -f {_RW_FORWARD_CONF} {_RW_CONF_PREFIX}*.conf && systemctl restart rsyslog",
                 root_pwd, logger=logger, timeout=30)
