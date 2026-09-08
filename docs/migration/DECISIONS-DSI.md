@@ -16234,3 +16234,80 @@ mesuré contre un risque non mesuré.*
 mission, `CODE` = `feat`/`fix` touchant `laravel/` ou `backend/` ; ceci touche
 `tests/e2e/`. **Le compteur reste donc à zéro**, et le métrique a un angle mort
 sur l'outillage de test et la CI. *Je le signale sans m'en servir.*
+
+---
+
+## E-510
+
+**Mes deux comptes de suites étaient faux DEUX fois, dans le même sens, et pour
+la même cause : personne ne dépouillait les commentaires.**
+
+```
+occurrences dans les suites qui lancent un navigateur :
+  finally        brut 167  ·  hors commentaires  88  ·  EN COMMENTAIRE  79
+  close()        brut 347  ·  hors commentaires 321  ·  EN COMMENTAIRE  26
+  process.exit   brut 182  ·  hors commentaires 141  ·  EN COMMENTAIRE  41
+
+comptes vrais :   (a) 62   (b) 37        annonces : 67 et 41
+population :      110 suites             annoncee : 114
+```
+
+**47 % des occurrences de `finally` vivent dans de la prose.** Et quatre des
+« 114 suites » ne portaient `puppeteer.launch` qu'en commentaire.
+
+> **Un motif trouvé dans un commentaire compte comme du code jusqu'à ce qu'on
+> dépouille — et la prose de ce dépôt parle abondamment de ses propres
+> défauts.** *C'est la forme la plus discrète de mesure fausse : stable,
+> reproductible, et fausse de la même quantité à chaque exécution. Rien dans sa
+> sortie ne la signale.*
+
+Deux implémentations indépendantes (un script Python jetable, puis le module JS
+livré) s'accordent sur `110 / 62 / 37`. Quatre témoins forgés, dont un fichier
+dont le `finally` n'existe QUE dans un commentaire, et un dont le
+`puppeteer.launch` est commenté — les deux discriminent.
+
+### Ce que je livre : un cliquet, pas une porte
+
+`tests/e2e/lib-navigateur.invariant.mjs` échoue si un compte **croît**, et
+signale sans échouer quand il baisse. *Une porte qui refuserait à 62 serait
+rouge en permanence, et on l'éteindrait.*
+
+### ⛔ Et j'ai corrigé mon propre commentaire, qui surpromettait
+
+Il affirmait que le filet *« rattrape (b) même quand le `finally` est sauté »*.
+Table de couverture, mesurée **au mécanisme** par `gestion-ssh-key-c6` dans
+`@puppeteer/browsers` (`lib/cjs/launch.js:91`) :
+
+```
+chemin de sortie      puppeteer   un finally   withNavigateur
+sortie propre            oui         oui           oui
+process.exit()           oui         NON           oui
+SIGINT / TERM / HUP      oui         NON           oui
+SIGKILL (tueur memoire)  NON         NON           NON   <- par definition
+```
+
+**Puppeteer pose déjà ses gestionnaires : mon filet est redondant sur les quatre
+chemins qu'il couvre.** Il ne sert que si une suite passait
+`handleSIGINT: false`, et aucune ne le fait. *Gardé parce qu'il coûte une ligne
+et ferme un cas qu'une option pourrait ouvrir, pas parce qu'on peut montrer
+qu'il sert — et écrit avec cette limite.*
+
+**Et la valeur réelle de l'enveloppeur, formulée par `c6` et meilleure que la
+mienne** : `SIGKILL` n'est couvert par rien, c'est la définition du signal.
+**Donc il ne nettoie pas après l'OOM, il le rend MOINS PROBABLE** — en ne
+gardant pas un navigateur ouvert pendant qu'une suite échoue. *Il agit sur la
+cause mesurée, pas sur son symptôme, et il n'a pas à avoir de chemin par lequel
+il réduirait un compte d'orphelins.*
+
+`c6` retire de son côté le mot « fuyards » : sur un arrêt propre, ces 62 suites
+ne fuient pas. **Ce qu'elles font est garder un navigateur ouvert plus longtemps
+que nécessaire** — ce n'est pas la même chose, et ça se corrige par la même
+chose. *Un mot faux fait chercher une fuite qui n'existe pas.*
+
+### État de la mission, tranché
+
+**Étape 1 : zéro CODE au sens de la mission**, pour le troisième tour. **Étape 2
+sans objet** : la file des 11 est épuisée, vérifiée item par item (E-501) puis
+par le script d'extinction lui-même (E-508, six fois « déjà archivée »).
+**Étape 3 : la déclaration `socle_avertissement` tient**, témoin étalonné dans
+le fichier, parité 40/40.
