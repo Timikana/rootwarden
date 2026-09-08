@@ -14914,3 +14914,138 @@ courriels, et une direction que je n'avais jamais mesurée.* **Aucun n'a été t
 recensement ; le recensement est venu après.** *Et le seul instrument qui les aurait tous
 attrapés — une garde qui compare chaque défaut de port à l'attribution du compose — ne peut
 lire ni `.env` (gitignoré) ni l'environnement d'un conteneur.*
+
+---
+
+## ⛔ E-482 — RATIO 23:1, ET LA CAUSE EST QUE LA LISTE DES PORTAGES EST VIDE
+
+**2026-09-08, 05:35.** Relance de l'équipe.
+
+### ① LE RATIO, ET IL EST MAUVAIS
+
+```
+24 commits depuis 04:39 · CODE 1 · autre 23 · ratio 23,0   ⚠ DEPASSE 2:1
+```
+
+**Et la définition rate DEUX livraisons de code réelles** — `a179fa04` (un `fix` sur
+`srv-docker.env.example`) et `29ec1d13` (un `feat` livrant `scripts/cles-atteintes.py`).
+*Aucune ne touche `laravel/` ni `backend/`.* **Compte honnête : 21 / 3, soit 7:1. Au-dessus
+dans les deux lectures.**
+
+### ⛔ ② MA PART, D'ABORD
+
+**Huit des 23 sont de moi**, et *sept portent sur UN SEUL défaut* — le `DOSSIER-52` : le
+dossier, trois amendements, plus trois relectures de pairs.
+
+> **Sept documents pour une trouvaille est le problème du ratio dans sa forme la plus pure.**
+> *Ç'aurait dû être UN document révisé sur place, pas quatre ajouts empilés.*
+
+*Ma discipline « garder l'historique en place plutôt que corriger en silence » est juste pour
+une entrée de journal ; appliquée à un dossier vivant, elle produit un objet qu'on ne peut
+plus lire d'un bout à l'autre.* **La trace de mes erreurs vaut ; sa forme cumulative ne vaut
+pas quatre commits.**
+
+### 🔴 ③ MAIS LA CAUSE PROFONDE N'EST PAS QUE L'ÉQUIPE ÉCRIT : C'EST QUE LA LISTE EST VIDE
+
+**J'ai remesuré les onze items, un par un, contre ce que le portage APPELLE :**
+
+```
+les 5 catalogues                    ✅ apparies — 13 sites, 0 cle manquante
+ssh_audit : releve planifie         ✅ DEJA PORTE — `ecris('/ssh-audit/schedules', corps)`
+                                       + GET liste + DELETE + toggle : le CRUD complet
+ssh_audit : sshd_config en LECTURE  ✅ DEJA PORTE — `/ssh-audit/config` -> `cfgContenu`
+ssh_audit : relever un serveur      ✅ DEJA PORTE — `/ssh-audit/scan`, audit-ssh.js:176
+groups : creer un groupe            ✅ appele (12 occurrences)
+groups : scan de derive de masse    ✅ appele — `drift_scan`, `/drift/scan`
+fail2ban : desactiver une jail      ✅ appele — `/fail2ban/jail`
+fail2ban : geolocaliser une adresse ✅ appele — `/fail2ban/geoip`
+superv : les 2 capacites PERDUES    ✅ AUDIT-SUPERVISION-…-PERDUES.md:1 « il n'y en a
+                                       aucune » · DECISIONS-DSI:8686 « FERMEES TOUTES
+                                       LES DEUX »
+serveurs : test de connexion        ⛔ AUCUN ENDPOINT BACKEND N'EXISTE
+serveurs : import CSV               ⛔ AUCUN ENDPOINT BACKEND N'EXISTE
+```
+
+**Les deux derniers ne sont pas des portages non faits : ce sont des développements neufs.**
+*Les seuls `/test*` du backend sont `/cve_test_connection` (OpenCVE), `/graylog/test`,
+`/test` (monitoring) et `/test_platform_key`. Aucune route d'import.*
+
+> ⛔ **Assigner « test de connexion puis import CSV » comme un portage aurait été assigner un
+> fantôme** — et c'est exactement l'espèce qu'un pair m'a rapportée ce matin : *demander « ce
+> chemin est-il appelé » quand le chemin n'existe pas.* **Mes deux motifs négatifs étaient
+> devinés ; j'ai lu les endpoints réels avant de conclure.**
+
+### ⚠ ET C'EST LA QUATRIÈME FOIS QUE JE MESURE CETTE LISTE FERMÉE
+
+```
+E-464   6 sur 9 deja portees          mesure 3 fois
+E-482   + releve planifie, sshd_config en lecture, relever un serveur, superv
+        = onze items, ZERO portage restant
+```
+
+> **L'équipe n'écrit pas au lieu de porter : elle écrit parce qu'il n'y a plus rien à porter
+> sur cette liste, et personne ne l'avait remesurée pour le dire.** *Le ratio est un
+> symptôme de la liste, pas de l'équipe — et la liste se réémet tous les tours.*
+
+**C'est ma faute de supervision** : j'ai assigné de la MESURE et des RELECTURES pendant trois
+tours, en laissant croire que la liste tenait. *Une relance qui reconduit une liste fermée
+fabrique le ratio qu'elle dénonce.*
+
+---
+
+## ⚖ E-482 bis — LES DEUX DERNIERS ITEMS : JE TRANCHE, ET AUCUN NE SE DÉVELOPPE
+
+### `test de connexion` à un serveur — NE PAS DÉVELOPPER
+
+**La capacité existe déjà sous un autre nom** : `/ssh-audit/scan` ouvre une session sur la
+machine et rend son `sshd_config`. *Une machine qui rend un relevé est joignable ; l'échec du
+relevé EST le test de connexion.*
+
+> **Un bouton « tester » à côté d'un bouton qui teste en faisant quelque chose d'utile ajoute
+> un chemin sans ajouter une capacité.** *Et il ajoute un geste sortant de plus à garder.*
+
+### `import CSV` — NE PAS PORTER, et la raison n'est pas le coût
+
+```
+legacy/adm/includes/import_csv.php   ABSENT du disque (archive)
+au reseau                            403 — refuse par le .htaccess du repertoire
+endpoint backend                     AUCUN
+il ecrivait dans QUATRE tables
+il est bloque sur TROIS arbitrages de l'exploitant, non rendus
+```
+
+**Rien ne régresse en ne le portant pas** : il est déjà injoignable, et il l'était avant que
+je m'en occupe. *Le porter demanderait d'écrire un chemin d'écriture en masse dans quatre
+tables, dont les trois arbitrages qui le gouvernent ne sont pas rendus.*
+
+> **Un import de masse dont les règles ne sont pas décidées ne se porte pas : il se
+> SPÉCIFIE.** *Porter d'abord et arbitrer ensuite mettrait les quatre écritures en service
+> avant que quiconque ait dit ce qu'elles doivent faire d'une ligne en conflit.*
+
+**Si l'exploitant veut l'import de masse, il revient comme une demande neuve avec ses trois
+décisions** — pas comme le dernier item d'une liste de portage.
+
+---
+
+## ③ LES DÉCLARATIONS D'ÉTAT TIENNENT
+
+```
+lang/fr/auth.php · lang/en/auth.php · cgu.blade.php    0 · 0 · 0
+suites qui l'asserent                                   0
+jetons-interdits.mjs                                    0
+```
+
+## ⚠ ET UNE CORRECTION SUR MON PROPRE INSTRUMENT DE BANC
+
+```
+05:35:34   ps -> 3 processus de suite
+05:36:0x   ps -> 0, et l'enumeration ne montre RIEN
+```
+
+**Troisième fois que ce compte change en quelques secondes.** *Les trois fois, l'énumération
+ne montrait que du MCP puppeteer vieux de onze jours, ou rien.*
+
+> **À ce grain, `ps` n'est pas un signal de banc : c'est un signal de bruit.** *Je cesse de le
+> citer comme s'il l'était.* **Le signal qui a tenu, lui, est l'écriture de captures sous
+> `tests/e2e/screenshots` dans les trois dernières minutes** — mesurable, daté, et avec un
+> témoin (104 fichiers de moins de deux jours prouvent que la commande lit).
