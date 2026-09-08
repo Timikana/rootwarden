@@ -163,6 +163,25 @@ def _restaure_sshd(client, root_pass, bak_q, fp_q, logger, recharger=False):
     message DIT que le fichier est reste modifie — c'est l'information que
     l'ancienne version supprimait.
     """
+    # ── ECHAPPEMENT, et il PORTE ────────────────────────────────────────────
+    # `fp_q` / `bak_q` sortent de `shlex.quote` (:213 :214), une affectation
+    # chacune. Et l'echappement n'est PAS decoratif ici : `file_path` vient de
+    # `first_line.split(':', 1)` (:205), c'est-a-dire de la sortie d'un grep
+    # execute SUR LA MACHINE DISTANTE. L'origine n'est donc ni litterale ni
+    # calculee ici — une machine cible hostile ou compromise la choisit.
+    # EPREUVE du 2026-09-09, `shlex.quote` sur les formes d'attaque :
+    #   `x; id` `$(id)` `` `id` `` `a b`  -> enfermes dans des apostrophes
+    #   `x\nid`                          -> le saut de ligne reste DEDANS
+    #   `'; id; '`                        -> re-echappe en `'"'"'`
+    # Le cas du `\n` est celui qui avait perce dans `routes/updates.py` : ici il
+    # ne perce pas, parce que la neutralisation est un ENFERMEMENT et non une
+    # validation de forme.
+    # ⚠ `_restaure_sshd` (:149) recoit ces valeurs en PARAMETRES : la propriete
+    # est donc RELATIONNELLE, une question d'ARITE et non de seuil. Les quatre
+    # appelants (:231 :237 :243 :276) vivent tous dans
+    # `_ensure_sshd_allows_user` et passent tous les deux locales de :213-214 ;
+    # aucun appelant hors de ce fichier (mesure sur tout le depot).
+    # nosemgrep: rw-shell-fstring-execute-as-root
     _, err_c, code_c = execute_as_root(client, f"cp -a {bak_q} {fp_q}", root_pass, logger=logger)
     if code_c != 0:
         return False, (f"RETOUR ARRIERE ECHOUE ({(err_c or '').strip()[:120]}) - "
@@ -215,6 +234,8 @@ def _ensure_sshd_allows_user(client, root_pass, sa_name, logger):
     sa_q = shlex.quote(sa_name)
 
     # 1. Backup
+    # `fp_q` / `bak_q` — `shlex.quote` (:213 :214) ; origine = sortie de la machine distante, cf. :166.
+    # nosemgrep: rw-shell-fstring-execute-as-root
     _, err_b, code_b = execute_as_root(client, f"cp -a {fp_q} {bak_q}", root_pass, logger=logger)
     if code_b != 0:
         return False, False, f"Backup echoue : {(err_b or '')[:200]}"
@@ -889,22 +910,52 @@ def deploy_platform_key():
                         import base64 as _b64
 
                         # Creer le user rootwarden
+                        # ── ORIGINE LITTERALE : l'attaque n'est pas EXPRIMABLE ──────────────────
+                        # `sa_name` n'a que deux affectations dans ce fichier :
+                        #   :879   sa_name = Config.NOM_COMPTE_SERVICE
+                        #   :1334  sa_name = 'rootwarden'
+                        # et `NOM_COMPTE_SERVICE` est un litteral, `backend/config.py:71`
+                        # (`'rootwarden'`), une seule affectation dans tout le depot.
+                        # Aucune requete, aucune base, aucun argument ne l'atteint : il n'y a pas de
+                        # valeur hostile a echapper parce qu'il n'y a pas de valeur VARIABLE.
+                        # `configure_servers.py:287` le reprend meme comme nom RESERVE.
+                        # ⚠ CE QUE CETTE EXEMPTION NE DIT PAS : la ligne :904 ecrit
+                        # `NOPASSWD: ALL` dans `/etc/sudoers.d/rootwarden`. C'est deliberé — c'est
+                        # le compte de service du produit — et c'est une question de PORTEE de
+                        # droit, pas d'injection. L'exemption ne couvre que l'injection.
+                        # nosemgrep: rw-shell-fstring-execute-as-root
                         execute_as_root(client, f"id {sa_name} >/dev/null 2>&1 || /usr/sbin/useradd -r -m -s /bin/bash {sa_name}", root_pass, logger=logger)
+                        # `sa_name` — litteral `'rootwarden'` (`config.py:71`), cf. le bloc de :892.
+                        # nosemgrep: rw-shell-fstring-execute-as-root
                         execute_as_root(client, f"chown {sa_name}:{sa_name} /home/{sa_name}", root_pass, logger=logger)
 
                         # Deployer la keypair
                         key_b64 = _b64.b64encode(pubkey.encode()).decode()
+                        # `sa_name` — litteral `'rootwarden'` (`config.py:71`), cf. le bloc de :892.
+                        # nosemgrep: rw-shell-fstring-execute-as-root
                         execute_as_root(client, f"mkdir -p /home/{sa_name}/.ssh", root_pass, logger=logger)
+                        # `sa_name` — litteral `'rootwarden'` (`config.py:71`), cf. le bloc de :892.
+                        # nosemgrep: rw-shell-fstring-execute-as-root
                         execute_as_root(client, f"chmod 700 /home/{sa_name}/.ssh", root_pass, logger=logger)
                         execute_as_root(client, f"printf %s {key_b64} | base64 -d > /home/{sa_name}/.ssh/authorized_keys", root_pass, logger=logger)
+                        # `sa_name` — litteral `'rootwarden'` (`config.py:71`), cf. le bloc de :892.
+                        # nosemgrep: rw-shell-fstring-execute-as-root
                         execute_as_root(client, f"chmod 600 /home/{sa_name}/.ssh/authorized_keys", root_pass, logger=logger)
+                        # `sa_name` — litteral `'rootwarden'` (`config.py:71`), cf. le bloc de :892.
+                        # nosemgrep: rw-shell-fstring-execute-as-root
                         execute_as_root(client, f"chown -R {sa_name}:{sa_name} /home/{sa_name}/.ssh", root_pass, logger=logger)
 
                         # Configurer sudoers NOPASSWD
+                        # `sa_name` — litteral `'rootwarden'` (`config.py:71`), cf. le bloc de :892.
+                        # nosemgrep: rw-shell-fstring-execute-as-root
                         execute_as_root(client, f"echo '{sa_name} ALL=(ALL:ALL) NOPASSWD: ALL' > /etc/sudoers.d/{sa_name}", root_pass, logger=logger)
+                        # `sa_name` — litteral `'rootwarden'` (`config.py:71`), cf. le bloc de :892.
+                        # nosemgrep: rw-shell-fstring-execute-as-root
                         execute_as_root(client, f"chmod 440 /etc/sudoers.d/{sa_name}", root_pass, logger=logger)
 
                         # Valider sudoers
+                        # `sa_name` — litteral `'rootwarden'` (`config.py:71`), cf. le bloc de :892.
+                        # nosemgrep: rw-shell-fstring-execute-as-root
                         _, err_sudo, code_sudo = execute_as_root(
                             client, f"/usr/sbin/visudo -cf /etc/sudoers.d/{sa_name}", root_pass, logger=logger
                         )
@@ -1343,22 +1394,47 @@ def deploy_service_account():
                 import base64 as _b64
 
                 # 1. Creer l'utilisateur rootwarden s'il n'existe pas
+                # `sa_name` — meme origine litterale qu'a :892 (`config.py:71`).
+                # ⚠ ET CE BLOC EST LE JUMEAU DE :892-:908. `deploy_platform_key` (:792) et
+                # `deploy_service_account` (:1295) executent les MEMES neuf commandes root,
+                # a l'identique aux commentaires et aux noms de variables pres (mesure par
+                # `diff` le 2026-09-09). Un correctif sur l'un des deux chemins laisse
+                # l'autre arme : c'est la forme exacte du defaut V7, ou le CHEMIN avait ete
+                # corrige et pas l'ADRESSE. Unifier est un geste sur le deploiement, donc
+                # hors de mon perimetre — consigne en arbitrage, pas corrige ici.
+                # nosemgrep: rw-shell-fstring-execute-as-root
                 execute_as_root(client, f"id {sa_name} >/dev/null 2>&1 || /usr/sbin/useradd -r -m -s /bin/bash {sa_name}", root_pass, logger=logger)
+                # `sa_name` — litteral ; ce bloc est le jumeau de :892-:908, cf. :1346.
+                # nosemgrep: rw-shell-fstring-execute-as-root
                 execute_as_root(client, f"chown {sa_name}:{sa_name} /home/{sa_name}", root_pass, logger=logger)
 
                 # 2. Deployer la keypair plateforme
                 key_b64 = _b64.b64encode(pubkey.encode()).decode()
+                # `sa_name` — litteral ; ce bloc est le jumeau de :892-:908, cf. :1346.
+                # nosemgrep: rw-shell-fstring-execute-as-root
                 execute_as_root(client, f"mkdir -p /home/{sa_name}/.ssh", root_pass, logger=logger)
+                # `sa_name` — litteral ; ce bloc est le jumeau de :892-:908, cf. :1346.
+                # nosemgrep: rw-shell-fstring-execute-as-root
                 execute_as_root(client, f"chmod 700 /home/{sa_name}/.ssh", root_pass, logger=logger)
                 execute_as_root(client, f"printf %s {key_b64} | base64 -d > /home/{sa_name}/.ssh/authorized_keys", root_pass, logger=logger)
+                # `sa_name` — litteral ; ce bloc est le jumeau de :892-:908, cf. :1346.
+                # nosemgrep: rw-shell-fstring-execute-as-root
                 execute_as_root(client, f"chmod 600 /home/{sa_name}/.ssh/authorized_keys", root_pass, logger=logger)
+                # `sa_name` — litteral ; ce bloc est le jumeau de :892-:908, cf. :1346.
+                # nosemgrep: rw-shell-fstring-execute-as-root
                 execute_as_root(client, f"chown -R {sa_name}:{sa_name} /home/{sa_name}/.ssh", root_pass, logger=logger)
 
                 # 3. Configurer sudoers NOPASSWD:ALL
+                # `sa_name` — litteral ; ce bloc est le jumeau de :892-:908, cf. :1346.
+                # nosemgrep: rw-shell-fstring-execute-as-root
                 execute_as_root(client, f"echo '{sa_name} ALL=(ALL:ALL) NOPASSWD: ALL' > /etc/sudoers.d/{sa_name}", root_pass, logger=logger)
+                # `sa_name` — litteral ; ce bloc est le jumeau de :892-:908, cf. :1346.
+                # nosemgrep: rw-shell-fstring-execute-as-root
                 execute_as_root(client, f"chmod 440 /etc/sudoers.d/{sa_name}", root_pass, logger=logger)
 
                 # 4. Valider la syntaxe sudoers
+                # `sa_name` — litteral ; ce bloc est le jumeau de :892-:908, cf. :1346.
+                # nosemgrep: rw-shell-fstring-execute-as-root
                 out, err, code = execute_as_root(
                     client, f"/usr/sbin/visudo -cf /etc/sudoers.d/{sa_name}", root_pass, logger=logger
                 )

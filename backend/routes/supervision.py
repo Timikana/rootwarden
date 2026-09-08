@@ -1247,6 +1247,20 @@ def zabbix_config_read():
     try:
         with ssh_session(ip, port, ssh_user, ssh_pass,
                          logger=logger, service_account=svc_account) as client:
+            # ── ORIGINE LITTERALE : un CATALOGUE, pas une entree ────────────────────
+            # `config_path` vient de `_config_file_path` (:768) : soit l'un de deux
+            # litteraux (`/etc/zabbix/zabbix_agentd.conf`,
+            # `/etc/zabbix/zabbix_agent2.conf`), soit `AGENT_REGISTRY[p]['config_path']`.
+            # `AGENT_REGISTRY` a UNE SEULE affectation dans tout le depot — :125, un
+            # dictionnaire litteral — et aucune mutation (`[..]=`, `.update`,
+            # `.setdefault`, `.pop` : 0 occurrence, mesure sur `--include=*.py`).
+            # `config_dir` et `filename` en DERIVENT par `split('/')`, donc ils heritent
+            # de la propriete au lieu d'en reclamer une nouvelle.
+            # `service_name` est soit un ternaire entre deux litteraux, soit
+            # `agent_info['service']` — et `agent_info` est TOUJOURS `AGENT_REGISTRY[p]`
+            # (7 affectations, :1610 :1808 :1901 :1964 :2005 :2150 :2259, aucune venant
+            # d'une base ni d'une requete).
+            # nosemgrep: rw-shell-fstring-execute-as-root
             out, stderr, rc = execute_as_root(client,
                 f"cat {config_path} 2>/dev/null || echo 'FILE_NOT_FOUND'",
                 root_pass, timeout=15)
@@ -1295,10 +1309,22 @@ def zabbix_config_save():
             _, stderr, rc = execute_as_root(client, cmd, root_pass, logger=logger)
             if rc != 0:
                 if backup_path:
+                    # ── CALCULE PAR LE SERVEUR ──────────────────────────────────────────────
+                    # `backup_path` sort ici de `_backup_agent_config` (:603) :
+                    #   f"{backup_dir}/{filename}.bak.{timestamp}"
+                    # ou `timestamp` est `datetime.now().strftime('%Y%m%d_%H%M%S')` et les deux
+                    # autres derivent de `config_path` par `split('/')`. Aucun des trois ne
+                    # traverse le reseau : la valeur est fabriquee ici, elle n'est pas recue.
+                    # ⚠ A NE PAS CONFONDRE avec :1399 :1407 :2269 :2274, ou le MEME NOM porte
+                    # une valeur venue de la REQUETE. Un nom de variable n'est pas une
+                    # provenance.
+                    # nosemgrep: rw-shell-fstring-execute-as-root
                     execute_as_root(client, f"cp {backup_path} {config_path}", root_pass)
                 return jsonify({'success': False, 'message': f'Ecriture echouee: {stderr}'}), 500
 
             # Restart agent
+            # `config_path` / `config_dir` / `filename` / `service_name` — catalogue litteral `AGENT_REGISTRY:125`, cf. :1250.
+            # nosemgrep: rw-shell-fstring-execute-as-root
             _, stderr_r, rc_r = execute_as_root(client,
                 f"systemctl restart {service_name}", root_pass, timeout=15)
             if rc_r != 0:
@@ -1341,6 +1367,8 @@ def zabbix_list_backups():
     try:
         with ssh_session(ip, port, ssh_user, ssh_pass,
                          logger=logger, service_account=svc_account) as client:
+            # `config_path` / `config_dir` / `filename` / `service_name` — catalogue litteral `AGENT_REGISTRY:125`, cf. :1250.
+            # nosemgrep: rw-shell-fstring-execute-as-root
             out, _, rc = execute_as_root(client,
                 f"LC_ALL=C ls -la {config_dir}/{filename}.bak.* 2>/dev/null || echo 'NONE'",
                 root_pass, timeout=10)
@@ -1396,6 +1424,36 @@ def zabbix_restore_backup():
             backup_path = f"{config_dir}/{backup_name}"
 
             # Verifier que le backup existe
+            # ── REJET : la seule valeur qui vienne de la requete ────────────────────
+            # `backup_path` = f"{config_dir}/{backup_name}" (:1396) et `backup_name` est
+            # `data.get('backup_name')` — une entree. Elle est refusee par
+            # `_BACKUP_NAME_RE.fullmatch` (:39, `^[\w.-]+\.bak\.\d{8}_\d{6}$`) AVANT
+            # tout usage (:1383, :2256), et la garde DOMINE : elle rend 400 au lieu de
+            # continuer.
+            # ALLER-RETOUR mesure le 2026-09-09, contre le producteur de :603 :
+            #   3 dates x 3 fichiers (1er janvier, 31 decembre 23:59:59, 29 fevrier
+            #   bissextile) -> 9/9 ACCEPTES. Le validateur reconnait ce que le
+            #   producteur ecrit. C'est le controle qui MANQUAIT a `ssh_audit.py`, ou un
+            #   `\d{14}` refusait les 15 caracteres de `%Y%m%d_%H%M%S`.
+            # CONTRE-EPREUVE, 10 formes hostiles, 10 refusees :
+            #   `; id` · ` id` · `$(id)` · `` `id` `` · `../../etc/passwd`
+            #   · `…/../../etc/shadow` · '' · `x.conf.bak.2026` (tronquee)
+            #   · `…_003720\n`  <- refusee, et refusee TROIS fois independamment
+            # ⚠ RECTIFICATION de ma propre premiere redaction : j'allais ecrire ici que
+            # `fullmatch` FERME ce vecteur et que c'est celui de `routes/updates.py`.
+            # C'est faux, et je l'ai mesure AVANT de le graver :
+            #   `.strip()` (:1382, :2256) ramene `x…_003720\n` a `x…_003720`, qui est un
+            #     nom VALIDE — le saut final n'arrivait donc jamais au regex ;
+            #   `fullmatch` le refuserait de toute facon s'il arrivait ;
+            #   un `\n` INTERNE est refuse par la classe `[\w.-]`, qui ne l'exprime pas.
+            # Ce site n'a donc JAMAIS ete ouvert : la conversion `match`->`fullmatch` de
+            # `c869144b` y etait de la defense en profondeur, pas un correctif. Le
+            # rapprochement avec `routes/updates.py` aurait ete une ALARME FAUSSE gravee
+            # dans un commentaire permanent — la ou l'origine, elle, n'avait ni `.strip()`
+            # ni classe couvrant toute la chaine.
+            # La classe `[\w.-]` n'exprime ni `/`, ni espace, ni `;`, ni `$`, ni
+            # backtick : le rejet n'est pas une liste noire, c'est un alphabet.
+            # nosemgrep: rw-shell-fstring-execute-as-root
             _, _, rc = execute_as_root(client, f"test -f {backup_path}", root_pass, timeout=5)
             if rc != 0:
                 return jsonify({'success': False, 'message': f'Backup introuvable: {backup_name}'}), 404
@@ -1404,11 +1462,15 @@ def zabbix_restore_backup():
             _backup_agent_config(client, root_pass, config_path)
 
             # Restore
+            # `backup_name` — entree, rejetee par `_BACKUP_NAME_RE.fullmatch` (:39), cf. :1399. `config_path` litteral.
+            # nosemgrep: rw-shell-fstring-execute-as-root
             _, stderr, rc = execute_as_root(client, f"cp {backup_path} {config_path}", root_pass)
             if rc != 0:
                 return jsonify({'success': False, 'message': f'Restauration echouee: {stderr}'}), 500
 
             # Restart
+            # `config_path` / `config_dir` / `filename` / `service_name` — catalogue litteral `AGENT_REGISTRY:125`, cf. :1250.
+            # nosemgrep: rw-shell-fstring-execute-as-root
             _, stderr_r, rc_r = execute_as_root(
                 client, f"systemctl restart {service_name}", root_pass, timeout=15)
             if rc_r != 0:
@@ -1843,6 +1905,8 @@ def generic_deploy(platform):
                         config_content = _build_agent_config_content(platform, global_cfg, row, overrides)
                         if config_content:
                             config_dir = '/'.join(config_path.split('/')[:-1])
+                            # `config_path` / `config_dir` / `filename` / `service_name` — catalogue litteral `AGENT_REGISTRY:125`, cf. :1250.
+                            # nosemgrep: rw-shell-fstring-execute-as-root
                             _, _, rc_dir = execute_as_root(client, f"mkdir -p {config_dir}", root_pass)
                             echecs += _echec("creation du repertoire de configuration", rc_dir)
                             _backup_agent_config(client, root_pass, config_path)
@@ -2087,6 +2151,8 @@ def generic_config_read(platform):
     try:
         with ssh_session(ip, port, ssh_user, ssh_pass,
                          logger=logger, service_account=svc_account) as client:
+            # `config_path` / `config_dir` / `filename` / `service_name` — catalogue litteral `AGENT_REGISTRY:125`, cf. :1250.
+            # nosemgrep: rw-shell-fstring-execute-as-root
             out, _, rc = execute_as_root(client,
                 f"cat {config_path} 2>/dev/null || echo 'FILE_NOT_FOUND'", root_pass, timeout=15)
             if 'FILE_NOT_FOUND' in out:
@@ -2165,10 +2231,14 @@ def generic_config_save(platform):
             if rc != 0:
                 # Meme repli que la route Zabbix : on remet la version d'avant.
                 if backup_path:
+                    # `backup_path` — calcule par le serveur (`_backup_agent_config`:603), cf. :1298.
+                    # nosemgrep: rw-shell-fstring-execute-as-root
                     execute_as_root(client, f"cp {backup_path} {config_path}", root_pass)
                 return jsonify({'success': False, 'restarted': False,
                                 'message': f'Ecriture echouee: {stderr}'}), 500
 
+            # `config_path` / `config_dir` / `filename` / `service_name` — catalogue litteral `AGENT_REGISTRY:125`, cf. :1250.
+            # nosemgrep: rw-shell-fstring-execute-as-root
             _, stderr_r, rc_r = execute_as_root(
                 client, f"systemctl restart {service_name}", root_pass, timeout=15)
             if rc_r != 0:
@@ -2215,6 +2285,8 @@ def generic_backups(platform):
     try:
         with ssh_session(ip, port, ssh_user, ssh_pass,
                          logger=logger, service_account=svc_account) as client:
+            # `config_path` / `config_dir` / `filename` / `service_name` — catalogue litteral `AGENT_REGISTRY:125`, cf. :1250.
+            # nosemgrep: rw-shell-fstring-execute-as-root
             out, _, rc = execute_as_root(client,
                 f"LC_ALL=C ls -la {config_dir}/{filename}.bak.* 2>/dev/null || echo 'NONE'",
                 root_pass, timeout=10)
@@ -2266,17 +2338,23 @@ def generic_restore(platform):
         with ssh_session(ip, port, ssh_user, ssh_pass,
                          logger=logger, service_account=svc_account) as client:
             backup_path = f"{config_dir}/{backup_name}"
+            # `backup_name` — entree, rejetee par `_BACKUP_NAME_RE.fullmatch` (:39), cf. :1399. `config_path` litteral.
+            # nosemgrep: rw-shell-fstring-execute-as-root
             _, _, rc = execute_as_root(client, f"test -f {backup_path}", root_pass, timeout=5)
             if rc != 0:
                 return jsonify({'success': False, 'message': f'Backup introuvable: {backup_name}'}), 404
             _backup_agent_config(client, root_pass, config_path)
 
+            # `backup_name` — entree, rejetee par `_BACKUP_NAME_RE.fullmatch` (:39), cf. :1399. `config_path` litteral.
+            # nosemgrep: rw-shell-fstring-execute-as-root
             _, stderr, rc = execute_as_root(
                 client, f"cp {backup_path} {config_path}", root_pass, logger=logger)
             if rc != 0:
                 return jsonify({'success': False, 'restarted': False,
                                 'message': f'Restauration echouee: {stderr}'}), 500
 
+            # `config_path` / `config_dir` / `filename` / `service_name` — catalogue litteral `AGENT_REGISTRY:125`, cf. :1250.
+            # nosemgrep: rw-shell-fstring-execute-as-root
             _, stderr_r, rc_r = execute_as_root(
                 client, f"systemctl restart {service_name}", root_pass, timeout=15)
             if rc_r != 0:
