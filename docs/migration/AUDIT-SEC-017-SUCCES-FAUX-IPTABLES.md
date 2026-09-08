@@ -22,13 +22,26 @@ machine changé depuis l'archivage.*
 
 ### LE DÉFAUT — trois étages, et le troisième est le pire
 
+**⚠ Cité par son TEXTE, pas par sa ligne** — *voir §5 : mes premières citations
+étaient périmées vingt minutes après publication.*
+
 ```
-:175-176  touch + chmod sur rules.v4 et rules.v6      valeur JETEE
-:178      _write_rules_safe(… "/etc/iptables/rules.v4")   ← le fichier de DEMARRAGE est ecrit
-:179      execute_as_root(… "iptables-restore < …")        valeur JETEE
-:181-183  idem pour l'IPv6                                 valeur JETEE
-:185      _log.info("Règles iptables appliquées avec succès.")   ⛔ INCONDITIONNEL
-:186      except Exception  →  ne rattrape que des exceptions PYTHON
+touch {path} && chmod 640 {path}                   valeur JETEE
+_write_rules_safe(… "/etc/iptables/rules.v4")      ← le fichier de DEMARRAGE est ecrit
+execute_as_root(… "iptables-restore < …")          valeur JETEE
+execute_as_root(… "ip6tables-restore < …")         valeur JETEE
+_log.info("Règles iptables appliquées avec succès.")   ⛔ INCONDITIONNEL
+except Exception                                    → ne rattrape que du PYTHON
+```
+
+*Lignes `183` · `187` · `189` · `190` **à `d1fb406b` (2026-09-08 11:41:42)**. Elles
+bougent ; le texte, non.*
+
+**Remesure :**
+
+```
+grep -nE "iptables-restore <|appliquées avec succès" backend/iptables_manager.py
+grep -cE "\bcode\b" backend/iptables_manager.py        # attendu : 0
 ```
 
 **`execute_as_root()` rend `(sortie, erreur, CODE)` — `ssh_utils.py:559` et `:586`.
@@ -116,3 +129,35 @@ AVANT l'envoi. Elle réduit donc la fréquence de SEC-017 sans le fermer.**
 **Une garde partielle en amont d'un échec silencieux en aval déplace le défaut
 vers le haut de l'échelle de surprise.** *Ce n'est pas une raison de retirer ma
 validation — c'en est une de ne pas laisser SEC-017 ouvert derrière elle.*
+
+
+---
+
+## 5. ⚠ MES PROPRES CITATIONS ÉTAIENT PÉRIMÉES EN VINGT MINUTES
+
+**Ce document citait `:178`, `:179`, `:183`, `:185`, `:186`. Les lignes réelles
+sont `182`, `183`, `187`, `189`, `190`.**
+
+```
+e64792dd   2026-09-08 ~11:2x   publication de SEC-017, citant :178/:179/:185
+d1fb406b   2026-09-08 11:41:42 ci(semgrep) — AJOUTE 4 lignes de commentaire
+                               (un `nosemgrep` motive, +4 sur tout ce qui suit)
+```
+
+**Le défaut est INTACT** — `d1fb406b` n'a ajouté qu'un commentaire justifié.
+*Vérifié : les deux `restore` jettent toujours leur valeur, le succès est
+toujours inconditionnel, et le mot `code` reste à **zéro** occurrence.*
+
+> ⛔ **Mais un constat de sécurité dont toute la valeur est qu'on retrouve le
+> code citait des lignes fausses vingt minutes après sa publication.**
+
+**TROISIÈME fois sur ce chantier que ma propre mesure se périme dans l'heure** —
+*8 minutes, 76 minutes, 20 minutes.* **Ce n'est plus un accident, c'est le
+régime : huit sessions écrivent, et un numéro de ligne est la donnée la plus
+volatile qu'un audit puisse contenir.**
+
+**Corrigé par la forme, pas par la vigilance** : *le défaut est désormais cité par
+son TEXTE — qui ne bouge pas — la ligne n'est donnée qu'avec le commit qui
+l'ancre, et la commande de remesure est écrite à côté.* **C'est la règle du
+chantier (« chaque chiffre porte sa commande de remesure ») appliquée à un chiffre
+que je n'avais pas vu comme un chiffre.**
