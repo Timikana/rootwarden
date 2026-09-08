@@ -14244,3 +14244,58 @@ session sans production, c'est une session en attente de l'exploitant.**
 
 **Rien de neuf n'attend l'exploitant** au-delà des trois actes déjà écrits — plus
 `MAIL_MAILER` pour ⑤ (`E-475`). *Je ne crée pas de dossier pour les redire.*
+
+### ⚠ REPRISE DE `E-476` §④ — MA CONCLUSION TENAIT, MA RAISON ÉTAIT FAUSSE
+
+**2026-09-08, 05:0x, après relecture par le pair qui tient `tests/e2e/`** (`dad1a7cc`).
+
+J'ai retiré le motif `location = "/x"` en écrivant qu'il était **redondant** avec
+`window.location`. **Il ne l'était pas — il couvrait strictement plus large.** Mesuré, le
+motif relu depuis le fichier plutôt que retapé :
+
+```
+                                 window.location    le mien
+window.location.href = '/x'            LU              LU
+location.href        = '/x'            RATE            LU     <- forme NUE
+document.location    = '/x'            RATE            LU
+top.location.href    = '/x'            RATE            LU
+self.location.replace('/x')            RATE            RATE
+```
+
+`window.location` exigeait le littéral `window.`. **La forme nue est la plus courante en
+JS moderne, et aucun des deux motifs ne l'aurait vue.**
+
+Le parc n'en porte aucune hors `vendor/`, déjà ignoré : **retirer ne perdait rien, et mon
+zéro était exact.** Mais :
+
+> **Une raison fausse ne se périme pas au même rythme que le parc qu'elle décrit.** Celle-ci
+> se relit comme « cette famille est couverte », et le prochain qui s'en sert pour écarter
+> un motif se trompera *sans qu'aucun chiffre ne bouge.*
+
+**Et c'est la MÊME espèce que celle que je venais de corriger chez elle** : raisonner sur
+le **grain du motif** — le littéral `window.` — quand l'objet est la **destination**. *Je
+l'ai attrapée chez un pair sur `href=`, et je l'ai commise deux paragraphes plus bas.*
+[[feedback_regle_appliquee_en_lisant]] : **on applique une règle en LISANT, jamais en
+ÉCRIVANT.**
+
+> **Deux motifs qui rendent zéro sur le parc ne sont pas redondants pour autant : l'un rend
+> zéro parce qu'il est couvert, l'autre parce que la forme est absente aujourd'hui. Le même
+> chiffre, deux raisons, une seule survit à un commit.** *(formulation du pair)*
+
+**Le correctif livré est meilleur que ma correction et que mon ajout** : un seul motif
+élargi — préfixe libre, `.href` optionnel, `.replace`/`.assign` — plutôt que deux dont l'un
+dédouane l'autre, sans faux positif sur les deux pièges du parc (`$this->location = …`,
+`allocation = '/x'`).
+
+**Et l'échantillon forgé est posé sur la forme NUE, pas sur `window.location.href`.**
+*Vérifié : motif restreint à `window.` → code 2, « n'extrait pas son propre échantillon ».*
+**Un échantillon qui n'exerce que le cas facile ne prouve pas l'élargissement** — si
+quelqu'un restreint le motif un jour, un échantillon préfixé resterait vert et
+l'élargissement partirait en silence. *L'auto-épreuve mord donc aussi sur les
+restrictions futures, ce qui est plus que ce pour quoi je l'avais écrite.*
+
+**Et le pair signale que sa première mutation, par `sed`, a échoué sur son propre
+délimiteur et rendu `code : 0`** — *l'apparence d'un vert pour une mesure qui n'a jamais eu
+lieu.* Refaite par chaîne exacte avec assertion d'unicité. **Ma propre première mutation de
+son motif a rendu « ancre absente » pour la même raison** : je l'ai refaite sur la chaîne
+réelle plutôt que d'écrire « vérifié ».
