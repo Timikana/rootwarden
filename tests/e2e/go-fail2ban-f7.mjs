@@ -386,6 +386,12 @@ try {
         constate('cible', 'SANS OBJET — F7 est un sous-lot de PORTAGE, le legacy n\'ajoute rien a mesurer');
         note('\n0 etapes, 0 PASS, 0 FAIL');
         note('=== TOUT OK ===');
+        // Ce `process.exit` est A L'INTERIEUR du `try` dont le `finally` (:726)
+        // porte la seule fermeture du navigateur (:758). `process.exit()`
+        // n'execute AUCUN `finally` : sans la ligne suivante, le navigateur
+        // lance a :223 n'etait jamais ferme sur ce chemin. C'est l'idiome des
+        // 40 autres suites du repertoire — `close()` PUIS `exit()`.
+        try { await navigateur.close(); } catch { /* deja ferme */ }
         process.exit(0);
     }
 
