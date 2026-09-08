@@ -22916,6 +22916,48 @@ etait reelle sur le RAYON, pas sur la resolution.* **Je le corrige parce qu'un r
 comble un trou inexistant deplace la confiance vers le mauvais controle** — et parce que sa remarque de
 principe, elle, est juste : *un `0` sur 3/7 et un `0` sur 7/7 se lisent pareil et ne valent pas pareil.*
 
+### 4 quinquies. ⛔ J'AI PROPOSE UN ARMEMENT REEL, ET LA SESSION 7 A EU RAISON DE LE REFUSER
+
+**Comme lead, j'ai suggere d'armer pour de vrai la branche « arme » du detecteur sur
+`vendor/.../403.blade.php`**, au motif que son rayon en PAGES est faible : elle n'est rendue que sur un
+403, donc pas les 39 du socle. *Le rayon en pages etait juste. Le raisonnement etait faux.*
+
+    fichiers de suites MENTIONNANT 403          57       (leur releve : 55)
+    ASSERTIONS sur 403, toutes formes           55       (leur releve : 54)
+        dont  `===? 403`                        53
+        dont  `assert.strictEqual(…, 403, …)`    2       <- forme que MON motif ratait
+
+> **Le rayon d'une vue d'erreur ne se compte pas en pages qui l'affichent, mais en ASSERTIONS qui
+> l'attendent. Une page rarement vue peut etre l'observable le plus mesure du depot.** *Armer cette vue
+> transformait 55 attentes de `403` en `500`, repartis dans les LOTs d'autres sessions, sur une cause que
+> personne n'aurait reliee a un fichier `vendor/`.*
+
+**Et sa seconde raison est meilleure que la premiere** : `laravel/.gitignore:23` porte `/vendor`, et **0
+fichier de `vendor/` n'est suivi**. *Donc un `touch` dans `vendor/` ne laisse AUCUNE trace dans
+`git status`* — une restauration manquee, une interruption, et le prochain LOT rougit 55 fois avec la
+cause invisible. **Meme espece que « une alerte mal datee » : l'ecriture qu'on ne voit nulle part.**
+
+> **Un detecteur dont une branche est prouvee par MUTATION est un detecteur honnete ; un detecteur qui a
+> coute 55 fausses defaillances a d'autres est un detecteur qu'on desinstalle.** *Sa formulation, et elle
+> tranche mieux que ma proposition.*
+
+**Ce que je retiens contre moi** : *j'ai mesure le rayon d'un artefact dans l'unite ou je venais de
+mesurer les autres* — des pages, parce que les trois composants du socle se comptaient en pages. **L'unite
+juste depend de l'objet, pas de la mesure precedente.**
+
+### 4 sexies. Ma SIXIEME forme supposee du jour, et deux temoins-MIROIRS
+
+    grep -c '===? *403'    ->  compte des LIGNES, pas des occurrences   (rattrape)
+    mon motif entier       ->  ratait `assert.strictEqual(r.status, 403, …)`  2 assertions
+
+*Trouve en cherchant ce que le motif EXCLUAIT, pas ce qu'il rendait.* **Et l'erreur va encore du cote
+rassurant** : un sous-compte sur un chiffre qui mesure un risque.
+
+> **Cinq motifs qui supposent une forme aujourd'hui, et DEUX temoins qui supposaient la meme.** *Un temoin
+> derive de la meme premisse que la sonde est un MIROIR, pas un temoin* — ma sonde du rayon rendait `0` et
+> son temoin aussi. **Les trois autres zeros ont ete rattrapes par un temoin qui DISCRIMINAIT ; celui-la
+> ne l'a ete que parce que le resultat etait invraisemblable.**
+
 **Parades, par ordre de solidite** : compiler en `www-data` (`gosu`/`setpriv` sur la l.44) plutot que
 chowner apres ; a defaut, un `chown` **periodique** ou **avant chaque suite**. ⚠ Et la l.59 porte
 `2>/dev/null || true` : **un chown en echec est indiscernable d'un chown reussi**, donc la parade ne peut
