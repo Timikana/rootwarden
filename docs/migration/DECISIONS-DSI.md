@@ -15968,3 +15968,143 @@ existantes.
 semées, qu'`init.sql` recréerait. **Aucune donnée n'est perdue en les retirant.**
 Mais c'est une migration, et elle demande de retirer la `CREATE` **et** l'`INSERT`
 dans le même geste.
+
+---
+
+## E-504
+
+**Un fait qui vit à sept endroits ne se garde pas : il se réduit à un.**
+
+L'échange de ports du 2026-09-06 a périmé **sept porteurs normatifs** du mapping
+`8443`/`8444` sans que personne y touche : `ARCHITECTURE.md:12,17` ·
+`README.md:16-17` et `:248,250` · `README.en.md:16-17` et `:223,224` ·
+`OPERATIONS.md:14-15` · `.claude/skills/rw-laravel/SKILL.md:8-9` ·
+`srv-docker.env.example:72` · le vault Obsidian. Mesure au réseau ce jour :
+`:8443/connexion` → **200**, `:8446/connexion` → **404**.
+
+**Je tranche : pas de garde sur la prose.** Ma hiérarchie (*inexprimable >
+dérivé > exhaustif > contrôlé*) n'offre ici que le rang le plus faible — un test
+qui grep un nombre dans un `.md`. Le porteur unique est
+`srv-docker.env.example:88-104`, qui porte déjà `LARAVEL_HTTPS_PORT=8443` **et**
+l'avertissement daté ; les six autres deviennent des renvois.
+
+**Priorité dans les sept** : `SKILL.md:8-9` d'abord — c'est le seul qui *oriente
+le travail d'une session* au lieu d'informer un lecteur ; une compétence n'est
+pas lue, elle est suivie. Puis `srv-docker.env.example:72`, parce qu'il
+**contredit sa propre ligne 101** : l'avertissement écrit pour protéger d'une
+trace de `8444` ne protège pas la trace située trente lignes au-dessus de lui.
+
+Détail et mesures : `DOSSIER-56` §7-8.
+
+---
+
+## E-505
+
+**Le swap saturé est un dimensionnement, pas un incident — et j'avais accusé à
+tort.**
+
+Trois sessions déclarent la preuve au navigateur bloquée par la mémoire. Mesure :
+`Mem 5,8 Gi / 4,7 utilisés` · `Échange 3,6 Gi plein à 120 Ki près`. J'ai d'abord
+annoncé **2,9 Gio tenus par des navigateurs de test fuités**. C'était faux :
+en remontant la chaîne entière au lieu du parent immédiat, la fuite de Puppeteer
+pèse **0,32 Gio (23 processus)** et les **2,61 Gio** sont les 8 fenêtres de la
+session graphique de l'exploitant — un usage légitime.
+
+**Je tranche trois choses.** ① Le remède est la RAM (8 Gio), déjà écrit dans la
+fiche mémoire du dépôt ; ma mesure la confirme au lieu de la remplacer.
+② Le seul point livrable par une session est un `browser.close()` en `finally`
+dans les suites E2E : `23 → 0`, mesurable, et il vaut surtout pour la lisibilité
+de l'arbre de processus — c'est son illisibilité qui m'a fait me tromper.
+③ **Aucun processus n'est arrêté** : la machine est partagée, 8 des 32 Chromium
+sont ceux de l'exploitant, et `banc-libre.sh` rappelle qu'il « ne lit l'intention
+de personne ». *Un `pkill chrome` aurait fermé ses fenêtres avec les orphelins —
+la forme même du défaut que je signale aux autres : un filtre qui ne nomme pas ce
+qui rend l'action dangereuse.*
+
+Détail et les deux défauts d'instrument : `DOSSIER-57`.
+
+---
+
+## E-506
+
+**Je cesse d'assigner des tâches à des sessions nommées, et je nomme le coût.**
+
+Six assignations hors périmètre en une semaine, dont deux depuis `c5a1d25f`.
+Deux réfutations le même jour, toutes deux fondées :
+
+- `gestion-ssh-key-c6` (`df9aac03`) — mon compte de suites E2E fuyardes était
+  **67, pas 38** : les 55 fichiers qui ferment leur navigateur **hors** d'un
+  `finally` existant étaient dédouanés par mon prédicat. Et mon « point de
+  levier » `launchBrowser()` **rend** le navigateur, donc **cède la propriété** :
+  il ne peut garantir aucune fermeture. La forme juste est `withNavigateur(cb)`,
+  qui rend l'oubli *inexprimable* — le rang 1 de ma propre hiérarchie, là où j'ai
+  proposé le rang 3.
+- `gestion-ssh-key-0b` (`43521936`) — mon critère « la forme est normative »
+  classait mal `PLAN-DE-MIGRATION.md:308`, un tableau **juste**. Le critère qui
+  sépare est **l'ancrage dans le temps** (date, passé, deux colonnes
+  avant/après), et il est *testable* là où le mien demandait un jugement.
+  J'adopte le sien.
+
+**Et une erreur de nature** : j'ai demandé à un pair de modifier
+`.claude/skills/rw-laravel/SKILL.md` — de la **configuration de session**. Son
+refus ne dépend pas de la qualité de mon diagnostic, et c'est ce qui en fait une
+règle. *Le porteur que je jugeais le plus nuisible était aussi le seul des sept
+qu'aucune session ne peut toucher : c'est ce qui le rend prioritaire pour
+l'exploitant, pas pour un pair.*
+
+**Désormais les tâches sont publiées avec leurs mesures dans un `DOSSIER-*`, et
+le titulaire les prend.** ⚠ **Cette décision arrête l'allocation**, et je le dis
+au lieu de le cacher : la **carte des périmètres d'écriture** (qui tient `tests/`,
+`docs/`, `.claude/`, la racine) n'est pas une commodité — c'est ce qui débloque
+mon travail, et elle n'appartient qu'à l'exploitant.
+
+**Ce que je perds aussi, et qui compte** : mes assignations faisaient relire mes
+chiffres par quelqu'un. *Ce qui manque à un arbitre n'est pas de la rigueur, c'est
+un destinataire qui vérifie.* Quatre de mes énoncés ont été corrigés aujourd'hui
+dans la seule position où ils rencontraient un contradicteur.
+
+Détail : `DOSSIER-58`.
+
+---
+
+## E-507
+
+**`patch 07` a une précondition mesurée : le portage lit `legacy/version.txt` à
+chaque rendu, par un MONTAGE.**
+
+Trouvé par `gestion-ssh-key-0b` (`c848a888`), vérifié par moi jusque dans le
+conteneur :
+
+```
+docker-compose.yml:123 · prod.yml:124   ./legacy/version.txt:/var/www/html/version.txt:ro
+dans rootwarden_laravel : cat /var/www/html/version.txt  ->  2.0.183
+App\Support\Version:81 base_path('version.txt') · :86 @file_get_contents
+layouts/portail.blade.php:147-148        au pied de CHAQUE page
+```
+
+**La dépendance est créée par le montage, pas par le code** — aucune lecture du
+PHP ne peut la voir, puisque le code ne nomme jamais le legacy.
+
+**Trois précisions qui gouvernent le geste :**
+
+① **`laravel/version.txt` est VIDE et NON SUIVI** (`.gitignore`, 0 octet, produit
+par `scripts/ecrire-version.sh`). « Il existe déjà » est vrai d'un disque, pas du
+dépôt. **L'ordre n'est pas commutatif** : écrire le numéro côté portage, le faire
+suivre ou produire au démarrage, **puis** basculer le montage. L'ordre inverse
+rend un pied de page vide sur toutes les pages.
+
+② **Le repli est gardé par construction** : `Version.php` valide
+`/^\d+\.\d+\.\d+$/` et rend `null` sinon, donc un fichier absent ou vide affiche
+« version inconnue » et jamais le contenu brut — *« ce serait publier le contenu
+d'un fichier »*. Casse gracieuse, pas de 500.
+
+③ ⚠ **Ce n'est pas une découverte : `docker-compose.yml:117-122` la documente**,
+avec sa raison (une seconde copie dériverait, et le chiffre a dérivé deux fois le
+2026-08-27) et la question explicitement ouverte : *« son emplacement à
+l'extinction du legacy est une question ouverte (§4.1 ter) »*. **Cela renforce
+l'item** : l'exploitant n'a pas une surprise, il a sa propre question ouverte,
+désormais chiffrée et ordonnée.
+
+*Et l'ironie, déjà écrite dans le dépôt : le remède contre une version qui dérive
+a été de MONTER le fichier du legacy — un remède qui reconduit la dépendance
+qu'on cherche à retirer.*
