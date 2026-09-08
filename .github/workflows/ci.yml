@@ -546,6 +546,20 @@ jobs:
               # rw-shell-fstring-execute-as-root : interpolation NUE
               execute_as_root(client, f"id -u {nom}", 30)
 
+          def obus(nom):
+              # rw-subprocess-shell-true : chaine + shell=True.
+              # `pattern-not: subprocess.run([...], ...)` exige une CHAINE ici.
+              import subprocess
+              subprocess.run(f"id -u {nom}", shell=True)
+
+          def sql(cur, ident):
+              # rw-sql-fstring-execute : interpolation dans la requete
+              cur.execute(f"SELECT * FROM machines WHERE id = {ident}")
+
+          def decode_laxiste(octets):
+              # rw-decode-errors-ignore : masque un dechiffrement rate
+              return octets.decode('utf-8', errors='ignore')
+
           @bp.route('/temoin-sans-garde')
           def temoin_sans_garde():
               # rw-flask-route-without-api-key : aucun decorateur de garde
@@ -556,6 +570,20 @@ jobs:
           <?php
           // rw-php-echo-unescaped-var, forme longue
           echo $_GET['nom'];
+          // rw-php-equals-on-hash : le NOM de la variable de gauche porte
+          // « token » ; `pattern-not` n'exclut que la comparaison a $_SESSION.
+          $token_recu = 'x';
+          if ($token_recu === $attendu) { }
+          // rw-php-weak-random
+          $n = mt_rand(1, 10);
+          // rw-php-debug-leak
+          var_dump($n);
+          // rw-aes-cbc-encrypt. ⚠ SA REGLE PORTE UN `paths.exclude` EN DUR sur
+          // `scripts/migrate_crypto.php` : la fixture vit sous /tmp, donc elle
+          // n'est PAS exclue — c'est ce qu'on veut, et c'est aussi la raison
+          // pour laquelle un temoin de mordant ne remplace pas la relecture de
+          // l'exclusion elle-meme.
+          $c = openssl_encrypt($clair, 'AES-256-CBC', $cle, 0, $iv);
           // et la forme COURTE : c'est elle que le correctif SUPPOSE couverte
           ?>
           <?= $_GET['court'] ?>
@@ -571,6 +599,19 @@ jobs:
           def par_base64(client, charge):
               execute_as_root(client, f"printf '%s' '{charge}' | base64 -d | bash", 30)
 
+          def liste(nom):
+              # rw-subprocess-shell-true : forme GARDEE — une liste, pas de shell.
+              import subprocess
+              subprocess.run(['id', '-u', nom], check=True)
+
+          def sql_garde(cur, ident):
+              # rw-sql-fstring-execute : forme GARDEE — placeholder
+              cur.execute("SELECT * FROM machines WHERE id = %s", (ident,))
+
+          def decode_strict(octets):
+              # rw-decode-errors-ignore : forme GARDEE — pas de masquage
+              return octets.decode('utf-8')
+
           @bp.route('/temoin-garde')
           @require_api_key
           def temoin_garde():
@@ -580,6 +621,14 @@ jobs:
           cat > /tmp/mord-pas/t.php <<'MSG'
           <?php
           echo htmlspecialchars($_GET['nom'], ENT_QUOTES, 'UTF-8');
+          // rw-php-equals-on-hash : forme GARDEE — comparaison a temps constant
+          if (hash_equals($token_attendu, $token_recu)) { }
+          // rw-php-weak-random : forme GARDEE
+          $octets = random_bytes(32);
+          // rw-aes-cbc-encrypt : forme GARDEE — AEAD, pas CBC
+          $c = openssl_encrypt($clair, 'aes-256-gcm', $cle, 0, $iv, $tag);
+          // rw-php-debug-leak : aucune sortie de debogage — rien a ecrire ici,
+          // et c'est le point : ce temoin asserte ZERO sur les DIX regles.
           MSG
 
           echo "fixtures : $(ls -1 /tmp/mord /tmp/mord-pas | wc -l) fichiers"
@@ -597,7 +646,18 @@ jobs:
             || { echo "::error::une regle ne compile toujours pas"; exit 1; }
 
           manquantes=0
-          for r in rw-shell-fstring-execute-as-root rw-flask-route-without-api-key rw-php-echo-unescaped-var; do
+          # ⛔ LES QUATRE DERNIERES ONT ETE ACTIVEES SANS PREUVE DE MORDANT.
+          #    Le filtre `--severity=ERROR` les ecartait ; en le retirant, elles
+          #    ont rendu UNE trouvaille sur 370 fichiers — et c'etait un FAUX
+          #    POSITIF dans une dependance (`$token == 'base64'` d'un parseur SVG
+          #    de dompdf). « 1 sur 370 » se lit « code propre » OU « regle qui ne
+          #    matche presque rien », et rien ne separait les deux.
+          #    Elles sont donc assertees ici comme les trois autres.
+          for r in rw-shell-fstring-execute-as-root rw-flask-route-without-api-key \
+                   rw-php-echo-unescaped-var rw-subprocess-shell-true \
+                   rw-php-equals-on-hash rw-php-weak-random rw-php-debug-leak \
+                   rw-sql-fstring-execute rw-decode-errors-ignore \
+                   rw-aes-cbc-encrypt; do
             n=$(jq --arg r "$r" '[.results[] | select(.check_id | endswith($r))] | length' /tmp/mord.json)
             printf "  %-36s %s trouvaille(s)\n" "$r" "$n"
             [ "$n" -ge 1 ] || { echo "::error::$r ne MORD PAS — reparee en apparence seulement"; manquantes=$((manquantes+1)); }
