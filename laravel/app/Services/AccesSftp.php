@@ -132,10 +132,29 @@ use Illuminate\Support\Facades\DB;
  * sont retournables.** Mon essai a la main annoncait `AllowTcpForwarding` comme
  * retournable : c'est FAUX avec ce generateur, qui l'emet onze lignes plus haut.
  *
- * ⚠ ET UNE TROUVAILLE INCIDENTE, qui n'est pas le defaut d'injection : dans le
- * bloc PROPRE, `allowstreamlocalforwarding` vaut deja `yes`. Le profil « SFTP
- * restreint » ne ferme donc pas la redirection de sockets Unix — ce n'est pas
- * retourne par l'injection, c'est absent du profil.
+ * ⚠ ET UN TROU DE PROFIL, DISTINCT DU DEFAUT D'INJECTION — TROIS DIRECTIVES.
+ *
+ * Mesure sur le bloc PROPRE (aucune injection), `sshd -T -C user=bob` :
+ *
+ *     allowtcpforwarding           no     <- FERME par le bloc
+ *     gatewayports                 no     <- ferme par le DEFAUT d'OpenSSH
+ *     allowstreamlocalforwarding   yes    <- OUVERT, non nomme par le bloc
+ *     permitopen                   any    <- OUVERT, non nomme
+ *     permitlisten                 any    <- OUVERT, non nomme
+ *
+ * **Le profil « SFTP restreint » ferme cinq leviers et en laisse TROIS ouverts** :
+ * la redirection de sockets Unix, et les deux listes `PermitOpen`/`PermitListen`
+ * qui valent `any`. *Ce n'est PAS retourne par l'injection — c'est absent du
+ * profil, donc une decision a prendre, pas un defaut a corriger.*
+ *
+ * ⚠ LIMITE DE L'INSTRUMENT, ET ELLE DECIDE DE LA SUITE. `sshd -T` rend la
+ * configuration RESOLUE, pas le comportement. Il ne peut donc PAS dire si
+ * `PermitOpen any` a un effet quand `AllowTcpForwarding` vaut `no` — c'est une
+ * question de comportement a l'execution, qui exigerait une connexion reelle.
+ * **On m'a proposé le raisonnement « ces trois ne gouvernent que la redirection
+ * TCP, donc elles sont inertes » : il est plausible et je ne l'ai PAS mesure.**
+ * Il reste donc une hypothese, et le trou de profil doit etre traite comme
+ * potentiellement reel jusqu'a ce qu'une connexion le tranche.
  *
  * **Donc `sshd -t` ne rejette pas le doublon, et la directive la plus consequente
  * de cet endroit — `ForceCommand` — est neutralisee par la regle du premier
