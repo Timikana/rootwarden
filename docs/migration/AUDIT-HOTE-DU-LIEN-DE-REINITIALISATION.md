@@ -137,3 +137,66 @@ quelqu'un pourra énumérer les hôtes sans deviner.** *Le poser d'abord, c'est
     NON LU       `laravel/.env` — permission refusee. `APP_URL` non verifie.
     NON MESURE   si un compte reel a emprunte ce chemin : rien ne le
                  distinguerait d'une demande de reinitialisation ordinaire.
+
+---
+
+## 7. « "Ne pas envoyer" crée-t-il un oracle ? » — NON, et il RÉDUIT celui qui existe
+
+**Question posée avant d'écrire le correctif. Réponse structurelle ci-dessous ;
+elle n'est PAS une mesure, et je dis à la fin ce qu'il faut mesurer.**
+
+### 7.1 La structure des deux branches
+
+```
+adresse INCONNUE   brule()  =  1 × password_hash(BCRYPT, cout)
+adresse CONNUE     emet()   =  1 × password_hash(BCRYPT, MEME cout)
+                              + DB::transaction( UPDATE … ; INSERT … )
+                   puis, dans terminating() : l'envoi
+```
+
+**Le terme dominant — bcrypt — est présent des DEUX côtés au MÊME coût. C'est
+l'égalisation, et elle est bien faite.**
+
+### 7.2 Pourquoi il n'y a pas d'inversion — l'hypothèse que j'ai testée d'abord
+
+**J'ai d'abord soupçonné le contraire** : *un égalisateur calibré contre un coût
+devient un DISCRIMINATEUR quand l'autre côté s'allège.* **Si la branche connue
+perd le rendu du courriel, pourrait-elle passer SOUS la branche inconnue ?**
+
+> **Non, et c'est structurel :** `brule()` = 1 bcrypt · `emet()` = 1 bcrypt **+**
+> une transaction. **La branche connue est supérieure ou égale, quoi qu'on fasse
+> en aval.** *L'inversion est inexprimable — pas seulement improbable.*
+
+*Je le note parce que l'hypothèse était raisonnable et qu'elle est fausse : je
+l'ai vérifiée avant de la transmettre.*
+
+### 7.3 Et l'écart DIMINUE
+
+**L'envoi vit dans `terminating()` — APRÈS la composition de la réponse.** *Sous
+un SAPI qui termine la requête, il est invisible ; sous `mod_php`, il tombe dans
+la fenêtre de connexion (DOSSIER-24).*
+
+    aujourd'hui   Mail::raw -> rendu du gabarit + ecriture par le transport `log`
+    apres         Log::warning -> une ligne, aucun gabarit
+
+**Moins de travail post-réponse sur la seule branche qui en portait. L'écart
+rétrécit.**
+
+### 7.4 ⚠ Trois conditions, et la troisième est la vraie
+
+1. **La réponse au demandeur ne change pas** — *`back()->with('succes', …)` dans
+   les deux cas.* **C'est là que vit la propriété anti-énumération, pas dans le
+   chronomètre.**
+2. **Le journal ne doit pas être plus bavard sur la branche connue que le
+   courriel ne l'était** — *une ligne, pas un dump du jeu de données.*
+3. ⛔ **Ce raisonnement est STRUCTUREL, pas mesuré.** *Je ne prends jamais le
+   banc, et je n'ai pas chronométré ces 2,4 ms.*
+
+**Ce qu'il faut mesurer, et c'est court** : *le résidu APRÈS correctif, sur les
+deux branches, avec le même instrument qui a produit le 2,4 ms — et la comparer à
+lui.* **Attendu : plus petit. Si c'est plus grand, la cause est le journal, pas
+la structure.**
+
+> **L'exigence « l'écart est MESURÉ, pas supposé » est la bonne, et cette section
+> n'y répond pas : elle établit qu'aucune inversion n'est POSSIBLE, ce qui borne
+> le risque sans le chiffrer.**
