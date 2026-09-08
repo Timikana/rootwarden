@@ -770,6 +770,75 @@ qui double celle qui existe.* Corrigé avec sa remesure datée.
                     `fail2ban.js` — deux fichiers d'une AUTRE session. Non rafraichi
                     ici : le faire masquerait leur signal.
 
+## [2.0.303] - 2026-09-08
+
+### Securite - E-462 : `APP_URL` n'etait declaree NULLE PART, donc gardee par rien
+
+**Le defaut.** `APP_URL` compose le lien de reinitialisation de mot de passe que
+le portage envoie **par courriel, avec un jeton**. C'est la **seule** variable de
+la configuration qui fabrique une URL destinee a **quitter la machine**.
+
+**Elle ne vivait que dans `laravel/.env`, ignore par git** (`laravel/.gitignore:3`)
+— donc :
+
+    APP_URL dans srv-docker.env.example   0
+    APP_URL dans srv-docker.env           0
+    laravel/.env                          hors de l'arbre
+
+**Aucune garde fondee sur l'arbre ne POUVAIT la lire**, et `env-merge.sh` ne la
+propageait pas. *Trois inversions de port ont ete rattrapees dans l'arbre ces
+jours-ci ; celle-ci a survecu parce qu'elle etait invisible aux instruments, pas
+parce qu'elle etait plus difficile.*
+
+**Ce que ce commit repare : l'ABSENCE DE GARDIEN.** `APP_URL` est desormais
+declaree dans `srv-docker.env.example`, donc propagee par `env-merge` et
+**lisible par une garde de l'arbre**.
+
+### ⚠ Ce n'est PAS une simple declaration — precedence MESUREE
+
+    docker exec -e APP_URL=https://EPREUVE.invalid:9999 rootwarden_laravel       php artisan tinker --execute='echo config("app.url");'
+      -> https://EPREUVE.invalid:9999          <- l'injection l'emporte
+    TEMOIN, sans injection
+      -> http://192.168.0.245:8444             <- la valeur de laravel/.env
+
+**L'environnement du conteneur l'emporte sur `laravel/.env`** (le service porte
+`env_file: - srv-docker.env`). **Renseigner cette ligne CORRIGE donc la valeur en
+service**, a la recreation du conteneur. *Ecrit ici parce qu'un correctif qui
+change un etat d'exploitation par un chemin que personne n'a choisi doit
+s'annoncer.*
+
+### ⚠ Valeur DERIVEE, pas assignee
+
+    APP_URL=https://\${SERVER_NAME}:\${LARAVEL_HTTPS_PORT}
+
+**Ma premiere redaction codait `192.168.0.245:8443` en dur.** *C'est un fichier
+d'EXEMPLE que les deploiements copient : une IP en dur y est fausse partout
+ailleurs qu'ici, et se perime au premier changement de port — le defaut meme
+qu'on repare.* La forme `\${VAR}` a un precedent dans ce fichier
+(`LARAVEL_URL`), donc `env-merge` la traite deja.
+
+### ⚠ Le sens de `8444` s'est INVERSE le 2026-09-06
+
+L'echange de ports a donne `8080/8443` au portage et `8444/8446` au legacy.
+**Avant cette date, `:8444` designait le PORTAGE ; depuis, il designe le
+LEGACY.** *La valeur de `laravel/.env` etait juste a l'ecriture et son sens s'est
+inverse sous elle, sans que rien ne la touche.* **Dater avant d'interpreter une
+trace de `8444`** — l'avertissement est inscrit dans le fichier d'exemple.
+
+### Ce qui n'est PAS fait ici
+
+**La valeur en service** (`laravel/.env`) reste a l'exploitante : le fichier est
+hors de l'arbre, root dans le conteneur, et c'est l'etat d'exploitation d'un
+service vivant. **L'extension de `ports-des-deux-portails.mjs` a `APP_URL`**
+appartient a la session qui tient `laravel/tests/` — et elle devient POSSIBLE
+seulement maintenant, la variable etant enfin dans l'arbre.
+
+⛔ **Aucun formulaire soumis.** Soumettre `/mot-de-passe-oublie` enverrait un
+courriel reel a une personne reelle. Tout est mesure par `artisan tinker` et par
+lecture.
+
+---
+
 ## [2.0.279] - 2026-09-08
 
 ### Correction - E-461 : deux routes lisaient des FRAGMENTS comme des LIGNES
