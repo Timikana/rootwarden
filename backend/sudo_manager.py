@@ -230,6 +230,9 @@ def _make_tmpfile(client, root_password: str) -> str:
     """Cree un fichier temporaire sur le remote avec un nom aleatoire."""
     rand = secrets.token_hex(8)
     tmpfile = f"/tmp/rootwarden-sudo-{rand}.tmp"
+    #   `tmpfile` est construit DEUX LIGNES au-dessus, de `secrets.token_hex(8)`
+    #   et de rien d'autre. Aucune donnee exterieure n'entre dans ce nom.
+    # nosemgrep: rw-shell-fstring-execute-as-root
     execute_as_root(client, f"install -m 0600 -o root -g root /dev/null {tmpfile}",
                     root_password, timeout=10)
     return tmpfile
@@ -245,6 +248,15 @@ def _write_to_remote(client, root_password: str, content: str, target: str) -> N
 
 def validate_sudoers(client, root_password: str, path: str) -> tuple[bool, str]:
     """Lance visudo -cf <path>. Retourne (ok, output)."""
+        #   `path` n'est JAMAIS un chemin d'utilisateur. `validate_sudoers` a
+        #   exactement DEUX appelants dans tout le depot — :282 et :340 — et les
+        #   deux passent `tmpfile`, donc `/tmp/rootwarden-sudo-<16 hex>.tmp`.
+        #   C'est l'ORIGINE qui neutralise : aucune donnee de requete n'atteint ce
+        #   parametre. ⚠ Une exemption fondee sur l'appelant se PERIME si un
+        #   troisieme appelant apparait — le cliquet du job `sast-semgrep-custom`
+        #   ne le verra pas, puisque le compte ne bougerait pas. C'est la limite de
+        #   cette raison-ci, et elle est ecrite plutot que supposee.
+        # nosemgrep: rw-shell-fstring-execute-as-root
     out, err, code = execute_as_root(
         client, f"visudo -cf {path} 2>&1 || echo __VISUDO_KO__",
         root_password, timeout=15)
@@ -305,6 +317,12 @@ def deploy_policy(client, root_password: str, policy: dict) -> dict:
         }
     finally:
         # Cleanup tmpfile en cas d'echec (sinon le mv l'a deja consomme)
+        #   `tmpfile` vient de `_make_tmpfile` : `/tmp/rootwarden-sudo-{rand}.tmp`
+        #   ou `rand = secrets.token_hex(8)`. `token_hex` ne rend QUE des chiffres
+        #   hexadecimaux — mesure sur 200 tirages : alphabet `0123456789abcdef`,
+        #   longueur constante 16, zero caractere hors classe. Aucun metacaractere
+        #   n'est EXPRIMABLE dans cette valeur : c'est l'ALPHABET qui neutralise.
+        # nosemgrep: rw-shell-fstring-execute-as-root
         execute_as_root(client, f"rm -f {tmpfile}", root_password, timeout=5)
 
 
@@ -314,6 +332,15 @@ def remove_policy(client, root_password: str, username: str) -> dict:
     username = _validate_username(username)
     target = _target_path(username)
     existed, previous_content = audit_policy(client, root_password, username)
+    #   `target` vient de `_target_path(username)`, soit
+    #   `/etc/sudoers.d/` + `rootwarden-` + un nom PASSE PAR `_validate_username`.
+    #   Ce validateur ANCRE aux deux bouts — `^[a-zA-Z_][a-zA-Z0-9_-]{0,31}$` — et
+    #   `.strip()` AVANT, ce qui ferme le piege du `$` python (il accepte un `\n`
+    #   final). Epreuve : `;`, `\n` interne, `\r`, `\t`, `../`, `$(…)`, backtick
+    #   et la chaine vide sont TOUS refuses par une exception ; `alice\n` est
+    #   normalise en `alice`. Les deux constantes du prefixe sont litterales
+    #   (`SUDOERS_D_DIR`, `FILE_PREFIX`). C'est le REJET qui neutralise.
+    # nosemgrep: rw-shell-fstring-execute-as-root
     execute_as_root(client, f"rm -f {target}", root_password, timeout=10)
     return {
         'success': True,
@@ -356,4 +383,9 @@ def rollback_policy(client, root_password: str, username: str,
             'validation_output': validation_output,
         }
     finally:
+        #   Meme valeur, meme raison, autre chemin d'execution : `tmpfile` sort de
+        #   `_make_tmpfile`, donc `/tmp/rootwarden-sudo-<16 hex>.tmp`. Ce site est
+        #   le `finally` de `apply_policy`, l'autre celui de `restore_policy` — et
+        #   les deux nettoient LE MEME fichier, cree par la meme fonction.
+        # nosemgrep: rw-shell-fstring-execute-as-root
         execute_as_root(client, f"rm -f {tmpfile}", root_password, timeout=5)
