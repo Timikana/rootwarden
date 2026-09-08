@@ -89,3 +89,69 @@ nommés — une clé connue qui doit être atteinte, une clé forgée qui ne doi
 
 Code de sortie : **0** rien d'absent · **2** une clé atteinte manque au catalogue · **3**
 domaine non énuméré, verdict refusé.
+
+
+---
+
+# ADDENDUM — arbitrage rendu, et le risque du badge REMESURÉ
+
+**Décision (`0f4bd0a2`)** : `rollback_lien` se retire · `restreint` se garde, documenté sur
+place. *Coût asymétrique : une entrée dormante coûte une ligne ; la retirer obligerait celui
+qui rendra un jour un badge neutre à réinventer le libellé, avec un risque de divergence
+FR/EN à la clé.*
+
+## ⚠ LE RISQUE SIGNALÉ, ET CE QUE LA MESURE EN FAIT
+
+L'inquiétude transmise était celle-ci — et elle est de la bonne famille :
+
+> *Le badge dit « ceci ouvre » par sa PRÉSENCE. Son absence dit « restreint ». Donc un badge
+> perdu — CSS purgé, contraste insuffisant, jeton inerte — fait lire SÉCURISÉ un réglage qui
+> OUVRE l'accès. Quatre sur cinq ouvrent : la perte est silencieuse ET favorable.*
+
+**Mesuré : le badge n'est pas le seul porteur du sens.** Le libellé du champ l'énonce déjà,
+dans les deux langues :
+
+    f_sftp_only   « Transfert de fichiers uniquement (pas de terminal) »   n'ouvre pas
+    f_password    « Autoriser la connexion par mot de passe »              Allow…
+    f_tcp         « Autoriser les tunnels reseau »                         Allow…
+    f_agent       « Autoriser le rebond de cle »                           Allow…
+    f_x11         « Autoriser l'affichage graphique distant »              Allow…
+
+    concordance libelle / effet : 5 / 5, en FR comme en EN
+
+**Un badge perdu DÉGRADE l'avertissement ; il n'INVERSE pas le sens.** L'opérateur lit encore
+« Autoriser les tunnels réseau » sur la case elle-même. *C'est une différence de degré qui
+change la priorité : ce n'est pas la pastille KEV à 1,06:1, où le HTML juste ne disait rien
+de plus.*
+
+## ⛔ MAIS LA MESURE, ELLE, EST IMPOSSIBLE — et ça reste ouvert
+
+    <span class="rw-badge rw-badge--attention" data-rw="sftp-effet-{{ $cle }}">
+
+**L'ancre `data-rw` n'existe QUE dans la branche qui ouvre.** Conséquence :
+
+    reglage RESTREINT     aucune ancre  ->  l'assertion ne trouve rien
+    badge PERDU           aucune ancre  ->  l'assertion ne trouve rien
+
+**Aucune épreuve DOM ne peut distinguer les deux.** Un test qui vérifie l'absence du badge sur
+`sftp_only` passerait tout aussi bien si le badge avait disparu partout.
+
+*C'est le défaut réel, et il est de testabilité plutôt que d'affichage.* Le fermer demanderait
+**une ancre dans les deux branches** — un `data-rw="sftp-effet-x"` portant `ouvre` ou
+`restreint` en valeur, plutôt qu'un élément présent ou absent. **Une propriété portée par une
+VALEUR se mesure ; une propriété portée par une PRÉSENCE ne se distingue pas d'une panne.**
+
+Non fait ici : c'est un changement de vue, et la décision de rendre ou non le second badge
+vient d'être prise dans l'autre sens.
+
+## Ce qui n'a pas pu être mesuré, et pourquoi
+
+**Le contraste calculé du badge.** C'est la mesure utile — *aucune assertion sur la présence
+du `<span>` ne peut voir un badge invisible* — et elle demande un navigateur.
+
+    swap        3604 / 3702 Mio   =  97,4 %
+    disponible  1,4 Gio
+    Chrome      « Timed out waiting for the WS endpoint », deux fois chez une autre session
+
+**Une suite lancée dans cet état échouerait pour cette raison, pas pour la sienne.** Reporté,
+et dit plutôt que tenté.
