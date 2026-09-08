@@ -15049,3 +15049,92 @@ ne montrait que du MCP puppeteer vieux de onze jours, ou rien.*
 > citer comme s'il l'était.* **Le signal qui a tenu, lui, est l'écriture de captures sous
 > `tests/e2e/screenshots` dans les trois dernières minutes** — mesurable, daté, et avec un
 > témoin (104 fichiers de moins de deux jours prouvent que la commande lit).
+
+---
+
+## E-484 ⚖ — MON STYLE DE TITRE A CASSÉ LA GARDE ANTI-COLLISION, ET LA PARADE EST UNE ASYMÉTRIE
+
+**2026-09-08, ~05:5x.** *Le numéro de cette entrée est le premier écrit selon la convention
+qu'elle établit : **le numéro d'abord, l'emoji ensuite.***
+
+### ① CE QUE MON STYLE A COÛTÉ, MESURÉ
+
+La garde anti-collision du 07/09 portait `^#{1,6} +E-[0-9]+` — les dièses, des espaces, puis
+`E-`. **J'écris `## ⚖ E-480 — …` : un emoji entre les deux.** Le motif ne le franchit pas.
+
+```
+ancien motif  ^#{1,6} +E-        68 titres vus
+motif corrige ^#{1,6}[^0-9]*E-   99 titres vus
+                                 -> 31 de mes titres INVISIBLES, presque un tiers
+```
+
+**Conséquence directe, et elle est arithmétique :**
+
+```
+max par motif ETROIT : 467  ->  propose 468  ->  468 EST DEJA EMPLOYE   ⛔ COLLISION
+max par motif LARGE  : 482  ->  propose 483  ->  483 est libre          ✅
+```
+
+*Deux collisions ont été allouées APRÈS la règle et PAR elle — `E-463` et `E-468`.* **La
+garde a produit le défaut qu'elle existait pour empêcher, et sur un fichier qu'elle ne
+pouvait pas lire.**
+
+### 🔴 ② LA PARADE N'EST PAS UN MEILLEUR MOTIF : C'EST UNE ASYMÉTRIE
+
+> **Quand une mesure alimente une ALLOCATION, il faut se tromper LARGE.** *Un motif trop
+> large ne peut que pousser le numéro plus haut — il gaspille des numéros. Un motif trop
+> étroit fait COLLISION.* **Les deux erreurs ne se paient pas dans la même monnaie.**
+
+*C'est la même forme que le repli asymétrique de Q2 — « quand le coût est asymétrique, le
+repli doit l'être aussi » — appliquée à un compteur au lieu d'un garde.*
+
+### ⚖ ③ CE QUE JE TRANCHE POUR MA PROPRE NUMÉROTATION
+
+```
+1  LA BORNE se calcule LARGE, sur TOUT l'arbre docs/, en titres ET en citations
+     libres :   max(\bE-(\d+)\b)  +  1
+     mesure du 2026-09-08 : max 483 (docs/migration/PARITE.md) -> libre 484
+2  L'ALLOCATION s'ecrit avec LE NUMERO D'ABORD :   ## E-484 ⚖ — …
+     les deux motifs la voient, et une REFERENCE ne peut plus se faire passer
+     pour une allocation puisqu'elle ne commence jamais par `E-nnn`
+3  PAS DE REGISTRE
+```
+
+**Le point 3 est le plus important, et c'est un refus.** *Un registre est une SECONDE LISTE
+de numéros — exactement le défaut que j'ai reproché à la liste curatée des clés i18n.* **Il
+dériverait, et sa dérive serait invisible : rien ne rougit quand un registre oublie un
+numéro.** L'arbre EST le registre ; le motif large rend sa lecture sûre.
+
+### ⚠ ④ ET MON PROPRE INSTRUMENT D'AUDIT ÉTAIT FAUX DANS L'AUTRE SENS
+
+J'ai voulu compter les doublons. **Mon motif a rendu « 11 numéros portés par plusieurs
+titres ». Après raffinement : UN. Après lecture des quatre lignes : ZÉRO.**
+
+```
+478 · 479 · 482    mes entrees `bis` — convention deliberee, pas une collision
+476                `### REPRISE DE E-476 §④` — une REFERENCE dans un titre
+280                un titre + TROIS references (« le departage », « gel leve sur
+                   le seul patch E-280 », « la caracterisation complete d'E-280 »)
+```
+
+> **« Allocation » est une propriété SÉMANTIQUE que le texte d'un titre n'encode pas.**
+> *Chaque raffinement de mon motif attrapait des références et en manquait d'autres.*
+
+**Donc je n'ai PAS publié de compte de doublons** : je ne peux pas l'établir par motif, et le
+point 2 ci-dessus est la seule chose qui rende la question décidable — **pour l'avenir
+seulement.** *L'historique reste ambigu, et c'est acceptable : ce qui compte pour allouer est
+la BORNE, et la borne se calcule large.*
+
+### ⑤ CE QUE JE RETIENS DES DEUX INSTRUMENTS
+
+```
+la garde du pair   trop ETROITE  ->  a fabrique deux collisions
+mon audit          trop LARGE    ->  a fabrique onze faux doublons
+```
+
+**Aucun des deux auteurs n'a supposé une forme au hasard : chacun a supposé LA SIENNE.** *Le
+pair écrit `## E-nnn`, moi `## ⚖ E-nnn`, et nos deux motifs décrivent fidèlement le fichier
+de leur auteur.* **C'est la troisième fois de ce chantier qu'un motif suppose la forme du
+fichier de celui qui l'écrit** — après un espace unique avant `=>` et une entrée par ligne.
+
+> **Un motif écrit sur ses propres fichiers ne mesure pas un dépôt : il mesure un auteur.**
