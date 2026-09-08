@@ -22978,3 +22978,73 @@ sept, et **la boucle n'a rien imprime du tout**. *Une comparaison de fraicheur q
 comme « aucune vue n'est en retard », qui est la conclusion rassurante.* **Corrige avec un temoin sur un
 chemin connu avant de relancer.**
 
+---
+
+## E-504 — TROIS PATCHS DE LA FILE SONT DEJA DANS L'ARBRE, ET DEUX SONT LES MIENS
+
+**Mesure du 2026-09-08 vers 13:10**, sur une correction de la session 8 qui portait sur une phrase de moi.
+Lecture seule : `git apply --check`, aucune application.
+
+### 1. Ma phrase etait fausse
+
+J'ai ecrit a la session 8 : *« les quatre `.patch` restent non appliques a l'arbre donc absents des deux
+cotes »*. **Faux pour trois des huit fichiers.**
+
+    01  s applique      02  ECHOUE      03  s applique      04  ECHOUE (marque par son nom)
+    05  ECHOUE          06  ECHOUE      07  s applique      QUARANTAINE  ECHOUE (marque)
+
+**`02`, `05` et `06` echouent parce que leur contenu est DEJA DANS L'ARBRE** — verifie par la sonde la plus
+discriminante possible, *le texte que le patch AJOUTE* :
+
+    02  le bloc « ══ E-280 : TOUT LE PARC EST UN CHOIX, PLUS UN REPLI ══ »  ->  scheduler.py:340 (mot pour mot)
+        le `_log.error("Planification %s ignoree : portee illisible …")`     ->  scheduler.py:372
+        et une SECONDE correction parallele, chemin CVE                       ->  scheduler.py:237 / :251
+    05  applique le 2026-09-07 a 19:39, inscrit dans PLAN-DE-MIGRATION §2 ter
+    06  idem — c'est MON patch, et je l'ai applique moi-meme
+
+> **Un patch qui echoue parce que son contenu est DEJA LA se lit exactement comme un patch qui echoue parce
+> qu'il a derive.** *Les deux rendent « le patch a echoue » ; seul le premier ne demande rien.* Formule de
+> la session 8, et elle nomme le defaut mieux que l'incident.
+
+### 2. ⛔ ET SA CORRECTION EST FAUSSE D'UN PAS DE PLUS
+
+Elle conclut : *« le correctif E-280 est dans l'arbre — donc un redemarrage L'APPORTE, comme les trois
+correctifs root »*. **Mesure du regime :**
+
+    bloc E-280 du scheduler          entre par 1d99a236   09-04 14:59
+    fail-closed du chemin CVE        entre par 8a26a9c4   09-04 15:17
+    demarrage des workers                                 09-07 14:53 CEST
+    -> les DEUX sont ANTERIEURS  ->  DEJA VIVANTS dans le service
+
+**Un redemarrage n'apporte rien d'E-280 : le correctif est servi depuis le 4 septembre.**
+
+> **Ma conclusion tenait, et nos DEUX raisons etaient fausses.** *Je disais « le patch n'est pas
+> applique » ; elle disait « il l'est, donc le redemarrage l'apporte ». Le vrai est « il l'est, et le
+> service l'a deja ».* **§7 n°1 garde ses TROIS correctifs root — E-280 n'en est pas un quatrieme.**
+
+### 3. ⚠ ET DEUX DES TROIS ENTREES PERIMEES SONT A MOI
+
+`05` et `06` sont mes patchs d'echange des ports. **Je les ai appliques le 2026-09-07 a 19:39, je l'ai
+inscrit dans mon propre plan — et je les ai laisses dans un repertoire nomme `patchs-en-attente/`.**
+
+> **Le danger n'etait pas l'echec, c'etait de FORCER.** *Un `patch --force` sur `02` aurait pose un
+> TROISIEME `elif target_type == 'all'` dans un fichier qui en porte deja deux, legitimement, sur deux
+> chemins distincts (CVE et ssh_audit).* **Une file qui se presente comme homogene alors qu'elle melange
+> trois etats — a appliquer, deja applique, perime — arme le mode d'echec le plus couteux qu'elle
+> contienne.**
+
+*La session 8 a consigne l'etat reel dans `patchs-en-attente/README.md` : sept entrees, **trois reelles**
+— `01`, `03`, `07`.* **Je ne renomme ni ne deplace mes deux fichiers** : son README vient d'etre ecrit et
+les nomme, donc bouger les fichiers casserait le document qui redresse la file. *Le README est
+l'autorite ; mes deux patchs restent en place et sont declares perimes la.*
+
+### 4. Et un aveu qu'elle m'a fait, sur son propre artefact
+
+Son patch `07` **cassait le deploiement de production** : il retirait `php` de `docker-compose.yml` en
+laissant le bloc `php:` de `docker-compose.prod.yml`, un override sans `image:` ni `build:`. Mesure sur
+copies : `base seule` -> code 0, `base + prod` -> « invalid compose project ».
+
+> *« Ma validation etait juste sur son objet et muette sur celui qui comptait : je ne savais pas que
+> `docker-compose.prod.yml` existait. »* **Une epreuve qui ne connait pas tous les fichiers de sa
+> composition eprouve un sous-ensemble et rend un verdict d'ensemble.**
+
