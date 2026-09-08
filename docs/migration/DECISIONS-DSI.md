@@ -17122,3 +17122,65 @@ pas. **6 est exactement le nombre de règles `ERROR`. Il aurait affiché 6 que l
 règles compilent ou non.** *L'inférence était fausse ; la réparation, elle,
 restait bonne — et c'est le cas le plus traître : une conclusion juste soutenue
 par une preuve qui ne la soutient pas.*
+
+---
+
+## E-524
+
+**Le seul défaut trouvé par la règle des hachages était dans la RÈGLE, et le
+compte identique l'a presque caché.**
+
+L'exploitant ayant demandé de régler la CI, j'ai suivi la dernière trouvaille
+jusqu'à son emplacement — que mon cliquet ne disait pas encore.
+
+```
+:178  if ($l->self_hash === null)                      <- accuse a tort
+:192  if ($erreur === null && $l->prev_hash !== $tete)  <- INVISIBLE
+```
+
+**Deux défauts opposés dans la même règle** : elle accusait un **test de
+nullité** (elle apparie le *nom* de la variable de gauche, pas la nature de
+l'opérande droite — il n'y a aucune fuite de temps à comparer à `null`), et elle
+**ne couvrait ni `!==` ni `!=`** — *« si ça NE correspond PAS » est la
+formulation la plus naturelle d'une vérification, et c'était la moitié du
+domaine.*
+
+*Le cas de `:192` n'est pas exploitable : les deux côtés viennent du serveur,
+même raisonnement que l'exclusion `$_SESSION` déjà présente. Mais la règle ne
+pouvait pas le savoir — elle ne le voyait pas.*
+
+### ⚠ Le compte n'a pas bougé, et c'est ce qui instruit
+
+```
+avant   106  ·  dont 1 pour cette regle, a :178
+apres   106  ·  dont 1 pour cette regle, a :192
+```
+
+**Deux corrections opposées s'annulaient exactement.** *Sans vérifier
+l'IDENTITÉ de la trouvaille et non son nombre, j'aurais conclu que le
+changement n'avait rien fait.* Le témoin, lui, l'a vu : la règle passe de 1 à 2
+trouvailles sur la fixture positive, et reste à 0 sur les formes gardées.
+
+### ⛔ Trois erreurs à moi dans ce même fil
+
+**① J'ai localisé la trouvaille dans `dompdf`, deux fois faux.** Le rapport
+autoritaire la place dans `JournalAudit.php`, et **semgrep exclut `vendor/` par
+défaut** — dompdf n'est pas scanné du tout. *Je me suis trompé sur le fichier ET
+sur la raison.*
+
+**② Trois fois j'ai cassé un scalaire `run: |`** en y collant du python
+multi-ligne : l'indentation d'un scalaire est fixée par sa première ligne, et
+toute ligne moins indentée le termine. **La parade n'est pas plus de soin — le
+rapport est désormais un fichier, `.semgrep/rapport.py`, éprouvé hors CI sur un
+JSON forgé.**
+
+**③ Un commit dont le message annonçait plus que son contenu.** `77e45f63` ne
+portait que le changement de motifs ; son message annonçait aussi le témoin
+étendu et le message aligné. Mon script avait coupé sur une assertion au premier
+pas, et j'ai committé sans regarder.
+
+> **Une assertion qui protège l'ÉCRITURE ne protège pas le RÉCIT qu'on en fait.
+> Le message d'un commit se rédige APRÈS `git show --stat`, jamais avant.**
+
+*Le commit étant poussé, je ne l'ai pas réécrit : `af24756e` le complète et le
+dit.*
