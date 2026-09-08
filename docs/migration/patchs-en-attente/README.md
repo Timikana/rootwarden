@@ -266,3 +266,92 @@ et il ne voit pas un signet non ouvert, une cle d'API non employee, un script
 
 *C'est la seule inconnue qui reste, et elle est bornée : appliquer le patch ne détruit rien
 — `_deprecated/` garde 214 fichiers, et le bloc retiré est un `git revert` de distance.*
+
+---
+
+# ⛔ ETAT DE LA FILE, MESURE le 2026-09-08 14:45 — SEPT ENTREES, TROIS REELLES
+
+`git apply --check` sur les huit fichiers de ce repertoire :
+
+| patch | applique ? | verdict |
+|---|---|---|
+| `01-E-231-psk-illisible` | ✅ | **EN ATTENTE, reelle** |
+| `02-E-280-portee-scheduler` | ⛔ | **PERIME — deja dans HEAD** |
+| `03-telegraf-jeton-en-clair` | ✅ | **EN ATTENTE, reelle** |
+| `04-E-281-apres-fusion-NE-PAS-APPLIQUER-SUR-HEAD` | ⛔ | deja marque par son nom |
+| `05-echange-des-ports-entrypoint` | ⛔ | **PERIME — deja dans HEAD** |
+| `06-echange-des-ports-runner` | ⛔ | **PERIME — deja dans HEAD** |
+| `07-retrait-du-service-php` | ✅ | **EN ATTENTE, reelle** (etendue le 2026-09-08) |
+| `QUARANTAINE-perime-refait-par-a345e65` | ⛔ | deja marque par son nom |
+
+## Les trois periment, et leur contenu est LA — verifie ligne par ligne
+
+**`02`** voulait remplacer un `else` par `elif schedule['target_type'] == 'all':`.
+C'est dans `backend/scheduler.py` **deux fois** — `:237` et `:340` — avec le bloc
+de commentaire `E-280` a `:341`.
+
+**`05`** voulait poser `LARAVEL_HTTPS_PORT="${LARAVEL_HTTPS_PORT:-8443}"`. C'est
+a `laravel/docker-entrypoint.sh:86`, avec le commentaire exact du patch a `:83`.
+
+**`06`** voulait poser le bloc `══ ECHANGE DES PORTS DU 2026-09-06 ══`. Il est a
+`scripts/rejouer-lot.sh:93`, avec `BASE_LEGACY`/`BASE_LARAVEL` a `:102-103`.
+
+*Temoin : `ZZZ-INEXISTANT` cherche dans les trois fichiers rend 0 — la sonde
+distingue.*
+
+> **Un patch qui echoue parce que son contenu est DEJA LA se lit exactement
+> comme un patch qui echoue parce qu'il a derive.** Les deux rendent « le patch
+> a echoue » ; seul le premier ne demande rien.
+
+## ⚠ Pourquoi ça comptait, et pas seulement pour la longueur de la file
+
+Un exploitant travaillant cette file aurait rencontre **trois echecs sans cause
+apparente**. Et le risque n'est pas l'echec : c'est de **forcer**. Un `patch
+--force` sur `02` aurait pu poser un SECOND `elif target_type == 'all'` dans un
+fichier qui en porte deja deux, legitimement, sur deux chemins distincts.
+
+⚠ **Et ça corrige une phrase qui circulait** : « les quatre `.patch` restent non
+appliques a l'arbre donc absents des deux cotes ». **Faux pour `02` au moins** :
+son correctif est dans l'arbre. Il n'est pas dans le SERVICE, ce qui est l'autre
+question — et un redemarrage l'y met.
+
+
+## ✅ `01` ET `03` EPROUVES ENSEMBLE — mesure du 2026-09-08 14:50
+
+Les deux touchent **le même fichier**, `backend/routes/supervision.py`, et chacun
+n'avait été validé que **seul**. C'est la leçon de `07` appliquée en amont : *une
+validation juste sur son objet peut être muette sur celui qui compte.*
+
+    ordre 01 -> 03   applique, avec offset (Hunk #2 a 2380, +26 lignes)
+    ordre 03 -> 01   applique, avec offsets (Hunk #1 a 859, Hunk #2 a 867, +17)
+
+    les deux ordres produisent un fichier IDENTIQUE          ✅ (cmp -s)
+    le resultat COMPILE                                       ✅ 2647 lignes
+    original                                                     2584 lignes
+
+⚠ **Et « le patch s'est appliqué » n'est pas « le résultat est juste »** : un
+offset veut dire que le contexte a matché **ailleurs** que prévu. D'où le
+contrôle sur le contenu, et non sur le code de retour :
+
+    01 : 8 lignes FONCTIONNELLES ajoutees · 8/8 presentes · 0 deja presente
+    03 : 8 lignes FONCTIONNELLES ajoutees · 8/8 presentes · 2 deja presentes
+
+    TEMOIN : une ligne FORGEE (`zzz_ligne_forgee = 1`) est absente du resultat
+
+*Les lignes de commentaire sont ÉCARTÉES du décompte : elles n'attestent aucun
+geste. Mon premier contrôle les comptait — il grepait des mots français extraits
+des patchs (`annoncait`, `aucune`, `absent`) et rendait du vert sans mesurer le
+changement. **Un compte de grep porte le nom, pas le geste.***
+
+### Ce que ça autorise
+
+**`01` et `03` peuvent être signés et appliqués ensemble, dans n'importe quel
+ordre.** Ils sont indépendants, leur résultat compile, et aucun des deux n'est un
+coup pour rien.
+
+### La file, entièrement caractérisée
+
+    3 PERIMES        02 · 05 · 06   contenu deja dans HEAD
+    2 DEJA MARQUES   04 · QUARANTAINE
+    3 REELS          01 · 03 (independants, eprouves ensemble)
+                     07 (etendu a DEUX fichiers compose, eprouve de bout en bout)
