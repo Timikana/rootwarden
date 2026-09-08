@@ -68,9 +68,23 @@ const CAS = [
     { nom: '200 corps chaine',        arg: ['<html>', 200, null] },
     { nom: '200 corps nombre',        arg: [7, 200, null] },
     // ── 200, doute sur le marqueur ────────────────────────────────────────
-    { nom: 'doute (fr)',              arg: [{ marqueur_incertain: true, output: 'x' }, 200, null] },
-    { nom: 'doute (en)',              arg: [{ marker_uncertain: true, sortie: 'y' }, 200, null] },
-    { nom: 'doute PRIME sur success', arg: [{ success: true, marqueur_incertain: true }, 200, null] },
+    { nom: 'doute',                   arg: [{ marker_uncertain: true, output: 'x' }, 200, null], ton: 'doute' },
+    { nom: 'doute PRIME sur success', arg: [{ success: true, marker_uncertain: true }, 200, null], ton: 'doute' },
+    /*
+     * ⚠ DEUX CAS QUI MESURENT DES ALIAS RETIRES.
+     *
+     * Le module acceptait `marqueur_incertain` a cote de `marker_uncertain`, et
+     * `sortie` a cote de `output` — deux alias sans AUCUN producteur, mesures sur
+     * le depot entier. Retires. **Sans ces deux cas, retirer un alias serait
+     * indiscernable de le garder** : les deux formes rendaient un message, et la
+     * seule chose que l'epreuve exigeait etait « pas de silence ».
+     *
+     * C'est pourquoi les cas nomment desormais leur TON attendu : « non muet » ne
+     * distingue pas `doute` de `inabouti`, et c'est exactement ce qu'un alias
+     * retire change.
+     */
+    { nom: 'alias fr retire',         arg: [{ marqueur_incertain: true }, 200, null], sansNom: true },
+    { nom: 'alias sortie retire',     arg: [{ success: true, sortie: 'y' }, 200, null], ton: 'succes', detail: '' },
     // ── 200, verdict fonde ────────────────────────────────────────────────
     { nom: 'succes',                  arg: [{ success: true, output: 'ok' }, 200, null] },
     { nom: 'echec regles',            arg: [{ success: false, output: 'bad rule' }, 200, null] },
@@ -96,7 +110,14 @@ for (const c of CAS) {
     const muet = !r || typeof r !== 'object'
         || typeof r.titre !== 'string' || r.titre.trim() === ''
         || !TONS.includes(r.ton) || typeof r.sur !== 'boolean';
-    if (muet) { rouges.push(c.nom); } else { ok++; }
+    if (muet) { rouges.push(c.nom); ok--; }
+    /*
+     * ⚠ Le TON attendu quand le cas en nomme un, et le DETAIL quand il en nomme
+     * un. « Pas de silence » etait trop faible pour voir un alias retire.
+     */
+    else if (c.ton && r.ton !== c.ton) { rouges.push(c.nom + ' [ton=' + r.ton + ' attendu ' + c.ton + ']'); }
+    else if (c.detail !== undefined && r.detail !== c.detail) { rouges.push(c.nom + ' [detail=' + JSON.stringify(r.detail) + ']'); }
+    ok++;
     if (!mutation) {
         console.log(`  ${muet ? 'FAIL' : 'ok  '} ${c.nom.padEnd(24)} ${muet ? 'SILENCE' : r.ton.padEnd(9) + ' sur=' + r.sur}`);
     }
