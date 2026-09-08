@@ -211,3 +211,55 @@ appariement d'accolades.*
 **Aucun de nous ne devrait publier ce nombre avant que les deux prédicats soient
 rapprochés.** *Ce n'est pas une querelle de chiffre : c'est le seuil d'un
 mécanisme qui décide, et je ne sais pas lequel des deux est juste.*
+
+
+---
+
+## 7. ✅ RAPPROCHÉ — `125 / 70`, et mes DEUX termes étaient faux
+
+**Les prédicats ont été échangés sous forme réfutable. J'ai rejoué le leur sur ma
+portée : `population 125 · (a) 70` — l'accord est exact.**
+
+### 7.1 L'écart de population : 6 fichiers, le lancement n'est QUE dans une chaîne
+
+```
+ma retention   (commentaires seuls depouilles)   132
+leur retention (commentaires ET litteraux)       126
+ecart : 6 fichiers ou `puppeteer.launch` ne subsiste que dans une CHAINE
+  go-fail2ban-f7 · go-page-groupes · go-page-pare-feu · go-page-wazuh
+  lib-navigateur.epreuve · lib-navigateur.invariant
+puis 126 − 1 (lib-navigateur.mjs)                125   ✓
+```
+
+> **Je dépouillais les commentaires et PAS les littéraux.** *« Cité » n'est pas
+> « appelé » — et une chaîne est une citation autant qu'un commentaire. J'avais
+> corrigé la moitié de ma faute en croyant l'avoir corrigée entière.*
+
+### 7.2 ⛔ ET SUR LE DÉFAUT, MON MOTIF DÉDOUANAIT
+
+**Mon motif acceptait n'importe quel `.close(`. Recensement des receveurs, dérivé
+de la source dépouillée :**
+
+```
+ctx 151 · navigateur 121 · browser 30 · c 28 · page 11 · ctxEn 4 · context 1
+```
+
+> ⛔ **`ctx`, `c`, `ctxEn`, `context` sont des CONTEXTES et `page` une PAGE. Une
+> suite qui ferme proprement ses contextes dans un `finally` et n'a JAMAIS fermé
+> le navigateur était classée SAINE par ma sonde.**
+
+**C'est pourquoi je comptais 68 et non 70 : mon erreur était du côté PERMISSIF.**
+*Deux suites réellement en défaut sortaient de ma liste — et c'est la classe de
+faute que je répète depuis deux jours qu'un pair ne relit pas.* **Celui-ci l'a
+relue.**
+
+### 7.3 Ce que ça règle, et ce que ça vaut
+
+    le compte arrete       population 125 · defaut (a) 70 · defaut (b) 37
+    le cliquet             recalibre a 70, et il refuse desormais tout
+                           receveur de `.close(` INCONNU a l'execution
+
+**Mon §6 disait « je ne sais pas lequel des deux est juste ». Réponse : ni l'un ni
+l'autre — le leur après correction de sa population, le mien jamais.** *Et la
+seule raison pour laquelle un seuil faux n'a pas été scellé sur `main` est qu'un
+chiffre a refusé d'être reproduit.*
