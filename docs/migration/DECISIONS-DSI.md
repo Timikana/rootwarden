@@ -15205,3 +15205,71 @@ swap 96,3 % · Chrome ne demarre pas
 
 **Il reste une phrase à retirer et un bouton avec elle.** *C'est tout ce qui relie encore les
 deux portails, et ça tient dans un encart.*
+
+---
+
+## E-486 ✅ — LE LEGACY N'EST L'ÉCRIVAIN EXCLUSIF DE RIEN, ET C'ÉTAIT LA DERNIÈRE ESPÈCE
+
+**2026-09-08, ~06:0x.** *La cinquième espèce de dépendance : ni un lien, ni un appel — un
+ÉTAT que seul le legacy écrirait, et que l'extinction couperait en silence.*
+
+### LA MESURE
+
+```
+tables ECRITES par le legacy servi, code depouille   21 noms extraits
+                    croises contre le schema REEL    10 tables · 11 etaient du BRUIT
+                                                     (`by`, `for`, `is`, `on`, `without`…
+                                                      un `UPDATE` dans une chaine en prose)
+```
+
+**Chacune des dix est aussi écrite par le portage ou par le backend.** *Le seul écart
+apparent — `notifications`, « portage ÉCRIT 0 » — était un artefact de mon motif.*
+
+### ⚠ ET C'EST LA TROISIÈME FOIS CETTE NUIT QUE MON MOTIF ÉNUMÈRE MES PROPRES IDÉES
+
+```
+1  Mail::send · Mail::to · Mailable · ->notify( · Notification::
+   -> le code emploie `Mail::raw`   =>  « le portage n'envoie AUCUN courriel »   FAUX
+2  Route::(get|post)
+   -> la route est `Route::delete('/notifications/{id}', … 'supprimer')` :744
+      =>  « le portage ne sait pas supprimer une notification »   FAUX
+3  INSERT|UPDATE|DELETE sur le nom de table
+   -> les ecritures du portage vivent dans un SERVICE injecte, pas dans le controleur
+      =>  « portage ECRIT 0 »   FAUX
+```
+
+> **Trois fois, l'énumération était la mienne — la liste des formes auxquelles j'ai pensé.**
+> *Et les trois fois la conclusion allait dans le sens ALARMANT : une capacité déclarée
+> absente alors qu'elle est là.*
+
+**C'est textuellement la règle que je porte** — *fonder sur le MÉCANISME et pas sur
+l'ÉNUMÉRATION* — **enfreinte trois fois en trois heures, sur trois objets différents.** *Ce
+qui m'a rattrapée les trois fois n'est pas la mémoire de la règle : c'est un reste inexpliqué
+— une page de 2387 octets pour une capacité déclarée absente, une route de suppression dans
+le legacy sans jumelle, un `LIT 34` face à un `ÉCRIT 0`.*
+
+**La parade praticable, et elle est plus courte que la vigilance : chercher le PRÉFIXE, pas
+la forme.** `Mail::` plutôt que cinq méthodes. `Route::` plutôt que deux verbes. *Un préfixe
+sur-couvre — et [[E-484]] a établi qu'un motif qui sur-couvre se paie en bruit, jamais en
+omission.*
+
+### ✅ CE QUE CETTE MESURE CLÔT
+
+**Les cinq espèces de dépendance au legacy sont mesurées, et aucune n'est vivante :**
+
+```
+1  les 11 racines servies      aucune capacite qui ne soit ailleurs
+2  portage -> legacy           1 lien, dans l'encart `ipt-non-porte` (E-485)
+3  backend -> legacy           0 appel · 1 entree CORS inerte (E-481)
+4  les courriels               1 flux, avec une vulnerabilite REELLE que
+                               `MAIL_MAILER=log` tient fermee (DOSSIER-52)
+5  la base                     le legacy n'est l'ecrivain exclusif de RIEN
+```
+
+> **Il n'existe plus aucune raison technique de garder le legacy en service.** *Ce qui reste
+> n'est pas une capacité : c'est une phrase fausse dans un encart, huit gestes d'exploitant,
+> et 100 Mio de mémoire.*
+
+⚠ **Et « aucune espèce vivante » n'est pas « aucune espèce ».** *Les cinq ont été trouvées une
+par une, par cinq chemins différents ; aucune par un recensement.* **Je ne peux pas affirmer
+qu'il n'en existe pas une sixième — seulement que je ne sais plus où la chercher.**
