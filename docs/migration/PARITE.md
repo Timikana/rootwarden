@@ -21481,6 +21481,17 @@ zéro `$(` hors commentaire), sourcé sous `set -u` :
 **Trois méthodes indépendantes concordent** : `${#REF_LARAVEL[@]}`, un `grep -o '\[[a-z0-9-]+\]='` sur le
 bloc borné, et les différences d'ensembles. Témoins dans les deux sens.
 
+> ⚠ **CORRECTION DU 2026-09-08 — elles étaient DEUX, pas trois.** *Les différences d'ensembles étaient
+> calculées sur des fichiers écrits DEPUIS les tableaux sourcés par bash : elles partageaient le prédicat de
+> la première.* Seul le `grep -o` portait un prédicat différent — un MOTIF sur le texte contre un SOURÇAGE
+> par l'interprète. **Vérifié en cassant : une clé retirée du texte fait passer les deux de 85 à 84,
+> ensemble** — c'est ce que font deux instruments indépendants, et c'est ce que le troisième ne pouvait pas
+> faire puisqu'il dérivait du premier.
+>
+> *La conclusion — 85 — reste juste et corroborée par deux prédicats distincts. C'est le COMPTE de
+> corroborations qui était inflaté.* **Formulation de la session 7, qui a payé la version grave le même
+> jour** : trois enveloppes autour d'un seul prédicat, lues comme trois confirmations.
+
 **La cause.** Les lignes de référence portent **plusieurs clés chacune** —
 `[go-socle-navigation]=75 [go-socle-i18n]=23 [go-socle-passerelle]=10 [go-socle-auth]=14` — et mon `awk`
 faisait `match($0, /^[ \t]*\[[a-z0-9-]+\]=/)`, **qui n'imprime que la première de chaque ligne**. 58 au lieu
