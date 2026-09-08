@@ -67,7 +67,7 @@ synchronise l'octet, pas la mémoire du processus qui l'a lu.**
 
 ## 3. Ce que je tranche
 
-**E-500 — L'étape 2 de la mission n'a plus d'objet, et je cesse d'assigner des
+**E-501 — L'étape 2 de la mission n'a plus d'objet, et je cesse d'assigner des
 capacités de cette file.** Deux sessions me l'ont dit avant que je le mesure :
 *« ne m'assigne rien pour combler le temps »*, *« le dire vaut mieux qu'un
 travail inventé »*. Et l'une a chiffré le coût : **cinq assignations en deux
