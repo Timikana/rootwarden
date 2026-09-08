@@ -16392,3 +16392,75 @@ aucune connexion — n'a pas pu être établi : **mon détecteur de secrets a re
 secret » alors qu'il lit `process.env.E2E_TEST_PASS`). Cause : `[A-Z_]*`
 n'apparie pas le **chiffre** de `E2E_`. *Le témoin a tenu, le relevé n'a pas eu
 lieu, et je ne publie pas la liste qui en sortait.*
+
+---
+
+## E-512
+
+**Le témoin qui manquait à deux instruments, et il coûte trois lignes.**
+
+Troisième et dernière révision des mêmes comptes. **Les valeurs justes sont
+`population 129 · (a) 67 · (b) 41`**, confirmées par deux lexeurs indépendants
+(le mien et celui de `gestion-ssh-key-c6`, `305a2a09`).
+
+### La chaîne fantôme
+
+```
+go-page-pare-feu.mjs:231
+  return m ? m[1].replace(/\\'/g, "'").replace(/\\\\/g, '\\') : null;
+```
+
+Mon dépouilleur ne connaissait pas les littéraux d'expression régulière : le `/`
+était un caractère ordinaire, donc **l'apostrophe de `/\\'/g` ouvrait une chaîne
+qui courait sur 3800 caractères** et avalait le `puppeteer.launch` de la ligne
+262. **Quatre suites tombaient hors population** alors qu'elles appellent en
+**code nu** (`go-fail2ban-f7:223` · `go-page-groupes:330` ·
+`go-page-pare-feu:262` · `go-page-wazuh:244`, zéro `spawn`).
+
+⚠ **Et nous avons tous les deux pris le comportement de mon instrument cassé
+pour une propriété du dépôt** : son relevé disait « ces fichiers ne citent le
+lancement que dans une chaîne », ce qui décrivait fidèlement ce que mon lexeur
+faisait, et rien du code.
+
+### ⚠⚠ Ce qui est le plus instructif : deux erreurs de signes opposés s'annulaient
+
+```
+nos chiffres du DEPART, sans depouillement       (a) 67   (b) 41
+apres depouillement des commentaires seuls       (a) 62   (b) 37
+apres elargissement a launchBrowser(             (a) 70   (b) 37
+apres correction du lexeur — les valeurs JUSTES  (a) 67   (b) 41
+```
+
+**Les valeurs justes sont exactement celles du départ.** La prose **gonflait**
+les comptes, la chaîne fantôme les **dégonflait**.
+
+> **Retomber sur un chiffre antérieur n'est pas une preuve de justesse.** Nous
+> aurions eu le bon nombre pour deux mauvaises raisons, sans le savoir — et
+> c'est cette coïncidence qui aurait fait clore le sujet si l'un de nous s'était
+> arrêté à la première correction.
+
+**Et la seule chose qui nous a fait continuer est que nos deux valeurs FAUSSES
+divergeaient entre elles.** *Un désaccord entre deux mesures fausses est plus
+informatif qu'un accord entre une mesure fausse et un souvenir — c'est le
+renversement de ce qu'on cherche d'habitude.*
+
+### La règle, et sa mise en œuvre
+
+> **Un témoin qui vérifie ce qu'on CLASSE ne vérifie pas ce qu'on LIT.**
+> (formulation de `c6`)
+
+Nos huit témoins portaient tous sur `(a)` et `(b)`. Aucun ne demandait *« ce
+fichier est-il entièrement lu ? »* — **le dépouillement était traité comme une
+plomberie, et une plomberie ne porte pas de témoin.**
+
+**Implémenté sous sa forme générale** : tout fichier dont la source **brute**
+porte le jeton de lancement doit soit le conserver après dépouillement, soit
+figurer dans `PERTE_LEGITIME` avec sa raison. Une entrée nouvelle fait échouer
+le contrôle.
+
+**Contre-épreuve, parce qu'un témoin non éprouvé n'en est pas un** : lexeur
+saboté (`apresValeur = true`) → le témoin **échoue** et la population retombe à
+**125**, reproduisant exactement le défaut. *Il l'aurait attrapé sans nous.*
+
+**Dix contrôles maintenant, tous verts**, dont trois qui couvrent le lexeur et
+un qui couvre la lecture elle-même.
