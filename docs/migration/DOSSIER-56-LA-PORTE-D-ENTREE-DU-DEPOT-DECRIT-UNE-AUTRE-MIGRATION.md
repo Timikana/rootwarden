@@ -198,3 +198,150 @@ Le geste le plus court de ce dossier n'est plus `README.md:16-17` seul :
 3. la version annoncee dans quatre documents
 4. README.md:19, la mesure du 2026-08-23
 ```
+
+---
+
+# 7. `ARCHITECTURE.md` — 1179 lignes qui décrivent l'arbre par des chemins morts
+
+**Mesuré le 2026-09-08 à 16:05 CEST.** C'était le dernier gros document non
+examiné du dépôt, et sa péremption n'est pas de la même espèce que celle du
+runbook : **elle ne fait pas taper une commande fausse, elle fait chercher un
+fichier qui n'existe pas.** C'est plus faible, et je le dis plutôt que de
+l'aligner sur §6.
+
+## 7.1 Les chemins : faux DEUX fois
+
+Le document emploie la forme `www/…` — le nom du répertoire **avant la vague 0**
+(`52251087 refactor(migration): vague 0 - www/ devient legacy/`).
+
+```
+chemins www/*.php distincts cites          43
+  -> existent sous legacy/_deprecated/     39     <- prefixe faux ET fichier archive
+  -> existent sous legacy/ (vivant)         0
+  -> introuvables des deux cotes            4
+
+TEMOIN  www/adm/health_check.php -> resolu   ✅   (l'instrument resout bien)
+        www/zzz/inexistant.php   -> non      ✅   (et il discrimine)
+```
+
+**Zéro des 43 désigne un fichier vivant.** Le document décrit intégralement un
+arbre archivé, par des chemins portant un préfixe retiré depuis deux renommages.
+
+## 7.2 Les comptes, contre la mesure — et le témoin qui valide l'instrument
+
+```
+:39   « Sur 63 tables »                   mesure  65 CREATE TABLE
+:414  « 77 routes en 8 modules »          mesure  229 @bp.route en 27 modules
+
+  fail2ban.py   annonce 19  ·  mesure 19   ✅  <- LE TEMOIN
+  updates.py    annonce 12  ·  mesure 14
+  cve.py        annonce 16  ·  mesure 18
+  ssh.py        annonce 10  ·  mesure 19
+  wazuh.py      annonce 11  ·  mesure 15
+```
+
+⚠ **`fail2ban.py` à l'identique est ce qui rend le reste lisible.** Mon prédicat
+`@bp.route` s'accorde avec celui de l'auteur du document sur un module ; les
+écarts ailleurs sont donc de la **croissance réelle**, pas un désaccord
+d'instrument. *Sans ce module-là, « 77 contre 229 » aurait tout aussi bien pu
+signifier que je comptais autre chose que lui.*
+
+## 7.3 ⛔ Et `health_check.php` : ma crainte, et pourquoi elle ne tient pas
+
+`:843` présente `www/security/health_check.php` comme un *« dashboard diagnostic
+des 11 routes backend »*. C'est le fichier que les consignes interdisent
+d'ouvrir — il écrit sur `srv-zabbix`, la **production**, au chargement.
+
+**Il n'y a pas de danger vivant, et pour trois raisons cumulées :**
+
+```
+① le fichier est ARCHIVE          legacy/_deprecated/adm/health_check.php
+② le chemin annonce est FAUX      « security/ » ; il est sous « adm/ »
+③ une requete sur l'archive       rend 404 (RedirectMatch sur _deprecated)
+```
+
+*Personne ne peut l'atteindre en suivant cette ligne.* **Je l'écris comme un
+non-danger plutôt que comme une alarme** : une alarme de plus sur un document
+périmé aurait fait ranger celle-ci par ressemblance avec les autres, et c'est
+exactement le coût que `feedback_forme_de_ce_qu_on_transmet` mesure.
+
+---
+
+# 8. LE FAIT QUI COMPTE : un seul échange de ports a périmé SEPT porteurs
+
+Le diagramme d'`ARCHITECTURE.md:12-17` dit `:8443 → legacy` / `:8444 → laravel`.
+**Au réseau, redaté maintenant : `:8443/connexion` → 200 · `:8446/connexion` →
+404.** Le document se date lui-même au **2026-08-23** (`:8`) — donc **il était
+juste à l'écriture**, et il est devenu faux le **2026-09-06** sans que personne
+n'y touche.
+
+**C'est le même événement que `APP_URL=…:8444` de `DOSSIER-54`, et j'en compte
+maintenant sept porteurs normatifs :**
+
+```
+ARCHITECTURE.md:12,17                        le diagramme
+README.md:16-17     + :248,250               le tableau, PUIS une seconde fois
+README.en.md:16-17  + :223,224               idem, en anglais
+OPERATIONS.md:14-15                          le runbook (cf. §6)
+.claude/skills/rw-laravel/SKILL.md:8-9       ⛔ une COMPETENCE de session
+srv-docker.env.example:72                    ⛔ contredit sa propre ligne 102
+obsidian…/containers-docker.md:17,39         le vault (miroir, 482 .md)
+```
+
+## 8.1 ⚠ Les deux porteurs qui ne sont pas de la simple documentation
+
+**`.claude/skills/rw-laravel/SKILL.md:8-9`** — *« Le frontend Laravel (`laravel/`,
+port 8444) tourne en parallèle du legacy (`legacy/`, port 8443). Le legacy reste
+la référence. »* **Une compétence n'est pas lue, elle est suivie.** Une session
+qui la charge reçoit le mapping inversé *et* « le legacy reste la référence »
+comme cadre de travail — alors que le legacy sert zéro `.php`.
+
+**`srv-docker.env.example` se contredit à trente lignes d'intervalle :**
+
+```
+:72    « le legacy (8443) reste la reference tant que la parite… »      FAUX
+:101   « ⚠ LE PORT EST 8443, ET LE SENS DE 8444 S'EST INVERSE LE 2026-09-06. »
+:104   « DATER avant d'interpreter une trace de 8444. »                 JUSTE
+```
+
+> **L'avertissement de `:101` a été écrit pour protéger le lecteur d'une trace de
+> `8444`. La ligne `:72` est une telle trace, dans le même fichier, trente lignes
+> plus haut, non protégée.** *On applique une règle en LISANT, jamais en
+> écrivant — et ici c'est littéral et mesurable : l'auteur de l'avertissement n'a
+> pas relu son propre fichier au-dessus de lui.*
+
+## 8.2 Mon instrument a sur-collecté, et c'est instructif
+
+Mon premier relevé rendait **24 fichiers**. Faux : `CHANGELOG.md:1119`,
+`srv-docker.env.example:102`, `scripts/rejouer-lot.sh:95` et
+`PLAN-DE-MIGRATION.md:308-309` décrivent l'échange **correctement**.
+
+> **Une description juste et une affirmation fausse du même fait contiennent les
+> mêmes jetons.** Un motif fondé sur la co-présence de `8443` et de `legacy` ne
+> peut pas les séparer : il faut lire la ligne et juger sa POSITION — un tableau,
+> un diagramme, un « va ici » sont normatifs ; un récit daté ne l'est pas.
+
+## 8.3 ⛔ CE QUE JE TRANCHE — E-504
+
+**Sept porteurs pour un fait, et la prose ne se garde pas par construction.**
+Ma propre hiérarchie (*inexprimable > dérivé > exhaustif > contrôlé*) n'offre
+ici que le rang le plus faible : un test qui grep un nombre dans un `.md`.
+
+**Donc le remède n'est pas sept corrections plus une garde. C'est de réduire le
+nombre de porteurs à UN.**
+
+```
+LE porteur : srv-docker.env.example:88-104
+             il porte deja LARAVEL_HTTPS_PORT=8443 et l'avertissement DATE
+les six autres : remplacer la valeur par un renvoi vers ce bloc
+```
+
+*Un fait qui vit à sept endroits se périme sept fois et se corrige une fois sur
+sept. Un fait qui vit à un endroit avec sa date se périme une fois — et l'échange
+du 06/09 l'aurait alors coûté un seul geste, pas sept documents faux pendant
+deux jours.*
+
+⚠ **Et l'ordre de priorité, dans ces sept :** `SKILL.md:8-9` d'abord — c'est le
+seul qui **oriente le travail d'une session** au lieu d'informer un lecteur.
+Puis `:72` de `srv-docker.env.example`, parce qu'un fichier qui se contredit
+apprend à ses lecteurs à ne pas le croire, y compris là où il a raison.

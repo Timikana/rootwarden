@@ -15968,3 +15968,57 @@ existantes.
 semées, qu'`init.sql` recréerait. **Aucune donnée n'est perdue en les retirant.**
 Mais c'est une migration, et elle demande de retirer la `CREATE` **et** l'`INSERT`
 dans le même geste.
+
+---
+
+## E-504
+
+**Un fait qui vit à sept endroits ne se garde pas : il se réduit à un.**
+
+L'échange de ports du 2026-09-06 a périmé **sept porteurs normatifs** du mapping
+`8443`/`8444` sans que personne y touche : `ARCHITECTURE.md:12,17` ·
+`README.md:16-17` et `:248,250` · `README.en.md:16-17` et `:223,224` ·
+`OPERATIONS.md:14-15` · `.claude/skills/rw-laravel/SKILL.md:8-9` ·
+`srv-docker.env.example:72` · le vault Obsidian. Mesure au réseau ce jour :
+`:8443/connexion` → **200**, `:8446/connexion` → **404**.
+
+**Je tranche : pas de garde sur la prose.** Ma hiérarchie (*inexprimable >
+dérivé > exhaustif > contrôlé*) n'offre ici que le rang le plus faible — un test
+qui grep un nombre dans un `.md`. Le porteur unique est
+`srv-docker.env.example:88-104`, qui porte déjà `LARAVEL_HTTPS_PORT=8443` **et**
+l'avertissement daté ; les six autres deviennent des renvois.
+
+**Priorité dans les sept** : `SKILL.md:8-9` d'abord — c'est le seul qui *oriente
+le travail d'une session* au lieu d'informer un lecteur ; une compétence n'est
+pas lue, elle est suivie. Puis `srv-docker.env.example:72`, parce qu'il
+**contredit sa propre ligne 101** : l'avertissement écrit pour protéger d'une
+trace de `8444` ne protège pas la trace située trente lignes au-dessus de lui.
+
+Détail et mesures : `DOSSIER-56` §7-8.
+
+---
+
+## E-505
+
+**Le swap saturé est un dimensionnement, pas un incident — et j'avais accusé à
+tort.**
+
+Trois sessions déclarent la preuve au navigateur bloquée par la mémoire. Mesure :
+`Mem 5,8 Gi / 4,7 utilisés` · `Échange 3,6 Gi plein à 120 Ki près`. J'ai d'abord
+annoncé **2,9 Gio tenus par des navigateurs de test fuités**. C'était faux :
+en remontant la chaîne entière au lieu du parent immédiat, la fuite de Puppeteer
+pèse **0,32 Gio (23 processus)** et les **2,61 Gio** sont les 8 fenêtres de la
+session graphique de l'exploitant — un usage légitime.
+
+**Je tranche trois choses.** ① Le remède est la RAM (8 Gio), déjà écrit dans la
+fiche mémoire du dépôt ; ma mesure la confirme au lieu de la remplacer.
+② Le seul point livrable par une session est un `browser.close()` en `finally`
+dans les suites E2E : `23 → 0`, mesurable, et il vaut surtout pour la lisibilité
+de l'arbre de processus — c'est son illisibilité qui m'a fait me tromper.
+③ **Aucun processus n'est arrêté** : la machine est partagée, 8 des 32 Chromium
+sont ceux de l'exploitant, et `banc-libre.sh` rappelle qu'il « ne lit l'intention
+de personne ». *Un `pkill chrome` aurait fermé ses fenêtres avec les orphelins —
+la forme même du défaut que je signale aux autres : un filtre qui ne nomme pas ce
+qui rend l'action dangereuse.*
+
+Détail et les deux défauts d'instrument : `DOSSIER-57`.
