@@ -15138,3 +15138,70 @@ de leur auteur.* **C'est la troisième fois de ce chantier qu'un motif suppose l
 fichier de celui qui l'écrit** — après un espace unique avant `=>` et une entrée par ligne.
 
 > **Un motif écrit sur ses propres fichiers ne mesure pas un dépôt : il mesure un auteur.**
+
+---
+
+## E-485 ✅ — LE PORTAGE NE MÈNE PLUS AU LEGACY : UN SEUL LIEN RESTE, ET IL EST CONNU
+
+**2026-09-08, ~06:0x.** *J'ai corrigé 21 liens morts DU legacy VERS le portage. Le travail
+symétrique — le portage vers le legacy — n'avait jamais été mesuré.*
+
+### LA MESURE, AVEC SON TÉMOIN
+
+```
+Navigation.php, code depouille :   'legacy' -> 0 occurrence · 'route' -> 33
+
+porteDuLegacy(pour(role, toutes permissions)) :
+  role 1   19 entrees visibles   false
+  role 2   20 entrees visibles   false
+  role 3   32 entrees visibles   false
+
+TEMOIN+  menu forge SANS route -> true      le predicat SAIT rendre true
+         menu forge AVEC route -> false
+```
+
+**Aucun rôle ne voit une entrée pointant vers le legacy.** *Et le `false` est une mesure, pas
+un artefact : le prédicat rend `true` sur un menu forgé.*
+
+### LES SEPT SITES QUI CONSTRUISENT UNE URL LEGACY — SIX SONT DU CODE MORT
+
+```
+accueil.blade.php:349          branche @else, jamais prise (0 entree sans route)
+composants/entrees-menu:32     idem
+PortailController:310 · :354   idem
+LiensLegacy.php:259            repli pour un chemin HORS des 30 entrees catalogue
+LiensLegacy.php:280            expose `base_legacy`, consomme par les precedents
+bashrc.blade.php:247           un COMMENTAIRE
+─────────────────────────────────────────────────────────────────────────────
+pare-feu.blade.php:304         ⛔ LE SEUL VIVANT — `/iptables/` EN DUR
+```
+
+### ⚖ ET CE SEUL LIEN VIVANT EST UN ÉNONCÉ FAUX, PAS SEULEMENT UN LIEN
+
+Il vit dans l'encart `data-rw="ipt-non-porte"`, sous `pare-feu.suite` — *« seul le retour
+arrière reste sur l'ancien portail »*. **I5 et I6 sont portés : l'énoncé est faux depuis
+`63caeb24`.**
+
+> **C'est l'espèce que j'ai corrigée 21 fois cette nuit, du côté du portage : un libellé qui
+> annonce une absence comblée.** *Et il est pire ici que dans le legacy — il envoie vers un
+> portail qu'on démonte pour un geste qui est sous les yeux de qui lit.*
+
+**⛔ ET JE NE LE CORRIGE PAS, POUR UNE RAISON QUI N'EST PAS LA MIENNE.** *La session qui tient
+ce fichier a refusé d'écrire « tout est porté » sans l'avoir vu à l'écran, et c'est
+exactement ce que cet encart existe pour éviter.* **Retirer un énoncé faux d'une vue Blade
+qu'on ne peut pas rendre, c'est risquer de casser le gabarit pour supprimer une phrase** — et
+rien ne rattraperait une erreur de syntaxe Blade sans rendu.
+
+```
+le blocage est le meme que tout le reste : la memoire
+swap 96,3 % · Chrome ne demarre pas
+```
+
+### CE QUE ÇA CLÔT
+
+> **Côté portage, l'extinction est propre par CONSTRUCTION** — `porteDuLegacy` est dérivé de
+> l'état, pas énuméré, donc il ne se périme pas. *Le jour où le legacy s'éteint, aucun lien de
+> navigation ne casse, pour aucun rôle.*
+
+**Il reste une phrase à retirer et un bouton avec elle.** *C'est tout ce qui relie encore les
+deux portails, et ça tient dans un encart.*
