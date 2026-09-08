@@ -24,30 +24,26 @@ réel.*
 > recommencer.*
 
 ```
-⓪  LE VERROU                                          ⛔ L'EXPLOITANT — inchange
+⓪  LE VERROU                                          ✅ DONNE le 2026-09-08 08:0x
+      mot explicite de l'exploitante : « Oui, ②-④ seulement »
 ①  Porter I5, avec Q1–Q4                              ✅ FAIT
-      pare-feu.js code depouille : iptables-validate 1 · apply 1 · rollback 1
-                                   pare-feu/version 1  (le chemin de LECTURE)
-      Q1 pare-feu-gabarits.js · Q2 pare-feu-ssh-ouvert.js · Q3 pare-feu-retour-visible.js
-      + les 4 epreuves dans laravel/tests/Outils/, les 7 du preflight a 0
-②  Archiver legacy/iptables/                           ✅ DEBLOQUEE
-      2 fichiers suivis · lien entrant du portage : 0 dans le CODE
-      (2 occurrences de `/iptables/` dans pare-feu.blade.php, les DEUX en
-       commentaire Blade — depouille : 0 · url_legacy : 0 partout)
-③  adm/api/notifications.php                           ✅ DEBLOQUEE
-      ses gestes cote portage : 7 routes, dont Route::delete(…'supprimer')
-      ⚠ le legacy n'y fait que UPDATE (marquer lu) et DELETE — aucun INSERT :
-        il n'est l'ecrivain exclusif de rien
-④  api_proxy.php                                       ✅ DEBLOQUEE
-      le portage a sa passerelle : Route::any('/api/gateway/{chemin?}')
-⑤  La chaine d'authentification                        ✅ DEBLOQUEE
-      legacy/auth : 10 fichiers suivis
-      legacy/lang : 3 a la racine (.htaccess + en.php + fr.php) + 74 CATALOGUES
-      les 74 sont atteints par glob(__DIR__ . '/{fr,en}/*.php') — AUCUN fichier
-      ne les NOMME : ils meurent avec leurs deux chargeurs
-      ⚠ « 74 » est exact — mesure par profondeur de chemin, pas par pathspec :
-        `git ls-files 'legacy/lang/*.php'` en rend 76, une pathspec git n'est
-        PAS un glob shell et son `*` traverse les `/`
+②  Archiver legacy/iptables/                           ✅ EXECUTEE 08:1x
+      2 fichiers -> _deprecated/iptables/ · /iptables/ 302 -> 403
+      ⚠ a cree 3 liens morts (head:209, menu:83, menu:248), rebases sur /pare-feu
+      ⚠ a ORPHELINE menu.php : iptables/index.php etait son dernier incluant
+③  adm/api/notifications.php                           ✅ EXECUTEE 08:2x
+      1 fichier · 302 -> 404
+      ⚠ a cree 4 references mortes dans menu.php, dont DEUX invisibles a la
+        suite (hx-post d'htmx) — les quatre traitees, corps RETIRES et non
+        rendus inatteignables par un `return`
+④  api_proxy.php                                       ✅ EXECUTEE 08:3x
+      1 fichier · 302 -> 404
+      ⚠ 2 references mortes subsistent, aucune n'est un appel : head.php:57
+        (`'API_URL' => '/api_proxy.php'`, une definition) et js/utils.js (un test
+        de chaine). La suite ne voit pas head.php:57 : motif JS `cle: '/x'`, pas
+        PHP `'cle' => '/x'`
+⑤  La chaine d'authentification                        ⛔ A L'EXPLOITANTE
+      87 fichiers · retire l'ecran de connexion ET fait passer php UNHEALTHY
 ⑥  _sortie.php, avec le vhost                          ⛔ EN DERNIER
       legacy/.htaccess:43   ErrorDocument 404 /_sortie.php
 ```
