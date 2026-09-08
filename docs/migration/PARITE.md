@@ -22840,6 +22840,38 @@ de LA VUE QUE J'EDITE appartient-il a root ? »*, ce qui est **necessaire et pas
 > et cette propriete n'est pas visible depuis la page qu'on edite.** *Il faut interroger la CHAINE
 > D'INCLUSION, pas le fichier.*
 
+### 4 bis-2. ⛔ ET DEUX DES SEPT SONT LES VUES D'ERREUR DU FRAMEWORK — releve par la session 7
+
+    Illuminate/Foundation/Exceptions/views/403.blade.php       compile ROOT
+    Illuminate/Foundation/Exceptions/views/minimal.blade.php   compile ROOT
+
+> **Si elles s'arment, la page qui RAPPORTE les pannes est celle qui tombe, et le diagnostic perd son
+> dernier point d'appui.** *Je les avais mises en fin de liste (« plus deux vues vendor ») : elles doivent
+> etre en tete.*
+
+**Et j'ai mesure la PROBABILITE, qui n'etait pas dans son releve — elle ne baisse pas l'inquietude, elle
+la deplace :**
+
+    laravel/vendor         IGNORE par git (.gitignore:23), 0 fichier suivi  ->  RECONSTRUIT
+    docker-entrypoint.sh:20   composer install --no-interaction --prefer-dist
+    docker-entrypoint.sh:44   php artisan view:cache            (en ROOT)
+    docker-entrypoint.sh:59   chown -R www-data:www-data storage/framework/views
+    mtime actuel des deux vues        2026-08-11 15:56  (compiles du 2026-09-07 22:29)
+
+**AU DEMARRAGE, la chaine se repare toute seule** : `composer install` rafraichit `vendor/`, **puis**
+`view:cache` recompile, **puis** le `chown` normalise. *L'ordre des trois lignes est correct, et c'est
+pourquoi le boot n'est pas le probleme.*
+
+> ⛔ **LE DANGER EST A CHAUD** : un `composer install` lance a la main par `docker exec` — *le geste normal
+> pour ajouter une dependance pendant la migration, et `vendor/` etant reconstruit, c'est un geste
+> attendu* — **rafraichit les `mtime` de `vendor/` SANS rejouer ni `view:cache` ni le `chown`**. Les deux
+> vues d'erreur exigent alors une recompilation que `www-data` ne peut pas ecrire. **La page 403 et la page
+> d'erreur generique rendent 500 — au moment precis ou on regarde des pages d'erreur.**
+
+**Donc les deux vues `vendor/` ne sont pas les moins urgentes des sept : elles ont la consequence la plus
+haute ET un declencheur distinct de celui des trois composants** — pas une edition de vue, mais une
+commande de dependances. *Deux declencheurs independants pour la meme cause.*
+
 ### 4 ter. ⚠ MA SONDE DU RAYON A RENDU ZERO, ET LE TEMOIN AUSSI — CINQUIEME MOTIF QUI SUPPOSE UNE FORME
 
     grep "@extends('layouts.portail')"          ->  0 vue      ⛔
@@ -22849,6 +22881,12 @@ de LA VUE QUE J'EDITE appartient-il a root ? »*, ce qui est **necessaire et pas
 **Cause** : *les 45 `@extends` du depot portent TOUS un second argument* —
 `@extends('layouts.portail', ['titre' => __('...')])`. **Ma parenthese fermante n'existe nulle part.**
 Refait sans supposer la fermeture (motif arrete apres la quote) : **39**.
+
+**Et la session 7 a nomme la classe generale de son propre echec de motif, qui vaut pour SEC-017 :**
+
+> **Un motif cherche ce qui EST ecrit. Un defaut de « valeur jetee » est ce qui n'est PAS ecrit — aucun
+> motif de presence ne le trouvera.** *Son `iptables-restore|--test` cherchait un mot la ou la propriete
+> est une ABSENCE D'AFFECTATION.*
 
 > **Cinquieme occurrence du meme piege en une journee** : l'espace unique avant `=>` (E-420), une entree
 > par ligne (E-452), rien entre `##` et `E-` (allocation), un `--since` herite de la date refutee
