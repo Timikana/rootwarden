@@ -150,8 +150,30 @@ while IFS='|' read -r num chemins raison; do
     dire "     $raison"
     if [ "$n" -eq 0 ]; then dire "     ✅ déjà archivée"; continue; fi
     for p in $chemins; do
-        dest="legacy/_deprecated/$(basename "$p")"
+        # ══ LA DESTINATION DÉRIVE DU CHEMIN COMPLET, PAS DU `basename` ═══════
+        #
+        # Premier jet : `legacy/_deprecated/$(basename "$p")`. **Deux destinations
+        # sur six étaient DÉJÀ OCCUPÉES** — `_deprecated/notifications.php` (1
+        # fichier) et `_deprecated/auth` (5). Le `git mv` aurait échoué à l'étape 3,
+        # et l'à-sec restait VERT : il annonçait la destination sans vérifier
+        # qu'elle est libre.
+        #
+        # > **Un contrôle à sec qui ne vérifie pas ce dont l'exécution a besoin
+        # > n'est pas un contrôle : c'est une annonce.**
+        #
+        # La convention de `_deprecated/` est d'ailleurs le chemin COMPLET —
+        # `adm`, `api`, `auth` y existent déjà sous cette forme. En la suivant, deux
+        # sources différentes ne peuvent PLUS se heurter : la collision devient
+        # inexprimable au lieu d'être contrôlée.
+        rel="${p#legacy/}"
+        dest="legacy/_deprecated/$rel"
+        if [ -e "$dest" ]; then
+            dire "     ⛔ DESTINATION OCCUPÉE : $dest — REFUS"
+            dire "        (ceinture : la dérivation du chemin complet devrait l'éviter)"
+            exit 1
+        fi
         if [ "$EXECUTER" -eq 1 ]; then
+            mkdir -p "$(dirname "$dest")"
             if git mv "$p" "$dest" 2>/dev/null; then dire "     ✅ git mv $p -> $dest"
             else dire "     ⛔ git mv $p a ÉCHOUÉ"; exit 1; fi
         else
