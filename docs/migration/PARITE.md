@@ -22630,3 +22630,80 @@ d'affectation ecrit `machine_supervision_profile` pour une machine du parc, et l
 licite est la machine **3** (OpenCVE-Test-OnPrem) sur le mot de l'exploitant. *La chaine est etablie par
 lecture — site d'appel, URL, couche, decorateurs — pas par un aller-retour reseau.*
 
+---
+
+## E-499 — MON `StartedAt` AVAIT ONZE JOURS DE TROP, ET §7 N°1 PORTE DIX-HUIT COMMITS DONT QUATRE CORRECTIFS ROOT
+
+**Mesure du 2026-09-08 12:23**, apres une correction de la session 7 que j'ai remesuree plutot que reprise.
+
+### 1. Le chiffre que je relayais etait faux, et il venait de mon PROPRE brief permanent
+
+    ce que je donnais   rootwarden_python   StartedAt 2026-08-27T12:28:43Z   (~12 jours)
+    MESURE              rootwarden_python   StartedAt 2026-09-07T12:53:00Z   (~21 h)
+                        rootwarden_test_server        2026-08-20T10:43:32Z
+                        rootwarden_laravel            2026-09-06T19:38:50Z
+                        rootwarden_php                2026-09-06T17:40:33Z
+                        rootwarden_db                 2026-09-06T17:40:10Z
+
+**Mon brief portait `RAPPEL E-238 : StartedAt = 2026-08-27T12:28:43Z`.** *Une valeur lue sans sa date, et
+cette fois elle etait dans mes propres instructions permanentes* — donc reconduite a chaque tour sans
+jamais rencontrer un contradicteur. **La session 7 me l'a corrigee en me disant pourquoi elle le faisait :
+« un chiffre qui rend l'argument plus dramatique est celui qu'on relaie le plus volontiers ».**
+
+### 2. ⚠ LE PIEGE DES DEUX HORLOGES ETAIT ARME, ET IL NE M'A PAS PRIS PAR CHANCE
+
+    mtime de backend/routes/updates.py   2026-09-08 12:16:06 +0200  (CEST)
+    StartedAt des workers                2026-09-07 12:53:00        (UTC)
+
+**Compares naivement, `12:16 < 12:53` rend « le fichier precede le demarrage » — le verdict INVERSE.**
+Ramenes en UTC : fichier `10:16:06`, demarrage `12:53:00` la veille, **ecart = 21 h 23 min**, le fichier
+est plus neuf. *Ici le JOUR differe, donc les 2 h de decalage ne suffisent pas a retourner la conclusion.*
+**C'est de la chance, pas de la methode** : sur deux horodatages du meme jour, elle basculait.
+
+### 3. ⛔ LA CONSEQUENCE, ET ELLE VA DANS LE SENS QUI ALARME
+
+`use_reloader = False`, `workers = 4` (`backend/hypercorn_config.py:14,17`). Donc **tout `.py` de
+`backend/` ecrit apres 2026-09-07 12:53 UTC est ABSENT du service.** Mesure par fenetre :
+
+    backend/ commite AVANT le demarrage   85 commits   ->  VIVANTS dans le service
+    backend/ commite APRES le demarrage   18 commits   ->  ABSENTS du service
+
+**Les quatre plus lourds des dix-huit touchent une commande root :**
+
+    5c5f0ca8  09-07 20:13  fix(sudo)      un echec de rendu ecrivait NOPASSWD: ALL
+    266f21a2  09-07 23:31  fix(iptables)  SEC-015 : dest_path interpole BRUT en commande root
+    ffe14f97  09-08 11:58  fix(updates)   E-463 : time_/date atteignaient une ligne cron.d root
+    53e72b1b  09-08 04:13  fix(ssh)       E-461 : deux routes lisaient des FRAGMENTS comme des LIGNES
+
+Plus `f1f6e9af` (une route APPELEE retiree par erreur, puis remise), `ea9916f6` (rollback de politique
+rouvert), `211afd37`/`be5a30ef` (les quatre portes iptables archivent), `f73e28a5` (`GEOIP_ENABLED`).
+**`backend/scheduler.py` figure dans les fichiers touches** — donc le raisonnement d'E-238 tient toujours,
+sur une fenetre de 21 h et non de douze jours.
+
+> **§7 n°1 — « redemarrer `rootwarden_python` » — ne vaut donc pas ce que mon brief lui donnait.** *Il
+> n'active pas un patch en attente : il met en service QUATRE correctifs de commande root deja ecrits,
+> relus et commites.* **Le cout de ne PAS redemarrer est desormais plus grand que celui de redemarrer**, et
+> c'est l'inverse de ce que je transmettais.
+
+### 4. ⚠⚠ ET J'AI COMMIS L'ERREUR QUE J'AI ENSEIGNEE UNE HEURE PLUS TARD
+
+**J'ai annonce le fail-open sudo « ferme », avec son test de mutation, sans nommer le regime.** Il est
+ferme **dans l'arbre**. `5c5f0ca8` est de 20:13 CEST le 07, soit **7 h 20 apres** le demarrage des
+workers : *le service accorde toujours `ALL=(ALL:ALL) NOPASSWD: ALL` quand un rendu de politique echoue.*
+
+> Puis, une heure plus tard, j'ai reproche a la session 7 de ne pas nommer le regime de sa sonde. **Ma
+> remarque etait juste et je la devais d'abord a moi.** *Une regle protege les autres, pas soi : on
+> l'applique en LISANT, jamais en ECRIVANT* — deja inscrit dans la memoire du chantier, et c'est la
+> forme la plus nette que j'en aie rencontree, parce que les deux gestes sont **dans la meme session, a
+> une heure d'intervalle, sur le meme predicat**.
+
+### 5. Le piege que la session 7 a nomme et que je n'avais pas
+
+`backend/` est monte en **bind** sur `/app`. Un `grep` **dans le conteneur** trouve donc le correctif,
+3 occurrences, exactement comme dans l'arbre.
+
+> **Un fichier partage ne fait pas un code partage : le montage synchronise l'octet, pas la memoire du
+> processus qui l'a lu.** *C'est la verification qu'on ferait spontanement pour trancher arbre/service, et
+> elle rend le mauvais verdict.* **Ce qui porte est `use_reloader = False` plus les horodatages** — pas un
+> releve de contenu, de quelque cote qu'on le prenne.
+
