@@ -20,7 +20,8 @@ réel.*
 
 ```
 racines servies : 11        (E-474 — j'avais publie 19, puis 89, puis 0)
-  auth/*                7   la chaine d'authentification
+  auth/*                7   la chaine d'authentification — mais sa FERMETURE
+                            compte 17 fichiers + 74 catalogues (voir ⑤)
   iptables/index.php    1   la derniere PAGE metier
   adm/api/notifications 1   une API
   api_proxy.php         1   la passerelle
@@ -84,21 +85,62 @@ ligne. Il ne reste que le contrôle des appelants, qui devient trivial après �
 *Cité 17 fois, dont `legacy/js/utils.js` et `head.php:57` (`API_URL`).* **Tombe avec le socle
 qu'il sert.**
 
-### ⑤ La chaîne d'authentification — sept fichiers
+### ⑤ La chaîne d'authentification — **17 fichiers, plus 74 catalogues**
 
-**C'est ici que la séquence cesse d'être mécanique**, et je tranche :
+⚠ **J'avais écrit « sept ». La fermeture, mesurée, en compte DIX-SEPT** — et elle tire
+`lang/` que ma séquence ne mentionnait nulle part :
 
-> **Elle s'archive, elle ne se dénie pas.**
+```
+auth/    forgot_password · functions · login · logout · password_policy
+         reset_password · step_up · verify · verify_2fa              9
+tires    adm/includes/{audit_log,crypto}.php                          2
+par      includes/{lang,mail_helper,totp_crypto}.php                  3
+require  db.php · head.php · lang/fr.php                              3
+                                                                     ──
+                                                                     17
+puis     lang/{fr,en}.php:12  glob('/{fr,en}/*.php')  ->  37 + 37 = 74 catalogues
+```
 
-*Un `Require all denied` la rendrait inatteignable en la laissant présente — donc exécutable
-par tout ce qui l'inclut, et présente au prochain inventaire comme une question ouverte.*
-**L'archivage dit ce que le refus tait : cette capacité a été portée, et ceci n'est plus la
-porte.**
+> **⑤ n'est pas une étape : c'est TOUT LE RESTE.** *Une fois ②③④ faits, il ne subsiste que
+> cette fermeture et `_sortie.php`.* **La séquence a donc quatre gestes, pas six — et le
+> cinquième est le seul qui demande de l'ordre INTERNE.**
 
-⚠ **Contrôle propre à cette étape, et il n'est pas dans les autres** : *la réinitialisation
-de mot de passe est portée (`E-465` : 4 routes, 9 tests verts) — mais elle envoie un
-COURRIEL.* **Vérifier que le portage sait l'envoyer AVANT de retirer la porte legacy**, sinon
-on retire le seul chemin de récupération d'un compte.
+**Ordre interne, mesuré :**
+
+```
+login.php  ->  crypto.php  ->  verify.php
+```
+
+⛔ **Retirer `verify.php` en premier casse les deux autres.** *L'étape n'est pas un bloc
+indifférencié, et je l'avais écrite comme si elle l'était.*
+
+### La décision : elle s'archive, elle ne se dénie pas
+
+*Un refus la rendrait inatteignable en la laissant présente — donc exécutable par ce qui
+l'inclut, et ouverte au prochain inventaire.* **L'archivage dit ce que le refus tait : cette
+capacité a été portée, et ceci n'est plus la porte.**
+
+⚠ **Mais c'est un argument de PROPRETÉ, pas de SÛRETÉ**, et je le corrige après
+contre-épreuve : *`auth/.htaccess:5-7` dénie DÉJÀ `functions.php` et `password_policy.php` —
+exactement l'état que je décrivais comme dangereux, et le mal annoncé ne s'est pas produit.*
+
+### ⚠ Quatre capacités sans équivalent servi, à trancher AVANT la fermeture
+
+```
+l'envoi du COURRIEL de reinitialisation   MAIL_MAILER absente du conteneur (05/09)
+                                          le portage PREPARE le lien, le legacy ENVOIE
+le re-hachage bcrypt au login             0 occurrence cote portage
+changer sa PROPRE cle SSH                 l'unique ecriture est gardee `role:3`
+changer sa PROPRE adresse                 aucune route, ni pour soi ni pour un admin
+```
+
+*Aucune n'est bloquante seule.* **La première est la garde que j'avais posée ; les trois
+autres viennent de la contre-épreuve et je les reprends.**
+
+⛔ **Et ce qui N'EST PAS un motif de blocage, verifié :** *l'alarme « retirer `login.php` fige
+`login_history` et `last_failed_login_at`, lus par l'export RGPD » est REFUTÉE — les deux
+colonnes ont un écrivain côté portage (`HistoriqueConnexions:79` injecté dans
+`ConnexionController:25`, et `ConnexionController:215`).*
 
 ### ⑥ `_sortie.php` — **en dernier, avec le vhost**
 
