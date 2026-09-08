@@ -749,6 +749,20 @@ def schedule_advanced_update():
             execute_as_root(client, f"printf '%s' '{encoded}' | base64 -d > {cron_file}", root_password)
             execute_as_root(client, f"chmod 0644 {cron_file}", root_password)
             execute_as_root(client, "systemctl restart cron 2>/dev/null || service cron restart 2>/dev/null || true", root_password)
+        # ⚠ CETTE ROUTE N'ENREGISTRE RIEN, ET CE N'EST PAS UN OUBLI DE CODE.
+        #
+        # Mesure du 2026-09-08 : 0 ecriture SQL ici, 1 dans la route soeur
+        # (`UPDATE machines SET maj_secu_date`) — temoin que la sonde fonctionne.
+        # La raison est le SCHEMA : la table `machines` ne porte que `maj_secu_date`
+        # et `maj_secu_last_exec_date`, lues par `monitoring.py`. **Il n'existe aucune
+        # colonne pour la mise a jour COMPLETE.**
+        #
+        # Consequence : pour cette route, « planifiee sur la machine et rien en base »
+        # est l'etat PERMANENT. L'ecran peut montrer une MAJ de securite planifiee,
+        # jamais une MAJ complete planifiee.
+        #
+        # C'est une MIGRATION, pas un correctif — et une colonne sans lecteur serait
+        # une capacite sans ecran. Les deux moities se decident ensemble.
         return jsonify({'success': True, 'message': 'Planification avancée enregistrée avec succès.'}), 200
     except Exception as e:
         logging.error(f"[schedule_advanced_update] Erreur: {e}")
