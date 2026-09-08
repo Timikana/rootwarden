@@ -16064,3 +16064,47 @@ un destinataire qui vérifie.* Quatre de mes énoncés ont été corrigés aujou
 dans la seule position où ils rencontraient un contradicteur.
 
 Détail : `DOSSIER-58`.
+
+---
+
+## E-507
+
+**`patch 07` a une précondition mesurée : le portage lit `legacy/version.txt` à
+chaque rendu, par un MONTAGE.**
+
+Trouvé par `gestion-ssh-key-0b` (`c848a888`), vérifié par moi jusque dans le
+conteneur :
+
+```
+docker-compose.yml:123 · prod.yml:124   ./legacy/version.txt:/var/www/html/version.txt:ro
+dans rootwarden_laravel : cat /var/www/html/version.txt  ->  2.0.183
+App\Support\Version:81 base_path('version.txt') · :86 @file_get_contents
+layouts/portail.blade.php:147-148        au pied de CHAQUE page
+```
+
+**La dépendance est créée par le montage, pas par le code** — aucune lecture du
+PHP ne peut la voir, puisque le code ne nomme jamais le legacy.
+
+**Trois précisions qui gouvernent le geste :**
+
+① **`laravel/version.txt` est VIDE et NON SUIVI** (`.gitignore`, 0 octet, produit
+par `scripts/ecrire-version.sh`). « Il existe déjà » est vrai d'un disque, pas du
+dépôt. **L'ordre n'est pas commutatif** : écrire le numéro côté portage, le faire
+suivre ou produire au démarrage, **puis** basculer le montage. L'ordre inverse
+rend un pied de page vide sur toutes les pages.
+
+② **Le repli est gardé par construction** : `Version.php` valide
+`/^\d+\.\d+\.\d+$/` et rend `null` sinon, donc un fichier absent ou vide affiche
+« version inconnue » et jamais le contenu brut — *« ce serait publier le contenu
+d'un fichier »*. Casse gracieuse, pas de 500.
+
+③ ⚠ **Ce n'est pas une découverte : `docker-compose.yml:117-122` la documente**,
+avec sa raison (une seconde copie dériverait, et le chiffre a dérivé deux fois le
+2026-08-27) et la question explicitement ouverte : *« son emplacement à
+l'extinction du legacy est une question ouverte (§4.1 ter) »*. **Cela renforce
+l'item** : l'exploitant n'a pas une surprise, il a sa propre question ouverte,
+désormais chiffrée et ordonnée.
+
+*Et l'ironie, déjà écrite dans le dépôt : le remède contre une version qui dérive
+a été de MONTER le fichier du legacy — un remède qui reconduit la dépendance
+qu'on cherche à retirer.*
