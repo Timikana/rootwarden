@@ -840,6 +840,18 @@ def schedule_advanced_security_update():
             ">> /var/log/auto_security_update.log 2>&1"
         )
         # Appel curl pour notifier le backend après exécution
+        # ⚠ E-463 ter : LA SEULE VALEUR DE CETTE LIGNE CRON QUI NE SOIT NI UN ENTIER
+        # NI UN CONDENSE HEX. Les deux autres interpolees dans `callback_command` sont
+        # sures par CONSTRUCTION — `exec_token` est un `hexdigest()` (`[0-9a-f]{64}`)
+        # et `machine_id` sort de `validate_machine_id`, donc un `int`.
+        #
+        # `backend_url` vient de l'ENVIRONNEMENT, non cite, dans une ligne executee en
+        # root. **Ce n'est pas un defaut aujourd'hui** : l'environnement est pose au
+        # deploiement, pas par un appelant. *Mais si `API_URL` devenait un jour reglable
+        # depuis l'application ou la base, elle atterrirait ici SANS AUCUNE GARDE* — et
+        # le puits est le meme fichier `cron.d` que celui d'E-463.
+        # Signale plutot que corrige : borner une variable d'environnement au hasard
+        # casserait les deploiements qui emploient un nom d'hote legitime.
         backend_url = os.environ.get("API_URL", "https://srv-docker:5000")
         # Token HMAC machine-to-machine (cf. _security_exec_token) - le cron
         # n'a pas de session, on l'authentifie via ce token borne au machine_id.
@@ -859,8 +871,31 @@ def schedule_advanced_security_update():
             execute_as_root(client, f"chmod 0644 {cron_file}", root_password)
             execute_as_root(client, "systemctl restart cron 2>/dev/null || service cron restart 2>/dev/null || true", root_password)
 
-        # Enregistrement de la date de planification dans la BDD
-        scheduled_datetime = f"{date} {time_}:00"
+        # ══ E-463 ter : LA BASE AUSSI SE DERIVE ════════════════════════════
+        #
+        # Cette ligne reassemblait les CHAINES recues (`f"{date} {time_}:00"`)
+        # alors que les entiers derives existaient dix lignes plus haut. J'avais
+        # derive pour le cron et pas pour la base : cinq entrees sur six, POURTANT
+        # ACCEPTEES, produisaient une ligne cron juste et une valeur de base
+        # malformee — mesure du 2026-09-08 :
+        #
+        #     time_=' 14 : 30 '  -> cron '30 14 * * *'  base '2026-01-05  14 : 30 :00'
+        #     time_='1_4:3_0'    -> cron '30 14 * * *'  base '2026-01-05 1_4:3_0:00'
+        #     time_='14:\u0663\u0660'      -> cron '30 14 * * *'  base '2026-01-05 14:\u0663\u0660:00'
+        #     time_='14\n:30'    -> cron '30 14 * * *'  base '2026-01-05 14\n:30:00'
+        #     date='2026-1-5'    -> cron  '5 9 * * *'   base '2026-1-5 09:05:00'
+        #
+        # ⚠ ET L'ORDRE AGGRAVAIT : le `cron.d` est ecrit et cron redemarre AVANT
+        # cet `UPDATE`. En mode strict MySQL refuse ces valeurs — donc la
+        # planification est INSTALLEE sur la machine et la base n'en dit rien.
+        # L'ecran et la machine divergent en silence, c'est-a-dire le mode d'echec
+        # exact que ce correctif existait pour eviter.
+        #
+        # `%02d` sur des entiers : il n'y a plus de chaine recue nulle part.
+        scheduled_datetime = (
+            f"{_annee:04d}-{_mois:02d}-{_jour:02d} "
+            f"{_heure:02d}:{_minute:02d}:00"
+        )
         with get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("UPDATE machines SET maj_secu_date = %s WHERE id = %s", (scheduled_datetime, machine_id))
