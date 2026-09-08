@@ -347,7 +347,46 @@ d636e70d   2026-09-07 22:15:09   cette ligne : « SEC-015 est toujours OUVERT »
                                  interpole BRUT dans une commande root
 ```
 
-**`shlex.quote(dest_path)` est en place. `shlex` est importé. SEC-015 est FERMÉ.**
+**`shlex.quote(dest_path)` est en place. `shlex` est importé.**
+
+⛔ **ET C'EST FERMÉ DANS L'ARBRE SEULEMENT — rectification du 2026-09-08.**
+
+```
+backend/hypercorn_config.py:14   workers = 4
+                          :17   use_reloader = False       <- verifie par moi
+266f21a2                        2026-09-07 21:31:56 UTC    <- verifie par moi
+demarrage des workers           2026-09-07 12:53:00 UTC    <- RELAYE, PAS verifie
+                                (socket docker : permission refusee)
+```
+
+**Un `.py` est lu au DÉMARRAGE. Si l'heure relayée est juste, le correctif a été
+écrit 8 h 39 après, donc `dest_path` est TOUJOURS interpolé brut dans le processus
+qui tourne.**
+
+> ⚠ **« SEC-015 est FERMÉ » était une affirmation SANS SON RÉGIME** — et j'ai
+> cette règle en mémoire depuis des jours : *« arbre, service, ou moteur de base :
+> nommer le régime ; une affirmation sans son régime est invérifiable ».*
+> **Je l'ai enfreinte le jour même où je corrigeais des tiers pour des faits
+> périmés.**
+
+⛔ **Et le piège de vérification est réel** : *`backend/` est monté en BIND sur
+`/app`. Un `grep` DANS le conteneur trouve le correctif à l'identique de l'arbre
+— et rend le MAUVAIS verdict.* **Un fichier partagé ne fait pas un code partagé :
+le montage synchronise l'octet, pas la mémoire du processus qui l'a lu.** *Un
+`docker exec … python -c` ne sert pas davantage : il ouvre un nouveau processus.*
+
+⚠ **Deux horloges, et elles sont armées sur cette mesure** : *les `mtime` sont en
+CEST, `StartedAt` en UTC.* **Comparés naïvement, `12:16 < 12:53` conclut « le
+fichier précède le démarrage » — l'inverse du vrai. J'ai ramené les deux en UTC
+dans la même commande.**
+
+### 8.2 bis ⚠ CE QUE ÇA FAIT À SEC-017
+
+**Si le service tourne sur le code d'avant `266f21a2`, alors le processus porte
+AUJOURD'HUI les deux défauts à la fois** : *`dest_path` interpolé brut **et** le
+succès annoncé sans vérification.* **SEC-017 n'est donc pas seulement ouvert dans
+l'arbre : dans le service, il coexiste avec un défaut que j'ai publié comme
+fermé.**
 
 > **J'avais raison en l'écrivant, et ma note est fausse 76 minutes plus tard.**
 > *Le pire est que je l'ai RECITÉE aujourd'hui comme un fait courant, pour fonder
