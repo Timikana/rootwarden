@@ -124,18 +124,53 @@ capacité a été portée, et ceci n'est plus la porte.**
 contre-épreuve : *`auth/.htaccess:5-7` dénie DÉJÀ `functions.php` et `password_policy.php` —
 exactement l'état que je décrivais comme dangereux, et le mal annoncé ne s'est pas produit.*
 
-### ⚠ Quatre capacités sans équivalent servi, à trancher AVANT la fermeture
+### ⚠ UNE seule capacité sans équivalent servi — j'en avais repris QUATRE
+
+**Trois des quatre sont RÉFUTÉES. Mesuré avant de les inscrire comme verrous :**
 
 ```
-l'envoi du COURRIEL de reinitialisation   MAIL_MAILER absente du conteneur (05/09)
-                                          le portage PREPARE le lien, le legacy ENVOIE
-le re-hachage bcrypt au login             0 occurrence cote portage
-changer sa PROPRE cle SSH                 l'unique ecriture est gardee `role:3`
-changer sa PROPRE adresse                 aucune route, ni pour soi ni pour un admin
+⛔ « le re-hachage bcrypt : 0 occurrence cote portage »
+   MotDePasse.php:236   password_needs_rehash($hache, PASSWORD_BCRYPT, ['cost' => …])
+   et son docbloc :211-219 explique pourquoi `Hash::needsRehash()` de Laravel
+   n'est PAS l'equivalent -> il a ete porte AVEC SOIN, pas oublie
+
+⛔ « changer sa PROPRE cle SSH : l'unique ecriture est gardee role:3 »
+   web.php:225   POST /profil/cle-ssh   -> PortailController::definirCleSsh   POUR SOI
+   web.php:803   POST /comptes/{id}/cle-ssh  role:3                           POUR AUTRUI
+   DEUX routes, pas une. Et le legacy VIF n'ecrit `ssh_key` NULLE PART.
+
+⛔ « changer sa PROPRE adresse : aucune route »
+   web.php:218   POST /profil/courriel  -> PortailController::changerCourriel
+
+✅ l'envoi du COURRIEL de reinitialisation   RESTE la seule, et elle est a l'exploitant
+   MAIL_MAILER absente du conteneur (mesure du 05/09) : le portage PREPARE le lien,
+   le legacy ENVOIE.
 ```
 
-*Aucune n'est bloquante seule.* **La première est la garde que j'avais posée ; les trois
-autres viennent de la contre-épreuve et je les reprends.**
+> **J'allais inscrire quatre verrous dont trois n'existent pas.** *Un dossier de séquence qui
+> porte de faux blocages ne retarde pas l'extinction d'une heure : il la retarde jusqu'à ce
+> que quelqu'un reprenne chacun d'eux — et il donne à ce quelqu'un une raison de croire que
+> le reste est aussi solide.*
+
+### ⚠ Et le motif est le même que l'alarme RGPD, réfutée une heure plus tôt
+
+*Cette contre-épreuve a été excellente à FALSIFIER mes affirmations — l'ordre interne de ⑤,
+les 17 fichiers, `glob()` absent de mon graphe : tout tenait.* **Ses propres affirmations
+POSITIVES — « ceci n'existe pas côté portage » — se sont trompées CINQ fois :**
+
+```
+login_history · last_failed_login_at · le re-hachage · la route de courriel
+· la route de cle SSH
+```
+
+> **Falsifier une affirmation qu'on vérifie et ÉNUMÉRER ce qui existe sont deux gestes
+> différents.** *Le premier est une mesure ; le second est une ABSENCE, et une absence exige
+> un témoin.* **Aucune des cinq n'en portait.**
+
+*Je le note sans reproche : ses contradictions ont corrigé mon dossier sur quatre points
+réels, et aucune de mes propres sondes ne les avait vus. **Mais une absence annoncée se
+mesure comme une présence, et c'est vrai de nous deux** — ma sonde a manqué les mêmes deux
+écrivains, exactement de la même façon.*
 
 ⛔ **Et ce qui N'EST PAS un motif de blocage, verifié :** *l'alarme « retirer `login.php` fige
 `login_history` et `last_failed_login_at`, lus par l'export RGPD » est REFUTÉE — les deux
