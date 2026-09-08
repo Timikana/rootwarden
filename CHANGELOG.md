@@ -5,6 +5,90 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## I5 — appliquer un jeu de règles : l'écran, le consentement, et les quatre propriétés
+
+### ⚠ Ce que I5 crée, et ce qu'il ne crée pas
+
+    RoutesBackend:114   '/iptables-'   et la comparaison est PAR PREFIXE
+    -> /iptables-apply traversait DEJA la passerelle, sans cet ecran
+
+**I5 ne crée pas l'atteignabilité du geste : il crée l'ÉCRAN.** Un geste qui n'était
+atteignable que par requête forgée devient un bouton. *C'est pour cela que Q1–Q4 ne sont pas
+négociables — elles n'encadrent pas un geste nouveau, elles encadrent un geste qui existait
+sans garde-fou visible.*
+
+### Q1 — le port SSH vient de la machine
+
+La table `ipt-ports` est remplie **en base** par le serveur. Sans elle, aucun jeu n'est
+composé : **fail-closed**, parce que le repli évident (`22`) est exactement ce que Q1 corrige
+et qu'il enfermerait dehors quiconque a changé son port.
+
+⚠ **Les trois machines du parc sont à 22** : le parc ne peut donc pas distinguer « lu » de
+« supposé ». Q1 est mesurée **au module**, avec un port discriminant (2222), et le témoin
+montre que le même gabarit à 22 rend autre chose. *Une mesure sur le parc aurait été verte et
+vide.*
+
+### Q2 — le doute compte comme un refus
+
+`rwLaisseLeSshOuvert` rend trois valeurs. **`true` seul active le bouton** ; `false` et `null`
+l'interdisent, avec un message distinct. *Un doute sur « ce jeu ferme-t-il SSH ? » se paie en
+accès perdu et en console physique : on refuse plutôt que de parier.* Le verdict s'affiche
+**avant** le bouton — un jeu qui fermerait SSH doit se lire avant qu'on ait envie de cliquer.
+
+### Q3 — les huit titres existaient, les huit clés non
+
+`rwRetourPareFeu()` rend `titre: 'ipt_retour_succes'` — un **nom de clé**. Mesure : **8 titres
+cités, 0 au catalogue.** Q3 est « totale » et elle l'est ; c'est précisément ce qui rendait le
+défaut invisible — *un titre non vide qui ne DÉSIGNE rien satisfait toute assertion de forme.*
+
+Posées dans les **trois** endroits : `lang/fr`, `lang/en` (99 = 99) et la liste curatée de
+`PareFeuController` — sans laquelle elles ne voyagent pas et l'écran afficherait
+`ipt_retour_succes` en ayant l'air de fonctionner.
+
+**Quatre des huit portent `sur: false`** : leurs libellés disent *« je ne sais pas »*, jamais
+*« ça a échoué »*, et invitent à relever l'état de la machine.
+
+### Q4 — avant consentement, aucune requête
+
+`demandeConsentement()` ne contient aucun appel : elle remplit et affiche. **Mesuré au réseau,
+avec son témoin** — `0` requête vers `/iptables-apply` à l'ouverture du panneau, **exactement
+1** après confirmation.
+
+### ⚠ Vu à l'image, invisible à l'assertion
+
+Le panneau de consentement s'ouvrait **sous le bouton, hors de l'écran** sur une page longue.
+`hidden = false`, correctement rempli, et invisible. *Un clic qui ne montre rien se lit comme
+un bouton mort : on reclique, ou on conclut que le geste a échoué.* Il est désormais amené
+sous les yeux.
+
+**Et deux classes CSS inventées** (`rw-bloc-code`, `rw-bouton--fantome`) attrapées avant
+écriture par le contrôle « les classes employées existent-elles ? ». Les 17 classes de la
+section sont relevées dans `rw.css`.
+
+### Le panneau « non porté » est CORRIGÉ, pas retiré
+
+`pare-feu.suite` annonçait que *l'application et le retour arrière* restaient sur l'ancien
+portail. **L'application est portée ; le retour arrière ne l'est pas.** Le texte le dit
+maintenant exactement — *une capacité qui reste ailleurs doit être déclarée, et une capacité
+portée ne doit plus être annoncée comme absente.*
+
+### Mesure — 30 assertions, 0 échec, aucune machine jointe
+
+    ⛔ SURETE PAR CONSTRUCTION : toute requete vers /api/gateway/ est STUBBEE et
+    jamais transmise. Aucun appel ne peut atteindre le backend, meme si un motif
+    etait faux — on ne s'appuie pas sur « je ne clique pas sur le bouton ».
+
+    Q1  port 2222 present · 22 absent · TEMOIN le meme gabarit a 22 differe
+    Q2  ouvre -> true · ferme -> false · TEMOIN les trois entrees different
+    Q3  cinq retours (succes, success:false, 500, 403, requete avortee)
+        chacun VISIBLE, aucun identifiant nu, TEMOIN >= 3 messages distincts
+    Q4  0 requete avant consentement · EXACTEMENT 1 apres
+
+*L'assertion « pas un identifiant nu » est celle qui aurait attrapé les huit clés manquantes :
+`t()` rend le nom de la clé quand elle ne voyage pas.*
+
+---
+
 ## Recherche vivante dans l'en-tête — l'écran manquait, pas l'endpoint
 
 Le legacy avait une recherche **instantanée dans son menu** ; le portage n'avait qu'une page.

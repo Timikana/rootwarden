@@ -192,6 +192,64 @@
     <div data-rw="ipt-histo-etat"></div>
 </div>
 
+{{-- ══ I5 — APPLIQUER UN JEU DE REGLES ═══════════════════════════════════════
+
+     ⚠ CE QUE CET ECRAN CREE, ET CE QU'IL NE CREE PAS.
+
+     `RoutesBackend:114` porte `/iptables-` et la comparaison est PAR PREFIXE :
+     `/iptables-apply` passe donc DEJA la passerelle, aujourd'hui, sans cet ecran.
+     **I5 ne cree pas l'atteignabilite — il cree l'ECRAN.** Un geste qui n'etait
+     atteignable que par requete forgee devient un bouton. C'est precisement pour
+     cela que Q1 a Q4 ne sont pas negociables : ils ne protegent pas d'un geste
+     nouveau, ils encadrent un geste qui existait sans garde-fou visible.
+
+     Q1  le port SSH vient de la MACHINE (`ipt-ports`, lu en base), jamais de `22`
+     Q2  un jeu qui fermerait SSH est REFUSE avant tout envoi — et le doute aussi
+     Q3  tout retour produit un message visible, succes comme echec comme doute
+     Q4  avant consentement, AUCUNE requete n'est emise
+--}}
+<div class="rw-section" data-rw="ipt-appl" hidden>
+    <h2 class="rw-sous-titre">{{ __('pare-feu.appl_titre') }}</h2>
+    <p class="rw-prose rw-aide" data-rw="ipt-appl-intro">{{ __('pare-feu.appl_intro') }}</p>
+
+    <div class="rw-champ">
+        <label class="rw-etiquette" for="ipt-appl-gabarit">{{ __('pare-feu.appl_gabarit') }}</label>
+        <select class="rw-saisie" id="ipt-appl-gabarit" data-rw="ipt-appl-gabarit"></select>
+        <p class="rw-aide rw-prose" data-rw="ipt-appl-gabarit-aide">{{ __('pare-feu.appl_gabarit_aide') }}</p>
+    </div>
+
+    {{-- L'APERCU N'EST PAS UN CONFORT : c'est ce qui rend le geste verifiable
+         avant d'etre consenti. On applique ce qu'on a lu. --}}
+    <p class="rw-sous-titre-fort">{{ __('pare-feu.appl_apercu') }}</p>
+    <pre class="rw-fichier" data-rw="ipt-appl-apercu"></pre>
+
+    {{-- Le verdict Q2, AVANT le bouton. Un jeu qui ferme SSH doit se lire avant
+         qu'on ait envie de cliquer, pas apres. --}}
+    <p class="rw-annonce" role="status" aria-live="polite" data-rw="ipt-appl-ssh"></p>
+
+    <div class="rw-actions">
+        <button type="button" class="rw-bouton rw-bouton--danger"
+                data-rw="ipt-appl-bouton" disabled>{{ __('pare-feu.appl_bouton') }}</button>
+    </div>
+
+    <p class="rw-annonce" role="status" aria-live="polite" data-rw="ipt-appl-annonce"></p>
+    <div data-rw="ipt-appl-etat"></div>
+</div>
+
+{{-- LE PANNEAU DE CONSENTEMENT. Hors du bloc ci-dessus pour qu'il ne depende pas
+     de son `hidden`. Le bouton de confirmation nait DESACTIVE et ne s'active que
+     lorsque le panneau s'ouvre : un panneau ferme ne doit rien pouvoir declencher. --}}
+<div class="rw-section" data-rw="ipt-appl-conf" hidden>
+    <p class="rw-sous-titre-fort" data-rw="ipt-appl-conf-titre"></p>
+    <p class="rw-prose" data-rw="ipt-appl-conf-texte"></p>
+    <div class="rw-actions">
+        <button type="button" class="rw-bouton rw-bouton--discret"
+                data-rw="ipt-appl-conf-non">{{ __('pare-feu.appl_conf_non') }}</button>
+        <button type="button" class="rw-bouton rw-bouton--danger"
+                data-rw="ipt-appl-conf-ok" disabled>{{ __('pare-feu.appl_conf_ok') }}</button>
+    </div>
+</div>
+
 <div class="rw-encart" data-rw="ipt-non-porte">
     <p class="rw-sous-titre-fort">{{ __('pare-feu.suite_titre') }}</p>
     <p class="rw-prose">{{ __('pare-feu.suite') }}</p>
@@ -206,5 +264,20 @@
     {{-- Le port SSH par machine, lu en BASE. Les gabarits du legacy supposent
          22 ; cette table existe pour que le portage n'ait jamais a le supposer. --}}
     <script id="ipt-ports" type="application/json">@json($portsSsh)</script>
+    {{-- ⚠ LES TROIS MODULES DE I5 SE CHARGENT AVANT `pare-feu.js`, qui les
+         consomme par `window.rw*`. Chacun porte UNE propriete, et le code de la
+         page les APPELLE plutot que de les reimplementer :
+
+           Q1  rwGabaritPareFeu(nom, port)             le port vient de la machine
+           Q2  rwLaisseLeSshOuvert(regles, port)       true / false / null
+           Q3  rwRetourPareFeu(corps, statut, erreur)  huit cas, dont QUATRE
+                                                       portent `sur: false`
+
+         `pare-feu.js` teste leur presence avant usage : modules absents, il ne
+         compose AUCUN jeu et le DIT — plutot que de retomber sur un gabarit qui
+         supposerait le port 22, ce que Q1 existe precisement pour empecher. --}}
+    <script src="/js/pare-feu-gabarits.js?v={{ @filemtime(public_path('js/pare-feu-gabarits.js')) ?: '0' }}"></script>
+    <script src="/js/pare-feu-ssh-ouvert.js?v={{ @filemtime(public_path('js/pare-feu-ssh-ouvert.js')) ?: '0' }}"></script>
+    <script src="/js/pare-feu-retour-visible.js?v={{ @filemtime(public_path('js/pare-feu-retour-visible.js')) ?: '0' }}"></script>
     <script src="/js/pare-feu.js?v={{ @filemtime(public_path('js/pare-feu.js')) ?: '0' }}"></script>
 @endsection

@@ -77,6 +77,22 @@ class PareFeuController extends Controller
             'valid_sans_copie', 'valid_v4_vide', 'valid_en_cours', 'valid_ok',
             'valid_invalide_titre', 'valid_invalide', 'valid_invalide_court',
             'valid_echec_titre', 'valid_echec', 'valid_sortie',
+            /*
+             * ⚠ LE TROISIEME ENDROIT. Ces cles existent dans les deux catalogues ;
+             * sans cette liste elles ne VOYAGENT pas jusqu'au JS, et `t()` rend
+             * alors le NOM DE LA CLE. Pour les huit titres de Q3 ce serait pire
+             * qu'un vide : le module rend un titre PAR CONSTRUCTION, donc l'ecran
+             * afficherait `ipt_retour_succes` a la place d'une phrase — en ayant
+             * l'air de fonctionner.
+             */
+            'ipt_retour_succes', 'ipt_retour_regles_invalides', 'ipt_retour_refus',
+            'ipt_retour_erreur_serveur', 'ipt_retour_corps_illisible',
+            'ipt_retour_inabouti', 'ipt_retour_doute_marqueur',
+            'ipt_retour_contrat_inconnu',
+            'appl_titre', 'appl_intro', 'appl_gabarit', 'appl_gabarit_aide',
+            'appl_apercu', 'appl_ssh_ouvert', 'appl_ssh_ferme', 'appl_ssh_doute',
+            'appl_bouton', 'appl_en_cours', 'appl_conf_titre', 'appl_conf_texte',
+            'appl_conf_ok', 'appl_conf_non', 'appl_annule',
         ] as $cle) {
             $textes[$cle] = __('pare-feu.' . $cle);
         }
