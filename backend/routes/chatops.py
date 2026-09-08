@@ -25,6 +25,11 @@ import chatops
 bp = Blueprint('chatops', __name__)
 
 
+# EXCEPTION DOCUMENTEE, et le docstring ci-dessous la porte : Slack et Teams ne
+# fournissent pas de cle d'API, donc l'authentification est la SIGNATURE Slack ou
+# un jeton partage, verifiee dans le corps. La route est en outre joignable
+# uniquement par le passthrough PHP.
+# nosemgrep: rw-flask-route-without-api-key
 @bp.route('/chatops/command', methods=['POST'])
 def chatops_command():
     """Endpoint entrant ChatOps. Auth : signature Slack OU jeton partage.

@@ -173,6 +173,10 @@ def apply_iptables_rules(client, root_password: str,
         _log.info("Application des règles iptables.")
 
         for path in ("/etc/iptables/rules.v4", "/etc/iptables/rules.v6"):
+            # `path` itere sur un TUPLE LITTERAL, deux lignes au-dessus : il ne peut valoir
+            # que l'un des deux chemins ecrits ici. La garde est par CONSTRUCTION — la
+            # valeur est inexprimable autrement — et non par controle.
+            # nosemgrep: rw-shell-fstring-execute-as-root
             execute_as_root(client, f"touch {path} && chmod 640 {path}", root_password)
 
         _write_rules_safe(client, root_password, rules_v4, "/etc/iptables/rules.v4")
