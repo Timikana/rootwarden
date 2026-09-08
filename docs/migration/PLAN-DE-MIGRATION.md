@@ -226,7 +226,12 @@ perime qu'avec l'artefact.** C'est pourquoi la cloture est ici et pas dans une c
         laravel/routes/web.php        Route::post('/serveurs/importer')
         ServeursController::importer  validation `mimes:csv,txt` + taille, journalisation
         Serveurs::importeCsv          54 l., en-tete controle, `IMPORT_MAX_LIGNES`,
-                                      delegue chaque ligne a `importeUneLigne` qui ECRIT
+                                      delegue chaque ligne a `importeUneLigne`
+        Serveurs::ajoute              ⚠ C'EST ELLE QUI ECRIT : `DB::table('machines')->insert([`
+                                      a la l.293. `importeUneLigne` valide, refuse les champs
+                                      interdits, teste le doublon, puis l'APPELLE (l.457).
+                                      *Corrige le 2026-09-08 : j'avais attribue l'ecriture a
+                                      l'appele DIRECT au lieu de suivre la CHAINE.*
         lang/fr/serveurs.php          22 cles `imp*`
         au reseau                     GET /serveurs/importer -> 405 · GET /serveurs/zzz -> 404
 
