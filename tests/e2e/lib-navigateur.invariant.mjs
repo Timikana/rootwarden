@@ -33,7 +33,7 @@ import { fileURLToPath } from 'node:url';
 
 /* Etat mesure le 2026-09-08 par cet instrument. A DESCENDRE en meme temps que
  * les adoptions, jamais a monter. */
-export const REFERENCE = { population: 125, defautA: 70, defautB: 37 };
+export const REFERENCE = { population: 129, defautA: 67, defautB: 41 };
 
 /*
  * ⛔ CETTE REFERENCE A ETE FAUSSE UNE FOIS, ET DANS LE SENS QUI DEDOUANE.
@@ -53,6 +53,13 @@ const EXCLUS = new Set([
     'lib-navigateur.invariant.mjs',
 ]);
 
+/*
+ * Apres ces mots-cles, un `/` ouvre une REGEX et non une division, meme si le
+ * caractere precedent est alphanumerique.
+ */
+const MOTS_CLES = new Set(['return', 'typeof', 'instanceof', 'in', 'of', 'new',
+    'delete', 'void', 'throw', 'case', 'do', 'else', 'yield', 'await']);
+
 /**
  * Remplace commentaires et litteraux par des espaces, en PRESERVANT les
  * offsets — les classements ne dependent que de positions relatives.
@@ -61,17 +68,53 @@ export function depouille(src) {
     let out = '';
     let i = 0;
     const n = src.length;
+    /*
+     * Le dernier jeton significatif decide si un `/` ouvre une EXPRESSION
+     * REGULIERE ou une division. Sans cette distinction, une apostrophe a
+     * l'interieur d'une regex ouvre une chaine FANTOME.
+     */
+    let dernier = '';       // dernier caractere significatif emis
+    let motCourant = '';    // identifiant en cours d'emission
+    let dernierMot = '';    // dernier identifiant complet emis
+    const emet = (c) => {
+        out += c;
+        if (/\s/.test(c)) return;
+        dernier = c;
+        if (/[A-Za-z0-9_$]/.test(c)) { motCourant += c; dernierMot = motCourant; }
+        else { motCourant = ''; dernierMot = ''; }
+    };
     while (i < n) {
         const c = src[i];
         if (c === '/' && src[i + 1] === '*') {
             const j = src.indexOf('*/', i + 2);
             const fin = j >= 0 ? j + 2 : n;
-            out += ' '.repeat(fin - i); i = fin; continue;
+            out += ' '.repeat(fin - i); i = fin; motCourant = ''; continue;
         }
         if (c === '/' && src[i + 1] === '/') {
             const j = src.indexOf('\n', i);
             const fin = j >= 0 ? j : n;
-            out += ' '.repeat(fin - i); i = fin; continue;
+            out += ' '.repeat(fin - i); i = fin; motCourant = ''; continue;
+        }
+        if (c === '/') {
+            const apresValeur = /[A-Za-z0-9_$)\]]/.test(dernier) && !MOTS_CLES.has(dernierMot);
+            if (!apresValeur) {
+                const deb = i; let k = i + 1; let classe = false; let ferme = false;
+                while (k < n) {
+                    const ch = src[k];
+                    if (ch === '\\') { k += 2; continue; }
+                    if (ch === '\n') break;            // une regex ne traverse pas la ligne
+                    if (ch === '[') classe = true;
+                    else if (ch === ']') classe = false;
+                    else if (ch === '/' && !classe) { k += 1; ferme = true; break; }
+                    k += 1;
+                }
+                if (ferme) {
+                    while (k < n && /[a-z]/.test(src[k])) k += 1;   // drapeaux
+                    out += ' '.repeat(k - deb); i = k;
+                    dernier = '/'; motCourant = ''; dernierMot = ''; continue;
+                }
+            }
+            emet('/'); i += 1; continue;                 // division
         }
         if (c === '"' || c === "'" || c === '`') {
             const q = c; const deb = i; i += 1;
@@ -80,9 +123,10 @@ export function depouille(src) {
                 if (src[i] === q) { i += 1; break; }
                 i += 1;
             }
-            out += ' '.repeat(i - deb); continue;
+            out += ' '.repeat(i - deb);
+            dernier = '"'; motCourant = ''; dernierMot = ''; continue;
         }
-        out += c; i += 1;
+        emet(c); i += 1;
     }
     return out;
 }
@@ -174,6 +218,14 @@ const TEMOINS = [
         null],
     ['DANS LA POPULATION par la FABRIQUE — launchBrowser() sans fermeture',
         'const navigateur = await launchBrowser();\nawait navigateur.newPage();',
+        { defautA: true, defautB: false }],
+    ['UNE APOSTROPHE DANS UNE REGEX N\'OUVRE PAS UNE CHAINE',
+        'const m = s.replace(/\\\\\'/g, "\'");\n'
+        + 'const navigateur = await puppeteer.launch({});\nawait navigateur.close();',
+        { defautA: true, defautB: false }],
+    ['UNE DIVISION N\'EST PAS UNE REGEX',
+        'const r = a / b; const q = c / d;\n'
+        + 'const navigateur = await puppeteer.launch({});\nawait navigateur.close();',
         { defautA: true, defautB: false }],
     ['UN CONTEXTE FERME NE VAUT PAS UN NAVIGATEUR FERME',
         'const navigateur = await puppeteer.launch({});\n'
