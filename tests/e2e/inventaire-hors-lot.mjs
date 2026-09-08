@@ -54,7 +54,7 @@
  *             1 = au moins une en porte  ->  a instruire
  *             2 = l'instrument n'a pas pu mesurer  ->  NE RIEN CONCLURE
  */
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
 
 const RACINE = new URL('../../', import.meta.url).pathname;
 const RUNNER = RACINE + 'scripts/rejouer-lot.sh';
@@ -82,7 +82,24 @@ function listesDuRunner() {
         const m = texte.match(new RegExp(`^${nom}=\\(([\\s\\S]*?)\\)`, 'm'));
         if (!m) return null;
         for (const jeton of m[1].split(/\s+/)) {
-            if (/^go-[a-z0-9.-]+$/.test(jeton)) noms.add(jeton);
+            /*
+             * ⚠ CE FILTRE DISAIT `^go-`, ET C'ETAIT LA MEME ERREUR UNE 3e FOIS.
+             *
+             * Dans ce seul fichier, trois endroits supposaient qu'une suite se
+             * nomme `go-…` : la population, ce filtre, et — par ricochet —
+             * l'exclusion de `go.mjs`. Deux mutations posees pour eprouver le
+             * garde des orphelines ont ete avalees ICI, en silence : le nom
+             * enrole n'atteignait jamais l'ensemble, la mutation ne mordait pas,
+             * et le vert qui suivait ne disait rien.
+             *
+             * > Corriger un prefixe a l'endroit ou il gene laisse ses jumeaux en
+             * > place, et le suivant se lit comme une confirmation.
+             *
+             * Mesure du 2026-09-08 : 0 jeton rejete par l'ancien motif comme par
+             * le nouveau. L'elargissement ne change RIEN aujourd'hui — il cesse
+             * seulement d'ecarter en silence le jour ou un nom sortira du moule.
+             */
+            if (/^[a-z0-9][a-z0-9._-]*$/.test(jeton)) noms.add(jeton);
         }
     }
 
@@ -145,8 +162,76 @@ if (enrolees === null || enrolees.size === 0) {
     process.exit(2);
 }
 
-const presentes = readdirSync(E2E).filter((f) => /^go-.*\.mjs$/.test(f))
+/*
+ * ⚠ LA POPULATION EST UN COMPLEMENT, PLUS UN PREFIXE — 2026-09-08.
+ *
+ * Elle valait `/^go-.*\.mjs$/`. Ce motif exclut `go.mjs` : un seul fichier, et
+ * ce fichier n'etait pas non plus enrole dans le lanceur. **Ni joue, ni
+ * surveille.** Il portait 11 routes archivees et ouvrait une route interdite.
+ *
+ * Pire, `test-full-deploy.mjs` — qui deployait un agent sur la machine 1,
+ * srv-zabbix, la PRODUCTION — echappait a la population pour la meme raison :
+ * son nom ne commence pas par `go`. Il a fallu le trouver a la main.
+ *
+ * Elargir le prefixe a `/^go.*\.mjs$/` aurait rattrape `go.mjs` et RATE
+ * `test-full-deploy.mjs`. Le defaut n'est pas la largeur du motif, c'est son
+ * SENS : une population definie par ce qu'elle INCLUT laisse dehors tout ce que
+ * personne n'a pense a nommer, et le silence d'une exclusion ressemble trait
+ * pour trait a une absence de probleme.
+ *
+ * D'ou l'inversion : **tout `.mjs` est une suite surveillee, SAUF ce qui est
+ * declare ici comme n'en etant pas une.** Un fichier ajoute demain entre dans
+ * la population sans que personne n'y pense — c'est le sens sur : l'oubli
+ * produit une suite de trop a declarer, jamais une suite de moins a surveiller.
+ *
+ * > Un defaut qu'on corrige en elargissant le motif revient par le premier nom
+ * > qu'on n'avait pas prevu. Un defaut qu'on corrige en inversant le defaut ne
+ * > revient pas.
+ */
+const HORS_POPULATION = [
+    { motif: /^lib-.*\.mjs$/,          quoi: 'bibliotheque partagee, sans effet propre' },
+    { motif: /^_.*\.mjs$/,             quoi: 'interne, prefixe par convention' },
+    { motif: /^smoke-.*\.mjs$/,        quoi: 'smoke, joue hors lot deliberement' },
+    { motif: /^\d\d-.*\.test\.mjs$/,   quoi: 'harnais numerote' },
+    { motif: /^(archive|code-totp|helpers)\.mjs$/,
+      quoi: 'outil partage : importe par des suites, ne se joue pas seul' },
+    { motif: /^(inventaire-hors-lot|jetons-interdits|liens-morts-legacy)\.mjs$/,
+      quoi: 'controle statique : ni navigateur ni session' },
+];
+
+const tousFichiers = readdirSync(E2E).filter((f) => /\.mjs$/.test(f));
+const presentes = tousFichiers
+    .filter((f) => ! HORS_POPULATION.some((c) => c.motif.test(f)))
     .map((f) => f.replace(/\.mjs$/, '')).sort();
+
+/*
+ * TEMOIN DE POPULATION — et le premier que j'ai ecrit ici ne valait RIEN.
+ *
+ * Il verifiait que chaque `.mjs` tombe dans la population OU dans une classe
+ * declaree. Mais la population EST « tout sauf les classes declarees » : la
+ * propriete etait vraie par definition, elle ne pouvait pas echouer, et elle
+ * imprimait pourtant l'assurance d'avoir ete verifiee. **Une universelle
+ * negative est vraie a vide, et celle-la l'etait par construction.**
+ *
+ * Ce qui peut reellement casser est l'autre sens : le lanceur enrole un nom que
+ * l'inventaire ne surveille pas — fichier renomme, supprime, ou range dans une
+ * classe hors population. Le lot le joue, l'inventaire ne le compte pas, et
+ * chacun des deux a l'air complet.
+ *
+ * > Un garde qui ne peut pas rougir n'est pas un garde faible : c'est une
+ * > affirmation deguisee en mesure.
+ */
+const orphelines = [...enrolees].filter((s) => ! presentes.includes(s)).sort();
+if (orphelines.length) {
+    console.log('\n⛔ ENROLEE(S) PAR LE LANCEUR, HORS DE LA POPULATION SURVEILLEE :');
+    for (const s of orphelines) {
+        const f = existsSync(`${E2E}${s}.mjs`) ? 'classee hors population' : 'fichier ABSENT';
+        console.log(`     ${s}  (${f})`);
+    }
+    console.log('   Le lot les joue, cet inventaire ne les voit pas : les deux ont');
+    console.log('   l\'air complets. NE RIEN CONCLURE.');
+    process.exit(2);
+}
 const horsListe = presentes.filter((s) => !enrolees.has(s));
 
 console.log(`suites presentes dans tests/e2e/ : ${presentes.length}`);

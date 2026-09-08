@@ -1,3 +1,14 @@
+/*
+ * HORS-LOT: ouvre un navigateur VISIBLE sur /supervision/ pour observer a la
+ * main. 21 lignes, aucune assertion, aucun verdict — elle n'a rien a rendre a
+ * un lot, et `headless: false` la rend inutilisable sans ecran.
+ *
+ * Elle n'ecrit pas : la seule navigation est un GET vers /supervision/. C'est
+ * bien un outil, mais elle reste dans la population surveillee — un fichier qui
+ * ouvre une session doit etre VU par l'inventaire, meme quand il est inoffensif.
+ * La classer hors population l'aurait rendue invisible pour la seule raison
+ * qu'elle est benigne aujourd'hui.
+ */
 import puppeteer from 'puppeteer';
 import { login, BASE_URL } from './helpers.mjs';
 
