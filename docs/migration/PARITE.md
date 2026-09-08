@@ -22756,3 +22756,83 @@ service, pas quatre**, et SEC-015 sort de la liste **parce que son defaut en sor
 > prend les fausses alarmes et RATIFIE les exculpations. *Je l'ai donc mesure deux fois, sur le depot
 > entier (`git grep` au commit, pas dans le fichier) et avec un temoin negatif.*
 
+---
+
+## E-500 — LA PARADE DU CACHE BLADE EST BORNEE AU DEMARRAGE, ET LA CAUSE EST REVENUE EN COURS DE ROUTE
+
+**Mesure du 2026-09-08 vers 12:50.** Partie d'une exculpation de la session 5 — *« `laravel/` n'est pas
+concerne par l'ecart arbre/service : Laravel relit `config/` et les vues a chaque requete, l'entrypoint
+refuse `config:cache` »*. **Sa conclusion tient. Son mecanisme est faux, et ce qui la sauve est une seule
+ligne d'entrypoint dont la portee est plus etroite que son commentaire.**
+
+### 1. Ce que l'entrypoint fait vraiment
+
+    laravel/docker-entrypoint.sh:44   php artisan view:cache  --no-interaction >/dev/null 2>&1 || true
+    laravel/docker-entrypoint.sh:59   chown -R www-data:www-data storage/framework/views 2>/dev/null || true
+
+**`config:cache` et `route:cache` sont bien refuses** (l.41-43, et la raison est ecrite : ils figeraient des
+valeurs qu'on modifie encore). **Mais les VUES sont compilees**, et en ROOT — le script tourne avant le
+passage a Apache. *Donc « Laravel relit les vues a chaque requete » est faux : les vues sont un artefact
+compile, et ce qui les rafraichit est une comparaison de `mtime`.*
+
+`PIEGE-CACHE-BLADE.md` documente l'incident : **le 2026-09-03, 111 compiles sur 151 appartenaient a root,
+et 28 pages d'erreur ont ete servies en sept minutes** — PHP ne peut pas reecrire un compile `root:root`,
+donc `touch()` echoue a la recompilation et rend 500, *le socle etant inclus partout*.
+
+### 2. ⛔ LA PARADE NE COUVRE QUE LE DEMARRAGE, ET LA CAUSE EST REVENUE 27 H APRES
+
+    demarrage rootwarden_laravel        2026-09-06 21:38:50 (CEST)
+    repertoire                          www-data:www-data 755
+    fichiers compiles                   58 www-data  ·  7 root:root
+    les 7 root, mtime                   2026-09-07 22:29:11 a 22:29:41
+                                        -> TOUS posterieurs au demarrage de 24 h 50
+    temoin                              58 www-data, tous posterieurs aussi  ·  0 avant le boot
+
+**Un processus ROOT a compile sept vues le 07 a 22:29, plus d'un jour apres le boot.** Le `chown` de la
+l.59 **ne tourne qu'au demarrage** : il ne peut rien contre ce qui arrive ensuite.
+
+> **Et son commentaire dit** : *« Sans cette ligne la cause est RECREEE a chaque demarrage : normaliser a
+> la main ne tient pas. Idempotente. »* **C'est vrai du DEMARRAGE et ca se lit comme si la classe etait
+> fermee.** *La cause n'est pas « recreee a chaque demarrage » : elle est recreee par tout `artisan` lance
+> en root, a n'importe quel moment.* **Une parade bornee a un instant, decrite par un commentaire qui
+> nomme cet instant, ressemble a une parade permanente.**
+
+### 3. Les sept vues armees — et TROIS sont du socle
+
+    composants/profil.blade.php          <- inclus partout
+    composants/theme.blade.php           <- inclus partout
+    composants/onglets-adm.blade.php     <- inclus partout
+    comptes.blade.php
+    cles-ssh.blade.php
+    vendor  Exceptions/views/403.blade.php  ·  minimal.blade.php
+
+### 4. ⚠ ET LE VERDICT EST « LATENT », PAS « ACTIF » — mesure dans les deux sens
+
+    les 7 compiles sont TOUS plus neufs que leur source  ->  aucune recompilation requise
+    -> AUCUN 500 arme a cet instant
+
+**Donc rien a corriger en urgence, et je le dis dans ce sens-la.** *Mais la condition suffisante est en
+place :* **la premiere modification de `profil`, `theme` ou `onglets-adm` fera echouer `touch()` et rendra
+500 sur toutes les pages qui les incluent** — et ce sont precisement les vues qu'une session de portage
+touche. *Le declencheur est un geste ordinaire, pas un incident.*
+
+**Parades, par ordre de solidite** : compiler en `www-data` (`gosu`/`setpriv` sur la l.44) plutot que
+chowner apres ; a defaut, un `chown` **periodique** ou **avant chaque suite**. ⚠ Et la l.59 porte
+`2>/dev/null || true` : **un chown en echec est indiscernable d'un chown reussi**, donc la parade ne peut
+pas signaler qu'elle n'a pas eu lieu.
+
+### 5. Deux instruments m'ont menti pendant cette mesure, dans le meme sens
+
+**a) `grep -r` est aveugle a `laravel/storage/`** (chemin de `.gitignore`, et `grep` enveloppe ripgrep) :
+
+    grep -rl 'rw-' laravel/storage/framework/views   ->   0 fichier
+    boucle shell sur le meme repertoire              ->  65 fichiers
+
+*Deja inscrit en memoire, et le temoin l'a rattrape parce que je l'ai pose AVANT.*
+
+**b) Ma reconstruction de chemin a rendu un ZERO SILENCIEUX.** Les compiles portent leur source en pied
+sous la forme `/var/www/html/...`, et j'avais ecrit `laravel${P#*/laravel}` — donc `[ -e ]` faux pour les
+sept, et **la boucle n'a rien imprime du tout**. *Une comparaison de fraicheur qui n'imprime rien se lit
+comme « aucune vue n'est en retard », qui est la conclusion rassurante.* **Corrige avec un temoin sur un
+chemin connu avant de relancer.**
+
