@@ -14700,3 +14700,118 @@ CHANGELOG plutôt que présenté comme vérifié, et c'est la mémoire qui l'emp
 code.* **Le panneau `suite` continue donc d'annoncer que le retour arrière est ailleurs :
 la session refuse d'écrire « tout est porté » sans l'avoir vu, et c'est précisément ce que
 ce panneau existe pour éviter.**
+
+---
+
+## ⚖ E-480 — LES DEUX ORPHELINES DE `sftp`, ET MON ÉCART DE 25 EN VALAIT 2
+
+**2026-09-08, ~05:2x.** L'appariement du catalogue `sftp` est rendu : **63 clés atteintes
+sur 65, aucune clé construite manquante.**
+
+### ① MON COMPTE ÉTAIT FAUX DU FACTEUR QUE J'AVAIS SOUPÇONNÉ
+
+J'avais annoncé « 43 / 126 / 35 / 36 / 65 clés que rien n'appelle » en notant que je n'avais
+pas balayé les contrôleurs. **Pour `sftp` : l'écart réel est 2, pas 25.**
+
+```
+litterales    36   __('sftp.titre')
+CURATEE       13   foreach ([...] as $cle) — elles VOYAGENT vers le script
+construites   27   trois familles, domaines enumeres A LEUR SOURCE
+orphelines     2
+```
+
+> **Une clé curatée n'est pas orpheline.** *Treize des quinze que le premier relevé donnait
+> pour mortes voyagent dans un bloc JSON vers le script — les confondre aurait fait retirer
+> un libellé EN SERVICE.*
+
+**Et l'autorité des domaines est le schéma, pas une liste recopiée** : `sftp.etat_` vient
+d'un `enum` MySQL (`policy_deployments.status`), `$champs` est un tableau littéral de la vue.
+*Deux des six sources ne sont ni un enum ni une constante de service : elles sont écrites
+DANS LA VUE — aucune migration ne les fera bouger, aucune revue de schéma ne les verra.*
+
+### ⚖ ② `rollback_lien` — RETIRER
+
+```
+'rollback_lien'     => 'Annuler ce deploiement dans l'ancien portail'
+'rollback_confirme' => 'Annuler ce deploiement et restaurer le bloc SSH precedent ?…'
+consommateurs de rollback_lien : 0
+```
+
+**Le libellé d'un état révolu.** La capacité a été portée le 07/09 ; le libellé qui renvoyait
+au legacy est resté. **Même espèce que les 21 liens morts de 03:50** — *un libellé qui
+annonce une absence comblée envoie l'opérateur ailleurs pour un geste qui est sous ses yeux.*
+
+### ⚖ ③ `restreint` — GARDER, ET DOCUMENTER SUR PLACE. Mais la question posée n'est pas la bonne
+
+```
+REGLAGES        sftp_only => 'restreint'   ·   les 4 autres => 'ouvre'
+acces-sftp.blade.php:113   @if ($effets[$colonne] === 'ouvre')
+                    :114   <span class="rw-badge rw-badge--attention">
+```
+
+**Rendre `restreint` avec la même classe serait faux** : `rw-badge--attention` est une
+alerte, et « restreint » n'en est pas une. *Le choix de ne pas le rendre est correct.*
+
+**Garder la clé, parce que le coût est asymétrique** : une entrée inutilisée coûte une ligne ;
+la retirer oblige celui qui rendra un jour le badge neutre à **réinventer le libellé**, avec
+un risque de divergence FR/EN à la clé. *Un libellé réinventé est plus cher qu'un libellé
+dormant.*
+
+> ⚠ **MAIS LE RISQUE N'EST PAS LA CLÉ — C'EST QUE L'ALERTE SE PERDE EN SILENCE ET DU BON
+> CÔTÉ.** Quatre réglages sur cinq ouvrent l'accès. **Le badge dit « ceci ouvre » par sa
+> PRÉSENCE ; son absence dit « restreint ».** Donc un badge perdu — CSS purgé, contraste
+> insuffisant, jeton inerte — fait lire *sécurisé* un réglage qui **ouvre**.
+
+**C'est le troisième signalement de cette forme dans ce dépôt** (la pastille KEV à 1,06:1 de
+contraste, HTML juste et invisible). **Mesuré, et cette fois c'est bon :**
+
+```
+.rw-badge--attention          1 definition, CSS ecrit a la main
+--rw-avert-fond               3 definitions   (clair · sombre · bascule)
+--rw-avertissement            3 definitions
+temoin- : --rw-zzz-inexistant 0
+```
+
+**Le contrôle général des jetons est vert, et il m'a rendu UN faux positif que j'ai écarté :**
+
+```
+⛔ --rw-part-unban   employe, jamais defini dans la feuille
+   -> fail2ban.js:564  corps.style.setProperty('--rw-part-unban', …)
+   -> CSS : var(--rw-part-unban, 50%)   AVEC SON REPLI DECLARE
+```
+
+*Ma sonde cherchait la définition dans la FEUILLE ; elle vient de la PAGE VIVANTE, et la
+forme `var(x, repli)` est précisément la garde par construction contre l'absence.*
+**Quatrième régime de lecture de la nuit** — arbre, service, base, et maintenant *la page qui
+s'exécute*. [[feedback_arbre_ou_service]].
+
+### ④ ET UNE CORRECTION À UNE CONSIGNE QUE J'AI DONNÉE
+
+J'avais écrit : *« dépouille les commentaires AVANT de mesurer, à chaque fois. »* **La
+consigne est juste et elle a un piège qu'elle ne dit pas :**
+
+> **Dépouiller en SUPPRIMANT des lignes détruit les numéros de ligne — qui sont précisément
+> ce qu'on veut rendre.** *Remplacer chaque ligne de commentaire par une ligne VIDE.*
+
+*Un relevé livré avec des numéros décalés est plus coûteux qu'un relevé sans numéros : il
+envoie lire le mauvais endroit avec l'autorité d'une mesure.* **Et je n'avais pas nommé ce
+piège en donnant la règle.**
+
+### ⑤ CE QUI RESTE OUVERT, ET CE N'EST PAS PETIT
+
+```
+5 catalogues apparies       sur les 5 demandes
+13 sites de cle construite  couverts
+68 AUTRES sites             hors de ces 5 modules — 81 au total, dont des
+                            familles A VARIABLE AU MILIEU :
+                              superv. + $champ['cle'] + _aide
+                              onboarding.etape_ + $cle + _titre
+la question INVERSE         « chaque cle du catalogue a-t-elle un consommateur »
+                            reste entiere sur les 4 autres catalogues
+```
+
+**Et l'outil existe** : `scripts/cles-atteintes.py`, qui **refuse de conclure** (code 3) quand
+un domaine construit n'est pas énuméré, et nomme les sites concernés. *Une sonde qui devine
+un domaine se trompe dans les deux sens : elle signale des clés fantômes, et elle déclare
+atteintes des clés qui ne le sont pour aucune valeur réelle.* **Il vaut pour les cinq
+catalogues — donc pour les quatre autres, sans le réécrire.**
