@@ -56,7 +56,7 @@ FILE_SUFFIX = '.conf'
 
 def _validate_username(username: str) -> str:
     username = (username or '').strip()
-    if not _USERNAME_RE.match(username):
+    if not _USERNAME_RE.fullmatch(username):
         raise ValueError(f"Nom d'utilisateur invalide : {username!r}")
     return username
 
@@ -64,7 +64,7 @@ def _validate_username(username: str) -> str:
 def _validate_path(path: str, field: str = 'path') -> str:
     """Valide un chemin absolu Unix sans traversal."""
     path = (path or '').strip()
-    if not _PATH_RE.match(path):
+    if not _PATH_RE.fullmatch(path):
         raise ValueError(f"Chemin {field} invalide : {path!r} (doit etre absolu, sans traversal)")
     if '..' in path.split('/'):
         raise ValueError(f"Chemin {field} contient '..' : {path!r}")

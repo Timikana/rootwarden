@@ -63,11 +63,11 @@ def _parse_ssh_key_line(line: str):
         return None
     # Si options ssh (from=,command=,etc.) en prefixe, on saute jusqu'au type
     rest = line
-    if not _SSH_KEY_TYPE_RE.match(rest.split(None, 1)[0]):
+    if not _SSH_KEY_TYPE_RE.fullmatch(rest.split(None, 1)[0]):
         # Cherche le prochain token qui ressemble a un type de cle
         tokens = rest.split()
         for i, tok in enumerate(tokens):
-            if _SSH_KEY_TYPE_RE.match(tok):
+            if _SSH_KEY_TYPE_RE.fullmatch(tok):
                 rest = ' '.join(tokens[i:])
                 break
         else:
@@ -78,7 +78,7 @@ def _parse_ssh_key_line(line: str):
     key_type = parts[0]
     key_data = parts[1]
     comment = parts[2].strip() if len(parts) > 2 else None
-    if not _SSH_KEY_TYPE_RE.match(key_type):
+    if not _SSH_KEY_TYPE_RE.fullmatch(key_type):
         return None
     try:
         raw = base64.b64decode(key_data, validate=False)
@@ -877,7 +877,7 @@ def deploy_platform_key():
                     sa_ok = False
                     try:
                         sa_name = Config.NOM_COMPTE_SERVICE
-                        if not re.match(r'^[a-z][a-z0-9_-]+$', sa_name):
+                        if not re.fullmatch(r'^[a-z][a-z0-9_-]+$', sa_name):
                             raise ValueError(f"Nom de compte invalide: {sa_name}")
                         # Installer sudo si absent (utilise su - avec root_password)
                         try:
@@ -1852,7 +1852,7 @@ def scan_server_users():
                 uname, uid_str, home, shell = parts[0], parts[1], parts[2], parts[3]
                 uid = int(uid_str) if uid_str.isdigit() else 0
 
-                if not re.match(r'^/[a-zA-Z0-9/_.-]+$', home):
+                if not re.fullmatch(r'^/[a-zA-Z0-9/_.-]+$', home):
                     continue
 
                 user_keys = keys_by_user.get(uname, [])
@@ -2261,7 +2261,7 @@ def server_user_keys():
     username = (request.args.get('username') or '').strip()
     if not machine_id or not username:
         return jsonify({'success': False, 'message': 'machine_id et username requis'}), 400
-    if not re.match(r'^[a-zA-Z_][a-zA-Z0-9_-]{0,63}$', username):
+    if not re.fullmatch(r'^[a-zA-Z_][a-zA-Z0-9_-]{0,63}$', username):
         return jsonify({'success': False, 'message': 'username invalide'}), 400
 
     conn = get_db_connection()
@@ -2443,7 +2443,7 @@ def server_user_remove_key():
         return jsonify({'success': False, 'message': 'machine_id, username et fingerprint_sha256 requis'}), 400
     if not _validate_username(username):
         return jsonify({'success': False, 'message': 'username invalide'}), 400
-    if not re.match(r'^[A-Za-z0-9+/]{40,64}$', fingerprint):
+    if not re.fullmatch(r'^[A-Za-z0-9+/]{40,64}$', fingerprint):
         return jsonify({'success': False, 'message': 'fingerprint invalide'}), 400
 
     conn = get_db_connection()

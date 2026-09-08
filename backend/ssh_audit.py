@@ -116,7 +116,7 @@ def get_sshd_config(client, root_pass):
         stripped = line.strip()
         if stripped.lower().startswith('include '):
             include_path = stripped.split(None, 1)[1].strip()
-            if not _INCLUDE_PATH_RE.match(include_path):
+            if not _INCLUDE_PATH_RE.fullmatch(include_path):
                 _log.warning("Include path rejected (path traversal?): %s", include_path)
                 continue
             inc_cmd = f"cat {include_path} 2>/dev/null"
@@ -247,7 +247,7 @@ def _validate_value(value, directive=None):
         if value != ALLOWED_VALUES[directive]:
             return False, f"Valeur '{value}' non autorisee pour {directive}. Attendu: {ALLOWED_VALUES[directive]}"
         return True, None
-    if not VALUE_RE.match(value):
+    if not VALUE_RE.fullmatch(value):
         return False, f"Valeur '{value}' contient des caracteres non autorises."
     return True, None
 
@@ -430,7 +430,7 @@ _BACKUP_NAME_RE = re.compile(r'^sshd_config\.bak\.\d{14}$')
 def restore_backup(client, root_pass, backup_name):
     """Restore a backup file to sshd_config. Validate with sshd -t."""
     # Validate backup name (anti path-traversal)
-    if not _BACKUP_NAME_RE.match(backup_name):
+    if not _BACKUP_NAME_RE.fullmatch(backup_name):
         return False, f"Invalid backup name: {backup_name}"
 
     backup_path = f"/etc/ssh/{backup_name}"

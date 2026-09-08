@@ -124,7 +124,7 @@ def _load_migration_files() -> list[dict]:
 
     migrations = []
     for path in sorted(MIGRATIONS_DIR.glob('*.sql')):
-        m = _MIGRATION_RE.match(path.name)
+        m = _MIGRATION_RE.fullmatch(path.name)
         if not m:
             _log.debug("Fichier ignoré (nom invalide) : %s", path.name)
             continue

@@ -114,7 +114,7 @@ def get_remote_digest(image_ref):
     except Exception:
         return None
 
-    if not _HOST_RE.match(host or ''):
+    if not _HOST_RE.fullmatch(host or ''):
         _log.warning("Hote de registre invalide, ignore : %r", host)
         return None
     base = f"https://{host}"

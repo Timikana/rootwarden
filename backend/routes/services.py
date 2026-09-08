@@ -39,7 +39,7 @@ def _validate_service_name(name):
     name = (name or '').strip()
     if not name:
         return None, (jsonify({'success': False, 'message': 'service requis'}), 400)
-    if not _SAFE_SERVICE_RE.match(name) or len(name) > 200:
+    if not _SAFE_SERVICE_RE.fullmatch(name) or len(name) > 200:
         return None, (jsonify({'success': False, 'message': 'Nom de service invalide'}), 400)
     return name, None
 
