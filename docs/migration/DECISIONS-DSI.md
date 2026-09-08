@@ -16108,3 +16108,46 @@ désormais chiffrée et ordonnée.
 *Et l'ironie, déjà écrite dans le dépôt : le remède contre une version qui dérive
 a été de MONTER le fichier du legacy — un remède qui reconduit la dépendance
 qu'on cherche à retirer.*
+
+---
+
+## E-508
+
+**La séquence d'extinction est ÉPUISÉE, et E-507 gardait le mauvais geste.**
+
+`bash scripts/eteindre-le-legacy.sh` rend **exit 0**, quatre contrôles au vert, et
+**six fois « déjà archivée »** : les six étapes portent sur des chemins déjà
+vides ou déjà archivés, et les 12 fichiers encore suivis sous `legacy/` ne sont
+nommés par aucune étape (recoupement zéro, mesuré par `gestion-ssh-key-0b`,
+recoupé ici). *Une séquence dont toutes les étapes ont abouti se lit exactement
+comme une séquence qui attend.*
+
+**Rectification de E-507** : le montage de `legacy/version.txt` n'est **pas** une
+précondition à `patch 07` — le patch ne mentionne jamais `version.txt`, et après
+lui le portage garde son montage. La précondition garde le geste **suivant**,
+celui qui retirera le répertoire ou le vhost. *Nommer le mauvais geste aurait
+fait classer la précondition « déjà satisfaite ».* **Et en retour, `patch 07` a
+bien encore un objet** : `php:` est déclaré à `docker-compose.yml:8` et
+`prod.yml:58`.
+
+**Un seul signal de santé est réellement faux, et il est borné.** `php` est
+`UNHEALTHY` depuis 45 h : sa sonde vise `/auth/login.php`, archivé par l'étape ⑤
+(404 mesuré depuis le conteneur). C'est la récidive du faux UNHEALTHY de 21 h du
+2026-09-05. **Il ne bloque rien** — 0 service ne déclare `depends_on php`
+(témoin : 3 trouvés sur `db`) — donc `./maj.sh` démarrerait. **Et il se résout
+avec `patch 07`, sans geste séparé.**
+
+**Ce qui reste tient en quatre gestes**, aucun à moi : ① signer `patch 07` ·
+② placer le numéro de version (ordre non commutatif) · ③ retirer le répertoire et
+le vhost · ④ corriger le garde du contrôle 1, qui ne peut jamais refuser
+(`git ls-files` sur un fichier `.gitignore`).
+
+⛔ **Et deux artefacts de ma propre mesure, retirés** : j'ai lu les sorties d'un
+script que mon `bash -c 'source'` avait fait tourner dans le **parent du dépôt**
+(`:60 cd "$(dirname "$0")/.."`), et j'ai alarmé sur le healthcheck du portage
+alors qu'il est **corrigé à la ligne suivante — par moi, dans cette session**.
+*Un commentaire qui narre le défaut qu'il a corrigé se lit comme un défaut
+vivant : troisième fois aujourd'hui, et la première où j'ai été trompé par ma
+propre documentation de mon propre correctif.*
+
+Détail et mesures : `DOSSIER-59`.
