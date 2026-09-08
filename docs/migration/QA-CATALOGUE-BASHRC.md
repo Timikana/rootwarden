@@ -106,3 +106,65 @@ ci-dessus.
   appel n'est pas une réussite* — et rien n'a été exercé ici.
 - **Le contraste ni le rendu.** Aucun navigateur : le swap est à **3702/3702 Mio (100 %)**,
   1,1 Gio de RAM disponible. *Une suite lancée dans cet état échouerait pour la machine.*
+
+
+---
+
+# ADDENDUM — le piège de l'ACCÈS PROPRIÉTÉ, mesuré et écarté
+
+**Signalé après coup** : plus de la moitié des clés d'un autre module sont lues en accès
+propriété (`textes.cle`), pas en chaîne (`textes['cle']`). *Une sonde qui ne cherche que la
+forme chaîne fabrique des libellés morts qui sont vivants* — une première sonde y annonçait 43
+orphelines ; il y en avait 2.
+
+**Sur `bashrc`, la proportion est plus extrême encore :**
+
+    acces PROPRIETE   textes.x      45
+    acces CHAINE      textes['x']    0
+    -> 45 / 45, soit CENT POUR CENT en propriete
+
+**`cles-atteintes.py` ne cherche que la forme chaîne. Il aurait donc manqué les 45.** Il ne
+les a pas manquées, et pour une raison qu'il faut nommer : *elles sont citées en PHP*, dans le
+tableau `$textes` du contrôleur, sous forme `'cle' => __('bashrc.cle')`. **La sonde a vu la
+citation en amont, pas la lecture en aval.** Elle avait raison par un chemin qu'elle
+n'annonçait pas.
+
+## Et le défaut INVERSE, celui qui rend du VIDE
+
+Une clé absente du catalogue fait afficher **son nom** par `__()`. Mais une clé que le JS
+**attend** et que le contrôleur ne **transmet pas** rend `undefined` — donc **du vide**, pas un
+identifiant. *L'une se voit, l'autre pas.*
+
+    cles TRANSMISES par le controleur ($textes)   45
+    cles ATTENDUES par le JS (textes.x)           45
+    attendues NON transmises                       0
+    transmises jamais lues                         0
+
+    TEMOIN  « deploy_fait » attendu ET transmis : oui / oui
+    TEMOIN  cle forgee « zzz » : dans aucun des deux
+
+**Les trois ensembles coïncident exactement.** Aucun libellé silencieusement vide, aucun
+libellé transmis pour rien.
+
+---
+
+# CE QUE JE PEUX PROUVER, ET CE QUE JE NE PEUX PAS
+
+    92 cles
+    48 dans une famille qui NOMME un geste   -> les 6 gestes PROUVES par un site d'appel
+       comptes=6 · figlet=6 · deploy=7 · restore=8 · apercu=7 · gabarit=14
+    44 ne nomment aucun geste                -> colonnes, etats, avertissements ;
+                                                la question n'a pas d'objet pour elles
+     2 orphelines, parmi les 44
+
+## ⛔ Ce que je ne peux PAS prouver, dit comme tel
+
+- **Qu'un geste RÉUSSIT.** Je prouve qu'il est **appelé**, avec son fichier et sa ligne. *Un
+  appel n'est pas une réussite.* Rien n'a été exercé : aucune requête, aucune machine.
+- **Que les 44 clés sans geste sont rendues À L'ÉCRAN.** Elles sont **citées** — en Blade ou
+  dans `$textes`. Une citation n'est pas un rendu : un `@if` faux, une branche morte, un badge
+  invisible les laisseraient citées et jamais vues. *Ce contrôle demande un navigateur, et le
+  swap est à 100 %.*
+- **Que le catalogue EN dit la même chose que le FR.** La parité des **clés** est exacte
+  (92 = 92) ; la parité des **sens** n'est pas mesurée — et `non_porte_texte` prouve qu'elle
+  peut se rompre dans les deux langues à la fois.
