@@ -13920,3 +13920,66 @@ et une forme non listée lui échapperait — elle doit refuser d'écrire.*
 tests/e2e/jetons-interdits.mjs   code 0
 ```
 
+---
+
+## ⚠ E-474 — MON « 19 RACINES » EST FAUX. IL Y EN A ONZE — ET J'AI MIS TROIS SONDES À LE VOIR
+
+**`E-473` publiait « 19 des 26 fichiers métier sont atteignables par un navigateur ».** *Le
+fait qui fondait la correction — le legacy n'est pas un arbre suspendu à une page — reste
+vrai. Le chiffre est faux.*
+
+```
+racines REELLES : 11
+  _sortie.php · adm/api/notifications.php · api_proxy.php · iptables/index.php
+  auth/{forgot_password,login,logout,reset_password,step_up,verify,verify_2fa}.php
+```
+
+### Trois sondes, trois erreurs, TROIS DIRECTIONS DIFFÉRENTES
+
+*Toutes les trois sur la même question, en un quart d'heure :*
+
+```
+1re sonde   ne gardait qu'UN <FilesMatch> par fichier
+            -> db/menu/head/footer.php declares SERVIS   (ils sont DENIES)   19
+2e sonde    n'heritait pas les refus dans les SOUS-repertoires
+            -> lang/{fr,en}/*.php declares racines       (denies par lang/)  89
+3e sonde    ne retirait que <FilesMatch>, pas <Files>
+            -> le `Require all denied` de <Files "version.txt"> lu comme
+               un refus GLOBAL                                                0
+```
+
+> **Chaque sonde rendait un nombre plausible, et aucune ne rendait le même.** *19, puis 89,
+> puis 0 — et j'ai publié le premier.*
+
+**Ce qui a fini par trancher n'est aucune sonde : c'est d'avoir LU `legacy/.htaccess` en
+entier, 51 lignes.** *Je mesurais un fichier de 51 lignes avec trois analyseurs successifs au
+lieu de l'ouvrir.*
+
+### Ce que ça change, et ce que ça ne change pas
+
+**Ne change pas** : la thèse de `E-473`. *Retirer `iptables/index.php` ne libère rien, parce
+que le legacy est un jeu PLAT de racines et non un arbre.* **Et la chaîne d'authentification
+est vivante — mesurée à `200` avec son témoin.**
+
+**Change, et dans le sens qui RENFORCE le point** :
+
+```
+7 des 11 racines sont la chaine d'AUTHENTIFICATION
+```
+
+*Je l'avais noyée dans dix-neuf. Elle est en réalité la MAJORITÉ de ce qui reste servi.*
+
+> **La surface résiduelle du legacy n'est pas « des restes de migration ». C'est un portail
+> d'authentification complet, plus une page de pare-feu.**
+
+### Et deux refus déjà en place que je ne connaissais pas
+
+*`legacy/.htaccess` denie déjà `db|menu|head|footer.php` — depuis un pentest du 2026-05-20,
+avec sa raison écrite : « ils peuvent émettre des warnings/HTML hors contexte qui leakent des
+paths ou affichent du menu admin ».* **J'ai passé la nuit à compter des racines sans lire le
+fichier qui les décide.**
+
+**How to apply, et c'est la seule leçon utile ici** : *pour un fichier de configuration COURT
+et faisant AUTORITÉ, le lire vaut mieux que le parser.* **Un analyseur se trompe en silence ;
+51 lignes ne se trompent pas.**
+
