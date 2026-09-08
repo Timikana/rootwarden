@@ -260,3 +260,119 @@ La session a d'abord cité au CHANGELOG `APP_URL=https://\${SERVER_NAME}…` —
 *C'est la même mécanique que mes accents graves exécutés par le shell : un motif retapé n'est
 pas le motif du fichier.* **La parade est identique dans les deux cas : lire depuis
 l'artefact, jamais depuis sa mémoire.**
+
+---
+
+# ⛔⛔ RECTIFICATION MAJEURE — MON MÉCANISME ÉTAIT FAUX, ET LE DÉFAUT RÉEL EST PIRE
+
+**2026-09-08, ~05:3x.** *Je corrige la thèse centrale de ce dossier. La conclusion
+opérationnelle — **ne pas armer SMTP** — se renforce ; sa raison change entièrement.*
+
+## ① CE QUE J'AI ÉCRIT DE FAUX
+
+J'ai annoncé que le courriel de réinitialisation portait
+`http://192.168.0.245:8444/reinitialiser?…` — le legacy, en clair.
+
+**Cette valeur vient de `artisan tinker`, c'est-à-dire de HORS REQUÊTE.** Mesuré :
+
+```
+hors requete (tinker)        route('connexion')  ->  http://192.168.0.245:8444   APP_URL
+dans une requete             la page emet        ->  https://localhost:8443      HOTE DE LA REQUETE
+« :8444 » dans une page servie                   ->  0 occurrence
+```
+
+Et `ReinitialisationController.php:156` construit le lien **dans** `envoyer(Request $requete)` :
+
+```php
+$lien = route('reinit.formulaire', ['uid' => (int) $compte->id, 'jeton' => $clair]);
+```
+
+> **Donc le lien du courriel ne porte PAS `:8444`. Il porte l'hôte de la requête qui a
+> soumis le formulaire.**
+
+*J'ai mesuré avec l'instrument qui n'était pas dans le régime du code.* **Cinquième fois
+cette nuit qu'arbre, service, base et page-vivante se confondent** — et cette fois j'ai
+publié avant de vérifier le régime. [[feedback_arbre_ou_service]].
+
+### Et `APP_URL` n'a AUCUNE conséquence vivante aujourd'hui
+
+```
+sites composant une URL, tous contextes        92
+sites composant une URL HORS REQUETE            0
+Mail:: (toutes formes)                          1, dans un CONTROLEUR donc en requete
+Console/Commands · Jobs · planificateur        aucune composition d'URL
+```
+
+**`APP_URL` est faux et inerte.** *C'est un piège en sommeil pour le jour où quelque chose
+composera une URL hors requête — un courriel mis en file, un rapport planifié — pas un
+défaut vivant.* **Il faut toujours le corriger ; il ne fallait pas l'annoncer comme la
+cause.**
+
+## 🔴 ② CE QUE LE DÉFAUT EST RÉELLEMENT : L'HÔTE EST FOURNI PAR LE DEMANDEUR
+
+```
+curl -H "Host: attaquant.invalid" https://localhost:8443/connexion
+  ->  200
+  ->  la page emet   https://attaquant.invalid
+
+gardes cherchees :  TrustHosts · trustedHosts · forceRootUrl   ->  AUCUNE
+vhost Apache du portage :  ServerName localhost, sans rejet des autres hotes
+```
+
+**Conséquence sur le flux de réinitialisation :**
+
+```
+1  une requete POST /mot-de-passe-oublie avec l'adresse d'une VICTIME
+   et un en-tete `Host` choisi par le demandeur
+2  route() a la ligne 156 bâtit le lien sur CET hote
+3  la victime recoit un courriel dont le lien de reinitialisation pointe
+   vers l'hote du demandeur, JETON COMPRIS
+4  si elle clique, le jeton part chez lui
+```
+
+> ⛔ **Ce n'est pas un lien cassé : c'est un lien dont l'adresse est choisie par celui qui
+> déclenche l'envoi.** *La conclusion « ne pas armer SMTP » ne vaut plus par prudence
+> d'hygiène — elle est la seule chose qui rend ce défaut latent.*
+
+**Aujourd'hui `mail.default` vaut `log`** : le courriel s'écrit dans un fichier. **Le jour où
+un transport réseau est armé, ce défaut devient vivant.**
+
+*Le fichier lui-même porte cette phrase, écrite pour un autre défaut du même flux :* « il
+devient vivant le jour où un transport RÉSEAU est configuré — et ce jour-là, personne ne
+pensera à relire ce fichier ». **Elle s'applique deux fois.**
+
+## ⚖ ③ CE QUE ÇA CHANGE DANS LA LISTE DES CORRECTIFS
+
+```
+AVANT (ce que j'avais ecrit)          APRES (mesure)
+1  APP_URL, valeur                    devient SECONDAIRE — inerte, mais prerequis du 2
+2  declarer dans l'exemple            garde son sens : rendre la variable lisible
+⬅ 0  L'HOTE DE CONFIANCE              NOUVEAU, ET C'EST LE PREMIER
+      TrustHosts, ou URL::forceRootUrl(config('app.url')) sur le chemin du
+      courriel, ou le rejet des hotes inconnus par Apache
+3  ne pas armer SMTP avant            INCHANGE, et c'est desormais un verrou de
+   d'avoir verifie                    securite et non d'hygiene
+```
+
+**⚠ Et les deux se composent, dans cet ordre :** `forceRootUrl(config('app.url'))` **emploie
+`APP_URL`**. *Forcer la racine sur une valeur fausse remplacerait un hôte choisi par le
+demandeur par un hôte faux choisi par nous.* **Corriger `APP_URL` d'abord ; forcer ensuite.**
+
+## ④ CE QUE JE RETIENS CONTRE MOI
+
+**J'ai publié un dossier, puis son amendement, sur un mécanisme que je n'avais pas
+mesuré dans le bon régime.** *Deux niveaux de correction sur ma propre thèse, et c'est un pair
+qui m'a fait relire en me forçant à mesurer le rayon d'action.*
+
+> **Ce qui m'a fait trouver le vrai défaut n'est pas un doute sur ma conclusion : c'est une
+> question de PORTÉE — « combien de sites cette variable contamine-t-elle ? »** *La réponse
+> (91 en requête, 1 en courriel, 0 hors requête) a rendu ma thèse intenable en une mesure.*
+
+**Un chiffre de portée aurait dû précéder le dossier, pas le suivre.** *J'avais l'habitude de
+le demander aux autres — « ton compte porte-t-il ses objets ? » — et je ne me l'étais pas
+demandé.*
+
+⛔ **AUCUN FORMULAIRE N'A ÉTÉ SOUMIS.** *Tout est mesuré par `curl` sur des pages de lecture,
+par `artisan tinker`, et par lecture de code. Soumettre `/mot-de-passe-oublie` enverrait un
+courriel à une personne réelle — et, ce défaut étant ce qu'il est, ce serait aussi la
+démonstration qu'on refuse de faire.*
