@@ -322,7 +322,7 @@ déjà* — `Iptables.php:111` et `pare-feu.js:37` le documentent tous les deux.
 > passerait au vert sans rien mesurer.* **Il faut dériver le port depuis la base
 > et chercher CETTE valeur** — sinon la mesure est vraie et vide.
 
-### 8.2 SEC-015 est toujours OUVERT
+### 8.2 ~~SEC-015 est toujours OUVERT~~ — ⛔ FERMÉ 76 MINUTES APRÈS CETTE LIGNE
 
 `backend/iptables_manager.py:126` :
 
@@ -338,6 +338,31 @@ appelants actuels passent un littéral.**
 > sans poser `shlex.quote(dest_path)` ouvrirait la fonctionnalité et retirerait
 > la seule chose qui tenait lieu de barrière : l'absence d'appelant dérivant une
 > destination.*
+
+#### ⛔ RECTIFICATION (2026-09-08) — ce paragraphe est PÉRIMÉ, et de 76 minutes
+
+```
+d636e70d   2026-09-07 22:15:09   cette ligne : « SEC-015 est toujours OUVERT »
+266f21a2   2026-09-07 23:31:56   fix(iptables): SEC-015 — `dest_path` etait
+                                 interpole BRUT dans une commande root
+```
+
+**`shlex.quote(dest_path)` est en place. `shlex` est importé. SEC-015 est FERMÉ.**
+
+> **J'avais raison en l'écrivant, et ma note est fausse 76 minutes plus tard.**
+> *Le pire est que je l'ai RECITÉE aujourd'hui comme un fait courant, pour fonder
+> un argument — en lisant le DOCSTRING de la fonction, qui décrit l'état passé au
+> passé et disait donc vrai.*
+
+**Troisième fois sur ce chantier qu'une prose est prise pour du code — et la
+première où la prose était exacte.** *« Il n'a jamais protégé `dest_path`, qui
+ÉTAIT interpolé brut » est une phrase juste : c'est moi qui l'ai lue au présent.*
+
+⚠ **Et c'est la deuxième fois que MA propre mesure se périme dans l'heure qui
+suit** (la §3.2 de l'audit des gardes croisées était tombée en 8 minutes). *Sur
+un dépôt où huit sessions écrivent, un audit daté à la minute n'est pas une
+précaution de style : c'est la seule chose qui distingue « j'ai mesuré » de « je
+me souviens ».*
 
 ### 8.3 ⛔ POURQUOI JE N'ÉCRIS PAS ENCORE
 

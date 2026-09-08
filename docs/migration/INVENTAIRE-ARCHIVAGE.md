@@ -49,7 +49,7 @@ l'instrument. En cherchant **l'artefact français** (piège 1) et **la couche**
 | geste | verdict | citation `laravel/` |
 |---|---|---|
 | accorder / révoquer l'accès d'un compte à une machine | **PORTÉ** | `routes/web.php:974` → `Services/Permissions.php:213` `definitAcces()`, qui fait `insertOrIgnore` (:222) et `delete` (:227) sur `user_machine_access` |
-| le **préréglage sudo** par couple (compte, machine) | **NON PORTÉ** | `sudo_preset`, `sudo_nopasswd`, `sudo_runas` : 0 occurrence |
+| le **préréglage sudo** par couple (compte, machine) | ~~**NON PORTÉ**~~ → **PORTÉ** (E-494) | ~~`sudo_preset`, `sudo_nopasswd`, `sudo_runas` : 0 occurrence~~ — voir la rectification ci-dessous |
 
 **La garde anti-escalade est portée elle aussi** (`Permissions.php:215`), et le
 portage documente qu'il la relève de `update_server_access.php:66`.
@@ -57,6 +57,46 @@ portage documente qu'il la relève de `update_server_access.php:66`.
 > **Le fichier reste NON ARCHIVABLE — mais pour une raison bien plus étroite que
 > « la seule façon vivante d'accorder un sudo ».** L'octroi d'accès est porté. Ce
 > qui manque est le préréglage sudo, soit trois colonnes.
+
+### ⚠ E-494 — RECTIFICATION : les trois colonnes sont ÉCRITES, la ligne ci-dessus est fausse
+
+*L'énoncé barré est conservé : un plan dont on ne peut plus lire ce qu'il disait avant ne se
+corrige pas, il se réécrit — et personne ne sait plus sur quoi il a décidé.*
+
+**Remesuré le 2026-09-08 sur les 407 fichiers `.php`/`.js` de `laravel/` hors `vendor/`, code
+DÉPOUILLÉ de ses commentaires** (sans quoi les docblocks qui *parlent* de ces colonnes se
+comptent comme des usages) :
+
+    sudo_preset     3   Permissions.php:264 (select) · :266 (lecture) · :322 (ECRITURE)
+    sudo_nopasswd   1   Permissions.php:323 (ECRITURE, derive du prereglage)
+    sudo_runas      1   Permissions.php:324 (ECRITURE, 'root')
+
+    commande :  python3 — 407 fichiers, motif litteral sur contenu depouille
+                puis `grep -n` sur le fichier BRUT pour les lignes citables
+
+**Les TROIS colonnes sont écrites, pas seulement `sudo_preset`.** *La ligne barrée les
+déclarait toutes les trois à zéro ; la rectification qui m'a été transmise n'en avait mesuré
+qu'une.*
+
+⚠ **ET LE PIÈGE DE CITATION, PARCE QU'IL VA MORDRE LE PROCHAIN LECTEUR.** Mon premier relevé
+citait `:128`, `:130`, `:163` — **les lignes du contenu DÉPOUILLÉ, pas du fichier.** Dépouiller
+les commentaires décale la numérotation de près de cent lignes. *Un chiffre juste sur une ligne
+introuvable est pire qu'une absence de citation : le lecteur ouvre, ne trouve rien, et conclut
+que la mesure est fausse.* **Mesurer sur le dépouillé, citer sur le brut.**
+
+### Le geste, lui, est joignable par DEUX chemins portés
+
+    politiques.js  ->  '/policy/sudo/' + geste,  geste ∈ {deploy, remove}
+                       valeurs posees par ouvre('deploy') et ouvre('remove')
+                       ancres politique-deployer / politique-retirer, vue vivante
+    permissions    ->  Permissions.php:322-324 ecrit les trois colonnes
+
+**`sudo_preset` à « 0 occurrence » était un compte de NOM sur un chemin COMPOSÉ** — un motif
+littéral sur `/policy/sudo/deploy` rend zéro sur une capacité entièrement présente. La même
+cause a mordu trois sessions le même tour.
+
+*Conséquence pour ce document : `manage_access.php` reste non archivable pour ses autres
+raisons s'il en a, mais **plus pour le préréglage sudo**. Le vérifier avant de s'en servir.*
 
 ### 1.2 `profile/export.php` — ✅ **confirmée**
 

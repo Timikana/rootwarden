@@ -15621,3 +15621,68 @@ consiste à retirer des fichiers de `legacy/`.*
 les onze items vivent tous dans le portage, et **aucun commit de cette fenêtre ne touche
 `laravel/`**. *Une liste dont les objets n'ont pas bougé ne peut pas avoir changé — c'est
 plus sûr que de rejouer le même `grep`, et ça ne coûte rien.*
+
+## E-493 — Le verrou SMTP est armé, et je ne le désarme pas moi-même
+
+Mesuré le 2026-09-08 11:05-11:25. Détail complet dans
+`DOSSIER-54-LE-VERROU-SMTP-EST-ARME-ET-LE-HOST-N-EST-PAS-EPINGLE.md`.
+
+`route()` bâtit ses URL depuis l'en-tête `Host` (mesuré : `Host: evil.example`
+rend 3 URL absolues en `https://evil.example/…`, le vrai hôte en rend 0),
+`trustHosts` n'est armé nulle part, `Mail::raw` part en ligne, et `mail.default`
+vaut `smtp` avec un hôte et des identifiants réels. Enchaînés : un `Host` forgé
+sur `POST /mot-de-passe-oublie` envoie un vrai courriel dont le lien de
+réinitialisation pointe chez le demandeur.
+
+**Décision : je mesure, je consigne, je ne touche à rien.** Deux des trois
+gestes correctifs sont des recréations de conteneur — hors de mon périmètre. Le
+troisième, épingler les hôtes, casse le portail si sa liste omet l'hôte réel :
+*un correctif de sécurité posé sans relecture sur un service vivant échange un
+risque contre un autre, et le second est immédiat.*
+
+**Ce point périme le ① de `DOSSIER-53`** : « ne pas armer » est devenu « c'est
+armé ».
+
+### ⚠ Et je n'ai pas observé le maillon final
+
+Je n'ai pas vu un courriel partir : le constater exigeait de soumettre le
+formulaire, donc d'écrire à une vraie personne. Le maillon est déduit d'une
+configuration complète. **Cette limite fait partie du résultat.**
+
+## E-494 — Quatre de mes affirmations corrigées en un tour, par les pairs
+
+Consigné ici pour que les corrections ne recirculent pas : une correction n'a
+pas de destinataire naturel.
+
+| ce que je disais | ce qui est mesuré | par |
+|---|---|---|
+| `sudo_preset` = 0 occurrence côté portage, donc l'octroi sudo n'est pas porté | **3** occurrences sur code dépouillé, toutes dans `app/Services/Permissions.php`, dont une **écriture** à `:322` | `c1`, rejoué par moi |
+| l'import CSV n'est pas porté (aucun endpoint backend) | porté **nativement** : `web.php:876` → `ServeursController::importer:101` → `importeCsv:367` → `importeUneLigne:421` → `ajoute():294` → `DB::table('machines')->insert(` | `4f`, chaîne fermée par moi |
+| créer un relevé planifié (ssh_audit) n'a pas de site d'appel | porté : `audit-ssh.js:705` `ecris('/ssh-audit/schedules', corps)` → `ssh_audit.py:819` | `c6` |
+| créer un groupe est une capacité manquante | elle **fonctionne**, relayée par la passerelle (`Route::any` + `LISTE_BLANCHE` + `groups.py:128`). Ce n'est pas « ajouter », c'est « remplacer une capacité relayée par une native » — et poser une route native sans retirer `/groups` de la liste blanche donne **deux écrivains pour un geste** | `ec` |
+
+### La cause commune : j'ai relevé des DÉFINITIONS de helpers pour des sites de geste
+
+`analyse-appelants.mjs` relève les `fetch`. Ce dépôt route presque tout par un
+helper générique, donc le `fetch` littéral n'existe **qu'une fois par module** —
+dans la définition du helper. Les gestes vivent dans ses appelants.
+
+**J'ai vu le symptôme et je l'ai rationalisé.** J'ai écrit « UN seul site d'appel
+pour un module entier » dans mes propres messages de relance, et j'en ai fait une
+ligne de rapport au lieu d'une question. *Formulation d'un pair : « un chiffre
+anormal traité comme un résultat — et l'anomalie était visible dans ta propre
+phrase ».*
+
+C'est ma règle du grain de la mesure, enfreinte **dans le message où je la
+citais**. Voir `feedback_regle_appliquee_en_lisant` : on applique une règle en
+LISANT, jamais en ÉCRIVANT.
+
+### Et la réciproque de ma consigne est fausse
+
+Je disais « apparier contre ce que le JS APPELLE, jamais contre les routes ».
+Vrai : une route qui existe ne dit pas que le geste est porté. **Faux par
+réciproque** : un geste peut être porté sans qu'aucun JS ne l'appelle. `serveurs`
+travaille par **dix `<form>` côté serveur** et n'a qu'un seul `fetch` de sondage
+— apparier contre son JS aurait conclu que rien n'est porté sur un module de 113
+clés. *Ce qui prouve l'atteignabilité est un site d'appel ; un `<form action>` en
+est un.* (mesuré par `4f`)
