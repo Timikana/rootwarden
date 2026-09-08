@@ -215,17 +215,45 @@ fi
 
 run ${DC} --env-file "${ENV_FILE}" ${PROFILE_FLAG} up -d
 
-# ── Etape 5b : restart PHP pour vider l'OPcache ─────────────────────────────
-# Le bind-mount ./legacy:/var/www/html synchronise les fichiers source en temps
-# reel mais PHP-FPM/Apache utilisent OPcache qui garde les versions compilees
-# en memoire. `up -d` ne recreate le container PHP que si l'image a change ;
-# une simple modif PHP (ajout bouton, fix UI, etc.) ne declenche pas le
-# recreate. Sans restart, on sert l'ancienne version pendant des heures.
-# Cout : ~2s. Benefice : zero piege OPcache, le code PHP commit = code servi.
+# ── Etape 5b : redemarrer le service qui ne peut PAS recharger ──────────────
+#
+# ⚠ CE PAS REDEMARRAIT `php` — LE SERVICE DU LEGACY — ET SUR UN MOTIF FAUX.
+#
+# L'ancien commentaire disait : « PHP-FPM/Apache utilisent OPcache qui garde
+# les versions compilees en memoire […] Sans restart, on sert l'ancienne
+# version pendant des heures. » Mesure du 2026-09-08 sur les DEUX conteneurs :
+#
+#     opcache.enable              => On
+#     opcache.validate_timestamps => On      <- OPcache REVALIDE
+#     opcache.revalidate_freq     => 2       <- toutes les 2 secondes
+#     temoin : ini_get("opcache.validate_timestamps") rend "1" — deux lectures
+#     independantes qui concordent
+#
+# Donc PHP n'a jamais servi l'ancienne version « pendant des heures » : au pire
+# DEUX SECONDES. Le pas etait inutile sur son propre motif, ET vise sur le
+# service mort depuis l'extinction.
+#
+# ── LE SERVICE QUI EN A REELLEMENT BESOIN ──────────────────────────────────
+#
+# `python` est monte en bind (`./backend:/app`) et porte :
+#     hypercorn_config.py:14   workers = 4
+#     hypercorn_config.py:17   use_reloader = False
+#
+# Quatre workers gardent en memoire le module importe AU DEMARRAGE, et aucun
+# mecanisme ne le revalide. C'est le raisonnement de l'ancien commentaire,
+# juste, applique au mauvais des deux services montes en bind.
+#
+# ⛔ ET C'EST CE TROU QUI A LAISSE 19 COMMITS `backend/` HORS SERVICE PENDANT
+# 21 HEURES, dont trois correctifs de commande root. Un exploitant lançant
+# `./maj.sh` croyait avoir mis a jour.
+#
+# ⚠ `laravel` n'est PAS redemarre, et c'est MESURE : il revalide comme `php`.
+# L'ajouter serait le meme geste sans fondement, dans l'autre sens.
+# ⚠ `php` n'est plus redemarre : il part avec `patchs-en-attente/07`.
 if [ "$DRY_RUN" -eq 0 ]; then
-    echo -e "${GREEN}[maj]${NC} Vider OPcache PHP (restart container)..."
-    ${DC} --env-file "${ENV_FILE}" ${PROFILE_FLAG} restart php >/dev/null 2>&1 || \
-        echo -e "  ${YELLOW}!${NC} Restart php a echoue (container deja a jour ?)"
+    echo -e "${GREEN}[maj]${NC} Redemarrer le backend Python (workers sans rechargement)..."
+    ${DC} --env-file "${ENV_FILE}" ${PROFILE_FLAG} restart python >/dev/null 2>&1 || \
+        echo -e "  ${YELLOW}!${NC} Restart python a ECHOUE — le code commite n'est PAS en service."
 fi
 
 # ── Etape 5c : bootstrap proxy-internal-legacy si env API_KEY orpheline ─────
@@ -234,7 +262,7 @@ fi
 # contre la table api_keys. Le fallback legacy est opt-in via API_KEY_BOOTSTRAP=1.
 #
 # Probleme decouvert sur prod (v1.21.3) : tant qu'un admin n'a pas cree sa
-# 1ere cle via /adm/api_keys.php (qui auto-insere proxy-internal-legacy), la
+# 1ere cle via /cles-api (qui auto-insere proxy-internal-legacy), la
 # table api_keys reste vide, le proxy PHP envoie l'env API_KEY que personne
 # ne reconnait -> 401 systematique sur toutes les routes (deploy_platform_key,
 # list_machines, etc.). Plus rien ne marche dans l'UI apres maj.
@@ -272,7 +300,7 @@ INSERT IGNORE INTO api_keys (name, key_prefix, key_hash, scope_json, created_by,
 VALUES ('${LEGACY_NAME}', '${LEGACY_PREFIX}', '${LEGACY_HASH}', NULL, NULL, 1);
 SQL
             echo -e "  ${GREEN}OK${NC} cle legacy inseree (scope=NULL, auto_generated=1)."
-            echo -e "  ${YELLOW}Action recommandee${NC} : creer une cle scopee dans /adm/api_keys.php,"
+            echo -e "  ${YELLOW}Action recommandee${NC} : creer une cle scopee dans /cles-api,"
             echo -e "  rotater srv-docker.env:API_KEY puis revoquer ${LEGACY_NAME}."
         fi
     fi
@@ -303,11 +331,11 @@ SQL
             if [ "${CRIT:-0}" != "0" ] && [ "${CRIT:-NULL}" != "NULL" ]; then
                 echo ""
                 echo -e "${RED}[maj]${NC} ${CRIT} cle(s) API actives > 180 jours - rotation recommandee."
-                echo -e "  Aller dans /adm/api_keys.php > Revoquer puis ${CYAN}↻ Renouveler${NC}."
+                echo -e "  Aller dans /cles-api > Revoquer puis ${CYAN}↻ Renouveler${NC}."
             elif [ "${WARN:-0}" != "0" ] && [ "${WARN:-NULL}" != "NULL" ]; then
                 echo ""
                 echo -e "${YELLOW}[maj]${NC} ${WARN} cle(s) API actives entre 90 et 180 jours - pense a les rotater."
-                echo -e "  Voir /adm/api_keys.php."
+                echo -e "  Voir /cles-api."
             fi
         fi
     fi
