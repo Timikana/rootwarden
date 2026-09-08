@@ -14042,3 +14042,70 @@ s'archive et ne se dénie pas.* **Corrigé ce tour** : `E-474`, mon compte de ra
 **Rien de neuf n'attend l'exploitant** au-delà des trois actes déjà écrits, et je ne crée pas
 de dossier pour les redire.
 
+---
+
+## ✅ E-475 — LE DERNIER VERROU DE ⑤ TIENT EN UNE VARIABLE, ET J'AI FAILLI PUBLIER UNE FAUSSE ALARME DESSUS
+
+*Remesure du seul blocage réel restant dans `DOSSIER-48` ⑤ : l'envoi du courriel de
+réinitialisation.*
+
+### La mesure
+
+```
+LEGACY lit   8 variables MAIL_*   MAIL_DEBUG · MAIL_ENABLED · MAIL_FROM · MAIL_SMTP_{HOST,
+                                  PASSWORD, PORT, TLS, USER}
+PORTAGE lit 12                    dont les SIX du SMTP, identiques
+INTERSECTION legacy ∩ portage : 6  — et les 6 sont POSEES dans srv-docker.env.example
+manque : MAIL_MAILER
+```
+
+**Le mappage a été fait le 2026-09-05.** *Le portage lit désormais le SMTP qui tourne déjà
+pour `backend/mail_utils.py` — on ne configure pas un second serveur, on branche le portage
+sur celui qui marche.*
+
+> **Il ne manque qu'une variable, et son absence est DÉLIBÉRÉE.** *`config/mail.php:25-31` :
+> `MAIL_ENABLED` vaut déjà `true`, donc en faire l'interrupteur ferait basculer le transport
+> à l'ENREGISTREMENT du fichier — `laravel/` est monté en direct et Laravel relit `config/` à
+> chaque requête.* **« Le mappage rend CAPABLE ; l'exploitant ARME. »**
+
+### ⚠ ET J'AI FAILLI CORRIGER UN COMMENTAIRE QUI EST JUSTE
+
+*Le bloc porte « ce fichier en LISAIT 15 autres — INTERSECTION ZERO ». **J'ai lu un imparfait
+comme un présent** et j'allais inscrire que le commentaire mentait.*
+
+```
+« en LISAIT »   -> l'etat AVANT le mappage du 05/09, que ce commentaire DOCUMENTE
+« en LIT »      -> ce que j'ai cru lire
+```
+
+**Un temps verbal était toute la différence** — et j'avais déjà mesuré l'intersection à 6
+avant de le lire, donc les deux se contredisaient sous mes yeux. *C'est la faute que je
+relève chez les autres depuis deux jours : conclure avant d'avoir lu, et ne pas réconcilier
+deux sorties qui se contredisent.*
+
+### Ce que le commentaire m'apprend, et que je ne savais pas
+
+⚠ **Armer le SMTP a un effet de bord documenté** :
+
+```
+ce conteneur tourne sous `mod_php`, SANS php-fpm
+=> pas de fastcgi_finish_request()
+=> le travail differe part apres l'ECRITURE de la reponse, pas apres sa FIN
+=> un oracle temporel se rouvre sur la recuperation de compte (DOSSIER-24)
+```
+
+**Ce n'est pas une raison de ne pas armer. C'est une chose à savoir en armant** — et elle
+appartient à l'exploitant, comme le geste.
+
+### Donc, pour la séquence
+
+```
+⑤ le seul verrou reel   MAIL_MAILER=smtp dans srv-docker.env, puis recreer
+                        (env_file est lu a la CREATION, pas au redemarrage)
+                        ⚠ avec l'oracle temporel ci-dessus a l'esprit
+```
+
+**Rien d'autre n'attend dans ⑤.** *Les trois autres « capacités sans équivalent » étaient
+réfutées une heure plus tôt ; celle-ci est réelle, précise, et tient en une ligne de
+configuration.*
+
