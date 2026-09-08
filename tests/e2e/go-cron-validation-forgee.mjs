@@ -108,8 +108,23 @@ if (SURCHARGE) {
  * Un `.py` est lu au DEMARRAGE. Mesure du 2026-09-08 12:20 :
  *
  *     backend/hypercorn_config.py:17   use_reloader = False   (4 workers)
- *     rootwarden_python StartedAt      2026-09-07T12:53:00Z
- *     validateurs ecrits               2026-09-08 12:16 CEST  = 21 h APRES
+ *     rootwarden_python StartedAt      2026-09-07T12:53:00Z   (UTC)
+ *     mtime backend/routes/updates.py  2026-09-08T10:16:06Z   (UTC)
+ *     ecart                            76986 s = 21 h 23 min APRES
+ *
+ * ⚠ LES DEUX HORODATAGES SONT EN UTC, ET CE N'EST PAS UN DETAIL. Le premier
+ * jet de cette mesure comparait un `mtime` en CEST (12:16:06 +0200) au
+ * `StartedAt` en UTC (12:53:00). Contre-epreuve jouee :
+ *
+ *     comparaison naive des heures locales -> « 12:16 < 12:53 »
+ *     -> « le fichier PRECEDE le demarrage » -> VERDICT INVERSE
+ *
+ * Ma conclusion ne tenait que parce que le JOUR differait. Sur deux
+ * horodatages du meme jour, elle basculait — et rien dans la sortie ne l'aurait
+ * signale.
+ *
+ * > Deux horloges dans une meme comparaison ne se voient pas : elles rendent un
+ * > verdict plausible. Les convertir DANS LA MEME COMMANDE, ou ne pas comparer.
  *
  * `backend/` est monte en bind sur `/app`, donc le FICHIER du conteneur est
  * celui de l'arbre — 3 occurrences des deux cotes. **Mais les quatre workers
