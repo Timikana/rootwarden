@@ -16,6 +16,65 @@ réel.*
 
 ---
 
+## ⚡ ÉTAT D'ENTRÉE — mesuré le 2026-09-08 à 06:4x, chaque ligne avec sa commande
+
+> ⚠ **Ce bloc est en tête parce que le reste de ce dossier a été écrit entre 02:32 et 03:02,
+> AVANT I5 (04:34), I6 (04:49) et le retrait de l'encart (06:08).** *Son étape ① se lit encore
+> comme à faire.* **Une séquence qui présente une étape close comme ouverte fait
+> recommencer.*
+
+```
+⓪  LE VERROU                                          ⛔ L'EXPLOITANT — inchange
+①  Porter I5, avec Q1–Q4                              ✅ FAIT
+      pare-feu.js code depouille : iptables-validate 1 · apply 1 · rollback 1
+                                   pare-feu/version 1  (le chemin de LECTURE)
+      Q1 pare-feu-gabarits.js · Q2 pare-feu-ssh-ouvert.js · Q3 pare-feu-retour-visible.js
+      + les 4 epreuves dans laravel/tests/Outils/, les 7 du preflight a 0
+②  Archiver legacy/iptables/                           ✅ DEBLOQUEE
+      2 fichiers suivis · lien entrant du portage : 0 dans le CODE
+      (2 occurrences de `/iptables/` dans pare-feu.blade.php, les DEUX en
+       commentaire Blade — depouille : 0 · url_legacy : 0 partout)
+③  adm/api/notifications.php                           ✅ DEBLOQUEE
+      ses gestes cote portage : 7 routes, dont Route::delete(…'supprimer')
+      ⚠ le legacy n'y fait que UPDATE (marquer lu) et DELETE — aucun INSERT :
+        il n'est l'ecrivain exclusif de rien
+④  api_proxy.php                                       ✅ DEBLOQUEE
+      le portage a sa passerelle : Route::any('/api/gateway/{chemin?}')
+⑤  La chaine d'authentification                        ✅ DEBLOQUEE
+      legacy/auth : 10 fichiers suivis
+      legacy/lang : 3 a la racine (.htaccess + en.php + fr.php) + 74 CATALOGUES
+      les 74 sont atteints par glob(__DIR__ . '/{fr,en}/*.php') — AUCUN fichier
+      ne les NOMME : ils meurent avec leurs deux chargeurs
+      ⚠ « 74 » est exact — mesure par profondeur de chemin, pas par pathspec :
+        `git ls-files 'legacy/lang/*.php'` en rend 76, une pathspec git n'est
+        PAS un glob shell et son `*` traverse les `/`
+⑥  _sortie.php, avec le vhost                          ⛔ EN DERNIER
+      legacy/.htaccess:43   ErrorDocument 404 /_sortie.php
+```
+
+### Les SEPT espèces de dépendance, et non cinq
+
+**Ce dossier en listait cinq ; j'en avais mesuré cinq AUTRES et déclaré l'ensemble clos.**
+*L'union en fait sept, et deux n'avaient jamais été mesurées avant le 2026-09-08 06:3x.*
+
+```
+1  require / include                    les 11 racines           ✅
+2  appel HTTP                           backend -> legacy : 0    ✅
+3  lien entrant du portage              1, puis 0 (b14767f4)     ✅
+4  chemin CONSTRUIT par glob()          2 appels reels           ✅ mesure le 08/09
+     TEMOIN+ 183 occurrences du mot « glob » dans legacy/, dont 2 sont des appels
+5  configuration du SERVEUR             ErrorDocument, etape ⑥   ✅ mesure le 08/09
+6  URL composee pour un COURRIEL        ⛔ DEFAUT REEL, tenu ferme par MAIL_MAILER=log
+7  ecrivain exclusif en BASE            le legacy ne l'est de rien ✅
+```
+
+> **Seule la sixième porte un défaut vivant** — l'hôte du lien de réinitialisation est fourni
+> par le demandeur (`DOSSIER-52`). **Elle n'est pas un obstacle à l'extinction : elle est un
+> obstacle à l'ARMEMENT DE SMTP.** *Les deux sont indépendants et ne doivent pas être
+> confondus dans la même attente.*
+
+---
+
 ## L'état, mesuré et corrigé
 
 ```
