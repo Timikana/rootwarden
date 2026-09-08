@@ -19,7 +19,7 @@ _JAIL_RE = re.compile(r'^[a-zA-Z0-9_-]+$')
 def _validate_jail(jail: str) -> str:
     """Valide le nom d'un jail contre l'injection de commandes."""
     jail = jail.strip()
-    if not _JAIL_RE.match(jail):
+    if not _JAIL_RE.fullmatch(jail):
         raise ValueError(f"Nom de jail invalide : {jail!r}")
     return jail
 

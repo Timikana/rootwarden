@@ -430,7 +430,7 @@ def ssh_audit_fix():
         return jsonify({'success': False, 'message': f"Directive '{directive}' non autorisee."}), 400
 
     # Validation valeur
-    if not VALUE_RE.match(value):
+    if not VALUE_RE.fullmatch(value):
         return jsonify({'success': False, 'message': f"Valeur '{value}' contient des caracteres non autorises."}), 400
 
     ip, port, user, ssh_pass, root_pass, svc, mid, err = _resolve_ssh_creds(data)
