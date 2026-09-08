@@ -298,6 +298,101 @@ if (inertes.length) {
     process.exit(2);
 }
 
+/*
+ * ⚠ LE CLASSEUR AUSSI DOIT PROUVER QU'IL DISTINGUE — TEMOIN FORGE, 2026-09-08.
+ *
+ * Les formes ci-dessus prouvent qu'on EXTRAIT. `etat()` decide ensuite si une
+ * cible est VIVANTE, ARCHIVEE ou INCONNUE, et rien ne prouvait qu'il sache les
+ * distinguer. C'est pourtant lui qui fabrique le verdict : une extraction
+ * parfaite et un classeur casse rendent « aucun lien mort ».
+ *
+ * Ce defaut s'est deja produit ici. `ARCHIVE` etait derive de la portee : en la
+ * restreignant, il pointait un repertoire inexistant, `etat()` ne rendait plus
+ * jamais ARCHIVE, et les liens morts passaient en INCONNU — donc au VERT.
+ *
+ * ══ POURQUOI FORGE, ET NON EMPRUNTE AU PARC ═══════════════════════════════
+ *
+ * Le temoin precedent exigeait « au moins un lien vers une cible VIVANTE ».
+ * Cette premisse a expire le 2026-09-08 : les archivages successifs ont eteint
+ * le dernier lien vivant du legacy, et la suite rendait 2 — « je n'ai pas pu
+ * mesurer » — sur un parc parfaitement mesurable.
+ *
+ * > Un temoin EMPRUNTE au parc se perime quand le parc change. Et ici le parc
+ * > change PARCE QU'ON L'ETEINT : le temoin devenait faux du fait meme du
+ * > travail qu'il surveille.
+ *
+ * Le remplacer par un vivier plus large — les actifs statiques — ne fait que
+ * repousser l'echeance : il redeviendra muet quand ceux-la partiront.
+ *
+ * ══ CE QUI NE SE PERIME PAS ═══════════════════════════════════════════════
+ *
+ * Les cibles du temoin sont DERIVEES DE L'ARBRE, jamais ecrites en dur : un
+ * `.php` quelconque pris parmi les fichiers servis, un `.php` quelconque pris
+ * sous `_deprecated`, et un chemin qui ne peut pas exister. Aucune de ces trois
+ * ne depend d'un LIEN, ni d'un fichier NOMME.
+ *
+ * **Elles tiennent aussi longtemps que les deux repertoires ont un contenu — et
+ * quand le legacy n'aura plus un seul `.php` servi, ce controle n'aura plus rien
+ * a surveiller.** Le temoin s'eteint alors avec son objet, pas avant lui : c'est
+ * la difference entre une premisse qui expire et une premisse qui se conclut.
+ *
+ * ⚠ ET IL NE FORGE AUCUN FICHIER. Ecrire un `.php` temoin dans `legacy/` serait
+ * ecrire dans le perimetre d'une autre session, et un fichier oublie apres un
+ * plantage deviendrait un faux VIVANT permanent. On derive de ce qui est deja
+ * la ; on n'ajoute rien qu'il faudrait ensuite retirer.
+ */
+function unPhpSous(racine) {
+    const pile = [racine];
+    while (pile.length) {
+        const d = pile.pop();
+        let entrees;
+        try { entrees = readdirSync(d, { withFileTypes: true }); } catch { continue; }
+        for (const e of entrees) {
+            const p = join(d, e.name);
+            if (e.isDirectory()) {
+                /* `_deprecated` est DANS `legacy` : sans ca le temoin VIVANT
+                 * pourrait etre pioche parmi les archives, et prouverait
+                 * l'inverse de ce qu'il annonce. */
+                if (racine === LEGACY && p === ARCHIVE) continue;
+                pile.push(p); continue;
+            }
+            if (e.name.endsWith('.php')) return p;
+        }
+    }
+
+    return null;
+}
+
+const vivantForge  = unPhpSous(LEGACY);
+const archiveForge = unPhpSous(ARCHIVE);
+const attendus = [
+    ['VIVANT',  vivantForge,  LEGACY],
+    ['ARCHIVE', archiveForge, ARCHIVE],
+];
+const casses = [];
+for (const [classe, absolu, base] of attendus) {
+    if (absolu === null) {
+        casses.push(`${classe} : aucun .php sous ${base.replace(RACINE, '')} — rien a en deriver`);
+        continue;
+    }
+    const url = '/' + absolu.replace(base, '').replace(/^\//, '');
+    const rendu = etat(url);
+    if (rendu !== classe) casses.push(`${classe} : etat("${url}") rend ${rendu}`);
+}
+/* Et l'INCONNU, qui n'a pas besoin de l'arbre : il a besoin de son absence. */
+{
+    const url = '/zzz-temoin-qui-ne-peut-pas-exister/' + 'aucun'.repeat(3) + '.php';
+    const rendu = etat(url);
+    if (rendu !== 'INCONNU') casses.push(`INCONNU : etat("${url}") rend ${rendu}`);
+}
+if (casses.length) {
+    console.log('\n⛔ LE CLASSEUR NE DISTINGUE PAS LES TROIS ETATS :');
+    for (const c of casses) console.log(`   ${c}`);
+    console.log('   Les motifs peuvent extraire parfaitement : le verdict serait faux');
+    console.log('   quand meme. NE RIEN CONCLURE.');
+    process.exit(2);
+}
+
 console.log(`PORTEE DECLAREE : legacy/ (hors _deprecated) — ${lus.length} fichiers lus`);
 console.log(`FORMES LUES     : ${FORMES.map((f) => f.nom).join(' · ')}`);
 console.log('  un vert ne dit pas « aucun lien mort » : il dit « aucun, dans ces formes-la ».');
