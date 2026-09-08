@@ -1044,6 +1044,36 @@
     /** La version lue et son verdict. `null` tant que rien n'est restaurable. */
     var versionCourante = null;
 
+    /*
+     * ══ LE JETON DE LECTURE — POURQUOI UN COMPTEUR ET PAS TROIS DESARMEMENTS ══
+     *
+     * `rbRemetAZero()` desarmait deja tout AVANT la lecture. C'est juste pour un
+     * enchainement sequentiel, et FAUX en concurrence : la lecture est
+     * asynchrone, et les trois chemins de REFUS du `.then()` rendaient la main
+     * sans rien desarmer.
+     *
+     *     1. clic sur la version B      -> requete B partie
+     *     2. clic sur la version A      -> rbRemetAZero() desarme, requete A partie
+     *     3. la reponse B arrive TARD   -> Q2 vrai -> versionCourante = B, bouton ACTIF
+     *     4. la reponse A arrive        -> affiche A et « SSH ferme », NE DESARME PAS
+     *
+     *     -> l'ecran montre A et son REFUS, le bouton est arme sur B.
+     *        L'operateur lit un refus, voit un bouton actif, clique, et applique
+     *        un jeu de regles de pare-feu QU'IL N'A PAS LU.
+     *
+     * Desarmer dans les trois refus serait EXHAUSTIF : juste tant que personne
+     * n'ajoute un quatrieme chemin de sortie. Le jeton rend la reponse perimee
+     * INEXPRIMABLE — elle ne peut plus rien ecrire du tout, pas meme l'apercu.
+     * C'est le rang que ce depot prefere : inexprimable > derive > exhaustif.
+     *
+     * ⚠ ET IL VIT DANS `rbRemetAZero()`, PAS DANS `litLaVersion()`. Les deux
+     * appelants comptent : changer de machine (`:211`) perime aussi une lecture
+     * en vol, et le docblock de ce site le disait deja — « changer de cible
+     * perime donc tout ». Le jeton ne fait qu'y ajouter ce qui n'etait pas encore
+     * arrivable au moment ou il a ete ecrit.
+     */
+    var jetonLecture = 0;
+
     function rbDire(texte, variante) {
         if (!rbAnnonce) { return; }
         rbAnnonce.textContent = texte || '';
@@ -1056,6 +1086,8 @@
     }
 
     function rbRemetAZero() {
+        // Toute lecture en vol devient perimee ICI : voir le docblock du jeton.
+        jetonLecture += 1;
         versionCourante = null;
         if (sectionRb) { sectionRb.hidden = true; }
         if (rbApercu) { rbApercu.textContent = ''; }
@@ -1076,11 +1108,21 @@
         var id = selecteur ? selecteur.value : '';
         if (!id) { rbDire(t('aucune_machine_choisie'), 'echec'); return; }
         rbRemetAZero();
+        // APRES le remise a zero : c'est elle qui incremente le jeton.
+        var mien = jetonLecture;
         if (sectionRb) { sectionRb.hidden = false; }
         rbDire(t('rb_lecture'));
 
         appellePortage('/pare-feu/version', { machine_id: Number(id), version_id: Number(versionId) })
             .then(function (r) {
+                /*
+                 * ⛔ PREMIERE INSTRUCTION, AVANT TOUT RENDU. Un seul `textContent`
+                 * place au-dessus et le jeton ne gouvernerait pas CE rendu-la :
+                 * la garde doit dominer TOUS les chemins de sortie qui la suivent,
+                 * et elle ne les domine que si rien ne la precede.
+                 */
+                if (mien !== jetonLecture) { return; }
+
                 var corps = r.corps || {};
                 if (r.statut !== 200 || corps.success !== true) {
                     // Le serveur rend deja sa phrase ; on ne la reformule pas.

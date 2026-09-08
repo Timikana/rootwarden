@@ -5,6 +5,54 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## I6 — le désarmement existait et ne gouvernait pas la concurrence
+
+Le retour arrière désarmait déjà tout **avant** la lecture. C'est juste pour un enchaînement
+séquentiel, et faux dès que deux lectures se chevauchent : la lecture est asynchrone, et les
+**trois chemins de refus** rendaient la main sans rien désarmer.
+
+    1. clic sur la version B      -> requete B partie
+    2. clic sur la version A      -> desarme, requete A partie
+    3. la reponse B arrive TARD   -> Q2 vrai -> arme sur B, bouton ACTIF
+    4. la reponse A arrive        -> affiche A et « SSH ferme », NE DESARME PAS
+
+    -> l'ecran montre A et son REFUS, le bouton est arme sur B
+
+**L'opérateur lit un refus, voit un bouton actif, clique — et applique un jeu de règles de
+pare-feu qu'il n'a pas lu.** Un double clic suffit.
+
+### Le jeton, et pourquoi pas trois désarmements
+
+Désarmer dans les trois refus serait **exhaustif** : juste tant que personne n'ajoute un
+quatrième chemin de sortie. Un compteur incrémenté à chaque remise à zéro, capturé avant
+l'appel et contrôlé **en première instruction** du `.then()`, rend la réponse périmée
+**inexprimable** — elle ne peut plus rien écrire, pas même l'aperçu, ce que le seul
+désarmement laissait passer.
+
+Il vit dans `rbRemetAZero()` et non dans la lecture : **les deux appelants comptent.** Changer
+de machine périme aussi une lecture en vol, et le docblock de ce site le disait déjà — *« changer
+de cible périme donc tout »*. Le jeton n'y ajoute que ce qui n'était pas encore arrivable quand
+il a été écrit.
+
+### Ce qui n'a pas été fait, et pourquoi
+
+**La course n'est pas reproduite.** `pare-feu.js` n'expose rien sur `globalThis` et n'est pas
+chargeable seul ; un banc sur une copie de l'ordonnancement testerait la copie. Ce qui restait à
+établir n'était plus « la course arrive-t-elle » mais « le jeton domine-t-il tous les chemins de
+rendu » — et cela se lit. Quatre contrôles structurels, avec leur contre-épreuve : retirer la
+garde change bien la première instruction mesurée.
+
+**Aucune requête ajoutée.** `/iptables-` est une entrée à **préfixe** de la liste blanche : le
+même préfixe ouvre `validate`, `apply` et `rollback` sans les distinguer, et ce qui tient est que
+ce script n'en compose aucune autre — la fermeture **par l'absence**. Un correctif qui aurait
+ajouté un appel l'aurait annulée sans que rien ne le signale. Le diff est purement additif.
+
+**Correction d'un motif que j'avais transmis faux** : « le seul des cinq gestes sans aucune
+garde, un `confirm()` puis la requête » décrit le **legacy**. Le portage a un consentement et
+appelle `/iptables-validate`. *Un motif faux voyage avec l'autorité de la trouvaille juste qu'il
+accompagne.* L'asymétrie réelle est ailleurs : `restaure()` appelle `/iptables-rollback` sans
+validation, là où le chemin `apply` valide — et elle n'est pas refermée ici.
+
 ## Le dernier fil — l'encart tombe, et le parcours de I6 est mesuré
 
 Deux choses que l'entrée précédente déclarait non faites.
