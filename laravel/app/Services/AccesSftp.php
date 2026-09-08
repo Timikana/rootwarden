@@ -68,9 +68,46 @@ use Illuminate\Support\Facades\DB;
  * valider la configuration COMPLETE, et ne deplace qu'ensuite. Un bloc syntaxi-
  * quement invalide ne peut pas fermer l'acces SSH a la machine.
  *
- * Les chemins `chroot_dir` et `working_dir` passent par `_validate_path` :
- * absolu, sans traversee. C'est verifie AU BACKEND, donc une requete forgee ne
- * le contourne pas.
+ * ⚠ CE QUE CE COMMENTAIRE AFFIRMAIT, ET QUI ETAIT FAUX A MOITIE.
+ *
+ * Il disait : « les chemins `chroot_dir` ET `working_dir` passent par
+ * `_validate_path` […] verifie AU BACKEND, donc une requete forgee ne le
+ * contourne pas. » **Vrai pour `chroot_dir`, FAUX pour `working_dir` quand
+ * `sftp_only` est vrai.** Mesure du 2026-09-08 sur `backend/sftp_manager.py` :
+ *
+ *     :127  working_dir = policy.get('working_dir')     de la BASE, non valide
+ *     :151  if sftp_only:
+ *     :153      "ForceCommand internal-sftp" + f" -d {working_dir}"   BRUT
+ *     :157  elif working_dir:
+ *     :158      working_dir = _validate_path(working_dir, 'working_dir')
+ *     :162      lines.append(f"    # working_dir={working_dir} …")    COMMENTAIRE
+ *
+ * **La validation est presente exactement la ou la valeur est inoffensive, et
+ * absente exactement la ou elle est employee.** Et `routes/policies.py:370`
+ * prend `data.get('working_dir')` brut a l'ecriture.
+ *
+ * ⚠ CE N'EST PAS UNE INJECTION DE SHELL — le contenu part par un heredoc CITE.
+ * C'est une injection dans `sshd_config` : un saut de ligne ecrit des directives
+ * arbitraires dans le bloc `Match User`, et un `reload` suit. `sshd -t` valide la
+ * SYNTAXE, pas l'intention : `AllowTcpForwarding yes` est syntaxiquement parfait.
+ *
+ * ⚠ BORNE DE SEVERITE, pour ne ni dramatiser ni minimiser : la page est en
+ * `ROLE_SUPERADMIN` et les routes en `@require_role(3)`. **Ce n'est donc pas une
+ * elevation de privilege, c'est un defaut de defense en profondeur** — un role 3
+ * peut ecrire des directives sshd par un champ qui n'est pas fait pour ca.
+ *
+ * ⚠ ET LE CORRECTIF N'EST PAS DE MON COTE. Il vit dans `backend/sftp_manager.py`,
+ * hors de mon perimetre d'ecriture. Ce commentaire dit donc l'etat REEL en
+ * attendant, plutot que de promettre un controle absent : **un commentaire qui
+ * affirme plus que le code est pire que pas de commentaire — il dispense le
+ * lecteur de verifier.**
+ *
+ * Ce qui EST vrai aujourd'hui : `chroot_dir` passe par `_validate_path`, et
+ * cette fonction est saine — eprouve le 2026-09-08, les deux sens :
+ * saut de ligne AU MILIEU refuse, traversee refusee, chemin nominal ACCEPTE
+ * (`_PATH_RE` sans `re.MULTILINE`, donc `$` ne s'apparie pas en milieu de
+ * chaine). Le correctif consiste donc a la faire DOMINER les deux branches, pas
+ * a en ecrire une nouvelle.
  */
 class AccesSftp
 {
