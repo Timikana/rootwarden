@@ -71,6 +71,13 @@ for _r in AUDIT_RULES:
     ALLOWED_VALUES[_r['key']] = _r.get('fix', '')
 VALUE_RE = re.compile(r'^[a-zA-Z0-9/._-]+$')  # Fallback regex si pas dans whitelist
 
+# Le format d'horodatage des sauvegardes de `sshd_config`. PARTAGE entre le
+# producteur (`backup_sshd_config`) et le validateur (`_BACKUP_NAME_RE`) :
+# c'est leur DESACCORD qui rendait la restauration impossible. Pose en tete de
+# module et non pres du validateur, pour qu'il precede son premier usage a la
+# lecture comme a l'execution.
+_BACKUP_TS_FORMAT = '%Y%m%d_%H%M%S'
+
 
 # ── Parsing ───────────────────────────────────────────────────────────────────
 
@@ -259,7 +266,7 @@ def backup_sshd_config(client, root_pass):
 
     Retourne le chemin du fichier backup.
     """
-    timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+    timestamp = datetime.datetime.now().strftime(_BACKUP_TS_FORMAT)
     backup_path = f"/etc/ssh/sshd_config.bak.{timestamp}"
     cmd = f"cp /etc/ssh/sshd_config {backup_path}"
     _, stderr, rc = execute_as_root(client, cmd, root_pass, logger=_log)
@@ -318,6 +325,11 @@ def apply_fix(client, root_pass, key, value):
     _, stderr, rc = execute_as_root(client, fix_cmd, root_pass, logger=_log)
     if rc != 0:
         _log.error("Echec modification sshd_config pour %s: %s", key, stderr)
+        #   `backup_path` sort de `backup_sshd_config`, qui le construit d'un
+        #   horodatage SERVEUR : `f"/etc/ssh/sshd_config.bak.{strftime(_BACKUP_TS_FORMAT)}"`.
+        #   `%Y%m%d_%H%M%S` ne rend que des chiffres et un souligne — aucun
+        #   metacaractere n'y est exprimable. C'est l'ORIGINE qui neutralise.
+        # nosemgrep: rw-shell-fstring-execute-as-root
         execute_as_root(client, f"cp {backup_path} /etc/ssh/sshd_config", root_pass, logger=_log)
         return False, f"Echec de la modification: {stderr}"
 
@@ -325,6 +337,11 @@ def apply_fix(client, root_pass, key, value):
     _, sshd_err, rc_t = execute_as_root(client, "/usr/sbin/sshd -t", root_pass, logger=_log)
     if rc_t != 0:
         _log.warning("sshd -t echoue apres modification de %s: %s - restauration du backup", key, sshd_err)
+        #   `backup_path` sort de `backup_sshd_config`, qui le construit d'un
+        #   horodatage SERVEUR : `f"/etc/ssh/sshd_config.bak.{strftime(_BACKUP_TS_FORMAT)}"`.
+        #   `%Y%m%d_%H%M%S` ne rend que des chiffres et un souligne — aucun
+        #   metacaractere n'y est exprimable. C'est l'ORIGINE qui neutralise.
+        # nosemgrep: rw-shell-fstring-execute-as-root
         execute_as_root(client, f"cp {backup_path} /etc/ssh/sshd_config", root_pass, logger=_log)
         return False, f"Configuration invalide apres modification: {sshd_err}"
 
@@ -357,6 +374,11 @@ def save_sshd_config(client, root_pass, new_config):
     cmd = f"printf '%s' '{b64}' | base64 -d > /etc/ssh/sshd_config"
     _, stderr, rc = execute_as_root(client, cmd, root_pass, logger=_log)
     if rc != 0:
+        #   `backup_path` sort de `backup_sshd_config`, qui le construit d'un
+        #   horodatage SERVEUR : `f"/etc/ssh/sshd_config.bak.{strftime(_BACKUP_TS_FORMAT)}"`.
+        #   `%Y%m%d_%H%M%S` ne rend que des chiffres et un souligne — aucun
+        #   metacaractere n'y est exprimable. C'est l'ORIGINE qui neutralise.
+        # nosemgrep: rw-shell-fstring-execute-as-root
         execute_as_root(client, f"cp {backup_path} /etc/ssh/sshd_config", root_pass, logger=_log)
         return False, f"Write failed: {stderr}"
 
@@ -364,6 +386,11 @@ def save_sshd_config(client, root_pass, new_config):
     _, sshd_err, rc_t = execute_as_root(client, "/usr/sbin/sshd -t", root_pass, logger=_log)
     if rc_t != 0:
         _log.warning("sshd -t failed after save - restoring backup")
+        #   `backup_path` sort de `backup_sshd_config`, qui le construit d'un
+        #   horodatage SERVEUR : `f"/etc/ssh/sshd_config.bak.{strftime(_BACKUP_TS_FORMAT)}"`.
+        #   `%Y%m%d_%H%M%S` ne rend que des chiffres et un souligne — aucun
+        #   metacaractere n'y est exprimable. C'est l'ORIGINE qui neutralise.
+        # nosemgrep: rw-shell-fstring-execute-as-root
         execute_as_root(client, f"cp {backup_path} /etc/ssh/sshd_config", root_pass, logger=_log)
         return False, f"Config invalid (sshd -t): {sshd_err}"
 
@@ -391,12 +418,22 @@ def toggle_directive(client, root_pass, key, enable):
 
     _, stderr, rc = execute_as_root(client, cmd, root_pass, logger=_log)
     if rc != 0:
+        #   `backup_path` sort de `backup_sshd_config`, qui le construit d'un
+        #   horodatage SERVEUR : `f"/etc/ssh/sshd_config.bak.{strftime(_BACKUP_TS_FORMAT)}"`.
+        #   `%Y%m%d_%H%M%S` ne rend que des chiffres et un souligne — aucun
+        #   metacaractere n'y est exprimable. C'est l'ORIGINE qui neutralise.
+        # nosemgrep: rw-shell-fstring-execute-as-root
         execute_as_root(client, f"cp {backup_path} /etc/ssh/sshd_config", root_pass, logger=_log)
         return False, f"Toggle failed: {stderr}"
 
     # Validate
     _, sshd_err, rc_t = execute_as_root(client, "/usr/sbin/sshd -t", root_pass, logger=_log)
     if rc_t != 0:
+        #   `backup_path` sort de `backup_sshd_config`, qui le construit d'un
+        #   horodatage SERVEUR : `f"/etc/ssh/sshd_config.bak.{strftime(_BACKUP_TS_FORMAT)}"`.
+        #   `%Y%m%d_%H%M%S` ne rend que des chiffres et un souligne — aucun
+        #   metacaractere n'y est exprimable. C'est l'ORIGINE qui neutralise.
+        # nosemgrep: rw-shell-fstring-execute-as-root
         execute_as_root(client, f"cp {backup_path} /etc/ssh/sshd_config", root_pass, logger=_log)
         return False, f"Config invalid after toggle: {sshd_err}"
 
@@ -425,7 +462,34 @@ def list_backups(client, root_pass):
     return sorted(backups, key=lambda b: b['filename'], reverse=True)
 
 
-_BACKUP_NAME_RE = re.compile(r'^sshd_config\.bak\.\d{14}$')
+# ══ LE VALIDATEUR REFUSAIT TOUTE SAUVEGARDE QUE LE SYSTEME PRODUIT ══════════
+#
+# Il valait `^sshd_config\.bak\.\d{14}$` — QUATORZE chiffres, sans souligne.
+# Or `backup_sshd_config` produit `%Y%m%d_%H%M%S`, soit HUIT chiffres, un
+# souligne, SIX chiffres :
+#
+#   produit   sshd_config.bak.20260909_003720   <- 15 caracteres, avec « _ »
+#   accepte   sshd_config.bak.20260909003720    <- 14 chiffres, sans « _ »
+#   verdict   REFUSE
+#
+# `restore_backup` rendait donc « Invalid backup name » pour CHAQUE sauvegarde
+# reelle, et `:411` les LISTE a l'ecran : l'interface montrait des sauvegardes
+# qu'on ne pouvait jamais restaurer. Le chemin de repli d'un `sshd_config`
+# casse etait mort.
+#
+# ⚠ CE N'EST PAS UNE REGRESSION : le producteur n'a JAMAIS eu d'autre format.
+#   Mesure du 2026-09-09 sur l'historique entier du fichier — six commits le
+#   touchent, tous avec `strftime('%Y%m%d_%H%M%S')`, depuis `9e85bfdb`
+#   (2026-04-10). Le validateur a ete ajoute PLUS TARD par `1df4aca4`, contre
+#   un format qui n'a jamais existe. La restauration est morte depuis son
+#   ecriture, et rien ne le signalait : un garde qui refuse TOUT rend la meme
+#   sortie qu'un garde correct sur une entree invalide.
+#
+# LE FORMAT EST DESORMAIS UNE CONSTANTE PARTAGEE, et `tests/test_ssh_audit_
+# sauvegardes.py` asserte le ALLER-RETOUR : ce que le producteur ecrit doit
+# etre accepte par le validateur. C'est ce test-la qui manquait — pas un
+# motif plus juste, mais un LIEN entre les deux bouts.
+_BACKUP_NAME_RE = re.compile(r'^sshd_config\.bak\.\d{8}_\d{6}$')
 
 def restore_backup(client, root_pass, backup_name):
     """Restore a backup file to sshd_config. Validate with sshd -t."""
@@ -436,6 +500,13 @@ def restore_backup(client, root_pass, backup_name):
     backup_path = f"/etc/ssh/{backup_name}"
 
     # Check backup exists
+    #   `backup_path` = `f"/etc/ssh/{backup_name}"`, et `backup_name` est passe
+    #   par `_BACKUP_NAME_RE.fullmatch` quatre lignes plus haut :
+    #   `^sshd_config\.bak\.\d{8}_\d{6}$`. Epreuve du 2026-09-09 : `../../etc/
+    #   passwd`, `/etc/passwd`, `…; id`, `…$(id)`, backtick, espace et `\n` final
+    #   sont TOUS refuses. C'est le REJET qui neutralise — et c'est un garde
+    #   ANTI-TRAVERSEE, pas seulement anti-injection.
+    # nosemgrep: rw-shell-fstring-execute-as-root
     _, _, rc = execute_as_root(client, f"test -f {backup_path}", root_pass, logger=_log, timeout=5)
     if rc != 0:
         return False, f"Backup not found: {backup_name}"
@@ -448,6 +519,11 @@ def restore_backup(client, root_pass, backup_name):
         pass  # Not critical
 
     # Restore
+    #   `backup_path` sort de `backup_sshd_config`, qui le construit d'un
+    #   horodatage SERVEUR : `f"/etc/ssh/sshd_config.bak.{strftime(_BACKUP_TS_FORMAT)}"`.
+    #   `%Y%m%d_%H%M%S` ne rend que des chiffres et un souligne — aucun
+    #   metacaractere n'y est exprimable. C'est l'ORIGINE qui neutralise.
+    # nosemgrep: rw-shell-fstring-execute-as-root
     _, stderr, rc = execute_as_root(client, f"cp {backup_path} /etc/ssh/sshd_config", root_pass, logger=_log)
     if rc != 0:
         return False, f"Restore failed: {stderr}"
@@ -457,6 +533,11 @@ def restore_backup(client, root_pass, backup_name):
     if rc_t != 0:
         # Restore the current backup we just made
         if current_backup:
+            #   `current_backup` sort du MEME `backup_sshd_config` que les six premiers
+            #   sites : horodatage serveur, chiffres et souligne. Ce site est le repli du
+            #   repli — il restaure la config qu'on venait de sauvegarder avant de tenter
+            #   la restauration demandee.
+            # nosemgrep: rw-shell-fstring-execute-as-root
             execute_as_root(client, f"cp {current_backup} /etc/ssh/sshd_config", root_pass, logger=_log)
         return False, f"Restored config invalid (sshd -t): {sshd_err}"
 
