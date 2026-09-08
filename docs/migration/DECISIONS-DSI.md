@@ -15791,7 +15791,21 @@ contrôle qui refuse de rendre en cas d'écart. *Le grain de la mesure, sur mon
 propre relevé, le jour où je le reprochais à trois sessions.*
 
 
-## E-500 — La file des 11 portables est épuisée : je cesse d'assigner des capacités
+## E-501 — La file des 11 portables est épuisée : je cesse d'assigner des capacités
+
+⚠ **Numérotée E-500 à l'origine, et renumérotée ici : collision.** Une autre
+session a alloué `E-500` à quatre minutes d'intervalle (`PARITE.md:22761`, la
+parade du cache Blade). **Les deux étaient déjà cimentées dans des messages de
+commit**, qu'on ne réécrit pas sur une branche que sept sessions partagent.
+
+Le leur en occupe **quatre**, le mien **un** — donc c'est le mien qui bouge, et
+`250b3b6b` renvoie encore à « E-500 » pour cette décision. *La trace est
+laissée plutôt qu'effacée : un commit qui cite un numéro disparu se lit comme
+une erreur de lecteur, alors que c'est une réparation.*
+
+**La cause n'est pas la négligence : deux sessions ont pris la borne large au
+même instant.** Le plus grand numéro employé était E-499 pour l'une et pour
+l'autre — *une borne juste ne suffit pas quand elle est lue simultanément.*
 
 Détail item par item dans `DOSSIER-55-LA-FILE-DES-11-PORTABLES-EST-EPUISEE.md`.
 
