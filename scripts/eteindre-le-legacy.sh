@@ -149,35 +149,38 @@ while IFS='|' read -r num chemins raison; do
     dire "  étape $num — $n fichier(s) suivis"
     dire "     $raison"
     if [ "$n" -eq 0 ]; then dire "     ✅ déjà archivée"; continue; fi
-    for p in $chemins; do
-        # ══ LA DESTINATION DÉRIVE DU CHEMIN COMPLET, PAS DU `basename` ═══════
+    for f in $(for p in $chemins; do git ls-files "$p"; done); do
+        # ══ L'UNITÉ EST LE FICHIER, PAS LE RÉPERTOIRE ═══════════════════════
         #
-        # Premier jet : `legacy/_deprecated/$(basename "$p")`. **Deux destinations
-        # sur six étaient DÉJÀ OCCUPÉES** — `_deprecated/notifications.php` (1
-        # fichier) et `_deprecated/auth` (5). Le `git mv` aurait échoué à l'étape 3,
-        # et l'à-sec restait VERT : il annonçait la destination sans vérifier
-        # qu'elle est libre.
+        # Deux jets faux avant celui-ci, et le second se croyait « par
+        # construction » :
         #
-        # > **Un contrôle à sec qui ne vérifie pas ce dont l'exécution a besoin
-        # > n'est pas un contrôle : c'est une annonce.**
+        #   1  `_deprecated/$(basename "$p")`  ->  DEUX destinations sur six deja
+        #      occupees, et l'a-sec restait VERT : il annoncait sans verifier.
+        #   2  `_deprecated/${p#legacy/}` sur le REPERTOIRE  ->  `legacy/auth`
+        #      donne `_deprecated/auth`, qui existe DEJA avec 5 fichiers. J'avais
+        #      ecrit « la collision devient inexprimable » : faux — la derivation
+        #      n'evite que les collisions entre sources DIFFERENTES, pas celle
+        #      d'une source avec l'archive PARTIELLE du meme chemin.
         #
-        # La convention de `_deprecated/` est d'ailleurs le chemin COMPLET —
-        # `adm`, `api`, `auth` y existent déjà sous cette forme. En la suivant, deux
-        # sources différentes ne peuvent PLUS se heurter : la collision devient
-        # inexprimable au lieu d'être contrôlée.
-        rel="${p#legacy/}"
-        dest="legacy/_deprecated/$rel"
+        # Mesure : `_deprecated/auth` porte 5 fichiers (2FA, step-up), `legacy/auth`
+        # en porte 10 AUTRES. **Aucune collision par fichier** — donc la fusion est
+        # propre du moment que l'unite deplacee est le FICHIER.
+        #
+        # > Un archivage par REPERTOIRE echoue des qu'une partie du repertoire est
+        # > deja archivee ; par FICHIER, il fusionne.
+        dest="legacy/_deprecated/${f#legacy/}"
         if [ -e "$dest" ]; then
             dire "     ⛔ DESTINATION OCCUPÉE : $dest — REFUS"
-            dire "        (ceinture : la dérivation du chemin complet devrait l'éviter)"
+            dire "        deux versions du même fichier : c'est une décision, pas un déplacement"
             exit 1
         fi
         if [ "$EXECUTER" -eq 1 ]; then
             mkdir -p "$(dirname "$dest")"
-            if git mv "$p" "$dest" 2>/dev/null; then dire "     ✅ git mv $p -> $dest"
-            else dire "     ⛔ git mv $p a ÉCHOUÉ"; exit 1; fi
+            if git mv "$f" "$dest" 2>/dev/null; then dire "     ✅ $f -> $dest"
+            else dire "     ⛔ git mv $f a ÉCHOUÉ"; exit 1; fi
         else
-            dire "     [à sec] git mv $p -> $dest"
+            dire "     [à sec] $f -> $dest"
         fi
     done
 done < <(etapes)
