@@ -95,11 +95,46 @@ la même cause : l'étape ⑤ a archivé la cible de la sonde.
 **⚠ Et il ne bloque rien — mesuré, avec témoin :**
 
 ```
-sur la configuration FUSIONNEE (-f base -f prod), qui est celle qui s'applique :
-  depends_on conserves            3
-  laravel -> db, resources    php -> db, python, resources    python -> db, resources
-  cibles nommant « php »          0
+sur la configuration FUSIONNEE (-f base -f prod), rendue en JSON par compose
+lui-meme et lue par un analyseur — PAS au motif :
+
+  services            4 : db, laravel, php, python
+  blocs depends_on    3 : laravel -> db · php -> db, python · python -> db
+  « php » CIBLE d'un depends_on   NON
+  « php » SERVICE declare         OUI
+  TEMOIN : service inexistant rendu ?  NON  (l'instrument sait rendre le vide)
 ```
+
+⚠ **DEUXIEME RECTIFICATION DE CE §, et elle porte sur ma premiere.** Mon
+enumeration disait `laravel -> db, resources` et `php -> db, python, resources`.
+**`resources` n'est pas un service** : c'est `deploy.resources` (limites CPU et
+memoire), present dans les quatre services. Releve par `0b`, verifie ici par
+analyseur. *Et c'est indiscernable de toute sonde par fenetre ou indentation :*
+
+```
+:33  indent=4   depends_on:          :53  indent=4   deploy:
+:34  indent=6     db:                :54  indent=6     resources:
+```
+
+**Meme profondeur, meme forme.** Ma sonde collectait les cles a l'indentation 6
+dans une fenetre de 400 caracteres apres `depends_on:` — elle ramassait
+`deploy.resources` des que les deux blocs se suivaient.
+
+⛔ **Et le point qui porte sur ma RETRACTATION elle-meme.** J'avais signale que
+la commande ayant produit cette mesure etait corrompue (mes backticks avaient
+execute `config`). **J'ai retire le code de sortie et GARDE l'enumeration.**
+
+> **Quand on retire une mesure comme cassee, tout ce qu'elle a produit est
+> suspect — pas seulement la partie ou la casse etait VISIBLE.** *Le code de
+> sortie etait manifestement faux, donc retracte ; l'enumeration etait
+> plausible, donc conservee. La retractation s'est arretee la ou le defaut
+> cessait de se voir.* (formulation de `0b`)
+
+*Precision qui ne m'excuse pas mais situe le mecanisme : la sortie de `compose
+config` etait valide — c'est mon LECTEUR qui sur-collectait. Le defaut etait donc
+independant de la commande cassee, ce qui rend la lecon plus large, pas plus
+etroite : deux defauts distincts dans une meme mesure, et j'en avais retire un
+seul.*
 
 ⚠ **Et une borne que je dois à `0b` (`131e886c`), parce qu'elle change ce que la
 mesure PROUVE sans changer la conclusion.** Mon premier relevé disait « 0
