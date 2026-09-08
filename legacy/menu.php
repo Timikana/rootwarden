@@ -188,7 +188,7 @@ $sideLink = function(string $href, string $svg, string $label, string $title = '
             <div class="flex items-center justify-between px-3 py-2 border-b border-gray-100 dark:border-gray-700">
                 <span class="text-xs font-bold text-gray-700 dark:text-gray-200">Notifications</span>
                 <div class="flex gap-1">
-                    <button hx-post="/adm/api/notifications.php" hx-vals='{"action":"read_all"}' hx-swap="none"
+                    <button data-rw-retire="endpoint archive etape ③" hx-swap="none"
                             class="text-[10px] text-blue-500 hover:text-blue-700">Tout lire</button>
                     <a href="<?= rtrim(getenv('LARAVEL_URL') ?: 'http://localhost:8080', '/') ?>/notifications" class="text-[10px] text-gray-400 hover:text-gray-600 ml-2">Voir tout</a>
                 </div>
@@ -351,19 +351,24 @@ const _notifIcons = {
 };
 
 function refreshNotifBadge() {
-    fetch('/adm/api/notifications.php?action=count')
-        .then(r => r.json())
-        .then(d => {
-            const badge = document.getElementById('notif-badge');
-            if (!badge) return;
-            if (d.count > 0) {
-                badge.textContent = d.count > 99 ? '99+' : d.count;
-                badge.classList.remove('hidden');
-            } else {
-                badge.classList.add('hidden');
-            }
-        })
-        .catch(() => {});
+    /*
+     * ⛔ CORPS RETIRE — l'endpoint est archive (etape ③), et il ne se rebase pas.
+     *
+     * Le portage porte le geste (/notifications/compte, /notifications,
+     * /notifications/tout-lire, /notifications/{id}/lire, DELETE
+     * /notifications/{id}). Mais l'appel etait un `fetch` en MEME ORIGINE et le
+     * portage ecoute sur un autre port : **un lien peut traverser une origine, un
+     * XHR authentifie non.** Le rebaser rendrait un 401 avale par le `.catch`.
+     *
+     * ⚠ ET J'AVAIS D'ABORD MIS UN `return` DEVANT LE `fetch`, en laissant le corps.
+     * La suite des liens morts a refuse — a juste titre : **du code mort derriere
+     * un `return` garde la reference dans le TEXTE, et un instrument qui lit le
+     * texte ne peut pas savoir qu'il est inatteignable.** Retirer vaut mieux que
+     * rendre inatteignable.
+     *
+     * ⚠ Ce fichier est ORPHELIN depuis l'etape ② : plus aucun fichier servi ne
+     * l'inclut. Ce retrait garde l'arbre coherent pour qui le relira.
+     */
 }
 
 function toggleNotifDropdown() {
@@ -374,49 +379,8 @@ function toggleNotifDropdown() {
 }
 
 function loadNotifList() {
-    fetch('/adm/api/notifications.php?action=list&limit=10')
-        .then(r => r.json())
-        .then(d => {
-            const list = document.getElementById('notif-list');
-            if (!d.success || !d.notifications.length) {
-                list.innerHTML = '<div class="px-3 py-4 text-center text-xs text-gray-400">Aucune notification</div>';
-                return;
-            }
-            list.innerHTML = d.notifications.map(n => {
-                const icon = _notifIcons[n.type] || _notifIcons.info;
-                const unread = !n.read_at;
-                const bg = unread ? 'bg-blue-50 dark:bg-blue-900/20' : '';
-                const ago = timeAgo(n.created_at);
-                const readBtn = unread
-                    ? `<button hx-post="/adm/api/notifications.php" hx-vals='{"action":"read","id":${n.id}}' hx-swap="none" class="text-[10px] text-blue-500 hover:text-blue-700 flex-shrink-0">Lire</button>`
-                    : '';
-                // Patch A03-XSS-01 (OWASP A03 XSS) : avant on inserait
-                // `onclick="window.location='${n.link}'"` brut -> stored XSS
-                // si n.link = "javascript:alert(1)//" ou contenait '. Maintenant
-                // on n'utilise plus d'attribut inline et on attache un listener
-                // qui ne deroule QUE des paths internes (commencent par /).
-                const safeLink = (typeof n.link === 'string' && /^\/[A-Za-z0-9_\-./?=&#%]*$/.test(n.link)) ? n.link : '';
-                return `<div class="flex items-start gap-2 px-3 py-2 ${bg} hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer text-xs"${safeLink ? ` data-rw-link="${escHtml(safeLink)}"` : ''}>
-                    <span class="text-sm mt-0.5">${icon}</span>
-                    <div class="flex-1 min-w-0">
-                        <div class="font-medium text-gray-800 dark:text-gray-200 ${unread ? 'font-bold' : ''}">${escHtml(n.title)}</div>
-                        <div class="text-gray-500 dark:text-gray-400 truncate">${escHtml(n.message)}</div>
-                        <div class="text-gray-400 mt-0.5">${ago}</div>
-                    </div>
-                    ${readBtn}
-                </div>`;
-            }).join('');
-            // Listener delegue : ne navigue que si data-rw-link contient un
-            // path interne valide. Aucun javascript: ni URL externe ne passe.
-            list.querySelectorAll('[data-rw-link]').forEach(el => {
-                el.addEventListener('click', () => {
-                    const dest = el.getAttribute('data-rw-link') || '';
-                    if (dest.startsWith('/')) window.location.assign(dest);
-                });
-            });
-            if (typeof htmx !== 'undefined') htmx.process(list);
-        })
-        .catch(() => {});
+    /* ⛔ CORPS RETIRE — meme raison que `refreshNotifBadge` ci-dessus :
+       endpoint archive a l'etape ③, appel en meme origine, fichier orphelin. */
 }
 
 function escHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
