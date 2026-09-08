@@ -312,8 +312,27 @@ fichier qui en porte deja deux, legitimement, sur deux chemins distincts.
 
 ⚠ **Et ça corrige une phrase qui circulait** : « les quatre `.patch` restent non
 appliques a l'arbre donc absents des deux cotes ». **Faux pour `02` au moins** :
-son correctif est dans l'arbre. Il n'est pas dans le SERVICE, ce qui est l'autre
-question — et un redemarrage l'y met.
+son correctif est dans l'arbre.
+
+⛔ **ET MA PROPRE CONCLUSION ETAIT FAUSSE D'UN PAS.** J'avais ecrit ici « il
+n'est pas dans le SERVICE, et un redemarrage l'y met ». **Non : le service l'a
+deja.** Rectifie le 2026-09-08 14:55, sur mesure d'un pair puis rejouee par moi :
+
+    workers demarres          2026-09-07 12:53 UTC
+    1d99a236  09-04 14:59     bloc E-280 du scheduler    ANTERIEUR -> deja servi
+    8a26a9c4  09-04 15:17     fail-closed du chemin CVE  ANTERIEUR -> deja servi
+
+    contre-epreuve, les trois correctifs root :
+    5c9… / ffe… / e80…  09-07 et 09-08   POSTERIEURS -> absents du service
+
+**Un redemarrage n'apporte RIEN d'E-280**, et le bilan de §7 n°1 reste a TROIS
+correctifs de commande root — pas quatre. Mon « il y a un correctif de plus dans
+la balance » est RETIRE.
+
+> **Nos deux raisons etaient fausses et se compensaient sur le verdict.** Le pair
+> disait « le patch n'est pas applique » ; je disais « il l'est, donc le
+> redemarrage l'apporte ». Le vrai est **« il l'est, et le service l'a deja »**.
+> *Deux erreurs de sens oppose qui rendaient la meme conclusion.*
 
 
 ## ✅ `01` ET `03` EPROUVES ENSEMBLE — mesure du 2026-09-08 14:50
