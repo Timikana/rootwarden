@@ -753,16 +753,42 @@ def schedule_advanced_update():
         #
         # Mesure du 2026-09-08 : 0 ecriture SQL ici, 1 dans la route soeur
         # (`UPDATE machines SET maj_secu_date`) — temoin que la sonde fonctionne.
-        # La raison est le SCHEMA : la table `machines` ne porte que `maj_secu_date`
-        # et `maj_secu_last_exec_date`, lues par `monitoring.py`. **Il n'existe aucune
-        # colonne pour la mise a jour COMPLETE.**
         #
-        # Consequence : pour cette route, « planifiee sur la machine et rien en base »
-        # est l'etat PERMANENT. L'ecran peut montrer une MAJ de securite planifiee,
-        # jamais une MAJ complete planifiee.
+        # ⚠ CORRECTION D'UNE PREMIERE REDACTION DE CE COMMENTAIRE. J'avais ecrit
+        # « il n'existe aucune colonne pour la mise a jour complete ». C'est FAUX,
+        # et la verite est en deux morceaux qui ne sont pas le meme travail :
         #
-        # C'est une MIGRATION, pas un correctif — et une colonne sans lecteur serait
-        # une capacite sans ecran. Les deux moities se decident ensemble.
+        #   `mysql/init.sql:99-107`   TABLE `update_schedules` — machine_id,
+        #                             interval_minutes, last_run, next_run, FK
+        #                             vers `machines`. Elle modelise un INTERVALLE.
+        #   qui la touche             py=0 · php=0     ZERO code, nulle part
+        #                             (temoin : `machines` py=28/php=115,
+        #                              `ssh_audit_schedules` py=2 — la sonde voit)
+        #
+        # Donc : **une structure existe pour le modele par INTERVALLE et personne
+        # ne l'ecrit — c'est un VESTIGE. Aucune structure n'existe pour le modele
+        # par DATE/HEURE/RECURRENCE, celui de cette route — c'est une MIGRATION.**
+        #
+        # Consequence inchangee : pour cette route, « planifiee sur la machine et
+        # rien en base » est l'etat PERMANENT. L'ecran peut montrer une MAJ de
+        # securite planifiee, jamais une MAJ complete planifiee.
+        #
+        # ⚠ ET LE « VOISIN SAIN » PARTAGE CET ANGLE MORT. `schedule_update`
+        # (`:447-498`), cite partout comme le modele d'hygiene, installe un cron et
+        # **n'enregistre rien non plus** — alors que `update_schedules` a ete taillee
+        # exactement pour lui. Il est sain sur l'INJECTION (`int()` plus bornes
+        # `1 <= n <= 10080`) et aveugle sur la PERSISTANCE. *« Voisin sain » etait
+        # vrai sur l'axe mesure et faux comme jugement general : l'etiquette a
+        # voyage d'un axe a l'autre sans que personne le dise.*
+        #
+        # Trois routes installent un cron ; la base n'en garde qu'une trace,
+        # `maj_secu_date`, par une COLONNE et non par cette table.
+        #
+        # Rien n'est corrige ici, et la raison se demontre toute seule : **une
+        # table sans lecteur, nous en avons une sous les yeux.** C'est exactement
+        # ce qu'on obtient en decidant une moitie sans l'autre. Si
+        # `update_schedules` est un vestige a retirer ou une intention jamais
+        # cablee, `init.sql` ne le dit pas — a trancher par qui tient le schema.
         return jsonify({'success': True, 'message': 'Planification avancée enregistrée avec succès.'}), 200
     except Exception as e:
         logging.error(f"[schedule_advanced_update] Erreur: {e}")
