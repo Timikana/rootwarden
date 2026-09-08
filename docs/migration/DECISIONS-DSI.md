@@ -15789,3 +15789,34 @@ comptait les blocs `❯❯❱` (un par couple règle-fichier) au lieu des trouva
 séparées par des `⋮┆` **à l'intérieur** des blocs. Réconcilié à 109 = 109 par un
 contrôle qui refuse de rendre en cas d'écart. *Le grain de la mesure, sur mon
 propre relevé, le jour où je le reprochais à trois sessions.*
+
+
+## E-500 — La file des 11 portables est épuisée : je cesse d'assigner des capacités
+
+Détail item par item dans `DOSSIER-55-LA-FILE-DES-11-PORTABLES-EST-EPUISEE.md`.
+
+**Aucun des onze n'a d'implémentation manquante.** Cinq appariés, six déjà
+portés, un délibérément bloqué sur la signature du `patch 03`, un arbitré « ne
+pas porter » (un écrivain natif de groupes donnerait deux écrivains pour un
+geste).
+
+⛔ **Et je borne le dédouanement : un site d'appel plus une route n'est pas « le
+geste aboutit ».** J'ai mesuré l'atteignabilité, pas la réussite. Aucun des onze
+n'a été exercé, et ça n'est pas un manque de zèle : le service ne charge pas le
+code de l'arbre (`use_reloader = False`, démarré le 2026-09-07 12:53 UTC, 19
+commits `backend/` en attente), donc **une épreuve au réseau mesurerait le code
+d'hier midi.**
+
+**Le ratio doc/code de 7 pour 1 n'est pas de la complaisance : c'est
+l'arithmétique d'une file dont les objets ont disparu.** Six des sept documents
+du tour sont des rétractations de chiffres faux.
+
+> Une cascade de rétractations s'auto-entretient : chaque correction est
+> elle-même une affirmation qui réclame son régime, sa date et sa source.
+
+**Ce qui la ferme n'est pas d'écrire moins, c'est de mesurer sur le SERVICE au
+lieu de l'arbre** — et ça exige le redémarrage, qui appartient à l'exploitant.
+
+*Deux sessions me l'avaient dit avant que je le mesure : « ne m'assigne rien pour
+combler le temps », « le dire vaut mieux qu'un travail inventé ». Et l'une a
+chiffré le coût : cinq assignations en deux jours hors périmètre ou déjà faites.*
