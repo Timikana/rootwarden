@@ -148,3 +148,115 @@ donc ne jamais regarder l'URL qu'elle compose (le vrai défaut).
 *Ce qui m'a fait continuer n'est pas la mémoire de la règle : c'est que `/mot-de-passe-oublie`
 rendait 2387 octets de page. **Une page qui existe pour une capacité que je venais de
 déclarer absente est un reste inexpliqué.***
+
+---
+
+# AMENDEMENT — la forme dérivée ramène le piège qu'elle répare, et l'ordre des gestes le décide
+
+**2026-09-08, ~05:2x, après `a179fa04` et `4aabbe1d`.** *Ma recommandation était moins bonne
+que ce qui a été livré ; ce qui a été livré ramène un piège que le plan documente. Les deux
+sont vrais.*
+
+## ① CE QUE J'AI RECOMMANDÉ ÉTAIT PIRE
+
+J'avais écrit : `APP_URL=https://192.168.0.245:8443`. **Une IP en dur dans un fichier
+d'EXEMPLE que les déploiements copient.** *Fausse partout ailleurs qu'ici, et périssable au
+premier changement de port — **le défaut même qu'on répare.***
+
+**La forme livrée est la bonne pour le modèle :**
+
+```
+srv-docker.env.example:116   APP_URL=https://${SERVER_NAME}:${LARAVEL_HTTPS_PORT}
+```
+
+> **Le correctif d'une valeur périmée ne doit pas poser une valeur périssable.**
+
+## ② ET LE GESTE N'EST PAS INERTE — J'AVAIS TORT SUR CE POINT AUSSI
+
+J'avais réservé la valeur à l'exploitant et demandé « seulement la déclaration ». **La
+déclaration EXÉCUTE la correction**, parce que `env_file: srv-docker.env` met la variable
+dans l'environnement du conteneur, et **l'environnement l'emporte sur `laravel/.env`** :
+
+```
+docker exec -e APP_URL=https://EPREUVE.invalid:9999 …
+  config('app.url')  ->  https://EPREUVE.invalid:9999    l'injection l'emporte
+temoin, sans injection
+  config('app.url')  ->  http://192.168.0.245:8444        laravel/.env
+```
+
+*Contre-épreuve refaite de mon côté, identique.* **Je décrivais comme une déclaration ce qui
+est un correctif d'exploitation par un chemin détourné** — et la session l'a annoncé en
+toutes lettres dans le fichier et au CHANGELOG plutôt que de le laisser passer pour inerte.
+
+## 🔴 ③ MAIS LA FORME DÉRIVÉE RAMÈNE LE PIÈGE QUE LE PLAN A DÉJÀ PAYÉ
+
+```
+srv-docker.env:100      SERVER_NAME=localhost          <- le fichier VIVANT
+srv-docker.env:375      LARAVEL_HTTPS_PORT=8443
+=> APP_URL resolu       https://localhost:8443
+```
+
+**Dans un courriel, `localhost` désigne la machine du DESTINATAIRE.**
+
+> **On échangerait un lien cassé contre un autre** : `http://…:8444` avait le mauvais port et
+> pas de chiffrement, mais une IP **joignable**. `https://localhost:8443` a le bon port et le
+> chiffrement, et n'est joignable par **personne**.
+
+*C'est le piège n° 3 du §2 ter du plan, mot pour mot* — écrit à propos de `LARAVEL_URL` et
+`LEGACY_URL` : **« remettre la forme dérivée aurait substitué `localhost` et cassé tout lien
+vu depuis une autre machine ».** C'est exactement pour cela que ces deux-là sont **en dur
+dans le fichier vivant.**
+
+### Le motif est établi par les deux variables sœurs, et il faut le suivre
+
+```
+                MODELE (derive)                          VIVANT (en dur)
+LARAVEL_URL     http://${SERVER_NAME}:${LARAVEL_PORT}    https://192.168.0.245:8443
+LEGACY_URL      https://${SERVER_NAME}:${HTTPS_PORT}     https://192.168.0.245:8446
+APP_URL         https://${SERVER_NAME}:${LARAVEL_HTTPS_PORT}   ⛔ ABSENT
+```
+
+### 🔴 Et le mécanisme qui propage le correctif est celui qui le casse
+
+```
+env-merge.sh:65   if ! echo "${existing_keys}" | grep -q "^${key}$"
+                  -> n'ajoute QUE les cles MANQUANTES
+```
+
+**Donc `env-merge` déposerait la ligne DÉRIVÉE dans le fichier vivant**, où `SERVER_NAME`
+vaut `localhost`. *Le remède arrive par le tuyau qui le dénature.*
+
+## ⚖ CE QUE ÇA DONNE COMME ORDRE, ET L'ORDRE EST LA DÉCISION
+
+```
+1  ⛔ EXPLOITANT — ecrire A LA MAIN dans srv-docker.env :
+       APP_URL=https://192.168.0.245:8443
+   (ou le nom d'hote reellement joignable par les destinataires)
+
+2  ALORS env-merge est un no-op sur cette cle : il n'ajoute que ce qui MANQUE,
+   et la valeur ecrite a la main se protege elle-meme de la fusion
+
+3  recreation du conteneur -> la valeur d'environnement l'emporte sur laravel/.env
+4  verifier : `artisan tinker` doit rendre :8443 ET https ET un hote joignable
+5  ALORS SEULEMENT armer MAIL_MAILER=smtp
+```
+
+> **L'ordre 1-avant-2 n'est pas une précaution : c'est ce qui fait que la valeur écrite à la
+> main survit.** *`env-merge` ne l'écrasera pas, précisément parce qu'il ne complète que les
+> absences.*
+
+**Inverser 1 et 2 dépose `localhost` et le rend ensuite très difficile à distinguer d'un
+choix.**
+
+## ⚠ ET UNE DERNIÈRE, QUI N'EST PAS DE MOI MAIS QUI COMPTE
+
+La session a d'abord cité au CHANGELOG `APP_URL=https://\${SERVER_NAME}…` — **des
+échappements parasites venus de son heredoc, absents de l'artefact.** Corrigée en
+**recopiant la ligne depuis le fichier** plutôt qu'en la retapant.
+
+> **Un journal qui ne cite pas exactement l'artefact est la divergence que ce chantier vient
+> de payer trois fois — et elle a été commise dans l'entrée qui la dénonce.**
+
+*C'est la même mécanique que mes accents graves exécutés par le shell : un motif retapé n'est
+pas le motif du fichier.* **La parade est identique dans les deux cas : lire depuis
+l'artefact, jamais depuis sa mémoire.**
