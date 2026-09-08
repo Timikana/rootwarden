@@ -22245,3 +22245,48 @@ ecriture, et un apres — *asserter en DELTA, comme pour tout le reste.*
 Ici, qui ecrit une fonction ne voit pas ce qu'elle recouvre — **il faut avoir a ECRIRE dans le fichier pour
 buter dessus**, ce qu'une relecture ne fait pas.
 
+---
+
+## E-490 — UNE MESURE PERIMEE CITEE A L'APPUI D'UN RAISONNEMENT, DANS UN COMMENTAIRE
+
+**Cinquieme membre de la famille de l'echange des ports, et le premier qui ne vive pas dans une VALEUR.**
+Releve par la session 8 le 2026-09-08, remesure ici.
+
+    laravel/apache-ssl.conf.tmpl:80-81
+      « Mesure sur profil Chrome PERSISTANT, deux processus : aucun surclassement.
+        `http://localhost:8444/connexion` rend 200, servi en clair. »
+
+    remesure du 2026-09-08 :
+      http://localhost:8444/connexion    301 -> https://localhost:8444/   (le LEGACY)
+      http://localhost:8080/connexion    301 -> https://localhost:8443/   (le PORTAGE) ✅
+      https://localhost:8446/connexion   404   (le legacy ne sert pas /connexion)
+
+**La mesure etait JUSTE le 2026-09-06** : `:8444` etait alors le port HTTP du PORTAGE. **L'echange du
+2026-09-07 a 19:39 en a inverse le sens sans toucher au texte.**
+
+> **Une VALEUR perimee casse, ou se signale. Une MESURE perimee citee a l'appui d'un raisonnement se relit
+> comme une PREUVE.** *Et celle-ci vit dans un commentaire : rien ne l'exerce, donc rien ne la contredit.*
+
+**Ce que ca ne renverse PAS** — et je le dis pour qu'un arbitrage clos ne soit pas rouvert : *la decision de
+ne pas poser HSTS sur le portage tient sur son propre argument* — une porte a sens unique mise en cache un
+an, sur un certificat auto-signe, se pose apres verification au reseau et sur decision. **La mesure perimee
+etayait une correction accessoire, pas la decision.**
+
+**Non corrige : le fichier est dans `laravel/`, hors de mon perimetre**, et son contenu est un COMMENTAIRE —
+donc inerte. *Signale a qui tient le vhost du portage.*
+
+### ⟶ LA FAMILLE DE L'ECHANGE COMPTE CINQ MEMBRES, DONT DEUX OUVERTS
+
+| # | membre | etat |
+|---|---|---|
+| 1 | `installer-sur-vm.sh` / `migrer-vers-vm.sh` — etiquettes inversees | ✅ ferme (E-457) |
+| 2 | `laravel/docker-entrypoint.sh:86` — repli `8446` | ✅ ferme (patch `05`) |
+| 3 | `scripts/rejouer-lot.sh:93-94` — les deux bases | ✅ ferme (patch `06`) |
+| 4 | `config/app.php:69` — `LEGACY_URL` nommait le portage | ✅ ferme (`38d366ef`, session 8) |
+| 5 | `apache-ssl.conf.tmpl:80` — **une mesure**, pas une valeur | ⛔ ouvert, inerte |
+| — | `laravel/.env` — `APP_URL` | ⛔ **ouvert, exploitant** |
+| — | `backend/server.py:137` — repli CORS | ⛔ ouvert, a l'extinction |
+
+*Les quatre premiers etaient des VALEURS ; le cinquieme est un ENONCE. C'est la meme cause — l'echange — et
+deux especes d'artefact.*
+
