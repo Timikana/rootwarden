@@ -17010,3 +17010,59 @@ qu'on ne regarde pas.*
 **Je ne le corrige pas ce tour-ci** : `build-docker` est en dépendance de trois
 jobs, donc le retirer touche l'ordonnancement de la CI, pas une ligne. **C'est un
 `patch 09` à écrire, et il vient après le lancement** — comme tout le reste.
+
+---
+
+## E-522
+
+**La CI bâtissait l'image MORTE et laissait la VIVANTE sans couverture. Corrigé,
+et la CI est son propre juge.**
+
+```
+mesure du 2026-09-08, apres patch 07 :
+  laravel/Dockerfile   1 citation dans compose   ·   0 dans ci.yml
+  php/Dockerfile       0 citation dans compose   ·   2 dans ci.yml
+  temoin : zzz/Dockerfile -> 0 et 0 (le detecteur discrimine)
+
+build-docker    batissait  php (mort) + python (vivant)
+security-scan   scannait   rootwarden-php:scan + rootwarden-python:scan
+                if: github.event_name == 'push'  -> il tourne apres fusion
+```
+
+**L'image que les exploitants lancent — le portage — n'était ni bâtie ni scannée
+par la CI. Trivy scannait un artefact que personne ne déploie.**
+
+> *« Un outil borné à un périmètre qui se vide ne tombe pas en panne : il réussit
+> plus vite. »* — écrit ce matin à propos de `lint-php`, et le même mécanisme
+> avait un second porteur que je n'avais pas cherché.
+
+### Pourquoi j'applique celui-ci au lieu de le mettre en file
+
+**`patch 08` attend parce que son effet est dans un conteneur et que je ne peux
+pas le redémarrer. Celui-ci a son effet ENTIÈREMENT dans la CI — et la CI est
+exactement ce qui le teste.** *Un correctif dont le banc est le juge s'applique ;
+un correctif dont le juge est absent se met en file.*
+
+```
+trois substitutions, ancres EXTRAITES du fichier et non retapees :
+  build-docker    « Build PHP/Apache image »   -> Laravel, tag -laravel
+  security-scan   « Build PHP image for scan » -> Laravel, tag …-laravel:scan
+  security-scan   « Scan PHP image »           -> Laravel
+les `needs` et les noms de jobs ne changent pas : aucun reordonnancement.
+```
+
+⚠ **Et ma contre-épreuve en delta aurait pu me tromper** : après substitution,
+`php/Dockerfile` et `rootwarden-php:scan` comptent encore **1** chacun — **dans
+le commentaire que je viens d'écrire pour expliquer le changement.** *Cinquième
+fois aujourd'hui que ma propre prose contient le motif que je compte. J'ai
+regardé les lignes au lieu de conclure du nombre.*
+
+### Ce qui reste non couvert, et je le nomme
+
+**`php/Dockerfile` n'est plus bâti par personne.** Il subsiste avec les 7 autres
+fichiers de `php/`, inertes — leur retrait attend le redémarrage (E-517 :
+`php/php.ini` est encore monté par le conteneur qui tourne).
+
+**Et `security-scan` ne tourne pas sur une PR** (`if: … == 'push'`), donc son
+demi-correctif ne sera éprouvé qu'après la fusion sur `main`. *Déclaré plutôt que
+présenté comme vérifié.*

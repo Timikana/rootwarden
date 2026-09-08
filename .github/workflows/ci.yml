@@ -262,13 +262,23 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
-      - name: Build PHP/Apache image
+      # ⛔ CE PAS BATISSAIT L'IMAGE MORTE ET LAISSAIT LA VIVANTE SANS COUVERTURE.
+      #    Mesure du 2026-09-08, apres `patch 07` :
+      #      laravel/Dockerfile   cite 1 fois dans compose, 0 fois dans ce fichier
+      #      php/Dockerfile       cite 0 fois dans compose, 2 fois ici
+      #    Le service `php` est retire de `compose` ; plus rien ne bâtit son image
+      #    hors la CI. Et l'image que les exploitants LANCENT — le portage —
+      #    n'etait ni batie ni scannee. `security-scan` (Trivy) scannait donc
+      #    `rootwarden-php:scan`, un artefact que personne ne deploie.
+      #    « Un outil borne a un perimetre qui se vide ne tombe pas en panne :
+      #      il reussit plus vite. »
+      - name: Build Laravel/Apache image
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: ./php/Dockerfile
+          file: ./laravel/Dockerfile
           push: false
-          tags: ${{ env.IMAGE_PREFIX }}-php:${{ github.sha }}
+          tags: ${{ env.IMAGE_PREFIX }}-laravel:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -692,14 +702,14 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
-      - name: Build PHP image for scan
+      - name: Build Laravel image for scan
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: ./php/Dockerfile
+          file: ./laravel/Dockerfile
           push: false
           load: true
-          tags: rootwarden-php:scan
+          tags: rootwarden-laravel:scan
           cache-from: type=gha
 
       - name: Build Python image for scan
@@ -712,10 +722,10 @@ jobs:
           tags: rootwarden-python:scan
           cache-from: type=gha
 
-      - name: Scan PHP image
+      - name: Scan Laravel image
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
         with:
-          image-ref: rootwarden-php:scan
+          image-ref: rootwarden-laravel:scan
           format: table
           exit-code: 0
           severity: CRITICAL,HIGH
