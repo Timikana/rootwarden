@@ -216,12 +216,20 @@ def create_backup() -> str:
 
             for table in tables:
                 # CREATE TABLE
+                # `table` ne vient pas d'une entree : il vient de `SHOW TABLES` ci-dessus,
+                # donc du CATALOGUE de la base. Un placeholder %s ne peut PAS porter un nom
+                # de table ; la garde est ici que la liste est RENDUE DEPUIS SA SOURCE.
+                # Injecter exigerait de pouvoir CREER une table au nom choisi — soit un
+                # privilege DDL, soit une compromission deja totale.
+                # nosemgrep: rw-sql-fstring-execute
                 cur.execute(f"SHOW CREATE TABLE `{table}`")
                 create_stmt = cur.fetchone()[1]
                 f.write(f"\nDROP TABLE IF EXISTS `{table}`;\n")
                 f.write(f"{create_stmt};\n\n")
 
                 # INSERT rows
+                # Meme `table`, meme raison qu'au SHOW CREATE ci-dessus.
+                # nosemgrep: rw-sql-fstring-execute
                 cur.execute(f"SELECT * FROM `{table}`")
                 rows = cur.fetchall()
                 if rows:

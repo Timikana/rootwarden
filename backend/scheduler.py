@@ -238,6 +238,11 @@ def _run_scheduled_scan(schedule: dict):
             # « Tout le parc » reste un CHOIX executable : une ligne 'all' deja
             # en base continue de tourner. `cve.py` a cesse de l'OFFRIR a la
             # creation ; cesser d'offrir n'est pas cesser de savoir lire.
+            # Les deux interpolations sont des LITTERAUX de cette fonction :
+            # `base_cols` (une liste de colonnes) et `NON_ARCHIVEE` (un predicat).
+            # Aucune des deux n'est jamais reaffectee, et surtout pas depuis une entree.
+            # Ce sont des FRAGMENTS DE REQUETE, qu'un placeholder ne peut pas porter.
+            # nosemgrep: rw-sql-fstring-execute
             cur.execute(f"SELECT {base_cols} FROM machines WHERE {NON_ARCHIVEE}")
         else:
             # Echec ferme : « je ne sais pas quoi scanner » ne doit jamais
