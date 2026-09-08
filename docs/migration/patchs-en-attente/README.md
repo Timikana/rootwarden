@@ -154,6 +154,44 @@ d'objet — ce patch est ce qui le fait disparaître, et non une correction de l
 
 ```
 docker compose -f <modifie> config --quiet     code 0
+
+⛔ **CETTE VALIDATION ETAIT VRAIE SUR SON OBJET ET MUETTE SUR CELUI QUI COMPTAIT.**
+RECTIFICATION du 2026-09-08 14:35.
+
+Je l'avais jouee sur la BASE SEULE. **`docker-compose.prod.yml` existe** — un
+fichier d'override documente dans `README.md`, `OPERATIONS.md` et
+`CONTRIBUTING-SECURITY.md`, invoque par `docker compose -f base -f prod`. Je ne
+le savais pas quand j'ai prepare ce patch.
+
+Son bloc `php:` **ne porte ni `image:` ni `build:`** : il ne surcharge que
+`volumes`, `read_only`, `tmpfs`, `cap_drop`, `cap_add`. Donc en retirant `php` de
+la base sans toucher l'override, le patch laissait un service defini par le seul
+override — et la superposition devenait **invalide** :
+
+    avant l'extension du patch, sur des copies :
+      base seule                 -> code 0
+      base + prod (documentee)   -> « service "php" has neither an image nor a
+                                      build context specified: invalid compose
+                                      project »
+
+**Le patch aurait casse le chemin de deploiement de PRODUCTION**, en passant la
+validation que j'avais choisie.
+
+Le patch porte desormais DEUX hunks — un par fichier compose — et l'epreuve est
+rejouee de bout en bout sur des copies neuves :
+
+    apres application : `php` = 0 dans la base ET dans l'override
+    base seule                 -> code 0
+    base + prod                -> code 0
+    services restants          -> db · laravel · python
+
+*Code de sortie capture SANS tube : un code qui traverse un tube n'est pas celui
+de la commande.*
+
+⚠ Et le patch DERIVE : `Hunk #2 succeeded at 315 (offset 28 lines)` — les
+modifications de `docker-compose.yml` du 2026-09-08 l'ont decale de 28 lignes.
+Il s'applique encore ; une derive assez grande le ferait echouer. **A rejouer
+avant signature, pas a supposer.**
 services declares                              db · laravel · python
                                                 (`php` absent, les autres intacts)
 ```
