@@ -349,6 +349,13 @@ def unban_all(client, root_password: str, jail: str) -> tuple[str, str, int]:
 def get_fail2ban_logs(client, root_password: str, lines: int = 50) -> str:
     """Lit les dernieres lignes du log fail2ban."""
     lines = max(10, min(500, int(lines)))
+    #   `lines` ne peut pas porter de metacaractere : la ligne precedente en
+    #   fait `max(10, min(500, int(lines)))`. `int()` LEVE sur tout ce qui
+    #   n'est pas numerique, et le clamp borne le reste a [10, 500]. La valeur
+    #   interpolee est donc un ENTIER entre 10 et 500, jamais une chaine.
+    #   `shlex.quote` sur un int n'ajouterait rien — c'est le TYPE qui neutralise.
+    #   (`backend/routes/fail2ban.py:600` documente que la borne vit ici.)
+    # nosemgrep: rw-shell-fstring-execute-as-root
     out, _, _ = execute_as_root(
         client, f'tail -n {lines} /var/log/fail2ban.log 2>/dev/null || echo "[LOG ABSENT]"',
         root_password, timeout=10)
@@ -458,6 +465,14 @@ def detect_services(client, root_password: str) -> list[dict]:
 
     results = []
     for service, (check_cmd, jail_names, log_path) in KNOWN_SERVICES.items():
+        #   `check_cmd` est l'un des HUIT litteraux de `KNOWN_SERVICES` (:438) :
+        #   `which sshd`, `which vsftpd`, `which apache2 || which httpd`, etc.
+        #   Aucune donnee de requete n'y entre, et le dictionnaire n'est MUTE
+        #   nulle part (0 occurrence de `KNOWN_SERVICES[`, `.update(`, `.pop(`
+        #   dans tout `backend/`). C'est l'ORIGINE qui neutralise, pas un
+        #   echappement — et `shlex.quote` casserait la commande, puisque la
+        #   valeur EST une commande et non un argument.
+        # nosemgrep: rw-shell-fstring-execute-as-root
         out, _, _ = execute_as_root(
             client, f'{check_cmd} >/dev/null 2>&1 && echo INSTALLED || echo MISSING',
             root_password, timeout=5)
