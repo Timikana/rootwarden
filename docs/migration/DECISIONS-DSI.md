@@ -15512,3 +15512,75 @@ l'exécuter.*
 **Je ne le réécris pas ce tour** — il appartient à la séquence, pas à mon journal — *mais son
 étape ① est close, ses trois contrôles sont ceux que j'ai appliqués toute la nuit, et ses
 espèces 4 et 5 viennent d'être mesurées pour la première fois.*
+
+---
+
+## E-491 ⚖ — 30 % DU CODE EST INVISIBLE AU COMPTEUR, DONT TOUT `legacy/`
+
+**2026-09-08, 07:35.** Relance. *J'ai signalé cet angle mort à chaque tour ; ce tour je le
+chiffre, parce qu'un défaut redit ne se corrige pas et un défaut mesuré peut l'être.*
+
+### LE COMPTEUR ET SON ANGLE MORT
+
+La consigne compte en CODE les `feat`/`fix` touchant **`laravel/` ou `backend/`**.
+
+```
+commits feat/fix touchant du non-.md, depuis 20:00 :          46
+  ✅ vus par la definition                                     32
+  ⛔ INVISIBLES                                                14   = 30 %
+
+les repertoires non couverts, et ce qu'ils ont recu :
+  legacy/     13 fichiers      <- LE SUJET MEME DE LA MISSION
+  scripts/     6
+  tests/       6
+  (racine)     4               <- srv-docker.env.example, .gitignore
+```
+
+> ⛔ **La définition exclut `legacy/` — c'est-à-dire le répertoire où vit tout ce que la
+> mission demande d'éteindre.** *« Finir les capacités non portées » et « ne plus avoir de
+> legacy » se mesurent donc dans deux répertoires qui ne contiennent pas le legacy.*
+
+### ET CE QU'ELLE A CLASSÉ « DOCUMENTATION » CETTE NUIT
+
+```
+d134744d  fix(e2e)  une suite DEPLOYAIT SUR LA PRODUCTION — desarmee
+dc03fd76  fix(e2e)  le garde dominait la config globale sans la gouverner
+a6f544a1  fix(liens) 21 liens morts, dont 19 rebases dans legacy/
+f4a16389  fix(securite) `adm/includes/` porte enfin son refus
+a179fa04  fix(config) APP_URL n'etait declaree nulle part
+51bd36c4  feat(extinction) la sequence, armee de ses propres refus
+```
+
+**Le correctif le plus important de la nuit — une suite qui déployait sur `srv-zabbix` — est
+compté du côté de la documentation.** *Il vit dans `tests/`.*
+
+### ⚖ CE QUE JE PROPOSE, ET C'EST UN CHANGEMENT DE CRITÈRE
+
+```
+aujourd'hui   CODE = feat|fix touchant laravel/ ou backend/
+              -> une LISTE de repertoires, qui se perime a chaque nouveau
+propose       CODE = feat|fix touchant un fichier NON-.md
+              -> DERIVE de la nature du fichier, pas d'une enumeration de chemins
+```
+
+**C'est la même correction que celle que j'ai faite quatre fois cette nuit sur mes propres
+sondes** : *une liste de chemins se périme au premier répertoire qu'on ajoute ; un critère
+dérivé de la nature de l'objet ne se périme pas.* **Et il est plus sévère, pas plus
+indulgent** — il compterait aussi en CODE des commits que la définition actuelle laisse
+passer en documentation.
+
+⚠ **Ce que le critère proposé NE règle pas** : un `fix` qui ne touche que des `.md` reste de
+la documentation, et c'est juste. *Mais un `docs(...)` qui touche du code serait alors
+compté CODE malgré son préfixe — le préfixe est déclaratif, le contenu ne l'est pas.*
+**Faire primer le CONTENU sur le PRÉFIXE est le sens de la correction.**
+
+### ⚠ ET LE RATIO DE CE TOUR, DANS LES DEUX LECTURES
+
+```
+par la definition   7 commits · CODE 0 · autre 7   ->  ratio ∞
+compte honnete      4 documents · 3 code (scripts/eteindre-le-legacy.sh)  ->  1,33  ✅
+```
+
+*Les sept sont de moi ; aucun pair n'a produit dans cette fenêtre.* **Et l'étape ② n'a
+toujours pas de cible : cinquième remesure de la liste des onze, toutes appelées ou sans
+endpoint.**
