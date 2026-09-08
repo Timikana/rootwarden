@@ -199,6 +199,16 @@
         fermeConsentement();
         annonceApplDire('');
         composeLeJeu();
+
+        /*
+         * I6 : la version lue appartient a la machine PRECEDENTE, et son verdict
+         * Q2 a ete calcule sur le port de celle-la. Changer de cible perime donc
+         * tout — la meme raison que `dernierReleve`, `derniereCopie` et le jeu
+         * de I5. Restaurer sur une machine une version lue sur une autre est
+         * exactement ce que le `WHERE id = ? AND server_id = ?` du service
+         * empeche cote serveur ; l'ecran ne doit pas non plus le proposer.
+         */
+        rbRemetAZero();
         annonceValidDire('');
 
         if (!id || !opt) {
@@ -600,7 +610,23 @@
                 tdMotif.textContent = motif !== '' ? motif : t('histo_sans_motif');
                 if (motif === '') { tdMotif.className = 'rw-tableau__discret'; }
 
-                tr.append(tdDate, tdAuteur, tdMotif);
+                /*
+                 * I6 — LE BOUTON DE RETOUR ARRIERE. Il ne declenche AUCUN geste :
+                 * il LIT la version pour la montrer et repondre a Q2. Le geste
+                 * lui-meme attend un consentement, deux ecrans plus loin.
+                 */
+                var tdAction = document.createElement('td');
+                var bRb = document.createElement('button');
+                bRb.type = 'button';
+                bRb.className = 'rw-bouton rw-bouton--minuscule';
+                bRb.dataset.rw = 'ipt-rb-choisir-' + v.id;
+                bRb.textContent = t('rb_bouton');
+                bRb.addEventListener('click', (function (id, date) {
+                    return function () { litLaVersion(id, date); };
+                }(v.id, String(v.date || ''))));
+                tdAction.appendChild(bRb);
+
+                tr.append(tdDate, tdAuteur, tdMotif, tdAction);
                 corpsHisto.appendChild(tr);
             }
             cadreHisto.hidden = false;
@@ -982,6 +1008,171 @@
         });
     }
     garnisLesGabarits();
+
+    // ══════════════════════════════════════════════════════════════════════
+    //  SOUS-LOT I6 — LE RETOUR ARRIERE
+    // ══════════════════════════════════════════════════════════════════════
+    //
+    // ⚠ PLUS DANGEREUX QUE L'APPLICATION, ET NON MOINS :
+    //
+    //   APPLIQUER       l'operateur ECRIT les regles, il les a sous les yeux
+    //   RETOUR ARRIERE  l'operateur choisit une DATE, il ne peut pas se relire
+    //
+    // Le legacy y met un `confirm()` de navigateur, et rien d'autre : ni Q1 ni Q2.
+    // Laisser ce geste la-bas n'aurait pas ete de la prudence — c'aurait ete
+    // laisser le plus dangereux des cinq sans aucune garde pendant que le portail
+    // gardé prend les quatre plus surs.
+    //
+    // ⚠ ET Q2 SE CALCULE SUR LE PORT ACTUEL. `iptables_history` ne porte AUCUN
+    // port : une version etait valide LE JOUR DE SON ARCHIVAGE. Si le port SSH a
+    // change depuis — c'est-a-dire si quelqu'un a suivi le durcissement qu'on
+    // prescrit — la restaurer FERME l'acces. Et la reprise passerait elle aussi
+    // par SSH.
+    var sectionRb   = document.querySelector('[data-rw="ipt-rb"]');
+    var rbArchive   = document.querySelector('[data-rw="ipt-rb-archive"]');
+    var rbApercu    = document.querySelector('[data-rw="ipt-rb-apercu"]');
+    var rbSsh       = document.querySelector('[data-rw="ipt-rb-ssh"]');
+    var rbBouton    = document.querySelector('[data-rw="ipt-rb-bouton"]');
+    var rbAnnonce   = document.querySelector('[data-rw="ipt-rb-annonce"]');
+    var rbEtatZone  = document.querySelector('[data-rw="ipt-rb-etat"]');
+    var rbConf      = document.querySelector('[data-rw="ipt-rb-conf"]');
+    var rbConfTitre = document.querySelector('[data-rw="ipt-rb-conf-titre"]');
+    var rbConfTexte = document.querySelector('[data-rw="ipt-rb-conf-texte"]');
+    var rbConfOk    = document.querySelector('[data-rw="ipt-rb-conf-ok"]');
+    var rbConfNon   = document.querySelector('[data-rw="ipt-rb-conf-non"]');
+
+    /** La version lue et son verdict. `null` tant que rien n'est restaurable. */
+    var versionCourante = null;
+
+    function rbDire(texte, variante) {
+        if (!rbAnnonce) { return; }
+        rbAnnonce.textContent = texte || '';
+        rbAnnonce.className = 'rw-annonce' + (variante ? ' rw-annonce--' + variante : '');
+    }
+
+    function fermeRbConsentement() {
+        if (rbConf) { rbConf.hidden = true; }
+        if (rbConfOk) { rbConfOk.disabled = true; }
+    }
+
+    function rbRemetAZero() {
+        versionCourante = null;
+        if (sectionRb) { sectionRb.hidden = true; }
+        if (rbApercu) { rbApercu.textContent = ''; }
+        if (rbArchive) { rbArchive.textContent = ''; }
+        if (rbSsh) { rbSsh.textContent = ''; rbSsh.className = 'rw-annonce'; }
+        if (rbBouton) { rbBouton.disabled = true; }
+        if (rbEtatZone) { rbEtatZone.replaceChildren(); }
+        fermeRbConsentement();
+        rbDire('');
+    }
+
+    /*
+     * Lit la version archivee — LECTURE SEULE, aucune machine jointe — puis rend
+     * Q2 sur le port ACTUEL. Le bouton de restauration ne s'active que si Q2 rend
+     * `true` : `false` ET `null` refusent tous les deux.
+     */
+    function litLaVersion(versionId, date) {
+        var id = selecteur ? selecteur.value : '';
+        if (!id) { rbDire(t('aucune_machine_choisie'), 'echec'); return; }
+        rbRemetAZero();
+        if (sectionRb) { sectionRb.hidden = false; }
+        rbDire(t('rb_lecture'));
+
+        appellePortage('/pare-feu/version', { machine_id: Number(id), version_id: Number(versionId) })
+            .then(function (r) {
+                var corps = r.corps || {};
+                if (r.statut !== 200 || corps.success !== true) {
+                    // Le serveur rend deja sa phrase ; on ne la reformule pas.
+                    rbDire(String(corps.message || t('rb_lecture_echec')), 'echec');
+
+                    return;
+                }
+                var regles = String(corps.rules_v4 || '');
+                var port = Number(corps.port_ssh || 0);
+                if (rbApercu) { rbApercu.textContent = regles; }
+                if (rbArchive) { rbArchive.textContent = t('rb_archive_le', { date: date || corps.created_at }); }
+                rbDire('');
+
+                if (!window.rwLaisseLeSshOuvert || !port) {
+                    rbSsh.textContent = t('rb_ssh_doute', { port: port || '?' });
+                    rbSsh.className = 'rw-annonce rw-annonce--echec';
+
+                    return;
+                }
+                var ouvert = window.rwLaisseLeSshOuvert(regles, port);
+                if (ouvert === true) {
+                    rbSsh.textContent = t('rb_ssh_ouvert', { port: port });
+                    rbSsh.className = 'rw-annonce rw-annonce--ok';
+                    versionCourante = { id: Number(versionId), date: date, regles: regles, port: port };
+                    if (rbBouton) { rbBouton.disabled = false; }
+
+                    return;
+                }
+                rbSsh.textContent = ouvert === false
+                    ? t('rb_ssh_ferme', { port: port })
+                    : t('rb_ssh_doute', { port: port });
+                rbSsh.className = 'rw-annonce rw-annonce--echec';
+            });
+    }
+
+    /* Q4 — ouvrir le panneau n'emet rien : aucun `appelle()` ici. */
+    function demandeRbConsentement() {
+        if (!versionCourante) { return; }
+        var o = optionChoisie();
+        var machine = o ? (o.textContent || '').trim() : '';
+        if (rbConfTitre) {
+            rbConfTitre.textContent = t('rb_conf_titre', { date: versionCourante.date, machine: machine });
+        }
+        if (rbConfTexte) { rbConfTexte.textContent = t('rb_conf_texte', { machine: machine }); }
+        if (rbConf) { rbConf.hidden = false; }
+        if (rbConfOk) { rbConfOk.disabled = false; }
+        if (rbConf && rbConf.scrollIntoView) { rbConf.scrollIntoView({ block: 'center' }); }
+    }
+
+    function restaure() {
+        if (!versionCourante) { return; }
+        var id = selecteur ? selecteur.value : '';
+        if (!id) { rbDire(t('aucune_machine_choisie'), 'echec'); return; }
+
+        fermeRbConsentement();
+        var repos = rbBouton.textContent;
+        rbBouton.disabled = true;
+        rbBouton.textContent = t('rb_en_cours');
+        rbDire(t('rb_en_cours'));
+        if (rbEtatZone) { rbEtatZone.replaceChildren(); }
+
+        appelle('/iptables-rollback', { history_id: versionCourante.id }).then(function (r) {
+            rbBouton.disabled = false;
+            rbBouton.textContent = repos;
+
+            // Q3 — le meme juge que I5, donc la meme phrase pour le meme cas.
+            var verdict = window.rwRetourPareFeu
+                ? window.rwRetourPareFeu(r.corps, r.statut, r.statut === 0)
+                : { ton: 'inabouti', titre: 'ipt_retour_contrat_inconnu', detail: '', sur: false };
+            var variante = verdict.ton === 'succes' ? 'ok'
+                : (verdict.ton === 'echec' ? 'echec' : 'attention');
+            rbDire(t(verdict.titre), variante);
+            if (rbEtatZone && verdict.detail) {
+                var pre = document.createElement('pre');
+                pre.className = 'rw-fichier';
+                pre.textContent = String(verdict.detail);
+                rbEtatZone.appendChild(pre);
+            }
+            // Un retour arriere reussi ARCHIVE l'etat precedent : l'historique a
+            // donc une ligne de plus, et la liste doit le refleter.
+            if (verdict.sur === true && verdict.ton === 'succes') { chargeHistorique(); }
+        });
+    }
+
+    if (rbBouton) { rbBouton.addEventListener('click', demandeRbConsentement); }
+    if (rbConfOk) { rbConfOk.addEventListener('click', restaure); }
+    if (rbConfNon) {
+        rbConfNon.addEventListener('click', function () {
+            fermeRbConsentement();
+            rbDire(t('rb_annule'), 'attention');
+        });
+    }
 
     surChoix();
 }());

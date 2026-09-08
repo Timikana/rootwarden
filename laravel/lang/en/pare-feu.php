@@ -160,4 +160,28 @@ return [
     'appl_conf_ok'    => 'Replace the rules',
     'appl_conf_non'   => 'Cancel',
     'appl_annule'     => 'Cancelled — no request was sent.',
+
+    /* I6 — rollback. It is MORE dangerous than applying, not less: applying, the
+     * operator WRITES the rules and can read them; rolling back, they pick a DATE.
+     * `iptables_history` carries no port, and an archived version was valid ON THE
+     * DAY IT WAS ARCHIVED — if the SSH port changed since, restoring it closes
+     * access. Q2 therefore uses TODAY's port, never the archive's.
+     * The first two keys are rendered by the SERVER and need not travel. */
+    'rb_version_absente'     => 'No version selected.',
+    'rb_version_introuvable' => 'That version cannot be found for this machine.',
+    'rb_titre'      => 'Rollback',
+    'rb_bouton'     => 'Return to this version',
+    'rb_lecture'    => 'Reading the archived version…',
+    'rb_lecture_echec' => 'The version could not be read. Nothing was restored.',
+    'rb_apercu'     => 'What will be restored',
+    'rb_archive_le' => 'Version archived on :date',
+    'rb_ssh_ouvert' => "SSH port :port — the machine's port TODAY — stays reachable with this version.",
+    'rb_ssh_ferme'  => "⛔ This version CLOSES SSH port :port, which is the machine's port today. It may have been valid the day it was archived: restored now, it would cut your access.",
+    'rb_ssh_doute'  => '⛔ Whether this version leaves SSH port :port open cannot be determined. We refuse rather than gamble — and recovery would also go over SSH.',
+    'rb_conf_titre' => 'Restore the version from :date on :machine?',
+    'rb_conf_texte' => 'The current rules on :machine will be REPLACED by this archived version. The current state is archived before the write, so this rollback is itself reversible. No request has been sent yet.',
+    'rb_conf_ok'    => 'Restore this version',
+    'rb_conf_non'   => 'Cancel',
+    'rb_en_cours'   => 'Restoring…',
+    'rb_annule'     => 'Cancelled — no request was sent.',
 ];

@@ -5,6 +5,83 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## I6 — le retour arrière : porté, et pourquoi c'était le plus dangereux des cinq
+
+### L'asymétrie qui décide, et elle renverse l'attente
+
+    APPLIQUER       l'operateur ECRIT les regles : il les a sous les yeux
+    RETOUR ARRIERE  l'operateur choisit une DATE : il ne peut pas se relire
+
+Le legacy y met un `confirm()` de navigateur et rien d'autre — ni Q1, ni Q2. **Laisser ce
+geste là-bas n'était pas de la prudence : c'était laisser le plus dangereux des cinq sans
+aucune garde pendant que le portail gardé prenait les quatre plus sûrs.**
+
+### Q2 se calcule sur le port ACTUEL, jamais sur celui de l'archive
+
+`iptables_history` ne porte **aucun port**. Une version archivée était valide **le jour de son
+archivage** : si le port SSH a changé depuis — c'est-à-dire *si quelqu'un a suivi le
+durcissement qu'on prescrit* — la restaurer ferme l'accès. Et la reprise passerait elle aussi
+par SSH.
+
+*Aucune colonne de port n'a été ajoutée à `iptables_history` : elle n'expliquerait qu'un refus
+après coup, là où Q2 sur le port actuel le prévient.*
+
+### Montrer le texte n'est pas un confort
+
+`GET /iptables-history` ne rend pas les règles (par volume), et le seul `SELECT` qui les lit
+est **dans la route qui les applique**. Sans une lecture séparée, montrer le texte exigerait de
+l'appliquer d'abord. D'où `POST /pare-feu/version` — lecture seule, aucune machine jointe.
+
+> **Un geste dont on ne voit pas l'objet ne se consent pas : il s'accepte.**
+
+### La garde est dans le `WHERE`, sur l'objet atteint
+
+    SELECT ... FROM iptables_history WHERE id = ? AND server_id = ?
+
+Une version appartenant à une **autre** machine rend `null`, même si le demandeur a accès à
+celle qu'il annonce. *Sans le `server_id`, un `history_id` forgé suffirait à lire le pare-feu
+d'une machine interdite — et, le retour arrière posé, à l'y appliquer.* Même règle que
+`/iptables-rollback` côté backend, qui contrôle l'accès **après** avoir résolu la version.
+
+### Mesure — la moitié serveur : 7 assertions, 0 échec, table INTACTE
+
+`iptables_history` est **vide** : une assertion de cloisonnement y serait vacante. La mesure
+insère donc une version **dans une transaction annulée** — nothing persists — pour disposer
+d'un **témoin positif** :
+
+    TEMOIN POSITIF  la version est lue pour SA machine
+    ⛔ la MEME version est REFUSEE pour une autre machine
+    ⛔ refusee aussi pour la production (machine 1)
+    un id inexistant rend null
+    les REGLES sont bien rendues (non vides)
+    le LISTING, lui, ne transporte AUCUNE regle
+    ⛔ APRES ANNULATION la table est intacte (0 ligne)
+
+*Sans le témoin positif, les quatre refus seraient indiscernables d'une table vide. Et on ne
+fabrique pas la condition d'une mesure sur une donnée partagée : la transaction annulée est ce
+qui permet les deux à la fois.*
+
+### ⚠ CE QUI N'EST PAS MESURÉ, ET POURQUOI — À NE PAS LIRE COMME VÉRIFIÉ
+
+**Le parcours au navigateur de I6 n'a pas pu être exercé.** La machine est à bout :
+
+    load average 13,57  ·  RAM 5783/5958 Mo  ·  SWAP 3702/3702 Mo (100 %)
+    memoire disponible 140 Mo  ·  Chrome : « Timed out waiting for the WS endpoint »
+
+Deux tentatives, même échec. **Ce n'est pas un défaut du code : c'est l'impossibilité de
+lancer un navigateur.** Restent donc non mesurés à l'écran : le bouton par ligne
+d'historique, la quatrième colonne, l'aperçu, le verdict Q2 rendu, le panneau de consentement,
+et **Q4 au réseau** — `0` requête avant consentement, `1` après.
+
+*Ce qui EST vérifié sans navigateur : `node --check`, `php -l`, la parité FR/EN (116 = 116),
+le trajet des 15 clés par la liste curatée du contrôleur, et les 13 classes CSS relevées dans
+`rw.css`. Cela ne remplace pas le parcours.*
+
+**À rejouer dès que la machine respire** : `i6-rollback.mjs` est écrit et prêt (bac à sable),
+et il stubbe `/api/gateway/` **et** `/pare-feu/*`, donc ni machine jointe ni base touchée.
+
+---
+
 ## I5 — appliquer un jeu de règles : l'écran, le consentement, et les quatre propriétés
 
 ### ⚠ Ce que I5 crée, et ce qu'il ne crée pas
