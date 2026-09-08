@@ -102,10 +102,21 @@ if __name__ == '__main__':
 #
 #   ./scripts/geste-porte.py /preflight_check /logs /policy/rollback \
 #       /bashrc/deploy /bashrc/backups /server_user_remove_key      # APPELE x6
-#   ./scripts/geste-porte.py /zzz-invente /supervision /bashrc/prerequisites
+#   ./scripts/geste-porte.py /zzz-invente /supervision /policy/deployments
 #                                                                   # ABSENT x3
 #
-# `/supervision` doit rendre ABSENT : la route reelle est
-# `/supervision/<plateforme>/deploy`, et c'est elle qui piegeait l'ancre
-# tolerante. `/bashrc/prerequisites` doit rendre ABSENT : il est inexprimable
-# par decision, et une sonde qui le declarerait porte effacerait cette decision.
+# Les trois absences sont STRUCTURELLES, et c'est voulu :
+#   `/zzz-invente`        n'existe nulle part ;
+#   `/supervision`        la route reelle est `/supervision/<plateforme>/deploy`,
+#                         et c'est elle qui piegeait l'ancre tolerante ;
+#   `/policy/deployments` retiree du backend par `80c2057` et non restauree.
+#
+# ⚠⚠ UN TEMOIN DONT LE STATUT DEPEND D'UNE DECISION SE PERIME QUAND LA DECISION
+# BOUGE. Ce jeu portait `/bashrc/prerequisites` comme temoin negatif, au motif
+# qu'il etait « inexprimable par decision ». **Le 2026-09-07 a 21:46, une session
+# l'a porte au titre de l'iso-perimetre** — la decision a change, et le temoin
+# est devenu FAUX sans que rien dans l'outil ne bouge. La sonde, elle, avait
+# raison : elle a trouve l'appel a `bashrc.js:280`.
+#
+# *Un temoin doit etre absent par CONSTRUCTION, jamais par arbitrage.* Sinon le
+# jour ou il rougit, on soupçonne l'instrument au lieu de lire ce qu'il dit.
