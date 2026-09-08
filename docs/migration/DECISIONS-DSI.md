@@ -14577,3 +14577,126 @@ tenant la seconde pour le mot explicite** — elle est de l'exploitant, elle est
 elle nomme le geste. *Je n'ai fusionné aucune branche, et pas seulement par prudence :
 `origin/main` porte 7 commits absents de la branche, donc une fusion est une intégration à
 lire, pas un bouton.*
+
+---
+
+## ⛔ E-479 — J'AI DÉSINFORMÉ L'EXPLOITANT SUR UN GESTE QU'IL AVAIT DÉJÀ FAIT
+
+**2026-09-08, ~05:1x.** *La faute que je reprochais au plan, commise par moi le même tour,
+et transmise à l'exploitant deux fois.*
+
+### ① « IL NE MANQUE QUE `docker compose up -d` » — L'ÉCHANGE EST APPLIQUÉ DEPUIS LA VEILLE
+
+J'ai écrit, à l'exploitant et à la session qui tient le plan, que l'échange des ports était
+*« écrit partout, il ne manque que `up -d` »*. **Mesuré au réseau, avec le bon schéma pour
+chaque port :**
+
+```
+http://localhost:8080/    301   portage, redirection vers HTTPS
+https://localhost:8443/up 200   PORTAGE  <- les ports du portail historique
+http://localhost:8444/    301   legacy
+https://localhost:8446/   403   LEGACY   <- refuse par son .htaccess racine
+rootwarden_laravel  8080->80 · 8443->443
+rootwarden_php      8444->80 · 8446->443
+```
+
+**L'échange a été appliqué le 2026-09-07 à 19:39** — la session qui tient le plan l'a daté.
+*Je l'ai annoncé comme restant à faire pendant plus de vingt-quatre heures.*
+
+> **Et c'est exactement le défaut que je venais de reprocher au §2 ter du plan : un état
+> décrit au présent alors qu'il a changé.** *Je l'ai commis dans le message même où je le
+> signalais.*
+
+**Ma cause est identifiable et bête : j'ai lu l'ARBRE.** Le compose, l'env, l'entrypoint
+portaient les bonnes valeurs — donc « écrit ». Et j'en ai déduit « pas encore appliqué »
+parce que le plan le disait. *Deux sources d'accord, et aucune n'était le service.* **Le
+seul instrument qui pouvait trancher était une requête, et je ne l'ai pas faite.**
+[[feedback_arbre_ou_service]], et le plus cher des cas : **le journal et l'arbre
+concordaient, et tous deux étaient en retard sur le service.**
+
+### ② « LE RÉPERTOIRE `patchs-en-attente/` N'EXISTE PLUS » — IL EXISTE, HUIT FICHIERS
+
+```
+docs/migration/patchs-en-attente/   8 fichiers
+05-echange-des-ports-entrypoint.patch   `git apply --check --reverse` PASSE -> applique
+06-echange-des-ports-runner.patch       idem
+```
+
+**Mon `ls patchs-en-attente/` partait de la racine du dépôt.** *Le plan citait le chemin
+sans son préfixe, je l'ai recopié tel quel, et l'absence de sortie s'est lue « le
+répertoire n'existe plus ».*
+
+> **Un chemin relatif recopié depuis une prose n'est pas un chemin mesuré.** *Et `ls` sur un
+> répertoire absent, avec `2>/dev/null` quelque part dans la chaîne, rend exactement ce que
+> rend un répertoire vide.*
+
+**Troisième forme du même défaut cette nuit** : `2>/dev/null` sur un constat, un motif sans
+ancre, et maintenant un chemin sans racine. *Les trois rendent un silence qu'on lit comme
+une absence.*
+
+### ③ ET UN TROISIÈME QUI EST JUSTE SUR LE FOND, FAUX SUR L'ADRESSE
+
+J'ai attribué « 151 compilés dont 111 root » au §2 ter. **C'est au §7**, lignes 5510 et
+5589. *Le chiffre est bien périmé — mais quelqu'un l'aurait cherché au mauvais endroit, et
+une correction mal adressée coûte le temps de celui qui la suit.*
+[[feedback_erreur_de_designation]].
+
+### CE QUE ÇA CHANGE POUR CE QUI ATTEND L'EXPLOITANT
+
+```
+AVANT (ce que j'ai annonce)          APRES (mesure)
+1  docker compose up -d               ⛔ RETIRE — fait le 2026-09-07 a 19:39
+2  docker compose restart python      reste : E-460 (GEOIP) + E-461 (fragments)
+3  .claude/skills/rw-pre-commit:15    reste
+4  MAIL_MAILER=smtp                   reste (etape ⑤ du DOSSIER-48)
+5  les deux decisions du DOSSIER-49   restent (conservation · transfert ip-api)
+6  ⬅ NEUF : LA MEMOIRE DE LA MACHINE
+```
+
+**⚠ ⑥ EST NOUVEAU ET IL BLOQUE TOUTE MESURE À L'ÉCRAN.** Relevé par la session du banc,
+puis par moi :
+
+```
+au pic (releve du banc)   load 13,57 · swap 3702/3702 (100 %) · 140 Mo dispo
+                          Chrome : « Timed out waiting for the WS endpoint », 2 fois
+a ma mesure               load 3,01 · swap 3629/3702 (98 %) · 1408 Mo dispo
+les 7 plus gros           7 x `claude`, 315 a 374 Mo  ->  ~2,4 Go pour la flotte
+```
+
+> **Aucune session ne peut mesurer à l'écran en ce moment, et une suite lancée maintenant
+> échouera pour cette raison — pas pour la sienne.** *C'est la pire forme de faux négatif :
+> un échec attribué au code qu'on éprouve.*
+
+**Et c'est déjà écrit** ([[project_migration_vm_debian]]) : *3,8 Gio était sous le plancher,
+passer à 8.* La machine en porte 5,9 et la flotte de huit sessions en consomme 2,4 à elle
+seule. **Ce n'est pas une fuite, c'est un dimensionnement.**
+
+---
+
+## ✅ E-479 bis — LES CINQ GESTES DU PARE-FEU SONT PORTÉS
+
+```
+pare-feu.js, code depouille :
+  iptables-validate  1     I4
+  iptables-apply     1     I5
+  iptables-rollback  1     I6
+  pare-feu/version   1     le chemin de LECTURE, qui n'existait pas
+```
+
+**Le retour arrière est porté, et mon point 1 était impraticable tel que je l'avais écrit.**
+J'avais dit *« récupérer le texte archivé — le `SELECT` existe déjà, `:396` »*. **Ce `SELECT`
+est DANS la route qui applique** : montrer le texte aurait exigé de l'appliquer d'abord, ce
+qui vidait mon point 3 de son sens. *Une lecture n'existait pas ; il a fallu la créer* —
+`POST /pare-feu/version`, `WHERE id = ? AND server_id = ?`, **les deux identifiants dans le
+même `WHERE` étant la garde** : sans le `server_id`, un `history_id` forgé lisait le
+pare-feu d'une machine interdite, et le retour arrière posé, l'y appliquait.
+
+> **Ma forme citait un `SELECT` sans regarder DANS QUELLE ROUTE il vivait.** *Le grain de ma
+> lecture était la requête ; l'objet était le chemin qui l'exécute.*
+
+**Et la moitié navigateur n'est pas mesurée** — le bouton par ligne, l'aperçu, le verdict Q2
+rendu, le panneau de consentement, Q4 au réseau. *Déclaré en clair dans le commit et le
+CHANGELOG plutôt que présenté comme vérifié, et c'est la mémoire qui l'empêche, pas le
+code.* **Le panneau `suite` continue donc d'annoncer que le retour arrière est ailleurs :
+la session refuse d'écrire « tout est porté » sans l'avoir vu, et c'est précisément ce que
+ce panneau existe pour éviter.**
