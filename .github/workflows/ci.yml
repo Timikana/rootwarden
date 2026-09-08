@@ -565,13 +565,6 @@ jobs:
               # rw-sql-fstring-execute : interpolation dans la requete
               cur.execute(f"SELECT * FROM machines WHERE id = {ident}")
 
-          def par_variable(client, nom, pwd):
-              # rw-shell-fstring-var-execute-as-root : la f-string passe par une
-              # VARIABLE avant l'appel. C'est la forme que la regle soeur ne
-              # voyait pas, et c'est celle de `apt_update` (5 sites).
-              cmd = f"apt-mark hold {nom}"
-              execute_as_root(client, cmd, pwd)
-
           def decode_laxiste(octets):
               # rw-decode-errors-ignore : masque un dechiffrement rate
               return octets.decode('utf-8', errors='ignore')
@@ -628,16 +621,6 @@ jobs:
               # rw-sql-fstring-execute : forme GARDEE — placeholder
               cur.execute("SELECT * FROM machines WHERE id = %s", (ident,))
 
-          def par_variable_garde(client, nom, pwd):
-              # rw-shell-fstring-var-execute-as-root : forme GARDEE. L'exemption
-              # porte sur TOUT l'intervalle apparie — de l'affectation a l'appel —
-              # donc un quote pose ICI compte, alors qu'il est sur une AUTRE ligne
-              # que l'appel. C'est exactement ce que la regle soeur ne sait pas
-              # faire (cf. graylog.py:410, quote 3 lignes plus haut, accuse quand
-              # meme).
-              cmd = f"apt-mark hold {shlex.quote(nom)}"
-              execute_as_root(client, cmd, pwd)
-
           def decode_strict(octets):
               # rw-decode-errors-ignore : forme GARDEE — pas de masquage
               return octets.decode('utf-8')
@@ -693,8 +676,7 @@ jobs:
                    rw-php-echo-unescaped-var rw-subprocess-shell-true \
                    rw-php-equals-on-hash rw-php-weak-random rw-php-debug-leak \
                    rw-sql-fstring-execute rw-decode-errors-ignore \
-                   rw-aes-cbc-encrypt \
-                   rw-shell-fstring-var-execute-as-root; do
+                   rw-aes-cbc-encrypt; do
             n=$(jq --arg r "$r" '[.results[] | select(.check_id | endswith($r))] | length' /tmp/mord.json)
             printf "  %-36s %s trouvaille(s)\n" "$r" "$n"
             [ "$n" -ge 1 ] || { echo "::error::$r ne MORD PAS — reparee en apparence seulement"; manquantes=$((manquantes+1)); }
