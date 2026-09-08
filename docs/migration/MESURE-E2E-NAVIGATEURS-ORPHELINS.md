@@ -338,3 +338,74 @@ plomberie ne porte pas de témoin.*
 pour être présent en code nu doit subsister.* **Trois d'entre eux existent
 maintenant, et les deux premiers sont exactement ceux qui manquaient à nos DEUX
 instruments.**
+
+
+---
+
+## 9. ✅ LE DÉFAUT (b) ÉTAIT UN MIRAGE — `129 / 67 / 0`, et ma vérification a produit sa propre fausse alarme
+
+**Confirmé indépendamment, avec le prédicat JUSTE :**
+
+```
+predicat JUSTE : un `exit` apres le lancement, AUCUNE fermeture AVANT lui
+  -> cas reels : 0
+```
+
+**Les 41 « défauts » textuels fermaient le navigateur AVANT de sortir. C'est
+l'idiome du répertoire, et le prédicat l'accusait.**
+
+> **La position TEXTUELLE d'un `exit` n'est pas son ordre d'exécution — et une
+> fermeture qui le PRÉCÈDE le rend inoffensif.** *Le critère retenait tout `exit`
+> situé avant la DERNIÈRE fermeture du fichier, donc il comptait comme fautif le
+> geste le plus banal du répertoire.*
+
+### 9.1 ⚠ ET MA PROPRE VÉRIFICATION A ACCUSÉ TROIS FICHIERS SAINS
+
+**J'ai vérifié l'exculpation — c'est la classe que personne ne relit — et j'ai
+trouvé 3 cas restants. Ils étaient faux.**
+
+```
+go-page-chatops       close:337  exit:341   ecart 4 lignes
+go-page-graylog-g2    close:389  exit:392   ecart 3
+go-page-maintenance   close:467  exit:471   ecart 4
+```
+
+**J'avais posé une fenêtre de « ≤ 2 lignes » — un nombre MAGIQUE, que je n'ai
+dérivé de rien.** *Les trois fermaient bien avant leur `exit` ; il y avait une
+ligne de message entre les deux.*
+
+> ⛔ **Et mon erreur était du côté qui ALARME, comme les trois précédentes sur ce
+> même compte.** *Quatre erreurs d'alarme sur un seul défaut, réparties sur deux
+> sessions.*
+
+### 9.2 La cause commune des QUATRE
+
+**Chacune a substitué un SUBSTITUT à la propriété :**
+
+    la propriete           « une fermeture est-elle ATTEINTE avant l'exit ? »
+    substitut 1            la position textuelle de l'exit
+    substitut 2            « avant la DERNIERE fermeture du fichier »
+    substitut 3 (le mien)  l'ECART EN LIGNES entre les deux
+
+> **Un substitut se trompe toujours dans un sens, et il est stable : il ne se
+> signale pas.** *Les trois substituts se trompaient du côté de l'accusation —
+> parce qu'un substitut de proximité échoue quand le code est aéré, et le code
+> aéré est le code soigné.*
+
+**Le témoin qui manquait est celui-là, et il coûte une ligne** : *un fichier qui
+ferme puis sort sur deux lignes consécutives ne doit PAS être un défaut.*
+
+### 9.3 Le compte final, et ce qu'il vaut
+
+    REFERENCE   110/62/37 -> 125/70/37 -> 129/67/41 -> 129/67/0
+
+**`(a) = 67` est le seul défaut réel. Et mon 67 du premier message était juste par
+ACCIDENT — deux erreurs de signes opposés — alors qu'il l'est maintenant par
+mesure.** *La différence ne se voit pas dans le chiffre ; elle se voit dans ce
+qu'on peut en faire.*
+
+⚠ **Et une classe de défaut d'outil, à garder** : *un module d'invariant
+s'exécutait À L'IMPORT et posait `process.exitCode`.* **Un module qui expose des
+fonctions ET agit au chargement ne peut pas être importé — et il fait échouer le
+programme APPELANT.** *Trouvé en réutilisant son lexeur depuis une autre sonde :
+les deux sorties se sont mêlées.*

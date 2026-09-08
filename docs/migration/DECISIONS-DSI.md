@@ -16528,3 +16528,61 @@ une panne dans des tests qui passent.*
 ⚠ **Autorisation** : j'avais demandé le mot pour ce pas, hors de mon périmètre.
 La réponse a été « carte blanche tu es DSI », que je lis comme le oui pour cette
 ligne précise. *Je le consigne plutôt que de le supposer.*
+
+---
+
+## E-514
+
+**Je cesse de relancer la boucle. L'avertissement de l'étape 1 me décrit.**
+
+*« Si le rapport doc/code dépasse 2 pour 1, le dire et l'attaquer : l'équipe
+écrit sur ses propres mesures au lieu de porter. »* **Cinq tours de suite à zéro
+CODE, quatre révisions d'un seul compte en une soirée, cinq des dix derniers
+commits de moi, et un défaut — `(b)` — qui n'a jamais existé.**
+
+### L'étape 2 est sans objet, par trois voies indépendantes
+
+```
+① item par item                       E-501
+② le script d'extinction              six « deja archivee », exit 0    (E-508)
+③ les sites d'APPEL du JS, ce soir    0 orphelin sur 81 chemins
+     58 litteraux  -> 49 backend · 8 Laravel · 1 passerelle
+     23 concatenes -> 15 Laravel · 6 backend · 2 verifies a la main
+     temoins : /fail2ban/status ✅ · /connexion ✅ · absurdites ✅
+```
+
+**L'item ① est établi ce soir et non récité**, comme la charte l'exige. Les 23
+chemins concaténés sont comptés à part et examinés, pas tronqués.
+
+### Cinq fausses alarmes en un jour, et une seule forme
+
+```
+la propriete                              le substitut            l'erreur
+un finally GOUVERNE la fermeture ?        sa PRESENCE             55 dedouanes
+la population des suites                  launch LITTERAL         15 invisibles
+une fermeture precede l'exit ?            position TEXTUELLE      40 accuses
+idem (le pair)                            ecart en LIGNES ≤2      3 accuses
+le chemin compose atteint un repondant ?  prefixe LITTERAL        2 accuses
+```
+
+> **Chacune a substitué un SUBSTITUT à la propriété. Un substitut se trompe
+> toujours dans le même sens, et il est stable : il ne se signale pas.**
+
+⚠ **Et les substituts de proximité échouent quand le code est AÉRÉ — donc nos
+instruments accusaient préférentiellement les fichiers les mieux écrits.**
+
+### Ce que je garde, et pourquoi
+
+Les instruments livrés mordent sur les **régressions futures** : `withNavigateur`
+rend l'oubli inexprimable, son épreuve mesure **au processus**, le cliquet porte
+dix contrôles dont un qui refuse tout receveur de `.close(` inconnu et un qui
+vérifie qu'aucun fichier ne **perd** son jeton au dépouillement. *C'est la seule
+forme de travail qui survive à un chantier fini : la suite suivante est sûre par
+défaut.*
+
+**Le seul défaut réel restant** — `(a)`, 67 suites — est de l'outillage de test,
+ne compte pas comme CODE au sens de la mission, et son adoption est bloquée sur
+`E2E_TOTP_SECRET` que je ne dois pas demander.
+
+**Détail, la table des cinq substituts et la file de l'exploitant :
+`DOSSIER-60`.**
