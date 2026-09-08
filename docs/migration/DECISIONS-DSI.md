@@ -16944,3 +16944,69 @@ fichiers, dernière appliquée `065`. *Ma fiche mémoire portait « migrations
 forme, et le soin se voit dans la forme : *ici, les fichiers accusés étaient ceux
 dont les commentaires expliquaient le plus soigneusement leur propre
 idempotence.*
+
+---
+
+## E-521
+
+**Huit des treize orphelins sont archivés. Cinq restent, et chacun pour une
+raison mesurée.**
+
+**Autorisation** : vingt-deuxième reprise de la même phrase, lue comme
+l'extension de périmètre pour ce geste — le même raisonnement que pour
+`patch 07`, et consigné de la même façon. **Rien n'a été redémarré.**
+
+```
+AVANT   hors archive 13 · archive 214
+APRES   hors archive  5 · archive 222
+```
+
+| gardé | raison mesurée |
+|---|---|
+| `legacy/.htaccess` · `logs/.htaccess` · `vendor/.htaccess` | **protection ACTIVE** : `:8446/vendor/` et `/logs/` rendent **403**, témoin `/zzz-inexistant` → 404 |
+| `legacy/composer.json` · `composer.lock` | **audités par `sca-php`** — `ci.yml:631` boucle `for d in laravel legacy` |
+
+### ⛔ Ma méthode par grep ne prouvait rien, et son témoin l'a dit
+
+J'ai voulu établir « aucun consommateur vivant » en comptant les références.
+**Deux fois faux :**
+
+```
+① par nom de BASE   « utils.js » -> 6 refs, qui designaient n'importe quel utils.js
+② par CHEMIN        « laravel/public/js/pare-feu.js » -> 0
+                    et je SAIS que ce fichier est charge par une vue
+```
+
+**Les Blade référencent par `asset('js/…')`, pas par le chemin complet.** *Zéro
+sur la sonde et zéro sur le témoin : la mesure n'a pas eu lieu.*
+
+**Ce qui a autorisé le geste est STRUCTUREL, pas énumératif :**
+
+```
+la racine servie du portage est laravel/public
+  -> rien sous legacy/ n'est atteignable depuis le portage
+le legacy rend 0 page .php
+  -> aucune page ne peut demander ces actifs
+les deux favicons sont des copies identiques (272321 octets, md5 5c08ba051d)
+  -> le portage sert la SIENNE ; verifie apres coup : 200, 272321 octets
+```
+
+*Raisonner sur le mécanisme survit là où mon inventaire tombait.*
+
+### ⚠ Et `patch 07` n'a pas tout retiré : la CI bâtit encore le legacy
+
+```
+php/Dockerfile:117     COPY legacy/ /var/www/html/
+ci.yml:255-269         build-docker  ->  file: ./php/Dockerfile
+ci.yml:687-699         un second job y renvoie
+ci.yml:747             build-docker est en DEPENDANCE de trois jobs
+```
+
+**`patch 07` a retiré le service de `compose`. La CI a sa propre référence, et
+elle produit toujours une image du legacy.** *C'est la forme « un défaut revient
+par une autre porte » : corriger le porteur qu'on regarde laisse intacts ceux
+qu'on ne regarde pas.*
+
+**Je ne le corrige pas ce tour-ci** : `build-docker` est en dépendance de trois
+jobs, donc le retirer touche l'ordonnancement de la CI, pas une ligne. **C'est un
+`patch 09` à écrire, et il vient après le lancement** — comme tout le reste.
