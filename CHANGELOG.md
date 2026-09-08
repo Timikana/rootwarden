@@ -809,7 +809,7 @@ s'annoncer.*
 
 ### ⚠ Valeur DERIVEE, pas assignee
 
-    APP_URL=https://\${SERVER_NAME}:\${LARAVEL_HTTPS_PORT}
+    APP_URL=https://${SERVER_NAME}:${LARAVEL_HTTPS_PORT}
 
 **Ma premiere redaction codait `192.168.0.245:8443` en dur.** *C'est un fichier
 d'EXEMPLE que les deploiements copient : une IP en dur y est fausse partout
