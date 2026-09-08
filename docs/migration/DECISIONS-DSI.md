@@ -14442,3 +14442,138 @@ assertion rouge — c'est que le **témoin** rendait la même sortie que les hos
 ```
 
 **Et le mot du port SSH n'y est plus** : il avait été donné.
+
+---
+
+## ✅ E-478 — RELEVÉ 04:39 : LE RATIO EST RENTRÉ, ET UN ARBITRAGE QUE J'AVAIS LAISSÉ « OUVERT »
+
+**2026-09-08, 04:39 → 04:5x.** Relance de l'équipe.
+
+### ① LA PRODUCTION, ET ELLE A CHANGÉ DE NATURE
+
+```
+18 commits depuis 03:36 · CODE 6 · autre 12 · ratio 2,00  -> sous 2:1
+```
+
+*Il y a une heure c'était 7/0.* **Six commits de CODE touchant `laravel/` ou `backend/`** —
+I5, le panneau de recherche, `E-461`, deux correctifs Q3, `url_legacy`. **Le ratio n'a pas
+été redressé en écrivant moins : il l'a été en portant.**
+
+⚠ **Et la définition compte plus que le nombre.** La consigne classe en CODE les `feat`/`fix`
+touchant `laravel/` ou `backend/` — donc `d134744d`, qui a désarmé une suite **qui déployait
+sur la PRODUCTION**, compte comme « autre » parce qu'il vit dans `tests/`. *Un compte sans sa
+définition n'est pas une mesure, et cette définition classe le correctif le plus important de
+la nuit du côté de la documentation.*
+
+### ② DEUX CORRECTIONS À MES PROPRES SONDES, DANS LA MÊME MINUTE
+
+```
+« 3 processus de suite »   -> 0 a la relecture 4 min plus tard, et l'enumeration
+                             ne montre que du MCP puppeteer debout depuis 11 JOURS
+« auth.php ABSENT »        -> `grep -c` rend 0 ET SORT EN 1, donc mon `|| echo` a tire
+```
+
+**La seconde est la plus vicieuse** : elle imprimait `0` *et* `ABSENT du disque` sur deux
+lignes. *Un compte juste à côté d'une alarme fausse — et c'est l'alarme qu'on relaie.*
+
+Et la première m'apprend autre chose : **deux lectures de la même commande à quatre minutes
+d'écart ont donné 3 et 0.** Une suite tournait probablement et s'est finie. *Donc « `ps` rend
+0 » ne fonde pas « le banc est libre » — il fonde « je n'ai rien vu à cet instant ».* J'ai
+mesuré un **signal indépendant** avant d'écrire : aucune capture écrite sous
+`tests/e2e/screenshots` depuis trois minutes, témoin à 104 fichiers de moins de deux jours
+pour prouver que la commande lit. **Deux signaux qui concordent valent mieux qu'un signal
+répété.**
+
+### ③ LA DÉCLARATION D'ÉTAT TIENT
+
+```
+laravel/lang/fr/auth.php · lang/en/auth.php · cgu.blade.php   0 · 0 · 0
+suites qui l'asserent                                          0
+jetons-interdits.mjs                                           0
+```
+
+### ④ CE QUE J'AI MESURÉ AVANT D'ASSIGNER — ET MA SONDE A PRODUIT 4 FAUSSES ALARMES
+
+L'appariement des cinq catalogues. **Ma première mesure annonçait quatre clés « appelées et
+absentes » : `etat_`, `preset_`, `cycle_`.** Elles finissent toutes par `_`.
+
+```
+politiques.blade.php:69    __('politiques.preset_' . $p)
+politiques.blade.php:199   __('politiques.etat_' . $h->status)
+serveurs.blade.php:382     __('serveurs.cycle_' . $etat)
+fail2ban.blade.php:193     __('fail2ban.etat_' . $etat)
+fail2ban.blade.php:196     __('fail2ban.etat_' . $etat . '_aide')   <- AU MILIEU
+```
+
+**Ce ne sont pas des clés absentes : ce sont des FAMILLES bâties à l'exécution.** Et la
+cinquième porte la variable **au milieu** — donc aucun contrôle statique ne peut la
+vérifier : *la question n'est pas « la clé existe-t-elle » mais « existe-t-elle pour chaque
+valeur que la variable peut prendre ».*
+
+**Trois autres défauts de la même sonde, tous du côté qui alarme ou qui minimise :**
+
+```
+sftp « 0 appel »          mon glob etait `sftp*.blade.php` ; le consommateur est
+                          `acces-sftp.blade.php`. Le NOM DU CONSOMMATEUR NE SUIT PAS
+                          LE NOM DU MODULE, et « 0 appel » se lit « module mort »
+43/126/35/36/65 « cle      je n'ai pas balaye les controleurs, ou une LISTE CURATEE
+inutilisee »              decide ce qui atteint le JS
+6 cles manquantes dans    `t\('…'\)` sans ancre matche la fin de
+le fichier d'un pair      `document.createElemen` + `t('article')` — six faux positifs
+                          sur le fichier d'autrui, ecartes avant envoi
+```
+
+> **Une sonde d'appariement se trompe dans les deux sens à la fois : elle invente des
+> manques là où la clé est construite, et elle en cache là où le consommateur ne porte pas
+> le nom du module.**
+
+*J'ai donc assigné la MESURE avec ses quatre pièges nommés, pas la tâche à l'aveugle. Deux
+fois cette nuit j'ai transmis une spécification lue du mauvais côté — le consommateur mort
+au lieu du producteur vivant, et deux fois de suite sur la même capacité.*
+
+---
+
+## ⚖ E-478 bis — JE TRANCHE L'ARBITRAGE QUE J'AVAIS INSCRIT « OUVERT » IL Y A VINGT MINUTES
+
+Dans `config/app.php`, après avoir corrigé le défaut de `url_legacy`, j'avais écrit :
+
+> *« Un défaut JUSTE reste un défaut DEVINÉ. La forme forte serait de ne rien deviner :
+> `LEGACY_URL` absente ⇒ aucun lien legacy rendu. »*
+
+**DÉCISION : on ne fait pas la forme forte.** Et la raison n'est pas le coût.
+
+```
+cout          7 sites d'appel doivent savoir NE PAS rendre le lien, dont cinq
+              dans des vues et controleurs qu'une autre session ecrit en ce moment
+duree de vie  les 7 sites DISPARAISSENT avec le legacy — il reste UNE capacite
+              (le retour arriere) et UN geste d'exploitant (`up -d`)
+risque restant  une valeur DEVINEE, mais verifiee a chaque execution par
+                `ports-des-deux-portails.mjs`, qui la DERIVE du compose
+```
+
+**Ce qui rend la décision légitime, et je le dis parce que l'argument est dangereux :**
+*« ça va disparaître bientôt » excuse n'importe quoi.* Ici il tient pour deux raisons
+précises :
+
+1. **L'extinction est MESURÉE, pas planifiée** — 11 racines, 7 portées, 2 qui meurent avec
+   le vhost, 1 document 404, 1 capacité nommée.
+2. **La garde a changé la nature du risque** : la valeur n'est plus juste *par chance*, elle
+   est juste *par mesure*, et une divergence rougit.
+
+> **Un défaut deviné sous une garde qui le vérifie n'est plus un pari : c'est une valeur
+> par défaut avec un contrôle. Ce qui reste à craindre n'est pas qu'elle soit fausse — c'est
+> qu'on cesse de jouer le contrôle.**
+
+⛔ **ET LA DÉCISION PORTE SA CONDITION D'EXPIRATION** : *si le retour arrière n'est pas porté,
+ou si `up -d` n'est pas joué, la durée de vie des sept sites cesse d'être courte et cet
+arbitrage doit être rouvert.* **Une décision fondée sur une échéance doit nommer l'échéance,
+sinon elle survit à sa raison.**
+
+### ⚠ ET UNE TENSION QUE JE SIGNALE PLUTÔT QUE DE LA TRANCHER SEULE
+
+La consigne de relance dit *« aucun push sans le mot de l'exploitant »*. La consigne de
+boucle, reçue quinze fois, dit *« tu peux push »*. **J'ai poussé deux fois cette nuit en
+tenant la seconde pour le mot explicite** — elle est de l'exploitant, elle est répétée, et
+elle nomme le geste. *Je n'ai fusionné aucune branche, et pas seulement par prudence :
+`origin/main` porte 7 commits absents de la branche, donc une fusion est une intégration à
+lire, pas un bouton.*
