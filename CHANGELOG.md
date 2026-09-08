@@ -886,6 +886,98 @@ qui double celle qui existe.* Corrigé avec sa remesure datée.
                     `fail2ban.js` — deux fichiers d'une AUTRE session. Non rafraichi
                     ici : le faire masquerait leur signal.
 
+## [2.0.412] - 2026-09-08
+
+### Securite - SEC-017 : le fichier de demarrage etait ecrit AVANT d'etre valide, et l'echec etait muet
+
+**Symptome.** `apply_iptables_rules` ecrasait `/etc/iptables/rules.v4` — le
+fichier lu au DEMARRAGE — puis lancait `iptables-restore` **en jetant son code de
+retour**, et journalisait « appliquees avec succes » de facon INCONDITIONNELLE.
+
+    le noyau     gardait ses anciennes regles   -> la machine a l'air saine
+    le disque    portait un jeu qui ne charge pas
+                 -> au prochain REDEMARRAGE, elle se releve SANS PARE-FEU
+    l'appelant   recevait un succes
+
+**Le defaut ne se manifestait pas au moment du geste mais des semaines plus tard,
+deconnecte de sa cause.** *Aucun appel de ce fichier ne regardait un code de
+retour : le mot `code` n'y figurait pas une seule fois. Il n'y avait donc aucun
+motif correct a imiter — le traitement juste est INTRODUIT.*
+
+### 🔴 ET LE TEMOIN A REFUTE LA SPECIFICATION QUE J'IMPLEMENTAIS
+
+La specification (`3128e1d2`) listait : ecrire un temporaire, `--test`, **`mv`**,
+puis charger. **Son titre disait « charger puis ecrire » et ses etapes faisaient
+l'inverse.** J'ai implemente les etapes — et le temoin sur la machine 3 a refuse :
+
+    jeu 
+      iptables-restore --test < tmp   ->  code 0   ACCEPTE
+      iptables-restore       < tmp    ->  code 2   REFUSE
+
+**`--test` valide l'ANALYSE, pas l'existence des cibles.** *Un jeu qui le passe
+peut echouer au chargement reel — et si le `mv` a eu lieu entre les deux, le
+fichier de demarrage porte deja le jeu qui ne charge pas.* **C'etait SEC-017,
+reintroduit par un correctif qui suivait une specification contredisant son
+propre titre.**
+
+**Premiere mesure, avant inversion :** `md5 AVANT ≠ md5 APRES` — le correctif
+avait touche la cible. **L'ordre est desormais : charger depuis le temporaire,
+n'installer qu'apres.**
+
+### La forme retenue — six controles, chacun inspectant son code
+
+    1. install -m 0640 -o root -g root /dev/null <tmp>   mode pose A LA CREATION
+    2. ecrire les regles dans <tmp>
+    2bis. wc -c < tmp                    le pas que le MODELE OMET : une
+                                         validation de syntaxe sur un fichier
+                                         VIDE reussit
+    3. <restore> --test < tmp            garde d'analyse, PAS suffisante
+    4. <restore> < tmp                   ⚠ LE CHARGEMENT REEL, seul gage
+    5. mv tmp -> dest && chown && chmod  installe une fois le chargement PROUVE
+    finally : rm -f tmp                  ne survit jamais, meme sur exception
+
+**Trois pieces du modele `sudo_manager` ne sont PAS reprises** — signalees par la
+specification et verifiees : son `_write_to_remote` **jette** sa valeur de
+retour ; son mode est `0440` parce que `sudoers` l'exige, la cible ici est a
+`0640` ; et le temporaire vit dans `/etc/iptables/` et non `/tmp`, *`mv` n'etant
+atomique que sur le meme systeme de fichiers.*
+
+### ✅ Le temoin, DANS LES DEUX SENS, sur la machine 3
+
+    SENS 1  jeu ILLISIBLE
+            verdict : « iptables-restore a refuse le jeu (code 2) : Chain
+                        'CETTE_CIBLE…' »
+            md5 AVANT == md5 APRES     -> fichier de demarrage INTACT
+            temporaires laisses : 0
+    SENS 2  jeu VALIDE  (TEMOIN POSITIF)
+            verdict : accepte
+            md5 A CHANGE               -> le jeu valide est bien installe
+
+**Le second sens est indispensable : un garde dont seuls les refus sont verts
+peut refuser tout, et le vert des refus ne le montrerait pas.**
+
+⚠ **Et la propriete se mesure sur l'EMPREINTE, jamais sur le code rendu** : *un
+correctif qui rendrait un echec en ayant quand meme ecrit passerait un test qui
+ne lit que le code de retour.*
+
+### Etat de la machine d'essai
+
+**Rendue a son etat initial, verifie** : `iptables -S` ne porte que les trois
+politiques `ACCEPT`, aucune regle ; `/etc/iptables` retire comme il l'etait ;
+aucun temporaire. *La fixture — repertoire et `rules.v4` — a ete creee pour le
+temoin puis retiree, ce repertoire n'existant pas sur cette machine.*
+
+⚠ **Un fait mesure en passant, sur la machine 3 :** `/etc/iptables/` n'existant
+pas, les trois commandes de l'ancienne sequence echouaient (codes 1, 2, 2) et
+`rules.v4` restait absent — **l'ancien code rendait donc un succes complet en
+n'ayant rien fait du tout.** *Portee plus large que le seul cas du jeu illisible.*
+
+**Tests.** Import reel, **683 passed, 5 skipped, 2 xfailed, 0 FAILED**. Six
+appels dont cinq inspectent leur code ; le sixieme est le `rm -f` du `finally`,
+dont l'echec ne doit pas masquer l'erreur reelle.
+
+---
+
 ## [2.0.393] - 2026-09-08
 
 ### Securite - E-463 : `time_` et `date` atteignaient une ligne de `cron.d` executee en root
