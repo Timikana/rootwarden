@@ -189,6 +189,26 @@ class JournalAudit
 
             $scellees++;
 
+            // ── PAS D'ORACLE : les deux operandes sortent de la BASE ─────────────
+            // La regle vise la comparaison d'un secret en temps non constant. Le
+            // canal temporel suppose qu'un attaquant FOURNISSE un cote et OBSERVE le
+            // temps pour deviner l'autre. Ici il ne fournit ni l'un ni l'autre :
+            //   `parcourt()` ne prend AUCUN argument (:162) ;
+            //   `$tete` vaut `self::GENESE` (constante de classe, :164) ou
+            //     `(string) $l->self_hash` (:216), une colonne ;
+            //   `$l->prev_hash` est une colonne du meme SELECT (:171).
+            // Aucune requete n'atteint un operande, et le resultat n'est pas une
+            // decision d'authentification : c'est un verdict d'integrite de chaine,
+            // rendu en bloc a la fin du parcours.
+            // LE TEMOIN EST DANS CE FICHIER : :415 et :419 utilisent `hash_equals`,
+            // parce que `verifieEmpreinte(string $stockee, ...)` RECOIT l'empreinte en
+            // parametre. La distinction est donc deja tracee ici, deliberement — et
+            // c'est elle qui rend cette exemption verifiable au lieu d'affirmable.
+            // ⚠ CE QUE CETTE EXEMPTION NE DIT PAS : elle ne dit rien de la solidite de
+            // la chaine ni de la cle qui la signe (cf. le commentaire de `cle()` sur
+            // `AUDIT_HMAC_KEY` absente). Elle ne couvre que l'absence de canal
+            // temporel sur CETTE comparaison.
+            // nosemgrep: rw-php-equals-on-hash
             if ($erreur === null && $l->prev_hash !== $tete) {
                 $erreur = [
                     'id' => (int) $l->id,
