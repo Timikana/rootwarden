@@ -136,3 +136,108 @@ d'une des onze racines. *La mesure porte sur le dépôt ; elle ne voit pas vos u
 
 ⛔ **Et rien ici n'autorise à exercer quoi que ce soit.** *Aucune machine n'a été jointe pour
 écrire ce dossier ; tout y est statique.*
+
+---
+
+# ⚠ CONTRE-ÉPREUVE — trois affirmations sur quatre tiennent, la quatrième est mal énoncée
+
+**Mise à l'épreuve indépendante** (`CONTRADICTION-DOSSIER-48.md`, `0cca6d5f`). *Je l'avais
+demandée en disant de ne me croire sur aucun chiffre ; c'était justifié.*
+
+## ⛔ L'affirmation ③ est FAUSSE — et la séquence tient quand même
+
+*J'écrivais : « la chaîne d'auth n'a pas d'autre consommateur que la page de pare-feu ».*
+
+```
+auth/verify.php a QUATRE requerants :
+  iptables/index.php:37          etape ②
+  adm/api/notifications.php:13   etape ③   — absent de mon enonce
+  api_proxy.php:22               etape ④
+  adm/includes/crypto.php:3      — ABSENT DE MA SEQUENCE ENTIERE
+```
+
+**Les trois premiers partent avant ⑤ : l'ORDRE est correct. C'est la JUSTIFICATION qui est
+fausse.**
+
+> **Et c'est le pire cas pour un dossier de séquence** — *le prochain lecteur vérifiera
+> l'énoncé, le trouvera faux, et doutera de tout l'ordre.* **Une conclusion juste tirée d'une
+> prémisse fausse ne se distingue pas d'une erreur tant qu'on ne l'a pas rejouée.**
+
+## ⛔ L'étape ⑤ compte 7 fichiers. La fermeture en compte 13.
+
+```
+manquaient : crypto.php · audit_log.php · mail_helper.php · totp_crypto.php
+             + les deux DEJA denies de auth/ (functions, password_policy)
+```
+
+⚠ **Et une contrainte d'ORDRE INTERNE à ⑤ que je n'énonçais pas** : *`login.php` requiert
+`crypto.php`, qui requiert `verify.php`.* **Retirer `verify.php` en premier casse les deux
+autres. ⑤ n'est pas un bloc indifférencié.**
+
+## ⛔ Trois espèces de dépendance manquent à mon graphe
+
+*Mon graphe n'en employait que DEUX. C'est la faute que je cite aux autres depuis trois
+jours, commise dans le dossier qui fixe la séquence.*
+
+```
+glob()          lang/fr.php:12 et lang/en.php:12 retiennent 74 catalogues
+                -> `lang/` n'apparait a AUCUNE etape de ma sequence
+URL par COURRIEL  reset_password.php : 0 requerant, 0 lien
+                -> mon graphe le donnerait LIBRE. Il ne l'est pas.
+config SERVEUR   je l'emploie pour l'affirmation ④ sans la NOMMER
+                -> donc sans la chercher ailleurs
+```
+
+## ✅ « Archiver, pas dénier » : le choix tient, l'ARGUMENT change
+
+*Un précédent l'affaiblit, et il est juste :* `auth/.htaccess:5-7` **dénie déjà
+`functions.php` et `password_policy.php`** — *exactement l'état que je décrivais comme
+dangereux, et le mal annoncé ne s'est pas produit.*
+
+> **C'est un argument de PROPRETÉ, pas de SÛRETÉ.** *Archiver reste plus propre ; ça n'est
+> plus urgent.* **Je corrige la qualification plutôt que la décision.**
+
+## ⛔⛔ MAIS L'ALERTE RGPD EST RÉFUTÉE — et nos deux sondes ont échoué DE LA MÊME FAÇON
+
+*La contre-épreuve annonçait : « `login.php` est le SEUL écrivain de `login_history` et
+`last_failed_login_at`, tous deux LUS par l'export RGPD — les retirer fige deux sections d'un
+livrable légal ».* **Mesuré :**
+
+```
+login_history          ConnexionController -> HistoriqueConnexions:79 (injecte :25)  PORTE
+last_failed_login_at   ConnexionController:215  $maj = [… 'last_failed_login_at' => now()]  PORTE
+                       et son docbloc :205 cite login.php:249 — le portage SAIT
+last_failed_login_at   lecteurs qui le NOMMENT : 0
+```
+
+**Les deux colonnes ont un écrivain côté portage. Retirer `login.php` ne fige rien.**
+
+⚠ **Et l'instructif est que MA sonde l'avait manqué aussi**, exactement pareil : *je
+cherchais `INSERT|UPDATE` sur la MÊME LIGNE que le nom de colonne.* **Le portage écrit par un
+tableau (`$maj = [...]`) appliqué par un `->update($maj)` ailleurs — deux lignes, donc
+invisible aux deux sondes.**
+
+> **Deux sessions, deux instruments écrits séparément, le même angle mort — parce que les
+> deux supposaient que le verbe d'écriture et la colonne tiennent sur une ligne.** *Un angle
+> mort partagé ne se corrige pas par une seconde lecture : il se corrige en changeant la
+> forme de la question.*
+
+**Une alarme non vérifiée aurait bloqué l'étape ⑤ au nom d'une obligation légale.** *C'est le
+côté qui alarme, et il a été relu ; c'est ce qui l'a arrêté.*
+
+## Ce qui reste vrai de la contre-épreuve, et qui entre dans le dossier
+
+**Les capacités de la chaîne d'auth sans équivalent servi**, à vérifier avant ⑤ :
+
+```
+l'envoi du COURRIEL de reinitialisation   MAIL_MAILER absente du conteneur (mesure 05/09)
+                                          le portage prepare le lien, le legacy ENVOIE
+le re-hachage bcrypt au login             0 occurrence au portage
+changer sa PROPRE cle SSH                 l'unique ecriture est gardee role:3
+changer sa PROPRE adresse                 aucune route, ni pour soi ni pour un admin
+```
+
+⚠ **La première est la garde que j'avais posée ; les trois autres sont neuves et je les
+reprends.** *Aucune n'est bloquante en soi — toutes doivent être tranchées avant que la porte
+ne se ferme.*
+
