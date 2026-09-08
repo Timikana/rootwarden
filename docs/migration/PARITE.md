@@ -863,7 +863,7 @@ complet.
 
 ---
 
-## ⚠⚠ AVERTISSEMENT DE NUMEROTATION — **HUIT NUMEROS DESIGNENT DEUX CHOSES** (2026-09-07)
+## ⚠⚠ AVERTISSEMENT DE NUMEROTATION — **DIX NUMEROS DESIGNENT DEUX CHOSES** (2026-09-07, corrige le 08)
 
 **`E-452` a `E-459` existent DANS LES DEUX REGISTRES, avec des sujets differents.** Mesure :
 
@@ -885,6 +885,23 @@ meme numero :
 | 457 | deux scripts nommant chaque portail par l'autre | une suite hors lot postant un deploiement sudo |
 | 458 | B4 porte, le defaut de `mode` | **« deux numerotations pour un meme produit »** |
 | 459 | trois boutons vers un 404 | « ou vit la cible » |
+
+### ⟶ CORRECTION DU 2026-09-08 — **DIX, PAS HUIT. Et les deux de plus viennent de ma REGLE.**
+
+    collisions recentes : E-452 453 454 455 456 457 458 459 463 468
+
+**E-463 et E-468 ont ete alloues APRES ma regle du 2026-09-07, et PAR elle.** Le motif que j'avais inscrit
+— `^#{1,6} +E-[0-9]+` — **exige que `E-` suive immediatement les diese et les espaces.** Or
+`DECISIONS-DSI.md` titre `## ⚖ E-480 — …` et `## ⛔ E-482 — …` : **un emoji s'interpose, et le motif ne le
+franchit pas.**
+
+> **Ma regle anti-collision a produit deux collisions de plus.** *Elle rendait « max 469 » le 2026-09-08 a
+> 05:45, quand le vrai maximum etait **482** — et `E-469` etait DEJA PRIS.* Rattrape avant commit par le
+> motif corrige (`^#{1,6}[^0-9]*E-`), pas par moi.
+
+**Troisieme fois qu'un de mes motifs suppose une forme** : un espace unique avant `=>` (E-420), une entree
+par ligne (E-452 retracte), et rien entre `##` et `E-`. *La forme supposee est toujours celle de MON propre
+fichier.*
 
 > **La cause est mienne et elle est simple : ma commande de remesure ne lit que CE fichier.** *« max E-459 »
 > etait juste pour `PARITE.md` et faux pour le chantier* — le vrai maximum etait **E-462**. J'ai alloue huit
@@ -22187,4 +22204,34 @@ sous l'iso-perimetre, et le gabarit attend une destination — pas un selecteur.
 
 ⚠ **Et le defaut que Q1 ferme n'est pas encore ferme EN SERVICE** : tant que rien ne charge ce fichier, les
 gabarits que l'operateur peut appliquer restent ceux du legacy, avec leur `--dport 22` en dur.
+
+---
+
+## E-483 — MON PORTAGE DE B4 A TUE LE COMPTEUR DE CIBLES : deux `function annonce()` dans une portee
+
+**Defaut que j'ai introduit, trouve et corrige par une autre session** (`52380be7`, 2026-09-07 21:46).
+*Je ne l'ai pas vu en le relisant ; elle l'a vu en ECRIVANT dans le meme fichier.*
+
+    1a67dc9e  08-26 20:47   + function annonce()                      <- le compteur de cibles
+    48262a5d  09-07 13:33   + function annonce(cible, texte, echec)   <- MOI, meme portee
+    52380be7  09-07 21:46   - function annonce()                       <- corrige par un tiers
+
+**En JavaScript, deux declarations `function` du meme nom dans une meme portee ne sont pas une erreur : la
+seconde ECRASE la premiere.** Mon ajout a donc silencieusement supprime le compteur — *« le compteur de
+cibles etait mort », dit son commit.*
+
+> ⚠ **`node --check` NE VOIT PAS une redeclaration.** *Il a rendu « propre » sur mes deux passages, et il
+> avait raison : ce n'est pas une faute de syntaxe, c'est une perte de fonction.* Mon controle de l'epoque —
+> `node --check` + un temoin negatif sur un fichier casse — mesurait la SYNTAXE, jamais l'existence de ce
+> que le fichier portait deja.
+
+**La parade, et elle est de meme nature que celles du reste du chantier** : avant d'ajouter une fonction a
+un fichier existant, **compter les declarations du nom choisi**. Un seul `grep -c "function <nom>"` avant
+ecriture, et un apres — *asserter en DELTA, comme pour tout le reste.*
+
+    grep -c 'function annonce' laravel/public/js/bashrc.js    # AVANT : 1  ->  choisir un autre nom
+
+**Et la lecon de flotte est la meme qu'ailleurs** : *qui ecrit un correctif ne certifie pas qu'il est la.*
+Ici, qui ecrit une fonction ne voit pas ce qu'elle recouvre — **il faut avoir a ECRIRE dans le fichier pour
+buter dessus**, ce qu'une relecture ne fait pas.
 
