@@ -5,9 +5,18 @@ description: Conventions du portage RootWarden vers Laravel - schema partage san
 
 # Portage RootWarden vers Laravel
 
-Le frontend Laravel (`laravel/`, port 8444) tourne **en parallele** du legacy
-(`legacy/`, port 8443) pendant toute la migration. Le legacy reste la reference
-tant que la parite d'un module n'est pas prouvee.
+Le frontend Laravel (`laravel/`) est le portail SERVI : il occupe `8080/8443`
+depuis l'echange de ports du 2026-09-06. Le legacy (`legacy/`) est passe sur
+`8444/8446`, et il est ETEINT — zero `.php` metier servi hors
+`legacy/_deprecated/` (214 fichiers archives, mesure du 2026-09-08). **Il n'est
+plus la reference : la reference est le portage.**
+
+⚠ DATER toute trace de `8444` avant de l'interpreter. Avant le 2026-09-06 elle
+designait le PORTAGE ; depuis, elle designe le legacy. Une valeur juste a
+l'ecriture est devenue fausse sans que rien ne la touche, et sept documents l'ont
+porte pendant deux jours. **Porteur unique de ce fait :
+`srv-docker.env.example:88-104`** — s'y reporter plutot que de recopier un port
+ici (E-504).
 
 Decisions et mesures : `docs/migration/{INVENTAIRE,ARCHITECTURE-UI,DEPRECIATION}.md`.
 

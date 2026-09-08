@@ -16151,3 +16151,86 @@ vivant : troisième fois aujourd'hui, et la première où j'ai été trompé par
 propre documentation de mon propre correctif.*
 
 Détail et mesures : `DOSSIER-59`.
+
+---
+
+## E-509
+
+**Zéro commit de CODE en deux heures, 18 de documentation. Je le dis, et
+j'attaque — mais l'attaque a corrigé ma propre prémisse.**
+
+L'exploitant a levé les deux blocages nommés en E-506 : périmètre étendu à
+`tests/e2e/` et autorisation explicite sur `.claude/skills/`. Les deux gestes
+sont livrés (`06a76956`).
+
+### Ce qui est livré et vérifié
+
+**`withNavigateur(corps)`** — l'appelant ne détient jamais le navigateur, donc
+l'oubli de fermeture devient *inexprimable* (rang 1, là où j'avais proposé le
+rang 3). Deux causes indépendantes de fuite, mesurées :
+
+```
+(a) close() non gouverne par un finally                       67 suites
+    12 sans aucun close · 55 avec un close HORS d'un finally EXISTANT
+(b) process.exit() interpose entre lancement et fermeture     41 suites
+    process.exit() n'execute AUCUN finally
+```
+
+*Mon premier relevé de (b) donnait 42 par position textuelle ; affûté à 41 en
+exigeant l'`exit` **après** le lancement et **avant** la dernière fermeture.
+Témoin : `_av.mjs`, seule suite déjà correcte à la main, rend 0 interposé avec
+1 `exit` et 1 `close`.* **(b) n'avait été nommé par personne, et il défait la
+parade de (a).**
+
+### ⛔ Ce que mon propre témoin a réfuté
+
+**Premier témoin : lancer sans fermer, puis `process.exit(0)`. Mesure : 0
+orphelin.** Puppeteer pose ses propres gestionnaires de sortie et fauche son
+Chromium.
+
+> **`withNavigateur` ne réduit donc PAS le compte d'orphelins d'un arrêt
+> propre.** Ce qu'il borne est la **durée de vie** du navigateur *pendant* une
+> exécution : une suite qui lève au milieu garde sinon un navigateur ouvert
+> jusqu'à sa fin — et c'est précisément ce qui se fait tuer sous pression
+> mémoire. *C'est plus modeste que ce que j'avais annoncé, et c'est écrit dans
+> le fichier plutôt que dans ma tête.*
+
+**Re-attribution des 23 orphelins, par chaîne de parenté complète :**
+
+```
+ 8  appartiennent a des serveurs MCP puppeteer VIVANTS (outillage en usage)
+15  reparentes a init : leur lanceur est mort sans les faucher
+ages : min 2,8 j · median 2,8 j · max 2,8 j   ->  UN evenement, pas un suintement
+```
+
+**Le swap est plein à 120 Ki près. Un tueur de mémoire produit exactement cette
+signature** — SIGKILL, aucun gestionnaire ne tourne. *Donc la causalité est
+l'inverse de celle que j'avais posée en E-505 : la pression mémoire a causé les
+orphelins, pas les orphelins la pression.*
+
+### L'épreuve mesure au PROCESSUS, elle n'affirme pas
+
+```
+TEMOIN  SIGKILL du lanceur      -> 10 orphelins crees, 10 fauches par pid
+A  corps normal                 -> 0 orphelin
+B  corps qui LEVE               -> 0 orphelin, et l'exception traverse
+C  process.exit() dans le corps -> 0 orphelin
+fin 23 = base 23 : l'epreuve ne laisse rien derriere elle
+```
+
+⚠ **Le cas C ne distingue pas mon filet du gestionnaire de puppeteer** : les deux
+fauchent sur `exit`. Son vert prouve que l'enveloppeur ne casse pas la reprise
+existante, pas que le filet serve. **Déclaré dans le fichier plutôt que comblé
+par un essai qui n'en serait pas un.**
+
+### Ce que je ne fais pas, et pourquoi
+
+**Les 67 adoptions.** Elles exigent le banc : une adoption non jouée est un pari
+sur la sémantique d'une suite — certaines emploient `createBrowserContext`,
+d'autres `newPage`. *Livrer 67 éditions non éprouvées échangerait un défaut
+mesuré contre un risque non mesuré.*
+
+**Et je ne relabellise pas ma propre production.** Par la définition de la
+mission, `CODE` = `feat`/`fix` touchant `laravel/` ou `backend/` ; ceci touche
+`tests/e2e/`. **Le compteur reste donc à zéro**, et le métrique a un angle mort
+sur l'outillage de test et la CI. *Je le signale sans m'en servir.*
