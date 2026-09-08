@@ -73,7 +73,7 @@ return [
      * only applying rules and its rollback remain on the old portal. The backend
      * reserve is kept and stated: `iptables.py` has not been reloaded by the
      * running process, so the call being wired does not mean it answers. */
-    'suite' => 'Reading, storing a copy and dry-run validation touch no machine — validation is ported here. Only applying rules and its rollback remain on the old portal. Validation has not been exercised since the service restarted: if it does not answer, the old portal remains the proven path.',
+    'suite' => "Reading, the database copy, dry-run validation and APPLYING rules are all ported here. Only rollback — restoring an archived version — remains on the previous portal. The history above lists the versions; that is where rollback will start from once ported.",
     'suite_lien' => 'Open the firewall on the old portal',
 
     // ── I2: the database copy ───────────────────────────────────────────
@@ -130,4 +130,34 @@ return [
     // A non-measurement announced in advance is a reserve; announced
     // afterwards, an excuse. Said above the button — see fr.
     'copie_jamais_exercee' => "Saving a rule copy has never yet been performed from this interface: the action is wired and confirmed, but its completion has not been observed on a machine. The old portal remains the only proven route.",
+
+    /* Q3 — the eight titles `rwRetourPareFeu()` returns. They were cited by the
+     * module and existed nowhere: a title that designates nothing satisfies every
+     * shape assertion while rendering bare. The four `sur: false` cases say
+     * "I don't know", never "it failed". */
+    'ipt_retour_succes'           => 'The rules were applied.',
+    'ipt_retour_regles_invalides' => 'The server rejected these rules: nothing was applied, and the machine is unchanged.',
+    'ipt_retour_refus'            => 'The request was refused before the rules were checked at all. Nothing was applied — and whether these rules are valid is unknown.',
+    'ipt_retour_erreur_serveur'   => 'The server failed before answering. Nothing tells us whether the rules were applied: read the machine state before retrying.',
+    'ipt_retour_corps_illisible'  => 'The server answered, but its answer is unreadable. The change may have gone through: read the machine state before retrying.',
+    'ipt_retour_inabouti'         => 'The request never left. Nothing was applied.',
+    'ipt_retour_doute_marqueur'   => 'The server reports that its verdict is not sound. Read it as neither success nor failure: read the machine state.',
+    'ipt_retour_contrat_inconnu'  => 'The answer matches no expected case. Read the machine state rather than assume.',
+
+    /* I5 — the apply screen. */
+    'appl_titre'      => 'Apply a rule set',
+    'appl_intro'      => 'The chosen set REPLACES every rule on the machine in one gesture: `iptables-restore` overwrites the tables, it does not append. The previous version is archived before the write.',
+    'appl_gabarit'    => 'Rule set',
+    'appl_gabarit_aide' => 'The SSH port is read from the chosen machine, never assumed to be 22 — that is what stops a template from locking you out.',
+    'appl_apercu'     => 'What will be applied',
+    'appl_ssh_ouvert' => 'SSH port :port stays reachable with this set.',
+    'appl_ssh_ferme'  => '⛔ This set CLOSES SSH port :port. Applied, it would cut your access to the machine — and returning would need a physical console.',
+    'appl_ssh_doute'  => '⛔ Whether SSH port :port stays open with this set cannot be determined. We refuse rather than gamble: a doubt here is paid in lost access.',
+    'appl_bouton'     => 'Apply to the machine',
+    'appl_en_cours'   => 'Applying…',
+    'appl_conf_titre' => 'Replace the rules on :machine?',
+    'appl_conf_texte' => 'Every current rule on :machine will be REPLACED by the set ":gabarit". The previous version is archived and stays restorable from the history. No request has been sent yet.',
+    'appl_conf_ok'    => 'Replace the rules',
+    'appl_conf_non'   => 'Cancel',
+    'appl_annule'     => 'Cancelled — no request was sent.',
 ];
