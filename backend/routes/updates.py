@@ -898,6 +898,14 @@ def schedule_advanced_security_update():
         )
         with get_db_connection() as conn:
             cursor = conn.cursor()
+            # ⚠ RESIDU D'ORDRE, prealable a E-463 et plus etroit depuis : le `cron.d`
+            # est ecrit et cron redemarre AVANT cette ligne. E-463 ter a ferme l'echec
+            # de FORMAT (la valeur derive, MySQL ne peut plus la refuser), mais un echec
+            # de la base pour une AUTRE raison — connexion perdue, verrou — laisse encore
+            # la planification installee sur la machine et rien d'enregistre.
+            # Inscrit et non corrige : intervertir demanderait de defaire le `cron.d` en
+            # cas d'echec SQL, donc un chemin de rattrapage qui joint la machine une
+            # seconde fois — un geste que ce lot n'a pas mandat d'ecrire.
             cursor.execute("UPDATE machines SET maj_secu_date = %s WHERE id = %s", (scheduled_datetime, machine_id))
             conn.commit()
 
