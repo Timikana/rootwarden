@@ -22858,9 +22858,24 @@ la deplace :**
     docker-entrypoint.sh:59   chown -R www-data:www-data storage/framework/views
     mtime actuel des deux vues        2026-08-11 15:56  (compiles du 2026-09-07 22:29)
 
-**AU DEMARRAGE, la chaine se repare toute seule** : `composer install` rafraichit `vendor/`, **puis**
-`view:cache` recompile, **puis** le `chown` normalise. *L'ordre des trois lignes est correct, et c'est
-pourquoi le boot n'est pas le probleme.*
+**AU DEMARRAGE, la chaine se repare toute seule** : `view:cache` recompile, **puis** le `chown`
+normalise. *L'ordre est correct, et c'est pourquoi le boot n'est pas le probleme.*
+
+> ⚠ **CORRECTION DE MA PROPRE PHRASE, faite dans les minutes qui ont suivi son commit.** J'avais ecrit que
+> `composer install` etait le premier maillon de cette chaine. **Il est CONDITIONNEL** :
+>
+>     docker-entrypoint.sh:18   if [ ! -f vendor/autoload.php ]; then
+>     docker-entrypoint.sh:20       composer install …
+>     docker-entrypoint.sh:21   fi
+>
+> Il ne tourne **que si `vendor/` est absent**. Ce qui repare au boot est `view:cache` (l.44) plus le
+> `chown` (l.59), **tous deux hors de tout `if`** — verifie par la structure, les seuls `if` anterieurs se
+> fermant aux l.21 et l.34, **pas par l'indentation**.
+>
+> **Et cette correction DURCIT la conclusion au lieu de l'adoucir** : puisque `composer install` ne
+> s'execute pas aux demarrages ordinaires, **la seule facon usuelle de rafraichir les `mtime` de
+> `vendor/` est de le lancer a la main** — donc hors de toute sequence qui rejouerait `view:cache` ou le
+> `chown`. *Le chemin dangereux n'est pas un cas de bord : c'est le chemin NORMAL de la commande.*
 
 > ⛔ **LE DANGER EST A CHAUD** : un `composer install` lance a la main par `docker exec` — *le geste normal
 > pour ajouter une dependance pendant la migration, et `vendor/` etant reconstruit, c'est un geste
