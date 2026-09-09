@@ -221,6 +221,71 @@ qui est ma propre règle, payée une fois de plus ce soir.
 
 ---
 
+## 3bis. DEUX AJOUTS DE `gestion-ssh-key-c6`, rejoués avant d'être portés
+
+### ⓔ Un nom d'utilisateur qui commence par un tiret devient une OPTION
+
+`routes/ssh.py:2881` — la route la plus destructrice du fichier :
+
+```
+cmd = f"/usr/sbin/userdel {flag_str} {shlex.quote(username)} 2>&1"
+```
+
+**`shlex.quote` n'entoure de guillemets que ce qui en a besoin.** Un nom sans
+métacaractère en sort *nu* :
+
+```
+'sftpuser'      ->  sftpuser        aucun guillemet
+'-R'            ->  -R              aucun guillemet   <- lu comme une OPTION
+'-rf'           ->  -rf             aucun guillemet
+'--root=/tmp'   ->  --root=/tmp     mais REFUSE en amont (le `/` et le `=`)
+```
+
+Et `_motif_nom_invalide` (`configure_servers.py:70`) les **accepte** — mesuré :
+
+```
+'sftpuser' 'Debian-exim' '-R' '-rf' 'root'   ->  ACCEPTES
+'--root=/tmp' '..' 'a/b' 'a;id' "a'b"        ->  REFUSES
+```
+
+**Ce n'est pas exploitable aujourd'hui, et la raison est du bon grain** : *`userdel`
+prend UN opérande. Consommé comme option, il se retrouve sans opérande et rend
+une erreur d'usage.* **Ce qui la rendrait vivante : une option courte et sans
+argument qui soit destructrice, ou une évolution vers deux opérandes.**
+
+> C'est un défaut **DORMANT** au sens strict : inerte aujourd'hui, effectif au
+> premier changement d'un tiers — et le tiers en question n'aurait aucune raison
+> de venir lire cette ligne.
+
+**Le remède est du rang 1 — inexprimable, pas contrôlé** : poser `--` avant le
+nom ferme l'analyse d'options *par construction*, et coûte deux caractères.
+**`:283` du même fichier le fait déjà pour `grep -Fxq --`.** *La parade existe
+dans le fichier ; elle n'a pas voyagé jusqu'ici.*
+
+### ⓕ La seule valeur qui SORT d'une machine distante
+
+`file_path`, tiré du `grep` distant à `:205`, est réinjecté dans le message rendu
+à l'appelant (`:290-291`) — il traverse donc la passerelle et atteint
+l'interface.
+
+**Ce n'est pas classé en défaut** : le portage échappe par défaut. C'est la
+surface à regarder si ce message est un jour rendu en HTML brut.
+
+⚠ **Et c6 a démoli une inquiétude que j'avais laissée debout.** J'avais noté que
+`file_path` vient d'une machine distante, donc qu'« une cible hostile la
+choisit » — vrai, et sans conséquence :
+
+> *L'attaquant qui contrôle le `grep` de la machine X a déjà root sur X — et
+> l'écriture a lieu sur X. Il n'obtient rien qu'il n'ait déjà.* **Aucune
+> frontière de confiance n'est franchie.**
+
+Et elle écrit ce qui la réfuterait, ce qui rend le négatif utilisable au lieu de
+rassurant : `file_path` atteignant une commande sur l'hôte RootWarden · persisté
+puis rejoué contre une AUTRE machine · un appelant passant un `sa_name` non
+littéral. **Les trois sont non observés, et le troisième est mesuré.**
+
+---
+
 ## 4. ⛔ CE QUE LE ZÉRO DU CLIQUET NE DIT PAS
 
 Trois limites, écrites ici pour qu'elles voyagent avec le chiffre rond.
@@ -252,7 +317,12 @@ trois fichiers). Coût faible, gain : une exemption qui cesse de se recopier.
 les services. Non urgent, et il touche l'installation d'agents : donc après un
 redémarrage, éprouvé sur la machine 3 (OpenCVE-Test-OnPrem, 192.168.0.2).
 
-**④ Vérifier `visudo -cf`** sur la ligne injectée, si la gravité de ⓑ doit être
+**④ Poser `--` avant le nom dans `userdel`** (`routes/ssh.py:2881`). Deux
+caractères, garde par construction, et la parade existe déjà trois lignes plus
+haut dans le même fichier. *Le geste touche la route la plus destructrice du
+module : donc après un redémarrage, éprouvé sur la 3.*
+
+**⑤ Vérifier `visudo -cf`** sur la ligne injectée, si la gravité de ⓑ doit être
 tranchée finement. Demande une machine, donc pas nous.
 
 ⚠ **Et le rappel qui gouverne les trois derniers** : `use_reloader = False`,
