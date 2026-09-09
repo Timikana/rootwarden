@@ -18614,3 +18614,69 @@ un TUBE n'est pas celui de la commande », commise en la vérifiant.
 **Deux sessions, un même objet, deux troncatures indépendantes, dans les deux
 commandes qui mesuraient le défaut de la troncature.** *Aucune des deux n'a été
 trouvée par son auteur.*
+
+**E-607 — `rules-rootwarden.yml` est exécuté par TROIS étapes de la CI, dont un
+témoin positif et un témoin négatif.** Mesuré à un grain plus fin que celui de
+`0b`, qui en annonçait deux :
+
+```
+:464  :479   « Run custom rules (.semgrep/rules-rootwarden.yml) »
+:658          « TEMOIN POSITIF — chaque regle reparee doit MORDRE »
+:694          « TEMOIN NEGATIF — les formes GARDEES ne doivent PAS mordre »
+TEMOIN de comparaison : .gitleaks.toml cite 1 fois · reference-trouvailles.txt 3 fois
+```
+
+**Ce n'est donc pas seulement de la politique exécutable : c'est de la politique
+exécutée avec ses deux témoins.** Le conflit sur ce fichier est bien un conflit
+de code — **quatre, pas trois.**
+
+**E-608 — ⛔ ET MON « 4 » ÉTAIT JUSTE PAR ACCIDENT DE SEAU, PAS PAR MESURE.**
+`0b` a nommé sa sixième instance : *« j'ai classé par EXTENSION — un critère
+choisi parce qu'il se lit d'un coup d'œil, pas parce qu'il répond à la
+question »*. **Ma propre commande faisait exactement la même chose :**
+
+```
+case "$f" in *.py|*.php|*.yml|*.mjs|*.sh) t='CODE / CONFIG' ;; *.md) t='document' ;; esac
+```
+
+*J'ai mis `.yml` du bon côté par choix de seau. La question était « qu'est-ce qui
+décide du comportement du produit », et mon prédicat n'y répondait pas — il
+répondait « quelle est l'extension ».* C'est `0b` qui a fait la mesure qui fonde
+mon chiffre, **après** que je l'aie corrigé avec l'autorité d'une correction.
+
+> **Un prédicat de confort qui rend la BONNE réponse est plus dangereux que celui
+> qui se trompe : rien ne réclame qu'on le redérive.** Les cinq bornes
+> précédentes se sont signalées par un écart ; celle-ci ne s'est signalée par
+> rien — elle a été trouvée parce que `0b` cherchait le motif de SA propre
+> erreur, et que le mien était le même.
+
+**E-609 — La forme que ce fil a nommée, et qui manquait.** *(la formulation est
+la mienne, la reconnaissance de sa portée est de `0b`)*
+
+> **Une troncature chez le VÉRIFICATEUR transfère le tort au VÉRIFIÉ.**
+
+Les cinq bornes précédentes coûtaient un mauvais compte. Celle-ci **fabrique une
+fausse réfutation d'autrui** — et le coût n'est pas symétrique : *une fausse
+alarme sur soi se corrige ; une fausse réfutation d'un tiers lui fait retirer un
+fait juste.* **C'est un dédouanement par procuration, et il porte l'autorité de
+la vérification.**
+
+**CLÔTURE DU FIL.** Douze heures, deux sessions, une trentaine de rectifications.
+**Aucune erreur n'a été trouvée par son auteur** — chaque fois par l'autre, et
+jamais par vigilance : toujours par une mesure citée contre une affirmation, ou
+par un reste inexpliqué. *C'est la démonstration matérielle de la seule règle qui
+ait tenu de bout en bout : un résultat faux et vraisemblable ne porte aucun signe
+de sa fausseté, et il n'y a rien à voir depuis l'intérieur.*
+
+**Ce qui reste à l'exploitant, et rien de plus :**
+
+```
+un droit d'ecriture             les 3 controles eprouves + le chiffrement du jeton
+Migration-Laravel d'ABORD       elle porte les versions completes des deux documents
+puis chaque branche security/   4 conflits de CODE a trancher, 2 de document triviaux
+le regime des branches          28 bascules de HEAD sur 11 cibles, worktree jamais employe
+le jeton Telegraf               chiffrer :2465, DECHIFFRER :541, puis patch 03
+login_attempts                  retention — decision de conformite
+```
+
+**Aucun des six n'est technique.**
