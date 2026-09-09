@@ -51,13 +51,25 @@ services:
       # les deux portails. Rien a generer — et si le repertoire est vide, c'est
       # l'entrypoint qui produit un auto-signe, avec le nommage du legacy.
       - ./certs:/var/www/certs
-      # Le numéro de version a UNE seule source : legacy/version.txt, écrit par le
-      # mécanisme de bump. Le portage le LIT, en lecture seule, et n'en tient pas de
-      # copie — une seconde copie dériverait, et ce chiffre a déjà dérivé deux fois
-      # le 2026-08-27 (resté à 1.38.17 pendant deux bumps, puis trois commits sur le
-      # même numéro). Le chemin reste `legacy/` tant que le legacy est servi ; son
-      # emplacement à l'extinction du legacy est une question ouverte (§4.1 ter).
-      - ./legacy/version.txt:/var/www/html/version.txt:ro
+      # ══ LE MONTAGE DE version.txt EST RETIRÉ, ET IL N'A PAS DE REMPLAÇANT ══
+      #
+      # La question ouverte du §4.1 ter — « où vit version.txt à l'extinction du
+      # legacy ? » — est tranchée : NULLE PART DE PARTICULIER. `laravel/` est déjà
+      # monté sur `/var/www/html` (ci-dessus), donc `laravel/version.txt` y
+      # apparaît de lui-même. Ce montage ne faisait que le RECOUVRIR :
+      #
+      #   mesure du 2026-09-08, docker inspect + stat :
+      #     legacy/version.txt   inode 1998793, 8 octets   <- monté PAR-DESSUS
+      #     laravel/version.txt  inode 2011193, 0 octet    <- recouvert
+      #
+      # Et il n'y a jamais eu deux sources : `VERSION-JALON` (SUIVI) porte
+      # MAJEUR.MINEUR, et `scripts/version.sh` DÉRIVE le correctif du nombre de
+      # commits. Les deux `version.txt` sont des PRODUITS, ignorés par git à bon
+      # droit. La dérive du 2026-08-27 venait d'une version ASSIGNÉE ; elle ne peut
+      # plus se produire depuis qu'elle se dérive (INF-004).
+      #
+      # `scripts/ecrire-version.sh` écrit désormais dans `laravel/version.txt`,
+      # avant que les conteneurs montent — donc le fichier existe déjà au démarrage.
     env_file:
       - srv-docker.env
     depends_on:
