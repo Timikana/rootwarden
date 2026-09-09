@@ -87,7 +87,7 @@ RACINE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Releves le 2026-09-09 par ce meme recensement. Remesure :
 #   python3 backend/tests/test_commandes_root_indirectes.py
 REFERENCE_INDIRECTES = 37
-REFERENCE_AVEUX = 10
+REFERENCE_AVEUX = 7
 
 CAT_EN_LIGNE = 'f-string EN LIGNE (vue par semgrep)'
 CAT_INERTE_FSTRING = 'f-string sans interpolation'
@@ -147,9 +147,44 @@ def recense(source: str):
         """(noms teintes -> lignes, noms connus) pour une portee."""
         teintes = collections.defaultdict(list)
         connus = set()
+        # ── LA PORTEE ENGLOBANTE, ni parcourue ni declaree ────────────────────
+        #
+        # Depuis un site d'appel, python atteint TROIS portees : locale,
+        # ENGLOBANTE, module. La version precedente parcourait la locale et
+        # DECLARAIT que le module lui echappait — mais la portee englobante
+        # n'etait ni l'une ni l'autre : c'etait le trou ENTRE les deux.
+        #
+        # Releve par `gestion-ssh-key-ec` le 2026-09-09 : quatre des dix aveux
+        # ne sont pas « non resolvables », ils sont « resolvables par une portee
+        # que le resolveur ne parcourt pas ». Les trois `_stream` de
+        # `routes/updates.py` lient `command` dans la fonction MERE, jamais dans
+        # le `generate` imbrique qui l'utilise — et leurs valeurs sont des
+        # `ast.Constant` pures.
+        #
+        #   > Un aveu qui compte juste peut se tromper sur ce qu'il avoue.
+        #
+        # On remonte donc la chaine, en collectant les arguments ET les cibles
+        # d'affectation de chaque englobante. La teinture remonte aussi : une
+        # variable teintee dans la mere et lue dans la fille EST un site
+        # indirect, pas un aveu.
         englobante = fonction
         while englobante is not None:
             connus |= {p.arg for p in ast.walk(englobante.args) if isinstance(p, ast.arg)}
+            if englobante is not fonction:
+                for n in ast.walk(englobante):
+                    if not isinstance(n, (ast.Assign, ast.AnnAssign, ast.AugAssign,
+                                          ast.NamedExpr, ast.For, ast.AsyncFor)):
+                        continue
+                    valeur = n.value if not isinstance(n, (ast.For, ast.AsyncFor)) else n.iter
+                    cibles = n.targets if isinstance(n, ast.Assign) else [n.target]
+                    for cible in cibles:
+                        for x in ast.walk(cible):
+                            if not isinstance(x, ast.Name):
+                                continue
+                            connus.add(x.id)
+                            if valeur is not None and _interpolee(valeur):
+                                if n.lineno not in teintes[x.id]:
+                                    teintes[x.id].append(n.lineno)
             englobante = peres.get(englobante)
         corps = fonction if fonction is not None else arbre
         # DEUX passes : la seconde propage `for cmd in cmds` quand `cmds` n'est
@@ -300,6 +335,10 @@ _TEMOINS = [
      "def f(c, p):\n    cmd = 'rm /tmp/x'\n    execute_as_root(c, cmd, p)\n"),
     (CAT_RESOLU_SUR, 'boucle sur des litteraux nus',
      "def f(c, p):\n    for cmd in ['a', 'b']:\n        execute_as_root(c, cmd, p)\n"),
+    (CAT_INDIRECTE, 'f-string liee dans la portee ENGLOBANTE',                    # ⟵ portee
+     "def m(c, p):\n    cmd = f'rm {x}'\n    def g():\n        execute_as_root(c, cmd, p)\n    return g\n"),
+    (CAT_RESOLU_SUR, 'litteral lie dans la portee ENGLOBANTE',                    # ⟵ portee
+     "def m(c, p):\n    cmd = 'rm /tmp/x'\n    def g():\n        execute_as_root(c, cmd, p)\n    return g\n"),
     (CAT_AVEU_NOM, 'nom jamais lie dans la portee',
      "def f(c, p):\n    execute_as_root(c, VENU_D_AILLEURS, p)\n"),
     (CAT_AVEU_FORME, 'indice de dictionnaire',                                   # ⟵ Subscript
