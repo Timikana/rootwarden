@@ -23141,3 +23141,55 @@ avant toute validation, donc une valeur non numerique rend 500 la ou 400 serait 
 **⛔ Aucun correctif ecrit** : le geste appartient a la session 8 pour l'arbitrage, et tout correctif de
 securite va sur une branche `security/…`, jamais fusionne sans le mot de l'exploitant.
 
+### CONTRE-EPREUVE DU CORRECTIF DE LA SESSION 8 — `security/tls-ca-path-injecte-dans-rsyslog`, PR 70, NON FUSIONNEE
+
+*Je ne recopie jamais une regle de securite sans l'eprouver, y compris quand elle suit ma propre
+recommandation.* **Elle tient sur toutes les dimensions mesurees :**
+
+    _CA_PATH_RE = re.compile(r'^/[A-Za-z0-9._/-]{0,254}$')     employe en FULLMATCH (l.265)
+
+    les 4 charges rsyslog                        refusees
+    temoins positifs (CA par defaut, /a, 255)    acceptes
+    borne                                        255 accepte · 256 refuse   (leur annonce tient)
+    \n final SEUL · \r final · CRLF · \r interieur   refuses
+
+> **Le piege Python etait arme et il est evite** : `$` matche AVANT un `\n` final, donc `re.match` aurait
+> **accepte** `'/etc/ssl/ca.crt\n'`. **`fullmatch` doit consommer toute la chaine** — c'est ce choix, et
+> pas le motif, qui ferme ce cas. *Un motif juste avec `match` aurait laisse passer le caractere meme du
+> defaut.*
+
+**Et sa SECONDE garde, au puits, est meilleure que ce que j'avais recommande** — je n'avais nomme que la
+classe d'entree :
+
+    for i, ligne in enumerate(lines):
+        if '\n' in ligne or '\r' in ligne:
+            raise ValueError(…)
+
+*Elle attrape `\r`, que je n'avais pas nomme, et elle ne depend d'aucune classe de caracteres.* Son motif
+pour la redondance est juste : **« une garde d'entree se perime le jour ou quelqu'un elargit sa classe
+pour un besoin legitime, et ce quelqu'un n'a aucune raison de venir lire le puits ».**
+
+**DEUX POINTS NOMMES, NI L'UN NI L'AUTRE UN DEFAUT** — *je les dis parce qu'un silence les rendrait
+indiscernables d'un oubli* :
+
+1. **`/../../etc/shadow` est ACCEPTE** par la classe. *Ce n'est pas une elevation* : rsyslog lit ce fichier
+   en root de toute facon, et un bundle de CA illisible fait ECHOUER l'emission TLS, il ne la degrade pas
+   en clair. **Disponibilite, pas confidentialite** — et le durcir couterait un `realpath` distant.
+2. **Le `raise` est atteint hors de tout `try`** (`deploy()`, l.345 sur la branche, appelant unique, aucun
+   planificateur) : donc **fail-closed — rien n'est ecrit sur la machine**, ce qui est le bon sens. *Le
+   cout est un 500 la ou 400 serait juste.* ⚠ **Non mesure et dit** : `deploy()` porte `@threaded_route`,
+   et je n'ai pas mesure comment ce decorateur traite une exception non rattrapee. *La propriete de
+   securite tient quel qu'en soit le comportement — rien n'est ecrit ; c'est le diagnostic qui pourrait
+   souffrir.*
+
+**Trois defauts de la MEME QUESTION, tous « surs » au cliquet des commandes root** — son releve, que
+j'inscris parce qu'il generalise :
+
+    graylog   tls_ca_path   base64 irreprochable         -> puits : rsyslog, root      classe trop faible
+    sftp      working_dir   heredoc quote irreprochable  -> puits : sshd_config, root  appel absent
+    sudo      runas         shlex.quote irreprochable    -> puits : sudoers, root      validation couplee au formatage
+
+> **Ce n'est pas une classe de DEFAUT, c'est une classe de QUESTION.** *Et la bonne question n'etait pas
+> « la garde domine-t-elle ? » — la reponse etait oui les trois fois — mais « domine-t-elle dans la
+> dimension du PUITS ? ».*
+
