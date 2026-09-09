@@ -186,6 +186,64 @@ def test_LES_SEPT_valeurs_du_puits_sont_toutes_gardees():
         assert garde in source, f'la garde de {valeur} ({garde}) a disparu'
 
 
+def test_le_motif_est_employe_en_FULLMATCH_et_non_en_MATCH():
+    """`fullmatch` est PORTEUR : un `match` ferait revenir la faille.
+
+    En python, `$` s'apparie AUSSI juste avant un saut de ligne terminal. Avec
+    ce motif EXACT et inchange :
+
+        _CA_PATH_RE.match('/etc/ssl/ca.crt\\n')      ->  ACCEPTE
+        _CA_PATH_RE.fullmatch('/etc/ssl/ca.crt\\n')  ->  refuse
+
+    Donc « simplifier » l'appel en `match` rouvrirait le defaut SANS TOUCHER A
+    LA CLASSE — et une relecture du motif ne verrait rien. Un commentaire ne
+    garde pas ca : ce test le garde.
+
+    Releve par `gestion-ssh-key-4f` en EPROUVANT le correctif, y compris la
+    partie qui suivait sa propre recommandation.
+    """
+    motif = _motif_ca()
+    avec_saut = '/etc/ssl/ca.crt' + NL
+    # la mesure qui fonde l'exigence, refaite ici
+    assert motif.match(avec_saut), (
+        'python a change : `$` ne s apparie plus avant un saut de ligne final. '
+        'Le commentaire du motif est a remesurer.'
+    )
+    assert not motif.fullmatch(avec_saut), \
+        '`fullmatch` accepte un saut de ligne final : la propriete a disparu'
+    # et l'APPEL dans le code doit etre un fullmatch
+    source = _source()
+    appels_match = [l.strip() for l in source.split(NL)
+                    if '_CA_PATH_RE.match(' in l and not l.strip().startswith('#')]
+    assert not appels_match, (
+        f'_CA_PATH_RE est appele en `.match` : la faille revient sans que la '
+        f'classe bouge.\n  ' + '\n  '.join(appels_match)
+    )
+    appels_full = [l.strip() for l in source.split(NL)
+                   if '_CA_PATH_RE.fullmatch(' in l and not l.strip().startswith('#')]
+    assert len(appels_full) == 1, \
+        f'{len(appels_full)} appels en `.fullmatch`, 1 attendu'
+
+
+def test_la_traversee_acceptee_est_un_choix_ASSUME():
+    """`/../../etc/shadow` passe la classe, et c'est documente comme tel.
+
+    Ce n'est pas une elevation : rsyslog lit ce fichier en root de toute facon,
+    et un bundle de CA illisible fait ECHOUER l'emission TLS au lieu de la
+    degrader en clair. Disponibilite, pas confidentialite.
+
+    Le test existe pour que ce choix reste ECRIT : si quelqu'un le durcit un
+    jour, il doit le faire en connaissance de cause et non par reflexe — et si
+    quelqu'un le lit comme un oubli, ce test lui repond.
+    """
+    motif = _motif_ca()
+    assert motif.fullmatch('/../../etc/shadow'), \
+        'la traversee est desormais refusee : mettre a jour le commentaire du motif'
+    commentaires = NL.join(l for l in _source().split(NL) if l.strip().startswith('#'))
+    assert 'Disponibilite, pas confidentialite' in commentaires, \
+        'la raison du choix a disparu des commentaires'
+
+
 if __name__ == '__main__':
     for nom, fn in sorted(globals().items()):
         if nom.startswith('test_'):
