@@ -49,6 +49,13 @@ return [
 
     'deverrouiller' => 'Déverrouiller',
     'deverrouille' => 'Compte déverrouillé.',
+    'role_change' => 'Rôle modifié.',
+    'role_titre' => 'Rôle',
+    'err_auto_role' => "Vous ne pouvez pas changer votre propre rôle.",
+    'err_role_inconnu' => "Ce rôle n'existe pas.",
+    'err_role_superadmin_intouchable' => "Un administrateur ne peut pas modifier le rôle d'un superadministrateur.",
+    'err_role_trop_haut' => "Vous ne pouvez attribuer qu'un rôle strictement inférieur au vôtre.",
+    'err_role_requis' => "Le rôle voulu doit être indiqué.",
     'suspendre' => 'Suspendre',
     'activer' => 'Activer',
     'active' => 'Compte activé.',

@@ -821,6 +821,20 @@ Route::middleware(['memorisation', 'session.authentifiee', 'session.revoquee', '
         ->whereNumber('id')->middleware(['role:3', 'perm:can_admin_portal'])->name('comptes.activite');
 
     /*
+     * ⚠ SECOND GESTE PERDU A L'EXTINCTION, et `role:2` n'est pas une faute de
+     *   frappe : `manage_roles.php:31` pose `checkAuth([ROLE_ADMIN,
+     *   ROLE_SUPERADMIN])`, donc le legacy l'ouvrait au role 2. Ce qui borne un
+     *   role 2 n'est pas la route, ce sont DEUX gardes du service — il ne touche
+     *   pas un role 3, et il n'assigne qu'un role STRICTEMENT inferieur au sien,
+     *   c'est-a-dire role 1 seulement.
+     *
+     *   Mettre `role:3` ici serait un DURCISSEMENT silencieux : il retirerait a
+     *   un administrateur une capacite qu'il avait, sans que rien ne le dise.
+     */
+    Route::post('/comptes/{id}/role', [ComptesController::class, 'role'])
+        ->whereNumber('id')->middleware(['role:2', 'perm:can_admin_portal'])->name('comptes.role');
+
+    /*
      * L'exemption d'expiration de mot de passe — `role:3`.
      *
      * `legacy/adm/api/update_user.php:31` pose `checkAuth([ROLE_SUPERADMIN])` et

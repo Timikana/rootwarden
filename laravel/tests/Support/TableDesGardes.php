@@ -100,6 +100,13 @@ class TableDesGardes
             ['POST', 'comptes/{id}/deverrouiller', ['role:3', 'perm:can_admin_portal']],
             ['GET', 'comptes/{id}/etat-suppression', ['role:3', 'perm:can_admin_portal']],
             ['POST', 'comptes/{id}/mot-de-passe', ['role:2', 'perm:can_admin_portal']],
+            // ⚠ `role:2` ET NON `role:3` : `manage_roles.php:31` pose
+            //   `checkAuth([ROLE_ADMIN, ROLE_SUPERADMIN])`, donc le legacy
+            //   l'ouvrait au role 2. Ce qui borne un role 2 sont DEUX gardes du
+            //   service — il ne touche pas un role 3, et il n'assigne qu'un role
+            //   STRICTEMENT inferieur au sien. Mettre `role:3` ici serait un
+            //   DURCISSEMENT silencieux.
+            ['POST', 'comptes/{id}/role', ['role:2', 'perm:can_admin_portal']],
             ['POST', 'comptes/{id}/second-facteur', ['role:3', 'perm:can_admin_portal']],
             ['GET', 'derive-config', ['role:2', 'perm:can_view_compliance']],
             ['GET', 'docker', ['role:2']],

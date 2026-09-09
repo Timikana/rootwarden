@@ -333,8 +333,12 @@ class InventaireDesGardesTest extends TestCase
             //    suspension, perdu a l'extinction du legacy). Les deux sites ont
             //    ete RELUS a leur nouvelle place, comme ce gel l'exige — le
             //    step-up y est inchange.
-            'ComptesController.php:554',      // compte_supprimer
-            'ComptesController.php:579',      // compte_anonymiser
+            // ⚠ 554 -> 598 et 579 -> 623 le 2026-09-09 : la methode `role()` a
+            //    ete inseree plus haut (report du changement de role, second
+            //    geste perdu a l'extinction). RELUS a leur nouvelle place, comme
+            //    ce gel l'exige : le step-up y est inchange.
+            'ComptesController.php:598',      // compte_supprimer
+            'ComptesController.php:623',      // compte_anonymiser
             'PasserelleController.php:88',    // generique, action DERIVEE du chemin
             'PermissionsController.php:165',  // permission_definir
             'PortailController.php:196',      // profil_effacement (E-449)
