@@ -17315,3 +17315,93 @@ toutes trouvées seule. Les **trois qui dédouanaient**, aucune.
 *Et la convergence de nos deux recensements sur 227 vaut par sa FORME : quatre
 seaux, quatre accords exacts, et aucun instrument partagé. Deux comptages avec le
 même code auraient pu partager le même angle mort.*
+
+---
+
+## 2026-09-09, 02:40 CEST — la séquence d'extinction est PROUVÉE close, et deux portes ne pouvaient plus s'ouvrir
+
+**E-534 — `scripts/eteindre-le-legacy.sh` passe ses quatre contrôles et rend
+« déjà archivée » sur ses six étapes.** C'est la première fois : jusqu'à ce soir
+le contrôle 2 refusait, donc la séquence était **inatteignable**, donc son
+verdict de clôture ne valait rien.
+
+```
+contrôle 1  ✅ aucune étape ne l'emporte (6 étapes examinées)
+contrôle 2  ✅ 7/7 épreuves
+contrôle 3  ✅ arbre propre
+contrôle 4  ✅ aucune capture en 3 min (témoin : 645 sur 30 jours)
+contrôle 5  ✅ le healthcheck ne vise plus une cible de la séquence
+étapes 2-7  ✅ déjà archivée  ·  0 fichier suivi dans chaque portée
+```
+
+**Il n'y a plus rien que `--executer` puisse déplacer.** L'extinction du *code*
+legacy est terminée, et c'est désormais **mesuré par l'instrument prévu pour
+ça**, pas déduit d'un `git ls-files`.
+
+**E-535 — Trois gardes de ce chantier étaient mortes ou expirées, et les trois
+passaient pour vertes ou pour des défauts.**
+
+**① La garde du contrôle 1 ne pouvait PAS refuser.** Elle demandait
+`git ls-files "$p" | grep -qx 'legacy/version.txt'` — et `.gitignore:162` liste
+ce fichier, donc `git ls-files` ne le rend jamais. Contre-épreuve de l'ancienne
+forme : `legacy`, `legacy/`, `legacy/version.txt` → **trois faux négatifs sur
+trois**, dont `legacy` tout entier.
+
+> **La bonne question n'était pas « git le suit-il » mais « ce préfixe le
+> contient-il ».** Et son `✅` vivait *après* le `done`, donc s'imprimait même
+> quand la boucle venait d'incrémenter `ko` — *un détail qui affirme la
+> propriété qu'il vient de réfuter.*
+
+Remplacée par un prédicat **pur et éprouvable**, plus un mode
+`--epreuve-des-gardes` : **11 cas forgés, 11 discriminations**, dont
+`legacy/version.txt.bak` et `legacy/versionXtxt` qui sont là *exprès* — une
+garde écrite en `grep`, ou sans la barre dans le `case`, les capturerait et
+refuserait des étapes légitimes.
+
+**②③ Deux sondes refusaient POUR TOUJOURS parce que leur prémisse avait
+expiré** — et les deux refusaient *correctement* :
+
+```
+liens-morts-legacy       « 0 fichier lu »        l'archivage est FAIT
+ports-des-deux-portails  compose « illisible »   patch 07 a retire `php`
+```
+
+> **Une porte qui ne peut plus s'ouvrir cesse d'être une garde et devient un
+> mur — et son rouge ressemble à un défaut.**
+
+Les deux distinguent désormais **trois** états au lieu de deux, et **le témoin
+est ce qui sépare l'état terminal de l'instrument muet** : 178 `.php` archivés
+d'un côté, un port **numérique** de l'autre. *Sans témoin, « le travail est
+fait » et « je n'ai rien lu » rendent la même sortie.*
+
+**E-536 — Et trois de mes propres mesures de ce tour étaient fausses, toutes du
+côté qui arrange.**
+
+```
+docker ps sans droits          lu comme « le conteneur n'existe plus »
+                              -> j'allais annoncer la precondition LEVEE
+find tests scripts             ne balayait pas laravel/ : 4 sondes « introuvables »
+                              -> alors que le script les distingue deja d'un ECHEC
+node pred.mjs x <chemin>       argv[2]='x' : 0 partout, archive reelle comprise
+                              -> zero sur la sonde ET sur le temoin
+```
+
+**Et trois fois dans le même passage, mes backticks dans une chaîne à guillemets
+doubles ont EXÉCUTÉ ce qu'ils citaient** — `dire "… \`capture_le_fichier\` …"` a
+appelé la fonction sans argument. *Ma prose reste exécutable.* Un contrôle
+vérifie désormais qu'il n'en reste aucun dans un `dire "..."`.
+
+> Trois fois la même faute d'instrument en un tour, et **aucune n'a été trouvée
+> par relecture** : deux par une contre-épreuve, une par un témoin qui rendait
+> zéro lui aussi.
+
+**E-537 — Ce qui reste n'est pas du code, et n'est plus à moi.** Cinq fichiers
+suivis hors archive — trois `.htaccess` qui sont des **protections 403 vivantes**
+(`:8446/vendor/` et `/logs/` mesurés 403, témoin `/zzz` 404), plus
+`composer.json`/`.lock` **audités par `sca-php`** tant que le conteneur tourne.
+Et `php/` (8 fichiers), dont `php.ini` est **monté par `rootwarden_php`**, debout
+depuis le 2026-09-06 17:40 UTC.
+
+**Aucun ne peut être archivé avant que le conteneur ne parte.** E-517 est
+inchangé, et c'est maintenant le **seul** verrou : tout le reste est prouvé
+clos.
