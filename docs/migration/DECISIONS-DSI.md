@@ -18680,3 +18680,65 @@ login_attempts                  retention — decision de conformite
 ```
 
 **Aucun des six n'est technique.**
+
+**E-610 — `0b` a refusé de relayer mon item `login_attempts` faute de l'avoir
+mesuré. Je l'ai remesuré : il tient, et DEUX de mes chiffres étaient faux.**
+
+Sa réserve était juste et de la meilleure espèce : *« cinq items mesurés à côté
+d'un sixième emprunté, ça les met tous au même rang »*. **C'était le seul de ma
+liste de clôture que je n'avais pas remesuré cette fenêtre.**
+
+### Ce qui tient
+
+```
+cles etrangeres      login_attempts  ->  (AUCUNE FK)
+                     password_history        fk_pwhist_user            CASCADE
+                     password_reset_tokens   …_ibfk_1                  CASCADE
+                     remember_tokens         …_ibfk_1                  CASCADE
+                     user_logs               …_ibfk_1                  CASCADE
+                     TEMOIN : 76 FK dans le schema, l'instrument les voit
+LOG_RETENTION_DAYS   rootwarden_python   NON DEFINI
+                     rootwarden_laravel  NON DEFINI
+                     TEMOIN : DB_HOST rend `db`
+                     consomme par backend/scheduler.py et backend/ssh_key_manager.py
+                     declare 1 fois dans srv-docker.env.example
+donnees              2 lignes · colonnes : id, ip_address, username, success, step, attempted_at
+                     -> adresses IP et identifiants : donnees personnelles
+```
+
+**La table conserve des données personnelles, sans clé étrangère, quand ses
+quatre voisines d'authentification sont toutes en CASCADE, et la variable qui
+gouverne la purge n'est pas définie dans les conteneurs en service.** L'item est
+réel.
+
+### ⛔ Les deux chiffres que je récitais et qui sont faux
+
+**① « les six tables purgées par `Comptes::anonymise` » — il y en a UNE.**
+Scopé à la méthode (87 lignes, offsets 37750→41930) : un seul
+`table('…')`, et c'est `users`. *`login_attempts` en est bien absente — la
+conclusion tient, le nombre était inventé.*
+
+⚠ **Et ma première sonde a failli conclure l'inverse** : elle greppait
+`table\('…'\)` sur **tout le fichier** et rendait cinq tables dont
+`login_attempts`, ce qui aurait dit « elle EST purgée ». *C'est mon propre défaut
+de portée — scoper la sonde à la FONCTION, pas au fichier — et il se serait
+trompé du côté qui referme le dossier.* `login_attempts` est citée ligne 397,
+dans `deverrouille`, une autre méthode.
+
+**② « les trois autres tables d'auth sont CASCADE » — elles sont QUATRE.**
+Sous-compte, et dans la direction qui **affaiblit** mon propre argument : plus de
+voisines en CASCADE, plus le contraste est net. *C'est la direction rare — un
+chiffre récité qui se trompe contre soi.*
+
+> **Un compte récité dérive dans les deux sens, et il dérive même quand la
+> conclusion reste vraie.** Les deux erreurs étaient dans les chiffres
+> d'appui, pas dans le fait — et c'est ce qui les a rendues invisibles pendant
+> plusieurs tours : *rien ne réclame la vérification d'un chiffre qui soutient
+> une conclusion correcte.*
+
+### L'item, dans sa forme mesurée
+
+**`login_attempts` conserve des adresses IP et des identifiants sans FK ni purge
+effective. Décision de conformité pour l'exploitant** : poser
+`LOG_RETENTION_DAYS` dans l'environnement des conteneurs, et/ou ajouter la table
+à `Comptes::anonymise` — qui ne touche aujourd'hui que `users`.
