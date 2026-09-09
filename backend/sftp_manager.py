@@ -124,7 +124,46 @@ def render_policy(policy: dict) -> str:
 
     sftp_only = bool(policy.get('sftp_only', False))
     chroot_dir = policy.get('chroot_dir')
+    # ⛔ LA GARDE DE `working_dir` EST ICI PARCE QU'ELLE DOIT DOMINER LES DEUX
+    #    BRANCHES, ET ELLE N'EN GOUVERNAIT QU'UNE.
+    #
+    #    `_validate_path` etait appele dans la branche `elif working_dir:`, qui
+    #    n'ecrit qu'un COMMENTAIRE (« informatif - non applique »). La branche
+    #    `if sftp_only:` interpole la MEME valeur dans une DIRECTIVE VIVANTE :
+    #
+    #        "    ForceCommand internal-sftp" + f" -d {working_dir}"
+    #
+    #    et elle n'avait aucune garde. La valeur arrive brute de la requete
+    #    (`routes/policies.py`, `data.get('working_dir') or None`), part dans
+    #    `/etc/ssh/sshd_config.d/rootwarden-<user>.conf` (chown root) et est
+    #    chargee par sshd.
+    #
+    #    > La garde existait, elle mordait, et elle etait au MAUVAIS ENDROIT.
+    #    > Ce n'est pas une garde faible : c'est un APPEL ABSENT — et c'est
+    #    > pourquoi les deux durcissements successifs de `_validate_path` (le
+    #    > `fullmatch` qui ferme le saut de ligne final, puis la garde de
+    #    > segments sur `'..'`) n'atteignaient NI L'UN NI L'AUTRE ce chemin.
+    #
+    #    Et `sshd -t` ne rattrape pas : une directive injectee est
+    #    syntaxiquement valide. La valeur est en outre PERSISTEE.
+    #
+    #    Mesure du 2026-09-09 par `gestion-ssh-key-0b`, sur la fonction REELLE
+    #    avec un double de `ssh_utils` qui LEVE s'il est touche (donc zero appel
+    #    root) :
+    #      '/upload'                     -> rendu normal, 11 lignes
+    #      '/upload' + saut + directive  -> RENDU SANS ERREUR, 12 lignes, la
+    #                                       directive seule sur sa ligne DANS le
+    #                                       bloc `Match User`
+    #      la MEME valeur, branche elif  -> REFUSEE par `_validate_path`
+    #    Le troisieme temoin est le coeur de la demonstration.
+    #
+    #    ⚠ La portee n'est PAS un gain de privilege : l'acteur est role 3 avec
+    #    acces machine, et il dispose deja de gestes root sur la cible. Ce que le
+    #    defaut ajoute est la PERSISTANCE — une commande passe, un `sshd_config`
+    #    reste.
     working_dir = policy.get('working_dir')
+    if working_dir:
+        working_dir = _validate_path(working_dir, 'working_dir')
     # Les `.get(..., True)` qui suivent sont desormais INATTEIGNABLES : la
     # garde ci-dessus exige les quatre cles. Ils restent pour que la ligne
     # se lise seule, mais ils ne decident plus de rien.
@@ -155,7 +194,10 @@ def render_policy(policy: dict) -> str:
             "    PermitTTY no",
         ])
     elif working_dir:
-        working_dir = _validate_path(working_dir, 'working_dir')
+        # ⚠ Plus de `_validate_path` ici : la garde a ete REMONTEE au-dessus des
+        #    deux branches, ou elle les domine. La laisser en double donnerait a
+        #    croire que c'est CETTE ligne qui protege, alors que la branche
+        #    voisine n'en avait pas.
         # Pour shell normal : injecter un cd <dir> via ForceCommand n'est pas
         # une bonne idee (casse les .profile/.bashrc). On documente l'intention
         # mais on n'applique pas - le admin doit setter HOME ou utiliser .profile.
