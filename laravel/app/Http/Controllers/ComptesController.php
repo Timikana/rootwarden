@@ -386,6 +386,46 @@ class ComptesController extends Controller
     }
 
     /**
+     * Active ou SUSPEND un compte — le geste que l'extinction du legacy avait
+     * emporte (`legacy/adm/api/toggle_user.php`).
+     *
+     * ⚠ L'ETAT VOULU EST DIT, IL N'EST PAS DEDUIT. Le legacy lisait `active`
+     * puis l'inversait ; deux appels concurrents s'annulaient et un rejeu ne
+     * rendait pas le meme etat. Ici `actif` est un booleen explicite, donc le
+     * geste est idempotent.
+     *
+     * ⚠ ET L'ABSENCE DU PARAMETRE N'EST PAS UNE SUSPENSION. `boolean()` de
+     * Laravel rend `false` sur une cle absente : sans ce controle, un appel mal
+     * forme SUSPENDRAIT le compte au lieu d'echouer. Le repli d'un geste
+     * destructeur ne doit pas etre le geste.
+     */
+    public function activite(Request $requete, int $id): JsonResponse
+    {
+        [$auteur] = $this->qui($requete);
+        if (! $requete->has('actif')) {
+            return response()->json([
+                'success' => false, 'message' => __('comptes.err_actif_requis'),
+            ], 422);
+        }
+        $actif = $requete->boolean('actif');
+        $err = $this->comptes->definitActivite($id, $actif, $auteur);
+        if ($err !== null) {
+            // `err_inconnu` est un 404, les deux refus de garde sont des 422 :
+            // « ce compte n'existe pas » et « ce geste est refuse » ne se
+            // diagnostiquent pas au meme endroit.
+            return response()->json(['success' => false, 'message' => __($err)],
+                $err === 'comptes.err_inconnu' ? 404 : 422);
+        }
+        $this->journalise($auteur, ($actif ? 'Activation' : 'Suspension') . " du compte #{$id}");
+
+        return response()->json([
+            'success' => true,
+            'message' => __($actif ? 'comptes.active' : 'comptes.suspendu'),
+            'actif' => $actif,
+        ]);
+    }
+
+    /**
      * L'exemption d'expiration de mot de passe d'un compte.
      *
      * ══ SUPERADMINISTRATEUR SEULEMENT, ET LA GARDE EST DANS LA ROUTE ══════
