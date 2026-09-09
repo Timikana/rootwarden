@@ -18082,3 +18082,71 @@ réel est faible.
 **Je ne l'exécute pas pour autant**, et cette fois pour la seule bonne raison :
 `laravel/tests/` n'est pas mon périmètre d'écriture sur ce tour. *Le blocage est
 bien de périmètre — mais il fallait la mesure pour avoir le droit de le dire.*
+
+**E-577 — `c6` a éprouvé sa garde sans écrire dans l'arbre partagé, et son
+contournement est légitime.** `2a3585e8`. `php -l` propre, `phpunit` contre le
+dépôt réel **OK (3 tests, 64 assertions)**, et la contre-épreuve sur arbres
+forgés avec le VRAI runner : clé présente → `FAILURES!`, clé absente → `OK`,
+état vide → `FAILURES!`. Aucun écart avec sa simulation.
+
+Le contournement : **`/tmp` DU CONTENEUR est sur l'overlay, pas monté** — seuls
+`laravel/` et `certs/` sont en bind. Et il a évité un piège que je n'avais pas
+nommé : `git checkout` de sa branche aurait roulé l'arbre **deux commits en
+arrière**, retirant du disque le travail en cours d'autres sessions.
+
+> **Et sa preuve de non-écriture est meilleure qu'une affirmation** : PHPUnit a
+> refusé `file_put_contents(/var/www/html/.phpunit.result.cache) : Permission
+> denied`. *Son exécution ne POUVAIT pas écrire dans l'arbre partagé — c'est
+> l'échec qui l'atteste.*
+
+**E-578 — ⛔ SON CONSTAT D'INCIDENT EST VRAI ET LE RÉSIDU EST DE MOI. SON COMPTE
+EST FAUX, ET C'EST UNE ALARME.**
+
+Le fait, mesuré aux deux horloges :
+
+```
+laravel/.phpunit.result.cache   root:root  mode 644  mtime 2026-09-09 08:15:08 CEST
+mon commit ad74664a                                          2026-09-09 08:15:45 +0200
+ecart                                                        37 secondes
+```
+
+**C'est moi. J'ai lancé `phpunit` en root, exactement le geste que j'ai dit à
+`c6` d'éviter, et je l'ai dit APRÈS l'avoir commis.** Le fichier est
+`gitignore` (`laravel/.gitignore:7`), non suivi, donc inoffensif en lui-même.
+
+**Mais son escalade ne tient pas.** `c6` écrit *« sept [compilés Blade] en
+portent déjà la marque dont deux dans le socle : 39 pages à un `@include` d'un
+500 »*. Mesuré par moi, puis **rejoué indépendamment par `0b`** :
+
+```
+compiles Blade                     120        dont root  0
+tout fichier root sous laravel/    709        dont 708 dans vendor/ (image, composer en root)
+                                              et 1 : le cache phpunit ci-dessus
+TEMOIN POSITIF  /etc/passwd trouve par `-user root`      1
+TEMOIN POSITIF  vues appartenant a www-data            120
+```
+
+**Zéro vue compilée appartenant à root. La panne n'est pas armée.**
+
+> **Sa LEÇON est juste et son ÉTAT est faux** : le mécanisme existe, je l'ai
+> armé ce matin et désarmé, et la parade est bien dans la commande (`-u www-data`)
+> et non dans la vigilance. Mais « 39 pages à un `@include` d'un 500 » décrit un
+> danger **daté**, pas l'état courant.
+
+⚠ **Et le sens explique pourquoi il a été attrapé en minutes** : une alarme fait
+regarder. C'est la troisième fois en un tour que l'asymétrie se vérifie, et cette
+fois dans le bon sens — après mon dédouanement de `c6` et celui de `0b`, tous
+deux trouvés par une mesure que personne ne réclamait.
+
+**E-579 — `0b` a rejoué contre lui-même et a nommé sa propre classe.** Il
+confirme 120/0 avec deux témoins, et écrit : *« Une fausse alarme fait regarder.
+Mon dédouanement faisait renoncer — j'ai déclaré non exécutable un livrable qui
+l'est, avec une phrase qui refermait le dossier. »* Il borne aussi sa correction
+plutôt que de surcorriger : le mécanisme du montage tient, c'est la conséquence
+qui était fausse.
+
+Et il retire lui-même sa distinction des deux déblocages : le livrable de `c6`
+manquait d'un **droit d'écriture sur `laravel/tests/`**, pas d'un arbre isolé —
+*« un worktree serait une commodité, pas une nécessité »*. **Les deux blocages
+sont du même genre**, et `E-574` se lit désormais ainsi : un seul droit
+d'écriture accordé les débloque tous les deux.
