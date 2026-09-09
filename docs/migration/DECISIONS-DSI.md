@@ -17897,3 +17897,83 @@ et `composer.lock` (37 218 o) sont **suivis par git**, donc les 898 fichiers son
 reconstituables par un `composer install`. *C'est ce qui rend la non-suppression
 peu coûteuse — et ce qui rendrait la suppression réversible si l'exploitant la
 voulait.*
+
+---
+
+**E-569 — RÉTRACTATION IMMÉDIATE : mon propre relevé de production était faux
+d'un facteur 6,5, et du côté qui ALARME.** L'étape 1 de la mission demande le
+ratio doc/code. Mon premier chiffre : **2,40**, au-dessus du seuil de 2, donc
+« l'équipe écrit sur ses mesures au lieu de porter ». Le vrai : **0,37**.
+
+```
+fenetre 12 h, 105 commits
+  FUSIONS (ni code ni doc)   44
+  CODE                       41
+  DOC (docs/ seulement)      15
+  autre                       5
+  somme 105 == 105           oui
+```
+
+Deux défauts, tous deux dans mon classeur :
+
+① **44 commits de fusion rangés dans DOC**, parce qu'un commit de fusion n'a
+aucun fichier et que `all(x.startswith('docs/') for x in [])` vaut **`True`** —
+*l'universelle vraie à vide, que j'ai déjà consignée et recommise.*
+
+② **Mon prédicat CODE était trop étroit** : `feat`/`fix` seulement, et
+`laravel/`|`backend/` seulement. Il excluait `test`, `chore`, `revert`, et
+`scripts/`, `.github/`, `.semgrep/` — qui sont de la production dans ce dépôt
+(le cliquet semgrep, le script d'extinction, les règles maison).
+
+> **Un instrument qui classe doit rendre une somme, et la somme doit être
+> vérifiée contre un compte indépendant.** Sans le `105 == 105`, les 44 fusions
+> restaient dans la mauvaise colonne sans qu'aucune ligne ne paraisse fausse.
+
+⚠ **Et la direction compte** : ce faux chiffre allait me faire reprocher à
+l'équipe d'écrire au lieu de porter, sur une fenêtre où elle a produit 41
+commits de code contre 15 de documentation. *Une fausse alarme adressée à
+quelqu'un d'autre est le seul type d'erreur de mesure dont le coût est immédiat.*
+
+**Limite déclarée, et elle gouverne l'étape 2** : les 105 commits portent tous
+l'auteur `Timikana`. Le parc partage une identité git, donc « quelle session n'a
+pas produit de CODE depuis deux tours » est **inévaluable depuis git**. J'ai
+assigné sur la valeur des tâches, pas sur ce critère, et je le dis plutôt que de
+laisser croire que le critère a été appliqué.
+
+**E-570 — Le jeton Telegraf est en clair dans `supervision_config`, et son
+commentaire affirme un chiffrement qui n'existe pas.** Voir `DOSSIER-66`. Écrit
+sans chiffrement à `:2475` et `:2499`, relu brut à `:541`, quand `tls_psk_value`
+— même table, même fichier — est chiffré à `:718` et déchiffré à `:895`/`:1242`.
+`decrypt_password` est appelé 4 fois dans ce fichier, zéro pour le jeton (témoin :
+le `4` prouve que l'instrument voit les déchiffrements).
+
+**Le défaut est ARMÉ, PAS EXERCÉ** : la table est vide (`0 0`, mesuré). J'étais à
+un mot d'écrire « un secret est déjà en clair en service », ce qui aurait
+contredit `DOSSIER-55` §⑨ en présentant sa formulation exacte comme une
+sous-estimation. *C'est le témoin — un `COUNT(*)` dans la même commande — qui a
+fait dire « la table est vide » au lieu de « la requête n'a pas abouti ».*
+
+**L'ordre juste pour l'exploitant : chiffrer d'abord, porter `patch 03`
+ensuite.** L'inverse crée un secret en clair qu'une migration devra rattraper.
+Correctif assigné à `gestion-ssh-key-0b`, branche `security/`, **non fusionnée**.
+
+**E-571 — L'étape 3 tient, et je la fais remplacer par une garde parce qu'elle
+est récitée seize fois.** `socle_avertissement` : 0 dans `laravel/lang/{fr,en}/auth.php`,
+0 dans `cgu.blade.php`, 0 dans toute suite ; les 2 seuls fichiers du dépôt qui
+portent le mot sont `CHANGELOG.md` et ce fichier — ma propre prose. Témoins
+étalonnés : `cgu_titre` → 4 fichiers, clé absurde → 0.
+
+`git grep` dans ce fichier rend **seize** consignations de cette même mesure.
+*Le coût n'est pas la commande — c'est qu'une vérification récitée dérive, alors
+qu'une garde refuse.* Assignée à `gestion-ssh-key-c6`, avec la contrainte de
+distinguer **trois** états (clé absente · clé présente · instrument muet), sans
+quoi un renommage de `lang/` la rendrait verte pour toujours.
+
+**E-572 — La file des 11 reste épuisée, remesurée site par site plutôt que
+reconduite.** ② `/ssh-audit/schedules` 9 · ③ `groupes.js` 20 · ④ `importeCsv` 1 ·
+⑤ `/ssh-audit/config` 3 · ⑥ `/fail2ban/{jail,geoip}` 2 · ⑦ `/ssh-audit/scan` 4 ·
+⑧ `drift_scan` 4 (témoin : motif absurde → 0). ⑨ a rendu `0` **et**
+`FICHIER ABSENT` sur la même ligne : mon idiome `$(grep -c … || echo ABSENT)`
+**confond zéro correspondance et fichier absent**, `grep -c` sortant en code 1
+quand le compte est nul. `supervision.js` est bien là (80 224 o, suivi) — c'était
+mon motif qui ne valait rien.
