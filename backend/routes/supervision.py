@@ -365,6 +365,29 @@ def _write_config_stream(client, root_password, file_path, config_lines):
     echecs = 0
     try:
         for key, value in config_lines.items():
+            # ⚠ `re.escape` ECHAPPE POUR UNE REGEX PYTHON, PAS POUR LE SHELL.
+            #    Il ne protege donc PAS la ligne suivante.
+            #
+            #    Le fragment construit ici atterrit dans un `sed -i -E '/.../d'`, entre
+            #    APOSTROPHES de shell. Mesure du 2026-09-09, python 3.13 : `re.escape`
+            #    laisse INTACTS l'apostrophe, la barre oblique, le guillemet double et le
+            #    backtick — les quatre qui comptent ici. Il echappe `$`, `&`, `|`, `(`,
+            #    `.`, `*`, l'espace et le saut de ligne.
+            #
+            #    CE QUI PROTEGE CETTE LIGNE est `_SAFE_PARAM_RE` (:337), TRENTE LIGNES PLUS
+            #    HAUT et sur un AUTRE objet — `^[a-zA-Z0-9_.:-]+$`, eprouve dans les deux
+            #    sens : `Timeout` accepte (temoin positif), `a'b` `a;b` `a/d` `a b` `a$b`
+            #    refuses.
+            #
+            #    ⚠ Elargir `_SAFE_PARAM_RE` — pour accepter les directives d'un nouvel
+            #    agent, par exemple — rendrait cette ligne injectable SANS la toucher, et
+            #    `re.escape` continuerait d'y donner l'apparence d'une protection.
+            #
+            #    Releve conjointement par `gestion-ssh-key-c1` et par moi, sur DEUX fichiers
+            #    differents : c'est une CLASSE, pas un site. Voir `DOSSIER-62` §ⓐ.
+            #    Le nom n'est PAS change ici : `grep_regex` dit « regex », il ne promet pas
+            #    d'echappement de shell. C'est l'ancien nom de `ssh_audit.py` qui le
+            #    promettait, et il est devenu `motif_cle_regex`.
             grep_regex = f"^[#[:space:]]*{re.escape(key)}[[:space:]]*="
             delete_cmd = f"sed -i -E '/{grep_regex}/d' {file_path}"
             _, _, rc_purge = execute_as_root(client, delete_cmd, root_password)

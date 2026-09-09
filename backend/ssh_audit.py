@@ -314,12 +314,34 @@ def apply_fix(client, root_pass, key, value):
     # Modification : commenter l'ancienne directive + ajouter la nouvelle en fin de fichier
     # Utilise grep + printf + base64 pour eviter toute injection sed/shell
     import base64
-    escaped_key = re.escape(key)
+    # ⚠ `re.escape` ECHAPPE POUR UNE REGEX PYTHON, PAS POUR LE SHELL.
+    #
+    #    Mesure du 2026-09-09, python 3.13 : il laisse INTACTS l'apostrophe, la
+    #    barre oblique, le guillemet double et le backtick — exactement les
+    #    quatre qui comptent ici, ou la valeur vit entre APOSTROPHES de shell et
+    #    dans une expression `s///`. Il echappe `$`, `&`, `|`, `(`, `.`, `*`,
+    #    l'espace et le saut de ligne.
+    #
+    #    CE QUI PROTEGE CES LIGNES N'EST DONC PAS CETTE FONCTION : c'est
+    #    `_validate_directive` (:241), appelee en PREMIERE INSTRUCTION de cette
+    #    fonction, contre `ALLOWED_DIRECTIVES` — un ensemble DERIVE de
+    #    `AUDIT_RULES` (16 cles, toutes alphanumeriques), pas une liste retapee.
+    #    La garde domine donc tous les `return` qui suivent.
+    #
+    #    LE NOM A CHANGE POUR CA. L'ancien affirmait un echappement que la
+    #    fonction ne fournit pas — et un nom qui rassure a tort ne se contente
+    #    pas de tromper son lecteur : il SE PROPAGE. Le prochain qui ecrira une
+    #    commande a cote reutiliserait la variable en la croyant sure. Le
+    #    nouveau dit ce qu'elle EST : un fragment de regex.
+    #
+    #    ⚠ Elargir `ALLOWED_DIRECTIVES` rendrait ces lignes injectables SANS les
+    #    toucher. C'est la garde qu'il faut lire, pas celle-ci.
+    motif_cle_regex = re.escape(key)
     new_line = f"{key} {value}"
     b64_line = base64.b64encode(new_line.encode()).decode()
     fix_cmd = (
-        f"grep -qiE '^\\s*#?\\s*{escaped_key}\\b' /etc/ssh/sshd_config && "
-        f"sed -i '/^\\s*#*\\s*{escaped_key}\\b/s/^/# /' /etc/ssh/sshd_config; "
+        f"grep -qiE '^\\s*#?\\s*{motif_cle_regex}\\b' /etc/ssh/sshd_config && "
+        f"sed -i '/^\\s*#*\\s*{motif_cle_regex}\\b/s/^/# /' /etc/ssh/sshd_config; "
         f"printf '%s\\n' \"$(echo {b64_line} | base64 -d)\" >> /etc/ssh/sshd_config"
     )
     _, stderr, rc = execute_as_root(client, fix_cmd, root_pass, logger=_log)
@@ -408,13 +430,35 @@ def toggle_directive(client, root_pass, key, enable):
     except RuntimeError as e:
         return False, str(e)
 
-    escaped_key = re.escape(key)
+    # ⚠ `re.escape` ECHAPPE POUR UNE REGEX PYTHON, PAS POUR LE SHELL.
+    #
+    #    Mesure du 2026-09-09, python 3.13 : il laisse INTACTS l'apostrophe, la
+    #    barre oblique, le guillemet double et le backtick — exactement les
+    #    quatre qui comptent ici, ou la valeur vit entre APOSTROPHES de shell et
+    #    dans une expression `s///`. Il echappe `$`, `&`, `|`, `(`, `.`, `*`,
+    #    l'espace et le saut de ligne.
+    #
+    #    CE QUI PROTEGE CES LIGNES N'EST DONC PAS CETTE FONCTION : c'est
+    #    `_validate_directive` (:241), appelee en PREMIERE INSTRUCTION de cette
+    #    fonction, contre `ALLOWED_DIRECTIVES` — un ensemble DERIVE de
+    #    `AUDIT_RULES` (16 cles, toutes alphanumeriques), pas une liste retapee.
+    #    La garde domine donc tous les `return` qui suivent.
+    #
+    #    LE NOM A CHANGE POUR CA. L'ancien affirmait un echappement que la
+    #    fonction ne fournit pas — et un nom qui rassure a tort ne se contente
+    #    pas de tromper son lecteur : il SE PROPAGE. Le prochain qui ecrira une
+    #    commande a cote reutiliserait la variable en la croyant sure. Le
+    #    nouveau dit ce qu'elle EST : un fragment de regex.
+    #
+    #    ⚠ Elargir `ALLOWED_DIRECTIVES` rendrait ces lignes injectables SANS les
+    #    toucher. C'est la garde qu'il faut lire, pas celle-ci.
+    motif_cle_regex = re.escape(key)
     if enable:
         # Uncomment: remove leading # from lines matching the key
-        cmd = f"sed -i 's/^\\s*#\\s*\\({escaped_key}\\b\\)/\\1/' /etc/ssh/sshd_config"
+        cmd = f"sed -i 's/^\\s*#\\s*\\({motif_cle_regex}\\b\\)/\\1/' /etc/ssh/sshd_config"
     else:
         # Comment: add # before lines matching the key
-        cmd = f"sed -i 's/^\\s*\\({escaped_key}\\b\\)/# \\1/' /etc/ssh/sshd_config"
+        cmd = f"sed -i 's/^\\s*\\({motif_cle_regex}\\b\\)/# \\1/' /etc/ssh/sshd_config"
 
     _, stderr, rc = execute_as_root(client, cmd, root_pass, logger=_log)
     if rc != 0:
