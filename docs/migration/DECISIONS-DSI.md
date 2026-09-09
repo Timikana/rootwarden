@@ -18150,3 +18150,87 @@ manquait d'un **droit d'écriture sur `laravel/tests/`**, pas d'un arbre isolé 
 *« un worktree serait une commodité, pas une nécessité »*. **Les deux blocages
 sont du même genre**, et `E-574` se lit désormais ainsi : un seul droit
 d'écriture accordé les débloque tous les deux.
+
+**E-580 — `0b` a corrigé ma PREUVE et pas ma conclusion, et sa correction est de
+ma propre classe consignée.** J'ai écrit *« c'est faux, ta mesure le réfute
+déjà : 120/0 »*. **Un `120/0` d'aujourd'hui ne réfute pas une alerte portant sur
+08:20** — c'est exactement `feedback_alerte_mal_datee`, ma note, et j'allais me
+la faire ratifier. Vérifié depuis, sur la fenêtre :
+
+```
+compiles              119     mtime AVANT 08:15:08 : 119     APRES : 0
+proprietaires distincts        www-data (seul)
+```
+
+*Le répertoire n'a pas été vidé : les compilés d'avant l'incident sont là, tous
+`www-data`. Le compte de `c6` ne peut donc pas venir de là.*
+
+**Et son affinement sur l'asymétrie est meilleur que le mien.** J'attribuais la
+différence de traitement à la DIRECTION (alarme vs dédouanement). Il montre que
+ce n'est pas la direction :
+
+> **Son alarme portait un NOMBRE FALSIFIABLE — « 7 compilés, 2 dans le socle, 39
+> pages ». N'importe qui pouvait le compter, et quelqu'un l'a fait. Nos deux
+> dédouanements ne portaient aucun nombre : « pas d'échappatoire », « php existe
+> donc c'était exécutable ». Il n'y avait rien à compter, donc rien à réfuter —
+> il fallait d'abord INVENTER la mesure.**
+
+**Le remède n'est donc pas de se méfier des exculpations : c'est de leur EXIGER
+un nombre, comme on l'exige d'une alarme.** *Une exculpation chiffrée se réfute ;
+une exculpation en prose se ratifie parce qu'elle n'offre aucune prise.*
+
+**E-581 — L'item de signature « propriété du cache compilé en PRODUCTION » est
+RÉPONDABLE, et `c6` s'est trompé dans le sens qui m'arrangeait.** Il a écrit *« ma
+correction ne vide pas ton item : la production reste non mesurée »*. J'ai vérifié
+plutôt que d'accepter — c'est une mesure qui m'arrange, donc celle à refaire :
+
+```
+images laravel baties            1        rootwarden-laravel:latest, 2026-09-06 13:08:20
+la ligne 59 commitee             3055dec0, 2026-09-03 12:16
+l image PORTE la ligne 59        oui   `chown -R www-data:www-data storage/framework/views`
+                                        (temoin : le motif `chown … storage` est trouve 2 fois)
+ordre dans l entrypoint          :44 `view:cache` en ROOT  ->  :59 le chown APRES
+docker-compose.prod.yml:110-113  tmpfs uid=33,gid=33 sur views, cache, sessions, bootstrap/cache
+uid 33                           = www-data (verifie dans le conteneur)
+prod et dev                      MEME image (`build: context .`, `dockerfile ./laravel/Dockerfile`)
+```
+
+**Le piège est donc fermé PAR CONSTRUCTION en production** : le tmpfs est recréé
+vide à chaque démarrage et appartient à `www-data`, et le `chown` de `:59`
+s'exécute **après** le `view:cache` qui tourne en root. `DOSSIER-00:335` disait
+« je n'interroge pas la prod » — c'était vrai le 2026-09-03 ; **l'image du
+2026-09-06 postdate le correctif.**
+
+*Ce qui reste, et c'est beaucoup plus étroit que « non mesuré » : personne n'a
+vérifié qu'un déploiement de production a bien rebâti depuis cette image.*
+
+**E-582 — ⛔ ET J'AI FAILLI SUR-GÉNÉRALISER LA FERMETURE DE `0b`, UNE MESURE AVANT
+DE L'ÉCRIRE.** Son argument — *« un `phpunit` qui n'effectue aucun rendu ne
+compile aucune vue Blade, quel que soit l'utilisateur »* — est juste **pour le
+test de `c6`**, mesuré : 0 requête, 0 rendu, `glob` / `RecursiveDirectoryIterator`
+/ `file_get_contents`.
+
+J'allais l'étendre à la suite entière. **C'est faux :**
+
+```
+fichiers de test               23     temoins : 14 `public function test`, 18 `assertSame`
+this->get( · this->post( · this->actingAs( · get(route(        0 fichier
+view(                                                          1 fichier
+  -> laravel/tests/Feature/ComptesRenduSignauxTest.php:156   return view('comptes', …)
+```
+
+**Un seul test de la suite rend une vue, et c'est `comptes` — celle que j'ai
+modifiée ce matin, et celle dont j'ai armé puis désarmé le compilé root.** Lancer
+la suite complète en root arme donc exactement un compilé, et c'est celui qui
+compte.
+
+> **La fermeture par mécanisme était juste sur son objet et fausse d'un cran plus
+> haut.** *Un raisonnement qui tient pour un fichier ne tient pas pour la suite
+> parce qu'il suffit d'UN rendeur — et l'universelle « aucun test ne rend » est
+> exactement le genre d'affirmation qu'un seul contre-exemple détruit.*
+
+⚠ Et mon premier témoin sur ce point rendait **zéro** : `git grep -l '\$this->get('`
+cherche une barre oblique inverse littérale entre apostrophes simples. *Zéro sur
+la sonde et zéro sur le témoin : la mesure n'avait pas eu lieu.* Recalibré sur
+`public function test` (14) et `assertSame` (18), la propriété est devenue
+lisible — et l'exception est apparue.
