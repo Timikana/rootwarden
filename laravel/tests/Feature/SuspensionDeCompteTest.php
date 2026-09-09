@@ -191,6 +191,33 @@ class SuspensionDeCompteTest extends TestCase
         $this->assertSame(1, $this->actif(1));
     }
 
+    /**
+     * ⚠ LE CAS QUE MA PREMIERE GARDE RENDAIT FAUX, trouve en ecrivant celle de
+     * la RETROGRADATION et non en relisant celle-ci.
+     *
+     * La forme initiale comptait `role_id = 3 AND active = 1` et refusait a
+     * `<= 1`. Sur une cible DEJA INACTIVE avec un AUTRE superadmin actif, le
+     * compte valait 1 -> refus. Or suspendre un compte deja suspendu est un
+     * no-op, et le message annoncait « le dernier superadmin ACTIF » a propos
+     * d'un compte qui ne l'etait pas.
+     *
+     *   > La question n'est pas « combien y en a-t-il » mais « en reste-t-il un
+     *   > APRES ».
+     */
+    public function test_suspendre_un_superadmin_DEJA_INACTIF_est_permis(): void
+    {
+        $this->pose(1, 'ancien-chef', 3, 0);   // la CIBLE, deja inactive
+        $this->pose(2, 'chef', 3, 1);          // un AUTRE, actif
+        $this->pose(9, 'jean', 1, 1);
+
+        $this->assertNull(
+            $this->comptes->definitActivite(1, false, 9),
+            'un compte deja suspendu ne peut pas etre « le dernier superadmin actif »'
+        );
+        $this->assertSame(0, $this->actif(1));
+        $this->assertSame(1, $this->actif(2), 'et le superadmin actif ne bouge pas');
+    }
+
     public function test_un_compte_inconnu_rend_err_inconnu(): void
     {
         $this->pose(1, 'chef', 3, 1);

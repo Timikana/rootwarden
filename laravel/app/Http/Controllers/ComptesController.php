@@ -122,6 +122,11 @@ class ComptesController extends Controller
             'comptes' => $this->comptes->liste(),
             'roles' => Comptes::ROLES,
             'estSuperadmin' => $roleId >= 3,
+            // Le role NUMERIQUE de l'auteur, et pas seulement `estSuperadmin` :
+            // le selecteur de role n'offre a un role 2 que les roles
+            // STRICTEMENT inferieurs au sien, comme la garde 4 du service.
+            // Offrir une option que le service refusera serait un controle mort.
+            'roleAuteur' => $roleId,
             'longueurMinimale' => Comptes::LONGUEUR_MINIMALE,
             'importMaxKo' => self::IMPORT_MAX_KO,
             'importColonnes' => Comptes::IMPORT_COLONNES,
@@ -422,6 +427,45 @@ class ComptesController extends Controller
             'success' => true,
             'message' => __($actif ? 'comptes.active' : 'comptes.suspendu'),
             'actif' => $actif,
+        ]);
+    }
+
+    /**
+     * Change le ROLE d'un compte — second geste perdu a l'extinction du legacy
+     * (`legacy/adm/includes/manage_roles.php:124-163`).
+     *
+     * ⚠ LE ROLE DE L'AUTEUR EST TRANSMIS AU SERVICE, PAS RELU PAR LUI.
+     *    Deux des six gardes en dependent (« un role 2 ne touche pas un role 3 »
+     *    et « n'assigne qu'un role strictement inferieur au sien »). Le relire
+     *    en base ouvrirait une fenetre entre la session et la decision ; le
+     *    prendre de la session, comme `qui()` le fait pour tous les autres
+     *    gestes de ce controleur, ferme cette fenetre.
+     *
+     * ⚠ ET L'ABSENCE DU PARAMETRE N'EST PAS UN ROLE. `integer()` rendrait `0`
+     *    sur une cle absente — un role qui n'existe pas, donc un refus par la
+     *    garde 2. Le controle explicite rend un message qui NOMME le probleme
+     *    plutot qu'un « role inconnu » qui ferait chercher dans la table.
+     */
+    public function role(Request $requete, int $id): JsonResponse
+    {
+        [$auteur, $roleAuteur] = $this->qui($requete);
+        if (! $requete->has('role')) {
+            return response()->json([
+                'success' => false, 'message' => __('comptes.err_role_requis'),
+            ], 422);
+        }
+        $role = (int) $requete->input('role');
+        $err = $this->comptes->definitRole($id, $role, $auteur, $roleAuteur);
+        if ($err !== null) {
+            return response()->json(['success' => false, 'message' => __($err)],
+                $err === 'comptes.err_inconnu' ? 404 : 422);
+        }
+        $this->journalise($auteur, "Role du compte #{$id} porte a {$role}");
+
+        return response()->json([
+            'success' => true,
+            'message' => __('comptes.role_change'),
+            'role' => $role,
         ]);
     }
 

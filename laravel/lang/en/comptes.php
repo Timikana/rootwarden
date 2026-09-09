@@ -48,6 +48,13 @@ return [
 
     'deverrouiller' => 'Unlock',
     'deverrouille' => 'Account unlocked.',
+    'role_change' => 'Role changed.',
+    'role_titre' => 'Role',
+    'err_auto_role' => 'You cannot change your own role.',
+    'err_role_inconnu' => 'That role does not exist.',
+    'err_role_superadmin_intouchable' => 'An administrator cannot change a superadministrator role.',
+    'err_role_trop_haut' => 'You may only assign a role strictly below your own.',
+    'err_role_requis' => 'The desired role must be given.',
     'suspendre' => 'Suspend',
     'activer' => 'Enable',
     'active' => 'Account enabled.',
