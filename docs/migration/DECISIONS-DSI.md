@@ -18848,3 +18848,75 @@ terminé.*
 ci-dessus, pas reconduit. **Étape 3 : tenue** (0 · 0 · 0, témoins `cgu_titre` 4
 et clé absurde 0). **Étape 4 : les six décisions de `E-611` sont inchangées et
 n'attendent que l'exploitant.**
+
+---
+
+**E-614 — J'ai refait « rien n'est non porté » avec un AUTRE instrument, en sens
+inverse, parce que c'est la conclusion qui m'arrange le plus.** Le tour précédent
+la dérivait du JS. Ici, depuis l'archive : les 178 `.php` archivés, ceux qui
+écrivent en base, et les tables qu'ils touchent, comparées à celles que
+`laravel/app` cite.
+
+```
+fichiers .php archives              178
+dont ECRIVANT (INSERT/UPDATE/DELETE) 38
+tables ecrites par l'archive         20
+tables citees par laravel/app        34      TEMOIN, doit etre > 0
+ORPHELINES                            3      iptables_rules · linux_versions · update_schedules
+```
+
+**Deux des trois sont des artefacts de mon instrument :**
+
+```
+iptables_rules     PORTE — PareFeuController · Iptables.php · pare-feu.js · web.php
+                   et 4 fichiers JS atteignent /iptables (liste blanche)
+update_schedules   PORTE PAR LA PASSERELLE — mises-a-jour.js atteint
+                   /schedule_update et /schedule_advanced_update, tous deux en liste blanche
+```
+
+*Mon motif `table('…')` ne voit pas une écriture qui passe par la passerelle vers
+`backend/`, et la passerelle **est** un mécanisme porté. Une table « jamais
+écrite par `laravel/app` » peut être parfaitement servie.*
+
+**E-615 — `linux_versions` est une table MORTE, et son extinction a retiré un
+DÉFAUT, pas une capacité.**
+
+```
+ecrivain unique      legacy/_deprecated/update/functions/machines.php:89   (ARCHIVE)
+mentions backend/    0        mentions laravel/    0
+lignes               0        (compte EXACT, pas TABLE_ROWS qui est une estimation)
+FK                   linux_versions_ibfk_1 -> machines(id) ON DELETE CASCADE
+```
+
+**Et le détail qui inverse le verdict.** L'archive écrivait :
+
+```sql
+INSERT INTO linux_versions (machine_id, version, last_checked) VALUES (…)
+ON DUPLICATE KEY UPDATE version = :version, last_checked = NOW()
+```
+
+*Intention : une valeur courante par machine.* **Mais le schéma ne porte AUCUNE
+clé unique sur `machine_id`** — seulement `KEY machine_id`, l'index de la clé
+étrangère. Le seul index unique est `PRIMARY KEY (id)`, que l'`INSERT` ne
+fournit jamais.
+
+> **L'`ON DUPLICATE KEY UPDATE` était donc INERTE : chaque appel insérait une
+> ligne de plus.** Le legacy *voulait* une valeur courante et *produisait* un
+> historique qui grossissait sans fin. **Le portage fait ce que le legacy
+> VOULAIT** — `monitoring.py:183`,
+> `UPDATE machines SET linux_version = %s, last_checked = NOW()`, mêmes deux
+> champs — *et pas ce qu'il FAISAIT.*
+
+**L'extinction a donc supprimé une fuite lente, pas une capacité.** *Un
+`ON DUPLICATE KEY UPDATE` sans clé unique est un défaut qu'aucune relecture du
+SQL n'attrape : la requête est correcte, c'est le SCHÉMA qui la rend inerte.*
+
+**Ce qui revient à l'exploitant, et c'est mineur** : garder ou supprimer la table
+`linux_versions`. **Elle ne nuit pas** — 0 ligne, aucun écrivain, FK en CASCADE —
+et sa suppression est une migration, donc hors de mon périmètre. *Je la signale
+pour qu'elle soit un choix et non un oubli.*
+
+**Étapes 1 à 3 de ce tour** : 1 commit depuis 10:35, le mien, **0 CODE** — le
+critère de l'étape 2 se déclenche pour toutes les sessions, et **je n'assigne
+rien**, la raison étant maintenant mesurée par deux instruments indépendants et
+non récitée. Étape 3 tenue (0 · 0 · 0, témoins `cgu_titre` 4 et clé absurde 0).
