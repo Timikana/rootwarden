@@ -224,3 +224,105 @@ commit, et un seul reçoit le chiffrement — qui est la ligne juste en dessous.
 > suivi la même préoccupation pour les deux dans le même souffle. **L'omission
 > est locale au chiffrement, pas générale** — ce qui est plus embarrassant pour
 > le geste d'origine, et plus utile pour qui corrigera.
+
+---
+
+# EXTENSION du 2026-09-09 10:55 — AUCUNE branche `security/` ne se fusionne proprement, et quatre conflits sont dans du CODE
+
+**Signalé par `0b`, rejoué et étendu par moi. Aucun geste : `git merge-tree` ne
+touche pas l'arbre de travail, et le témoin le confirme.**
+
+## 1. Les branches, DÉRIVÉES et non reprises
+
+```
+branches non fusionnees dans origin/main, enumerees :
+  security/backend-cve
+  security/garde-socle-avertissement
+  security/semgrep-regles-mortes
+  Migration-Laravel                      (la branche de travail)
+  bundle/refs/heads/laravel              2026-08-17   artefact de bundle
+  bundle/refs/stash                      2026-05-05   artefact de bundle
+```
+
+*Les deux `bundle/` ne sont pas du travail en cours — un `stash` de mai et une
+vague de portage d'août, tous deux antérieurs de plusieurs semaines. Je les
+nomme pour que personne ne les poursuive.*
+
+## 2. La simulation, code de sortie sans tube
+
+```
+security/backend-cve                 code=1 · 2 chemins
+    backend/routes/cve.py                              CODE
+    backend/scheduler.py                               CODE
+security/garde-socle-avertissement   code=1 · 1 chemin
+    docs/migration/QA-JETON-TELEGRAF-EN-CLAIR.md       document
+security/semgrep-regles-mortes       code=1 · 3 chemins
+    backend/ssh_utils.py                               CODE
+    .semgrep/rules-rootwarden.yml                      CONFIG
+    docs/migration/QA-APPARIEMENT-CINQ-CATALOGUES.md   document
+
+TOTAL : 6 chemins, dont 4 en CODE ou CONFIG
+TEMOIN : Migration-Laravel contre elle-meme -> code 0
+```
+
+> ⛔ **Aucune des trois branches ne se fusionne proprement, et quatre des six
+> conflits sont dans du code de `backend/` ou dans les règles semgrep.** Elles
+> sont remontées comme « vérifiées, en attente d'un mot » — **le mot ne suffira
+> pas** : il faudra trancher `cve.py`, `scheduler.py`, `ssh_utils.py` et
+> `rules-rootwarden.yml`.
+
+*La provenance étrangère du §1 n'était que le symptôme visible. Le problème de
+fusionnabilité est indépendant d'elle et plus lourd.* **Les deux conflits de
+documents se résolvent sans perte** — garder `Migration-Laravel`, qui contient
+dans les deux cas la version de la branche **plus** des ajouts (174 lignes contre
+113 ; 17 506 octets contre 9 326). **Les quatre autres demandent une décision de
+contenu.**
+
+## 3. ⚠ ET J'AI MIS UN `head -6` DANS LA COMMANDE QUI MESURAIT CE DÉFAUT
+
+Ma première passe tronquait la liste des conflits à six lignes. **Elle a caché
+exactement le troisième conflit que `0b` nommait** —
+`QA-APPARIEMENT-CINQ-CATALOGUES.md` — *et elle faisait donc passer SON relevé
+pour inexact.*
+
+C'est la cinquième instance de la borne de confort en une heure, et la pire des
+cinq :
+
+```
+head -20 sur le reflog        -> 10 bascules au lieu de 28
+--since='2026-09-07'          -> 2 commits egares au lieu de 3
+git log -3 sur un fichier     -> « changement recent » au lieu de cinq mois
+six PR relues sur un critere  -> les commits portes jamais lus
+head -6 sur les conflits      -> 5 chemins au lieu de 6, ET un pair mis en tort
+```
+
+> **Je l'ai commise dans la commande qui la mesurait**, une heure après l'avoir
+> nommée, et dans le document qui l'énonce. *C'est la propriété que ce dépôt a
+> déjà consignée : une règle protège les autres, pas soi — on l'applique en
+> LISANT, jamais en ÉCRIVANT.* Ce qui manque n'est pas un énoncé, c'est un
+> contradicteur.
+
+⚠ **Et son effet le plus coûteux n'est pas le mauvais compte** : c'est qu'une
+troncature chez le vérificateur **transfère le tort au vérifié**. `0b` avait
+raison sur les trois, et mon relevé le montrait à deux.
+
+## 4. Précision d'un chiffre de `0b`
+
+Il écrit *« trois des six conflits sont dans du CODE »*. **Mesuré : quatre** —
+trois `.py` plus `.semgrep/rules-rootwarden.yml`. *Un fichier de règles semgrep
+n'est pas de la prose : c'est ce qui décide si la CI bloque, et le dépôt le
+traite comme du code — le job « Les regles custom MORDENT » l'atteste.*
+
+## 5. Ce que ça change pour l'exploitant
+
+Le §5 de ce dossier disait « un droit d'écriture débloque trois des quatre ».
+**C'est vrai et insuffisant.** L'état complet :
+
+```
+un droit d'ecriture           debloque les 3 controles eprouves + le correctif du jeton
+la fusion de Migration-Laravel  d'ABORD, elle porte les versions completes
+puis chaque branche security/   4 conflits de CODE a trancher, 2 de document triviaux
+le regime des branches          28 bascules de HEAD sur 11 cibles, worktree jamais employe
+```
+
+**Aucun de ces quatre points n'est technique. Les quatre sont des décisions.**
