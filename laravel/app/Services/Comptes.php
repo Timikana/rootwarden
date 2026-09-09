@@ -399,6 +399,65 @@ class Comptes
     }
 
     /**
+     * Active ou SUSPEND un compte. Rend une cle d'erreur, ou `null` si c'est fait.
+     *
+     * ══ POURQUOI CE GESTE EXISTE : IL AVAIT ETE PERDU A L'EXTINCTION ═══════
+     *
+     * `legacy/adm/api/toggle_user.php` le portait. Apres l'archivage du legacy,
+     * `users.active` n'etait plus ecrit que par deux `insert` (creation) et par
+     * UNE `update` — celle de l'ANONYMISATION, irreversible. Suspendre un compte
+     * le temps d'un preavis imposait donc de le DETRUIRE.
+     *
+     * Mesure du 2026-09-09 par `gestion-ssh-key-5f`, verifiee avant reprise :
+     * 28 couples (verbe, colonnes) archives sur `users` contre 16 sites vivants.
+     * Le grain qui trouve ce genre de trou n'est pas la TABLE — c'est le couple.
+     *
+     * Et `active` DECIDE : `backend/configure_servers.py:873` ne construit
+     * `allowed_usernames` qu'avec `user['active']`. Suspendre retire donc
+     * reellement l'acces aux machines au prochain deploiement.
+     *
+     * ══ UN BOOLEEN EXPLICITE, ET PAS LA BASCULE DU LEGACY ═════════════════
+     *
+     * `toggle_user.php:64-68` LISAIT `active` puis l'inversait. Deux appels
+     * concurrents s'annulent, et un rejeu ne rend pas le meme etat : la bascule
+     * n'est ni idempotente ni sure. Ici l'appelant DIT l'etat voulu.
+     *
+     * ══ LES TROIS GARDES SONT REPRISES, ET LA TROISIEME EST LA DECISIVE ═══
+     *
+     * 1. superadministrateur seulement — `checkAuth([ROLE_SUPERADMIN])` a
+     *    `:26`. Elle est dans la ROUTE (`role:3`), pas recopiee ici.
+     * 2. pas sur soi-meme — `:49`. Sans elle, un superadmin se ferme la porte
+     *    et personne ne peut la rouvrir.
+     * 3. ⛔ PAS LE DERNIER SUPERADMIN ACTIF — `:71-78`. C'est celle qui empeche
+     *    de verrouiller le portail pour tout le monde. Elle ne joue QU'A la
+     *    desactivation, et seulement si la cible est un role 3.
+     *
+     * ⚠ La garde 3 compte `role_id = 3 AND active = 1`. Si la cible est le seul
+     * superadmin actif, le compte vaut 1 et le geste est refuse — la cible EST
+     * comptee, c'est voulu, et c'est ce que fait le legacy.
+     */
+    public function definitActivite(int $id, bool $actif, int $auteur): ?string
+    {
+        if ($id === $auteur) {
+            return 'comptes.err_auto_activite';
+        }
+        $cible = DB::table('users')->where('id', $id)->first(['active', 'role_id']);
+        if ($cible === null) {
+            return 'comptes.err_inconnu';
+        }
+        if (! $actif && (int) $cible->role_id === 3) {
+            $actifs = (int) DB::table('users')
+                ->where('role_id', 3)->where('active', 1)->count();
+            if ($actifs <= 1) {
+                return 'comptes.err_dernier_superadmin';
+            }
+        }
+        DB::table('users')->where('id', $id)->update(['active' => $actif ? 1 : 0]);
+
+        return null;
+    }
+
+    /**
      * Reinitialise le second facteur : le secret est efface, la personne devra
      * s'enroler a nouveau. GARDE HIERARCHIQUE reprise du legacy
      * (`manage_roles.php:111`) : un role 2 ne touche pas un role 3.

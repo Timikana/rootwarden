@@ -328,8 +328,13 @@ class InventaireDesGardesTest extends TestCase
             . "n'a pas eu lieu");
 
         $this->assertSame([
-            'ComptesController.php:514',      // compte_supprimer
-            'ComptesController.php:539',      // compte_anonymiser
+            // ⚠ 514 -> 554 et 539 -> 579 le 2026-09-09 : la methode `activite()`
+            //    a ete inseree PLUS HAUT dans ce controleur (report du geste de
+            //    suspension, perdu a l'extinction du legacy). Les deux sites ont
+            //    ete RELUS a leur nouvelle place, comme ce gel l'exige — le
+            //    step-up y est inchange.
+            'ComptesController.php:554',      // compte_supprimer
+            'ComptesController.php:579',      // compte_anonymiser
             'PasserelleController.php:88',    // generique, action DERIVEE du chemin
             'PermissionsController.php:165',  // permission_definir
             'PortailController.php:196',      // profil_effacement (E-449)

@@ -94,6 +94,7 @@ class TableDesGardes
              * fichier qu'on eteint. Garde sur la ROUTE, pas dans le controleur.
              */
             ['POST', 'comptes/{id}/expiration', ['role:3', 'perm:can_admin_portal']],
+            ['POST', 'comptes/{id}/activite', ['role:3', 'perm:can_admin_portal']],
             ['POST', 'comptes/{id}/anonymiser', ['role:3', 'perm:can_admin_portal']],
             ['POST', 'comptes/{id}/cle-ssh', ['role:3', 'perm:can_admin_portal']],
             ['POST', 'comptes/{id}/deverrouiller', ['role:3', 'perm:can_admin_portal']],

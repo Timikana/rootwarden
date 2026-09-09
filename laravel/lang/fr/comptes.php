@@ -49,6 +49,13 @@ return [
 
     'deverrouiller' => 'Déverrouiller',
     'deverrouille' => 'Compte déverrouillé.',
+    'suspendre' => 'Suspendre',
+    'activer' => 'Activer',
+    'active' => 'Compte activé.',
+    'suspendu' => 'Compte suspendu. Il ne peut plus se connecter, et son accès aux machines sera retiré au prochain déploiement.',
+    'err_auto_activite' => "Vous ne pouvez pas suspendre votre propre compte.",
+    'err_dernier_superadmin' => "Impossible de suspendre le dernier superadministrateur actif : personne ne pourrait rouvrir le portail.",
+    'err_actif_requis' => "L'état voulu (actif) doit être indiqué : une absence n'est pas une suspension.",
 
     'totp_reinitialiser' => 'Réinitialiser la 2FA',
     'totp_question' => "Réinitialiser le second facteur de « :nom » ? L'utilisateur devra enrôler un nouvel authentificateur avant de pouvoir se connecter.",
