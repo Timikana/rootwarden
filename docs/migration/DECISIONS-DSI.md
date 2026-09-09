@@ -18408,3 +18408,46 @@ désigne tous les deux.**
 > qu'elle recouvre.** C'est la contrepartie exacte de la règle qu'il a formulée
 > ce matin — exiger un nombre des exculpations — appliquée à celle qu'il
 > recevait.
+
+**E-593 — Une PR de sécurité que j'ai fusionnée a porté dans `main` un document
+étranger, et j'allais m'en exculper.** Voir `DOSSIER-68`. `9603e6da`
+(`QA-QUATRE-COMMANDES-ROOT-INDIRECTES.md`, document de `0b`) est dans
+`origin/main`, porté par `6a4faba5` — la fusion de #70, sur `tls_ca_path` et
+rsyslog. **2 de mes 7 fusions ont porté un commit que leur titre n'annonçait
+pas.**
+
+⛔ **Et le défaut est pire que ce que j'allais écrire.** Je commençais à consigner
+que le relevé manquait, que `gh pr merge` ne montre pas les commits. **Mesuré :
+`gh pr view 70 --json commits` liste `9603e6da`.** L'information était
+disponible avant la fusion, par une commande à un drapeau près de celle que je
+lançais.
+
+> **Ce n'est pas un outil qui manque : c'est un relevé que je n'ai pas fait.**
+> Et j'allais l'écrire dans l'autre sens — la forme qui dédouane, sur mon propre
+> geste, dans le document qui l'examine.
+
+⚠ **Second défaut de la MÊME fusion.** J'avais déjà consigné avoir fusionné #70
+sans lire ses contrôles. J'ai corrigé la lecture des contrôles pour les six PR
+suivantes et **je n'ai pas pensé une seule fois à lire ce qu'elles portaient.**
+*Corriger un manquement sur un objet ne fait pas regarder les autres propriétés
+du même geste.*
+
+**E-594 — Le basculement de `HEAD` est le régime NORMAL de ce chantier.** 28
+entrées `checkout: moving` dans le reflog, sur 11 cibles distinctes — 15 vers
+`Migration-Laravel`, 13 vers 10 branches `security/`. `0b` a audité ses 99
+commits : 97 sur `Migration-Laravel`, **3 égarés** les 04/09, 09/09 02:46 et
+09/09 09:15. *Sa collision n'est pas la première : c'est la première vue, et
+seulement parce qu'un commit manquant dans son compte de ratio l'a fait
+regarder.*
+
+**Et le remède par construction est déjà là, dans MON scratchpad** :
+`git worktree list` rend un second arbre `wt-main`, sur `main`, appartenant à ma
+session. **Un worktree a son propre `HEAD`.** *Je l'avais sous la main et je n'y
+ai pas pensé une seule fois.* Ordre du dépôt — inexprimable > dérivé > exhaustif
+> contrôlé : un worktree met le problème dans la première catégorie, relever
+`HEAD` avant de committer le laisse dans la dernière.
+
+**Je ne réécris pas `main`.** Le contenu porté est légitime, le dommage est de
+traçabilité et non d'intégrité, et réécrire un `main` que huit sessions suivent
+échangerait ce défaut contre un risque de perte. **Le remède serait plus coûteux
+que le mal.**
