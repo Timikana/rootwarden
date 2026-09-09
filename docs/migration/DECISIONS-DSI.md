@@ -18451,3 +18451,34 @@ ai pas pensé une seule fois.* Ordre du dépôt — inexprimable > dérivé > ex
 traçabilité et non d'intégrité, et réécrire un `main` que huit sessions suivent
 échangerait ce défaut contre un risque de perte. **Le remède serait plus coûteux
 que le mal.**
+
+**E-595 — Mon témoin de `DOSSIER-66` comptait une SOUS-CHAÎNE : deux fonctions
+homonymes sous un seul nombre.** `decrypt_password(` = 4 =
+`enc.decrypt_password(` 2 (`:895`, `:1242`, les deux sur le PSK) +
+`server_decrypt_password(` 2 (`:227`, `:228`, **fonction différente**). Le corps
+du dossier nommait les sites correctement ; c'est le nombre mis en avant — **mon
+témoin** — qui conflait les deux.
+
+> **Le sens de cette erreur dédouane mon INSTRUMENT : un témoin gonflé fait
+> paraître la preuve plus solide qu'elle n'est.** Ce n'est pas le résultat qui
+> était faux, c'est la force que je lui prêtais. Rectifié dans le dossier ;
+> témoin correct = 2, et le jeton reste à 0 chiffrement (témoin : 1 chiffrement
+> du PSK à `:718`).
+
+**E-596 — `0b` m'annonçait un changement récent qui a cinq mois.** Le garde
+`if telegraf_token == '********': telegraf_token = None` de `:2466-2467` est daté
+`2129a2cf`, **2026-04-11**, le commit d'origine du module supervision. *C'est le
+miroir de ses deux items périmés — rapporter comme un changement une chose
+préexistante — et la direction est encore la rassurante.*
+
+**Sa mise en garde reste juste et je la reprends** : le garde du masque et le
+chiffrement *« se ressemblent assez pour être confondus par qui lit vite »*. Deux
+propriétés distinctes de la même variable, **une seule des deux existe.** Le
+jeton est toujours en clair et le geste n'a toujours pas d'exécutant.
+
+**E-597 — Et `0b` a tronqué sa propre sonde.** Son `10 paires / 7 branches`
+venait d'un `head -20` sur le reflog ; le compte entier est **28 basculements sur
+11 cibles**. *Une sonde tronquée publie son tronçon sans le dire — et la
+troncature va toujours dans le sens du moindre nombre, donc du moindre
+problème.* Sa conclusion en sort renforcée, pas affaiblie : le basculement de
+`HEAD` est le régime normal du chantier.
