@@ -774,7 +774,16 @@ jobs:
         run: |
           set -uo pipefail
           echec=0
-          for d in laravel legacy; do
+          # ⚠ `legacy` A QUITTE CETTE BOUCLE le 2026-09-09, et pas par commodite :
+          #    ses `composer.json`/`.lock` sont archives sous `legacy/_deprecated/`,
+          #    et le conteneur qui chargeait leur `vendor/` est RETIRE. Auditer ces
+          #    14 paquets renseignerait sur des vulnerabilites dans du code que plus
+          #    rien n'execute.
+          #    La garde « composer.lock absent -> ECHEC » ci-dessous est CONSERVEE
+          #    telle quelle pour `laravel` (119 paquets) : c'est ELLE qui a impose de
+          #    corriger cette boucle dans le meme commit que l'archivage, au lieu de
+          #    laisser le job echouer. Une garde qui a servi.
+          for d in laravel; do
             if [ ! -f "$d/composer.lock" ]; then
               echo "::error::$d/composer.lock absent — les chemins ont bouge."
               echo "Ce job ECHOUE plutot que de passer sans avoir mesure."
