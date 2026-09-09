@@ -18,6 +18,7 @@ Routes :
 """
 
 import re
+import shlex
 import json
 import threading
 import base64
@@ -102,9 +103,31 @@ def _commande_desinstallation(paquets, services):
     `paquets` peut contenir des motifs `dpkg-query` (`nom-*`). `services` sont
     arretes de facon tolerante : leur echec n'est pas celui de la purge.
     """
+    # ⛔ SURE PAR CONTINGENCE DE SES APPELANTS, ET C'EST TOUT.
+    #
+    #    Cette fonction n'a AUCUNE garde. Elle citait ses paquets naivement
+    #    (`f"'{p}'"` — une apostrophe dans un nom en sortirait) et ne citait PAS
+    #    ses services du tout. Elle accepte n'importe quelle liste.
+    #    Ses quatre appelants passent aujourd'hui des listes LITTERALES
+    #    (:146 :155 :166 :174, verifie par AST). Donc rien n'est ouvert.
+    #
+    #    > Mais la surete vient de l'APPELANT, pas de la fonction — et le jour
+    #    > ou l'un passe une valeur venue d'ailleurs, AUCUN instrument ne le
+    #    > verra : la commande est batie au niveau MODULE, rangee dans un dict,
+    #    > relue par INDICE, et executee trois indirections plus loin.
+    #    (releve par `gestion-ssh-key-5f`, confirme par `gestion-ssh-key-ec`)
+    #
+    #    `shlex.quote` la rend sure PAR CONSTRUCTION. Le rendu reste
+    #    SEMANTIQUEMENT identique pour les quatre appelants — mesure par
+    #    `shlex.split`, PAS par egalite d'octets : `shlex.quote('zabbix-agent')`
+    #    rend `zabbix-agent` SANS apostrophes la ou l'ancienne forme en mettait.
+    #    Meme mot pour le shell, chaine differente.
+    #    Un motif `dpkg-query` comme `zabbix-agent2-plugin-*` reste entoure,
+    #    donc l'etoile reste litterale pour le shell et c'est `dpkg-query` qui
+    #    la developpe — comportement inchange.
     arrets = ''.join(
-        f"systemctl stop {s} 2>/dev/null || true\n" for s in services)
-    liste = ' '.join(f"'{p}'" for p in paquets)
+        f"systemctl stop {shlex.quote(s)} 2>/dev/null || true\n" for s in services)
+    liste = ' '.join(shlex.quote(p) for p in paquets)
 
     return (
         "export DEBIAN_FRONTEND=noninteractive\n"
