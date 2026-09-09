@@ -80,19 +80,69 @@ function attributions() {
      */
     const y = brut.replace(/^\s*#.*$/gm, '').replace(/\s#.*$/gm, '');
     const out = {};
+    let manquants = [];
     for (const [service, cle] of [['legacy', 'HTTPS_PORT'], ['portage', 'LARAVEL_HTTPS_PORT']]) {
         const m = y.match(new RegExp('\\$\\{' + cle + ':-(\\d+)\\}'));
-        if (!m) { return null; }
+        if (!m) { manquants.push(service); continue; }
         out[service] = Number(m[1]);
+    }
+    /*
+     * ── TROIS ETATS, ET L'ANCIENNE FORME LES CONFONDAIT EN DEUX ───────────────
+     *
+     * `patch 07` a retire le service `php` du compose le 2026-09-08. `HTTPS_PORT`
+     * n'y apparait donc plus, et cette fonction rendait `null` — c'est-a-dire
+     * « NE RIEN CONCLURE », c'est-a-dire un REFUS PERMANENT.
+     *
+     * Or ce refus est le SUCCES de ce que la sonde surveillait : il n'y a plus
+     * deux portails a comparer. Une porte qui ne peut plus s'ouvrir bloque la
+     * sequence d'extinction pour toujours, et son rouge ressemble a un defaut.
+     *
+     *   legacy ET portage lisibles   -> comparer, c'est la question d'origine
+     *   legacy absent, portage lu    -> ETAT TERMINAL, il n'y a qu'un portail
+     *   portage absent aussi         -> l'instrument n'a rien lu, exit 2
+     *
+     * ⚠ Le TEMOIN est ce qui separe le deuxieme du troisieme : « legacy absent »
+     * et « fichier illisible » rendent la meme sortie si on ne verifie pas
+     * qu'on a lu QUELQUE CHOSE. C'est pourquoi l'etat terminal exige que
+     * `portage` soit non seulement present mais NUMERIQUE.
+     */
+    if (manquants.length === 2) { return null; }
+    if (manquants.length === 1) {
+        return { manquants, ...out };
     }
     return out;
 }
 
 const PORTS = attributions();
 if (PORTS === null) {
-    console.log('  ⛔ docker-compose.yml illisible ou ses defauts ont change de forme.');
+    console.log('  ⛔ docker-compose.yml illisible : AUCUN des deux defauts de port lu.');
+    console.log('     « les deux absents » et « fichier illisible » sont la meme sortie.');
     console.log('     NE RIEN CONCLURE.');
     process.exit(2);
+}
+if (PORTS.manquants) {
+    /*
+     * L'ETAT TERMINAL. Un seul portail est declare : la question « les deux
+     * portails se marchent-ils sur les pieds » n'a plus d'objet.
+     */
+    if (PORTS.manquants.includes('portage')) {
+        console.log('  ⛔ le defaut de port du PORTAGE est absent, celui du legacy present.');
+        console.log('     C\'est l\'inverse de l\'extinction : le portage devrait rester.');
+        process.exit(1);
+    }
+    const restant = PORTS.portage;
+    if (!Number.isInteger(restant) || restant <= 0 || restant > 65535) {
+        console.log(`  ⛔ le port du portage est lu mais invalide : ${restant}`);
+        console.log('     NE RIEN CONCLURE.');
+        process.exit(2);
+    }
+    console.log('  ✅ ETAT TERMINAL — un seul portail est declare dans le compose.');
+    console.log(`     le legacy (\${HTTPS_PORT:-...}) a disparu du compose : 0 occurrence`);
+    console.log(`     le portage repond sur :${restant}, lu hors commentaires`);
+    console.log('     TEMOIN : ce vert n\'est pas « rien lu » — une valeur NUMERIQUE');
+    console.log('     a ete extraite du fichier. Sans elle, ce chemin sortirait en 2.');
+    console.log('     La comparaison des deux portails n\'a plus d\'objet.');
+    process.exit(0);
 }
 if (PORTS.legacy === PORTS.portage) {
     console.log(`  ⛔ les deux portails lisent le meme port (${PORTS.legacy}) — la sonde ne discrimine pas.`);
