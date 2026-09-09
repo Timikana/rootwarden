@@ -145,7 +145,25 @@ if (SURCHARGE) {
  *
  * et le comparer a la date du dernier commit touchant `backend/routes/updates.py`.
  */
-const REGIME = 'ARBRE (fonctions extraites du fichier) — PAS le service qui repond';
+/*
+ * ⚠ CE LIBELLE DISAIT « PAS le service qui repond », ET C'EST DEVENU FAUX.
+ *
+ * Il affirmait un ETAT — l'ecart de 21 h mesure le 2026-09-08 — dans un
+ * controle qui ne mesure que l'arbre. Les conteneurs ont redemarre le
+ * 2026-09-09T05:23:19Z, et les validateurs (mtime 2026-09-08T21:59:35Z) sont
+ * desormais CHARGES. L'affirmation s'est perimee sans qu'une ligne bouge.
+ *
+ * > Un controle statique ne doit pas affirmer l'etat d'un PROCESSUS : il ne le
+ * > mesure pas, et son affirmation survit au changement qu'elle decrit.
+ *
+ * Le libelle dit donc ce que ce controle MESURE, et donne la commande qui
+ * tranche le reste — plutot que de trancher a la place du lecteur avec un
+ * chiffre d'hier. La direction de l'ancienne erreur etait prudente (elle
+ * SOUS-estimait la couverture), mais une prudence fausse se relit comme un fait.
+ */
+const REGIME = 'ARBRE — fonctions extraites du fichier, PAS le processus en service';
+const COMMENT_TRANCHER = 'sudo docker inspect -f \'{{.State.StartedAt}}\' rootwarden_python'
+    + '  compare au mtime de backend/routes/updates.py (les deux en UTC)';
 const VALIDATEURS = ['_cron_heure_minute', '_cron_annee_mois_jour'];
 const ROUTE = 'schedule_advanced_update';
 
@@ -255,7 +273,8 @@ if (charge.erreur) {
 }
 
 console.log(`\nREGIME MESURE : ${REGIME}`);
-console.log('  un `.py` est lu au DEMARRAGE ; ce vert ne dit rien du processus qui sert.');
+console.log('  un `.py` est lu au DEMARRAGE. Pour savoir si le service porte ces');
+console.log(`  gardes : ${COMMENT_TRANCHER}`);
 console.log('\n=== ① les deux sens, sur les fonctions LUES depuis la source\n');
 let nominauxOk = 0;
 charge.resultats.forEach((r, i) => {
@@ -362,5 +381,6 @@ console.log(`Les deux sens tiennent — ${nominauxOk} valeur(s) nominale(s) acce
 console.log('aucune chaine ne ressort, et les deux gardes precedent le geste.');
 console.log('');
 console.log(`⚠ PORTEE DE CE VERT : ${REGIME}.`);
-console.log('  Il ne dit PAS que le service refuse ces charges aujourd\'hui.');
+console.log('  Que le service porte ces gardes se tranche par la commande ci-dessus,');
+console.log('  pas par ce verdict — et la reponse change a chaque redemarrage.');
 process.exit(0);
