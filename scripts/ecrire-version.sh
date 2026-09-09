@@ -30,7 +30,7 @@
 set -uo pipefail
 
 RACINE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-CIBLE="$RACINE/legacy/version.txt"
+CIBLE="$RACINE/laravel/version.txt"
 
 if "$RACINE/scripts/version.sh" --ecrire >/dev/null 2>&1; then
     printf '  version derivee du depot : %s\n' "$(cat "$CIBLE")"

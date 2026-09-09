@@ -141,6 +141,26 @@ capture_le_fichier() {
 #
 # Il n'exécute aucun geste et ne lit ni git ni Docker : il éprouve le prédicat.
 if [ "$EPREUVE" -eq 1 ]; then
+    # ── GARDE SUR LE SCRIPT LUI-MEME ────────────────────────────────────────
+    #
+    # QUATRE FOIS cette nuit, des backticks dans une chaine a guillemets DOUBLES
+    # ont EXECUTE ce qu'ils citaient : un `dire` citant un nom de fichier entre
+    # backticks l'a lance comme une commande, et rendu un message ampute.
+    # J'avais ecrit un controle pour ca — et je ne l'ai pas rejoue apres le
+    # patch suivant.
+    #
+    #   > Un controle qu'on doit penser a relancer n'est pas une garde. Celui-ci
+    #   > vit DANS le script, donc il tourne chaque fois qu'on l'eprouve.
+    dire '══ garde : aucun backtick executable dans un dire a guillemets doubles ══'
+    coupables=$(grep -nE 'dire[[:space:]]+"[^"]*`' "$0" || true)
+    if [ -n "$coupables" ]; then
+        n=$(printf '%s\n' "$coupables" | wc -l)
+        dire "  ⛔ $n ligne(s) portent un backtick executable :"
+        printf '%s\n' "$coupables" | sed 's/^/     /'
+        exit 1
+    fi
+    dire '  ✅ aucune'
+    dire ''
     dire '══ épreuve du prédicat capture_le_fichier ══'
     CIBLE='legacy/version.txt'
     rate=0
@@ -206,8 +226,30 @@ if grep -qE '^\s+- \./legacy/version\.txt:' docker-compose.yml; then
     else
         dire "  ⛔ $capture étape(s) l'emportent"
     fi
+elif [ -s laravel/version.txt ] && ! grep -qE '^\s+- \./legacy/' docker-compose.yml; then
+    # ── TROISIEME ETAT : `patch 08` est applique ──────────────────────────────
+    #
+    # Ce controle exigeait que le montage soit DECLARE, et refusait sinon. C'etait
+    # juste tant que le montage existait — mais `patch 08` l'a RETIRE, et le
+    # refus est devenu la reponse a un succes. Troisieme fois cette nuit qu'une
+    # garde de ce chantier refuse pour toujours parce que sa premisse a expire,
+    # et la premiere sur une garde que j'ai ecrite moi-meme.
+    #
+    #   > Une porte qui ne peut plus s'ouvrir cesse d'etre une garde et devient
+    #   > un mur — et son rouge ressemble a un defaut.
+    #
+    # Le TEMOIN separe l'etat terminal de l'anomalie : `laravel/version.txt`
+    # existe et n'est pas vide, ET aucune ligne de montage `./legacy/` ne
+    # subsiste. Sans lui, « le montage a disparu » et « quelqu'un a casse le
+    # compose » rendent la meme sortie.
+    dire "  ✅ ETAT TERMINAL — patch 08 applique, plus aucun montage ./legacy/"
+    dire "     laravel/version.txt : $(wc -c < laravel/version.txt) octets, [$(cat laravel/version.txt)]"
+    dire "     TEMOIN : ce vert n'est pas « rien lu » — une valeur a ete extraite."
+    dire '     Version.php lit base_path(version.txt), et laravel/ est monte sur'
+    dire '     /var/www/html : le fichier y apparait de lui-meme.'
 else
-    dire "  ⚠ le montage n'est plus déclaré — vérifier ce qui a changé avant de continuer"
+    dire "  ⚠ le montage n'est plus déclaré ET laravel/version.txt manque ou est vide"
+    dire "     — ce n'est pas l'etat terminal, c'est un compose casse. REFUS."
     ko=$((ko+1))
 fi
 

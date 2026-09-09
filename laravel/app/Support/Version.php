@@ -9,22 +9,35 @@ namespace App\Support;
  *
  * La regle qui produit ce numero a besoin de l'HISTORIQUE git. Le conteneur du
  * portage n'a pas de depot : un `git describe` y rendrait une erreur, ou pire,
- * un vide qui passerait pour une version. La source unique est donc
- * `legacy/version.txt`, une ligne, `MAJEUR.MINEUR.CORRECTIF`.
+ * un vide qui passerait pour une version. La source unique est donc un fichier
+ * `version.txt`, une ligne, `MAJEUR.MINEUR.CORRECTIF`.
  *
- * ══ POURQUOI CE CHEMIN, ET CE QU'IL A COUTE DE LE MESURER ════════════════
+ * ══ OU CE FICHIER VIT, ET POURQUOI IL A DEMENAGE (patch 08, 2026-09-09) ══
  *
- * Le fichier vit dans `legacy/`, et le conteneur du portage ne monte QUE
- * `laravel/`. Mesure du 2026-08-27 : `docker inspect` ne rend qu'un montage, et
- * quatre chemins plausibles ont ete sondes, aucun ne trouvait le fichier. La
- * donnee n'etait pas la — ce n'etait pas un defaut de code.
+ * IL VIT DESORMAIS DANS `laravel/`, et il n'y a plus AUCUN montage de fichier.
+ * `laravel/` est monte sur `/var/www/html`, donc `laravel/version.txt` y
+ * apparait de lui-meme — `base_path('version.txt')` le trouve sans qu'on
+ * declare quoi que ce soit.
  *
- * Il est desormais monte en LECTURE SEULE a la racine servie
- * (`./legacy/version.txt:/var/www/html/version.txt:ro`). Le numero reste donc a
- * UN seul endroit : `version.txt` a derive deux fois dans la seule journee du
- * 2026-08-27 — reste a 1.38.17 pendant deux increments, puis trois commits sur
- * le meme numero. Une variable d'environnement ou une copie a l'entrypoint
- * auraient ajoute une SECONDE source a un chiffre qui venait de diverger.
+ * ⚠ CE QUE CETTE PROSE DISAIT AVANT, ET QUI ETAIT DEVENU FAUX SANS QU'UN SEUL
+ *   COMMIT LA TOUCHE : le fichier vivait dans `legacy/` et etait monte un par
+ *   un (`./legacy/version.txt:/var/www/html/version.txt:ro`). Ce montage
+ *   RECOUVRAIT le jumeau `laravel/version.txt`, et les deux avaient DIVERGE —
+ *   mesure du 2026-09-09, juste avant le demenagement :
+ *
+ *       legacy/version.txt   2.0.183   <- monte PAR-DESSUS, donc AFFICHE
+ *       laravel/version.txt  2.0.470   <- recouvert
+ *       scripts/version.sh   2.0.78    <- la valeur DERIVEE, la seule juste
+ *
+ *   Trois valeurs pour un chiffre qui devait n'en avoir qu'une. Les deux
+ *   fichiers sont des PRODUITS (ignores par git) ; `VERSION-JALON` porte
+ *   MAJEUR.MINEUR et `scripts/version.sh` DERIVE le correctif du nombre de
+ *   commits depuis le dernier commit du jalon. Le montage de fichier etait donc
+ *   la cause de la divergence, pas son remede.
+ *
+ *   Un montage de FICHIER est en outre epingle a l'inode present au demarrage :
+ *   tout `mv` ou `git checkout` le DETACHE, et le conteneur sert un contenu que
+ *   plus rien ne reference. Le retirer ferme cette classe entiere.
  *
  * ══ UNE VERSION INCONNUE SE DIT ══════════════════════════════════════════
  *
@@ -45,9 +58,11 @@ final class Version
      * ══ `base_path`, ET SURTOUT PAS `public_path` ═════════════════════════
      *
      * Le premier jet lisait `public_path('/version.txt')`, qui resout
-     * `/var/www/html/public/version.txt`. Or `docker-compose.yml:76` monte le
-     * fichier a `/var/www/html/version.txt` — **hors de la racine web**, ce qui
-     * est deliberé : le numero n'a pas a etre servi par HTTP.
+     * `/var/www/html/public/version.txt`. Or le fichier vit a
+     * `/var/www/html/version.txt` — **hors de la racine web**, ce qui est
+     * deliberé : le numero n'a pas a etre servi par HTTP. (Avant `patch 08`
+     * c'etait un montage declare ; depuis, c'est simplement `laravel/`
+     * monte sur `/var/www/html` — le resultat est le meme chemin.)
      *
      * Les deux chemins differaient donc d'un segment, et le lecteur rendait
      * `null` MEME APRES la recreation du conteneur.
