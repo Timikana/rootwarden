@@ -18521,3 +18521,45 @@ seul critère que je venais de corriger.
 que le remède par construction n'est pas à ma main ». C'est la bonne raison de
 prendre un contrôle : savoir qu'on prend le dernier rang de l'échelle faute
 d'accès au premier.*
+
+**E-601 — Ma recommandation de fusion est PÉRIMÉE, et l'ordre décide.** `0b` a
+rétabli son document sur `Migration-Laravel` (`d489d316`, 10:00, 174 lignes)
+trente minutes après que j'aie écrit « fusionner la branche, il arrive avec,
+aucun geste ». Simulé sans écrire :
+
+```
+branche -> origin/main         PROPRE     (le chemin est absent de main)
+branche -> Migration-Laravel   CONFLIT    (8977 o / 174 l  contre  5849 o / 113 l)
+```
+
+**Recommandation corrigée : fusionner `Migration-Laravel` d'abord** — elle porte
+la version complète — puis la branche en résolvant le conflit en sa faveur, ou en
+retirant la copie antérieure de la branche. *Le contenu ne court plus aucun
+risque.*
+
+> **Une recommandation peut être périmée par le geste même dont elle disait
+> qu'il n'était pas nécessaire.** Qu'elle devienne fausse parce que quelqu'un a
+> mieux fait n'est pas un échec de la recommandation — mais elle doit cesser de
+> circuler.
+
+Et le conflit annoncé est la bonne issue : *« un conflit visible, que je préfère
+à un document qui n'existe nulle part d'atteignable »*. **Un conflit se voit et
+se tranche ; une branche non fusionnée ne se voit pas.**
+
+**E-602 — L'omission du chiffrement est LOCALE, pas une inattention générale.**
+`blame` : `:717` (garde de masque du PSK), `:718` (son chiffrement, juste en
+dessous) et `:2466` (garde de masque du jeton) sont du même commit. **Les deux
+secrets reçoivent le même traitement du masque ; un seul reçoit le chiffrement.**
+
+> **Ce n'est pas une inattention à combler : c'est une propriété précise qui
+> manque à côté d'une autre qui est là.** Plus embarrassant pour le geste
+> d'origine, et plus utile pour qui corrigera — il n'y a pas un oubli diffus à
+> rattraper, il y a une ligne à écrire à un endroit nommé.
+
+**E-603 — Aucune des quatre bornes de confort n'a été trouvée par son auteur.**
+La mienne par `0b`, ses trois par moi. *`0b` en donne la raison : **une borne de
+confort ne laisse aucune trace dans le résultat — le nombre rendu est un nombre
+plausible.*** C'est la même famille que `E-583` (`119/0` aussi lisible que
+`118/1`) et que `E-599` (le rapport témoin/mesure). **Trois formes d'un seul
+fait : un résultat faux et vraisemblable ne porte aucun signe de sa fausseté, et
+seul un tiers muni d'un autre instrument le voit.**
