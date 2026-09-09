@@ -232,3 +232,66 @@ deuxième fois de la journée que le chantier bute sur ce mur — la garde de
 dans `rootwarden_laravel`.** L'exécuter ne demande donc aucun outil manquant — il
 demande d'écrire le fichier dans `laravel/tests/`, qui est monté en bind. *Le
 blocage n'est pas technique, il est de périmètre.*
+
+---
+
+# RECTIFICATION du 2026-09-09 10:25 — mon témoin comptait une SOUS-CHAÎNE, et deux fonctions
+
+Le §1 de ce dossier écrivait :
+
+```
+appels de decrypt_password dans supervision.py   4
+```
+
+**Ce `4` compte une sous-chaîne, pas une fonction.** Mesuré en séparant :
+
+```
+`decrypt_password(`         4     <- ce que mon temoin comptait
+`enc.decrypt_password(`     2     :895  :1242   les DEUX sur le PSK
+`server_decrypt_password(`  2     :227  :228    une fonction DIFFERENTE
+somme 2 + 2 = 4                   == le compte par sous-chaine : oui
+```
+
+Le corps du §1 nommait correctement les sites — `:227`/`:228` y sont annotés
+« mot de passe serveur ». **Mais le nombre mis en avant était mon TÉMOIN**, celui
+qui devait prouver que le `0` du jeton n'est pas l'artefact d'un motif trop
+étroit. *Un témoin bâti sur une sous-chaîne est plus faible que je ne l'ai
+présenté : il attestait la présence de deux fonctions homonymes, pas deux appels
+de celle qui compte.*
+
+**La conclusion ne bouge pas** — le témoin correct est `enc.decrypt_password` = 2,
+les deux sur le PSK, zéro sur le jeton — **et le jeton est toujours en clair** :
+
+```
+chiffrement du jeton avant stockage       0 appel
+TEMOIN : chiffrement du PSK dans le fichier  1 appel  (:718)
+```
+
+> **Le sens de mon erreur est celui qui dédouane MON INSTRUMENT** : un témoin
+> gonflé fait paraître la preuve plus solide qu'elle n'est. Ce n'est pas le
+> résultat qui était faux, c'est la force que je lui prêtais.
+
+## Et `:2466-2467` n'est PAS un changement récent
+
+`0b` m'annonce comme *« un vrai changement en revanche, et il est bon »* le garde
+qui empêche le masque `'********'` d'écraser la valeur existante. **Daté :**
+
+```
+2464  # Chiffrer le token Telegraf si fourni
+2465  telegraf_token = data.get('telegraf_output_token', '')
+2466  if telegraf_token == '********':
+2467      telegraf_token = None  # garder l'existant
+
+dernier commit touchant ces lignes :
+  2129a2cf   2026-04-11 18:30   feat: module supervision multi-agent
+```
+
+**Cinq mois, et c'est le commit d'origine du module.** C'est le miroir exact de
+ses deux items périmés : il a rapporté comme un changement une chose
+préexistante. *Et la direction est encore la rassurante — « un défaut réel
+corrigé ».*
+
+⚠ **Sa mise en garde reste juste, et elle vaut pour ce dossier** : le garde du
+masque et le chiffrement *« se ressemblent assez pour être confondus par qui lit
+vite »*. Ce sont deux propriétés distinctes de la même variable, et une seule des
+deux existe.
