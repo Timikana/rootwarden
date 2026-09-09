@@ -17405,3 +17405,92 @@ depuis le 2026-09-06 17:40 UTC.
 **Aucun ne peut être archivé avant que le conteneur ne parte.** E-517 est
 inchangé, et c'est maintenant le **seul** verrou : tout le reste est prouvé
 clos.
+
+---
+
+## 2026-09-09, 03:20 CEST — le PUITS était la bonne question, et il a rendu trois défauts
+
+**E-538 — Trois défauts exploitables trouvés en une heure, et les trois par la
+même question : « nomme le PUITS, pas seulement le shell ».** Aucun n'entre par
+la valeur interpolée. **Le cliquet des commandes root indirectes répondait
+« sûr » sur les trois, et il avait raison — dans son domaine.**
+
+```
+graylog   tls_ca_path   len<=255 + startswith('/')  ->  grammaire RSYSLOG, root
+sftp      working_dir   garde sur la branche du COMMENTAIRE -> sshd_config, root
+sudo      runas         valide seulement si MIS EN FORME    -> sudoers, root
+```
+
+> **Un gage se juge sur son DOMAINE et sur son PUITS, pas sur sa qualité.** Les
+> trois gages étaient irréprochables : base64, heredoc quoté, `shlex.quote`.
+
+**Et la forme de chacun est différente** : une classe trop faible (graylog), un
+appel absent (sftp), une validation couplée au formatage (sudo). *Ce n'est pas
+une classe de défaut, c'est une classe de QUESTION.*
+
+**E-539 — Quatre PR `security/` attendent le mot de l'exploitant, et je donne un
+ordre.**
+
+```
+#70  graylog tls_ca_path   role 2 -> execution root sur toute machine accessible
+                           SANS identifiant SSH        <- LE PLUS GRAVE
+#64  sudo runas            role 3, deja root-equivalent : ce qui tombe est la
+                           PISTE D'AUDIT, pas la frontiere
+#71  sftp working_dir      role 3, deja root sur la cible : ce qui s'ajoute est
+                           la PERSISTANCE — une commande passe, un sshd reste
+#68  ssh_audit Include     defense en profondeur, aucune frontiere franchie
+```
+
+⚠ **Aucune des quatre chaînes n'a été exercée**, et ce n'est pas un oubli :
+chacune écrirait sur une machine du parc. *Mieux vaut quatre dossiers qui nomment
+leur trou que quatre dossiers qui l'ont comblé par vraisemblance.* Si une
+démonstration de bout en bout est voulue, c'est la machine 3 et sur ton mot.
+
+**E-540 — J'ai relayé une correction sans la rejouer, et c'était une mesure qui
+me CHARGEAIT.** J'ai transmis que `_write_to_remote` avait quatre appelants.
+`gestion-ssh-key-0b` l'a réfuté :
+
+```
+sftp_manager.py:192   def  ·  appelants :228 :396
+sudo_manager.py:241   def  ·  appelants :293 :366
+deux definitions homonymes · corps identiques · AUCUN import entre les fichiers
+```
+
+Le « 4 » était un compte **par nom**. Et le coût n'est pas le chiffre : *les deux
+fonctions sont identiques dans le SHELL et leurs PUITS diffèrent —
+`sshd_config` ici, `sudoers` là. Les confondre fusionne deux domaines sous une
+seule qualification : précisément ce que ce recensement existe pour empêcher.*
+
+> **Une correction REÇUE passe le contrôle qu'une mesure propre subirait.**
+> *(formulation de `0b`)* J'exige des autres qu'ils me rejouent — et j'ai accepté
+> sans rejouer une correction qui allait dans le sens de ma charge.
+
+**E-541 — Mon aveu comptait juste et se trompait sur ce qu'il avouait.**
+`gestion-ssh-key-ec` a résolu les 10 : **quatre ne sont pas « non résolvables »,
+ils sont « résolvables par une portée que le résolveur ne parcourt pas »**.
+
+```
+locale       parcourue
+ENGLOBANTE   NI parcourue NI declaree   <- le trou entre les deux
+module       non parcourue, mais DECLAREE
+```
+
+> **Un aveu qui compte juste peut se tromper sur ce qu'il avoue.** *La portée
+> englobante n'était pas une limite assumée : c'était un angle mort déguisé en
+> problème de forme* — `supervision.py:2036` est classé « forme non résolue »
+> alors que son `agent_info` est lié dans la fonction mère.
+
+**E-542 — Et douze fois cette nuit, mon PRÉDICAT était faux et jamais le
+fichier.** Trois dans le seul passage du renommage :
+
+```
+count('motif_cle_regex') == 6      mon COMMENTAIRE ecrit le jeton  -> 8
+count('escape')                    comptait 7 `_html.escape`       -> 10 pour 3
+'NE PROTEGE PAS LA LIGNE SUIVANTE' ma phrase est coupee sur DEUX lignes -> 0
+```
+
+Plus, sur le correctif graylog : **mon propre `{i}` de message d'erreur** compté
+comme une valeur du fichier de conf — *mon correctif cassait mon propre test.*
+
+**Les douze fois, le `&&` a tenu : rien n'a été écrit tant que le contrôle
+n'était pas vert.** C'est la seule parade qui ait marché — la vigilance, non.
