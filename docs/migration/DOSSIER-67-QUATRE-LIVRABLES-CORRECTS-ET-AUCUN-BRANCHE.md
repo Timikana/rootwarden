@@ -115,3 +115,105 @@ qui postdate le correctif d'entrypoint (2026-09-03 12:16), `chown` à `:59`
 **après** le `view:cache` de `:44`, et `tmpfs uid=33` recréé vide à chaque
 démarrage. *Il reste un fait de déploiement, pas de code : personne n'a vérifié
 qu'une production a rebâti depuis cette image.*
+
+---
+
+# ADDENDUM du 2026-09-09 09:55 — la version MATÉRIELLE du même défaut : `HEAD` est partagé
+
+**Signalé par `gestion-ssh-key-0b`, mesuré et rectifié par moi. Aucun geste
+exercé : je ne déplace, ne fusionne ni ne réécris rien.**
+
+`0b` a constaté que son document du jeton Telegraf avait disparu de l'arbre de
+travail. Il n'est pas perdu — il est sur une branche que personne n'a voulue
+telle qu'elle est.
+
+## 1. Le reflog de `HEAD`, qui est le même pour toutes les sessions
+
+```
+09:13:51   commit    docs(dsi): DOSSIER-66 …                    <- MOI, sur Migration-Laravel
+09:13:56   branch    security/garde-socle-avertissement CREEE DEPUIS HEAD
+09:15:03   commit    docs(qa): jeton Telegraf en clair          <- 0b, sur la branche
+09:15:22   commit    test(garde): la cle retiree ne revient pas
+09:15:22   checkout  -> Migration-Laravel                        (fenetre de 86 s)
+09:21:48   checkout  -> security/garde-socle-avertissement
+09:21:48   commit    docs(securite): la garde EST eprouvee
+09:21:49   checkout  -> Migration-Laravel                        (fenetre de 1 s)
+```
+
+**La branche a été créée à 09:13:56 depuis `HEAD`, c'est-à-dire depuis mon commit
+de 09:13:51, cinq secondes plus tôt.** Elle porte donc mes deux commits
+précédents comme ancêtres — ce qui rend `61c5a189` et `234f388e` « contenus »
+par elle sans que j'y aie jamais écrit.
+
+## 2. Deux rectifications, mesurées
+
+**① `2a3585e8` n'est pas de moi.** `0b` me l'attribue. Son contenu le dit :
+*« Session 5 — securite »*. C'est le document d'épreuve de `c6`, et c'est `c6`
+qui a créé la branche.
+
+**② Aucun `checkout` n'est de ma session.** Mes huit commits du tour sont tous
+sur `Migration-Laravel`, et aucun ne tombe dans l'une des deux fenêtres :
+
+```
+mes commits dans une fenetre de bascule   0
+mes commits sur Migration-Laravel         8 / 8
+```
+
+*Le reflog de `HEAD` entrelace les gestes de toutes les sessions : ma vérification
+a d'abord ressemblé à un aveu, parce que les checkouts de `c6` apparaissent dans
+« mon » reflog. C'est précisément le fait que ce dossier documente.*
+
+## 3. LA RÈGLE QUI AVAIT UN TROU, et c'est `0b` qui le nomme
+
+La consigne du chantier est *« committer par CHEMINS, jamais par l'index, qui est
+partagé »*. `0b` l'a respectée : `git add -- <chemin>` puis
+`git commit -- <chemin>`. **Le périmètre des FICHIERS était tenu.**
+
+> **L'index n'est pas la seule chose partagée : `HEAD` l'est aussi.** Un commit
+> scopé par chemin protège contre l'emport du fichier d'autrui — il n'offre
+> **aucune** protection contre le fait d'atterrir sur la mauvaise branche.
+> *(formulation de `0b`)*
+
+⚠ **Et la forme du défaut est ce qui le rend coûteux : rien n'a échoué.** `git
+add` a réussi, `git commit` a réussi, et son `git show --stat HEAD` a bien rendu
+« 1 file changed, 113 insertions » — *il l'a vérifié et cité comme preuve de
+propreté.*
+
+> **Un commit sur la mauvaise branche est indiscernable d'un commit correct par
+> toute vérification locale au commit.** Le seul relevé qui l'attrape est
+> `git rev-parse --abbrev-ref HEAD` **AVANT** — et aucune des sessions ne l'a
+> fait une seule fois aujourd'hui.
+
+## 4. Le document est intact, et je ne bouge rien
+
+```
+blob sur la branche   655a8b0dc0b56ddd29529c424739fe43165159ef
+blob dans son commit  655a8b0dc0b56ddd29529c424739fe43165159ef   IDENTIQUES
+113 lignes · 5849 octets
+present dans l'arbre de travail  NON        sur Migration-Laravel  NON
+sur origin/main                  NON        branches le contenant  security/garde-socle-avertissement (seule)
+```
+
+**Je ne fusionne pas et je ne réécris pas.** La branche n'est pas la mienne, et
+la consigne de ce tour interdit toute fusion sans le mot de l'exploitant. *Un
+`cherry-pick` créerait un doublon si la branche est fusionnée ensuite ; toucher à
+la branche pendant qu'une session y travaille est exactement le geste qui a causé
+ceci.*
+
+**Recommandation à l'exploitant : fusionner la branche, et le document arrive
+avec — aucun geste supplémentaire.** C'est la seule option qui ne demande aucune
+écriture dans un arbre que huit sessions partagent.
+
+## 5. Ce que ça ajoute au §2 de ce dossier
+
+Le §2 disait : *« chacun a bien fait sa part, et la somme des parts ne fait pas un
+produit »*. En voici la version matérielle : **trois sessions ont committé sur une
+branche que chacune croyait être la sienne.** Trois parts correctes, une branche
+que personne n'a voulue telle qu'elle est — **et un quatrième livrable qui n'est
+sur aucune branche, parce qu'il n'a pas d'exécutant.**
+
+⚠ Et `0b` a refusé l'exculpation que je lui offrais, en la chiffrant : *« mon
+ratio est infini aussi — 1 commit aujourd'hui, 0 de code — et pour la même raison
+structurelle que la tienne : mon mandat est le document. »* **Le diagnostic de
+l'étape 1 nous désigne tous les deux, et refuser l'exculpation était le seul
+moyen de le voir.**
