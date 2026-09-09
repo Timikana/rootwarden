@@ -123,8 +123,34 @@ def get_sshd_config(client, root_pass):
         stripped = line.strip()
         if stripped.lower().startswith('include '):
             include_path = stripped.split(None, 1)[1].strip()
+            # ⛔ DEUX GARDES, ET LA SECONDE MANQUAIT.
+            #
+            #    Le motif ci-dessus contient `.` et `/` dans sa classe : `..` y
+            #    est donc CONSTRUCTIBLE, et `/etc/ssh/../../etc/shadow` passait.
+            #    Mesure du 2026-09-09 :
+            #      /etc/ssh/sshd_config.d/*.conf         ACCEPTE  <- temoin
+            #      /etc/ssh/../../etc/shadow             ACCEPTE  ⚠
+            #      /etc/ssh/x/../../../root/.ssh/id_rsa  ACCEPTE  ⚠
+            #
+            #    Le message d'avertissement disait deja « path traversal? » :
+            #    l'auteur visait ce risque, et la classe de caracteres ne le
+            #    couvrait pas. Un journal qui NOMME une protection que le code
+            #    ne fournit pas est pire qu'un journal muet — il se relit comme
+            #    une preuve.
+            #
+            #    La garde ajoutee est celle qui existe deja dans le depot,
+            #    `sftp_manager._validate_path` : le test porte sur les SEGMENTS
+            #    et non sur la sous-chaine, donc `/etc/ssh/x..y` reste accepte —
+            #    ce n'est pas une remontee de repertoire.
+            #
+            #    ⚠ Les deux refus sont journalises SEPAREMENT : un motif refuse
+            #    et une traversee refusee ne font pas chercher au meme endroit,
+            #    et un libelle qui affirme la mauvaise cause coute une enquete.
             if not _INCLUDE_PATH_RE.fullmatch(include_path):
-                _log.warning("Include path rejected (path traversal?): %s", include_path)
+                _log.warning("Include path rejected (forme non conforme): %s", include_path)
+                continue
+            if '..' in include_path.split('/'):
+                _log.warning("Include path rejected (remontee de repertoire): %s", include_path)
                 continue
             inc_cmd = f"cat {include_path} 2>/dev/null"
             inc_out, _, inc_rc = execute_as_root(client, inc_cmd, root_pass, logger=_log)
