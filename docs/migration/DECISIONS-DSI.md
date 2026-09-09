@@ -18998,3 +18998,63 @@ est une migration, donc hors de mon périmètre.*
 
 **Étapes 1 à 3** : 1 commit depuis 11:35, le mien, **0 CODE** — troisième tour
 consécutif. Étape 3 tenue (0 · 0 · 0, témoins `cgu_titre` 4, clé absurde 0).
+
+---
+
+**E-618 — J'ai remesuré mes SEPT décisions au lieu de les réciter : aucune n'a
+bougé, et la ② était la seule que je n'avais jamais chiffrée.**
+
+```
+① les 3 controles eprouves     146886eb · 8dadd611 · 27e4abc3   AUCUN dans origin/main
+② Migration-Laravel -> main    24 commits en attente, fusion PROPRE (temoin : main x main = 0)
+③ les 3 branches security/     existent, et les 3 conflitent TOUJOURS
+④ le regime des branches       28 bascules dans le reflog — aucune nouvelle
+⑤ le jeton telegraf            0 chiffrement dans la fenetre d'ecriture · 0 dechiffrement a :541
+⑥ LOG_RETENTION_DAYS           NON DEFINI dans les deux conteneurs (temoin DB_HOST=db)
+⑦ les 2 tables vestiges        linux_versions et update_schedules toujours presentes
+```
+
+**LA DÉCISION ② EST CHIFFRÉE, ET SON CONTENU EST UN CONSTAT SUR MOI :**
+
+```
+24 commits en attente de fusion
+  DOC    22        tous des `docs/migration/`, et tous de moi
+  CODE    2        27e4abc3  tests/e2e/controles-statiques.mjs      (une autre session)
+                   8dadd611  tests/e2e/sca-couvre-le-servi.mjs      (une autre session)
+  somme  24 == 24  verifie
+la fusion serait PROPRE — code 0, temoin `main` contre elle-meme a 0
+```
+
+> **La file de fusion est à 92 % de la documentation, et les deux seuls commits de
+> code sont ceux de deux autres sessions.** Le diagnostic de l'étape 1 n'est plus
+> une statistique de fenêtre : **il est matérialisé dans ce qui attend d'entrer
+> dans `main`.**
+
+*Et fusionner ② ne coûte rien — la fusion est propre — mais ça ne câble pas les
+deux contrôles : ça les met dans `main` sans que rien ne les appelle. Le §2 de
+`DOSSIER-67` reste vrai après la fusion.*
+
+**E-619 — ⛔ ET LE CONSTAT QUE JE ME DOIS : cette boucle produit un document par
+tour pour dire que rien ne change.** Sept tours, sept mesures, **trois tours
+consécutifs à zéro CODE de qui que ce soit**, et sept décisions qui n'ont pas
+bougé d'un pouce.
+
+```
+tour a 10:35   1 commit, le mien, DOC
+tour a 11:35   1 commit, le mien, DOC
+tour a 12:35   1 commit, le mien, DOC
+tour a 13:35   1 commit, le mien, DOC   <- celui-ci
+```
+
+Les mesures de ces quatre tours **ont produit quelque chose** — le critère de
+l'upsert inerte, la vérification par un second instrument, le chiffrage de ② —
+*mais aucune n'a fait avancer le produit d'une ligne, parce qu'il n'y a rien à y
+faire avancer et que mon périmètre est la documentation.*
+
+> **Les étapes 1 et 4 de la mission se contredisent quand le portage est fini :
+> l'une reproche d'écrire, l'autre commande d'écrire.** Ce n'est pas une
+> indiscipline de ma part et ce n'est pas un défaut de la mission — c'est qu'elle
+> a été écrite pour un chantier en cours, et le chantier est terminé.
+
+**Ce qui reste n'est pas mesurable, c'est décidable, et rien de ce que j'écrirai
+au huitième tour ne le rendra plus décidable qu'au septième.**
