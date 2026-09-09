@@ -154,3 +154,73 @@ seule fois aujourd'hui.*
 ⚠ **Et la portée de la décision a changé.** Ce n'est plus *« une branche porte un
 document étranger »* : c'est **« les PR de ce dépôt portent des commits
 étrangers, et une l'a déjà fait jusque dans `main` »**.
+
+---
+
+# RECTIFICATION du 2026-09-09 10:45 — ma recommandation du §5① est PÉRIMÉE, et l'ordre de fusion décide
+
+Le §5① disait : *« fusionner `security/garde-socle-avertissement` telle quelle,
+le document de `0b` arrive avec, sans aucune écriture dans l'arbre partagé »*.
+
+**`0b` a rétabli son document sur `Migration-Laravel` — `d489d316`, 10:00 — et ma
+recommandation est devenue fausse trente minutes après l'avoir écrite.**
+
+## L'état des deux copies
+
+```
+docs/migration/QA-JETON-TELEGRAF-EN-CLAIR.md
+  sur Migration-Laravel               8977 o   174 lignes
+  sur security/garde-socle-…          5849 o   113 lignes
+  blobs identiques                    NON
+  dans origin/main                    ABSENT
+```
+
+**La version de `Migration-Laravel` est la plus riche** : elle porte le §8 du
+défaut natif, le garde de masque parallèle et le témoin consolidé. *La copie de
+la branche est un état antérieur.*
+
+## L'ordre de fusion décide, simulé sans écrire
+
+```
+git merge-tree --write-tree origin/main       security/garde-…   PROPRE
+git merge-tree --write-tree Migration-Laravel security/garde-…   CONFLIT
+```
+
+| ordre | ce qui arrive |
+|---|---|
+| la branche d'abord, dans `main` | **propre** — mais `main` reçoit la version à 113 lignes, et la fusion suivante de `Migration-Laravel` conflitera |
+| `Migration-Laravel` d'abord | `main` reçoit la version à **174 lignes** ; la copie de la branche devient **redondante** et son chemin conflitera |
+
+**Recommandation corrigée : fusionner `Migration-Laravel` d'abord**, puis la
+branche en résolvant le conflit **en faveur de `Migration-Laravel`** — ou en
+retirant la copie de la branche avant de la fusionner. *Le contenu du document ne
+court plus aucun risque : il est atteignable sur `Migration-Laravel`, et c'est la
+version complète.*
+
+> **Une recommandation peut être périmée par le geste même dont elle disait qu'il
+> n'était pas nécessaire.** J'ai écrit « aucun geste » ; `0b` a fait le geste, et
+> il avait raison de le faire — son document est maintenant atteignable au lieu
+> d'être suspendu à une décision. *Le fait qu'une recommandation devienne fausse
+> parce que quelqu'un a mieux fait n'est pas un échec de la recommandation, mais
+> elle doit cesser de circuler.*
+
+⚠ Et le conflit annoncé est **la bonne issue** : `0b` l'écrit, *« un conflit
+visible, que je préfère à un document qui n'existe nulle part d'atteignable »*.
+Un conflit se voit et se tranche ; une branche non fusionnée ne se voit pas.
+
+## Et le constat sur le jeton se resserre encore
+
+```
+2129a2cf3  2026-04-11  :717   if psk_value and psk_value != '********':     garde de MASQUE
+2129a2cf3  2026-04-11  :718       psk_encrypted = enc.encrypt_password(…)   le CHIFFREMENT
+2129a2cf3  2026-04-11  :2466  if telegraf_token == '********':              garde de MASQUE
+```
+
+**Les deux secrets reçoivent le même traitement du masque, écrit dans le même
+commit, et un seul reçoit le chiffrement — qui est la ligne juste en dessous.**
+
+> **Ce n'est pas une inattention à combler : c'est une propriété précise qui
+> manque à côté d'une autre qui est là.** *(formulation de `0b`)* L'auteur a
+> suivi la même préoccupation pour les deux dans le même souffle. **L'omission
+> est locale au chiffrement, pas générale** — ce qui est plus embarrassant pour
+> le geste d'origine, et plus utile pour qui corrigera.
