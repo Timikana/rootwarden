@@ -96,6 +96,18 @@ _VALID_PROTOCOLS = {'udp', 'tcp', 'tls', 'relp'}
 #    exploitable quand meme. Verifie independamment avant reprise — les SEPT
 #    valeurs qui atteignent le fichier de conf ont ete DERIVEES de l'AST de
 #    `_build_forward_conf`, et ce champ est le seul sans classe.
+#
+#    ⛔ ET `fullmatch` EST PORTEUR — CE N'EST PAS UN DETAIL DE STYLE.
+#       En python, `$` s'apparie AUSSI juste avant un saut de ligne TERMINAL.
+#       Donc `_CA_PATH_RE.match('/etc/ssl/ca.crt\n')` ACCEPTERAIT, avec ce motif
+#       exact et inchange — c'est-a-dire le caractere MEME du defaut, dans une
+#       classe par ailleurs juste.
+#       `fullmatch` doit consommer TOUTE la chaine, et c'est lui qui ferme ce
+#       cas. Si quelqu'un « simplifie » un jour l'appel en `match`, la classe
+#       reste identique et la faille revient SANS QUE CETTE LIGNE BOUGE.
+#       Releve par `gestion-ssh-key-4f` en eprouvant le correctif — y compris
+#       la partie qui suivait sa propre recommandation.
+#       (C'est la meme classe que les 58 conversions de `c869144b`.)
 _CA_PATH_RE = re.compile(r'^/[A-Za-z0-9._/-]{0,254}$')
 
 _RW_CONF_PREFIX = '/etc/rsyslog.d/50-rootwarden-'
@@ -262,6 +274,16 @@ def save_config():
         return jsonify({'success': False, 'message': 'Port hors bornes'}), 400
     if protocol not in _VALID_PROTOCOLS:
         return jsonify({'success': False, 'message': f'Protocole invalide : {protocol}'}), 400
+    # ⚠ DEUX POINTS NOMMES PAR `gestion-ssh-key-4f`, NI L'UN NI L'AUTRE UN DEFAUT.
+    #    Ils sont ecrits parce qu'un silence les rendrait indiscernables d'un
+    #    oubli.
+    #
+    #    ① `/../../etc/shadow` reste ACCEPTE par la classe. Ce n'est pas une
+    #       elevation : rsyslog lit ce fichier en root de toute facon, et un
+    #       bundle de CA illisible fait ECHOUER l'emission TLS au lieu de la
+    #       degrader en clair. Disponibilite, pas confidentialite — et le durcir
+    #       demanderait un `realpath` DISTANT, qui coute plus que ca ne rapporte.
+    #    ② `fullmatch` est employe A DESSEIN, cf. l'avertissement au motif.
     if tls_ca and not _CA_PATH_RE.fullmatch(tls_ca):
         return jsonify({'success': False, 'message': 'tls_ca_path invalide'}), 400
     if rl_burst < 0 or rl_interval < 0 or rl_burst > 1_000_000 or rl_interval > 86400:
