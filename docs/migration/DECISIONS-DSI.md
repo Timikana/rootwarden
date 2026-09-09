@@ -17664,3 +17664,93 @@ fois sur un tour entier.
 geste sans la mesure des trois sessions.** C'est exactement la faute que je
 viens de commettre trois fois : conclure d'un instrument sur un objet qu'il ne
 mesure pas.
+
+---
+
+## 2026-09-09, 08:45 CEST — ma clôture d'il y a une heure est RÉFUTÉE
+
+**E-554 — `DOSSIER-64` est réfuté sur son titre, pas sur sa méthode.** Il
+disait « l'archivage n'a rien coûté » et il portait, dans son propre §3, la
+réserve qui l'annulait : *un écrivain vivant sur la même table peut porter UN
+geste là où l'archive en portait SIX.*
+
+> **Une réserve écrite dans le corps ne rattrape pas un titre qui affirme.**
+
+`gestion-ssh-key-5f` a pris le bon grain — **(verbe, colonnes)** au lieu de
+(table) — et trouvé **trois capacités réellement perdues** sur `users` : 28
+couples archivés contre 16 sites vivants.
+
+**E-555 — Trois gestes PERDUS et non retirés.** Vérifiés indépendamment ici : les
+sites cités sont tous des `insert`, la seule `UPDATE` est l'anonymisation.
+
+```
+② UPDATE users SET active    la SUSPENSION n'existe plus : `active => 0`
+                             n'est atteignable que par l'ANONYMISATION,
+                             irreversible. Et `active` decide :
+                             configure_servers.py:873 le lit.
+③ UPDATE users SET role_id   promouvoir impose de RECREER le compte, donc de
+                             perdre son historique. Lu dans 39 fichiers, ecrit
+                             dans 2, les deux en `insert`.
+① UPDATE users SET sudo      drapeau positionnable UNE fois, lu par le
+                             deploiement (ssh_utils.py:937). L'EFFET est
+                             revocable en retirant l'acces machine ; le DRAPEAU
+                             ne l'est pas -> c'est la trace qui tombe.
+```
+
+**L'absence est COHÉRENTE** — deux `<form>` seulement dans `comptes.blade.php`,
+le `select role_id` dans celui de *création*, aucune route de bascule. *Aucun
+contrôle mort.*
+
+> **Retiré et perdu ne se distinguent pas par l'absence : ils se distinguent par
+> la présence d'une note.** `Permissions.php:305-320` documente un retrait
+> assumé ; ces trois-là n'ont rien.
+
+**E-556 — Et une donnée personnelle survit à l'effacement du compte.** Trouvée
+par `gestion-ssh-key-94`, vérifiée sur la base vivante.
+
+`login_attempts` est **la seule** des quatre tables d'auth **sans clé
+étrangère** (les trois autres sont en CASCADE). Elle porte `ip_address` et
+`username`. Elle n'est **pas** dans les six tables purgées par
+`Comptes::anonymise`. Et la purge de rétention **ne tourne pas** :
+`LOG_RETENTION_DAYS` est **non défini dans le conteneur en service**, et le
+scheduler sort immédiatement si la valeur est ≤ 0.
+
+*Ce n'est pas une régression : le legacy ne purgeait pas non plus à l'effacement.
+Il avait une atténuation — purge des lignes de plus de 24 h à chaque tentative —
+que le portage a rendue conditionnelle et éteinte par défaut.* **2 lignes
+aujourd'hui : le mécanisme est réel, le stock ne l'est pas encore. C'est le bon
+moment pour trancher.**
+
+**E-557 — Un commentaire affirmait qu'un contrôle de sécurité n'existait pas.**
+`MotDePasse.php:522-535`, daté du 2026-08-27, disait *« le portage ne consulte
+JAMAIS `active_sessions` »* et présentait le correctif comme travail futur. **Il
+est livré depuis le 2026-09-02** : `SessionRevoquee.php`, alias
+`bootstrap/app.php:77`, appliqué au groupe `routes/web.php:140` — **le seul
+`Route::middleware([` du fichier**.
+
+Corrigé, en gardant le constat **daté et au passé**.
+
+> **Laissé tel quel il faisait pire que se tromper : il disait à son lecteur
+> qu'un contrôle de sécurité n'existait pas, et lui donnait donc une raison de ne
+> pas mesurer.**
+
+**E-558 — Quatre instruments, quatre angles morts, et aucun ne voyait ceux des
+autres.**
+
+```
+moi (tables)          aveugle a l'ARITE
+5f (verbe, colonnes)  terminateur au 1er guillemet : `CONCAT('deleted-', id)`
+                      tronquait 12 colonnes a UNE      -> DEDOUANAIT
+94 (nom de table)     aveugle a la BOUCLE sur une liste et au SCHEMA (CASCADE)
+c1 (nom de table)     aveugle au HELPER et au nom dans un TABLEAU
+```
+
+**Trois des quatre ont produit une fausse alarme et l'ont arrêtée eux-mêmes.** Le
+seul **dédouanement** du lot a été trouvé par son auteur **en corrigeant autre
+chose** — la troisième source, distincte de l'écriture et de la revue.
+
+**E-559 — Et je m'interdis de porter ces trois gestes.** Ils touchent `users`, la
+table la plus lue du dépôt, sur le contrôle d'accès, et le service ne recharge
+pas l'arbre. *Écrire trois routes de bascule sans pouvoir les exercer serait
+exactement ce que j'ai refusé pour K4.* `DOSSIER-65` §9 porte les quatre gestes
+qui reviennent à l'exploitant.
