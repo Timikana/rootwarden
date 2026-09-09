@@ -67,12 +67,32 @@ def _target_path(username: str) -> str:
 
 # ── Rendering : 5 presets metier + custom ───────────────────────────────────
 
+_RUNAS_RE = re.compile(r'^[a-z_][a-z0-9_-]{0,31}$')
+
+
+def valide_runas(runas: str) -> str:
+    """Rend le `runas` NORMALISE, ou leve `ValueError`.
+
+    ══ POURQUOI CETTE FONCTION EXISTE SEPAREMENT DE `_runas_spec` ═══════════
+    Elle est ne d'un defaut : `_runas_spec` melait la VALIDATION et le FORMATAGE
+    en `(runas)`. Une branche de `render_policy` qui n'a pas besoin du format —
+    `custom` — n'appelait donc pas la fonction, et perdait la validation AVEC le
+    format. Or `runas` est interpole dans l'en-tete sur TOUS les chemins, y
+    compris celui-la.
+
+    Separer les deux permet a la garde de DOMINER : `render_policy` valide en
+    premiere instruction, et aucune branche ne peut plus l'esquiver en n'ayant
+    pas besoin de mettre la valeur en forme.
+    """
+    runas = (runas or 'root').strip()
+    if not _RUNAS_RE.fullmatch(runas):
+        raise ValueError(f"Runas invalide : {runas!r}")
+    return runas
+
+
 def _runas_spec(runas: str) -> str:
     """Construit le Runas_Spec (defaut root). Valide la chaine."""
-    runas = (runas or 'root').strip()
-    if not re.fullmatch(r'^[a-z_][a-z0-9_-]{0,31}$', runas):
-        raise ValueError(f"Runas invalide : {runas!r}")
-    return f"({runas})"
+    return f"({valide_runas(runas)})"
 
 
 def _tag(nopasswd: bool) -> str:
@@ -192,7 +212,27 @@ def render_policy(policy: dict) -> str:
         raise ValueError(
             "preset requis : aucun prereglage sudo n'est applique par defaut")
     nopasswd = bool(policy.get('nopasswd', False))
-    runas = policy.get('runas', 'root')
+    # ⛔ LA GARDE EST ICI PARCE QU'ELLE DOIT DOMINER TOUTES LES BRANCHES.
+    #
+    #    `runas` est interpole dans l'en-tete ci-dessous sur TOUS les chemins.
+    #    Sa seule validation vivait dans `_runas_spec`, que seules les branches
+    #    `systemctl_specific` et `PRESET_RENDERERS` appellent — la branche
+    #    `custom` ne lui passe pas `runas`, donc ne le validait JAMAIS.
+    #
+    #    Un saut de ligne dans ce champ FERME la ligne de commentaire et OUVRE
+    #    une directive sudoers que personne n'a demandee, dans un fichier nomme
+    #    d'apres quelqu'un d'autre — pendant que l'en-tete et le journal
+    #    continuent d'afficher la valeur attendue. Ce qui tombe d'abord, c'est
+    #    la piste d'audit.
+    #
+    #    Mesure du 2026-09-09, branche `custom` : 1 directive rendue avec un
+    #    `runas` legitime, 2 avec un `runas` portant un saut de ligne. Les cinq
+    #    branches qui appellent `_runas_spec` refusaient deja la meme valeur.
+    #
+    #    Une garde ne vaut que si elle domine TOUS les chemins qui la suivent —
+    #    et « la branche n'utilise pas ce champ » ne dispense pas de le valider
+    #    quand l'EN-TETE, elle, l'utilise.
+    runas = valide_runas(policy.get('runas', 'root'))
 
     header = (
         "# Genere par RootWarden - NE PAS EDITER MANUELLEMENT\n"
