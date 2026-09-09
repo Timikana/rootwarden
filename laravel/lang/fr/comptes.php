@@ -49,6 +49,13 @@ return [
 
     'deverrouiller' => 'Déverrouiller',
     'deverrouille' => 'Compte déverrouillé.',
+    'sudo_accorde' => 'Sudo global accordé.',
+    'sudo_retire' => 'Sudo global retiré.',
+    'sudo_titre' => 'Sudo global',
+    'sudo_donner' => 'Donner sudo',
+    'sudo_retirer' => 'Retirer sudo',
+    'err_auto_sudo' => "Vous ne pouvez pas modifier votre propre sudo global.",
+    'err_sudo_requis' => "L'état voulu (sudo) doit être indiqué.",
     'role_change' => 'Rôle modifié.',
     'role_titre' => 'Rôle',
     'err_auto_role' => "Vous ne pouvez pas changer votre propre rôle.",

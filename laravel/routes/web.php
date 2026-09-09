@@ -835,6 +835,19 @@ Route::middleware(['memorisation', 'session.authentifiee', 'session.revoquee', '
         ->whereNumber('id')->middleware(['role:2', 'perm:can_admin_portal'])->name('comptes.role');
 
     /*
+     * ⚠ TROISIEME ET DERNIER GESTE PERDU A L'EXTINCTION. `role:3` reprend
+     *   `toggle_sudo.php:26` (`checkAuth([ROLE_SUPERADMIN])`), et c'est la SEULE
+     *   garde du legacy en plus de « pas sur soi-meme ».
+     *
+     *   Ce drapeau est un REPLI : `configure_servers.py:1086-1094` ne le
+     *   consulte que si le compte n'a aucune politique pour la machine — mais
+     *   quand il decide, il accorde `NOPASSWD ALL`. Il etait POSABLE a la
+     *   creation et jamais retirable.
+     */
+    Route::post('/comptes/{id}/sudo', [ComptesController::class, 'sudoGlobal'])
+        ->whereNumber('id')->middleware(['role:3', 'perm:can_admin_portal'])->name('comptes.sudo');
+
+    /*
      * L'exemption d'expiration de mot de passe — `role:3`.
      *
      * `legacy/adm/api/update_user.php:31` pose `checkAuth([ROLE_SUPERADMIN])` et

@@ -48,6 +48,13 @@ return [
 
     'deverrouiller' => 'Unlock',
     'deverrouille' => 'Account unlocked.',
+    'sudo_accorde' => 'Global sudo granted.',
+    'sudo_retire' => 'Global sudo revoked.',
+    'sudo_titre' => 'Global sudo',
+    'sudo_donner' => 'Grant sudo',
+    'sudo_retirer' => 'Revoke sudo',
+    'err_auto_sudo' => 'You cannot change your own global sudo.',
+    'err_sudo_requis' => 'The desired state (sudo) must be given.',
     'role_change' => 'Role changed.',
     'role_titre' => 'Role',
     'err_auto_role' => 'You cannot change your own role.',
