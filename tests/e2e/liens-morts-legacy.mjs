@@ -398,9 +398,50 @@ console.log(`FORMES LUES     : ${FORMES.map((f) => f.nom).join(' · ')}`);
 console.log('  un vert ne dit pas « aucun lien mort » : il dit « aucun, dans ces formes-la ».');
 
 if (lus.length === 0) {
-    console.log('\n⛔ AUCUN FICHIER LU. « 0 lien mort » et « je n\'ai rien lu » sont la meme');
-    console.log('   sortie. NE RIEN CONCLURE.');
-    process.exit(2);
+    /*
+     * ── TROIS ETATS, ET L'ANCIENNE FORME LES CONFONDAIT EN DEUX ───────────────
+     *
+     * « 0 fichier lu » etait un refus INCONDITIONNEL, et c'etait juste tant que
+     * `legacy/` portait du code. Depuis l'archivage, 0 est l'etat ATTENDU — et
+     * ce refus est devenu PERMANENT, ce qui bloque la sequence d'extinction dont
+     * cette sonde est un controle. Une porte qui ne peut plus s'ouvrir cesse
+     * d'etre une garde et devient un mur, et son rouge ressemble a un defaut.
+     *
+     *   > La question n'est pas « ai-je lu des fichiers » mais « y a-t-il des
+     *   > fichiers a lire ». Les deux ne se distinguent que par un TEMOIN.
+     *
+     *   portee vide + archive PEUPLEE  -> ETAT TERMINAL, le travail est fait
+     *   portee vide + archive VIDE     -> je n'ai rien lu, exit 2
+     *
+     * Le temoin est l'archive : si `legacy/_deprecated/` porte des `.php`, alors
+     * la portee vide est un RESULTAT. Si elle est vide aussi, l'instrument ne
+     * lit rien du tout et son zero n'atteste rien.
+     */
+    let archivesPhp = 0;
+    const pile = existsSync(ARCHIVE) ? [ARCHIVE] : [];
+    while (pile.length) {
+        const d = pile.pop();
+        let entrees;
+        try { entrees = readdirSync(d, { withFileTypes: true }); } catch { continue; }
+        for (const e of entrees) {
+            const chemin = join(d, e.name);
+            if (e.isDirectory()) { pile.push(chemin); continue; }
+            if (e.name.endsWith('.php')) archivesPhp += 1;
+        }
+    }
+    if (archivesPhp === 0) {
+        console.log('\n⛔ AUCUN FICHIER LU, ET L\'ARCHIVE EST VIDE AUSSI.');
+        console.log('   « 0 lien mort » et « je n\'ai rien lu » sont la meme sortie.');
+        console.log('   NE RIEN CONCLURE.');
+        process.exit(2);
+    }
+    console.log('\n✅ ETAT TERMINAL — il n\'y a plus de code legacy a inspecter.');
+    console.log(`   portee (legacy/ hors _deprecated)  : 0 fichier`);
+    console.log(`   TEMOIN archive (legacy/_deprecated) : ${archivesPhp} fichiers .php`);
+    console.log('   Ce vert ne dit PAS « aucun lien mort » : il dit « il n\'y a plus');
+    console.log('   de fichier ou un lien mort pourrait vivre ». Le temoin separe');
+    console.log('   ce constat d\'un instrument qui ne lirait rien du tout.');
+    process.exit(0);
 }
 
 const morts = [];
