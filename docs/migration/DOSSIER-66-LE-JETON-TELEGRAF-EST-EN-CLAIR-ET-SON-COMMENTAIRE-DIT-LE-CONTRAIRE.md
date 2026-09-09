@@ -295,3 +295,56 @@ corrigé ».*
 masque et le chiffrement *« se ressemblent assez pour être confondus par qui lit
 vite »*. Ce sont deux propriétés distinctes de la même variable, et une seule des
 deux existe.
+
+---
+
+# DURCISSEMENT du 2026-09-09 10:35 — le commentaire n'a JAMAIS été vrai, et l'asymétrie est native
+
+Signalé par `0b`, **et mon `blame` va plus loin que le sien** :
+
+```
+2129a2cf3  2026-04-11 18:30  :2464   # Chiffrer le token Telegraf si fourni
+2129a2cf3  2026-04-11 18:30  :2465   telegraf_token = data.get('telegraf_output_token', '')
+2129a2cf3  2026-04-11 18:30  :2466   if telegraf_token == '********':
+2129a2cf3  2026-04-11 18:30  :2467       telegraf_token = None
+2129a2cf3  2026-04-11 18:30  :718    psk_encrypted = enc.encrypt_password(psk_value)   <- LE PSK
+statut du fichier dans ce commit : A  (il le CREE)
+TEMOIN : :369 rend 70aff91e7, 2026-08-22 — le blame discrimine bien
+```
+
+**Le commentaire, le code qui ne chiffre pas, ET le chiffrement du PSK sont tous
+les trois du même commit — celui qui crée le fichier.**
+
+> **Ce n'est donc pas « le jeton a été oublié quand le PSK a été durci plus
+> tard ».** Les deux secrets ont été écrits dans le même geste, l'un
+> correctement et l'autre pas, **avec un commentaire affirmant que le mauvais
+> était bon.** Le commentaire n'a jamais été vrai : lui et son démenti sont nés
+> ensemble.
+
+**Conséquence de méthode, et c'est elle qui compte** : aucune bissection ne
+l'aurait trouvé, aucun *« qu'est-ce qui a changé ? »* ne l'attrape, aucune chasse
+à la régression n'y mène. **Un défaut natif est invisible à tout instrument qui
+cherche une dérive** — et c'est la classe entière d'outils qu'on emploie par
+réflexe sur un fichier de cinq mois.
+
+## Et la nuance de `0b` sur mon témoin, qui m'aggrave
+
+J'avais écrit que mon témoin gonflé de 2 à 4 « dédouanait mon instrument ». Il
+ajoute, et c'est juste :
+
+> **Un témoin gonflé ne rend pas seulement la preuve plus solide — il rend le
+> `0` du jeton plus ÉTONNANT, donc plus crédible comme trouvaille.** Le témoin
+> et la mesure ne se contrôlent pas séparément : c'est leur **RAPPORT** qui porte
+> la conclusion.
+
+*`0 sur 4` se lit comme une anomalie ; `0 sur 2` comme une possibilité. Le même
+`0`, deux forces de conviction — et c'est le dénominateur que j'avais gonflé.*
+
+Le témoin correct, consolidé :
+
+```
+enc.decrypt_password(       2    :895 :1242   les deux sur le PSK
+server_decrypt_password(    2    :227 :228    fonction differente
+encrypt_password(           1    :718         le PSK, cote ECRITURE
+le jeton                    0 chiffrement · 0 dechiffrement
+```

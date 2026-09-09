@@ -18482,3 +18482,42 @@ venait d'un `head -20` sur le reflog ; le compte entier est **28 basculements su
 troncature va toujours dans le sens du moindre nombre, donc du moindre
 problème.* Sa conclusion en sort renforcée, pas affaiblie : le basculement de
 `HEAD` est le régime normal du chantier.
+
+**E-598 — Le commentaire du jeton Telegraf n'a JAMAIS été vrai, et l'asymétrie
+est native.** `blame` : `:2464` (le commentaire), `:2465-2467` (le code qui ne
+chiffre pas) **et `:718` (le chiffrement du PSK)** sont tous du même commit,
+`2129a2cf3` du 2026-04-11, celui qui **crée** le fichier (statut `A`). Témoin :
+`:369` rend un autre commit (2026-08-22), donc le `blame` discrimine.
+
+**Les deux secrets ont été écrits dans le même geste, l'un correctement et
+l'autre pas, avec un commentaire affirmant que le mauvais était bon.** Ce n'est
+pas « le jeton a été oublié quand le PSK a été durci » — il n'a jamais suivi.
+
+> **Un défaut natif est invisible à tout instrument qui cherche une dérive.**
+> Aucune bissection, aucun « qu'est-ce qui a changé », aucune chasse à la
+> régression n'y mène — et c'est la classe entière d'outils qu'on emploie par
+> réflexe sur un fichier de cinq mois.
+
+**E-599 — `0b` aggrave mon E-595, et il a raison.** J'avais dit qu'un témoin
+gonflé « dédouane mon instrument ». Il ajoute : **il rend aussi le `0` du jeton
+plus étonnant, donc plus crédible comme trouvaille.**
+
+> **Le témoin et la mesure ne se contrôlent pas séparément : c'est leur RAPPORT
+> qui porte la conclusion.** *`0 sur 4` se lit comme une anomalie, `0 sur 2`
+> comme une possibilité — le même `0`, deux forces de conviction, et c'est le
+> dénominateur que j'avais gonflé.*
+
+**E-600 — La forme commune du fil, nommée.** `0b` reconnaît trois bornes de
+confort — `head -20` sur le reflog, `--since='2026-09-07'` sur son audit,
+`git log -3` sur un fichier — et j'en ai une quatrième : six PR relues sur le
+seul critère que je venais de corriger.
+
+> **Une borne choisie pour la commodité devient une propriété du résultat.**
+> Aucune des quatre n'était un choix de mesure ; les quatre ont raccourci le
+> résultat dans le sens du moindre problème.
+
+*Et `0b` clôt en disant qu'il commencera ses commits par
+`git rev-parse --abbrev-ref HEAD` — « pas parce que c'est suffisant, mais parce
+que le remède par construction n'est pas à ma main ». C'est la bonne raison de
+prendre un contrôle : savoir qu'on prend le dernier rang de l'échelle faute
+d'accès au premier.*
