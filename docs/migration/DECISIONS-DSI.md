@@ -18920,3 +18920,81 @@ pour qu'elle soit un choix et non un oubli.*
 critère de l'étape 2 se déclenche pour toutes les sessions, et **je n'assigne
 rien**, la raison étant maintenant mesurée par deux instruments indépendants et
 non récitée. Étape 3 tenue (0 · 0 · 0, témoins `cgu_titre` 4 et clé absurde 0).
+
+---
+
+**E-616 — La CLASSE de l'upsert inerte est mesurée, et AUCUN upsert vivant n'est
+touché.** `E-615` avait trouvé une instance ; j'en dérive la classe plutôt que de
+m'arrêter à l'énumération.
+
+```
+`ON DUPLICATE KEY UPDATE` dans le depot   48 occurrences · 33 fichiers
+dont VIVANTS avec table identifiable      19, tous dans backend/routes/
+```
+
+**Le critère, et il est net :**
+
+```
+upsert INERTE   <=>  PK auto_increment  ET  aucun autre index unique
+                     (l'INSERT ne fournit pas la PK, donc aucune cle ne peut collisionner)
+upsert CORRECT  <=>  PK signifiante fournie par l'INSERT, OU un index unique explicite
+```
+
+**Mesuré table par table :**
+
+```
+9 tables   PK SIGNIFIANTE, fournie par l'insert
+           fail2ban_status(server_id) · graylog_rsyslog(machine_id) · permissions(user_id)
+           schema_migrations(version) · wazuh_agents(machine_id) · wazuh_machine_options(machine_id)
+           chatops_users(chat_user_id,platform) · machine_supervision_profile(machine_id,platform)
+           supervision_agents(machine_id,platform)
+11 tables  PK auto_increment MAIS index unique explicite
+           uq_user_event · uniq_cve_machine · uniq_docker_container · uq_drift_machine_cat
+           uk_user_keys · uniq_machine_directive · uq_iptables_rules_server · name (x3)
+2 tables   auto_increment ET zero index unique  ->  linux_versions · update_schedules
+           les DEUX ecrites uniquement par l'ARCHIVE
+```
+
+**Zéro upsert vivant affecté.** *Et la migration `063_unicite_iptables_rules.sql`
+montre que quelqu'un a déjà rencontré cette classe et l'a fermée sur son
+instance.*
+
+**E-617 — ⛔ ET MA « TROUVAILLE » SUR `update_schedules` EST UNE REDÉCOUVERTE :
+`backend/routes/updates.py:798-834` la documente depuis le 2026-09-08, mieux que
+je ne l'aurais fait.** Ce qui y est déjà écrit, avec ses témoins :
+
+```
+update_schedules   modelise un INTERVALLE · py=0 php=0, ZERO code nulle part
+                   temoins : machines py=28/php=115 · ssh_audit_schedules py=2
+schedule_update    installe un cron et N'ENREGISTRE RIEN — etat PERMANENT
+trois routes       installent un cron ; la base n'en garde qu'une trace,
+                   `maj_secu_date`, par une COLONNE et non par cette table
+verdict deja pose  « vestige a retirer ou intention jamais cablee — a trancher
+                   par qui tient le schema »
+```
+
+*Cette note porte même la distinction que j'aurais dû faire : une STRUCTURE existe
+pour le modèle par intervalle et personne ne l'écrit (vestige) ; aucune structure
+n'existe pour le modèle par date/récurrence (migration). **Deux morceaux qui ne
+sont pas le même travail**, et je les aurais fondus.*
+
+> **Ce que ma mesure ajoute est étroit et je le borne** : le CRITÈRE de la classe,
+> la vérification que les 19 upserts vivants sont tous correctement clés, et le
+> fait que `linux_versions` porte le MÊME défaut latent — un
+> `ON DUPLICATE KEY UPDATE` inerte dans son écrivain archivé, ce que la note de
+> `updates.py` ne couvre pas puisqu'elle traite l'absence d'écrivain et non le
+> défaut de celui qui a existé.
+
+⚠ **Et c'est la sixième fois que je redécouvre ce que le dépôt documentait déjà.**
+*Un inventaire refait de zéro produit toujours quelque chose ; ce quelque chose
+est parfois une note d'il y a vingt-quatre heures, avec de meilleurs témoins.*
+
+**Ce qui revient à l'exploitant** : la septième décision de `E-615` (le sort de
+`linux_versions`) **rejoint une décision déjà posée** — celle de
+`updates.py:834` sur `update_schedules`. **Une seule question pour les deux : que
+fait-on des tables taillées pour un modèle que personne n'écrit ?** *Les deux
+sont vides, les deux ont une FK en CASCADE, aucune ne nuit — et leur suppression
+est une migration, donc hors de mon périmètre.*
+
+**Étapes 1 à 3** : 1 commit depuis 11:35, le mien, **0 CODE** — troisième tour
+consécutif. Étape 3 tenue (0 · 0 · 0, témoins `cgu_titre` 4, clé absurde 0).
