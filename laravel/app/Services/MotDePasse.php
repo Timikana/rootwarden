@@ -528,14 +528,36 @@ class MotDePasse
          *     sessions vivent en FICHIERS (`SESSION_DRIVER=file`), et supprimer
          *     une ligne de base n'en ferme aucune.
          *
-         * Donc : cette purge ferme les sessions de l'ancien portail, et **aucune
-         * de celui-ci**. L'aide de l'ecran le dit desormais dans ces termes,
-         * plutot que de promettre une fermeture qu'elle n'obtient pas.
+         * ⛔ CE CONSTAT EST PERIME DEPUIS LE 2026-09-02, ET IL AFFIRMAIT
+         *    L'INVERSE DE L'ETAT COURANT SUR UN ECRAN DE SECURITE.
          *
-         * Le correctif complet est que le portage ECRIVE cette table a la
-         * connexion, comme le legacy le fait (`login.php:212`), et la consulte.
-         * Aucune migration n'est necessaire : la table existe et porte deja les
-         * colonnes voulues.
+         *    Il annoncait un correctif « complet » a faire. Il est LIVRE, et ses
+         *    trois volets sont en place — mesure du 2026-09-09 :
+         *
+         *      ECRIRE     `SessionsActives::enregistre` (updateOrInsert a la
+         *                 connexion)
+         *      SUPPRIMER  `revoque` · `ferme` · cette purge-ci
+         *      LIRE       `Http/Middleware/SessionRevoquee.php` (2026-09-02)
+         *                 <- le volet qui manquait, et sans lequel les deux
+         *                    autres ne faisaient rien
+         *
+         *    Et il garde REELLEMENT, verifie plutot que suppose :
+         *      alias `session.revoquee`   `bootstrap/app.php:77`
+         *      applique au groupe         `routes/web.php:140`
+         *      et ce groupe est le SEUL   1 seul `Route::middleware([` dans
+         *      qui exige l'authentification   tout le fichier
+         *
+         *    DONC CETTE PURGE FERME BIEN LES SESSIONS DE CE PORTAIL.
+         *
+         *    ⚠ Ce qui precede reste ecrit, DATE et au PASSE, parce que le
+         *    constat etait juste le 2026-08-27 : il explique pourquoi le
+         *    middleware existe. Mais laisse tel quel il faisait pire que se
+         *    tromper — il disait a son lecteur qu'un controle de securite
+         *    n'existait pas, et lui donnait donc une raison de ne pas mesurer.
+         *
+         *    Releve par `gestion-ssh-key-94` en appariant les gestes de
+         *    `active_sessions` : « si j'avais cru le commentaire, je publiais
+         *    une fuite de session refermee depuis treize jours ».
          *
          * Best-effort, comme le legacy : un echec de purge ne doit pas annuler un
          * changement de mot de passe deja ecrit.
