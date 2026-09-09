@@ -138,6 +138,33 @@
         if (r.ok && r.corps.success) setTimeout(() => location.reload(), 1200);
     }
 
+    /* ── Suspension / activation ─────────────────────────────────────────────
+     *
+     * Geste PERDU a l'extinction du legacy (`adm/api/toggle_user.php`) et
+     * reporte le 2026-09-09. Sans lui, suspendre un compte le temps d'un
+     * preavis imposait de le DETRUIRE : la seule ecriture vivante de
+     * `users.active` etait celle de l'anonymisation, irreversible.
+     *
+     * ⚠ `data-actif` porte l'etat VOULU, LU DANS LE DOM et non deduit ici.
+     *    L'API prend un booleen explicite : le legacy lisait `active` puis
+     *    l'inversait, donc deux appels concurrents s'annulaient et un rejeu ne
+     *    rendait pas le meme etat. Envoyer l'etat voulu rend le geste
+     *    idempotent.
+     */
+    async function basculeActivite(bouton) {
+        const actif = bouton.dataset.actif === '1';
+        bouton.disabled = true;
+        const r = await appelle(`/comptes/${bouton.dataset.id}/activite`, { actif });
+        bouton.disabled = false;
+        if (! r.corps) {
+            dis(garnis(L.err_reseau, { statut: r.statut }), 'echec');
+
+            return;
+        }
+        dis(r.corps.message, r.ok && r.corps.success ? 'ok' : 'echec');
+        if (r.ok && r.corps.success) setTimeout(() => location.reload(), 1200);
+    }
+
     /* ── Suppression / anonymisation, et le step-up qui les garde ────────── */
 
     const panneauSuppr = document.querySelector('[data-rw="comptes-panneau-suppression"]');
@@ -316,6 +343,7 @@
         if (rw.startsWith('compte-mdp-poser-')) return poseMotDePasse(el, false);
         if (rw.startsWith('compte-mdp-generer-')) return poseMotDePasse(el, true);
         if (rw.startsWith('compte-deverrouiller-')) return deverrouille(el);
+        if (rw.startsWith('compte-activite-')) return basculeActivite(el);
         // L'expiration est un `change` sur un `<select>`, pas un clic : le
         // repartiteur de clics ne la voit pas. Voir l'ecouteur dedie plus bas.
         if (rw.startsWith('compte-totp-')) {

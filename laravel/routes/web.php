@@ -806,6 +806,21 @@ Route::middleware(['memorisation', 'session.authentifiee', 'session.revoquee', '
         ->whereNumber('id')->middleware(['role:3', 'perm:can_admin_portal'])->name('comptes.deverrouiller');
 
     /*
+     * ⚠ CE GESTE AVAIT ETE PERDU A L'EXTINCTION DU LEGACY, pas retire.
+     *
+     * `legacy/adm/api/toggle_user.php` le portait. Apres l'archivage,
+     * `users.active` n'etait plus ecrit que par deux `insert` et par UNE
+     * `update` — celle de l'ANONYMISATION, irreversible. Suspendre un compte le
+     * temps d'un preavis imposait de le DETRUIRE.
+     *
+     * `role:3` reprend `checkAuth([ROLE_SUPERADMIN])` de `:26`. Les deux autres
+     * gardes du legacy — pas sur soi-meme, pas le dernier superadmin actif —
+     * sont dans le service, ou elles peuvent LIRE la base.
+     */
+    Route::post('/comptes/{id}/activite', [ComptesController::class, 'activite'])
+        ->whereNumber('id')->middleware(['role:3', 'perm:can_admin_portal'])->name('comptes.activite');
+
+    /*
      * L'exemption d'expiration de mot de passe — `role:3`.
      *
      * `legacy/adm/api/update_user.php:31` pose `checkAuth([ROLE_SUPERADMIN])` et

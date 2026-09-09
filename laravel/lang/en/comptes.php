@@ -48,6 +48,13 @@ return [
 
     'deverrouiller' => 'Unlock',
     'deverrouille' => 'Account unlocked.',
+    'suspendre' => 'Suspend',
+    'activer' => 'Enable',
+    'active' => 'Account enabled.',
+    'suspendu' => 'Account suspended. It can no longer sign in, and its machine access will be removed on the next deployment.',
+    'err_auto_activite' => 'You cannot suspend your own account.',
+    'err_dernier_superadmin' => 'Cannot suspend the last active superadministrator: nobody would be able to reopen the portal.',
+    'err_actif_requis' => 'The desired state (actif) must be given: an omission is not a suspension.',
 
     'totp_reinitialiser' => 'Reset 2FA',
     'totp_question' => 'Reset the second factor for ":nom"? The user will have to enrol a new authenticator before signing in.',
