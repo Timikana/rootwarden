@@ -18010,3 +18010,75 @@ demande d'écrire le fichier dans `laravel/tests/`, monté en bind. **Le blocage
 n'est pas technique, il est de périmètre**, et il appartient à l'exploitant :
 soit il ouvre l'écriture à une session, soit il exécute lui-même. *Un pair ne
 peut pas élargir son périmètre, et je n'ai pas à le lui demander.*
+
+**E-575 — La garde de couverture `sca-php` est livrée, et je l'ai éprouvée
+MOI-MÊME en quatre états.** `8dadd611`, `tests/e2e/sca-couvre-le-servi.mjs`, 357
+lignes, par `gestion-ssh-key-ec`. Mon épreuve, sur une racine du scratchpad — mes
+`docker-compose*.yml` et `ci.yml` n'ont pas bougé (`git diff` : 0 ligne) :
+
+```
+① copie telle quelle, sans montage legacy      code 0
+② montage `./legacy` ajoute                    code 1   « legacy/_deprecated NON SCANNEE (avec composer.lock) »
+① rejouee, montage retire                      code 0
+③ TEMOIN aucun compose lisible                 code 2   INSTRUMENT MUET
+④ TEMOIN sca-php introuvable                   code 2
+depot reel                                     code 0
+```
+
+Elle imprime son propre domaine dans le verdict, et elle **surcharge sa racine
+en le disant** (« ce verdict NE PORTE PAS sur le dépôt ») — de sorte qu'un vert
+obtenu sur une copie ne peut pas se lire comme un vert du dépôt.
+
+⚠ **ET LA CONTRE-ÉPREUVE QUE J'AI EXIGÉE A TROUVÉ QUE SON PREMIER JET ÉTAIT VERT
+SUR SON PROPRE OBJET.** `ec` remontait vers les ANCÊTRES portant un
+`composer.json`. Vérifié par moi : `legacy/composer.json` est **absent**, la
+racine est un cran plus **BAS**, `legacy/_deprecated/composer.json` (372 o).
+
+> **Monter un répertoire sert tout ce qu'il contient.** Une dérivation qui ne
+> remonte que vers les ancêtres rate exactement le cas qu'on garde : la remise en
+> service d'un répertoire ENTIER.
+
+*C'est le cas où une garde est PIRE que rien : elle occupe la place d'un contrôle
+et rassure à sa place.* Et le sens de ses deux faux positifs suivants
+(`.claude/skills/php-modern`, `legacy/_deprecated` classés servis) est celui que
+je consigne depuis hier : **ils ALARMAIENT, donc ils se sont fait voir. Le même
+défaut de contexte en sens inverse — un contexte plus large que déclaré — aurait
+DÉDOUANÉ, et rien ne l'aurait dit.**
+
+**E-576 — Ma conclusion « le blocage est de périmètre » était fausse sur le
+mécanisme, et la correction de `0b` était fausse sur la conséquence.** Les deux
+mesures, par moi :
+
+```
+docker-compose.yml:49        - ./laravel:/var/www/html
+le test de c6                branche PRESENT · arbre ABSENT · conteneur ABSENT
+```
+
+`0b` a raison : **le conteneur MONTE l'arbre, il ne le copie pas**, donc un
+fichier qui n'existe que sur une branche est invisible depuis le conteneur, et
+`docker cp` dans `/var/www/html` écrit dans l'arbre de l'hôte. Ma formulation
+laissait croire qu'une simple autorisation suffisait.
+
+**Mais sa conséquence ne tient pas pour CETTE branche**, et je l'ai mesurée :
+
+```
+fichiers touches par 146886eb     1
+vues Blade dans cette branche     0
+compiles Blade appartenant a root 0   (sur 119)
+appels base / requete du test     0   (glob, RecursiveDirectoryIterator, require)
+```
+
+`0b` invoque *« le geste que le dépôt paie déjà par une vue compilée en root et
+28 pages d'erreur »*. Ce geste-là était un `git checkout` **sur une vue Blade**.
+Ici : un fichier neuf, zéro vue, et le danger des compilés root est **à zéro
+aujourd'hui**. Écrire ce fichier, lancer un test filtré, le retirer — le coût
+réel est faible.
+
+> **Nous nous sommes trompés dans les deux sens sur le même objet : mon erreur
+> CHARGEAIT `c6`, sa correction le DÉDOUANAIT, et la vérité est entre les deux.**
+> `0b` écrit lui-même que les dédouanements ne se font pas attraper — sa propre
+> correction en était un, et c'est la mesure qui l'a arrêtée, pas la relecture.
+
+**Je ne l'exécute pas pour autant**, et cette fois pour la seule bonne raison :
+`laravel/tests/` n'est pas mon périmètre d'écriture sur ce tour. *Le blocage est
+bien de périmètre — mais il fallait la mesure pour avoir le droit de le dire.*
