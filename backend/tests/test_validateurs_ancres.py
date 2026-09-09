@@ -73,6 +73,30 @@ def _sources():
                     yield os.path.relpath(p, RACINE), fh.read()
 
 
+
+def _sur_une_ligne_de_commentaire(src: str, offset: int) -> bool:
+    """La ligne qui contient `offset` commence-t-elle par `#` ?
+
+    ══ POURQUOI CE CONTROLE EXISTE ═══════════════════════════════════════════
+    Le 2026-09-09, ce test a fait ECHOUER `main` sur `routes/graylog.py:102` —
+    une ligne de COMMENTAIRE ou j'explique justement que `.match()` accepterait
+    un `\n` final. Ma prose satisfaisait mon propre predicat, treizieme fois de
+    ce chantier. Un `.match()` cite dans une explication n'est pas un appel.
+
+    ⚠ CE CONTROLE NE DEPOUILLE PAS LES COMMENTAIRES, ET C'EST DELIBERE.
+    Depouiller par expression reguliere suppose resolu le probleme qu'on
+    depouille : un `#` a l'interieur d'une chaine ouvrirait un faux commentaire
+    et emporterait la suite de la ligne. Ici on ne regarde que le PREMIER
+    caractere non blanc de la ligne, ce qui ne peut rien avaler.
+
+    ⚠ LIMITE DECLAREE : un commentaire de FIN DE LIGNE (`x = 1  # Y.match(`)
+    reste signale. C'est une fausse alarme, et elle va dans le sens SUR — une
+    alarme se fait contredire, un dedouanement se fait ratifier.
+    """
+    debut = src.rfind('\n', 0, offset) + 1
+    return src[debut:offset].lstrip().startswith('#') or src[debut:].lstrip().startswith('#')
+
+
 def _fautes(sources=None):
     """Rend [(fichier, ligne, quoi)] pour chaque validateur ancre en `.match()`.
 
@@ -91,6 +115,8 @@ def _fautes(sources=None):
 
         # famille A : `re.match(r'^…$', X)` inline
         for m in re.finditer(r"re\.match\(\s*(r?)(['\"])(.*?)\2", src, re.S):
+            if _sur_une_ligne_de_commentaire(src, m.start()):
+                continue
             if _ancre_a_la_fin(m.group(3)):
                 fautes.append((chemin, src[:m.start()].count('\n') + 1,
                                f"re.match inline sur {m.group(3)!r}"))
@@ -99,6 +125,8 @@ def _fautes(sources=None):
         for m in re.finditer(r"\b([A-Za-z_][A-Za-z0-9_]*)\.match\(", src):
             nom = m.group(1)
             if nom == 're':
+                continue
+            if _sur_une_ligne_de_commentaire(src, m.start()):
                 continue
             motif = motifs.get(nom)
             ligne = src[:m.start()].count('\n') + 1
@@ -177,3 +205,60 @@ class TestLeBalayageMORD:
             "    pass\n"
         )
         assert _fautes([('prefixe.py', prefixe)]) == []
+
+
+class TestLaProseNEstPasDuCode:
+    """Un `.match()` cite dans une explication n'est pas un appel.
+
+    Le 2026-09-09, ce test a fait ECHOUER `main` sur `routes/graylog.py:102` —
+    une ligne de COMMENTAIRE ou l'auteur explique justement que `.match()`
+    accepterait un `\n` final. La prose satisfaisait le predicat.
+
+      > Treizieme fois de ce chantier qu'un texte declenche la sonde qu'il
+      > decrit. La parade n'est pas de reformuler la prose : c'est que
+      > l'instrument lise du CODE.
+    """
+
+    def test_un_match_en_commentaire_de_ligne_entiere_est_ignore(self):
+        src = ("import re\n"
+               "_X = re.compile(r'^a$')\n"
+               "# ici _X.match('a') accepterait un saut de ligne\n"
+               "_X.fullmatch('a')\n")
+        assert _fautes([('forge.py', src)]) == []
+
+    def test_un_match_en_commentaire_INDENTE_est_ignore(self):
+        src = ("import re\n"
+               "_X = re.compile(r'^a$')\n"
+               "def f():\n"
+               "    # _X.match(v) serait faux\n"
+               "    return _X.fullmatch(v)\n")
+        assert _fautes([('forge.py', src)]) == []
+
+    def test_un_re_match_inline_en_commentaire_est_ignore(self):
+        src = ("import re\n"
+               "# re.match(r'^a$', v) serait faux\n"
+               "re.fullmatch(r'^a$', v)\n")
+        assert _fautes([('forge.py', src)]) == []
+
+    def test_LE_MEME_MOTIF_DANS_DU_CODE_EST_TOUJOURS_SIGNALE(self):
+        """CONTRE-EPREUVE. Sans elle, ignorer les commentaires pourrait tout
+        ignorer, et les trois tests ci-dessus passeraient a vide."""
+        for src in ("import re\n_X = re.compile(r'^a$')\n_X.match('a')\n",
+                    "import re\nre.match(r'^a$', v)\n"):
+            assert len(_fautes([('forge.py', src)])) == 1, (
+                'un `.match()` dans du CODE n\'est plus signale : '
+                'le controle de commentaire est trop large'
+            )
+
+    def test_un_commentaire_de_FIN_DE_LIGNE_reste_signale(self):
+        """LIMITE DECLAREE, pas comblee.
+
+        Le controle ne regarde que le premier caractere non blanc de la ligne.
+        Un commentaire de fin de ligne reste donc signale — fausse alarme, et
+        elle va dans le sens SUR : une alarme se fait contredire, un
+        dedouanement se fait ratifier.
+        """
+        src = ("import re\n"
+               "_X = re.compile(r'^a$')\n"
+               "v = 1  # _X.match(v) serait faux\n")
+        assert len(_fautes([('forge.py', src)])) == 1
