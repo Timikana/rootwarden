@@ -17856,3 +17856,44 @@ par machine. *Trois gestes voisins, deux gardes identiques : la troisième s'éc
 toute seule, et elle serait fausse.* Ce qui reste ouvert du dossier est le seul
 point dont la raison ne parlait pas d'un redémarrage : **④ la rétention de
 `login_attempts`**, une décision de conformité pour l'exploitant.
+
+**E-568 — Les 898 derniers fichiers du legacy restent en place, et c'est un
+choix mesuré, pas un oubli.** « Ne plus avoir de legacy » vaut aussi pour ce que
+git ne suit pas. Remesuré le 2026-09-09 :
+
+```
+fichiers sur disque sous legacy/   1133
+dont suivis par git                 235   (l'archive _deprecated/)
+dont ignores / non suivis           898   TOUS sous legacy/vendor/
+montages docker les citant            0   temoin : 10 montages vus sur 5 conteneurs
+Dockerfile / compose les citant       0   temoin : laravel/vendor cite 1 fois
+code SERVI les citant                 0
+```
+
+**Je ne les supprime pas, pour trois raisons dans cet ordre :**
+
+① **Ils sont inertes.** Aucun montage, aucun `autoload` depuis `laravel/` ou
+`backend/`, `.gitignore:16` (`vendor/`) les exclut donc ils ne voyagent pas.
+
+② **Ils ne portent aucun écart de vulnérabilité.** Versions comparées aux
+paquets en service : `dompdf/dompdf` v3.1.6 des **deux** côtés,
+`spomky-labs/otphp` 11.5.0 des **deux** côtés. `phpmailer/phpmailer` v6.12.0
+n'existe que côté legacy — et n'est chargé par rien.
+
+③ **Le geste serait du bruit dans un arbre que sept sessions partagent**, pour
+des octets qu'aucun processus ne lit.
+
+⚠ **ET LE POINT QUI SURVIT À CETTE DÉCISION, parce qu'il est de mon fait** : la
+CI ne les audite plus. J'ai réduit `sca-php` à `for d in laravel` **dans le
+commit même de l'archivage** — la garde du job l'exigeait, et c'était juste
+puisque plus rien n'est servi. Mais la conséquence doit être écrite quelque part :
+
+> **Si quelqu'un remet un jour `legacy/` en service, il héritera de 898 fichiers
+> de dépendances tierces qu'aucun contrôle ne regarde plus, et rien dans le
+> dépôt ne l'en avertira.** Un job vert ne dit pas ce qu'il a cessé de couvrir.
+
+**Le retour en arrière est acquis** : `legacy/_deprecated/composer.json` (372 o)
+et `composer.lock` (37 218 o) sont **suivis par git**, donc les 898 fichiers sont
+reconstituables par un `composer install`. *C'est ce qui rend la non-suppression
+peu coûteuse — et ce qui rendrait la suppression réversible si l'exploitant la
+voulait.*
