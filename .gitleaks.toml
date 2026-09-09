@@ -34,6 +34,31 @@ paths = [
     '''backend/tests/''',
     '''obsidian-rootwarden/''',       # vault documentation : placeholders pedagogiques (openssl rand, etc.)
     '''docs/''',                       # documentation technique avec exemples de commandes
+    # ── ARCHIVE, ET L'EXEMPTION NOMME LE MECANISME PAS LE PAS ────────────────
+    #
+    # `legacy/_deprecated/php/install.sh:75` porte `openssl rand -base64 18`
+    # DANS une fonction `generate_password()`. Ce n'est pas un secret : c'est
+    # l'APPEL QUI EN FABRIQUE UN. Aucune valeur n'est presente dans le fichier,
+    # ni en clair ni en gabarit — le mot de passe genere part vers un volume au
+    # premier demarrage du conteneur, lequel est RETIRE depuis le 2026-09-09.
+    #
+    # ⚠ POURQUOI CETTE ENTREE APPARAIT AUJOURD'HUI ALORS QUE LE FICHIER N'A PAS
+    #   CHANGE : gitleaks lit le DIFF des commits de la reference. Le fichier
+    #   vivait a `php/install.sh` et n'etait exempte NULLE PART — verifie sur
+    #   `origin/main`, 0 entree le citant. C'est le `git mv` qui a re-presente
+    #   son contenu ENTIER comme des lignes ajoutees.
+    #
+    #   > Deplacer un fichier le re-expose integralement a un scanner de diff.
+    #
+    #   Sur les 13 fichiers archives ce jour, un seul porte un motif de la
+    #   regle — la trouvaille de la CI etait donc complete.
+    #
+    # ⛔ ET C'EST UNE ENTREE DE CHEMIN PRECISE, PAS `legacy/_deprecated/` :
+    #   exempter l'archive entiere aveuglerait le scanner sur 235 fichiers, dont
+    #   222 `.php` de l'ancien portail. Un secret reel qu'on archiverait
+    #   cesserait d'etre vu — et l'archivage est precisement le moment ou
+    #   personne ne relit.
+    '''legacy/_deprecated/php/install\.sh''',
 ]
 
 # Commentaires explicites "not-a-secret"
