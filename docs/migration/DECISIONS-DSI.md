@@ -18742,3 +18742,55 @@ chiffre récité qui se trompe contre soi.*
 effective. Décision de conformité pour l'exploitant** : poser
 `LOG_RETENTION_DAYS` dans l'environnement des conteneurs, et/ou ajouter la table
 à `Comptes::anonymise` — qui ne touche aujourd'hui que `users`.
+
+**E-611 — CLÔTURE : `0b` avait raison sur l'étendue de `anonymise`, et ma sonde
+débordait de 63 lignes sans dommage.** Mesuré par accolades équilibrées :
+
+```
+anonymise()   lignes 869 a 893   25 lignes   ->  1 appel table(), c'est `users`
+ma sonde precedente              88 lignes   ->  debordait de 63 lignes
+                                                 et n'a trouve que `users` quand meme
+tout le fichier                              ->  36 occurrences de table()
+```
+
+**Le même défaut de portée, deux fois, deux conséquences opposées.** Ma sonde
+scopée « jusqu'à la prochaine déclaration de méthode » a couvert 88 lignes au
+lieu de 25 — un débordement de 63 lignes — **et il n'a rien changé, parce que
+rien de dangereux n'était dans l'excédent.** Ma sonde de fichier, elle, rendait
+36 occurrences et allait conclure que `login_attempts` était purgée.
+
+> **Le dommage d'une portée fausse n'est pas proportionnel à l'erreur : il dépend
+> de ce qui tombe dedans.** Une même faute de scope est inoffensive à 63 lignes
+> près et fausse le verdict à 36 occurrences près. *Donc « ma portée est un peu
+> large » n'est pas une réserve qu'on peut évaluer sans regarder l'excédent.*
+
+**Ce que ni l'un ni l'autre n'avons fait, et ne ferons pas** : lire le contenu des
+2 lignes de la table. Ce sont des adresses IP et des identifiants de comptes
+réels. Les requêtes n'ont rendu que `COUNT(*)` et la liste des **colonnes** —
+*le compte et le schéma suffisent à établir l'item ; la valeur n'y ajoute rien et
+ne doit pas circuler.*
+
+---
+
+## FIN DU TOUR — six décisions, aucune technique
+
+```
+① un droit d'ecriture           les 3 controles eprouves + le chiffrement du jeton
+② Migration-Laravel d'ABORD     elle porte les versions completes des deux documents
+③ puis chaque branche security/ 4 conflits de CODE a trancher, 2 de document triviaux
+④ le regime des branches        28 bascules de HEAD sur 11 cibles, worktree jamais employe
+⑤ le jeton Telegraf             chiffrer :2465, DECHIFFRER :541, puis patch 03
+⑥ login_attempts                ip_address + username, aucune FK, LOG_RETENTION_DAYS
+                                 vide dans les deux conteneurs, anonymise() ne touche
+                                 que `users` — decision de CONFORMITE
+```
+
+**Les six sont mesurés des deux côtés.** `E-565` à `E-611`, `DOSSIER-66` à
+`DOSSIER-68`.
+
+> **La règle qui a tenu de bout en bout, démontrée sur nous plutôt qu'énoncée :
+> un résultat faux et vraisemblable ne porte aucun signe de sa fausseté.** Une
+> trentaine de rectifications en douze heures, **aucune trouvée par son
+> auteur** — jamais par vigilance, toujours par une mesure citée contre une
+> affirmation ou par un reste inexpliqué. *Ce n'est pas un défaut de rigueur : il
+> n'y a rien à voir depuis l'intérieur.*
