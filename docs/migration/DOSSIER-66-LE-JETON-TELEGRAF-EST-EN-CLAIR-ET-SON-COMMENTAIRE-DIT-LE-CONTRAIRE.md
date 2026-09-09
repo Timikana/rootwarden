@@ -130,3 +130,105 @@ ce dépôt ne fusionne pas un correctif de sécurité sans mot explicite.
 ⚠ **Rien dans ce dossier n'est un geste** : aucune écriture en base, aucun
 redémarrage, aucune migration. Le seul accès à la base est un `SELECT` de forme
 qui n'a imprimé ni valeur ni fragment de valeur.
+
+---
+
+# RECTIFICATION du 2026-09-09 10:05 — ma spécification du correctif était incomplète, et son défaut était SILENCIEUX
+
+Deux corrections de `gestion-ssh-key-0b`. **Je les ai rejouées avant de les
+relayer** — la règle que je m'impose depuis qu'une correction reçue m'a eue
+précisément parce qu'elle me chargeait. **Les deux tiennent.**
+
+## ① `:541` n'est pas un lecteur : il alimente un DÉPLOIEMENT
+
+Ma §1 le classait « lecteur ». C'est faux, et l'erreur est de conséquence :
+
+```
+def _build_agent_config_content(...)          :500     ← la fonction englobante
+    output_token = global_cfg.get('telegraf_output_token') or ''    :541
+    content += f'  token = "{output_token}"\n'                      :557
+appelants                                     :1951  et  :2144
+```
+
+**Le jeton part dans le TOML déposé sur la machine cible.** Donc :
+
+> **Chiffrer l'écriture sans déchiffrer à `:541` déploierait `sodium:…` comme
+> jeton.** Telegraf démarre, sa configuration est syntaxiquement valide, et
+> l'authentification échoue **à la sortie InfluxDB** — dans un agent distant,
+> loin du geste, sans erreur côté produit.
+
+C'est la jumelle du défaut de `working_dir` : là le gage **manquait**, ici le
+gage serait **posé** et le puits est ailleurs. *Ma consigne « à l'image du PSK »
+laissait déduire le déchiffrement sans le dire — et une spécification dont le
+point critique doit être déduit est une spécification incomplète.*
+
+**Mon rejeu, indépendant :** `def` à `:500`, interpolation à `:557`, deux
+appelants. Confirmé au numéro de ligne.
+
+## ② `VARCHAR(512)` borne le clair à 338 caractères
+
+```
+telegraf_output_token   varchar(512)   512
+tls_psk_value           varchar(512)   512
+
+clair  16 -> chiffre  83   sodium:   aller-retour identique
+clair  88 -> chiffre 179   sodium:   aller-retour identique
+clair 200 -> chiffre 327   sodium:   aller-retour identique
+clair 338 -> chiffre 511   sodium:   TIENT
+clair 339 -> chiffre 515   sodium:   DEPASSE
+```
+
+**Le chiffre de `0b` est exact au caractère.** Chiffrer rétrécit l'entrée
+acceptée de 512 à 338 **sans qu'aucune ligne ne le dise**. Un jeton InfluxDB fait
+~88 caractères, donc la borne n'est pas atteinte en pratique — mais elle devient
+une limite tacite du produit.
+
+**Et le mode d'échec est bénin** : `@@sql_mode` porte `STRICT_TRANS_TABLES`, donc
+un dépassement **lève** au lieu de tronquer. *Une valeur indéchiffrable ne peut
+pas s'installer en base par cette voie.*
+
+## ③ Ce que `0b` a mesuré et qui FERME une piste plutôt que d'en ouvrir une
+
+Le jeton est interpolé brut dans du TOML entre guillemets : une valeur portant
+`"` ou un saut de ligne injecterait des directives Telegraf, `[[inputs.exec]]`
+comprises. **Capacité marginale nulle** : `extra_config` est ajouté **verbatim**
+au même contenu (`:519`, `:534`, `:570`), sur la **même route**, sous les **mêmes
+gardes**. Le même acteur peut déjà écrire du TOML arbitraire, par conception.
+
+> **Un défaut dont l'exploitation demande une capacité déjà détenue — et
+> OFFERTE — n'est pas une élévation.** *C'est le genre de mesure qui retire un
+> point de la liste, et elle vaut autant que celle qui en ajoute.*
+
+## ④ L'entrée vide : la contingence est préservée
+
+`encryption.py:183-184` rend `""` pour `''` **et** pour `None` — mesuré, longueur
+0, sans préfixe. Les quatre sites du portage (`Supervision.php:297-298`,
+`ClePlateforme.php:65-66`) restent justes. *Ils le sont parce qu'aucun écrivain
+PHP n'existe pour ces colonnes, pas parce qu'ils sont corrects.*
+
+## ⛔ ⑤ ET LE CORRECTIF N'A PAS D'EXÉCUTANT
+
+**`0b` décline l'écriture : sa charge est l'analyse, en lecture seule sur le code.
+C'est la cinquième assignation d'écriture qu'il décline aujourd'hui.** Il a fait
+ce que je demandais explicitement — rejouer plutôt que croire — et il a rendu
+deux corrections que je n'avais pas.
+
+**Un pair ne peut pas élargir son propre périmètre, et je n'ai pas à le lui
+demander.** Le mien, sur ce tour, est `DECISIONS-DSI.md` et les `DOSSIER-*.md`.
+
+```
+le correctif tient en DEUX gestes
+    chiffrer a  :2465
+    dechiffrer a :541          <- celui que ma specification omettait
+```
+
+**Ce qui manque n'est pas une spécification, c'est un exécutant.** Et c'est la
+deuxième fois de la journée que le chantier bute sur ce mur — la garde de
+`socle_avertissement` livrée par `gestion-ssh-key-c6` (`146886eb`, branche
+`security/garde-socle-avertissement`) est dans le même cas : **elle n'a jamais
+été exécutée**, parce qu'il n'y a pas de `php` sur l'hôte.
+
+⚠ Et sur ce dernier point je mesure mieux que son auteur : **`php 8.4.25` existe
+dans `rootwarden_laravel`.** L'exécuter ne demande donc aucun outil manquant — il
+demande d'écrire le fichier dans `laravel/tests/`, qui est monté en bind. *Le
+blocage n'est pas technique, il est de périmètre.*
