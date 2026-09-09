@@ -302,3 +302,115 @@ moins de gestes à porter.* Onze colonnes récupérées après correction.
 ⚠ **Aucun des quatre n'est a moi.** ①②③ sont du code neuf sur le controle
 d'acces, ineprouvable avant un redemarrage. ④ est une valeur d'environnement et
 une decision de conservation — donc une decision de conformite, pas de code.
+
+---
+
+# CLÔTURE du 2026-09-09 — les trois sont portées, et le §9 se trompait sur le motif
+
+**Ce dossier disait, §9 : « Aucun des quatre n'est à moi. ①②③ sont du code neuf
+sur le contrôle d'accès, inéprouvable avant un redémarrage. »**
+
+**Les trois sont portées, fusionnées et vérifiées dans le service — et il n'y a
+eu aucun redémarrage de Laravel.**
+
+## 1. L'état, mesuré
+
+```
+comptes/{id}/activite   role:3,perm:can_admin_portal   SuspensionDeCompteTest  11 tests
+comptes/{id}/role       role:2,perm:can_admin_portal   ChangementDeRoleTest    16 tests / 57 assert.
+comptes/{id}/sudo       role:3,perm:can_admin_portal   SudoGlobalTest           8 tests / 42 assert.
+```
+
+Les gardes ci-dessus ne sont pas lues dans `web.php` : elles sont lues dans le
+**routeur en service**, par `gatherMiddleware()` sur les objets `Route` d'un noyau
+amorcé. *Le fichier dit ce qu'on a écrit ; le routeur dit ce qui garde.*
+
+```
+suite Laravel complete   456 passed, 2 skipped, 1643 assertions, 0 failed
+i18n comptes             124 = 124  (103 avant les trois portages)
+PR                       #85, 15 controles sur le SHA exact, 0 rouge
+main distant             68c79336, contient af505188
+au reseau                POST /comptes/9/sudo -> 419 CSRF
+temoin                   POST /comptes/9/inconnue -> 404, une route absente DIFFERE
+```
+
+⚠ **Le témoin est nécessaire ici**, et pas décoratif : sans lui, `419` pourrait
+être rendu par n'importe quel `POST` sur ce préfixe, garde CSRF comprise, y
+compris pour une route qui n'existe pas. C'est le **404** de la route absente qui
+fait que le `419` dit quelque chose.
+
+## 2. ⚠ POURQUOI LE §9 SE TROMPAIT — j'ai étendu une contrainte hors de son régime
+
+Le motif du §9 est repris de `DOSSIER-55` §ⓐ, qui est **juste** :
+
+```
+hypercorn_config.py:14   workers = 4
+hypercorn_config.py:17   use_reloader = False
+=> rootwarden_python ne charge JAMAIS le code de l'arbre sans redemarrage
+```
+
+**Cette contrainte est celle d'`hypercorn`. Je l'ai relayée comme si elle
+gouvernait le portage — qui ne tourne pas sous `hypercorn`.** PHP-FPM relit
+l'arbre à chaque requête. La preuve est dans les horloges, et il faut les deux :
+
+```
+rootwarden_laravel demarre  2026-09-09T05:22:48 UTC
+commit af505188             2026-09-09T06:52:42 UTC   (08:52:42 CEST)
+                            -> 1 h 30 APRES le demarrage
+la route repond             oui, sans redemarrage
+```
+
+> **Une contrainte mesurée sur un régime voyage avec l'autorité de sa mesure, et
+> rien dans son énoncé ne dit sur quoi elle porte.** « Inéprouvable avant un
+> redémarrage » était vrai, sourcé, daté — et faux ici. *C'est la forme de
+> dédouanement la plus difficile à attraper : elle ne contient aucune erreur.*
+
+Et elle a coûté exactement ce qu'un dédouanement coûte : **elle a rangé trois
+portages faisables dans la colonne de l'exploitant**, où ils auraient attendu un
+geste dont ils n'avaient pas besoin.
+
+### La condition qui aurait inversé le verdict, et qui n'est pas là
+
+```
+bootstrap/cache/routes-v7.php   ->  No such file or directory
+```
+
+**`php artisan route:cache` fige les routes dans un fichier.** S'il existait, une
+route neuve n'apparaîtrait pas et ma conclusion s'inverserait — *sans qu'aucune
+des deux mesures ci-dessus change*. Je le nomme parce qu'un futur `route:cache`
+posé pour la performance rendrait cette page fausse en silence.
+
+## 3. Ce qui reste, et ce qui n'a jamais été à moi
+
+```
+④ trancher la retention de `login_attempts`   TOUJOURS OUVERT, et c'est bien
+                                              une decision de conformite :
+                                              aucune cle etrangere (les trois
+                                              autres tables d'auth sont CASCADE),
+                                              absente des six tables purgees par
+                                              Comptes::anonymise, et
+                                              LOG_RETENTION_DAYS non defini dans
+                                              le conteneur en service
+```
+
+**Le ④ ne bouge pas d'un pouce, et pour la raison que le §9 donnait : ce n'est pas
+du code.** *Que trois motifs sur quatre se soient révélés faux ne rend pas le
+quatrième suspect — c'est le seul des quatre dont la raison ne parlait pas d'un
+redémarrage.*
+
+## 4. Une garde que je n'ai PAS écrite, et le test qui le dit
+
+Les deux premiers portages portent « pas le dernier superadmin ». **Le troisième
+non**, et c'est un choix : un superadmin sans `users.sudo` administre toujours le
+portail. `users.sudo` est un **repli** — `configure_servers.py:1086-1094` ne le
+consulte que si le compte n'a aucune politique pour la machine — et quand il
+décide, il accorde `NOPASSWD ALL`.
+
+> **Ajouter la garde ici aurait été raisonner par ANALOGIE DE FORME au lieu de
+> regarder l'objet.** Trois gestes voisins dans le même contrôleur, deux gardes
+> identiques : la troisième s'écrit toute seule, et elle serait fausse.
+
+`SudoGlobalTest::test_retirer_le_sudo_du_dernier_superadmin_est_PERMIS` **constate
+l'absence** pour qu'elle se lise comme une décision et non comme un oubli. S'il
+devient rouge, quelqu'un a ajouté la garde, et il devra dire pourquoi à cet
+endroit.
