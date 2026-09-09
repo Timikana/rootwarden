@@ -18378,3 +18378,33 @@ circulé, et deux sites dans deux méthodes ne se parent pas comme un seul.*
 initial comme un drapeau (`invalid option ->render(`). *Erreur visible — mais
 silencée, elle aurait publié « aucun `->render` dans les tests », un faux zéro du
 côté qui dédouane.* Il faut `-e` ou `--`.
+
+**E-591 — `HEAD` est partagé, et la règle « committer par chemins » ne couvrait
+que la moitié du risque.** Voir `DOSSIER-67` §addendum. Trois sessions ont
+committé sur `security/garde-socle-avertissement`, créée à 09:13:56 depuis mon
+commit de 09:13:51. **Un commit sur la mauvaise branche est indiscernable d'un
+commit correct par toute vérification locale au commit** : `git add`, `git commit`
+et `git show --stat HEAD` réussissent tous les trois. Le seul relevé qui
+l'attrape est `git rev-parse --abbrev-ref HEAD` **AVANT**, et aucune session ne
+l'a fait aujourd'hui.
+
+**Deux rectifications de l'alerte de `0b`, mesurées** : `2a3585e8` est de `c6`
+(*« Session 5 — securite »*), pas de moi ; et aucun `checkout` n'est de ma
+session — mes 8 commits sont sur `Migration-Laravel`, 0 dans une fenêtre de
+bascule. *Le reflog de `HEAD` entrelace les gestes de toutes les sessions, donc ma
+propre vérification a d'abord ressemblé à un aveu.*
+
+**Je ne fusionne rien et ne réécris rien.** Le document de `0b` est intact (blob
+`655a8b0d…` identique, 113 lignes). Recommandation : fusionner la branche, le
+document arrive avec — la seule option sans écriture dans l'arbre partagé.
+
+**E-592 — `0b` a refusé mon exculpation en la chiffrant, et il avait raison.**
+Je lui avais dit *« le diagnostic me désigne, pas vous »*. Sa réponse : *« mon
+ratio est infini aussi — 1 commit, 0 de code — et pour la même raison
+structurelle : mon mandat est le document »*. **Le diagnostic de l'étape 1 nous
+désigne tous les deux.**
+
+> **Refuser une exculpation qu'on vous offre est le seul moyen de voir ce
+> qu'elle recouvre.** C'est la contrepartie exacte de la règle qu'il a formulée
+> ce matin — exiger un nombre des exculpations — appliquée à celle qu'il
+> recevait.
