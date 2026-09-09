@@ -165,6 +165,27 @@
         if (r.ok && r.corps.success) setTimeout(() => location.reload(), 1200);
     }
 
+    /* ── Sudo global ─────────────────────────────────────────────────────────
+     *
+     * Troisieme et dernier geste perdu a l'extinction, reporte le 2026-09-09.
+     *
+     * ⚠ `data-sudo` porte l'etat VOULU, comme `data-actif` pour la suspension :
+     *   le legacy lisait `sudo` puis l'inversait. Meme forme, meme raison.
+     */
+    async function basculeSudo(bouton) {
+        const sudo = bouton.dataset.sudo === '1';
+        bouton.disabled = true;
+        const r = await appelle(`/comptes/${bouton.dataset.id}/sudo`, { sudo });
+        bouton.disabled = false;
+        if (! r.corps) {
+            dis(garnis(L.err_reseau, { statut: r.statut }), 'echec');
+
+            return;
+        }
+        dis(r.corps.message, r.ok && r.corps.success ? 'ok' : 'echec');
+        if (r.ok && r.corps.success) setTimeout(() => location.reload(), 1200);
+    }
+
     /* ── Role ────────────────────────────────────────────────────────────────
      *
      * Second geste perdu a l'extinction, reporte le 2026-09-09.
@@ -376,6 +397,7 @@
         if (rw.startsWith('compte-mdp-generer-')) return poseMotDePasse(el, true);
         if (rw.startsWith('compte-deverrouiller-')) return deverrouille(el);
         if (rw.startsWith('compte-activite-')) return basculeActivite(el);
+        if (rw.startsWith('compte-sudo-')) return basculeSudo(el);
         // L'expiration est un `change` sur un `<select>`, pas un clic : le
         // repartiteur de clics ne la voit pas. Voir l'ecouteur dedie plus bas.
         if (rw.startsWith('compte-totp-')) {

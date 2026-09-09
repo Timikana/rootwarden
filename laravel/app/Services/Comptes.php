@@ -551,6 +551,65 @@ class Comptes
         return null;
     }
 
+    /**
+     * Accorde ou RETIRE le sudo GLOBAL. Rend une cle d'erreur, ou `null`.
+     *
+     * ══ GESTE PERDU A L'EXTINCTION — le troisieme et le dernier ═══════════════
+     *
+     * `legacy/adm/api/toggle_sudo.php` le portait. Apres l'archivage,
+     * `users.sudo` n'etait plus ecrit que par DEUX `insert` (la creation, gatee
+     * `roleAuteur >= 3`). **Retirer le sudo global imposait de supprimer ou
+     * d'anonymiser le compte.**
+     *
+     * ══ CE QUE CE DRAPEAU COMMANDE, MESURE ET NON SUPPOSE ═════════════════════
+     *
+     * Il est lu par le deploiement — `ssh_utils.py:937` le SELECT, et
+     * `configure_servers.py:1058` le porte jusqu'ici (`:1086-1094`) :
+     *
+     *     preset par machine != 'none'  -> add_to_sudoers(policy)
+     *     preset par machine == 'none'  -> remove_from_sudoers
+     *     sinon SI users.sudo           -> add_to_sudoers() = NOPASSWD ALL
+     *     sinon                         -> remove_from_sudoers
+     *
+     * C'est donc un REPLI : il ne decide QUE si le compte n'a aucune politique
+     * pour CETTE machine. Mais quand il decide, il accorde `NOPASSWD ALL` — le
+     * commentaire du code le dit : « bool users.sudo=1 -> NOPASSWD ALL ».
+     *
+     * ⚠ L'EFFET ETAIT DEJA REVOCABLE PAR DEUX VOIES, toutes deux portees :
+     *     poser le preset de la machine a 'none'   `Permissions::definitAcces`
+     *     retirer l'acces machine                  la meme, `$accorde = false`
+     * **Ce qui n'etait pas revocable, c'est le DRAPEAU.** Un compte cree avec
+     * `sudo = 1` gardait donc un `NOPASSWD ALL` permanent sur toute machine
+     * accessible SANS politique par machine, et rien ne pouvait l'eteindre.
+     *
+     * ══ DEUX GARDES, C'EST TOUT CE QUE LE LEGACY EN AVAIT ════════════════════
+     *
+     *   1. superadministrateur seulement  `toggle_sudo.php:26` -> la ROUTE
+     *   2. pas sur soi-meme               `:46`                -> ici
+     *
+     * ⚠ ET JE N'AJOUTE PAS DE TROISIEME GARDE. Le parallele avec la suspension
+     * et la retrogradation serait « ne pas retirer le sudo du dernier
+     * superadmin » — mais le sudo GLOBAL n'a rien a voir avec l'administration
+     * du portail : un superadmin sans `users.sudo` administre toujours le
+     * portail, il n'a simplement plus de repli sudo sur les machines. Ajouter la
+     * garde serait raisonner par ANALOGIE de forme au lieu de regarder l'objet.
+     *
+     * Et comme pour les deux autres : un booleen EXPLICITE, pas la bascule du
+     * legacy (`:52-58`, lire puis inverser).
+     */
+    public function definitSudoGlobal(int $id, bool $sudo, int $auteur): ?string
+    {
+        if ($id === $auteur) {
+            return 'comptes.err_auto_sudo';
+        }
+        if (DB::table('users')->where('id', $id)->doesntExist()) {
+            return 'comptes.err_inconnu';
+        }
+        DB::table('users')->where('id', $id)->update(['sudo' => $sudo ? 1 : 0]);
+
+        return null;
+    }
+
     public function definitActivite(int $id, bool $actif, int $auteur): ?string
     {
         if ($id === $auteur) {

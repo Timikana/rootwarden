@@ -337,8 +337,10 @@ class InventaireDesGardesTest extends TestCase
             //    ete inseree plus haut (report du changement de role, second
             //    geste perdu a l'extinction). RELUS a leur nouvelle place, comme
             //    ce gel l'exige : le step-up y est inchange.
-            'ComptesController.php:598',      // compte_supprimer
-            'ComptesController.php:623',      // compte_anonymiser
+            // ⚠ 598 -> 629 et 623 -> 654 le 2026-09-09 : `sudoGlobal()` inseree
+            //    plus haut (troisieme et dernier geste perdu). RELUS.
+            'ComptesController.php:629',      // compte_supprimer
+            'ComptesController.php:654',      // compte_anonymiser
             'PasserelleController.php:88',    // generique, action DERIVEE du chemin
             'PermissionsController.php:165',  // permission_definir
             'PortailController.php:196',      // profil_effacement (E-449)

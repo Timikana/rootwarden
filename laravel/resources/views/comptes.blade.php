@@ -322,6 +322,26 @@
                                     @endforeach
                                 </select>
                             @endif
+                            {{-- SUDO GLOBAL — troisieme et dernier geste perdu a
+                                 l'extinction (`adm/api/toggle_sudo.php`), reporte le
+                                 2026-09-09. Il etait POSABLE a la creation et jamais
+                                 retirable : un compte cree avec `sudo = 1` gardait un
+                                 `NOPASSWD ALL` permanent sur toute machine accessible
+                                 SANS politique par machine.
+
+                                 ⚠ C'est un REPLI, pas le mecanisme principal :
+                                 `configure_servers.py:1086-1094` ne le consulte que
+                                 si le compte n'a aucune politique pour la machine.
+                                 Le libelle le dit — « global » — pour qu'on ne le
+                                 confonde pas avec les prereglages par machine de la
+                                 page des permissions. --}}
+                            @if ($estSuperadmin && (int) $c['id'] !== (int) session('utilisateur_id'))
+                                <button type="button" class="rw-bouton rw-bouton--minuscule"
+                                        data-rw="compte-sudo-{{ $c['id'] }}"
+                                        data-id="{{ $c['id'] }}"
+                                        data-sudo="{{ (int) $c['sudo'] ? '0' : '1' }}"
+                                >{{ (int) $c['sudo'] ? __('comptes.sudo_retirer') : __('comptes.sudo_donner') }}</button>
+                            @endif
                             {{-- LES DEUX GESTES COTE A COTE. Le legacy n'en offre
                                  qu'un — le destructeur — alors qu'il PORTE
                                  l'anonymisation, gardee et commentee, sans aucun
