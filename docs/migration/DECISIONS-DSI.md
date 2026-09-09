@@ -17754,3 +17754,67 @@ table la plus lue du dépôt, sur le contrôle d'accès, et le service ne rechar
 pas l'arbre. *Écrire trois routes de bascule sans pouvoir les exercer serait
 exactement ce que j'ai refusé pour K4.* `DOSSIER-65` §9 porte les quatre gestes
 qui reviennent à l'exploitant.
+
+---
+
+## 2026-09-09, 08:25 CEST — la SUSPENSION est reportée, et en service
+
+**E-560 — Le premier des trois gestes perdus est porté, atteignable et en
+service.** `POST /comptes/{id}/activite`, `role:3` + `perm:can_admin_portal`, un
+bouton par ligne, `basculeActivite` dans le répartiteur, 7 clés fr **et** en
+(parité mesurée : 110 = 110).
+
+**Les trois gardes du legacy sont reprises**, chacune là où elle peut agir : la
+première dans la route, les deux autres dans le service parce qu'elles doivent
+**lire la base** — dont celle qui refuse de suspendre le **dernier
+superadministrateur actif**, et un rôle 3 *inactif* n'y compte pas comme
+remplaçant.
+
+**Et je n'ai pas reporté la bascule.** `toggle_user.php:64-68` lisait `active`
+puis l'inversait : deux appels concurrents s'annulent, un rejeu ne rend pas le
+même état. *L'idempotence est une propriété de ce portage, pas du legacy, et elle
+est testée.*
+
+⚠ **L'absence du paramètre n'est pas une suspension.** `boolean()` rend `false`
+sur une clé absente — sans contrôle, un appel mal formé **suspendrait** le
+compte. *Le repli d'un geste destructeur ne doit pas être le geste.*
+
+**E-561 — Chaque garde est prouvée porteuse par mutation, pas par comptage.**
+Quatre mutations, **quatre échecs distincts, un par garde**, fichier rendu intact
+après (md5 identique). *« 10 tests passent » ne dit pas quelle garde est tenue ;
+« retirer celle-ci fait tomber celui-là » le dit.*
+
+**E-562 — Quatre gels du dépôt ont refusé mon changement, et les quatre avaient
+raison.** `TableDesGardes` · le compte des deux listes (141 → 142) · le gel des
+numéros de ligne du step-up (514/539 → 554/579, **relus** : `compte_supprimer`
+et `compte_anonymiser`, inchangés) · l'instantané des appelants du backend, qui
+demande de **rejouer l'analyseur et de LIRE sa sortie** avant de rafraîchir.
+
+*Fait : `comptes.js` n'a qu'**un** site `fetch`, le relais `appelle()`, inchangé ;
+`basculeActivite` passe par lui et **lit** le verdict. Le diff de l'instantané ne
+montre que le hachage.* **427 tests, 1525 assertions, 0 échec.**
+
+**E-563 — Et j'ai armé un 500 pour plus tard, avec mes propres tests.**
+`docker exec … php artisan test` tourne **en root** : il a laissé le compilé de
+`comptes.blade.php` appartenant à root, et `www-data` ne pouvait plus l'écraser.
+
+```
+avant  119 compiles, TOUS www-data
+apres  118 www-data + 1 ROOT — celui de comptes.blade.php
+contre-epreuve  touch en www-data -> Permission denied
+```
+
+> **`artisan` en root ne casse rien tout de suite : il arme une panne pour le
+> prochain qui touchera la vue.** Le symptôme et la cause sont séparés par des
+> jours. C'est `feedback_git_checkout_rearme_un_500` par une autre porte — là
+> c'était la DATE restituée, ici le PROPRIÉTAIRE laissé.
+
+**Désarmé** (119 www-data, 0 root, `touch` en www-data réussi), et la forme juste
+est `-u www-data` — vérifiée : 10 passed, cache inchangé.
+
+**E-564 — Et un `curl` sur une page authentifiée ne prouve pas qu'une vue
+compile.** `/comptes` rend **302 avant d'atteindre la vue** : ma première
+vérification ne mesurait rien. La compilation se mesure directement —
+`Blade::compileString` puis `php -l` — **avec son témoin** : un `@if` sans
+`@endif` rend le code 255. *Sans lui, « code 0 » serait indiscernable d'un lint
+qui ne lit rien.*
