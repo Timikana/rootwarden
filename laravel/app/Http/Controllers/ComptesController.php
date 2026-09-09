@@ -470,6 +470,37 @@ class ComptesController extends Controller
     }
 
     /**
+     * Accorde ou retire le sudo GLOBAL — troisieme et dernier geste perdu.
+     *
+     * ⚠ L'ABSENCE DU PARAMETRE N'EST PAS UN RETRAIT. `boolean()` rend `false`
+     *    sur une cle absente. Ici l'enjeu est inverse de la suspension : un
+     *    appel mal forme RETIRERAIT le sudo, ce qui est le cote SUR — mais il le
+     *    ferait en silence, et le geste ne serait pas celui qu'on a demande.
+     */
+    public function sudoGlobal(Request $requete, int $id): JsonResponse
+    {
+        [$auteur] = $this->qui($requete);
+        if (! $requete->has('sudo')) {
+            return response()->json([
+                'success' => false, 'message' => __('comptes.err_sudo_requis'),
+            ], 422);
+        }
+        $sudo = $requete->boolean('sudo');
+        $err = $this->comptes->definitSudoGlobal($id, $sudo, $auteur);
+        if ($err !== null) {
+            return response()->json(['success' => false, 'message' => __($err)],
+                $err === 'comptes.err_inconnu' ? 404 : 422);
+        }
+        $this->journalise($auteur, ($sudo ? 'Octroi' : 'Revocation') . " du sudo global sur le compte #{$id}");
+
+        return response()->json([
+            'success' => true,
+            'message' => __($sudo ? 'comptes.sudo_accorde' : 'comptes.sudo_retire'),
+            'sudo' => $sudo,
+        ]);
+    }
+
+    /**
      * L'exemption d'expiration de mot de passe d'un compte.
      *
      * ══ SUPERADMINISTRATEUR SEULEMENT, ET LA GARDE EST DANS LA ROUTE ══════

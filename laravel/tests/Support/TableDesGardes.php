@@ -107,6 +107,11 @@ class TableDesGardes
             //   STRICTEMENT inferieur au sien. Mettre `role:3` ici serait un
             //   DURCISSEMENT silencieux.
             ['POST', 'comptes/{id}/role', ['role:2', 'perm:can_admin_portal']],
+            // ⚠ Le sudo GLOBAL, un REPLI : `configure_servers.py:1086-1094` ne
+            //   le consulte que si le compte n'a AUCUNE politique pour la
+            //   machine — mais quand il decide, il accorde `NOPASSWD ALL`.
+            //   `role:3` reprend `toggle_sudo.php:26`.
+            ['POST', 'comptes/{id}/sudo', ['role:3', 'perm:can_admin_portal']],
             ['POST', 'comptes/{id}/second-facteur', ['role:3', 'perm:can_admin_portal']],
             ['GET', 'derive-config', ['role:2', 'perm:can_view_compliance']],
             ['GET', 'docker', ['role:2']],
