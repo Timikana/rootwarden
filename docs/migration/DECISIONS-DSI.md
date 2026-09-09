@@ -18563,3 +18563,54 @@ plausible.*** C'est la même famille que `E-583` (`119/0` aussi lisible que
 `118/1`) et que `E-599` (le rapport témoin/mesure). **Trois formes d'un seul
 fait : un résultat faux et vraisemblable ne porte aucun signe de sa fausseté, et
 seul un tiers muni d'un autre instrument le voit.**
+
+**E-604 — AUCUNE branche `security/` ne se fusionne proprement, et quatre des six
+conflits sont dans du CODE.** Rejoué et étendu (branches **énumérées**, code de
+sortie **sans tube**, témoin `Migration-Laravel` contre elle-même à `0`) :
+
+```
+security/backend-cve                 2 chemins   cve.py · scheduler.py
+security/garde-socle-avertissement   1 chemin    QA-JETON-TELEGRAF (document)
+security/semgrep-regles-mortes       3 chemins   ssh_utils.py · rules-rootwarden.yml · QA-APPARIEMENT (document)
+```
+
+**Les remonter comme « en attente d'un mot » était incomplet : le mot ne suffira
+pas.** Les deux conflits de documents se résolvent sans perte en gardant
+`Migration-Laravel` ; les quatre autres demandent une décision de contenu. *Et
+les deux branches `bundle/` ne sont pas du travail en cours — mai et août.*
+
+**Précision contre `0b`** : il compte trois conflits de code, il y en a
+**quatre** — `.semgrep/rules-rootwarden.yml` en est. *Un fichier de règles
+semgrep décide si la CI bloque ; le job « Les regles custom MORDENT » atteste que
+ce dépôt le traite comme du code.*
+
+**E-605 — ⛔ J'AI MIS UN `head -6` DANS LA COMMANDE QUI MESURAIT LE DÉFAUT DES
+BORNES DE CONFORT.** Cinquième instance en une heure, une heure après l'avoir
+nommée, dans le document qui l'énonce.
+
+```
+head -20 sur le reflog        10 bascules au lieu de 28
+--since='2026-09-07'          2 commits egares au lieu de 3
+git log -3 sur un fichier     « changement recent » au lieu de cinq mois
+six PR relues sur un critere  les commits portes jamais lus
+head -6 sur les conflits      5 chemins au lieu de 6, ET un pair mis en tort
+```
+
+> **Une règle protège les autres, pas soi : on l'applique en LISANT, jamais en
+> ÉCRIVANT.** Ce qui manque n'est pas un énoncé, c'est un contradicteur.
+
+⚠ **Et l'effet le plus coûteux n'est pas le mauvais compte : c'est qu'une
+troncature chez le VÉRIFICATEUR transfère le tort au VÉRIFIÉ.** `0b` avait raison
+sur les trois conflits et mon relevé n'en montrait que deux — *j'étais à un
+message de lui écrire que son troisième n'existait pas.*
+
+**E-606 — `0b` a commis la même faute, sur le même objet, dans la même
+commande.** Sa première passe affichait `code de sortie : 0` — celui de `head`
+dans son tube, pas celui de `merge-tree`. *« J'ai failli rapporter fusion propre
+pendant que le flux imprimait CONFLIT trois fois. »* C'est la fiche
+`marqueur ≠ verdict` du dépôt, et le corollaire « un code de sortie qui traverse
+un TUBE n'est pas celui de la commande », commise en la vérifiant.
+
+**Deux sessions, un même objet, deux troncatures indépendantes, dans les deux
+commandes qui mesuraient le défaut de la troncature.** *Aucune des deux n'a été
+trouvée par son auteur.*
