@@ -18794,3 +18794,57 @@ ne doit pas circuler.*
 > auteur** — jamais par vigilance, toujours par une mesure citée contre une
 > affirmation ou par un reste inexpliqué. *Ce n'est pas un défaut de rigueur : il
 > n'y a rien à voir depuis l'intérieur.*
+
+---
+
+**E-612 — Zéro CODE, douze documents, une heure : le diagnostic de l'étape 1 me
+désigne entièrement, et je l'attaque en mesurant le PRODUIT.** Fenêtre
+09:35 → 10:35, somme vérifiée `12 == 12` : **0 CODE · 12 DOC · 0 fusion**, ratio
+**infini**. Dix des douze sont de moi.
+
+*Le fil de rectifications a produit une trentaine de corrections réelles — mais
+elles portaient sur nos propres mesures, pas sur le produit. C'est exactement le
+diagnostic : « l'équipe écrit sur ses propres mesures au lieu de porter ».*
+
+**Donc je n'écris pas de dossier ce tour. Je fais une mesure.**
+
+**E-613 — RIEN N'EST NON PORTÉ, et cette fois c'est DÉRIVÉ du JS et non récité.**
+Au lieu de reconduire `E-501` (« la file des 11 est épuisée »), j'ai balayé les
+42 fichiers JS pour tout appel distant sans cible côté portage. **Cinq
+candidats, cinq artefacts, par TROIS défauts distincts de mon instrument :**
+
+```
+① supervision.js n'utilise PAS `ecris`      0 `ecris(` · 0 `litDistant(` · 12 `fetch(`
+   -> mon motif supposait un assistant universel qui n'existe pas
+② wazuh.js passe des NOMS D'ACTION           `ecris('config')` `('options')` `('regle')`
+   -> quatre « chemins manquants » qui ne sont pas des chemins
+③ mon ancre excluait le slash initial        web.php:1264
+   Route::any('/api/gateway/{chemin?}', PasserelleController::class)
+   -> `Route::\w+\(\s*'api/gateway` ne matche jamais `'/api/gateway`
+```
+
+**Le seul candidat qui ressemblait à un vrai chemin est routé, et son passage par
+la passerelle est un CHOIX documenté sur place** (`Permissions.php:171-179`) :
+
+> *« L'OCTROI PASSE PAR LA PASSERELLE — et c'est la seule raison qui vaille :
+> `POST /admin/temp_permissions` NOTIFIE le compte concerné
+> (`notify(type='perm_granted')`, `admin.py:196`). Réécrire l'insertion ici
+> priverait la personne de son avertissement, sans que rien ne le signale. **Un
+> effet de bord qu'on ne sait pas reproduire est une raison de ne PAS
+> court-circuiter.** »*
+
+⚠ **Et l'épreuve au réseau que j'ai tentée N'A PAS EU LIEU** : `POST` sur le
+chemin réel **et** sur un chemin inexistant rendent tous deux `419`. *Le garde
+CSRF répond avant la résolution de route — témoin identique à la sonde, donc
+aucune mesure.* C'est `artisan route:list` qui a tranché.
+
+**Conclusion pour l'étape 1, et elle est arithmétique** : le ratio doc/code ne
+peut plus être satisfait par personne, **parce qu'il n'y a plus rien à porter.**
+`E-501` le disait de l'étape 2 ; c'est désormais vrai de l'étape 1. *Un ratio
+infini n'est pas ici un défaut de discipline : c'est le quotient d'un portage
+terminé.*
+
+**Étape 2 : personne à relancer.** Aucun geste portable ne subsiste — mesuré
+ci-dessus, pas reconduit. **Étape 3 : tenue** (0 · 0 · 0, témoins `cgu_titre` 4
+et clé absurde 0). **Étape 4 : les six décisions de `E-611` sont inchangées et
+n'attendent que l'exploitant.**
