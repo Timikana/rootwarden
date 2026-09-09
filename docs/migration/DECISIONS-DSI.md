@@ -18312,3 +18312,69 @@ son dénominateur plus petit ne cachait rien.** *Mais ça ne se savait qu'après
 l'avoir mesuré : un dénominateur trop petit rend « un seul rendeur » faussement
 rassurant, et c'est exactement le type d'exculpation que `0b` demande de
 chiffrer.*
+
+---
+
+**E-586 — Le ratio doc/code de ce tour est 3,00 et il est le MIEN.** Fenêtre
+09:00 → 09:35, somme vérifiée `13 == 13` : 1 fusion, 3 CODE, 9 DOC. Attribution
+par contenu (les 13 commits portent le même auteur git) : **mes 7 commits sont
+7 DOC et 0 CODE** ; les pairs rendent 3 CODE et 2 DOC. *L'étape 1 diagnostique
+« l'équipe écrit sur ses propres mesures au lieu de porter » : le diagnostic est
+juste et il me désigne.*
+
+**Et il est structurel** : mon périmètre d'écriture est `DECISIONS-DSI.md` et les
+`DOSSIER-*.md` uniquement. *Un mandat qui autorise la documentation seule et
+mesure un ratio doc/code ne peut rendre qu'un ratio infini.* Décision déplacée à
+l'exploitant : ouvrir le périmètre, ou mesurer l'étape 1 sur les sessions qui
+portent.
+
+**E-587 — Personne n'est à relancer, et c'est la première fois que le critère est
+évaluable.** L'étape 2 vise les sessions sans CODE depuis deux tours. Les trois
+pairs sollicités ont tous produit du CODE dans cette fenêtre — `c6` (`146886eb`),
+`ec` (`8dadd611`), et une quatrième session (`27e4abc3`). *Je n'envoie donc rien :
+`E-501` a chiffré à cinq le coût des assignations inventées, et une file vide ne
+se remplit pas pour occuper le temps.*
+
+**E-588 — `DOSSIER-67` : quatre livrables corrects, aucun branché.** Voir le
+dossier. Le point qui se mord la queue : `27e4abc3` a été écrit pour corriger
+« quatre contrôles que rien n'appelle », **et son lanceur est cité par zéro
+fichier**. Témoin posé : `go-socle-passerelle.mjs` est bien cité dans `.github/`,
+donc la sonde voit un câblage quand il existe.
+
+> **Chacun a bien fait sa part, et la somme des parts ne fait pas un produit.**
+> C'est la forme la plus économique de perte : rien n'est faux, rien n'est perdu,
+> rien ne sert.
+
+**E-589 — L'étape 3 tient, et le seul chose qui garde le terme en vie est ma
+prose — qui grossit à chaque tour.** `socle_avertissement` : 0 dans
+`laravel/lang/{fr,en}/auth.php`, 0 dans `cgu.blade.php`, 0 suite. Témoins :
+`cgu_titre` → 4 fichiers, clé absurde → 0. **Les fichiers porteurs sont passés de
+2 à 3 ce tour, et le troisième est un `DOSSIER-*` que je viens d'écrire.** *Le
+coût de vérifier une déclaration croît avec le nombre de fois qu'on écrit qu'on
+l'a vérifiée* — raison de plus pour que la garde de `c6` remplace le contrôle
+manuel.
+
+**E-590 — RECTIFICATION : mes « deux sites de rendu » étaient UN.** `0b` l'a
+mesuré au tokenizer de PHP et je l'ai rejoué :
+
+```
+jeton `view`    1 fois, ligne 156
+jeton `render`  1 fois, ligne 167
+nombre de `;` entre 156 et 167 :  UN
+    return view('comptes', array_merge([ … ], $surcharge))->render();
+```
+
+**`:156` et `:167` sont les deux extrémités du même `return`, dans une seule
+méthode privée.** Mon relevé par motif a compté les deux moitiés d'une expression
+chaînée — *« un relevé par motif en comptait deux »*, la forme que j'avais
+signalée à `0b` dans l'autre sens.
+
+Le sens est l'**alarme**, donc il se serait fait attraper, et il ne change aucune
+conclusion : un rendeur, un fichier, une méthode. *Mais « deux sites » aurait
+circulé, et deux sites dans deux méthodes ne se parent pas comme un seul.*
+
+⚠ Et `0b` ajoute une troisième famille de faux zéro à sa collection :
+`grep -rlF '->render(' …` rend **0 fichier** parce que `ugrep` lit le tiret
+initial comme un drapeau (`invalid option ->render(`). *Erreur visible — mais
+silencée, elle aurait publié « aucun `->render` dans les tests », un faux zéro du
+côté qui dédouane.* Il faut `-e` ou `--`.
