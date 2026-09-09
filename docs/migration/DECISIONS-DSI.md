@@ -18234,3 +18234,81 @@ cherche une barre oblique inverse littérale entre apostrophes simples. *Zéro s
 la sonde et zéro sur le témoin : la mesure n'avait pas eu lieu.* Recalibré sur
 `public function test` (14) et `assertSame` (18), la propriété est devenue
 lisible — et l'exception est apparue.
+
+**E-583 — Mon « 0 fichier postérieur à 08:15:08 » était faux, et la cause est ma
+propre note : DEUX HORLOGES.** `0b` a relevé que l'arithmétique ne tenait pas
+(118 + 1 = 119, pas 119 + 0). Il soupçonnait la forme relative de `-newermt`.
+Ce n'était pas ça : **j'ai lancé `find` DANS LE CONTENEUR.**
+
+```
+hote      2026-09-09 09:32:56 CEST
+conteneur 2026-09-09 07:32:56 UTC      -> deux heures pile
+```
+
+Mon `-newermt "2026-09-09 08:15:08"` désignait donc **10:15:08 CEST**, et le
+fichier de 08:47:38 CEST (06:47:38 UTC) est tombé du côté « avant ». Refait
+depuis l'hôte, sans silencer `stderr` :
+
+```
+total .php                             119
+mtime AVANT 08:15:08 CEST              118
+mtime APRES                              1
+  2026-09-09 08:47:38  www-data:www-data  3592f78b37f141210dd52ed23296474a.php
+```
+
+*Une valeur plausible et fausse ne se signale pas d'elle-même : `119 / 0` était
+aussi lisible que `118 / 1`. C'est l'arithmétique de `0b`, pas la vraisemblance,
+qui l'a attrapée.*
+
+**E-584 — Et la CHRONOLOGIE de `0b` ferme la question mieux que mon mécanisme.**
+Vérifiée par moi, aux deux horloges :
+
+```
+08:15:08   mon phpunit en root        -> .phpunit.result.cache  root:root
+08:46:35   comptes.blade.php modifie     utilisateur:utilisateur
+08:47:38   son compile recree            www-data:www-data
+           et c'est le fichier 3592f78b… : le MEME que l'unique posterieur
+source 1788936395  <  compile 1788936458   -> 63 secondes, piege DESARME
+```
+
+> **À 08:15, le compilé de `comptes` était à jour par rapport à sa source :
+> Blade n'avait rien à recompiler. Mon exécution en root ne POUVAIT pas produire
+> de compilé root — non pas parce qu'aucun test ne rend, mais parce que le seul
+> test qui rend n'avait rien à recompiler à cet instant.**
+
+Et le compilé de 08:47:38 appartient à `www-data` : il vient d'une **requête
+HTTP**, pas de mon `phpunit`. *La boucle se ferme sans supposition.*
+
+⚠ **MAIS LA CONDITION EST UNE CONJONCTION, ET ELLE REDEVIENDRA VRAIE :**
+
+```
+(comptes.blade.php modifie depuis son compile)  ET  (suite lancee en root)
+        aujourd'hui FAUSSE                                le geste reste possible
+```
+
+**À la prochaine édition de `comptes.blade.php`, la première redevient vraie.**
+La parade dans la commande (`-u www-data`) est donc la bonne, et pour une raison
+plus étroite et plus solide que « un test rend une vue » : **un seul rendeur, sur
+la seule vue que le chantier édite en ce moment.** *L'armement et le déclencheur
+coïncident sur le même fichier — ce n'est pas une conjonction heureuse, c'est que
+la seule vue rendue par la suite est aussi la seule en travaux.*
+
+**E-585 — Le dénominateur de « un seul rendeur » est vérifié, pas supposé.**
+`c6` comptait 19 fichiers, moi 23 : l'écart aurait pu cacher un second rendeur,
+**et c'est le sens qui dédouane**. Mesuré dans tous les sens :
+
+```
+git ls-files 'laravel/tests/'          33 entrees   dont Feature 19  Outils 9  Doubles 2  Support 1  Unit 1  TestCase 1
+git ls-files 'laravel/tests/**/*.php'  23
+sur le DISQUE, *.php                   24           <- le denominateur COMPLET
+sites de rendu sur les 24              2, tous les deux dans ComptesRenduSignauxTest.php
+                                         :156  return view('comptes', …)
+                                         :167  ->render()
+TEMOIN POSITIF  sites `assertSame`     141
+```
+
+**Le 19 de `c6` était `Feature/` seul — et comme les deux sites de rendu y sont,
+son dénominateur plus petit ne cachait rien.** *Mais ça ne se savait qu'après
+l'avoir mesuré : un dénominateur trop petit rend « un seul rendeur » faussement
+rassurant, et c'est exactement le type d'exculpation que `0b` demande de
+chiffrer.*
