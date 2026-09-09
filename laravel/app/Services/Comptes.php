@@ -436,6 +436,121 @@ class Comptes
      * superadmin actif, le compte vaut 1 et le geste est refuse — la cible EST
      * comptee, c'est voulu, et c'est ce que fait le legacy.
      */
+    /**
+     * Reste-t-il un superadministrateur ACTIF si l'on retire celui-ci du compte ?
+     *
+     * ══ POURQUOI « SANS » ET NON UN SEUIL ════════════════════════════════════
+     *
+     * Ma premiere version comptait `role_id = 3 AND active = 1` et refusait a
+     * `<= 1`. Juste sur le cas qui compte — suspendre le seul superadmin actif —
+     * et FAUSSE sur un cas voisin :
+     *
+     *     cible = superadmin DEJA INACTIF, un AUTRE superadmin actif
+     *       -> count = 1 -> `<= 1` -> REFUS
+     *       or suspendre un compte deja suspendu est un no-op, et le message
+     *          annoncait « le dernier superadmin ACTIF » a propos d'un compte
+     *          qui ne l'etait pas.
+     *
+     * La question n'est pas « combien y en a-t-il » mais « en reste-t-il un
+     * APRES ». `id <> cible` la pose directement, et elle vaut pour les DEUX
+     * gestes — suspension et retrogradation — qui portent le meme danger.
+     *
+     * ⚠ Trouve en ECRIVANT la garde de la retrogradation, pas en relisant celle
+     * de la suspension. Troisieme source : ni l'ecriture initiale, ni la revue.
+     */
+    /**
+     * L'auteur peut-il assigner ce role ? La regle d'ANTI-ESCALADE, une fois.
+     *
+     * ══ POURQUOI ELLE VIT ICI ET PAS DEUX FOIS ════════════════════════════
+     *
+     * Elle etait ecrite a l'identique dans DEUX methodes de ce fichier :
+     * `rolePose()` (le role a la CREATION) et `definitRole()` (le CHANGEMENT).
+     * Trouve par une mutation qui n'a pas pu s'appliquer — son ancre matchait
+     * deux lignes de code, ce qui m'a fait chercher pourquoi.
+     *
+     * Ce fichier porte deja la lecon, dans la docstring de
+     * `_motif_nom_invalide` de `configure_servers.py` : « une regle recopiee
+     * finit par diverger de celle qui decide ». Et le legacy en donne la preuve
+     * a `manage_roles.php:154` : « Patch A01 : avant, `>` autorisait l'egalite
+     * -> un admin pouvait promouvoir un user en admin ». **Ce correctif a du
+     * etre applique a UN site ; l'autre aurait pu rester en `>`.**
+     *
+     * ⚠ Les deux appelants ne reagissent pas pareil, et c'est voulu : la
+     * CREATION rabat au role plancher (`RolePose`), le CHANGEMENT refuse. C'est
+     * la REGLE qui est partagee, pas la reponse.
+     */
+    private function assigneUnRoleTropHaut(int $role, int $roleAuteur): bool
+    {
+        return $roleAuteur < 3 && $role >= $roleAuteur;
+    }
+
+    private function resteUnSuperadminActifSans(int $id): bool
+    {
+        return DB::table('users')
+            ->where('role_id', 3)->where('active', 1)->where('id', '<>', $id)
+            ->exists();
+    }
+
+    /**
+     * Change le ROLE d'un compte. Rend une cle d'erreur, ou `null` si c'est fait.
+     *
+     * ══ GESTE PERDU A L'EXTINCTION, comme la suspension ═══════════════════════
+     *
+     * `legacy/adm/includes/manage_roles.php:124-163` le portait. Apres
+     * l'archivage, `users.role_id` n'etait plus ecrit que par DEUX `insert` — et
+     * il est LU par 39 fichiers de `laravel/app`. **Promouvoir ou retrograder
+     * imposait de RECREER le compte**, donc de perdre son historique, ses
+     * attributions de machines et ses permissions.
+     *
+     * ══ LES CINQ GARDES DU LEGACY, ET UNE SIXIEME QUI EST DE MOI ══════════════
+     *
+     *   1. role >= 2                 `:31`  -> la ROUTE
+     *   2. le role cible EXISTE      `:131` -> ici, contre la table `roles`
+     *   3. un role 2 ne touche pas
+     *      un role 3                 `:148` -> ici
+     *   4. un non-superadmin
+     *      n'assigne qu'un role
+     *      STRICTEMENT inferieur     `:154` -> ici. Le legacy porte la trace de
+     *                                 son propre defaut : « Patch A01 : avant,
+     *                                 `>` autorisait l'egalite -> un admin
+     *                                 pouvait promouvoir un user en admin ».
+     *                                 Le superadmin reste libre.
+     *   5. pas sur soi-meme          `:157` -> ici
+     *
+     *   6. ⛔ PAS LE DERNIER SUPERADMIN ACTIF — ABSENTE DU LEGACY, AJOUTEE ICI.
+     *      Le legacy protege le dernier superadmin contre la SUSPENSION
+     *      (`toggle_user.php:71`) et PAS contre la RETROGRADATION. Le danger est
+     *      le meme : plus personne ne peut administrer, et aucun chemin ne
+     *      rouvre. **C'est une garde AJOUTEE, pas portee**, et elle est nommee
+     *      comme telle pour qu'on ne la prenne pas pour une reprise.
+     */
+    public function definitRole(int $id, int $role, int $auteur, int $roleAuteur): ?string
+    {
+        if ($id === $auteur) {
+            return 'comptes.err_auto_role';
+        }
+        if (DB::table('roles')->where('id', $role)->doesntExist()) {
+            return 'comptes.err_role_inconnu';
+        }
+        $cible = DB::table('users')->where('id', $id)->first(['active', 'role_id']);
+        if ($cible === null) {
+            return 'comptes.err_inconnu';
+        }
+        $roleCible = (int) $cible->role_id;
+        if ($roleAuteur === 2 && $roleCible === 3) {
+            return 'comptes.err_role_superadmin_intouchable';
+        }
+        if ($this->assigneUnRoleTropHaut($role, $roleAuteur)) {
+            return 'comptes.err_role_trop_haut';
+        }
+        if ($roleCible === 3 && $role < 3 && ! $this->resteUnSuperadminActifSans($id)) {
+            return 'comptes.err_dernier_superadmin';
+        }
+        DB::table('users')->where('id', $id)->update(['role_id' => $role]);
+
+        return null;
+    }
+
     public function definitActivite(int $id, bool $actif, int $auteur): ?string
     {
         if ($id === $auteur) {
@@ -445,12 +560,9 @@ class Comptes
         if ($cible === null) {
             return 'comptes.err_inconnu';
         }
-        if (! $actif && (int) $cible->role_id === 3) {
-            $actifs = (int) DB::table('users')
-                ->where('role_id', 3)->where('active', 1)->count();
-            if ($actifs <= 1) {
-                return 'comptes.err_dernier_superadmin';
-            }
+        if (! $actif && (int) $cible->role_id === 3
+            && ! $this->resteUnSuperadminActifSans($id)) {
+            return 'comptes.err_dernier_superadmin';
         }
         DB::table('users')->where('id', $id)->update(['active' => $actif ? 1 : 0]);
 
@@ -788,7 +900,7 @@ class Comptes
         $valeurInvalide = $demande === null || ! in_array($demande, self::ROLES, true);
         $role = $valeurInvalide ? self::ROLE_PLANCHER : $demande;
 
-        if ($roleAuteur < 3 && $role >= $roleAuteur) {
+        if ($this->assigneUnRoleTropHaut($role, $roleAuteur)) {
             return new RolePose(self::ROLE_PLANCHER, $valeurInvalide, true);
         }
 

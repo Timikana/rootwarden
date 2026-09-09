@@ -288,6 +288,40 @@
                                         data-actif="{{ (int) $c['active'] ? '0' : '1' }}"
                                 >{{ (int) $c['active'] ? __('comptes.suspendre') : __('comptes.activer') }}</button>
                             @endif
+                            {{-- ROLE — second geste PERDU a l'extinction du legacy
+                                 (`adm/includes/manage_roles.php`), reporte le
+                                 2026-09-09. Sans lui, promouvoir un compte imposait
+                                 de le RECREER, donc de perdre son historique.
+
+                                 ⚠ LA CONDITION REPREND LES GARDES DU SERVICE, pour
+                                 ne pas afficher un controle qui refusera toujours :
+                                   · pas sur soi-meme          (garde 5)
+                                   · un role 2 ne voit pas le
+                                     selecteur d'un role 3     (garde 3)
+                                 et les OPTIONS reprennent la garde 4 : un non-
+                                 superadmin ne se voit offrir que les roles
+                                 STRICTEMENT inferieurs au sien. Un role 2 n'a donc
+                                 qu'une option, `user` — c'est exact, et c'est
+                                 visible.
+
+                                 `data-precedent` sert au retour arriere : six gardes
+                                 peuvent refuser, et un selecteur qui garde le choix
+                                 refuse afficherait un etat que la base ne porte pas. --}}
+                            @php($peutChangerLeRole = (int) $c['id'] !== (int) session('utilisateur_id')
+                                && ($estSuperadmin || (int) $c['role_id'] < 3))
+                            @if ($peutChangerLeRole)
+                                <label class="rw-visuellement-cache"
+                                       for="role-{{ $c['id'] }}">{{ __('comptes.role_titre') }}</label>
+                                <select id="role-{{ $c['id'] }}" class="rw-saisie rw-saisie--compacte"
+                                        data-rw="compte-role-{{ $c['id'] }}" data-id="{{ $c['id'] }}"
+                                        data-precedent="{{ (int) $c['role_id'] }}">
+                                    @foreach ($roles as $r)
+                                        @if ($roleAuteur >= 3 || $r < $roleAuteur)
+                                            <option value="{{ $r }}"@selected((int) $c['role_id'] === $r)>{{ __('comptes.role_' . $r) }}</option>
+                                        @endif
+                                    @endforeach
+                                </select>
+                            @endif
                             {{-- LES DEUX GESTES COTE A COTE. Le legacy n'en offre
                                  qu'un — le destructeur — alors qu'il PORTE
                                  l'anonymisation, gardee et commentee, sans aucun
