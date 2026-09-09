@@ -138,10 +138,21 @@
             numero aurait donc disparu de l'interface — une 2.0 qui ne peut pas
             dire son numero.
 
-            La source est unique : `legacy/version.txt`, monte en lecture seule.
-            Une version inconnue se DIT, elle ne se rend pas par un vide. Et un
-            montage de `volumes` ne prend effet qu'a la RECREATION du conteneur :
-            « version inconnue » avant cela est le comportement correct.
+            La source est unique, et elle a DEMENAGE le 2026-09-09 (patch 08) :
+            c'est `laravel/version.txt`, et il n'y a plus AUCUN montage de
+            fichier. `laravel/` etant monte sur `/var/www/html`, le fichier y
+            apparait de lui-meme et `Version::numero()` le trouve par
+            `base_path('version.txt')` — chemin inchange.
+
+            ⚠ CE QUE CE COMMENTAIRE DISAIT AVANT, ET QUI ETAIT DEVENU FAUX SANS
+            QU'UN SEUL COMMIT LE TOUCHE : « la source est `legacy/version.txt`,
+            monte en lecture seule ». Ce montage RECOUVRAIT le jumeau
+            `laravel/version.txt`, et les deux avaient DIVERGE — mesure du
+            2026-09-09 juste avant le demenagement : 2.0.183 servi, 2.0.470
+            recouvert, 2.0.78 derive. Le montage etait la CAUSE de la
+            divergence, pas son remede.
+
+            Une version inconnue se DIT, elle ne se rend pas par un vide.
         --}}
         <footer class="rw-pied" data-rw="pied-version">
             <span data-rw="pied-numero">{{ \App\Support\Version::numero() !== null
