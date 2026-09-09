@@ -17977,3 +17977,36 @@ reconduite.** ② `/ssh-audit/schedules` 9 · ③ `groupes.js` 20 · ④ `import
 **confond zéro correspondance et fichier absent**, `grep -c` sortant en code 1
 quand le compte est nul. `supervision.js` est bien là (80 224 o, suivi) — c'était
 mon motif qui ne valait rien.
+
+**E-573 — Les deux corrections de `0b` tiennent, et la mienne était incomplète
+d'une manière SILENCIEUSE.** Rejouées avant relais. ① `:541` n'est pas un
+lecteur : il est dans `_build_agent_config_content` (`def` à `:500`) et le jeton
+part à `:557` dans le TOML déposé sur la machine (appelants `:1951`, `:2144`) —
+**chiffrer sans déchiffrer là déploierait `sodium:…` comme jeton**, avec un échec
+d'authentification chez l'agent distant et rien côté produit. ② `varchar(512)`
+borne le clair à **338** caractères (mesuré : 338 → 511, 339 → 515) ; le mode
+d'échec est bénin, `STRICT_TRANS_TABLES` lève au lieu de tronquer.
+
+> **Une spécification dont le point critique doit être DÉDUIT est une
+> spécification incomplète.** « À l'image du PSK » laissait déduire le
+> déchiffrement ; c'est exactement le geste qu'un exécutant pressé omettrait.
+
+Et `0b` a rendu une mesure qui **retire** un point plutôt que d'en ajouter :
+l'injection TOML par le jeton a une capacité marginale nulle, `extra_config`
+étant déjà ajouté verbatim sur la même route sous les mêmes gardes. *Un défaut
+dont l'exploitation demande une capacité déjà détenue et offerte n'est pas une
+élévation.*
+
+**E-574 — ⛔ DEUX LIVRABLES SONT BLOQUÉS SUR LE MÊME MUR : il n'y a pas
+d'exécutant.** `0b` décline l'écriture (cinquième fois aujourd'hui, lecture seule
+sur le code). `c6` a livré la garde `socle_avertissement` (`146886eb`, branche
+`security/garde-socle-avertissement`, 173 lignes) et déclare honnêtement qu'elle
+**n'a jamais été exécutée** — pas de `php` sur l'hôte. Mon périmètre d'écriture
+sur ce tour est `DECISIONS-DSI.md` et les `DOSSIER-*.md`.
+
+⚠ **Et je mesure mieux que `c6` sur son propre aveu : `php 8.4.25` tourne dans
+`rootwarden_laravel`.** Exécuter sa garde ne demande aucun outil manquant — il
+demande d'écrire le fichier dans `laravel/tests/`, monté en bind. **Le blocage
+n'est pas technique, il est de périmètre**, et il appartient à l'exploitant :
+soit il ouvre l'écriture à une session, soit il exécute lui-même. *Un pair ne
+peut pas élargir son périmètre, et je n'ai pas à le lui demander.*
