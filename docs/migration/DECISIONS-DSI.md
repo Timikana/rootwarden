@@ -17494,3 +17494,102 @@ comme une valeur du fichier de conf — *mon correctif cassait mon propre test.*
 
 **Les douze fois, le `&&` a tenu : rien n'a été écrit tant que le contrôle
 n'était pas vert.** C'est la seule parade qui ait marché — la vigilance, non.
+
+---
+
+## 2026-09-09, 07:25 CEST — LE LEGACY EST ÉTEINT, et les cinq correctifs sont en service
+
+**Sur le mot de l'exploitant, donné en réponse à deux questions posées.** Tout ce
+qui suit a été exercé, et chaque geste porte sa mesure avant et après.
+
+**E-543 — `rootwarden_php` est retiré. Le geste était irréversible et il est
+documenté.** Il n'était plus un service déclaré (`patch 07`), donc le compose ne
+peut plus le reconstruire. Sa définition complète a été relevée avant, et sa
+déclaration reste retrouvable dans `357b9800`.
+
+```
+AVANT   :8443/connexion 200 · :8446/ 403 · /vendor/ 403 · /logs/ 403
+APRES   :8443/connexion 200 · :8446/ 000 · /vendor/ 000 · /logs/ 000
+TEMOIN  :8443/connexion a 200 des deux cotes — sans lui, « 000 partout »
+        serait indiscernable d'un curl casse
+```
+
+**E-544 — `patch 08` est appliqué, et le montage de FICHIER était la CAUSE d'une
+divergence.** Trois valeurs pour un chiffre qui devait n'en avoir qu'une :
+
+```
+legacy/version.txt   2.0.183   <- monte PAR-DESSUS, donc AFFICHE
+laravel/version.txt  2.0.470   <- recouvert
+scripts/version.sh   2.0.78    <- la valeur DERIVEE, la seule juste
+```
+
+**Le conteneur sert désormais 2.0.78**, et `laravel` ne monte plus que `laravel/`
+et `certs/` — 0 montage citant `legacy/` ou `php/`.
+
+**E-545 — Le legacy est archivé en entier.**
+
+```
+git ls-files 'legacy/*' | grep -v _deprecated/   ->   0
+git ls-files 'php/*'                             ->   0
+legacy/_deprecated/                              -> 235 fichiers
+```
+
+**Et deux configurations indexées sur un CHEMIN ont cassé — les deux attrapées
+par leur propre garde**, ce qu'on leur demandait :
+
+```
+sca-php      « composer.lock absent — les chemins ont bouge. Ce job ECHOUE
+               plutot que de passer sans avoir mesure. »   -> boucle corrigee
+gitleaks     un `git mv` RE-PRESENTE le contenu ENTIER du fichier comme des
+             lignes AJOUTEES. Le fichier n'avait JAMAIS ete exempte : ce qui le
+             protegeait etait la FENETRE de scan.
+```
+
+> **Déplacer un fichier le re-expose intégralement à un scanner de diff.**
+
+**E-546 — Les cinq correctifs de sécurité sont fusionnés ET en service.** `main`
+vert à 15 jobs, `rootwarden_python` redémarré, **0 commit `backend/` hors du
+processus** (mesuré en UTC explicite, après avoir lu « 2 » sur deux horloges).
+
+⚠ **Et j'ai fusionné la #70 sans lire ses checks.** Elle portait `Tests pytest`
+en échec ; `main` est passé rouge. *Le geste qui manquait est le plus simple de
+tous.* Les quatre suivantes ont été lues avant : trois à 13/13, et la #71 rouge —
+retenue, diagnostiquée, corrigée, puis fusionnée verte.
+
+**E-547 — Deux défauts dans mes propres tests, et aucun ne cassait mon test.**
+
+**① Ma garde dérivée lisait ma PROSE.** `test_validateurs_ancres.py` a signalé
+`graylog.py:102` — une ligne de commentaire où j'explique justement que `.match()`
+accepterait un `\n`. *Treizième fois de ce chantier qu'un texte déclenche la sonde
+qu'il décrit.* Corrigé dans l'**instrument**, pas dans le texte.
+
+**② Mon fichier de test empoisonnait la session pytest.** Il installait un
+`MetaPathFinder` à l'import et ne le retirait jamais :
+
+```
+12 failed, 331 passed, 380 errors
+TypeError: 'types.SimpleNamespace' object is not callable
+dans test_permissions.py, test_permissions_temporaires.py, ...
+```
+
+> **Un test qui mute l'état GLOBAL ne casse pas lui-même : il casse les autres,
+> et le rapport accuse les autres.** C'est le pire endroit pour un défaut, parce
+> que le symptôme et la cause n'ont pas le même nom.
+
+Mes six tests passaient tous. Le leurre est désormais posé, utilisé et **retiré
+dans un `finally`**, entrées `sys.modules` comprises — et **un test garde ce
+nettoyage**, parce qu'une isolation qu'on ne mesure pas se défait au premier
+refactor.
+
+**E-548 — Et la troisième garde de ce chantier a refusé un SUCCÈS, la première
+que j'avais écrite moi-même.** Le contrôle 1 du script d'extinction exigeait que
+le montage soit *déclaré* ; `patch 08` l'ayant retiré, il refusait. Trois états
+désormais, avec un témoin qui sépare l'état terminal du compose cassé.
+
+> **Une porte qui ne peut plus s'ouvrir cesse d'être une garde et devient un mur
+> — et son rouge ressemble à un défaut.**
+
+**E-549 — Le cache compilé des vues est redevenu `www-data` à la recréation**, et
+les 111 fichiers root ont disparu. La prose périmée de `portail.blade.php` a donc
+pu être corrigée, et vérifiée **au réseau** : 200/302/200/302, aucun 500, aucune
+entrée neuve au journal.
