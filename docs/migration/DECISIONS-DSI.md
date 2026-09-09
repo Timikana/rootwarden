@@ -17593,3 +17593,74 @@ désormais, avec un témoin qui sépare l'état terminal du compose cassé.
 les 111 fichiers root ont disparu. La prose périmée de `portail.blade.php` a donc
 pu être corrigée, et vérifiée **au réseau** : 200/302/200/302, aucun 500, aucune
 entrée neuve au journal.
+
+---
+
+## 2026-09-09, 08:00 CEST — la file est close pour la SEPTIÈME fois, et par un autre instrument
+
+**E-550 — J'ai vérifié que l'extinction du legacy n'avait rien coûté, TABLE PAR
+TABLE.** Six tours l'avaient établi *item par item* ; celui-ci l'établit par les
+écritures en base. *Un item peut être oublié d'une liste ; une écriture laisse
+une trace dans le schéma.*
+
+```
+tables reelles derivees de mysql/*.sql   63
+ecrites par les 178 .php archives        20
+avec un ecrivain VIVANT                  18   ✅
+sans                                      2   — les deux MORTES
+  linux_versions    cache abandonne · table VIDE · la capacite est portee en
+                    ENTIER (POST /linux_version · machines.linux_version
+                    PEUPLEE · mises-a-jour.js:188 l'affiche)
+  update_schedules  vestige, et `updates.py:805-834` le DIT avant moi
+TEMOIN : `machines` doit avoir un ecrivain vivant -> 6
+```
+
+⚠ **Et mon extracteur rendait d'abord 46 « tables »** — dont `si`, `une`,
+`pour`, `watch`, `for` : des mots de **PROSE** attrapés par `UPDATE <mot>` dans
+des commentaires. Corrigé en **intersectant avec le schéma dérivé**, et en
+exigeant la parenthèse ouvrante du `CREATE TABLE`. *Un compte de grep porte le
+nom, pas la chose — énième fois, et la parade est toujours la même : croiser
+avec une autorité dérivée.*
+
+**E-551 — Je ne déclare PAS les 18 tables « couvertes », et la nuance est tout
+le dossier.** Mon prédicat demandait *« existe-t-il un écrivain ? »*.
+
+> **Un écrivain vivant sur la même table peut porter UN geste là où l'archive en
+> portait SIX. C'est une question d'ARITÉ, pas de présence — mon vert est une
+> borne inférieure déguisée en verdict.**
+
+`users` : 19 écrivains archivés contre 6 vivants. `permissions` : 6 contre 1.
+`machines` est **la seule** où le vivant en a plus. Trois sessions qualifient
+geste par geste, avec consigne de distinguer **retiré exprès** de **perdu** —
+`Permissions.php:305-320` est le modèle d'un retrait assumé.
+
+⚠ **Et un axe que cette méthode ne couvre pas** : les gestes qui n'écrivent dans
+aucune table — un `ssh`, un `systemctl`, une lecture de fichier. **Les deux
+méthodes se complètent ; ni l'une ni l'autre ne suffit**, et le dire vaut mieux
+que de laisser croire qu'un 18/20 ferme la question.
+
+**E-552 — TROIS fausses alarmes en une heure, toutes arrêtées avant
+publication, toutes du même défaut de GRAIN.**
+
+```
+① « aucun DELETE sur user_machine_access »   grep oriente LIGNE sur une
+   requete Eloquent etalee sur TROIS lignes (Permissions.php:329)
+② « l'amorcage de la machine de test est perdu »   j'ai cherche UN site pour
+   une capacite qui en a DEUX (Serveurs.php:294 + Permissions.php:300)
+③ « le portage n'affiche pas la version d'OS »   le tableau est bati en JS,
+   pas en Blade — j'ai greppe la VUE (mises-a-jour.js:188)
+```
+
+> **Les trois viennent de mesurer le mauvais OBJET.** Aucune n'est une erreur de
+> raisonnement : trois fois le même défaut de grain, sur trois artefacts
+> différents.
+
+**Et les trois ALARMAIENT — c'est ce qui les a sauvées.** J'ai continué à mesurer
+parce qu'annoncer une capacité perdue engage. *Trois dédouanements du même genre
+seraient partis sans relecture.* C'est `E-533` vérifié une fois de plus, et cette
+fois sur un tour entier.
+
+**E-553 — Et je m'interdis de reprendre à mon compte la couverture geste par
+geste sans la mesure des trois sessions.** C'est exactement la faute que je
+viens de commettre trois fois : conclure d'un instrument sur un objet qu'il ne
+mesure pas.
