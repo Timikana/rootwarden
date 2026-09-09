@@ -55,6 +55,61 @@ _NAME_RE = re.compile(r'^[a-zA-Z0-9_-]{1,100}$')
 _HOST_RE = re.compile(r'^[a-zA-Z0-9._-]{1,253}$')
 _VALID_PROTOCOLS = {'udp', 'tcp', 'tls', 'relp'}
 
+# ⛔ `tls_ca_path` N'AVAIT PAS DE CLASSE, ET SON PUITS N'EST PAS UN SHELL.
+#
+#    Sa seule validation etait `len <= 255 and startswith('/')`. Aucune classe,
+#    aucune ancre — donc un SAUT DE LIGNE interieur passait, et le `.strip()`
+#    d'en face ne retire que les bords.
+#
+#    Cote shell la valeur est irreprochable : elle est encodee en base64, dont
+#    l'alphabet ne peut pas porter d'apostrophe. Mais le PUITS n'est pas un
+#    shell : c'est `/etc/rsyslog.d/99-rootwarden-graylog-forward.conf`, relu par
+#    rsyslog EN ROOT, et sa grammaire est celle de rsyslog.
+#
+#    MESURE du 2026-09-09, en logique pure, hors service. L'ancienne garde
+#    ACCEPTAIT les quatre charges suivantes, ou le saut de ligne ferme la
+#    directive attendue et en ouvre une autre :
+#      desarmer la verification du pair TLS
+#      charger un module arbitraire
+#      faire EXECUTER un binaire PAR ROOT
+#      reexpedier TOUS les journaux vers un tiers
+#    La MEME batterie sur `server_host`, qui a une classe ancree, refusait les
+#    quatre. Le temoin positif (le chemin de CA par defaut) passait des deux
+#    cotes.
+#
+#    > Le defaut n'etait pas une garde contournee : c'etait une garde qui DOMINE
+#    > et qui est trop faible pour l'un de ses deux champs — faible precisement
+#    > dans la dimension du PUITS. `server_host` etait traite comme une valeur
+#    > hostile, ce champ-ci comme un chemin de confiance, et rien ne disait
+#    > pourquoi la distinction.
+#
+#    La classe ci-dessous est batie sur le modele du motif d'hote : ancree aux
+#    deux bouts, employee en `fullmatch`. Le champ est un chemin absolu de bundle
+#    CA, donc `/` initial obligatoire et 254 caracteres apres — la borne de 255
+#    de l'ancienne garde est CONSERVEE.
+#    Contre-epreuve sur des chemins REELS, tous acceptes :
+#      /etc/ssl/certs/ca-certificates.crt · /etc/pki/tls/certs/ca-bundle.crt
+#      /usr/local/share/ca-certificates/ma-ca.crt · /opt/graylog/ca-2026.pem
+#
+#    Trouve par `gestion-ssh-key-4f` en qualifiant les commandes root indirectes
+#    de ce fichier : les DEUX sites sont surs cote shell, et celui-ci est
+#    exploitable quand meme. Verifie independamment avant reprise — les SEPT
+#    valeurs qui atteignent le fichier de conf ont ete DERIVEES de l'AST de
+#    `_build_forward_conf`, et ce champ est le seul sans classe.
+#
+#    ⛔ ET `fullmatch` EST PORTEUR — CE N'EST PAS UN DETAIL DE STYLE.
+#       En python, `$` s'apparie AUSSI juste avant un saut de ligne TERMINAL.
+#       Donc `_CA_PATH_RE.match('/etc/ssl/ca.crt\n')` ACCEPTERAIT, avec ce motif
+#       exact et inchange — c'est-a-dire le caractere MEME du defaut, dans une
+#       classe par ailleurs juste.
+#       `fullmatch` doit consommer TOUTE la chaine, et c'est lui qui ferme ce
+#       cas. Si quelqu'un « simplifie » un jour l'appel en `match`, la classe
+#       reste identique et la faille revient SANS QUE CETTE LIGNE BOUGE.
+#       Releve par `gestion-ssh-key-4f` en eprouvant le correctif — y compris
+#       la partie qui suivait sa propre recommandation.
+#       (C'est la meme classe que les 58 conversions de `c869144b`.)
+_CA_PATH_RE = re.compile(r'^/[A-Za-z0-9._/-]{0,254}$')
+
 _RW_CONF_PREFIX = '/etc/rsyslog.d/50-rootwarden-'
 _RW_FORWARD_CONF = '/etc/rsyslog.d/99-rootwarden-graylog-forward.conf'
 
@@ -167,6 +222,20 @@ def _build_forward_conf(cfg):
         ])
 
     lines.append('')
+    # ⛔ GARDE AU PUITS, et c'est le point de la nuit : la validation d'entree est
+    #    a soixante-dix lignes d'ici et sur un autre objet. Celle-ci est ICI, sur
+    #    ce que la fonction rend, et elle ne depend d'aucune classe de
+    #    caracteres : une ligne de directive ne peut pas en CACHER une seconde.
+    #
+    #    Elle est redondante avec la classe d'entree AUJOURD'HUI. C'est voulu :
+    #    une garde d'entree se perime quand quelqu'un elargit sa classe pour un
+    #    besoin legitime, et ce quelqu'un n'a aucune raison de venir lire ici.
+    for i, ligne in enumerate(lines):
+        if '\n' in ligne or '\r' in ligne:
+            raise ValueError(
+                f'directive rsyslog multiligne a l index {i} : une valeur porte '
+                f'un saut de ligne et injecterait une directive non demandee'
+            )
     return '\n'.join(lines)
 
 
@@ -205,7 +274,17 @@ def save_config():
         return jsonify({'success': False, 'message': 'Port hors bornes'}), 400
     if protocol not in _VALID_PROTOCOLS:
         return jsonify({'success': False, 'message': f'Protocole invalide : {protocol}'}), 400
-    if tls_ca and (len(tls_ca) > 255 or not tls_ca.startswith('/')):
+    # ⚠ DEUX POINTS NOMMES PAR `gestion-ssh-key-4f`, NI L'UN NI L'AUTRE UN DEFAUT.
+    #    Ils sont ecrits parce qu'un silence les rendrait indiscernables d'un
+    #    oubli.
+    #
+    #    ① `/../../etc/shadow` reste ACCEPTE par la classe. Ce n'est pas une
+    #       elevation : rsyslog lit ce fichier en root de toute facon, et un
+    #       bundle de CA illisible fait ECHOUER l'emission TLS au lieu de la
+    #       degrader en clair. Disponibilite, pas confidentialite — et le durcir
+    #       demanderait un `realpath` DISTANT, qui coute plus que ca ne rapporte.
+    #    ② `fullmatch` est employe A DESSEIN, cf. l'avertissement au motif.
+    if tls_ca and not _CA_PATH_RE.fullmatch(tls_ca):
         return jsonify({'success': False, 'message': 'tls_ca_path invalide'}), 400
     if rl_burst < 0 or rl_interval < 0 or rl_burst > 1_000_000 or rl_interval > 86400:
         return jsonify({'success': False, 'message': 'Rate limit hors bornes'}), 400
