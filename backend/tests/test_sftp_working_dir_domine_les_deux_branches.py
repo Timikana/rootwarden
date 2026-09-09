@@ -72,17 +72,46 @@ def _charge_sftp():
         def exec_module(self, module):
             pass
 
-    if not any(isinstance(f, Leurre) for f in sys.meta_path):
-        sys.meta_path.insert(0, Leurre())
+    # ⛔ L'ISOLATION EST OBLIGATOIRE, ET SON ABSENCE A COUTE 380 ERREURS.
+    #
+    #    La premiere version installait ce `Leurre` dans `sys.meta_path` a
+    #    l'IMPORT et ne le retirait JAMAIS. Consequence mesuree en CI le
+    #    2026-09-09 : tout autre module de test important `flask` ou `paramiko`
+    #    recevait un leurre dont les attributs sont des `SimpleNamespace` — donc
+    #    non appelables.
+    #
+    #        12 failed, 331 passed, 380 errors
+    #        TypeError: 'types.SimpleNamespace' object is not callable
+    #        dans `test_permissions.py`, `test_permissions_temporaires.py`, ...
+    #
+    #    > Un test qui mute l'etat GLOBAL de l'interpreteur ne casse pas
+    #    > lui-meme : il casse les autres, et le rapport accuse les autres.
+    #
+    #    Le leurre est donc pose, utilise, et RETIRE — y compris les entrees
+    #    qu'il a semees dans `sys.modules`, sans quoi le prochain `import flask`
+    #    les retrouverait la. Un test ci-dessous VERIFIE ce nettoyage : une
+    #    isolation qu'on ne mesure pas se defait au premier refactor.
     for cle, valeur in (('SECRET_KEY', 'x'), ('DB_PASSWORD', 'x'), ('API_KEY', 'x'),
                         ('ENCRYPTION_KEY', 'x'), ('AUDIT_HMAC_KEY', 'x')):
         os.environ.setdefault(cle, valeur)
     if RACINE not in sys.path:
         sys.path.insert(0, RACINE)
-    spec = importlib.util.spec_from_file_location(
-        'sftp_manager_sous_test', os.path.join(RACINE, 'sftp_manager.py'))
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+
+    leurre = Leurre()
+    avant = set(sys.modules)
+    sys.meta_path.insert(0, leurre)
+    try:
+        spec = importlib.util.spec_from_file_location(
+            'sftp_manager_sous_test', os.path.join(RACINE, 'sftp_manager.py'))
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+    finally:
+        # le `finally` porte : une exception d'import ne doit pas laisser le
+        # leurre en place, sinon l'echec d'UN test en fait echouer trois cents.
+        sys.meta_path.remove(leurre)
+        for nom in set(sys.modules) - avant:
+            if nom.split('.')[0] in Leurre.ABSENTS:
+                del sys.modules[nom]
 
     def interdit(*a, **k):
         raise AssertionError('un appel SORTANT a ete tente pendant un simple RENDU')
@@ -188,6 +217,39 @@ def test_chroot_dir_reste_valide_lui_aussi():
         except ValueError:
             continue
         raise AssertionError('chroot_dir accepte une valeur hostile')
+
+
+def test_le_chargement_n_a_RIEN_LAISSE_dans_l_etat_global():
+    """GARDE SUR L'EFFET DE BORD DE CE FICHIER LUI-MEME.
+
+    La premiere version laissait son `MetaPathFinder` dans `sys.meta_path` :
+    380 erreurs en CI, toutes dans d'AUTRES fichiers de test. Le rapport
+    accusait `test_permissions.py`.
+
+      > Un test qui mute l'etat global ne casse pas lui-meme : il casse les
+      > autres. C'est le pire endroit pour un defaut, parce que le symptome et
+      > la cause n'ont pas le meme nom.
+
+    Ce test n'attend pas la vigilance : il MESURE.
+    """
+    noms = [type(f).__name__ for f in sys.meta_path]
+    assert 'Leurre' not in noms, (
+        f'un Leurre subsiste dans sys.meta_path : {noms}. Tout autre module de '
+        f'test important flask ou paramiko recevrait un faux module.'
+    )
+    for absent in ('paramiko', 'flask', 'mysql', 'Crypto', 'cryptography',
+                   'dotenv', 'werkzeug', 'jwt', 'redis', 'requests'):
+        m = sys.modules.get(absent)
+        if m is None:
+            continue
+        assert getattr(m, '__spec__', None) is None or 'sftp' not in str(
+            getattr(m.__spec__, 'loader', '')), (
+            f'sys.modules[{absent!r}] porte encore un leurre de ce fichier'
+        )
+    # TEMOIN : le module sous test, lui, DOIT etre charge — sinon ce test
+    # passerait a vide sur un chargement qui n'a pas eu lieu.
+    assert hasattr(sftp, 'render_policy'), \
+        'sftp_manager n est pas charge : ce test ne mesure rien'
 
 
 if __name__ == '__main__':
