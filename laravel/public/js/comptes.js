@@ -165,6 +165,30 @@
         if (r.ok && r.corps.success) setTimeout(() => location.reload(), 1200);
     }
 
+    /* ── Role ────────────────────────────────────────────────────────────────
+     *
+     * Second geste perdu a l'extinction, reporte le 2026-09-09.
+     *
+     * ⚠ LE SELECTEUR REVIENT A SA VALEUR PRECEDENTE SI LE SERVEUR REFUSE, et
+     *   ici ca compte plus qu'ailleurs : SIX gardes peuvent refuser. Un
+     *   selecteur qui garde le choix refuse affiche un etat que la base ne
+     *   porte pas — et la personne repart en croyant avoir promu quelqu'un.
+     *   La forme est celle de l'exemption d'expiration, plus bas.
+     */
+    async function changeRole(el) {
+        const precedent = el.dataset.precedent !== undefined ? el.dataset.precedent : '';
+        el.disabled = true;
+        const r = await appelle(`/comptes/${el.dataset.id}/role`, { role: el.value });
+        el.disabled = false;
+        if (r.corps && r.corps.success) {
+            el.dataset.precedent = el.value;
+            dis(r.corps.message, 'ok');
+        } else {
+            el.value = precedent;
+            dis((r.corps && r.corps.message) || garnis(L.err_reseau, { statut: r.statut }), 'echec');
+        }
+    }
+
     /* ── Suppression / anonymisation, et le step-up qui les garde ────────── */
 
     const panneauSuppr = document.querySelector('[data-rw="comptes-panneau-suppression"]');
@@ -294,7 +318,15 @@
      * ete enregistre affiche un etat que la base ne porte pas — et la personne
      * repart en croyant avoir regle quelque chose.
      */
+    /*
+     * ⚠ LE TIRET DE `compte-role-` EST PORTEUR. Le formulaire de CREATION porte
+     * deja `data-rw="compte-role"` SANS suffixe : un selecteur en
+     * `^="compte-role"` le capterait et enverrait un changement de role a la
+     * creation d'un compte. Le tiret l'exclut.
+     */
     document.addEventListener('change', async (ev) => {
+        const role = ev.target.closest('[data-rw^="compte-role-"]');
+        if (role) { return changeRole(role); }
         const el = ev.target.closest('[data-rw^="compte-expiration-"]');
         if (! el) { return; }
         const precedent = el.dataset.precedent !== undefined ? el.dataset.precedent : '';
