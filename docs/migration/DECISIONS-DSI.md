@@ -17818,3 +17818,41 @@ vérification ne mesurait rien. La compilation se mesure directement —
 `Blade::compileString` puis `php -l` — **avec son témoin** : un `@if` sans
 `@endif` rend le code 255. *Sans lui, « code 0 » serait indiscernable d'un lint
 qui ne lit rien.*
+
+---
+
+**E-565 — Les trois capacités perdues de `DOSSIER-65` sont portées, et je clos le
+dossier.** `comptes/{id}/activite` (`role:3`), `comptes/{id}/role` (`role:2`,
+comme le legacy l'ouvrait), `comptes/{id}/sudo` (`role:3`) — gardes lues dans le
+**routeur en service** par `gatherMiddleware()`, pas dans `web.php`. 35 tests
+neufs, suite complète à **456 passed / 0 failed / 1643 assertions**, i18n
+`comptes` à **124 = 124**, PR #85 verte sur les 15 contrôles du SHA exact,
+fusionnée dans `main` (68c79336). Vérifié au réseau : `419` sur la route, `404`
+sur une route absente — *le témoin est ce qui donne un sens au 419*.
+
+**E-566 — RÉTRACTATION : le motif que j'ai donné pour ne pas porter ces trois
+capacités était faux, et il était sourcé.** `DOSSIER-65` §9 disait
+« inéprouvable avant un redémarrage », en reprenant la contrainte
+`use_reloader=False` + `workers=4` de `DOSSIER-55`. **Cette contrainte est celle
+d'`hypercorn` ; le portage tourne sous PHP-FPM, qui relit l'arbre à chaque
+requête.** Mesuré : conteneur démarré à 05:22:48 UTC, commit à 06:52:42 UTC,
+route qui répond — 1 h 30 d'écart, aucun redémarrage.
+
+> **Une contrainte mesurée sur un régime voyage avec l'autorité de sa mesure, et
+> rien dans son énoncé ne dit sur quoi elle porte.**
+
+C'est un **dédouanement**, la forme sans contradicteur naturel : il a rangé trois
+portages faisables dans la colonne de l'exploitant. Et il ne contenait aucune
+erreur — la phrase était vraie, datée, sourcée, et hors de son domaine. La
+condition qui inverserait le verdict est nommée dans le dossier :
+`bootstrap/cache/routes-v7.php` est absent, et un `route:cache` posé plus tard
+rendrait cette page fausse en silence.
+
+**E-567 — Je n'ai pas ajouté la garde « pas le dernier superadmin » au sudo
+global, et un test le constate.** Les deux gestes voisins la portent ; celui-ci
+ne peut pas priver le portail de son administration — `users.sudo` est un repli
+consulté par `configure_servers.py:1086-1094` seulement en l'absence de politique
+par machine. *Trois gestes voisins, deux gardes identiques : la troisième s'écrit
+toute seule, et elle serait fausse.* Ce qui reste ouvert du dossier est le seul
+point dont la raison ne parlait pas d'un redémarrage : **④ la rétention de
+`login_attempts`**, une décision de conformité pour l'exploitant.
