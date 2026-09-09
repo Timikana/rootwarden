@@ -263,6 +263,31 @@
                                         data-rw="compte-deverrouiller-{{ $c['id'] }}"
                                         data-id="{{ $c['id'] }}">{{ __('comptes.deverrouiller') }}</button>
                             @endif
+                            {{-- SUSPENDRE / ACTIVER — geste PERDU a l'extinction du
+                                 legacy (`adm/api/toggle_user.php`), reporte le
+                                 2026-09-09. Sans lui, suspendre un compte le temps
+                                 d'un preavis imposait de le DETRUIRE : la seule
+                                 ecriture vivante de `users.active` etait celle de
+                                 l'anonymisation, irreversible.
+
+                                 La condition est celle du selecteur d'expiration
+                                 juste au-dessus : superadministrateur, et pas sur
+                                 soi-meme. Les deux autres gardes du legacy vivent
+                                 dans le service, ou elles peuvent LIRE la base —
+                                 dont celle qui refuse de suspendre le DERNIER
+                                 superadministrateur actif.
+
+                                 ⚠ `data-actif` porte l'etat VOULU, pas l'etat
+                                 courant : l'API prend un booleen explicite et non
+                                 une bascule, donc le geste est idempotent. Le
+                                 libelle, lui, depend de l'etat courant. --}}
+                            @if ($estSuperadmin && (int) $c['id'] !== (int) session('utilisateur_id'))
+                                <button type="button" class="rw-bouton rw-bouton--minuscule"
+                                        data-rw="compte-activite-{{ $c['id'] }}"
+                                        data-id="{{ $c['id'] }}"
+                                        data-actif="{{ (int) $c['active'] ? '0' : '1' }}"
+                                >{{ (int) $c['active'] ? __('comptes.suspendre') : __('comptes.activer') }}</button>
+                            @endif
                             {{-- LES DEUX GESTES COTE A COTE. Le legacy n'en offre
                                  qu'un — le destructeur — alors qu'il PORTE
                                  l'anonymisation, gardee et commentee, sans aucun
