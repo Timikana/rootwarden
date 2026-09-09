@@ -60,10 +60,12 @@ set -u -o pipefail
 cd "$(dirname "$0")/.." || exit 2
 
 EXECUTER=0
+EPREUVE=0
 ETAPE=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --executer) EXECUTER=1 ;;
+        --epreuve-des-gardes) EPREUVE=1 ;;
         --etape)    shift; ETAPE="${1:-}" ;;
         *) printf '⛔ drapeau inconnu : %s\n   Un drapeau inconnu est une ERREUR, pas un silence.\n' "$1" >&2; exit 2 ;;
     esac
@@ -95,17 +97,115 @@ dire() { printf '%s\n' "$*"; }
 # `Version::numero()` rend `null` si le fichier manque : la page affiche
 # « version inconnue ». **Ce n'est pas une panne, c'est une perte SILENCIEUSE** —
 # donc exactement le genre de defaut qu'un script d'extinction doit refuser.
+# ⛔ CETTE GARDE ÉTAIT MORTE, ET ELLE NE POUVAIT PAS SE SIGNALER.
+#
+#    Sa forme précédente demandait `git ls-files "$p" | grep -qx
+#    'legacy/version.txt'`. Or `.gitignore:162` liste `legacy/version.txt` :
+#    `git ls-files` ne le rend JAMAIS, donc le `grep` échouait toujours, donc
+#    la garde ne pouvait JAMAIS refuser. Mesuré le 2026-09-09 :
+#
+#      grep -n version.txt .gitignore      -> :162 legacy/version.txt
+#      git ls-files legacy/version.txt     -> (vide)
+#      git check-ignore -v <fichier>       -> .gitignore:162
+#      le fichier sur le disque            -> PRÉSENT, 7 octets
+#      montages dans docker-compose.yml    -> 2
+#
+#    Elle passait donc pour la mauvaise raison — et elle aurait laissé passer
+#    une étape future portant sur `legacy` tout entier.
+#
+#    LA BONNE QUESTION N'EST PAS « git le suit-il » MAIS « ce préfixe le
+#    contient-il ». `capture_le_fichier` répond à celle-là, ne dépend d'aucun
+#    index, et surtout : elle est ÉPROUVABLE. `--epreuve-des-gardes` lui donne
+#    des entrées forgées et exige qu'elle refuse ET qu'elle accepte.
+#
+#    Une garde qui n'a jamais refusé n'est pas une garde prouvée.
+
+# Le préfixe « $1 » capture-t-il le fichier « $2 » ? Fonction PURE, sans effet.
+capture_le_fichier() {
+    prefixe="${1%/}"
+    cible="$2"
+    [ "$prefixe" = "$cible" ] && return 0
+    case "$cible" in
+        "$prefixe"/*) return 0 ;;
+    esac
+    return 1
+}
+
+# ══ ÉPREUVE DES GARDES ══════════════════════════════════════════════════════
+#
+# Une garde qui n'a jamais refusé n'est pas une garde prouvée — et celle du
+# contrôle 1 a passé pendant des jours SANS POUVOIR refuser. Ce mode lui donne
+# des entrées forgées et exige qu'elle discrimine dans les DEUX sens.
+#
+#   ./scripts/eteindre-le-legacy.sh --epreuve-des-gardes
+#
+# Il n'exécute aucun geste et ne lit ni git ni Docker : il éprouve le prédicat.
+if [ "$EPREUVE" -eq 1 ]; then
+    dire '══ épreuve du prédicat capture_le_fichier ══'
+    CIBLE='legacy/version.txt'
+    rate=0
+    # DOIT capturer — sinon la garde est morte, comme sa version précédente
+    for cas in 'legacy' 'legacy/' 'legacy/version.txt'; do
+        if capture_le_fichier "$cas" "$CIBLE"; then
+            dire "  ✅ « $cas » capture — la garde refuserait"
+        else
+            dire "  ⛔ « $cas » NE capture PAS — la garde est MORTE"
+            rate=$((rate+1))
+        fi
+    done
+    # NE DOIT PAS capturer — sinon la garde refuse tout et on cesse de la lire
+    for cas in 'legacy/auth' 'legacy/lang' 'legacy/iptables' 'legacy/_sortie.php' \
+               'legacy/version.txt.bak' 'legacy/versionXtxt' 'laravel/version.txt' ''; do
+        if capture_le_fichier "$cas" "$CIBLE"; then
+            dire "  ⛔ « $cas » capture À TORT — la garde est trop large"
+            rate=$((rate+1))
+        else
+            dire "  ✅ « $cas » ne capture pas"
+        fi
+    done
+    # ⚠ `legacy/version.txt.bak` et `legacy/versionXtxt` sont là exprès : une
+    #    garde écrite avec `grep` ou `case "$cible" in "$prefixe"*)` — sans la
+    #    barre — les capturerait, et refuserait des étapes légitimes.
+    dire ""
+    dire "── et la liste RÉELLE des étapes, aujourd'hui ──"
+    capture_reelle=0
+    for p in $(etapes | cut -d'|' -f2); do
+        capture_le_fichier "$p" "$CIBLE" && capture_reelle=$((capture_reelle+1))
+    done
+    dire "  $capture_reelle étape(s) sur $(etapes | wc -l) capturent version.txt"
+    dire "  (0 attendu aujourd'hui — et c'est un CONSTAT, pas la preuve que la garde marche :"
+    dire "   la preuve est au-dessus, sur des entrées forgées.)"
+    dire ""
+    if [ "$rate" -gt 0 ]; then
+        dire "⛔ $rate cas discriminent mal. La garde du contrôle 1 n'est pas fiable."
+        exit 1
+    fi
+    dire "✅ les 11 cas forgés discriminent. La garde peut refuser ET accepter."
+    exit 0
+fi
+
 dire "══ contrôle 1 — le fichier monté dans le portage ══"
 if grep -qE '^\s+- \./legacy/version\.txt:' docker-compose.yml; then
     dire "  ./legacy/version.txt est monté dans le portage (compose)"
+    capture=0
     for p in $(etapes | cut -d'|' -f2); do
-        if git ls-files "$p" | grep -qx 'legacy/version.txt'; then
+        if capture_le_fichier "$p" 'legacy/version.txt'; then
             dire "  ⛔ version.txt tombe dans la portée de « $p » — REFUS"
             dire "     le déplacer HORS de legacy/ et corriger le montage d'abord"
+            capture=$((capture+1))
             ko=$((ko+1))
         fi
     done
-    dire "  ✅ aucune étape ne l'emporte"
+    # ⚠ CE DÉTAIL EST CONDITIONNÉ À SON VERDICT, et il ne l'était pas.
+    #    L'ancien `✅ aucune étape ne l'emporte` vivait APRÈS le `done` et
+    #    s'imprimait même quand la boucle venait d'incrémenter `ko` : un détail
+    #    qui AFFIRME la propriété qu'il vient de réfuter fait chercher au
+    #    mauvais endroit. Le verdict agrégé restait juste ; la ligne, non.
+    if [ "$capture" -eq 0 ]; then
+        dire "  ✅ aucune étape ne l'emporte ($(etapes | wc -l) étapes examinées)"
+    else
+        dire "  ⛔ $capture étape(s) l'emportent"
+    fi
 else
     dire "  ⚠ le montage n'est plus déclaré — vérifier ce qui a changé avant de continuer"
     ko=$((ko+1))
