@@ -17252,3 +17252,66 @@ du chantier), et l'attendu `[434, 438]` était **retapé** et faux d'un cran.
 > **Un attendu retapé mesure ma mémoire ; un attendu dérivé mesure le fichier.**
 > Repris en lisant les positions dans `git show HEAD:<fichier>` et en exigeant
 > que le décalage **égale** le nombre de lignes insérées.
+
+---
+
+## 2026-09-09, 02:15 CEST — quatre gardes qui tiennent par autre chose que ce qu'on y lit
+
+**E-529 — Je fusionne l'analyse de quatre sessions en une classe, et cette classe
+n'est pas « des failles ».** `DOSSIER-62`. Quatre endroits où **le code est
+correct et où la RAISON de sa correction n'est pas celle qu'il affiche** :
+`re.escape` employé comme échappement de shell (3 appels, 6 usages, deux fichiers,
+trouvé séparément par deux sessions) · un heredoc irréprochable dont le puits est
+la grammaire de `sudoers` · une fonction sans garde, sûre par contingence de ses
+appelants · un motif qui accepte la traversée là où sa fonction la refuse.
+
+> **Ce qui tient par accident se casse au premier refactor qui a l'air anodin.**
+> Un `escaped_key` qui n'échappe pas le shell ne se contente pas de rassurer à
+> tort : **il se propage** — le prochain qui écrira une commande à côté
+> réutilisera la variable en la croyant sûre.
+
+**E-530 — Un correctif de sécurité est écrit et ATTEND.** PR 64, branche
+`security/runas-non-valide-sur-la-branche-custom`. `render_policy` écrivait
+`runas` dans l'en-tête sudoers sur tous les chemins et ne le validait que sur
+ceux qui avaient besoin de le **mettre en forme** ; la branche `custom` perdait
+la validation *avec* le format. Mesuré : 1 directive rendue avec une valeur
+légitime, 2 avec un saut de ligne.
+
+*Ce que ça ajoute n'est pas le pouvoir — un rôle 3 a déjà `all_nopasswd`,
+« ÉQUIVALENT ROOT ». Ça ajoute l'invisibilité : la trace dit une chose pendant
+que le fichier en fait une autre.* **Ce qui tombe d'abord est la piste d'audit.**
+Trouvé par `gestion-ssh-key-94`, rejoué avant reprise, puis **rectifié par elle**
+sur mon propre relevé (`:195` est une écriture, pas une lecture).
+
+**E-531 — Le zéro du cliquet semgrep ne voyage plus seul.** Trois limites sont
+désormais écrites dans l'en-tête de l'instrument, pas seulement dans un dossier :
+la **moitié invisible** (37 sites indirects, second cliquet) · le **domaine du
+gage** (le cliquet demande « la valeur est-elle injectable ? » et un site
+exploitable a répondu non) · les **10 aveux**, qui ne sont pas déclarés sûrs mais
+**non classés**.
+
+**E-532 — J'adopte le dessin de `gestion-ssh-key-5f` contre le mien.** J'avais
+posé un aveu, et je l'avais posé **en aval de trois filtres silencieux** :
+
+> **Un aveu placé après un filtre silencieux n'avoue que ce que le filtre a
+> laissé passer. La règle était bonne ; c'est sa POSITION qui la neutralisait.**
+
+D'où : compter tous les appels, écarter avec une raison **nommée**, exiger que
+**la somme des catégories égale le total** — vérifié par un comptage
+**indépendant** du recenseur, sinon c'est une tautologie. Deux cliquets, dont
+celui des **aveux** : le seul endroit où « je ne sais pas » a un compte, donc le
+seul où l'ignorance ne peut pas se dissoudre en silence.
+
+**E-533 — Et la leçon que je garde de la nuit, qui est d'elle aussi.** Six formes
+de mauvais compte sur une seule classe. Les **trois qui gonflaient**, je les ai
+toutes trouvées seule. Les **trois qui dédouanaient**, aucune.
+
+> **Un compte qui monte provoque un « pourquoi ? ». Un compte qui descend
+> provoque un hochement de tête.** L'erreur qui gonfle a un contradicteur
+> naturel — le lecteur agacé. L'erreur qui dédouane n'en a aucun.
+> **Une mesure qui vous arrange est celle qu'il faut refaire avec l'instrument
+> de quelqu'un d'autre.**
+
+*Et la convergence de nos deux recensements sur 227 vaut par sa FORME : quatre
+seaux, quatre accords exacts, et aucun instrument partagé. Deux comptages avec le
+même code auraient pu partager le même angle mort.*
