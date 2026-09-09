@@ -89,7 +89,6 @@ services:
       # C'est dans ce fichier qu'on a lu les 28 `Utime failed` du 2026-09-03.
       - ./laravel/storage/logs:/var/www/html/storage/logs
       # Le numero de version garde sa source unique, en lecture seule.
-      - ./legacy/version.txt:/var/www/html/version.txt:ro
 
     read_only: true
 

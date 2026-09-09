@@ -52,7 +52,7 @@ set -euo pipefail
 
 RACINE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 FICHIER_JALON="VERSION-JALON"
-FICHIER_PRODUIT="legacy/version.txt"
+FICHIER_PRODUIT="laravel/version.txt"
 
 derive() {
     local depot="${1:-$RACINE}"
@@ -218,22 +218,44 @@ case "${1:-}" in
         # affichaient « Version inconnue » sans qu'aucune erreur ne soit levee.
         # Le correctif d'atomicite avait donc introduit son propre defaut.
         printf '%s\n' "$v" > "$tmp" || { echo "version.sh : ecriture du tampon impossible" >&2; rm -f "$tmp"; exit 1; }
-        # ⚠ ON N'UTILISE PAS `mv`. IL CHANGE L'INODE, ET LE MONTAGE LE SUIT PAS.
+        # ══ `mv` EST REDEVENU LE BON GESTE, ET SEULEMENT PARCE QUE LE MONTAGE
+        #    DE FICHIER A DISPARU ════════════════════════════════════════════
         #
-        # `docker-compose.yml` monte ce fichier UN PAR UN
-        # (`./legacy/version.txt:/var/www/html/version.txt:ro`). Un montage de
-        # FICHIER est epingle a l'inode present au demarrage du conteneur : tout
-        # `mv`, `git checkout` ou reecriture par renommage le DETACHE, et le
-        # conteneur continue de servir l'ancien contenu depuis un inode que plus
-        # rien ne reference. Mesure du 2026-09-05 :
+        # HISTORIQUE, garde parce qu'il explique DEUX revirements. Tant que
+        # `docker-compose.yml` montait ce fichier UN PAR UN, `mv` etait INTERDIT :
+        # un montage de FICHIER est epingle a l'inode present au demarrage du
+        # conteneur, donc tout `mv`, `git checkout` ou reecriture par renommage le
+        # DETACHE, et seule une RECREATION du conteneur le repare.
+        #   mesure du 2026-09-05 : inode hote 1998793, inode conteneur 2013478
+        #                          orphelin, fige a 2.0.94
+        #   mesure du 2026-09-08 : le meme defaut en SENS INVERSE — un `mv` a fait
+        #                          suivre au conteneur le fichier SOUS-JACENT
         #
-        #     inode hote       1998793
-        #     inode conteneur  2013478      <- orphelin, fige a 2.0.94
+        # LE MONTAGE EST RETIRE (voir docker-compose.yml). `laravel/` est monte sur
+        # `/var/www/html`, donc `laravel/version.txt` y apparait de lui-meme et plus
+        # rien n'est epingle a un inode. `mv` ne peut donc plus rien detacher.
         #
-        # Le seul remede a un montage detache est de RECREER le conteneur, ce
-        # qui n'appartient pas a ce script. On ecrit donc EN PLACE : la
-        # redirection tronque et remplit l'inode existant, le montage tient.
-        cat "$tmp" > "$RACINE/$FICHIER_PRODUIT" && rm -f "$tmp"
+        # ⚠ ET IL EST DESORMAIS NECESSAIRE, pas seulement permis. `cat "$tmp" >
+        #    "$FICHIER"` exige l'ecriture sur LE FICHIER ; or celui-ci peut etre
+        #    recree en `root:root 0644` par l'entrypoint du conteneur — mesure du
+        #    2026-09-08 : `laravel/version.txt` etait `-rw-r--r-- root:root` et
+        #    l'utilisateur de l'hote ne pouvait PAS y ecrire. `mv` n'exige que
+        #    l'ecriture sur LE REPERTOIRE, que l'utilisateur possede.
+        #    Sans ce changement `ecrire-version.sh` echouerait — et `maj.sh:214`
+        #    comme `start.sh:139` l'appellent avec `|| true`, donc l'echec serait
+        #    AVALE et le pied de page afficherait « Version inconnue » en silence.
+        #
+        # `mv` sur le meme systeme de fichiers reste un `rename(2)` : remplacement
+        # atomique, aucune fenetre a zero octet.
+        #
+        # ⚠ `mktemp` CREE EN 0600 ET `mv` CONSERVE CE MODE. Le serveur web tourne
+        #    en `www-data` et doit LIRE ce fichier : on repose le mode
+        #    explicitement. Mesure du 2026-09-05 : sans cela `is_file()` rendait
+        #    vrai, `is_readable()` faux, et LES DEUX portails affichaient
+        #    « Version inconnue » sans qu'aucune erreur ne soit levee.
+        chmod 0644 "$tmp" || { echo "version.sh : chmod du tampon impossible" >&2; rm -f "$tmp"; exit 1; }
+        mv -f "$tmp" "$RACINE/$FICHIER_PRODUIT" \
+            || { echo "version.sh : REMPLACEMENT IMPOSSIBLE de $FICHIER_PRODUIT" >&2; rm -f "$tmp"; exit 1; }
         echo "$v -> $FICHIER_PRODUIT"
         ;;
     "") derive ;;
