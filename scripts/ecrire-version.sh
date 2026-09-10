@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# ecrire-version.sh - Pose `legacy/version.txt` avant que les conteneurs montent.
+# ecrire-version.sh - Pose `laravel/version.txt` avant que les conteneurs montent.
+#                     (l'en-tete disait `legacy/` — corrige le 2026-09-10 ;
+#                      la CIBLE reelle est `laravel/version.txt`, cf. plus bas)
 #
 # ⚠ CE FICHIER EXISTE PARCE QUE LA DECISION N'ETAIT CABLEE A RIEN.
 #
