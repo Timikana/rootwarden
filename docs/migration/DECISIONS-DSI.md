@@ -19058,3 +19058,83 @@ faire avancer et que mon périmètre est la documentation.*
 
 **Ce qui reste n'est pas mesurable, c'est décidable, et rien de ce que j'écrirai
 au huitième tour ne le rendra plus décidable qu'au septième.**
+
+---
+
+# 2026-09-10 — LA FUSION EST FAITE, ET `--remove-orphans` SERAIT UN PIÈGE
+
+**E-620 — `Migration-Laravel` est fusionnée dans `main` sur mot de l'exploitant.**
+PR #87, **15 contrôles sur le SHA exact, 0 rouge**, lus avant la fusion.
+
+```
+origin/main             aa5625e5
+ML..main en attente     0 commits   (etait 25)
+les 3 controles         2 / 3 dans main  (le 3e est sur security/garde-socle-avertissement)
+  8dadd611  tests/e2e/sca-couvre-le-servi.mjs        OUI
+  27e4abc3  tests/e2e/controles-statiques.mjs        OUI
+  146886eb  SocleAvertissementRetireTest.php         non — branche non fusionnee
+DOSSIER-66/67/68        3 / 3 dans main
+DECISIONS-DSI           porte E-619 dans main
+```
+
+**E-621 — Audit des trois scripts de déploiement : le code est SAIN, et le
+correctif « évident » serait DESTRUCTEUR.**
+
+**`maj.sh` — OK.** Son pas 5b a déjà été corrigé et il porte sa mesure
+(`:218-257`) : il redémarrait `php` sur le motif faux d'un OPcache qui ne
+revalide pas, alors que `opcache.validate_timestamps => On` et
+`revalidate_freq => 2`. **Il redémarre désormais `python`**, le seul des deux
+services montés en bind qui ne recharge pas (`workers = 4`,
+`use_reloader = False`). Et il tire `main` (`:138`), donc la fusion de `E-620`
+lui parvient.
+
+**`start.sh` et `stop.sh` — OK sur le code.**
+
+⛔ **ET LA QUESTION « ça tue les anciens conteneurs ? » : NON, et il ne faut PAS
+ajouter `--remove-orphans`.**
+
+```
+--remove-orphans dans le depot        0 occurrence   (start.sh · stop.sh · maj.sh · partout)
+orphelin en ce moment                0    `rootwarden_php` a ete retire a la main le 09/09
+services declares SANS profil        3   db · laravel · python
+services declares AVEC preprod       5   + mock-opencve · test-server
+DEBUG_MODE de ce serveur             true  -> le profil EST actif
+
+`up -d --remove-orphans` AVEC le profil    supprimerait 0 conteneur
+`up -d --remove-orphans` SANS le profil    supprimerait 2 conteneurs :
+                                           rootwarden_test_server · rootwarden_mock_opencve
+```
+
+> **Le drapeau qu'on ajouterait pour tuer un conteneur mort tuerait le serveur de
+> test et le mock dès que `DEBUG_MODE` n'est pas `true`.** *Un service derrière un
+> profil est indiscernable d'un orphelin pour `compose`, et c'est le profil — pas
+> le compose — qui décide.*
+
+⚠ **Et ma première sonde s'est trompée exactement là** : `config --services` sans
+`--profile preprod` m'a rendu 3 services, donc `test-server` et `mock-opencve`
+classés « orphelins ». *La conclusion opposée — « ajoute le drapeau » — tenait à
+un profil que je n'avais pas passé à l'instrument.*
+
+**Ce qui reste vrai** : si un jour un vrai orphelin apparaît, le geste juste est
+`docker compose --profile preprod up -d --remove-orphans` **à la main et une
+fois**, jamais un drapeau par défaut dans un script que quelqu'un lancera avec
+`DEBUG_MODE=false`.
+
+**E-622 — Deux commentaires périmés corrigés, zéro ligne de code touchée.**
+
+```
+start.sh:130-137           disait « `legacy/version.txt` […] le pied de page des DEUX
+                           portails lit ce fichier, monte en lecture seule dans chacun »
+                           -> les deux moities sont fausses depuis `patch 08` :
+                              le montage est RETIRE et il n'y a plus qu'UN portail
+scripts/ecrire-version.sh:2  disait « Pose `legacy/version.txt` »
+                           -> la CIBLE reelle est `laravel/version.txt` (`:33`)
+```
+
+**Contre-épreuve** : 24 lignes modifiées, **0 ligne de code** (témoin : le total
+est non nul), `bash -n` propre sur les quatre scripts, et
+`./scripts/ecrire-version.sh` rejoué rend `2.0.78`, forme
+`^[0-9]+\.[0-9]+\.[0-9]+$` validée.
+
+*Un commentaire qui affirme un montage retiré et un portail mort ne se signale
+pas : il se lit, et le prochain lecteur croira qu'il y a deux portails.*
