@@ -128,12 +128,20 @@ case "${1:-up}" in
         ;;
     *)
         # ── LE NUMERO DE VERSION, AVANT QUE LES CONTENEURS MONTENT ───────────
-        # `legacy/version.txt` n'est plus suivi par git : il est DERIVE du
-        # depot. Deux raisons de le poser ICI et pas ailleurs :
-        #   - le montage est un montage de FICHIER ; sans fichier, Docker cree
-        #     un REPERTOIRE et le montage ne s'accroche plus jamais ;
-        #   - le pied de page des DEUX portails lit ce fichier, monte en
-        #     lecture seule dans chacun.
+        # `laravel/version.txt` n'est pas suivi par git : il est DERIVE du
+        # depot, et c'est ce script qui le pose avant que les conteneurs montent.
+        #
+        # ⚠ CE COMMENTAIRE A ETE CORRIGE LE 2026-09-10. Il disait
+        # « `legacy/version.txt` […] le pied de page des DEUX portails lit ce
+        # fichier, monte en lecture seule dans chacun ». Les deux moities sont
+        # devenues fausses avec `patch 08` :
+        #   - le montage `./legacy/version.txt:/var/www/html/version.txt:ro` a
+        #     ete RETIRE des deux composes (`docker-compose.yml:54`) et n'a pas
+        #     de remplaçant : `laravel/` est monte sur `/var/www/html`, donc
+        #     `laravel/version.txt` y arrive tout seul ;
+        #   - il n'y a plus qu'UN portail — le legacy est eteint.
+        # La raison de poser le fichier ICI survit intacte : le pied de page le
+        # lit, et `ecrire-version.sh` le derive du compte de commits.
         # Le script tolere son propre echec (hors depot git) : voir son en-tete.
         echo -e "${GREEN}[RootWarden]${NC} Version..."
         "${SCRIPT_DIR}/scripts/ecrire-version.sh" || true
