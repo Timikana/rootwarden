@@ -343,15 +343,56 @@ def _switch_to_root_shell(client: paramiko.SSHClient, root_password: str,
         deadline = time.time() + 5
         while time.time() < deadline:
             if channel.recv_ready():
-                # LA REGLE MORD HORS DE SON OBJET, et son propre message le dit : elle vise
-                # `errors='ignore'` « sur un dechiffrement = padding oracle ». Ici il n'y a
-                # aucun dechiffrement : c'est un FLUX d'octets d'un canal paramiko, lu par
-                # tranches de 1024. Un caractere UTF-8 multi-octets peut etre COUPE entre
-                # deux tranches — `strict` leverait sur une coupure legitime, ce qui serait
-                # un defaut et non une garde.
-                # Le correctif JUSTE serait un decodeur incremental (`codecs.getincrementaldecoder`),
-                # pas `strict`. Note ecrite ici pour que l'exemption ne fasse pas oublier
-                # qu'il reste mieux a faire.
+                # ══ TRI DE `rw-decode-errors-ignore` — 2026-09-04 ══════════
+                #
+                # Constatation REELLE de severite ERROR, au journal CI depuis le
+                # 2026-05-19 et JAMAIS triee : le job etait rouge pour une autre
+                # raison (trois motifs qui ne compilaient pas) et
+                # `continue-on-error` l'absorbait. **Un rouge tolere n'a pas
+                # seulement masque que trois controles n'existaient pas : il a
+                # masque cette constatation-ci, qui est vraie.**
+                #
+                # ── POURQUOI LA RAISON DE LA REGLE NE S'APPLIQUE PAS ICI ──
+                #
+                # Le message de la regle invoque « un padding oracle sur un
+                # DECHIFFREMENT ». Il n'y a **aucun dechiffrement** a cet
+                # endroit : c'est la sortie d'un pseudo-terminal, lue par
+                # tranches de 1024 octets en attendant un prompt.
+                #
+                # ── ET `errors='ignore'` EST LE BON CHOIX, PAS UNE TOLERANCE ──
+                #
+                # `recv(1024)` coupe a une frontiere d'octets ARBITRAIRE : un
+                # caractere UTF-8 multi-octets peut etre scinde entre deux
+                # tranches. En decodage strict, toute banniere non ASCII coupee
+                # a la mauvaise place ferait LEVER cette fonction. Le strict
+                # serait donc moins sur, pas plus.
+                #
+                # Et l'octet perdu ne peut pas changer le verdict : le predicat
+                # est `'#' in output`, et `#` (0x23) est ASCII — il ne peut etre
+                # ni un octet de tete ni un octet de continuation d'une sequence
+                # multi-octets. **Ignorer des octets malformes ne peut donc ni
+                # CREER ni DETRUIRE un `#`.**
+                #
+                # ── CE QUI REFUTERAIT CE TRI, ET IL FAUT LE RELIRE ALORS ──
+                #
+                #   1. si le predicat cessait d'etre ASCII — un prompt localise,
+                #      un marqueur accentue : des octets perdus pourraient alors
+                #      changer le verdict ;
+                #   2. si `output` cessait d'etre confine. Il n'est aujourd'hui
+                #      NI journalise NI retourne, et l'exception porte un
+                #      message STATIQUE. Le rendre, le journaliser ou
+                #      l'interpoler dans une erreur ferait sortir un contenu qui
+                #      vient d'un PTY — lequel echote ce qu'on lui envoie, et
+                #      la ligne au-dessus lui envoie le mot de passe root.
+                #      **Ce serait un defaut d'une autre famille que celui que
+                #      la regle signale.**
+                #
+                # Qualifie par LECTURE (semgrep indisponible sur l'hote et dans
+                # les trois conteneurs). L'amelioration juste — un decodeur
+                # INCREMENTAL, qui garde les octets partiels au lieu de les
+                # jeter — est de la robustesse, pas de la securite : elle ne
+                # change aucun verdict de ce bloc.
+                #
                 # nosemgrep: rw-decode-errors-ignore
                 output += channel.recv(1024).decode('utf-8', errors='ignore')
                 if '#' in output:
