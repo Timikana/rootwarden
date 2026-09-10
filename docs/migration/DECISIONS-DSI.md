@@ -17856,3 +17856,1205 @@ par machine. *Trois gestes voisins, deux gardes identiques : la troisième s'éc
 toute seule, et elle serait fausse.* Ce qui reste ouvert du dossier est le seul
 point dont la raison ne parlait pas d'un redémarrage : **④ la rétention de
 `login_attempts`**, une décision de conformité pour l'exploitant.
+
+**E-568 — Les 898 derniers fichiers du legacy restent en place, et c'est un
+choix mesuré, pas un oubli.** « Ne plus avoir de legacy » vaut aussi pour ce que
+git ne suit pas. Remesuré le 2026-09-09 :
+
+```
+fichiers sur disque sous legacy/   1133
+dont suivis par git                 235   (l'archive _deprecated/)
+dont ignores / non suivis           898   TOUS sous legacy/vendor/
+montages docker les citant            0   temoin : 10 montages vus sur 5 conteneurs
+Dockerfile / compose les citant       0   temoin : laravel/vendor cite 1 fois
+code SERVI les citant                 0
+```
+
+**Je ne les supprime pas, pour trois raisons dans cet ordre :**
+
+① **Ils sont inertes.** Aucun montage, aucun `autoload` depuis `laravel/` ou
+`backend/`, `.gitignore:16` (`vendor/`) les exclut donc ils ne voyagent pas.
+
+② **Ils ne portent aucun écart de vulnérabilité.** Versions comparées aux
+paquets en service : `dompdf/dompdf` v3.1.6 des **deux** côtés,
+`spomky-labs/otphp` 11.5.0 des **deux** côtés. `phpmailer/phpmailer` v6.12.0
+n'existe que côté legacy — et n'est chargé par rien.
+
+③ **Le geste serait du bruit dans un arbre que sept sessions partagent**, pour
+des octets qu'aucun processus ne lit.
+
+⚠ **ET LE POINT QUI SURVIT À CETTE DÉCISION, parce qu'il est de mon fait** : la
+CI ne les audite plus. J'ai réduit `sca-php` à `for d in laravel` **dans le
+commit même de l'archivage** — la garde du job l'exigeait, et c'était juste
+puisque plus rien n'est servi. Mais la conséquence doit être écrite quelque part :
+
+> **Si quelqu'un remet un jour `legacy/` en service, il héritera de 898 fichiers
+> de dépendances tierces qu'aucun contrôle ne regarde plus, et rien dans le
+> dépôt ne l'en avertira.** Un job vert ne dit pas ce qu'il a cessé de couvrir.
+
+**Le retour en arrière est acquis** : `legacy/_deprecated/composer.json` (372 o)
+et `composer.lock` (37 218 o) sont **suivis par git**, donc les 898 fichiers sont
+reconstituables par un `composer install`. *C'est ce qui rend la non-suppression
+peu coûteuse — et ce qui rendrait la suppression réversible si l'exploitant la
+voulait.*
+
+---
+
+**E-569 — RÉTRACTATION IMMÉDIATE : mon propre relevé de production était faux
+d'un facteur 6,5, et du côté qui ALARME.** L'étape 1 de la mission demande le
+ratio doc/code. Mon premier chiffre : **2,40**, au-dessus du seuil de 2, donc
+« l'équipe écrit sur ses mesures au lieu de porter ». Le vrai : **0,37**.
+
+```
+fenetre 12 h, 105 commits
+  FUSIONS (ni code ni doc)   44
+  CODE                       41
+  DOC (docs/ seulement)      15
+  autre                       5
+  somme 105 == 105           oui
+```
+
+Deux défauts, tous deux dans mon classeur :
+
+① **44 commits de fusion rangés dans DOC**, parce qu'un commit de fusion n'a
+aucun fichier et que `all(x.startswith('docs/') for x in [])` vaut **`True`** —
+*l'universelle vraie à vide, que j'ai déjà consignée et recommise.*
+
+② **Mon prédicat CODE était trop étroit** : `feat`/`fix` seulement, et
+`laravel/`|`backend/` seulement. Il excluait `test`, `chore`, `revert`, et
+`scripts/`, `.github/`, `.semgrep/` — qui sont de la production dans ce dépôt
+(le cliquet semgrep, le script d'extinction, les règles maison).
+
+> **Un instrument qui classe doit rendre une somme, et la somme doit être
+> vérifiée contre un compte indépendant.** Sans le `105 == 105`, les 44 fusions
+> restaient dans la mauvaise colonne sans qu'aucune ligne ne paraisse fausse.
+
+⚠ **Et la direction compte** : ce faux chiffre allait me faire reprocher à
+l'équipe d'écrire au lieu de porter, sur une fenêtre où elle a produit 41
+commits de code contre 15 de documentation. *Une fausse alarme adressée à
+quelqu'un d'autre est le seul type d'erreur de mesure dont le coût est immédiat.*
+
+**Limite déclarée, et elle gouverne l'étape 2** : les 105 commits portent tous
+l'auteur `Timikana`. Le parc partage une identité git, donc « quelle session n'a
+pas produit de CODE depuis deux tours » est **inévaluable depuis git**. J'ai
+assigné sur la valeur des tâches, pas sur ce critère, et je le dis plutôt que de
+laisser croire que le critère a été appliqué.
+
+**E-570 — Le jeton Telegraf est en clair dans `supervision_config`, et son
+commentaire affirme un chiffrement qui n'existe pas.** Voir `DOSSIER-66`. Écrit
+sans chiffrement à `:2475` et `:2499`, relu brut à `:541`, quand `tls_psk_value`
+— même table, même fichier — est chiffré à `:718` et déchiffré à `:895`/`:1242`.
+`decrypt_password` est appelé 4 fois dans ce fichier, zéro pour le jeton (témoin :
+le `4` prouve que l'instrument voit les déchiffrements).
+
+**Le défaut est ARMÉ, PAS EXERCÉ** : la table est vide (`0 0`, mesuré). J'étais à
+un mot d'écrire « un secret est déjà en clair en service », ce qui aurait
+contredit `DOSSIER-55` §⑨ en présentant sa formulation exacte comme une
+sous-estimation. *C'est le témoin — un `COUNT(*)` dans la même commande — qui a
+fait dire « la table est vide » au lieu de « la requête n'a pas abouti ».*
+
+**L'ordre juste pour l'exploitant : chiffrer d'abord, porter `patch 03`
+ensuite.** L'inverse crée un secret en clair qu'une migration devra rattraper.
+Correctif assigné à `gestion-ssh-key-0b`, branche `security/`, **non fusionnée**.
+
+**E-571 — L'étape 3 tient, et je la fais remplacer par une garde parce qu'elle
+est récitée seize fois.** `socle_avertissement` : 0 dans `laravel/lang/{fr,en}/auth.php`,
+0 dans `cgu.blade.php`, 0 dans toute suite ; les 2 seuls fichiers du dépôt qui
+portent le mot sont `CHANGELOG.md` et ce fichier — ma propre prose. Témoins
+étalonnés : `cgu_titre` → 4 fichiers, clé absurde → 0.
+
+`git grep` dans ce fichier rend **seize** consignations de cette même mesure.
+*Le coût n'est pas la commande — c'est qu'une vérification récitée dérive, alors
+qu'une garde refuse.* Assignée à `gestion-ssh-key-c6`, avec la contrainte de
+distinguer **trois** états (clé absente · clé présente · instrument muet), sans
+quoi un renommage de `lang/` la rendrait verte pour toujours.
+
+**E-572 — La file des 11 reste épuisée, remesurée site par site plutôt que
+reconduite.** ② `/ssh-audit/schedules` 9 · ③ `groupes.js` 20 · ④ `importeCsv` 1 ·
+⑤ `/ssh-audit/config` 3 · ⑥ `/fail2ban/{jail,geoip}` 2 · ⑦ `/ssh-audit/scan` 4 ·
+⑧ `drift_scan` 4 (témoin : motif absurde → 0). ⑨ a rendu `0` **et**
+`FICHIER ABSENT` sur la même ligne : mon idiome `$(grep -c … || echo ABSENT)`
+**confond zéro correspondance et fichier absent**, `grep -c` sortant en code 1
+quand le compte est nul. `supervision.js` est bien là (80 224 o, suivi) — c'était
+mon motif qui ne valait rien.
+
+**E-573 — Les deux corrections de `0b` tiennent, et la mienne était incomplète
+d'une manière SILENCIEUSE.** Rejouées avant relais. ① `:541` n'est pas un
+lecteur : il est dans `_build_agent_config_content` (`def` à `:500`) et le jeton
+part à `:557` dans le TOML déposé sur la machine (appelants `:1951`, `:2144`) —
+**chiffrer sans déchiffrer là déploierait `sodium:…` comme jeton**, avec un échec
+d'authentification chez l'agent distant et rien côté produit. ② `varchar(512)`
+borne le clair à **338** caractères (mesuré : 338 → 511, 339 → 515) ; le mode
+d'échec est bénin, `STRICT_TRANS_TABLES` lève au lieu de tronquer.
+
+> **Une spécification dont le point critique doit être DÉDUIT est une
+> spécification incomplète.** « À l'image du PSK » laissait déduire le
+> déchiffrement ; c'est exactement le geste qu'un exécutant pressé omettrait.
+
+Et `0b` a rendu une mesure qui **retire** un point plutôt que d'en ajouter :
+l'injection TOML par le jeton a une capacité marginale nulle, `extra_config`
+étant déjà ajouté verbatim sur la même route sous les mêmes gardes. *Un défaut
+dont l'exploitation demande une capacité déjà détenue et offerte n'est pas une
+élévation.*
+
+**E-574 — ⛔ DEUX LIVRABLES SONT BLOQUÉS SUR LE MÊME MUR : il n'y a pas
+d'exécutant.** `0b` décline l'écriture (cinquième fois aujourd'hui, lecture seule
+sur le code). `c6` a livré la garde `socle_avertissement` (`146886eb`, branche
+`security/garde-socle-avertissement`, 173 lignes) et déclare honnêtement qu'elle
+**n'a jamais été exécutée** — pas de `php` sur l'hôte. Mon périmètre d'écriture
+sur ce tour est `DECISIONS-DSI.md` et les `DOSSIER-*.md`.
+
+⚠ **Et je mesure mieux que `c6` sur son propre aveu : `php 8.4.25` tourne dans
+`rootwarden_laravel`.** Exécuter sa garde ne demande aucun outil manquant — il
+demande d'écrire le fichier dans `laravel/tests/`, monté en bind. **Le blocage
+n'est pas technique, il est de périmètre**, et il appartient à l'exploitant :
+soit il ouvre l'écriture à une session, soit il exécute lui-même. *Un pair ne
+peut pas élargir son périmètre, et je n'ai pas à le lui demander.*
+
+**E-575 — La garde de couverture `sca-php` est livrée, et je l'ai éprouvée
+MOI-MÊME en quatre états.** `8dadd611`, `tests/e2e/sca-couvre-le-servi.mjs`, 357
+lignes, par `gestion-ssh-key-ec`. Mon épreuve, sur une racine du scratchpad — mes
+`docker-compose*.yml` et `ci.yml` n'ont pas bougé (`git diff` : 0 ligne) :
+
+```
+① copie telle quelle, sans montage legacy      code 0
+② montage `./legacy` ajoute                    code 1   « legacy/_deprecated NON SCANNEE (avec composer.lock) »
+① rejouee, montage retire                      code 0
+③ TEMOIN aucun compose lisible                 code 2   INSTRUMENT MUET
+④ TEMOIN sca-php introuvable                   code 2
+depot reel                                     code 0
+```
+
+Elle imprime son propre domaine dans le verdict, et elle **surcharge sa racine
+en le disant** (« ce verdict NE PORTE PAS sur le dépôt ») — de sorte qu'un vert
+obtenu sur une copie ne peut pas se lire comme un vert du dépôt.
+
+⚠ **ET LA CONTRE-ÉPREUVE QUE J'AI EXIGÉE A TROUVÉ QUE SON PREMIER JET ÉTAIT VERT
+SUR SON PROPRE OBJET.** `ec` remontait vers les ANCÊTRES portant un
+`composer.json`. Vérifié par moi : `legacy/composer.json` est **absent**, la
+racine est un cran plus **BAS**, `legacy/_deprecated/composer.json` (372 o).
+
+> **Monter un répertoire sert tout ce qu'il contient.** Une dérivation qui ne
+> remonte que vers les ancêtres rate exactement le cas qu'on garde : la remise en
+> service d'un répertoire ENTIER.
+
+*C'est le cas où une garde est PIRE que rien : elle occupe la place d'un contrôle
+et rassure à sa place.* Et le sens de ses deux faux positifs suivants
+(`.claude/skills/php-modern`, `legacy/_deprecated` classés servis) est celui que
+je consigne depuis hier : **ils ALARMAIENT, donc ils se sont fait voir. Le même
+défaut de contexte en sens inverse — un contexte plus large que déclaré — aurait
+DÉDOUANÉ, et rien ne l'aurait dit.**
+
+**E-576 — Ma conclusion « le blocage est de périmètre » était fausse sur le
+mécanisme, et la correction de `0b` était fausse sur la conséquence.** Les deux
+mesures, par moi :
+
+```
+docker-compose.yml:49        - ./laravel:/var/www/html
+le test de c6                branche PRESENT · arbre ABSENT · conteneur ABSENT
+```
+
+`0b` a raison : **le conteneur MONTE l'arbre, il ne le copie pas**, donc un
+fichier qui n'existe que sur une branche est invisible depuis le conteneur, et
+`docker cp` dans `/var/www/html` écrit dans l'arbre de l'hôte. Ma formulation
+laissait croire qu'une simple autorisation suffisait.
+
+**Mais sa conséquence ne tient pas pour CETTE branche**, et je l'ai mesurée :
+
+```
+fichiers touches par 146886eb     1
+vues Blade dans cette branche     0
+compiles Blade appartenant a root 0   (sur 119)
+appels base / requete du test     0   (glob, RecursiveDirectoryIterator, require)
+```
+
+`0b` invoque *« le geste que le dépôt paie déjà par une vue compilée en root et
+28 pages d'erreur »*. Ce geste-là était un `git checkout` **sur une vue Blade**.
+Ici : un fichier neuf, zéro vue, et le danger des compilés root est **à zéro
+aujourd'hui**. Écrire ce fichier, lancer un test filtré, le retirer — le coût
+réel est faible.
+
+> **Nous nous sommes trompés dans les deux sens sur le même objet : mon erreur
+> CHARGEAIT `c6`, sa correction le DÉDOUANAIT, et la vérité est entre les deux.**
+> `0b` écrit lui-même que les dédouanements ne se font pas attraper — sa propre
+> correction en était un, et c'est la mesure qui l'a arrêtée, pas la relecture.
+
+**Je ne l'exécute pas pour autant**, et cette fois pour la seule bonne raison :
+`laravel/tests/` n'est pas mon périmètre d'écriture sur ce tour. *Le blocage est
+bien de périmètre — mais il fallait la mesure pour avoir le droit de le dire.*
+
+**E-577 — `c6` a éprouvé sa garde sans écrire dans l'arbre partagé, et son
+contournement est légitime.** `2a3585e8`. `php -l` propre, `phpunit` contre le
+dépôt réel **OK (3 tests, 64 assertions)**, et la contre-épreuve sur arbres
+forgés avec le VRAI runner : clé présente → `FAILURES!`, clé absente → `OK`,
+état vide → `FAILURES!`. Aucun écart avec sa simulation.
+
+Le contournement : **`/tmp` DU CONTENEUR est sur l'overlay, pas monté** — seuls
+`laravel/` et `certs/` sont en bind. Et il a évité un piège que je n'avais pas
+nommé : `git checkout` de sa branche aurait roulé l'arbre **deux commits en
+arrière**, retirant du disque le travail en cours d'autres sessions.
+
+> **Et sa preuve de non-écriture est meilleure qu'une affirmation** : PHPUnit a
+> refusé `file_put_contents(/var/www/html/.phpunit.result.cache) : Permission
+> denied`. *Son exécution ne POUVAIT pas écrire dans l'arbre partagé — c'est
+> l'échec qui l'atteste.*
+
+**E-578 — ⛔ SON CONSTAT D'INCIDENT EST VRAI ET LE RÉSIDU EST DE MOI. SON COMPTE
+EST FAUX, ET C'EST UNE ALARME.**
+
+Le fait, mesuré aux deux horloges :
+
+```
+laravel/.phpunit.result.cache   root:root  mode 644  mtime 2026-09-09 08:15:08 CEST
+mon commit ad74664a                                          2026-09-09 08:15:45 +0200
+ecart                                                        37 secondes
+```
+
+**C'est moi. J'ai lancé `phpunit` en root, exactement le geste que j'ai dit à
+`c6` d'éviter, et je l'ai dit APRÈS l'avoir commis.** Le fichier est
+`gitignore` (`laravel/.gitignore:7`), non suivi, donc inoffensif en lui-même.
+
+**Mais son escalade ne tient pas.** `c6` écrit *« sept [compilés Blade] en
+portent déjà la marque dont deux dans le socle : 39 pages à un `@include` d'un
+500 »*. Mesuré par moi, puis **rejoué indépendamment par `0b`** :
+
+```
+compiles Blade                     120        dont root  0
+tout fichier root sous laravel/    709        dont 708 dans vendor/ (image, composer en root)
+                                              et 1 : le cache phpunit ci-dessus
+TEMOIN POSITIF  /etc/passwd trouve par `-user root`      1
+TEMOIN POSITIF  vues appartenant a www-data            120
+```
+
+**Zéro vue compilée appartenant à root. La panne n'est pas armée.**
+
+> **Sa LEÇON est juste et son ÉTAT est faux** : le mécanisme existe, je l'ai
+> armé ce matin et désarmé, et la parade est bien dans la commande (`-u www-data`)
+> et non dans la vigilance. Mais « 39 pages à un `@include` d'un 500 » décrit un
+> danger **daté**, pas l'état courant.
+
+⚠ **Et le sens explique pourquoi il a été attrapé en minutes** : une alarme fait
+regarder. C'est la troisième fois en un tour que l'asymétrie se vérifie, et cette
+fois dans le bon sens — après mon dédouanement de `c6` et celui de `0b`, tous
+deux trouvés par une mesure que personne ne réclamait.
+
+**E-579 — `0b` a rejoué contre lui-même et a nommé sa propre classe.** Il
+confirme 120/0 avec deux témoins, et écrit : *« Une fausse alarme fait regarder.
+Mon dédouanement faisait renoncer — j'ai déclaré non exécutable un livrable qui
+l'est, avec une phrase qui refermait le dossier. »* Il borne aussi sa correction
+plutôt que de surcorriger : le mécanisme du montage tient, c'est la conséquence
+qui était fausse.
+
+Et il retire lui-même sa distinction des deux déblocages : le livrable de `c6`
+manquait d'un **droit d'écriture sur `laravel/tests/`**, pas d'un arbre isolé —
+*« un worktree serait une commodité, pas une nécessité »*. **Les deux blocages
+sont du même genre**, et `E-574` se lit désormais ainsi : un seul droit
+d'écriture accordé les débloque tous les deux.
+
+**E-580 — `0b` a corrigé ma PREUVE et pas ma conclusion, et sa correction est de
+ma propre classe consignée.** J'ai écrit *« c'est faux, ta mesure le réfute
+déjà : 120/0 »*. **Un `120/0` d'aujourd'hui ne réfute pas une alerte portant sur
+08:20** — c'est exactement `feedback_alerte_mal_datee`, ma note, et j'allais me
+la faire ratifier. Vérifié depuis, sur la fenêtre :
+
+```
+compiles              119     mtime AVANT 08:15:08 : 119     APRES : 0
+proprietaires distincts        www-data (seul)
+```
+
+*Le répertoire n'a pas été vidé : les compilés d'avant l'incident sont là, tous
+`www-data`. Le compte de `c6` ne peut donc pas venir de là.*
+
+**Et son affinement sur l'asymétrie est meilleur que le mien.** J'attribuais la
+différence de traitement à la DIRECTION (alarme vs dédouanement). Il montre que
+ce n'est pas la direction :
+
+> **Son alarme portait un NOMBRE FALSIFIABLE — « 7 compilés, 2 dans le socle, 39
+> pages ». N'importe qui pouvait le compter, et quelqu'un l'a fait. Nos deux
+> dédouanements ne portaient aucun nombre : « pas d'échappatoire », « php existe
+> donc c'était exécutable ». Il n'y avait rien à compter, donc rien à réfuter —
+> il fallait d'abord INVENTER la mesure.**
+
+**Le remède n'est donc pas de se méfier des exculpations : c'est de leur EXIGER
+un nombre, comme on l'exige d'une alarme.** *Une exculpation chiffrée se réfute ;
+une exculpation en prose se ratifie parce qu'elle n'offre aucune prise.*
+
+**E-581 — L'item de signature « propriété du cache compilé en PRODUCTION » est
+RÉPONDABLE, et `c6` s'est trompé dans le sens qui m'arrangeait.** Il a écrit *« ma
+correction ne vide pas ton item : la production reste non mesurée »*. J'ai vérifié
+plutôt que d'accepter — c'est une mesure qui m'arrange, donc celle à refaire :
+
+```
+images laravel baties            1        rootwarden-laravel:latest, 2026-09-06 13:08:20
+la ligne 59 commitee             3055dec0, 2026-09-03 12:16
+l image PORTE la ligne 59        oui   `chown -R www-data:www-data storage/framework/views`
+                                        (temoin : le motif `chown … storage` est trouve 2 fois)
+ordre dans l entrypoint          :44 `view:cache` en ROOT  ->  :59 le chown APRES
+docker-compose.prod.yml:110-113  tmpfs uid=33,gid=33 sur views, cache, sessions, bootstrap/cache
+uid 33                           = www-data (verifie dans le conteneur)
+prod et dev                      MEME image (`build: context .`, `dockerfile ./laravel/Dockerfile`)
+```
+
+**Le piège est donc fermé PAR CONSTRUCTION en production** : le tmpfs est recréé
+vide à chaque démarrage et appartient à `www-data`, et le `chown` de `:59`
+s'exécute **après** le `view:cache` qui tourne en root. `DOSSIER-00:335` disait
+« je n'interroge pas la prod » — c'était vrai le 2026-09-03 ; **l'image du
+2026-09-06 postdate le correctif.**
+
+*Ce qui reste, et c'est beaucoup plus étroit que « non mesuré » : personne n'a
+vérifié qu'un déploiement de production a bien rebâti depuis cette image.*
+
+**E-582 — ⛔ ET J'AI FAILLI SUR-GÉNÉRALISER LA FERMETURE DE `0b`, UNE MESURE AVANT
+DE L'ÉCRIRE.** Son argument — *« un `phpunit` qui n'effectue aucun rendu ne
+compile aucune vue Blade, quel que soit l'utilisateur »* — est juste **pour le
+test de `c6`**, mesuré : 0 requête, 0 rendu, `glob` / `RecursiveDirectoryIterator`
+/ `file_get_contents`.
+
+J'allais l'étendre à la suite entière. **C'est faux :**
+
+```
+fichiers de test               23     temoins : 14 `public function test`, 18 `assertSame`
+this->get( · this->post( · this->actingAs( · get(route(        0 fichier
+view(                                                          1 fichier
+  -> laravel/tests/Feature/ComptesRenduSignauxTest.php:156   return view('comptes', …)
+```
+
+**Un seul test de la suite rend une vue, et c'est `comptes` — celle que j'ai
+modifiée ce matin, et celle dont j'ai armé puis désarmé le compilé root.** Lancer
+la suite complète en root arme donc exactement un compilé, et c'est celui qui
+compte.
+
+> **La fermeture par mécanisme était juste sur son objet et fausse d'un cran plus
+> haut.** *Un raisonnement qui tient pour un fichier ne tient pas pour la suite
+> parce qu'il suffit d'UN rendeur — et l'universelle « aucun test ne rend » est
+> exactement le genre d'affirmation qu'un seul contre-exemple détruit.*
+
+⚠ Et mon premier témoin sur ce point rendait **zéro** : `git grep -l '\$this->get('`
+cherche une barre oblique inverse littérale entre apostrophes simples. *Zéro sur
+la sonde et zéro sur le témoin : la mesure n'avait pas eu lieu.* Recalibré sur
+`public function test` (14) et `assertSame` (18), la propriété est devenue
+lisible — et l'exception est apparue.
+
+**E-583 — Mon « 0 fichier postérieur à 08:15:08 » était faux, et la cause est ma
+propre note : DEUX HORLOGES.** `0b` a relevé que l'arithmétique ne tenait pas
+(118 + 1 = 119, pas 119 + 0). Il soupçonnait la forme relative de `-newermt`.
+Ce n'était pas ça : **j'ai lancé `find` DANS LE CONTENEUR.**
+
+```
+hote      2026-09-09 09:32:56 CEST
+conteneur 2026-09-09 07:32:56 UTC      -> deux heures pile
+```
+
+Mon `-newermt "2026-09-09 08:15:08"` désignait donc **10:15:08 CEST**, et le
+fichier de 08:47:38 CEST (06:47:38 UTC) est tombé du côté « avant ». Refait
+depuis l'hôte, sans silencer `stderr` :
+
+```
+total .php                             119
+mtime AVANT 08:15:08 CEST              118
+mtime APRES                              1
+  2026-09-09 08:47:38  www-data:www-data  3592f78b37f141210dd52ed23296474a.php
+```
+
+*Une valeur plausible et fausse ne se signale pas d'elle-même : `119 / 0` était
+aussi lisible que `118 / 1`. C'est l'arithmétique de `0b`, pas la vraisemblance,
+qui l'a attrapée.*
+
+**E-584 — Et la CHRONOLOGIE de `0b` ferme la question mieux que mon mécanisme.**
+Vérifiée par moi, aux deux horloges :
+
+```
+08:15:08   mon phpunit en root        -> .phpunit.result.cache  root:root
+08:46:35   comptes.blade.php modifie     utilisateur:utilisateur
+08:47:38   son compile recree            www-data:www-data
+           et c'est le fichier 3592f78b… : le MEME que l'unique posterieur
+source 1788936395  <  compile 1788936458   -> 63 secondes, piege DESARME
+```
+
+> **À 08:15, le compilé de `comptes` était à jour par rapport à sa source :
+> Blade n'avait rien à recompiler. Mon exécution en root ne POUVAIT pas produire
+> de compilé root — non pas parce qu'aucun test ne rend, mais parce que le seul
+> test qui rend n'avait rien à recompiler à cet instant.**
+
+Et le compilé de 08:47:38 appartient à `www-data` : il vient d'une **requête
+HTTP**, pas de mon `phpunit`. *La boucle se ferme sans supposition.*
+
+⚠ **MAIS LA CONDITION EST UNE CONJONCTION, ET ELLE REDEVIENDRA VRAIE :**
+
+```
+(comptes.blade.php modifie depuis son compile)  ET  (suite lancee en root)
+        aujourd'hui FAUSSE                                le geste reste possible
+```
+
+**À la prochaine édition de `comptes.blade.php`, la première redevient vraie.**
+La parade dans la commande (`-u www-data`) est donc la bonne, et pour une raison
+plus étroite et plus solide que « un test rend une vue » : **un seul rendeur, sur
+la seule vue que le chantier édite en ce moment.** *L'armement et le déclencheur
+coïncident sur le même fichier — ce n'est pas une conjonction heureuse, c'est que
+la seule vue rendue par la suite est aussi la seule en travaux.*
+
+**E-585 — Le dénominateur de « un seul rendeur » est vérifié, pas supposé.**
+`c6` comptait 19 fichiers, moi 23 : l'écart aurait pu cacher un second rendeur,
+**et c'est le sens qui dédouane**. Mesuré dans tous les sens :
+
+```
+git ls-files 'laravel/tests/'          33 entrees   dont Feature 19  Outils 9  Doubles 2  Support 1  Unit 1  TestCase 1
+git ls-files 'laravel/tests/**/*.php'  23
+sur le DISQUE, *.php                   24           <- le denominateur COMPLET
+sites de rendu sur les 24              2, tous les deux dans ComptesRenduSignauxTest.php
+                                         :156  return view('comptes', …)
+                                         :167  ->render()
+TEMOIN POSITIF  sites `assertSame`     141
+```
+
+**Le 19 de `c6` était `Feature/` seul — et comme les deux sites de rendu y sont,
+son dénominateur plus petit ne cachait rien.** *Mais ça ne se savait qu'après
+l'avoir mesuré : un dénominateur trop petit rend « un seul rendeur » faussement
+rassurant, et c'est exactement le type d'exculpation que `0b` demande de
+chiffrer.*
+
+---
+
+**E-586 — Le ratio doc/code de ce tour est 3,00 et il est le MIEN.** Fenêtre
+09:00 → 09:35, somme vérifiée `13 == 13` : 1 fusion, 3 CODE, 9 DOC. Attribution
+par contenu (les 13 commits portent le même auteur git) : **mes 7 commits sont
+7 DOC et 0 CODE** ; les pairs rendent 3 CODE et 2 DOC. *L'étape 1 diagnostique
+« l'équipe écrit sur ses propres mesures au lieu de porter » : le diagnostic est
+juste et il me désigne.*
+
+**Et il est structurel** : mon périmètre d'écriture est `DECISIONS-DSI.md` et les
+`DOSSIER-*.md` uniquement. *Un mandat qui autorise la documentation seule et
+mesure un ratio doc/code ne peut rendre qu'un ratio infini.* Décision déplacée à
+l'exploitant : ouvrir le périmètre, ou mesurer l'étape 1 sur les sessions qui
+portent.
+
+**E-587 — Personne n'est à relancer, et c'est la première fois que le critère est
+évaluable.** L'étape 2 vise les sessions sans CODE depuis deux tours. Les trois
+pairs sollicités ont tous produit du CODE dans cette fenêtre — `c6` (`146886eb`),
+`ec` (`8dadd611`), et une quatrième session (`27e4abc3`). *Je n'envoie donc rien :
+`E-501` a chiffré à cinq le coût des assignations inventées, et une file vide ne
+se remplit pas pour occuper le temps.*
+
+**E-588 — `DOSSIER-67` : quatre livrables corrects, aucun branché.** Voir le
+dossier. Le point qui se mord la queue : `27e4abc3` a été écrit pour corriger
+« quatre contrôles que rien n'appelle », **et son lanceur est cité par zéro
+fichier**. Témoin posé : `go-socle-passerelle.mjs` est bien cité dans `.github/`,
+donc la sonde voit un câblage quand il existe.
+
+> **Chacun a bien fait sa part, et la somme des parts ne fait pas un produit.**
+> C'est la forme la plus économique de perte : rien n'est faux, rien n'est perdu,
+> rien ne sert.
+
+**E-589 — L'étape 3 tient, et le seul chose qui garde le terme en vie est ma
+prose — qui grossit à chaque tour.** `socle_avertissement` : 0 dans
+`laravel/lang/{fr,en}/auth.php`, 0 dans `cgu.blade.php`, 0 suite. Témoins :
+`cgu_titre` → 4 fichiers, clé absurde → 0. **Les fichiers porteurs sont passés de
+2 à 3 ce tour, et le troisième est un `DOSSIER-*` que je viens d'écrire.** *Le
+coût de vérifier une déclaration croît avec le nombre de fois qu'on écrit qu'on
+l'a vérifiée* — raison de plus pour que la garde de `c6` remplace le contrôle
+manuel.
+
+**E-590 — RECTIFICATION : mes « deux sites de rendu » étaient UN.** `0b` l'a
+mesuré au tokenizer de PHP et je l'ai rejoué :
+
+```
+jeton `view`    1 fois, ligne 156
+jeton `render`  1 fois, ligne 167
+nombre de `;` entre 156 et 167 :  UN
+    return view('comptes', array_merge([ … ], $surcharge))->render();
+```
+
+**`:156` et `:167` sont les deux extrémités du même `return`, dans une seule
+méthode privée.** Mon relevé par motif a compté les deux moitiés d'une expression
+chaînée — *« un relevé par motif en comptait deux »*, la forme que j'avais
+signalée à `0b` dans l'autre sens.
+
+Le sens est l'**alarme**, donc il se serait fait attraper, et il ne change aucune
+conclusion : un rendeur, un fichier, une méthode. *Mais « deux sites » aurait
+circulé, et deux sites dans deux méthodes ne se parent pas comme un seul.*
+
+⚠ Et `0b` ajoute une troisième famille de faux zéro à sa collection :
+`grep -rlF '->render(' …` rend **0 fichier** parce que `ugrep` lit le tiret
+initial comme un drapeau (`invalid option ->render(`). *Erreur visible — mais
+silencée, elle aurait publié « aucun `->render` dans les tests », un faux zéro du
+côté qui dédouane.* Il faut `-e` ou `--`.
+
+**E-591 — `HEAD` est partagé, et la règle « committer par chemins » ne couvrait
+que la moitié du risque.** Voir `DOSSIER-67` §addendum. Trois sessions ont
+committé sur `security/garde-socle-avertissement`, créée à 09:13:56 depuis mon
+commit de 09:13:51. **Un commit sur la mauvaise branche est indiscernable d'un
+commit correct par toute vérification locale au commit** : `git add`, `git commit`
+et `git show --stat HEAD` réussissent tous les trois. Le seul relevé qui
+l'attrape est `git rev-parse --abbrev-ref HEAD` **AVANT**, et aucune session ne
+l'a fait aujourd'hui.
+
+**Deux rectifications de l'alerte de `0b`, mesurées** : `2a3585e8` est de `c6`
+(*« Session 5 — securite »*), pas de moi ; et aucun `checkout` n'est de ma
+session — mes 8 commits sont sur `Migration-Laravel`, 0 dans une fenêtre de
+bascule. *Le reflog de `HEAD` entrelace les gestes de toutes les sessions, donc ma
+propre vérification a d'abord ressemblé à un aveu.*
+
+**Je ne fusionne rien et ne réécris rien.** Le document de `0b` est intact (blob
+`655a8b0d…` identique, 113 lignes). Recommandation : fusionner la branche, le
+document arrive avec — la seule option sans écriture dans l'arbre partagé.
+
+**E-592 — `0b` a refusé mon exculpation en la chiffrant, et il avait raison.**
+Je lui avais dit *« le diagnostic me désigne, pas vous »*. Sa réponse : *« mon
+ratio est infini aussi — 1 commit, 0 de code — et pour la même raison
+structurelle : mon mandat est le document »*. **Le diagnostic de l'étape 1 nous
+désigne tous les deux.**
+
+> **Refuser une exculpation qu'on vous offre est le seul moyen de voir ce
+> qu'elle recouvre.** C'est la contrepartie exacte de la règle qu'il a formulée
+> ce matin — exiger un nombre des exculpations — appliquée à celle qu'il
+> recevait.
+
+**E-593 — Une PR de sécurité que j'ai fusionnée a porté dans `main` un document
+étranger, et j'allais m'en exculper.** Voir `DOSSIER-68`. `9603e6da`
+(`QA-QUATRE-COMMANDES-ROOT-INDIRECTES.md`, document de `0b`) est dans
+`origin/main`, porté par `6a4faba5` — la fusion de #70, sur `tls_ca_path` et
+rsyslog. **2 de mes 7 fusions ont porté un commit que leur titre n'annonçait
+pas.**
+
+⛔ **Et le défaut est pire que ce que j'allais écrire.** Je commençais à consigner
+que le relevé manquait, que `gh pr merge` ne montre pas les commits. **Mesuré :
+`gh pr view 70 --json commits` liste `9603e6da`.** L'information était
+disponible avant la fusion, par une commande à un drapeau près de celle que je
+lançais.
+
+> **Ce n'est pas un outil qui manque : c'est un relevé que je n'ai pas fait.**
+> Et j'allais l'écrire dans l'autre sens — la forme qui dédouane, sur mon propre
+> geste, dans le document qui l'examine.
+
+⚠ **Second défaut de la MÊME fusion.** J'avais déjà consigné avoir fusionné #70
+sans lire ses contrôles. J'ai corrigé la lecture des contrôles pour les six PR
+suivantes et **je n'ai pas pensé une seule fois à lire ce qu'elles portaient.**
+*Corriger un manquement sur un objet ne fait pas regarder les autres propriétés
+du même geste.*
+
+**E-594 — Le basculement de `HEAD` est le régime NORMAL de ce chantier.** 28
+entrées `checkout: moving` dans le reflog, sur 11 cibles distinctes — 15 vers
+`Migration-Laravel`, 13 vers 10 branches `security/`. `0b` a audité ses 99
+commits : 97 sur `Migration-Laravel`, **3 égarés** les 04/09, 09/09 02:46 et
+09/09 09:15. *Sa collision n'est pas la première : c'est la première vue, et
+seulement parce qu'un commit manquant dans son compte de ratio l'a fait
+regarder.*
+
+**Et le remède par construction est déjà là, dans MON scratchpad** :
+`git worktree list` rend un second arbre `wt-main`, sur `main`, appartenant à ma
+session. **Un worktree a son propre `HEAD`.** *Je l'avais sous la main et je n'y
+ai pas pensé une seule fois.* Ordre du dépôt — inexprimable > dérivé > exhaustif
+> contrôlé : un worktree met le problème dans la première catégorie, relever
+`HEAD` avant de committer le laisse dans la dernière.
+
+**Je ne réécris pas `main`.** Le contenu porté est légitime, le dommage est de
+traçabilité et non d'intégrité, et réécrire un `main` que huit sessions suivent
+échangerait ce défaut contre un risque de perte. **Le remède serait plus coûteux
+que le mal.**
+
+**E-595 — Mon témoin de `DOSSIER-66` comptait une SOUS-CHAÎNE : deux fonctions
+homonymes sous un seul nombre.** `decrypt_password(` = 4 =
+`enc.decrypt_password(` 2 (`:895`, `:1242`, les deux sur le PSK) +
+`server_decrypt_password(` 2 (`:227`, `:228`, **fonction différente**). Le corps
+du dossier nommait les sites correctement ; c'est le nombre mis en avant — **mon
+témoin** — qui conflait les deux.
+
+> **Le sens de cette erreur dédouane mon INSTRUMENT : un témoin gonflé fait
+> paraître la preuve plus solide qu'elle n'est.** Ce n'est pas le résultat qui
+> était faux, c'est la force que je lui prêtais. Rectifié dans le dossier ;
+> témoin correct = 2, et le jeton reste à 0 chiffrement (témoin : 1 chiffrement
+> du PSK à `:718`).
+
+**E-596 — `0b` m'annonçait un changement récent qui a cinq mois.** Le garde
+`if telegraf_token == '********': telegraf_token = None` de `:2466-2467` est daté
+`2129a2cf`, **2026-04-11**, le commit d'origine du module supervision. *C'est le
+miroir de ses deux items périmés — rapporter comme un changement une chose
+préexistante — et la direction est encore la rassurante.*
+
+**Sa mise en garde reste juste et je la reprends** : le garde du masque et le
+chiffrement *« se ressemblent assez pour être confondus par qui lit vite »*. Deux
+propriétés distinctes de la même variable, **une seule des deux existe.** Le
+jeton est toujours en clair et le geste n'a toujours pas d'exécutant.
+
+**E-597 — Et `0b` a tronqué sa propre sonde.** Son `10 paires / 7 branches`
+venait d'un `head -20` sur le reflog ; le compte entier est **28 basculements sur
+11 cibles**. *Une sonde tronquée publie son tronçon sans le dire — et la
+troncature va toujours dans le sens du moindre nombre, donc du moindre
+problème.* Sa conclusion en sort renforcée, pas affaiblie : le basculement de
+`HEAD` est le régime normal du chantier.
+
+**E-598 — Le commentaire du jeton Telegraf n'a JAMAIS été vrai, et l'asymétrie
+est native.** `blame` : `:2464` (le commentaire), `:2465-2467` (le code qui ne
+chiffre pas) **et `:718` (le chiffrement du PSK)** sont tous du même commit,
+`2129a2cf3` du 2026-04-11, celui qui **crée** le fichier (statut `A`). Témoin :
+`:369` rend un autre commit (2026-08-22), donc le `blame` discrimine.
+
+**Les deux secrets ont été écrits dans le même geste, l'un correctement et
+l'autre pas, avec un commentaire affirmant que le mauvais était bon.** Ce n'est
+pas « le jeton a été oublié quand le PSK a été durci » — il n'a jamais suivi.
+
+> **Un défaut natif est invisible à tout instrument qui cherche une dérive.**
+> Aucune bissection, aucun « qu'est-ce qui a changé », aucune chasse à la
+> régression n'y mène — et c'est la classe entière d'outils qu'on emploie par
+> réflexe sur un fichier de cinq mois.
+
+**E-599 — `0b` aggrave mon E-595, et il a raison.** J'avais dit qu'un témoin
+gonflé « dédouane mon instrument ». Il ajoute : **il rend aussi le `0` du jeton
+plus étonnant, donc plus crédible comme trouvaille.**
+
+> **Le témoin et la mesure ne se contrôlent pas séparément : c'est leur RAPPORT
+> qui porte la conclusion.** *`0 sur 4` se lit comme une anomalie, `0 sur 2`
+> comme une possibilité — le même `0`, deux forces de conviction, et c'est le
+> dénominateur que j'avais gonflé.*
+
+**E-600 — La forme commune du fil, nommée.** `0b` reconnaît trois bornes de
+confort — `head -20` sur le reflog, `--since='2026-09-07'` sur son audit,
+`git log -3` sur un fichier — et j'en ai une quatrième : six PR relues sur le
+seul critère que je venais de corriger.
+
+> **Une borne choisie pour la commodité devient une propriété du résultat.**
+> Aucune des quatre n'était un choix de mesure ; les quatre ont raccourci le
+> résultat dans le sens du moindre problème.
+
+*Et `0b` clôt en disant qu'il commencera ses commits par
+`git rev-parse --abbrev-ref HEAD` — « pas parce que c'est suffisant, mais parce
+que le remède par construction n'est pas à ma main ». C'est la bonne raison de
+prendre un contrôle : savoir qu'on prend le dernier rang de l'échelle faute
+d'accès au premier.*
+
+**E-601 — Ma recommandation de fusion est PÉRIMÉE, et l'ordre décide.** `0b` a
+rétabli son document sur `Migration-Laravel` (`d489d316`, 10:00, 174 lignes)
+trente minutes après que j'aie écrit « fusionner la branche, il arrive avec,
+aucun geste ». Simulé sans écrire :
+
+```
+branche -> origin/main         PROPRE     (le chemin est absent de main)
+branche -> Migration-Laravel   CONFLIT    (8977 o / 174 l  contre  5849 o / 113 l)
+```
+
+**Recommandation corrigée : fusionner `Migration-Laravel` d'abord** — elle porte
+la version complète — puis la branche en résolvant le conflit en sa faveur, ou en
+retirant la copie antérieure de la branche. *Le contenu ne court plus aucun
+risque.*
+
+> **Une recommandation peut être périmée par le geste même dont elle disait
+> qu'il n'était pas nécessaire.** Qu'elle devienne fausse parce que quelqu'un a
+> mieux fait n'est pas un échec de la recommandation — mais elle doit cesser de
+> circuler.
+
+Et le conflit annoncé est la bonne issue : *« un conflit visible, que je préfère
+à un document qui n'existe nulle part d'atteignable »*. **Un conflit se voit et
+se tranche ; une branche non fusionnée ne se voit pas.**
+
+**E-602 — L'omission du chiffrement est LOCALE, pas une inattention générale.**
+`blame` : `:717` (garde de masque du PSK), `:718` (son chiffrement, juste en
+dessous) et `:2466` (garde de masque du jeton) sont du même commit. **Les deux
+secrets reçoivent le même traitement du masque ; un seul reçoit le chiffrement.**
+
+> **Ce n'est pas une inattention à combler : c'est une propriété précise qui
+> manque à côté d'une autre qui est là.** Plus embarrassant pour le geste
+> d'origine, et plus utile pour qui corrigera — il n'y a pas un oubli diffus à
+> rattraper, il y a une ligne à écrire à un endroit nommé.
+
+**E-603 — Aucune des quatre bornes de confort n'a été trouvée par son auteur.**
+La mienne par `0b`, ses trois par moi. *`0b` en donne la raison : **une borne de
+confort ne laisse aucune trace dans le résultat — le nombre rendu est un nombre
+plausible.*** C'est la même famille que `E-583` (`119/0` aussi lisible que
+`118/1`) et que `E-599` (le rapport témoin/mesure). **Trois formes d'un seul
+fait : un résultat faux et vraisemblable ne porte aucun signe de sa fausseté, et
+seul un tiers muni d'un autre instrument le voit.**
+
+**E-604 — AUCUNE branche `security/` ne se fusionne proprement, et quatre des six
+conflits sont dans du CODE.** Rejoué et étendu (branches **énumérées**, code de
+sortie **sans tube**, témoin `Migration-Laravel` contre elle-même à `0`) :
+
+```
+security/backend-cve                 2 chemins   cve.py · scheduler.py
+security/garde-socle-avertissement   1 chemin    QA-JETON-TELEGRAF (document)
+security/semgrep-regles-mortes       3 chemins   ssh_utils.py · rules-rootwarden.yml · QA-APPARIEMENT (document)
+```
+
+**Les remonter comme « en attente d'un mot » était incomplet : le mot ne suffira
+pas.** Les deux conflits de documents se résolvent sans perte en gardant
+`Migration-Laravel` ; les quatre autres demandent une décision de contenu. *Et
+les deux branches `bundle/` ne sont pas du travail en cours — mai et août.*
+
+**Précision contre `0b`** : il compte trois conflits de code, il y en a
+**quatre** — `.semgrep/rules-rootwarden.yml` en est. *Un fichier de règles
+semgrep décide si la CI bloque ; le job « Les regles custom MORDENT » atteste que
+ce dépôt le traite comme du code.*
+
+**E-605 — ⛔ J'AI MIS UN `head -6` DANS LA COMMANDE QUI MESURAIT LE DÉFAUT DES
+BORNES DE CONFORT.** Cinquième instance en une heure, une heure après l'avoir
+nommée, dans le document qui l'énonce.
+
+```
+head -20 sur le reflog        10 bascules au lieu de 28
+--since='2026-09-07'          2 commits egares au lieu de 3
+git log -3 sur un fichier     « changement recent » au lieu de cinq mois
+six PR relues sur un critere  les commits portes jamais lus
+head -6 sur les conflits      5 chemins au lieu de 6, ET un pair mis en tort
+```
+
+> **Une règle protège les autres, pas soi : on l'applique en LISANT, jamais en
+> ÉCRIVANT.** Ce qui manque n'est pas un énoncé, c'est un contradicteur.
+
+⚠ **Et l'effet le plus coûteux n'est pas le mauvais compte : c'est qu'une
+troncature chez le VÉRIFICATEUR transfère le tort au VÉRIFIÉ.** `0b` avait raison
+sur les trois conflits et mon relevé n'en montrait que deux — *j'étais à un
+message de lui écrire que son troisième n'existait pas.*
+
+**E-606 — `0b` a commis la même faute, sur le même objet, dans la même
+commande.** Sa première passe affichait `code de sortie : 0` — celui de `head`
+dans son tube, pas celui de `merge-tree`. *« J'ai failli rapporter fusion propre
+pendant que le flux imprimait CONFLIT trois fois. »* C'est la fiche
+`marqueur ≠ verdict` du dépôt, et le corollaire « un code de sortie qui traverse
+un TUBE n'est pas celui de la commande », commise en la vérifiant.
+
+**Deux sessions, un même objet, deux troncatures indépendantes, dans les deux
+commandes qui mesuraient le défaut de la troncature.** *Aucune des deux n'a été
+trouvée par son auteur.*
+
+**E-607 — `rules-rootwarden.yml` est exécuté par TROIS étapes de la CI, dont un
+témoin positif et un témoin négatif.** Mesuré à un grain plus fin que celui de
+`0b`, qui en annonçait deux :
+
+```
+:464  :479   « Run custom rules (.semgrep/rules-rootwarden.yml) »
+:658          « TEMOIN POSITIF — chaque regle reparee doit MORDRE »
+:694          « TEMOIN NEGATIF — les formes GARDEES ne doivent PAS mordre »
+TEMOIN de comparaison : .gitleaks.toml cite 1 fois · reference-trouvailles.txt 3 fois
+```
+
+**Ce n'est donc pas seulement de la politique exécutable : c'est de la politique
+exécutée avec ses deux témoins.** Le conflit sur ce fichier est bien un conflit
+de code — **quatre, pas trois.**
+
+**E-608 — ⛔ ET MON « 4 » ÉTAIT JUSTE PAR ACCIDENT DE SEAU, PAS PAR MESURE.**
+`0b` a nommé sa sixième instance : *« j'ai classé par EXTENSION — un critère
+choisi parce qu'il se lit d'un coup d'œil, pas parce qu'il répond à la
+question »*. **Ma propre commande faisait exactement la même chose :**
+
+```
+case "$f" in *.py|*.php|*.yml|*.mjs|*.sh) t='CODE / CONFIG' ;; *.md) t='document' ;; esac
+```
+
+*J'ai mis `.yml` du bon côté par choix de seau. La question était « qu'est-ce qui
+décide du comportement du produit », et mon prédicat n'y répondait pas — il
+répondait « quelle est l'extension ».* C'est `0b` qui a fait la mesure qui fonde
+mon chiffre, **après** que je l'aie corrigé avec l'autorité d'une correction.
+
+> **Un prédicat de confort qui rend la BONNE réponse est plus dangereux que celui
+> qui se trompe : rien ne réclame qu'on le redérive.** Les cinq bornes
+> précédentes se sont signalées par un écart ; celle-ci ne s'est signalée par
+> rien — elle a été trouvée parce que `0b` cherchait le motif de SA propre
+> erreur, et que le mien était le même.
+
+**E-609 — La forme que ce fil a nommée, et qui manquait.** *(la formulation est
+la mienne, la reconnaissance de sa portée est de `0b`)*
+
+> **Une troncature chez le VÉRIFICATEUR transfère le tort au VÉRIFIÉ.**
+
+Les cinq bornes précédentes coûtaient un mauvais compte. Celle-ci **fabrique une
+fausse réfutation d'autrui** — et le coût n'est pas symétrique : *une fausse
+alarme sur soi se corrige ; une fausse réfutation d'un tiers lui fait retirer un
+fait juste.* **C'est un dédouanement par procuration, et il porte l'autorité de
+la vérification.**
+
+**CLÔTURE DU FIL.** Douze heures, deux sessions, une trentaine de rectifications.
+**Aucune erreur n'a été trouvée par son auteur** — chaque fois par l'autre, et
+jamais par vigilance : toujours par une mesure citée contre une affirmation, ou
+par un reste inexpliqué. *C'est la démonstration matérielle de la seule règle qui
+ait tenu de bout en bout : un résultat faux et vraisemblable ne porte aucun signe
+de sa fausseté, et il n'y a rien à voir depuis l'intérieur.*
+
+**Ce qui reste à l'exploitant, et rien de plus :**
+
+```
+un droit d'ecriture             les 3 controles eprouves + le chiffrement du jeton
+Migration-Laravel d'ABORD       elle porte les versions completes des deux documents
+puis chaque branche security/   4 conflits de CODE a trancher, 2 de document triviaux
+le regime des branches          28 bascules de HEAD sur 11 cibles, worktree jamais employe
+le jeton Telegraf               chiffrer :2465, DECHIFFRER :541, puis patch 03
+login_attempts                  retention — decision de conformite
+```
+
+**Aucun des six n'est technique.**
+
+**E-610 — `0b` a refusé de relayer mon item `login_attempts` faute de l'avoir
+mesuré. Je l'ai remesuré : il tient, et DEUX de mes chiffres étaient faux.**
+
+Sa réserve était juste et de la meilleure espèce : *« cinq items mesurés à côté
+d'un sixième emprunté, ça les met tous au même rang »*. **C'était le seul de ma
+liste de clôture que je n'avais pas remesuré cette fenêtre.**
+
+### Ce qui tient
+
+```
+cles etrangeres      login_attempts  ->  (AUCUNE FK)
+                     password_history        fk_pwhist_user            CASCADE
+                     password_reset_tokens   …_ibfk_1                  CASCADE
+                     remember_tokens         …_ibfk_1                  CASCADE
+                     user_logs               …_ibfk_1                  CASCADE
+                     TEMOIN : 76 FK dans le schema, l'instrument les voit
+LOG_RETENTION_DAYS   rootwarden_python   NON DEFINI
+                     rootwarden_laravel  NON DEFINI
+                     TEMOIN : DB_HOST rend `db`
+                     consomme par backend/scheduler.py et backend/ssh_key_manager.py
+                     declare 1 fois dans srv-docker.env.example
+donnees              2 lignes · colonnes : id, ip_address, username, success, step, attempted_at
+                     -> adresses IP et identifiants : donnees personnelles
+```
+
+**La table conserve des données personnelles, sans clé étrangère, quand ses
+quatre voisines d'authentification sont toutes en CASCADE, et la variable qui
+gouverne la purge n'est pas définie dans les conteneurs en service.** L'item est
+réel.
+
+### ⛔ Les deux chiffres que je récitais et qui sont faux
+
+**① « les six tables purgées par `Comptes::anonymise` » — il y en a UNE.**
+Scopé à la méthode (87 lignes, offsets 37750→41930) : un seul
+`table('…')`, et c'est `users`. *`login_attempts` en est bien absente — la
+conclusion tient, le nombre était inventé.*
+
+⚠ **Et ma première sonde a failli conclure l'inverse** : elle greppait
+`table\('…'\)` sur **tout le fichier** et rendait cinq tables dont
+`login_attempts`, ce qui aurait dit « elle EST purgée ». *C'est mon propre défaut
+de portée — scoper la sonde à la FONCTION, pas au fichier — et il se serait
+trompé du côté qui referme le dossier.* `login_attempts` est citée ligne 397,
+dans `deverrouille`, une autre méthode.
+
+**② « les trois autres tables d'auth sont CASCADE » — elles sont QUATRE.**
+Sous-compte, et dans la direction qui **affaiblit** mon propre argument : plus de
+voisines en CASCADE, plus le contraste est net. *C'est la direction rare — un
+chiffre récité qui se trompe contre soi.*
+
+> **Un compte récité dérive dans les deux sens, et il dérive même quand la
+> conclusion reste vraie.** Les deux erreurs étaient dans les chiffres
+> d'appui, pas dans le fait — et c'est ce qui les a rendues invisibles pendant
+> plusieurs tours : *rien ne réclame la vérification d'un chiffre qui soutient
+> une conclusion correcte.*
+
+### L'item, dans sa forme mesurée
+
+**`login_attempts` conserve des adresses IP et des identifiants sans FK ni purge
+effective. Décision de conformité pour l'exploitant** : poser
+`LOG_RETENTION_DAYS` dans l'environnement des conteneurs, et/ou ajouter la table
+à `Comptes::anonymise` — qui ne touche aujourd'hui que `users`.
+
+**E-611 — CLÔTURE : `0b` avait raison sur l'étendue de `anonymise`, et ma sonde
+débordait de 63 lignes sans dommage.** Mesuré par accolades équilibrées :
+
+```
+anonymise()   lignes 869 a 893   25 lignes   ->  1 appel table(), c'est `users`
+ma sonde precedente              88 lignes   ->  debordait de 63 lignes
+                                                 et n'a trouve que `users` quand meme
+tout le fichier                              ->  36 occurrences de table()
+```
+
+**Le même défaut de portée, deux fois, deux conséquences opposées.** Ma sonde
+scopée « jusqu'à la prochaine déclaration de méthode » a couvert 88 lignes au
+lieu de 25 — un débordement de 63 lignes — **et il n'a rien changé, parce que
+rien de dangereux n'était dans l'excédent.** Ma sonde de fichier, elle, rendait
+36 occurrences et allait conclure que `login_attempts` était purgée.
+
+> **Le dommage d'une portée fausse n'est pas proportionnel à l'erreur : il dépend
+> de ce qui tombe dedans.** Une même faute de scope est inoffensive à 63 lignes
+> près et fausse le verdict à 36 occurrences près. *Donc « ma portée est un peu
+> large » n'est pas une réserve qu'on peut évaluer sans regarder l'excédent.*
+
+**Ce que ni l'un ni l'autre n'avons fait, et ne ferons pas** : lire le contenu des
+2 lignes de la table. Ce sont des adresses IP et des identifiants de comptes
+réels. Les requêtes n'ont rendu que `COUNT(*)` et la liste des **colonnes** —
+*le compte et le schéma suffisent à établir l'item ; la valeur n'y ajoute rien et
+ne doit pas circuler.*
+
+---
+
+## FIN DU TOUR — six décisions, aucune technique
+
+```
+① un droit d'ecriture           les 3 controles eprouves + le chiffrement du jeton
+② Migration-Laravel d'ABORD     elle porte les versions completes des deux documents
+③ puis chaque branche security/ 4 conflits de CODE a trancher, 2 de document triviaux
+④ le regime des branches        28 bascules de HEAD sur 11 cibles, worktree jamais employe
+⑤ le jeton Telegraf             chiffrer :2465, DECHIFFRER :541, puis patch 03
+⑥ login_attempts                ip_address + username, aucune FK, LOG_RETENTION_DAYS
+                                 vide dans les deux conteneurs, anonymise() ne touche
+                                 que `users` — decision de CONFORMITE
+```
+
+**Les six sont mesurés des deux côtés.** `E-565` à `E-611`, `DOSSIER-66` à
+`DOSSIER-68`.
+
+> **La règle qui a tenu de bout en bout, démontrée sur nous plutôt qu'énoncée :
+> un résultat faux et vraisemblable ne porte aucun signe de sa fausseté.** Une
+> trentaine de rectifications en douze heures, **aucune trouvée par son
+> auteur** — jamais par vigilance, toujours par une mesure citée contre une
+> affirmation ou par un reste inexpliqué. *Ce n'est pas un défaut de rigueur : il
+> n'y a rien à voir depuis l'intérieur.*
+
+---
+
+**E-612 — Zéro CODE, douze documents, une heure : le diagnostic de l'étape 1 me
+désigne entièrement, et je l'attaque en mesurant le PRODUIT.** Fenêtre
+09:35 → 10:35, somme vérifiée `12 == 12` : **0 CODE · 12 DOC · 0 fusion**, ratio
+**infini**. Dix des douze sont de moi.
+
+*Le fil de rectifications a produit une trentaine de corrections réelles — mais
+elles portaient sur nos propres mesures, pas sur le produit. C'est exactement le
+diagnostic : « l'équipe écrit sur ses propres mesures au lieu de porter ».*
+
+**Donc je n'écris pas de dossier ce tour. Je fais une mesure.**
+
+**E-613 — RIEN N'EST NON PORTÉ, et cette fois c'est DÉRIVÉ du JS et non récité.**
+Au lieu de reconduire `E-501` (« la file des 11 est épuisée »), j'ai balayé les
+42 fichiers JS pour tout appel distant sans cible côté portage. **Cinq
+candidats, cinq artefacts, par TROIS défauts distincts de mon instrument :**
+
+```
+① supervision.js n'utilise PAS `ecris`      0 `ecris(` · 0 `litDistant(` · 12 `fetch(`
+   -> mon motif supposait un assistant universel qui n'existe pas
+② wazuh.js passe des NOMS D'ACTION           `ecris('config')` `('options')` `('regle')`
+   -> quatre « chemins manquants » qui ne sont pas des chemins
+③ mon ancre excluait le slash initial        web.php:1264
+   Route::any('/api/gateway/{chemin?}', PasserelleController::class)
+   -> `Route::\w+\(\s*'api/gateway` ne matche jamais `'/api/gateway`
+```
+
+**Le seul candidat qui ressemblait à un vrai chemin est routé, et son passage par
+la passerelle est un CHOIX documenté sur place** (`Permissions.php:171-179`) :
+
+> *« L'OCTROI PASSE PAR LA PASSERELLE — et c'est la seule raison qui vaille :
+> `POST /admin/temp_permissions` NOTIFIE le compte concerné
+> (`notify(type='perm_granted')`, `admin.py:196`). Réécrire l'insertion ici
+> priverait la personne de son avertissement, sans que rien ne le signale. **Un
+> effet de bord qu'on ne sait pas reproduire est une raison de ne PAS
+> court-circuiter.** »*
+
+⚠ **Et l'épreuve au réseau que j'ai tentée N'A PAS EU LIEU** : `POST` sur le
+chemin réel **et** sur un chemin inexistant rendent tous deux `419`. *Le garde
+CSRF répond avant la résolution de route — témoin identique à la sonde, donc
+aucune mesure.* C'est `artisan route:list` qui a tranché.
+
+**Conclusion pour l'étape 1, et elle est arithmétique** : le ratio doc/code ne
+peut plus être satisfait par personne, **parce qu'il n'y a plus rien à porter.**
+`E-501` le disait de l'étape 2 ; c'est désormais vrai de l'étape 1. *Un ratio
+infini n'est pas ici un défaut de discipline : c'est le quotient d'un portage
+terminé.*
+
+**Étape 2 : personne à relancer.** Aucun geste portable ne subsiste — mesuré
+ci-dessus, pas reconduit. **Étape 3 : tenue** (0 · 0 · 0, témoins `cgu_titre` 4
+et clé absurde 0). **Étape 4 : les six décisions de `E-611` sont inchangées et
+n'attendent que l'exploitant.**
+
+---
+
+**E-614 — J'ai refait « rien n'est non porté » avec un AUTRE instrument, en sens
+inverse, parce que c'est la conclusion qui m'arrange le plus.** Le tour précédent
+la dérivait du JS. Ici, depuis l'archive : les 178 `.php` archivés, ceux qui
+écrivent en base, et les tables qu'ils touchent, comparées à celles que
+`laravel/app` cite.
+
+```
+fichiers .php archives              178
+dont ECRIVANT (INSERT/UPDATE/DELETE) 38
+tables ecrites par l'archive         20
+tables citees par laravel/app        34      TEMOIN, doit etre > 0
+ORPHELINES                            3      iptables_rules · linux_versions · update_schedules
+```
+
+**Deux des trois sont des artefacts de mon instrument :**
+
+```
+iptables_rules     PORTE — PareFeuController · Iptables.php · pare-feu.js · web.php
+                   et 4 fichiers JS atteignent /iptables (liste blanche)
+update_schedules   PORTE PAR LA PASSERELLE — mises-a-jour.js atteint
+                   /schedule_update et /schedule_advanced_update, tous deux en liste blanche
+```
+
+*Mon motif `table('…')` ne voit pas une écriture qui passe par la passerelle vers
+`backend/`, et la passerelle **est** un mécanisme porté. Une table « jamais
+écrite par `laravel/app` » peut être parfaitement servie.*
+
+**E-615 — `linux_versions` est une table MORTE, et son extinction a retiré un
+DÉFAUT, pas une capacité.**
+
+```
+ecrivain unique      legacy/_deprecated/update/functions/machines.php:89   (ARCHIVE)
+mentions backend/    0        mentions laravel/    0
+lignes               0        (compte EXACT, pas TABLE_ROWS qui est une estimation)
+FK                   linux_versions_ibfk_1 -> machines(id) ON DELETE CASCADE
+```
+
+**Et le détail qui inverse le verdict.** L'archive écrivait :
+
+```sql
+INSERT INTO linux_versions (machine_id, version, last_checked) VALUES (…)
+ON DUPLICATE KEY UPDATE version = :version, last_checked = NOW()
+```
+
+*Intention : une valeur courante par machine.* **Mais le schéma ne porte AUCUNE
+clé unique sur `machine_id`** — seulement `KEY machine_id`, l'index de la clé
+étrangère. Le seul index unique est `PRIMARY KEY (id)`, que l'`INSERT` ne
+fournit jamais.
+
+> **L'`ON DUPLICATE KEY UPDATE` était donc INERTE : chaque appel insérait une
+> ligne de plus.** Le legacy *voulait* une valeur courante et *produisait* un
+> historique qui grossissait sans fin. **Le portage fait ce que le legacy
+> VOULAIT** — `monitoring.py:183`,
+> `UPDATE machines SET linux_version = %s, last_checked = NOW()`, mêmes deux
+> champs — *et pas ce qu'il FAISAIT.*
+
+**L'extinction a donc supprimé une fuite lente, pas une capacité.** *Un
+`ON DUPLICATE KEY UPDATE` sans clé unique est un défaut qu'aucune relecture du
+SQL n'attrape : la requête est correcte, c'est le SCHÉMA qui la rend inerte.*
+
+**Ce qui revient à l'exploitant, et c'est mineur** : garder ou supprimer la table
+`linux_versions`. **Elle ne nuit pas** — 0 ligne, aucun écrivain, FK en CASCADE —
+et sa suppression est une migration, donc hors de mon périmètre. *Je la signale
+pour qu'elle soit un choix et non un oubli.*
+
+**Étapes 1 à 3 de ce tour** : 1 commit depuis 10:35, le mien, **0 CODE** — le
+critère de l'étape 2 se déclenche pour toutes les sessions, et **je n'assigne
+rien**, la raison étant maintenant mesurée par deux instruments indépendants et
+non récitée. Étape 3 tenue (0 · 0 · 0, témoins `cgu_titre` 4 et clé absurde 0).
+
+---
+
+**E-616 — La CLASSE de l'upsert inerte est mesurée, et AUCUN upsert vivant n'est
+touché.** `E-615` avait trouvé une instance ; j'en dérive la classe plutôt que de
+m'arrêter à l'énumération.
+
+```
+`ON DUPLICATE KEY UPDATE` dans le depot   48 occurrences · 33 fichiers
+dont VIVANTS avec table identifiable      19, tous dans backend/routes/
+```
+
+**Le critère, et il est net :**
+
+```
+upsert INERTE   <=>  PK auto_increment  ET  aucun autre index unique
+                     (l'INSERT ne fournit pas la PK, donc aucune cle ne peut collisionner)
+upsert CORRECT  <=>  PK signifiante fournie par l'INSERT, OU un index unique explicite
+```
+
+**Mesuré table par table :**
+
+```
+9 tables   PK SIGNIFIANTE, fournie par l'insert
+           fail2ban_status(server_id) · graylog_rsyslog(machine_id) · permissions(user_id)
+           schema_migrations(version) · wazuh_agents(machine_id) · wazuh_machine_options(machine_id)
+           chatops_users(chat_user_id,platform) · machine_supervision_profile(machine_id,platform)
+           supervision_agents(machine_id,platform)
+11 tables  PK auto_increment MAIS index unique explicite
+           uq_user_event · uniq_cve_machine · uniq_docker_container · uq_drift_machine_cat
+           uk_user_keys · uniq_machine_directive · uq_iptables_rules_server · name (x3)
+2 tables   auto_increment ET zero index unique  ->  linux_versions · update_schedules
+           les DEUX ecrites uniquement par l'ARCHIVE
+```
+
+**Zéro upsert vivant affecté.** *Et la migration `063_unicite_iptables_rules.sql`
+montre que quelqu'un a déjà rencontré cette classe et l'a fermée sur son
+instance.*
+
+**E-617 — ⛔ ET MA « TROUVAILLE » SUR `update_schedules` EST UNE REDÉCOUVERTE :
+`backend/routes/updates.py:798-834` la documente depuis le 2026-09-08, mieux que
+je ne l'aurais fait.** Ce qui y est déjà écrit, avec ses témoins :
+
+```
+update_schedules   modelise un INTERVALLE · py=0 php=0, ZERO code nulle part
+                   temoins : machines py=28/php=115 · ssh_audit_schedules py=2
+schedule_update    installe un cron et N'ENREGISTRE RIEN — etat PERMANENT
+trois routes       installent un cron ; la base n'en garde qu'une trace,
+                   `maj_secu_date`, par une COLONNE et non par cette table
+verdict deja pose  « vestige a retirer ou intention jamais cablee — a trancher
+                   par qui tient le schema »
+```
+
+*Cette note porte même la distinction que j'aurais dû faire : une STRUCTURE existe
+pour le modèle par intervalle et personne ne l'écrit (vestige) ; aucune structure
+n'existe pour le modèle par date/récurrence (migration). **Deux morceaux qui ne
+sont pas le même travail**, et je les aurais fondus.*
+
+> **Ce que ma mesure ajoute est étroit et je le borne** : le CRITÈRE de la classe,
+> la vérification que les 19 upserts vivants sont tous correctement clés, et le
+> fait que `linux_versions` porte le MÊME défaut latent — un
+> `ON DUPLICATE KEY UPDATE` inerte dans son écrivain archivé, ce que la note de
+> `updates.py` ne couvre pas puisqu'elle traite l'absence d'écrivain et non le
+> défaut de celui qui a existé.
+
+⚠ **Et c'est la sixième fois que je redécouvre ce que le dépôt documentait déjà.**
+*Un inventaire refait de zéro produit toujours quelque chose ; ce quelque chose
+est parfois une note d'il y a vingt-quatre heures, avec de meilleurs témoins.*
+
+**Ce qui revient à l'exploitant** : la septième décision de `E-615` (le sort de
+`linux_versions`) **rejoint une décision déjà posée** — celle de
+`updates.py:834` sur `update_schedules`. **Une seule question pour les deux : que
+fait-on des tables taillées pour un modèle que personne n'écrit ?** *Les deux
+sont vides, les deux ont une FK en CASCADE, aucune ne nuit — et leur suppression
+est une migration, donc hors de mon périmètre.*
+
+**Étapes 1 à 3** : 1 commit depuis 11:35, le mien, **0 CODE** — troisième tour
+consécutif. Étape 3 tenue (0 · 0 · 0, témoins `cgu_titre` 4, clé absurde 0).
+
+---
+
+**E-618 — J'ai remesuré mes SEPT décisions au lieu de les réciter : aucune n'a
+bougé, et la ② était la seule que je n'avais jamais chiffrée.**
+
+```
+① les 3 controles eprouves     146886eb · 8dadd611 · 27e4abc3   AUCUN dans origin/main
+② Migration-Laravel -> main    24 commits en attente, fusion PROPRE (temoin : main x main = 0)
+③ les 3 branches security/     existent, et les 3 conflitent TOUJOURS
+④ le regime des branches       28 bascules dans le reflog — aucune nouvelle
+⑤ le jeton telegraf            0 chiffrement dans la fenetre d'ecriture · 0 dechiffrement a :541
+⑥ LOG_RETENTION_DAYS           NON DEFINI dans les deux conteneurs (temoin DB_HOST=db)
+⑦ les 2 tables vestiges        linux_versions et update_schedules toujours presentes
+```
+
+**LA DÉCISION ② EST CHIFFRÉE, ET SON CONTENU EST UN CONSTAT SUR MOI :**
+
+```
+24 commits en attente de fusion
+  DOC    22        tous des `docs/migration/`, et tous de moi
+  CODE    2        27e4abc3  tests/e2e/controles-statiques.mjs      (une autre session)
+                   8dadd611  tests/e2e/sca-couvre-le-servi.mjs      (une autre session)
+  somme  24 == 24  verifie
+la fusion serait PROPRE — code 0, temoin `main` contre elle-meme a 0
+```
+
+> **La file de fusion est à 92 % de la documentation, et les deux seuls commits de
+> code sont ceux de deux autres sessions.** Le diagnostic de l'étape 1 n'est plus
+> une statistique de fenêtre : **il est matérialisé dans ce qui attend d'entrer
+> dans `main`.**
+
+*Et fusionner ② ne coûte rien — la fusion est propre — mais ça ne câble pas les
+deux contrôles : ça les met dans `main` sans que rien ne les appelle. Le §2 de
+`DOSSIER-67` reste vrai après la fusion.*
+
+**E-619 — ⛔ ET LE CONSTAT QUE JE ME DOIS : cette boucle produit un document par
+tour pour dire que rien ne change.** Sept tours, sept mesures, **trois tours
+consécutifs à zéro CODE de qui que ce soit**, et sept décisions qui n'ont pas
+bougé d'un pouce.
+
+```
+tour a 10:35   1 commit, le mien, DOC
+tour a 11:35   1 commit, le mien, DOC
+tour a 12:35   1 commit, le mien, DOC
+tour a 13:35   1 commit, le mien, DOC   <- celui-ci
+```
+
+Les mesures de ces quatre tours **ont produit quelque chose** — le critère de
+l'upsert inerte, la vérification par un second instrument, le chiffrage de ② —
+*mais aucune n'a fait avancer le produit d'une ligne, parce qu'il n'y a rien à y
+faire avancer et que mon périmètre est la documentation.*
+
+> **Les étapes 1 et 4 de la mission se contredisent quand le portage est fini :
+> l'une reproche d'écrire, l'autre commande d'écrire.** Ce n'est pas une
+> indiscipline de ma part et ce n'est pas un défaut de la mission — c'est qu'elle
+> a été écrite pour un chantier en cours, et le chantier est terminé.
+
+**Ce qui reste n'est pas mesurable, c'est décidable, et rien de ce que j'écrirai
+au huitième tour ne le rendra plus décidable qu'au septième.**
