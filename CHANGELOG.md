@@ -5,6 +5,44 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## Permissions — une liste à plancher dans une piste qui n'en a pas la largeur
+
+Sur `/permissions`, les noms de machines se **peignaient par-dessus** les listes de préréglage
+de la cellule voisine. L'écran qui accorde les accès sudo était illisible : on y lit
+`Accès + sudo compl` chevauché de `SiteInternet`, sans savoir laquelle des deux colonnes porte
+lequel des deux noms.
+
+Deux valeurs, chacune raisonnable isolément :
+
+    .rw-grille--compacte     piste minimale  160px
+    .rw-saisie--compacte     min-width       190px
+
+190 de liste + 12 de gouttière + 28 de remplissage = **230px de plancher dans une piste qui en
+mesure 172**. Le nom est le seul élément réductible ; il refuse de passer sous son contenu, et
+une cellule de grille ne rogne pas : le débordement se peint sur la voisine.
+
+**C'est le COUPLE qui est fautif, pas l'une des deux valeurs.** La même grille, la même classe
+et la même largeur de piste rendent correctement dès que la cellule porte une case à cocher —
+mesure sur les deux grilles de la page, pistes de 175,8px :
+
+    grille des droits (cases a cocher)   18 cellules    0 debordement    0 chevauchement
+    grille des acces  (listes)           33 cellules   33 debordements  29 chevauchements
+
+**Élargir l'écran n'y faisait rien.** `auto-fit` ajoute des colonnes au lieu de les élargir :
+de 1400 à 2000px la piste gagnait 3,5px et le débordement restait à 192. Le défaut était natif
+et insensible au viewport — aucun écran ne le montrait réparé.
+
+### Le remède ne choisit pas deux nombres qui s'accordent
+
+Rehausser `minmax()` à 240px suffisait à faire disparaître le symptôme aujourd'hui, et laissait
+la propriété reposer sur une inégalité que personne ne garde. `width: 100%` + `min-width: 0`
+retire son plancher à la liste et la fait **suivre** la piste : le débordement devient
+inexprimable, quelle que soit la largeur, y compris si quelqu'un rabaisse `minmax()` plus tard.
+Le `minmax(240px)` reste, mais il ne sert plus qu'à la lisibilité des libellés.
+
+Vérifié à 390, 768, 1400 et 2000px : **0 débordement, 0 chevauchement**, et la grille des
+droits ne bouge pas d'un pixel.
+
 ## I6 — le désarmement existait et ne gouvernait pas la concurrence
 
 Le retour arrière désarmait déjà tout **avant** la lecture. C'est juste pour un enchaînement

@@ -1937,6 +1937,50 @@ a.rw-bouton { display: inline-block; }
 .rw-liste-selection__ligne[hidden] { display: none; }
 
 /*
+ * UNE CELLULE QUI PORTE UNE LISTE DEROULANTE.
+ *
+ * `.rw-grille--compacte` pose un plancher de piste a 160px ; `.rw-saisie--compacte`
+ * pose un plancher de 190px a elle seule. Le couple est insoluble : 190 de liste
+ * + 12 de gouttiere + 28 de remplissage = 230px de plancher dans une piste qui
+ * en mesure 172. Le nom est le seul element reductible, il refuse de passer sous
+ * son contenu, et tout deborde a droite. Une cellule de grille ne rogne pas :
+ * le nom se PEINT sur la liste de la cellule voisine.
+ *
+ * Mesure du 2026-10-01 sur la grille des 33 machines, piste de 175,8px :
+ *   grille des droits (cases a cocher)  18 cellules   0 debordement   0 chevauchement
+ *   grille des acces  (listes)          33 cellules  33 debordements 29 chevauchements
+ * Meme grille, meme classe, meme largeur de piste : c'est le COUPLE qui est
+ * fautif, aucune des deux valeurs prise seule.
+ *
+ * Elargir l'ecran n'y fait RIEN : `auto-fit` ajoute des colonnes au lieu de les
+ * elargir. De 1400 a 2000px la piste gagne 3,5px et le debordement reste a 192.
+ *
+ * Le remede ne consiste pas a choisir deux nombres qui s'accordent aujourd'hui :
+ * `width: 100%` + `min-width: 0` retire son plancher a la liste et la fait SUIVRE
+ * la piste. Le debordement devient inexprimable quelle que soit la largeur de la
+ * piste, y compris si quelqu'un rabaisse `minmax()` plus tard. Le `minmax(240px)`
+ * ci-dessous ne sert plus qu'a la LISIBILITE des libelles de prereglage.
+ */
+.rw-grille--compacte.rw-grille--listes {
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+.rw-liste-selection__etiquette--empilee {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+}
+/* Un nom de machine peut etre long et sans espace (`Site_Internet_Pre-Prod`) :
+   sans point de coupe il redeborderait a lui seul. */
+.rw-liste-selection__etiquette--empilee .rw-liste-selection__nom {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+.rw-liste-selection__etiquette--empilee > .rw-saisie {
+    width: 100%;
+    min-width: 0;
+}
+
+/*
  * RAPPORT DU CONSTAT AVANT DEPLOIEMENT — sous-lot K2 du module `ssh/`.
  *
  * Le legacy deverse ce rapport dans une fenetre de texte monospace unique, ou la
