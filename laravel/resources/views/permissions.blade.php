@@ -169,7 +169,7 @@
                 </div>
 
                 <p class="rw-sous-titre-fort">{{ __('perms.acces') }}</p>
-                <div class="rw-grille rw-grille--compacte">
+                <div class="rw-grille rw-grille--compacte rw-grille--listes">
                     {{-- UN SEUL CONTROLE POUR TOUT L'ETAT. Une case a cocher plus une
                          liste de prereglages autoriseraient une combinaison
                          impossible — coche sans prereglage, ou prereglage sans
@@ -183,7 +183,7 @@
                          RETIRERAIT le sudo. Il le dit desormais. --}}
                     @foreach ($machines as $m)
                         @php($aAcces = in_array((int) $m->id, $acces[$c['id']], true))
-                        <label class="rw-liste-selection__etiquette">
+                        <label class="rw-liste-selection__etiquette rw-liste-selection__etiquette--empilee">
                             <span class="rw-liste-selection__nom">{{ $m->name }}</span>
                             <select class="rw-saisie rw-saisie--compacte"
                                     data-rw="acces-{{ $m->id }}-{{ $c['id'] }}"
