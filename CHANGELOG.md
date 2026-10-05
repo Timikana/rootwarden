@@ -5,6 +5,61 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## Dépendances PHP — quatre avis publiés après le dernier vert, et un vert qui aurait menti
+
+La CI rougit depuis le 2026-10-01 sur un seul job, `SCA PHP (composer audit)`. `composer.lock`
+n'avait pas bougé depuis le dernier vert (`ebd5b07d`, 0 fichier) : **quatre avis ont été publiés
+entre-temps** sur des paquets déjà verrouillés. N'importe quel commit aurait rougi.
+
+| Paquet | Avant | Après | Avis |
+|---|---|---|---|
+| `laravel/framework` | 13.25.0 | 13.34.0 | XSS dans la page de débogage (bas) |
+| `league/commonmark` | 2.10.0 | 2.10.3 | contournement `DisallowedRawHtml` (moyen), DoS quadratique (haut) |
+| `league/flysystem` | 3.35.2 | 3.36.0 | contournement du contrôle de chemin (bas) |
+| `league/flysystem-local` | 3.31.0 | 3.35.3 | suit `flysystem` |
+
+**Exposition mesurée : faible.** Le portage n'appelle ni Markdown ni `Storage::` (0 occurrence
+dans `app/` et `resources/views/`) : `commonmark` et `flysystem` sont transitifs. La page de
+débogage n'existe qu'avec `APP_DEBUG=true`, et la production est à `false` depuis le 2026-10-01.
+
+**La mise à jour est volontairement ÉTROITE.** Un premier essai avec `--with-dependencies` tirait
+45 paquets dont **deux majeures non demandées** — Guzzle 7 → 8, le client HTTP sous la passerelle
+et sous le déploiement de clés, et `brick/math` 0.18 → 1.0. Écarté : un correctif de sécurité
+n'emporte pas de changement de version majeure en passager. Le lockfile change sur exactement
+quatre paquets.
+
+### `./maj.sh` installe désormais les paquets — un vert de CI ne suffisait pas
+
+`vendor/` n'est pas suivi par git, et l'entrypoint ne lance `composer install` que si
+`vendor/autoload.php` est absent (`docker-entrypoint.sh:18-21`). Un `./maj.sh` apportait le nouveau
+`composer.lock` et **laissait les anciens paquets en service**, CI verte à l'appui.
+
+Nouvelle **étape 5a** : `maj.sh` demande à composer ce qu'il ferait (`--dry-run`), installe s'il y
+a quelque chose à faire, redémarre `laravel` (l'entrypoint remet les droits à `www-data`), puis
+**redemande** pour vérifier. Rien à faire → rien installé, rien redémarré. Le code retour ne
+discrimine rien (0 dans les deux cas, mesuré) : c'est le nombre d'opérations qui décide, lu par
+`scripts/compte-operations-composer.sh`, et une sortie non reconnue fait installer par précaution.
+
+Deux défauts de `maj.sh` corrigés au passage, tous deux mesurés :
+
+- **il ne se relançait pas après s'être mis à jour.** `git pull` pose un nouvel inode et bash
+  finit de lire l'ancien : une étape ajoutée n'aurait tourné qu'à la mise à jour SUIVANTE. Il se
+  relance maintenant une fois, sur la version tirée, après la vérification GPG ;
+- **il finissait par « OK » en vert après un échec.** Un échec d'installation est désormais
+  retenu, le script termine ses autres étapes, puis finit en rouge avec un code retour 1.
+
+Banc : `maj.sh` joué en entier avec un faux `docker` reproduisant les sorties réelles —
+en retard (installe, redémarre, vérifie), à jour (rien), échec (rouge, `rc=1`), `--check` (rien).
+Relance éprouvée sur un vrai `git pull` dans un dépôt local jetable : une relance quand `maj.sh`
+change, zéro quand il ne change pas.
+
+⚠ **Cette fois seulement, `./maj.sh` deux fois.** Le `maj.sh` installé sur l'hôte est l'ANCIEN :
+c'est lui qui tire cette version et il finit avec son propre contenu, sans l'étape 5a. Le second
+passage l'exécute. Ensuite, un seul suffit.
+
+Contrôle : `composer audit --locked` → « No security vulnerability advisories found ». Suite
+complète : 472 tests, 1 738 assertions, 0 échec.
+
 ## Clés SSH — le pré-contrôle refusait toutes les machines, et mon test le confirmait
 
 Une fois la panne TLS levée, « Déployer » refusait Eos : une machine saine, SSH authentifié,
