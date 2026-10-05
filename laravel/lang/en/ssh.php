@@ -83,4 +83,5 @@ return [
     "err_preflight_refuse" => "The pre-deployment check was refused. Nothing was deployed.",
     "err_preflight_sans_resultat" => "The pre-deployment check returned no result: it did not take place. Nothing was deployed.",
     "err_preflight_echoue" => "Pre-deployment check failed for: :machines. NOTHING was deployed — fix those machines or unselect them.",
+    "err_aucun_compte_avec_cle" => "No active account holds an SSH key on this fleet: a deployment would REMOVE every access instead of granting one. NOTHING was deployed — add a key to at least one account.",
 ];

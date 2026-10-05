@@ -53,8 +53,12 @@ class VerificationTlsDuBackendTest extends TestCase
             ];
 
             if (str_ends_with($requete->url(), '/preflight_check')) {
-                return Http::response(['success' => true, 'results' => [
-                    ['name' => 'machine-fictive', 'machine_id' => 3, 'ssh_ok' => true, 'users_with_keys' => 1],
+                // Forme RÉELLE du backend (`backend/routes/ssh.py:791-795`) :
+                // `users_with_keys` est À LA RACINE. La première version de ce faux
+                // le plaçait dans chaque machine — la même erreur que le code
+                // qu'elle prétendait garder, donc un test vert sur un défaut.
+                return Http::response(['success' => true, 'users_with_keys' => 1, 'results' => [
+                    ['name' => 'machine-fictive', 'machine_id' => 3, 'ssh_ok' => true, 'errors' => []],
                 ]]);
             }
 

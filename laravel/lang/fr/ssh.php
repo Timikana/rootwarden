@@ -104,4 +104,5 @@ return [
     "err_preflight_refuse" => "La verification pre-deploiement a ete refusee. Rien n'a ete deploye.",
     "err_preflight_sans_resultat" => "La verification pre-deploiement n'a rendu aucun resultat : elle n'a pas eu lieu. Rien n'a ete deploye.",
     "err_preflight_echoue" => "Verification pre-deploiement en echec pour : :machines. RIEN n'a ete deploye — corrigez ces machines ou decochez-les.",
+    "err_aucun_compte_avec_cle" => "Aucun compte actif ne porte de cle SSH sur ce parc : un deploiement RETIRERAIT tous les acces au lieu d'en poser. RIEN n'a ete deploye — ajoutez une cle a au moins un compte.",
 ];
