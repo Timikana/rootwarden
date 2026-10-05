@@ -28,14 +28,34 @@ et sous le déploiement de clés, et `brick/math` 0.18 → 1.0. Écarté : un co
 n'emporte pas de changement de version majeure en passager. Le lockfile change sur exactement
 quatre paquets.
 
-### ⚠ Le vert de la CI ne met PAS la production à jour
+### `./maj.sh` installe désormais les paquets — un vert de CI ne suffisait pas
 
-`composer install` ne tourne que si `vendor/autoload.php` est absent (`docker-entrypoint.sh:18-21`),
-et `vendor/` n'est pas suivi par git. Un `./maj.sh` apporte le nouveau `composer.lock` et **laisse
-les anciens paquets en service**. Le geste sur l'hôte est explicite :
+`vendor/` n'est pas suivi par git, et l'entrypoint ne lance `composer install` que si
+`vendor/autoload.php` est absent (`docker-entrypoint.sh:18-21`). Un `./maj.sh` apportait le nouveau
+`composer.lock` et **laissait les anciens paquets en service**, CI verte à l'appui.
 
-    docker exec -w /var/www/html rootwarden_laravel composer install --no-interaction --no-progress
-    docker compose --env-file srv-docker.env restart laravel
+Nouvelle **étape 5a** : `maj.sh` demande à composer ce qu'il ferait (`--dry-run`), installe s'il y
+a quelque chose à faire, redémarre `laravel` (l'entrypoint remet les droits à `www-data`), puis
+**redemande** pour vérifier. Rien à faire → rien installé, rien redémarré. Le code retour ne
+discrimine rien (0 dans les deux cas, mesuré) : c'est le nombre d'opérations qui décide, lu par
+`scripts/compte-operations-composer.sh`, et une sortie non reconnue fait installer par précaution.
+
+Deux défauts de `maj.sh` corrigés au passage, tous deux mesurés :
+
+- **il ne se relançait pas après s'être mis à jour.** `git pull` pose un nouvel inode et bash
+  finit de lire l'ancien : une étape ajoutée n'aurait tourné qu'à la mise à jour SUIVANTE. Il se
+  relance maintenant une fois, sur la version tirée, après la vérification GPG ;
+- **il finissait par « OK » en vert après un échec.** Un échec d'installation est désormais
+  retenu, le script termine ses autres étapes, puis finit en rouge avec un code retour 1.
+
+Banc : `maj.sh` joué en entier avec un faux `docker` reproduisant les sorties réelles —
+en retard (installe, redémarre, vérifie), à jour (rien), échec (rouge, `rc=1`), `--check` (rien).
+Relance éprouvée sur un vrai `git pull` dans un dépôt local jetable : une relance quand `maj.sh`
+change, zéro quand il ne change pas.
+
+⚠ **Cette fois seulement, `./maj.sh` deux fois.** Le `maj.sh` installé sur l'hôte est l'ANCIEN :
+c'est lui qui tire cette version et il finit avec son propre contenu, sans l'étape 5a. Le second
+passage l'exécute. Ensuite, un seul suffit.
 
 Contrôle : `composer audit --locked` → « No security vulnerability advisories found ». Suite
 complète : 472 tests, 1 738 assertions, 0 échec.
