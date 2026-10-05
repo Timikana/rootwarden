@@ -38,6 +38,12 @@ YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
 NC='\033[0m'
 
+# Les arguments d'origine, pour la relance apres auto-mise a jour (etape 1).
+ORIG_ARGS=("$@")
+# Une etape qui echoue sans arreter le script le DIT ici : le resume final
+# le relit, au lieu d'afficher « OK » apres un echec (mesure le 2026-10-05).
+ECHECS_MAJ=()
+
 DO_PULL=1
 DO_BUILD=1
 DRY_RUN=0
@@ -135,6 +141,7 @@ if [ "$DO_PULL" -eq 1 ]; then
             fi
         fi
     fi
+    SELF_AVANT=$(sha256sum "${SCRIPT_DIR}/maj.sh" | cut -d' ' -f1)
     run git pull --ff-only origin "${TARGET_BRANCH}"
 
     # Patch A08-NEW-01 (OWASP A08 Data Integrity) : verification signature GPG
@@ -154,6 +161,23 @@ if [ "$DO_PULL" -eq 1 ]; then
             exit 1
         fi
         echo -e "  ${YELLOW}!${NC} HEAD non signe GPG (mode permissif - set MAJ_REQUIRE_SIGNED=1 pour exiger)."
+    fi
+
+    # ── maj.sh vient peut-etre de se mettre a jour LUI-MEME ─────────────────
+    #
+    # `git pull` remplace le fichier par un NOUVEL inode ; bash garde ouvert
+    # l'ANCIEN et le lit jusqu'au bout. Sans relance, une nouvelle etape de ce
+    # script ne s'execute qu'a la mise a jour SUIVANTE — c'est ainsi que
+    # l'installation des paquets PHP (etape 5a) aurait manque son premier tour.
+    # On se relance donc sur la version tiree, sans re-tirer, une seule fois
+    # (MAJ_REEXEC empeche toute boucle). Placee APRES la verification GPG :
+    # on ne relance que ce qu'on a accepte d'executer.
+    if [ "$DRY_RUN" -eq 0 ] && [ -z "${MAJ_REEXEC:-}" ]; then
+        SELF_APRES=$(sha256sum "${SCRIPT_DIR}/maj.sh" | cut -d' ' -f1)
+        if [ "$SELF_AVANT" != "$SELF_APRES" ]; then
+            echo -e "  ${YELLOW}!${NC} maj.sh a change : relance sur la nouvelle version"
+            exec env MAJ_REEXEC=1 bash "${SCRIPT_DIR}/maj.sh" --no-pull "${ORIG_ARGS[@]}"
+        fi
     fi
 else
     echo -e "${GREEN}[maj 1/5]${NC} git pull SKIP (--no-pull)"
@@ -214,6 +238,58 @@ fi
 "${SCRIPT_DIR:-.}/scripts/ecrire-version.sh" || true
 
 run ${DC} --env-file "${ENV_FILE}" ${PROFILE_FLAG} up -d
+
+# ── Etape 5a : les paquets PHP suivent composer.lock ────────────────────────
+#
+# `vendor/` n'est pas suivi par git, et l'entrypoint ne lance `composer install`
+# que si `vendor/autoload.php` est ABSENT (`laravel/docker-entrypoint.sh:18-21`).
+# Un `git pull` qui apporte un nouveau `composer.lock` laissait donc les ANCIENS
+# paquets en service — avec une CI verte, puisque la CI audite le lockfile et non
+# ce qui tourne. Mesure du 2026-10-05 : quatre paquets vulnerables corriges dans
+# le lockfile, et aucun mis a jour sur l'hote.
+#
+# On demande a composer ce qu'il FERAIT (`--dry-run`), et on n'agit que s'il y a
+# quelque chose a faire : sur une mise a jour sans changement de dependances,
+# rien n'est installe ni redemarre. Memes options que l'entrypoint, sans quoi
+# chaque passage verrait des « differences » qui n'en sont pas.
+#
+# Le redemarrage de `laravel` qui suit n'est pas un confort : l'entrypoint
+# remet storage/ et bootstrap/cache/ a www-data. Sans lui, les fichiers que
+# `composer` vient d'ecrire en root (package:discover) resteraient en root.
+source "${SCRIPT_DIR}/scripts/compte-operations-composer.sh"
+if docker ps --format '{{.Names}}' | grep -q '^rootwarden_laravel$'; then
+    echo -e "${GREEN}[maj 5a]${NC} Paquets PHP (composer.lock)..."
+    COMPOSER_OPTS="--no-interaction --prefer-dist --no-progress"
+    PREVU=$(docker exec -w /var/www/html rootwarden_laravel \
+                composer install --dry-run ${COMPOSER_OPTS} 2>&1 || true)
+    N_OPS=$(compte_operations_composer "$PREVU")
+    if [ "$N_OPS" = "0" ]; then
+        echo -e "  ${GREEN}OK${NC} paquets deja conformes a composer.lock"
+    elif [ "$DRY_RUN" -eq 1 ]; then
+        echo -e "${CYAN}  [dry-run]${NC} composer install (${N_OPS:-?} operation(s)) puis restart laravel"
+    else
+        [ -n "$N_OPS" ] || echo -e "  ${YELLOW}!${NC} sortie de composer non reconnue : on installe par precaution"
+        echo -e "  ${CYAN}>${NC} composer install (${N_OPS:-?} operation(s))"
+        if docker exec -w /var/www/html rootwarden_laravel composer install ${COMPOSER_OPTS}; then
+            ${DC} --env-file "${ENV_FILE}" ${PROFILE_FLAG} restart laravel >/dev/null 2>&1 || \
+                echo -e "  ${YELLOW}!${NC} restart laravel a ECHOUE"
+            # VERIFIER apres le geste, pas croire la commande : on redemande.
+            APRES=$(docker exec -w /var/www/html rootwarden_laravel \
+                        composer install --dry-run ${COMPOSER_OPTS} 2>&1 || true)
+            if [ "$(compte_operations_composer "$APRES")" = "0" ]; then
+                echo -e "  ${GREEN}OK${NC} paquets conformes a composer.lock (verifie)"
+            else
+                echo -e "  ${RED}!${NC} paquets PAS conformes apres installation — les anciens peuvent etre en service"
+                ECHECS_MAJ+=("paquets PHP non conformes a composer.lock apres installation")
+            fi
+        else
+            echo -e "  ${RED}!${NC} composer install a ECHOUE — les ANCIENS paquets sont en service"
+            ECHECS_MAJ+=("composer install a echoue : anciens paquets PHP en service")
+        fi
+    fi
+else
+    echo -e "  ${YELLOW}!${NC} conteneur laravel absent : paquets PHP non verifies"
+fi
 
 # ── Etape 5b : redemarrer le service qui ne peut PAS recharger ──────────────
 #
@@ -343,5 +419,10 @@ fi
 
 if [ "$DRY_RUN" -eq 0 ]; then
     echo ""
+    if [ "${#ECHECS_MAJ[@]}" -gt 0 ]; then
+        echo -e "${RED}[maj] TERMINE AVEC ${#ECHECS_MAJ[@]} ECHEC(S)${NC} :"
+        for e in "${ECHECS_MAJ[@]}"; do echo -e "  ${RED}-${NC} $e"; done
+        exit 1
+    fi
     echo -e "${GREEN}[maj] OK${NC}. Verifier l'etat : ${YELLOW}docker ps${NC} ou ${YELLOW}./start.sh logs${NC}"
 fi
