@@ -5,6 +5,45 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## Clés SSH — le pré-contrôle refusait toutes les machines, et mon test le confirmait
+
+Une fois la panne TLS levée, « Déployer » refusait Eos : une machine saine, SSH authentifié,
+scannée, rien en attente. Trois défauts dans `DeploiementCles::preflight()`.
+
+**1. Le compte des comptes à déployer était lu au mauvais endroit.** Le backend rend
+`users_with_keys` UNE fois, à la racine (`backend/routes/ssh.py:791-795`). Le portage le lisait
+dans chaque résultat de machine, où il n'existe pas : `?? 0` rendait 0 partout, et **toutes les
+machines étaient refusées**. L'ancienne interface lisait bien la racine (`main.js:177`). Son zéro
+porte désormais un message de PARC (`ssh.err_aucun_compte_avec_cle`, 409), et non l'échec d'une
+machine qui ferait chercher sur Eos un défaut qui n'y est pas.
+
+**2. Les erreurs par machine étaient ignorées.** Le backend signale dans `errors` un audit
+d'inventaire échoué (`ssh.py:780-784`, « Ne pas déployer sans l'avoir relue ») sur une machine
+dont `ssh_ok` vaut `true`. Une fois le défaut 1 corrigé, cette machine aurait été **acceptée** —
+celle dont la liste des accès à révoquer n'a pas pu être établie. Une erreur suffit désormais,
+comme dans le legacy (`main.js:132-138`), et **la raison voyage jusqu'à l'écran** :
+« en échec pour : Eos (Audit d'inventaire indisponible…) ».
+
+**3. `$vide + ['erreur' => 'aucune_machine']` rendait une erreur NULLE.** L'union PHP garde la
+clé de gauche, et `$vide` porte déjà `erreur => null`. Mesuré : `NULL` avec `+`, la bonne valeur
+avec `array_merge`. Inatteignable depuis l'écran, qui n'envoie jamais de liste vide.
+
+### Pourquoi le test d'hier était vert
+
+`VerificationTlsDuBackendTest` (commit précédent) fabriquait sa réponse factice **d'après le code
+Laravel** : il plaçait `users_with_keys` dans chaque machine, c'est-à-dire la même erreur que le
+code qu'il gardait. *Un faux dérivé du code qu'il éprouve ne mesure que l'accord du code avec
+lui-même.* Les faux sont désormais recopiés du backend, avec leurs lignes citées.
+
+**Et pourquoi aucune suite ne l'a vu** : le bouton « Vérifier » passe par la passerelle
+(`/api/gateway/preflight_check`), qui fonctionnait, et le navigateur y lit lui-même le rapport.
+« Déployer » repasse par `DeploiementCles`, un autre code, qu'aucune suite n'exerce parce qu'il
+écrit des `authorized_keys` en root. Le geste le plus dangereux était le seul jamais joué.
+
+Contrôle : les 11 tests rejoués contre le code d'avant, extrait de `HEAD` dans un dossier jetable
+— **10 rouges, 1 vert** (HIBP, qui doit rester vert). Suite complète : 472 tests, 1 738
+assertions, 0 échec. Parité i18n `ssh` : 54 = 54.
+
 ## Clés SSH — le déploiement n'a jamais fonctionné en production : une ligne TLS non recopiée
 
 En production, « Déployer les clés SSH » échouait à **chaque** clic. Journal Laravel :

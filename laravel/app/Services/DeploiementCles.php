@@ -62,14 +62,17 @@ class DeploiementCles
      * Lance le preflight et rend un verdict.
      *
      * @param  list<int>  $machines
-     * @return array{concluant: ?PreflightConcluant, echecs: list<string>, brut: array, erreur: ?string}
+     * @return array{concluant: ?PreflightConcluant, echecs: list<string>, raisons: array<string, list<string>>, brut: array, erreur: ?string}
      */
     public function preflight(array $machines, int $idCompte, int $role, array $permissions): array
     {
-        $vide = ['concluant' => null, 'echecs' => [], 'brut' => [], 'erreur' => null];
+        $vide = ['concluant' => null, 'echecs' => [], 'raisons' => [], 'brut' => [], 'erreur' => null];
 
         if ($machines === []) {
-            return $vide + ['erreur' => 'aucune_machine'];
+            // `array_merge` et pas `+` : l'union garde la clé de GAUCHE, et `$vide`
+            // porte déjà `erreur => null` — `+` rendait donc une erreur NULLE et
+            // l'écran annonçait « en échec pour : . » (mesuré le 2026-10-05).
+            return array_merge($vide, ['erreur' => 'aucune_machine']);
         }
 
         $reponse = $this->appelle('/preflight_check', ['machines' => array_values($machines)],
@@ -83,28 +86,6 @@ class DeploiementCles
         }
 
         $resultats = $reponse['results'] ?? [];
-        $echecs = [];
-
-        foreach ($resultats as $r) {
-            $nom = (string) ($r['name'] ?? ('#' . ($r['machine_id'] ?? '?')));
-
-            /*
-             * DEUX CONDITIONS, ET LA SECONDE EST CELLE QUI COMPTE.
-             *
-             * `ssh_ok` dit que la machine répond. `users_with_keys` dit qu'il y a
-             * des comptes À DÉPLOYER — et c'est son ZÉRO qui, dans le legacy,
-             * transforme le déploiement en révocation générale
-             * (`MODULE-SSH.md:280`). Ne vérifier que `ssh_ok` porterait la moitié
-             * du garde, c'est-à-dire pas le garde.
-             */
-            if (($r['ssh_ok'] ?? false) !== true) {
-                $echecs[] = $nom;
-                continue;
-            }
-            if ((int) ($r['users_with_keys'] ?? 0) <= 0) {
-                $echecs[] = $nom;
-            }
-        }
 
         // Une liste de résultats VIDE n'est pas un succès : c'est une mesure qui
         // n'a pas eu lieu. Sans ce garde, zéro résultat vaudrait zéro échec.
@@ -112,8 +93,49 @@ class DeploiementCles
             return array_merge($vide, ['erreur' => 'preflight_sans_resultat', 'brut' => $reponse]);
         }
 
+        /*
+         * LE COMPTE DES COMPTES À DÉPLOYER EST GLOBAL, ET IL SE LIT À LA RACINE.
+         *
+         * `backend/routes/ssh.py:791-795` le rend UNE fois, à côté de `results`,
+         * jamais dans un résultat de machine. Le lire par machine (version
+         * d'avant le 2026-10-05) rendait 0 partout et refusait TOUTES les
+         * machines, Eos comprise, alors que la production en comptait 3.
+         *
+         * C'est son ZÉRO qui, dans le legacy, transforme le déploiement en
+         * révocation générale (`MODULE-SSH.md:280`). Il porte sur le PARC : le
+         * rendre comme l'échec d'une machine ferait chercher sur cette machine
+         * un défaut qui n'y est pas. Absent, il vaut refus.
+         */
+        if ((int) ($reponse['users_with_keys'] ?? 0) <= 0) {
+            return array_merge($vide, ['erreur' => 'aucun_compte_avec_cle', 'brut' => $reponse]);
+        }
+
+        $echecs = [];
+        $raisons = [];
+
+        foreach ($resultats as $r) {
+            $nom = (string) ($r['name'] ?? ('#' . ($r['machine_id'] ?? '?')));
+            $erreurs = array_values(array_map('strval', (array) ($r['errors'] ?? [])));
+
+            /*
+             * UNE ERREUR SUFFIT, MÊME QUAND SSH RÉPOND. Le backend signale dans
+             * `errors` un audit d'inventaire échoué (`ssh.py:780-784`) sur une
+             * machine dont `ssh_ok` vaut `true` : la liste des accès qui seront
+             * RÉVOQUÉS n'a pas pu être établie. Les ignorer — ce que faisait la
+             * version d'avant — acceptait exactement la machine que le backend
+             * demande de ne pas déployer. C'était aussi la règle du legacy
+             * (`legacy/_deprecated/ssh/main.js:132-138`).
+             */
+            if (($r['ssh_ok'] ?? false) !== true || $erreurs !== []) {
+                $echecs[] = $nom;
+                // La raison VOYAGE jusqu'à l'écran : sans elle, l'exploitant
+                // cherche sur la machine ce qui a été refusé ailleurs.
+                $raisons[$nom] = $erreurs;
+            }
+        }
+
         if ($echecs !== []) {
-            return array_merge($vide, ['echecs' => $echecs, 'brut' => $reponse]);
+            return array_merge($vide, ['echecs' => $echecs, 'raisons' => $raisons, 'brut' => $reponse]);
         }
 
         return array_merge($vide, [

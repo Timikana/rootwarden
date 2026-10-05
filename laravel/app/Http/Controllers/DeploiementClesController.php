@@ -64,7 +64,13 @@ class DeploiementClesController extends Controller
                 'etape' => 'preflight',
                 'message' => __('ssh.err_' . $verdict['erreur']),
                 'preflight' => $verdict['brut'],
-            ], $verdict['erreur'] === 'aucune_machine' ? 400 : 502);
+            ], match ($verdict['erreur']) {
+                'aucune_machine' => 400,
+                // Le backend a REPONDU : ce n'est pas une panne de passerelle,
+                // c'est un etat du parc qui interdit le geste.
+                'aucun_compte_avec_cle' => 409,
+                default => 502,
+            });
         }
 
         if ($verdict['concluant'] === null) {
@@ -72,8 +78,16 @@ class DeploiementClesController extends Controller
                 'success' => false,
                 'etape' => 'preflight',
                 'echecs' => $verdict['echecs'],
+                'raisons' => $verdict['raisons'],
+                // CHAQUE MACHINE AVEC SA RAISON. Le message nommait la machine et
+                // taisait le motif : l'exploitant cherchait sur Eos un defaut qui
+                // n'y etait pas (2026-10-05).
                 'message' => __('ssh.err_preflight_echoue', [
-                    'machines' => implode(', ', $verdict['echecs']),
+                    'machines' => implode(' ; ', array_map(
+                        static fn (string $nom) => ($verdict['raisons'][$nom] ?? []) === []
+                            ? $nom
+                            : $nom . ' (' . implode(' / ', $verdict['raisons'][$nom]) . ')',
+                        $verdict['echecs'])),
                 ]),
                 'preflight' => $verdict['brut'],
             ], 409);
