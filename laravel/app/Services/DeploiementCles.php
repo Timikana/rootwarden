@@ -160,6 +160,12 @@ class DeploiementCles
                 'X-User-Permissions' => json_encode($permissions),
                 'Content-Type' => 'application/json',
             ])
+                // ⚠ LA LIGNE QUE LA RECOPIE AVAIT OUBLIÉE. Le backend présente un
+                // certificat interne auto-signé, comme pour `PasserelleController`.
+                // Sans elle, chaque preflight échouait en cURL 60 et « Déployer les
+                // clés SSH » n'a jamais fonctionné en production (mesure du
+                // 2026-10-05). Gardé par `VerificationTlsDuBackendTest`.
+                ->withoutVerifying()
                 ->timeout((int) config('rootwarden.backend.delai', 120))
                 ->post($base . $chemin, $corps);
 

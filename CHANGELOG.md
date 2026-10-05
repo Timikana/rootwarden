@@ -5,6 +5,37 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## Clés SSH — le déploiement n'a jamais fonctionné en production : une ligne TLS non recopiée
+
+En production, « Déployer les clés SSH » échouait à **chaque** clic. Journal Laravel :
+
+    deploiement de cles : backend injoignable {"chemin":"/preflight_check",
+    "erreur":"cURL error 60: SSL certificate problem: self-signed certificate"}
+
+Le backend Python présente un certificat interne auto-signé. `PasserelleController` l'appelle
+avec `->withoutVerifying()` depuis l'origine ; `DeploiementCles::appelle()` avait recopié son
+adresse et ses en-têtes — son docblock prévient même qu'« une seconde source d'adresse finirait
+par diverger » — **mais pas la ligne TLS**. La divergence annoncée a eu lieu sur ce qui n'avait
+pas été recopié. Aucune requête n'atteignait le backend : zéro trace de `/preflight_check` côté
+Python, zéro déploiement de clé en base.
+
+**Pourquoi rien ne l'a vu.** `Http::fake()` ne fait aucune poignée de main TLS, donc les tests
+hermétiques passaient ; et les suites E2E ne cliquent pas sur « Déployer », qui écrit des
+`authorized_keys` en root. Les deux instruments étaient aveugles au même endroit pour deux raisons
+différentes.
+
+**Ce qui le garde désormais.** `VerificationTlsDuBackendTest` lit l'option `verify` que chaque
+requête emporte, telle que Guzzle la recevrait, au lieu d'attendre un échec réseau que le faux ne
+produit jamais. Vu rouge sur le code d'avant (`verify=true` sur `/preflight_check` et `/deploy`),
+vert après. Il porte aussi **le sens inverse** : vers `api.pwnedpasswords.com`, qui est sur
+Internet, la vérification doit rester active — le remède naïf « désactiver partout » serait une
+faute, et ce test la refuserait.
+
+Inventaire des appels HTTP sortants de `laravel/app/` : 4 fichiers. Vers le backend : passerelle,
+ChatOps, déploiement — seul le dernier était fautif. Vers Internet : HIBP, correct tel quel.
+
+Suite complète : 464 tests, 1 716 assertions, 0 échec.
+
 ## Permissions — une liste à plancher dans une piste qui n'en a pas la largeur
 
 Sur `/permissions`, les noms de machines se **peignaient par-dessus** les listes de préréglage
