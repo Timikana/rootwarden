@@ -5,6 +5,41 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## Audit de sécurité et de durcissement — 13 correctifs, chacun vu échouer avant de passer
+
+Premier audit d'ensemble du portail Laravel en production (l'audit de référence, de juin, portait
+sur le legacy). Chaque correctif a un test rejoué contre le code d'AVANT (rouge) puis après (vert).
+
+| | Constat | Correctif |
+|---|---|---|
+| C-1 | Le dépôt PUBLIC publie mot de passe ET secrets TOTP de comptes de test (dont un rôle 3) | En production, `rw-test-*` refusé au premier facteur (message identique à un mauvais mot de passe) ; un mot de passe publié impose son changement (empreintes SHA-256, jamais le clair) |
+| H-1 | **Régression** : aucun en-tête de sécurité HTTP | HSTS (durée réglable), nosniff, X-Frame-Options, Referrer-Policy, Permissions-Policy, CSP sûre appliquée + CSP cible en rapport ; `X-Powered-By` retiré ; garde CI qui lit la VRAIE réponse |
+| H-2 | Adresse de prod, noms d'hôtes, employeur, comptes réels dans les fichiers publiés | Remplacés par des valeurs neutres (l'historique git reste à traiter) |
+| H-3 | Clés d'hôte SSH jamais vérifiées (`AutoAddPolicy` ×9) | Confiance au premier usage (`ssh_host_keys`), refus AVANT tout envoi de mot de passe — prouvé avec un vrai sshd et un imposteur à la même IP ; « oublier la clé » pour une machine réinstallée |
+| H-4 | `docker-compose.prod.yml` jamais appelé — et il **ne démarrait pas** | Corrigé, vu démarrer sur une stack complète isolée, branché derrière `COMPOSE_DURCI=true` |
+| H-5 | Une installation neuve n'a aucun chemin vers une première connexion | `php artisan rootwarden:premier-compte`, portage fidèle d'`install.sh`, vérifié sur MySQL neuf |
+| M-1 | Cookie de session sans `Secure` | Sécurisé par défaut, sauf `SSL_MODE=disabled` |
+| M-2 | `GET`/`PUT /storage/{path}` sans middleware, gardés par la seule `APP_KEY` (qui a fuité) | `serve=false` : routes retirées |
+| M-3 | Sauvegardes en 0644 dans un dossier 0755 | 0600 / 0700, y compris les dumps existants |
+| M-4 | Backend tué ~1×/h par manque de mémoire | Limite 512 Mo → 1 Go |
+| M-5 | Token Telegraf stocké en clair | Chiffré à l'écriture et déchiffré à la relecture, ancien clair accepté |
+| M-6 | `.env` absent → 500 silencieux | Créé en mode production par l'entrypoint, clé vérifiée |
+| B-1 | Une clé d'API pouvait s'annoncer superadmin (`X-User-ID`) | Une clé au créateur connu agit en son nom |
+| B-2 | Script distant brièvement lisible (il peut porter `compte:mot de passe`) | Créé sous `umask 077` |
+| B-3 | Code mort écrivant le mot de passe root dans un PTY sans filtre | Retiré |
+| B-4 | 31 actions GitHub sur tag mobile | Épinglées par SHA |
+| B-7 | Second facteur limité par session et par IP seulement | Limite par compte, toutes IP confondues |
+
+**Écarté après vérification :** B-5 (`/dry_run_update` « sans bouton ») était FAUX — le bouton
+« Simuler » l'appelle (`mises-a-jour.js:892`). Le retirer l'aurait cassé.
+
+**Vu de l'extérieur :** le nom du portail n'existe pas dans le DNS public (NXDOMAIN, témoin
+`github.com` résolu) : la menace est interne.
+
+Tests : PHPUnit 472 → 502, pytest 755 → 778, 0 échec ; ruff OK ; 77 vues compilent.
+
+---
+
 ## Dépendances PHP — quatre avis publiés après le dernier vert, et un vert qui aurait menti
 
 La CI rougit depuis le 2026-10-01 sur un seul job, `SCA PHP (composer audit)`. `composer.lock`
