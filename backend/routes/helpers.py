@@ -61,7 +61,7 @@ def _validate_api_key_from_db(raw_key: str, route_path: str):
                 return None, None  # table vide = fallback autorise
             key_hash = hashlib.sha256(raw_key.encode('utf-8')).hexdigest()
             cur.execute(
-                "SELECT id, name, scope_json, revoked_at FROM api_keys "
+                "SELECT id, name, scope_json, revoked_at, created_by, auto_generated FROM api_keys "
                 "WHERE key_hash = %s LIMIT 1",
                 (key_hash,)
             )
@@ -97,6 +97,17 @@ def _validate_api_key_from_db(raw_key: str, route_path: str):
                 conn.commit()
             except Exception as e:
                 logger.warning("API key last_used update failed: %s", e)
+            # Audit 2026-10-13, B-1 : QUI parle avec cette cle. `get_current_user`
+            # s'en sert pour ne plus croire `X-User-ID` sur parole.
+            try:
+                from flask import g
+                g._rw_cle_api = {
+                    'id': row['id'],
+                    'created_by': row.get('created_by'),
+                    'interne': bool(row.get('auto_generated')),
+                }
+            except RuntimeError:
+                pass   # hors contexte de requete (scripts) : rien a memoriser
             return True, row['id']
         finally:
             conn.close()
@@ -195,6 +206,35 @@ def get_current_user():
         user_id = int(request.headers.get('X-User-ID', 0))
     except (ValueError, TypeError):
         user_id = 0
+
+    # ══ UNE CLE D'API AGIT AU NOM DE SON CREATEUR — audit 2026-10-13, B-1 ══
+    #
+    # Le role etait relu en base, mais `X-User-ID` venait de l'EN-TETE : une cle
+    # pleine portee pouvait annoncer l'id d'un superadmin et agir en role 3 sur
+    # tout le parc. Seule la cle INTERNE du portail (`auto_generated=1`) relaie
+    # l'identite de chaque utilisateur. Une cle au CREATEUR CONNU - toutes celles
+    # creees depuis l'ecran Cles d'API - agit au nom de `created_by`.
+    #
+    # UNE CLE SANS CREATEUR GARDE L'ANCIEN COMPORTEMENT, et c'est delibere. La
+    # cle du PORTAIL LUI-MEME est en base ; si sa ligne est anterieure a la
+    # colonne `auto_generated` sous un autre nom que `proxy-internal-legacy`,
+    # elle porte `auto_generated=0` et aucun createur. La priver d'identite
+    # ferait tomber TOUTES les requetes du portail. On la journalise a la place,
+    # pour qu'elle soit identifiee et marquee interne.
+    cle = getattr(g, '_rw_cle_api', None)
+    if cle is not None and not cle.get('interne'):
+        createur = int(cle.get('created_by') or 0)
+        if createur:
+            if user_id and user_id != createur:
+                logger.warning(
+                    "X-User-ID=%s ignore : la cle d'API #%s agit au nom de son createur (#%s)",
+                    user_id, cle.get('id'), createur)
+            user_id = createur
+        else:
+            logger.warning(
+                "Cle d'API #%s sans createur ni marque interne : X-User-ID cru sur parole. "
+                "La marquer auto_generated=1 si c'est la cle du portail, la revoquer sinon.",
+                cle.get('id'))
 
     if user_id <= 0:
         g._rw_user_cache = (0, 0)
