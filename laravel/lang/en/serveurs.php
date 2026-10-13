@@ -151,4 +151,14 @@ return [
     'imp_diverge_secret' => 'A row whose password or root password is empty is REJECTED. The legacy portal created it, and the machine then looked as though it carried a password when it had none.',
     'imp_diverge_env' => 'An unrecognised environment, criticality or network type REJECTS the row. The legacy portal silently replaced it with "OTHER": a typo on "PROD" removed the machine from the population of production machines, with nothing to signal it.',
 
+
+    // Audit 2026-10-13, H-3 : cle d'hote SSH memorisee (TOFU).
+    "cle_hote_titre" => "SSH host key",
+    "cle_hote_inconnue" => "No key stored: it will be recorded at the next backend connection.",
+    "cle_hote_memorisee" => "Stored since :depuis — :type, SHA-256 fingerprint :empreinte",
+    "cle_hote_aide" => "The backend refuses any connection if this machine presents another key: protection against impersonation. If the machine was REINSTALLED, forget its key: the next one will be accepted.",
+    "cle_hote_confirme" => "I confirm this machine was reinstalled (otherwise, impersonation is possible)",
+    "cle_hote_oublier" => "Forget host key",
+    "cle_hote_oubliee" => "Host key forgotten for :nom: the next connection will record it again.",
+    "cle_hote_confirmation_requise" => "Confirm the machine was reinstalled before forgetting its key.",
 ];
