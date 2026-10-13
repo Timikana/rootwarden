@@ -99,7 +99,7 @@ class DeploiementCles
          * `backend/routes/ssh.py:791-795` le rend UNE fois, à côté de `results`,
          * jamais dans un résultat de machine. Le lire par machine (version
          * d'avant le 2026-10-05) rendait 0 partout et refusait TOUTES les
-         * machines, Eos comprise, alors que la production en comptait 3.
+         * machines, y compris une machine saine, alors que la production en comptait 3.
          *
          * C'est son ZÉRO qui, dans le legacy, transforme le déploiement en
          * révocation générale (`MODULE-SSH.md:280`). Il porte sur le PARC : le

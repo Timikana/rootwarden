@@ -1827,8 +1827,8 @@ def scan_server_users():
             # ecrits par RootWarden via `printf '%s'` n'ont PAS de newline
             # finale -> le marqueur ###ENDUSER### colle sur la derniere cle,
             # le parser ne le voit pas -> les cles de l'user ne sont jamais
-            # enregistrees. Bug observe sur 4 users (rootwarden, gbroussier,
-            # kduplouy, cleopatre) v1.19.0.
+            # enregistrees. Bug observe sur 4 comptes (rootwarden et trois
+            # comptes d'administrateurs) v1.19.0.
             dump_script = (
                 "awk -F: '{print $6\":\"$1}' /etc/passwd | "
                 "while IFS=: read home user; do "
@@ -2025,7 +2025,7 @@ def scan_server_users():
             # Nettoyage des "fantomes" : users qui existaient en inventaire
             # mais qui ne sont plus sur le serveur (userdel manuel depuis une
             # autre console, compte systeme supprime, etc.). Sans ca, un
-            # compte comme `cleopatre` reste visible a vie dans l'UI.
+            # compte comme `ancien-compte` reste visible a vie dans l'UI.
             # On identifie les fantomes = rows en DB non-touchees par ce scan.
             #
             # ══ E-183 : LE SENS DU REPLI CHANGE, ET C'EST DELIBERE ═══════════

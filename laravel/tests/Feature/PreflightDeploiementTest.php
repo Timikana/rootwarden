@@ -11,7 +11,7 @@ use Tests\TestCase;
  * LE VERDICT DU PREFLIGHT, LU SUR LA FORME QUE LE BACKEND REND VRAIMENT.
  *
  * Mesure du 2026-10-05 en production, une fois la panne TLS levée : « Déployer »
- * refusait Eos — une machine saine, SSH authentifié, scannée, rien en attente.
+ * refusait srv-a — une machine saine, SSH authentifié, scannée, rien en attente.
  * `preflight()` lisait `users_with_keys` DANS chaque résultat de machine ; le
  * backend ne le rend qu'UNE fois, à la racine :
  *
@@ -56,9 +56,9 @@ class PreflightDeploiementTest extends TestCase
     #[Test]
     public function une_machine_saine_passe_quand_le_compte_global_est_positif(): void
     {
-        // Le cas exact de la production : Eos, 3 comptes avec une clé.
+        // Le cas exact de la production : srv-a, 3 comptes avec une clé.
         $v = $this->preflightAvec(['success' => true, 'users_with_keys' => 3,
-                                   'results' => [$this->machine('Eos')]]);
+                                   'results' => [$this->machine('srv-a')]]);
 
         $this->assertNull($v['erreur'], 'erreur inattendue : ' . var_export($v['erreur'], true));
         $this->assertSame([], $v['echecs'], 'machine saine refusee : ' . json_encode($v['echecs']));
@@ -70,9 +70,9 @@ class PreflightDeploiementTest extends TestCase
     {
         // Le zéro qui transforme un déploiement en révocation générale
         // (`MODULE-SSH.md:280`). Il porte sur le PARC, pas sur une machine :
-        // l'imputer à Eos ferait chercher sur Eos un défaut qui n'y est pas.
+        // l'imputer à srv-a ferait chercher sur srv-a un défaut qui n'y est pas.
         $v = $this->preflightAvec(['success' => true, 'users_with_keys' => 0,
-                                   'results' => [$this->machine('Eos')]]);
+                                   'results' => [$this->machine('srv-a')]]);
 
         $this->assertNull($v['concluant']);
         $this->assertSame('aucun_compte_avec_cle', $v['erreur']);
@@ -82,7 +82,7 @@ class PreflightDeploiementTest extends TestCase
     public function un_compte_global_absent_est_un_refus(): void
     {
         // Fail-closed : une réponse qui ne porte pas le compte n'autorise rien.
-        $v = $this->preflightAvec(['success' => true, 'results' => [$this->machine('Eos')]]);
+        $v = $this->preflightAvec(['success' => true, 'results' => [$this->machine('srv-a')]]);
 
         $this->assertNull($v['concluant']);
         $this->assertSame('aucun_compte_avec_cle', $v['erreur']);
@@ -93,24 +93,24 @@ class PreflightDeploiementTest extends TestCase
     {
         $audit = "Audit d'inventaire indisponible : la liste des acces qui seront REVOQUES n'a pas pu etre etablie.";
         $v = $this->preflightAvec(['success' => true, 'users_with_keys' => 3,
-                                   'results' => [$this->machine('Eos', true, [$audit])]]);
+                                   'results' => [$this->machine('srv-a', true, [$audit])]]);
 
         $this->assertNull($v['concluant'], 'une machine dont l inventaire n a pas pu etre lu a ete acceptee');
-        $this->assertSame(['Eos'], $v['echecs']);
-        $this->assertSame(['Eos' => [$audit]], $v['raisons'], 'la raison du refus doit voyager jusqu a l ecran');
+        $this->assertSame(['srv-a'], $v['echecs']);
+        $this->assertSame(['srv-a' => [$audit]], $v['raisons'], 'la raison du refus doit voyager jusqu a l ecran');
     }
 
     #[Test]
     public function seule_la_machine_fautive_est_nommee(): void
     {
         $v = $this->preflightAvec(['success' => true, 'users_with_keys' => 3, 'results' => [
-            $this->machine('Eos'),
-            $this->machine('Hyades', false, ['Port 22 injoignable sur 192.0.2.4']),
+            $this->machine('srv-a'),
+            $this->machine('srv-b', false, ['Port 22 injoignable sur 192.0.2.4']),
         ]]);
 
         $this->assertNull($v['concluant'], 'tout ou rien : une machine en echec bloque le lot');
-        $this->assertSame(['Hyades'], $v['echecs']);
-        $this->assertSame(['Port 22 injoignable sur 192.0.2.4'], $v['raisons']['Hyades']);
+        $this->assertSame(['srv-b'], $v['echecs']);
+        $this->assertSame(['Port 22 injoignable sur 192.0.2.4'], $v['raisons']['srv-b']);
     }
 
     #[Test]
@@ -130,12 +130,12 @@ class PreflightDeploiementTest extends TestCase
         config(['rootwarden.backend.url' => 'https://python:5000']);
         $raison = "Audit d'inventaire indisponible";
         Http::fake(['*' => Http::response(['success' => true, 'users_with_keys' => 3,
-                                           'results' => [$this->machine('Eos', true, [$raison])]])]);
+                                           'results' => [$this->machine('srv-a', true, [$raison])]])]);
 
         $r = $this->connecte(3)->postJson('/cles-ssh/deployer', ['machines' => [3]]);
 
         $r->assertStatus(409);
-        $this->assertStringContainsString('Eos (' . $raison . ')', (string) $r->json('message'),
+        $this->assertStringContainsString('srv-a (' . $raison . ')', (string) $r->json('message'),
             'le message doit nommer la machine ET dire pourquoi : ' . $r->json('message'));
         // Le déploiement n'est jamais parti : une seule requête, le preflight.
         Http::assertSentCount(1);
@@ -146,13 +146,13 @@ class PreflightDeploiementTest extends TestCase
     {
         config(['rootwarden.backend.url' => 'https://python:5000']);
         Http::fake(['*' => Http::response(['success' => true, 'users_with_keys' => 0,
-                                           'results' => [$this->machine('Eos')]])]);
+                                           'results' => [$this->machine('srv-a')]])]);
 
         $r = $this->connecte(3)->postJson('/cles-ssh/deployer', ['machines' => [3]]);
 
         $r->assertStatus(409);
         $this->assertSame(__('ssh.err_aucun_compte_avec_cle'), $r->json('message'));
-        $this->assertStringNotContainsString('Eos', (string) $r->json('message'),
+        $this->assertStringNotContainsString('srv-a', (string) $r->json('message'),
             'un defaut de PARC ne doit pas etre impute a une machine');
         Http::assertSentCount(1);
     }

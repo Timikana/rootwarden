@@ -8702,7 +8702,7 @@ occurrences de ce symbole sont des boucles `for u in scanned_users`.
    suivant. Ici la donnée est **perdue** ;
 2. **elle se journalise comme un succès** : `logger.info("%d fantome(s) purge(s)")`. Un opérateur qui
    relit le journal voit un **nettoyage**, pas un incident. Le commentaire au-dessus explique même
-   pourquoi la purge est une bonne idée — « sans ça, un compte comme `cleopatre` reste visible à vie ».
+   pourquoi la purge est une bonne idée — « sans ça, un compte comme `ancien-compte` reste visible à vie ».
    **Elle l'est, sur un scan qui a abouti.** C'est le motif « le cas visible traité, le cas subtil pris
    à l'envers » : la présence d'un raisonnement correct **à côté** endort la question ;
 3. **le volume est réel** : `server_user_inventory` porte **72** lignes, `server_user_ssh_keys` **20** —

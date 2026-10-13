@@ -90,7 +90,7 @@ n'existe plus.
 
 ## Clés SSH — le pré-contrôle refusait toutes les machines, et mon test le confirmait
 
-Une fois la panne TLS levée, « Déployer » refusait Eos : une machine saine, SSH authentifié,
+Une fois la panne TLS levée, « Déployer » refusait une machine saine, SSH authentifié,
 scannée, rien en attente. Trois défauts dans `DeploiementCles::preflight()`.
 
 **1. Le compte des comptes à déployer était lu au mauvais endroit.** Le backend rend
@@ -98,14 +98,14 @@ scannée, rien en attente. Trois défauts dans `DeploiementCles::preflight()`.
 dans chaque résultat de machine, où il n'existe pas : `?? 0` rendait 0 partout, et **toutes les
 machines étaient refusées**. L'ancienne interface lisait bien la racine (`main.js:177`). Son zéro
 porte désormais un message de PARC (`ssh.err_aucun_compte_avec_cle`, 409), et non l'échec d'une
-machine qui ferait chercher sur Eos un défaut qui n'y est pas.
+machine qui ferait chercher sur la machine un défaut qui n'y est pas.
 
 **2. Les erreurs par machine étaient ignorées.** Le backend signale dans `errors` un audit
 d'inventaire échoué (`ssh.py:780-784`, « Ne pas déployer sans l'avoir relue ») sur une machine
 dont `ssh_ok` vaut `true`. Une fois le défaut 1 corrigé, cette machine aurait été **acceptée** —
 celle dont la liste des accès à révoquer n'a pas pu être établie. Une erreur suffit désormais,
 comme dans le legacy (`main.js:132-138`), et **la raison voyage jusqu'à l'écran** :
-« en échec pour : Eos (Audit d'inventaire indisponible…) ».
+« en échec pour : srv-a (Audit d'inventaire indisponible…) ».
 
 **3. `$vide + ['erreur' => 'aucune_machine']` rendait une erreur NULLE.** L'union PHP garde la
 clé de gauche, et `$vide` porte déjà `erreur => null`. Mesuré : `NULL` avec `+`, la bonne valeur
@@ -22596,7 +22596,7 @@ depuis la migration vers l'API Python (pas une régression récente).
 
 ## [1.37.11] - 2026-08-06 — Fix : deploy sudoers TOUJOURS annulé en mode legacy (« visudo -cf refuse la politique ») + ligne droits sudo absente sans refresh
 
-**Symptômes (prod, EAU-ACTU)** :
+**Symptômes (prod, un serveur du parc)** :
 1. Chaque déploiement de clé SSH loggait `[user] visudo -cf refuse la politique -
    deploy annulé` pour TOUS les utilisateurs → **aucun fichier sudoers installé**
    → « j'ai mis NOPASSWD mais sudo demande toujours le mot de passe ». (Le fix
@@ -23927,10 +23927,10 @@ Nouvelle page `/adm/server_user_policies.php` (superadmin only) qui permet de co
 ## [1.21.7] - 2026-05-27 — Hotfixes pentest + reverse-proxy + UX
 
 ### Fix : reset password via reverse-proxy (HAProxy)
-- Symptome (LAGOON) : email de reset mdp contient `https://cleopatre-ssh.magiline.fr:8443/auth/reset_password.php?...` mais l'HAProxy public ecoute sur **443**, pas 8443. L'utilisateur tombe sur `Could not connect to server` au TCP.
-- Cause : `URL_HTTPS` servait pour le frontend JS (URL interne `lagoon:8443`) ET pour les emails (qui doivent referencer l'URL publique). Ces deux usages divergent des qu'il y a un reverse-proxy.
+- Symptome (production) : email de reset mdp contient `https://portail.example.com:8443/auth/reset_password.php?...` mais l'HAProxy public ecoute sur **443**, pas 8443. L'utilisateur tombe sur `Could not connect to server` au TCP.
+- Cause : `URL_HTTPS` servait pour le frontend JS (URL interne `hote-interne:8443`) ET pour les emails (qui doivent referencer l'URL publique). Ces deux usages divergent des qu'il y a un reverse-proxy.
 - Fix : nouvelle variable d'env optionnelle `URL_PUBLIC_HTTPS`. Si definie, `forgot_password.php` l'utilise pour construire le lien email. Fallback sur `URL_HTTPS` si absente (retrocompat).
-- Deploiement : editer `srv-docker.env` -> `URL_PUBLIC_HTTPS=https://cleopatre-ssh.magiline.fr` (sans port si HAProxy ecoute en 443), puis `docker compose restart php`.
+- Deploiement : editer `srv-docker.env` -> `URL_PUBLIC_HTTPS=https://portail.example.com` (sans port si HAProxy ecoute en 443), puis `docker compose restart php`.
 
 ### Fix : unlock_user laissait le rate-limit IP actif
 - Symptome : superadmin clique "Deverrouiller" sur un compte lock 120 min -> l'user retombe sur "Trop de tentatives, ressayer dans 10 minutes" sans pouvoir se logger.
@@ -23957,7 +23957,7 @@ Nouvelle page `/adm/server_user_policies.php` (superadmin only) qui permet de co
 ## [1.21.6] - 2026-05-26 — Backend auto-bootstrap api_key
 
 ### Fix critique : 401 persistant apres maj.sh
-- Symptome : sur LAGOON, malgre le hotfix v1.21.4/v1.21.5 dans `maj.sh`, le backend Python continuait a logger `API key refusee : DB indisponible ou table vide et API_KEY_BOOTSTRAP non active (fail-closed)`. Cause possible : `maj.sh` execute mais avec une version anterieure du script (etape 5c absente), ou container `rootwarden_db` down au moment du check.
+- Symptome : en production, malgre le hotfix v1.21.4/v1.21.5 dans `maj.sh`, le backend Python continuait a logger `API key refusee : DB indisponible ou table vide et API_KEY_BOOTSTRAP non active (fail-closed)`. Cause possible : `maj.sh` execute mais avec une version anterieure du script (etape 5c absente), ou container `rootwarden_db` down au moment du check.
 - Fix : deplacement du bootstrap legacy api_key de `maj.sh` (etape shell) VERS le backend Python lui-meme (`backend/bootstrap_api_key.py`). A chaque demarrage du container `rootwarden_python`, on verifie qu'une cle active matche le SHA-256 de `Config.API_KEY` ; sinon on INSERT `proxy-internal-legacy-bootstrap-YYYYMMDD`.
 - Avantages : plus de dependance shell, plus besoin du flag `API_KEY_BOOTSTRAP=1`, idempotent, best-effort (ne bloque pas le boot).
 - L'etape 5c de `maj.sh` reste en ceinture-bretelle.
@@ -24138,7 +24138,7 @@ deja autorise) + rollback complet (backup `.bak.rw` + `sshd -t` + restore si fai
 Et auto-fix dans `deploy_service_account` : si `paramiko.AuthenticationException`
 sur le test SSH du compte rootwarden, trigger automatique de
 `_ensure_sshd_allows_user(rootwarden)` puis retry. Resout les serveurs hardenes
-type SRV-WEB qui bloquaient silencieusement.
+type (port SSH non standard) qui bloquaient silencieusement.
 
 ### Documentation API enrichie
 

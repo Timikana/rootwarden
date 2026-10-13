@@ -98,8 +98,8 @@ class TestUserExists:
         ("1001\n", True),
         ("id: 'ghost': no such user\n", False),
         # Mode legacy : echo de la commande + sortie + prompt
-        ("id -u dnadir\r\n1001\r\nroot@EAU-ACTU:~#", True),
-        ("id -u ghost\r\nid: 'ghost': no such user\r\nroot@EAU-ACTU:~#", False),
+        ("id -u jdupont\r\n1001\r\nroot@srv-exemple:~#", True),
+        ("id -u ghost\r\nid: 'ghost': no such user\r\nroot@srv-exemple:~#", False),
         # Legacy, uid colle au prompt sur des lignes distinctes apres nettoyage
         ("root@srv:~# id -u bob\r\n0\r\nroot@srv:~#", True),
         ("", False),
