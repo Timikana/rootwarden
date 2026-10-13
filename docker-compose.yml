@@ -159,7 +159,13 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M
+          # 1G et non plus 512M (audit 2026-10-13, M-4). Mesure en production le
+          # 2026-10-05 : 74 redemarrages, le noyau tuant un worker vers 507 Mo
+          # (`Memory cgroup out of memory`) environ une fois par heure. Un kill
+          # en plein deploiement SSH peut laisser des authorized_keys a moitie
+          # ecrits. C'est un PLAFOND, pas une reservation. La tache horaire qui
+          # consomme reste a identifier.
+          memory: 1G
           cpus: '1.0'
         reservations:
           memory: 128M
