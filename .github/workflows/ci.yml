@@ -278,9 +278,47 @@ jobs:
           context: .
           file: ./laravel/Dockerfile
           push: false
+          # `load` : l'image doit exister dans le demon pour le pas suivant.
+          load: true
           tags: ${{ env.IMAGE_PREFIX }}-laravel:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # ── LES EN-TETES DE SECURITE SE MESURENT SUR LA REPONSE, PAS DANS UN FICHIER ──
+      # Audit 2026-10-13, H-1 : la migration avait PERDU tous les en-tetes que le
+      # legacy posait, et rien ne l'a vu — aucun test ne les exigeait. Ce pas
+      # demarre l'image REELLE et lit la reponse HTTPS de `/robots.txt` (statique :
+      # la mesure ne depend ni de PHP ni de la base). Il echoue si un seul en-tete
+      # manque, ou si PHP annonce sa version.
+      - name: En-tetes de securite servis par le portail
+        env:
+          IMG: ${{ env.IMAGE_PREFIX }}-laravel:${{ github.sha }}
+        run: |
+          set -eu
+          T="${RUNNER_TEMP:-$(mktemp -d)}"
+          docker run -d --name rw-entetes -p 127.0.0.1:18443:443 \
+            -e SSL_MODE=auto -e SERVER_NAME=localhost \
+            -v "$PWD/laravel:/var/www/html" "$IMG"
+          for i in $(seq 1 180); do
+            curl -sk -o /dev/null https://127.0.0.1:18443/robots.txt && break
+            sleep 2
+          done
+          echec=0
+          # Deux reponses, deux natures : un fichier STATIQUE (Apache seul) et une
+          # route PHP. `X-Powered-By` n'est emis que par PHP : le chercher sur un
+          # fichier statique serait un controle qui ne peut pas echouer.
+          for chemin in /robots.txt /connexion; do
+            curl -sk -D "$T/entetes" -o /dev/null "https://127.0.0.1:18443$chemin" || true
+            echo "== $chemin"; tr -d '\r' < "$T/entetes"
+            for h in 'Strict-Transport-Security: max-age=' 'X-Content-Type-Options: nosniff' \
+                     'X-Frame-Options: DENY' 'Referrer-Policy:' \
+                     "Content-Security-Policy: frame-ancestors 'none'" 'Permissions-Policy:'; do
+              if grep -qiF "$h" "$T/entetes"; then echo "OK      $chemin  $h"; else echo "ABSENT  $chemin  $h"; echec=1; fi
+            done
+            if grep -qi '^X-Powered-By:' "$T/entetes"; then echo "PRESENT $chemin  X-Powered-By (version PHP divulguee)"; echec=1; fi
+          done
+          docker rm -f rw-entetes >/dev/null
+          exit "$echec"
 
       - name: Build Python/Flask image
         uses: docker/build-push-action@v7

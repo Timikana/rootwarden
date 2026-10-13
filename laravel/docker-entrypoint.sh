@@ -75,6 +75,11 @@ SSL_MODE="${SSL_MODE:-auto}"
 SERVER_NAME="${SERVER_NAME:-localhost}"
 SERVER_ADMIN="${SERVER_ADMIN:-admin@localhost}"
 CERT_DIR="/var/www/certs"
+# Exportees ICI, pour les DEUX modes TLS : `rootwarden-laravel.conf` (Dockerfile)
+# lit `${SERVER_ADMIN}` quel que soit le mode. Exportees seulement dans la
+# branche TLS, elles levaient `AH00111` avec SSL_MODE=disabled (mesure du
+# 2026-10-13, deja present avant l'audit).
+export SERVER_NAME SERVER_ADMIN
 
 # ⚠ CE DEFAUT N'EST PAS UN CONFORT : SANS LUI, APACHE NE DEMARRE PAS.
 # Apache leve `AH00111` sur une variable inconnue et s'arrete. Une installation
@@ -84,6 +89,18 @@ CERT_DIR="/var/www/certs"
 # port n'est pas celui qu'Apache ecoute (443), c'est celui que l'HOTE PUBLIE, et
 # il ne sert qu'a construire la redirection HTTP -> HTTPS.
 LARAVEL_HTTPS_PORT="${LARAVEL_HTTPS_PORT:-8443}"
+
+# HSTS_MAX_AGE est lu par Apache (`zz-rootwarden-securite.conf`). ⚠ SANS
+# DEFINITION, APACHE NE DEMARRE PAS (AH00111, cf. ci-dessus) : le defaut est
+# donc pose ICI, pour les deux modes TLS. Une valeur non numerique retombe sur
+# le defaut, en le disant, plutot que d'emettre un en-tete invalide.
+HSTS_MAX_AGE="${HSTS_MAX_AGE:-86400}"
+case "$HSTS_MAX_AGE" in
+    ''|*[!0-9]*)
+        echo "[laravel] ⚠ HSTS_MAX_AGE='${HSTS_MAX_AGE}' n'est pas un nombre - defaut 86400" >&2
+        HSTS_MAX_AGE=86400 ;;
+esac
+export HSTS_MAX_AGE
 
 if [ "$SSL_MODE" = "disabled" ]; then
     # Choix EXPLICITE, pour un deploiement derriere un frontal qui termine le TLS.
