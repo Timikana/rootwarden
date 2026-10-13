@@ -497,6 +497,41 @@ def _get_install_commands(platform, global_cfg, os_version):
     return []
 
 
+# ══ LE TOKEN TELEGRAF — audit du 2026-10-13, M-5 (DOSSIER-66) ══════════════
+#
+# Il etait ecrit EN CLAIR (`save_platform_config`, dont le commentaire « Chiffrer
+# le token Telegraf si fourni » etait faux depuis l'origine) et relu tel quel, a
+# cote d'un PSK Zabbix, lui, chiffre. Chiffrer sans dechiffrer a la relecture
+# aurait envoye `gcm:...` a l'agent distant, qui echouerait a s'authentifier :
+# les DEUX bouts changent ensemble.
+_PREFIXES_CHIFFRES = ('gcm:', 'sodium:', 'aes:')
+
+
+def _chiffre_token_telegraf(token, enc):
+    """Valeur a ECRIRE en base. `None` = garder l'existant (masque d'affichage)."""
+    if token == '********':
+        return None
+    if not token:
+        return ''            # vider le champ reste possible
+    return enc.encrypt_password(token)
+
+
+def _dechiffre_token_telegraf(stocke, enc):
+    """Valeur a ENVOYER a l'agent.
+
+    Un token sans prefixe de chiffrement est un CLAIR HISTORIQUE, ecrit avant ce
+    correctif : il est rendu tel quel — sinon le prochain deploiement casserait —
+    et le journal demande de le re-enregistrer pour qu'il soit chiffre.
+    """
+    if not stocke:
+        return ''
+    if stocke.startswith(_PREFIXES_CHIFFRES):
+        return enc.decrypt_password(stocke)
+    logger.warning("Token Telegraf stocke EN CLAIR (ecrit avant le chiffrement) : "
+                   "re-enregistrer la configuration Telegraf pour le chiffrer.")
+    return stocke
+
+
 def _build_agent_config_content(platform, global_cfg, machine_row, overrides=None):
     """Genere le contenu du fichier de config pour un agent non-Zabbix."""
     overrides = overrides or {}
@@ -538,7 +573,8 @@ def _build_agent_config_content(platform, global_cfg, machine_row, overrides=Non
     elif platform == 'telegraf':
         interval = overrides.get('interval') or '10s'
         output_url = overrides.get('output_url') or global_cfg.get('telegraf_output_url') or ''
-        output_token = global_cfg.get('telegraf_output_token') or ''
+        from encryption import Encryption
+        output_token = _dechiffre_token_telegraf(global_cfg.get('telegraf_output_token') or '', Encryption())
         output_org = global_cfg.get('telegraf_output_org') or ''
         output_bucket = global_cfg.get('telegraf_output_bucket') or ''
         inputs = global_cfg.get('telegraf_inputs') or 'cpu,mem,disk,diskio,net,system'
@@ -2461,10 +2497,10 @@ def save_platform_config(platform):
             cur.execute("SELECT id FROM supervision_config WHERE platform = %s LIMIT 1", (platform,))
             existing = cur.fetchone()
 
-            # Chiffrer le token Telegraf si fourni
-            telegraf_token = data.get('telegraf_output_token', '')
-            if telegraf_token == '********':
-                telegraf_token = None  # garder l'existant
+            # Chiffre (le commentaire le promettait depuis l'origine, le code ne le
+            # faisait pas — audit 2026-10-13, M-5). `None` garde l'existant.
+            from encryption import Encryption
+            telegraf_token = _chiffre_token_telegraf(data.get('telegraf_output_token', ''), Encryption())
 
             if existing:
                 cur.execute("""
