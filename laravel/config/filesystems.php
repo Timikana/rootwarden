@@ -33,7 +33,12 @@ return [
         'local' => [
             'driver' => 'local',
             'root' => storage_path('app/private'),
-            'serve' => true,
+            // FERME (audit du 2026-10-13, M-2). A `true`, Laravel publie
+            // `GET` et `PUT /storage/{path}` SANS middleware, gardes par la seule
+            // signature `APP_KEY`. Le portail n'utilise ni `Storage::` ni URL
+            // signee : c'etait une lecture/ecriture de fichiers offerte a qui
+            // obtient la cle. Garde par `DurcissementPortailTest`.
+            'serve' => false,
             'throw' => false,
             'report' => false,
         ],

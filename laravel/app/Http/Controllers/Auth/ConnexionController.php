@@ -10,6 +10,7 @@ use App\Services\SessionsActives;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Etape mot de passe.
@@ -20,6 +21,28 @@ use Illuminate\View\View;
  */
 class ConnexionController extends Controller
 {
+    /**
+     * ══ IDENTIFIANTS PUBLIES — audit du 2026-10-13, C-1 ═══════════════════
+     *
+     * Le depot est PUBLIC. Il publie les mots de passe ET les secrets TOTP des
+     * comptes `rw-test-*` (dont un role 3), et plusieurs mots de passe par
+     * defaut (110 occurrences). Les retirer de l'arbre ne les retire pas de
+     * l'historique git : la protection doit tenir MEME SI ces comptes existent
+     * en production.
+     *
+     * EMPREINTES SHA-256, jamais le clair : recopier ici le mot de passe en
+     * ferait une 111e publication. Mesure du 2026-10-13 sur `tests/e2e/` :
+     * trois valeurs par defaut distinctes (95, 8 et 4 occurrences).
+     */
+    public const EMPREINTES_PUBLIEES = [
+        '9bd368eac311e6330a38a5117d9ef9cdb8700afb7cc0ed7bdfd4a45b895f1fb1',
+        'd0ad095134a0969108b8b22dd53b72b4febb9cf6594fe05643f01a4065c3ade7',
+        '186cf774c97b60a1c106ef718d10970a6a06e06bef89553d9ae65d938a886eae',
+    ];
+
+    /** Comptes de banc dont les deux facteurs sont publies. */
+    private const PREFIXE_COMPTES_DE_TEST = 'rw-test-';
+
     public function __construct(
         private readonly MotDePasse $motDePasse,
         private readonly HistoriqueConnexions $historique,
@@ -60,6 +83,18 @@ class ConnexionController extends Controller
             return back()->withErrors(['username' => __('auth.erreur_verrouille')])->onlyInput('username');
         }
 
+        // EN PRODUCTION, UN COMPTE DE BANC N'ENTRE PAS (C-1). Ses deux facteurs
+        // sont publies : s'il existe ici, n'importe qui l'ouvre. Le refus porte
+        // le MEME message qu'un mauvais mot de passe — sinon il revelerait que le
+        // compte existe. Les suites E2E du banc de dev (hors production) l'utilisent.
+        if ($compte && app()->isProduction()
+            && str_starts_with((string) $compte->name, self::PREFIXE_COMPTES_DE_TEST)) {
+            Log::warning('connexion refusee : compte de banc en production', ['compte' => $compte->name]);
+            $this->journalise($requete, $donnees['username'], false);
+
+            return back()->withErrors(['username' => __('auth.erreur_identifiants')])->onlyInput('username');
+        }
+
         $motDePasseValide = $compte && password_verify($donnees['password'], (string) $compte->password);
 
         if (! $motDePasseValide || ! $compte->active) {
@@ -92,6 +127,16 @@ class ConnexionController extends Controller
         // session (anti-fixation) et on passe la main au second facteur.
         DB::table('users')->where('id', $compte->id)
             ->update(['failed_attempts' => 0, 'locked_until' => null]);
+
+        // UN MOT DE PASSE PUBLIE NE RESTE PAS CELUI D'UN COMPTE (C-1). La
+        // personne entre — le mot de passe est bon — mais doit en changer,
+        // comme apres une remise par un administrateur. C'est le seul instant
+        // ou le clair existe : aucune tache de fond ne pourrait faire ce controle.
+        if (in_array(hash('sha256', (string) $donnees['password']), self::EMPREINTES_PUBLIEES, true)) {
+            DB::table('users')->where('id', $compte->id)->update(['force_password_change' => 1]);
+            Log::warning('connexion avec un mot de passe PUBLIE dans le depot : changement impose',
+                ['compte' => $compte->name]);
+        }
 
         /*
          * ══ LA REMISE A NIVEAU DU COUT BCRYPT ════════════════════════════

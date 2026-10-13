@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\ClesHoteSsh;
 use App\Services\JournalAudit;
 use App\Services\Serveurs;
 use Illuminate\Http\RedirectResponse;
@@ -35,12 +36,19 @@ class ServeursController extends Controller
     public function __construct(
         private readonly Serveurs $serveurs,
         private readonly JournalAudit $journal,
+        private readonly ClesHoteSsh $clesHote,
     ) {}
 
-    public function __invoke(): View
+    public function __invoke(Request $requete): View
     {
+        $machines = $this->serveurs->liste();
+
         return view('serveurs', [
-            'machines' => $this->serveurs->liste(),
+            'machines' => $machines,
+            // Audit 2026-10-13, H-3 : la cle d'hote memorisee de chaque machine,
+            // et le droit de l'oublier (role 3 seulement, comme la route).
+            'clesHote' => $this->clesHote->parMachine($machines),
+            'peutOublierCleHote' => (int) $requete->session()->get('role_id', 0) >= 3,
             'etiquettes' => $this->serveurs->etiquettesParMachine(),
             'notes' => $this->serveurs->notesParMachine(),
             'borneNotes' => Serveurs::NOTES_PAR_MACHINE,
@@ -164,6 +172,35 @@ class ServeursController extends Controller
         }
 
         return back()->with('succes', __('serveurs.modifiee', ['nom' => $brut['name']]));
+    }
+
+    /**
+     * Oublie la cle d'hote SSH d'une machine REINSTALLEE — audit 2026-10-13, H-3.
+     *
+     * Le backend refuse toute connexion dont la cle differe de celle vue au
+     * premier usage. C'est la protection contre l'usurpation ; c'est aussi une
+     * impasse pour une machine legitimement reinstallee, sans ce geste.
+     *
+     * Role 3 seulement (la ROUTE), confirmation EXIGEE (case `required` a
+     * l'ecran, revalidee ici) : oublier une cle, c'est accepter la prochaine
+     * qu'on presentera — y compris celle d'un usurpateur.
+     */
+    public function oublierCleHote(Request $requete, int $id): RedirectResponse
+    {
+        if (! $requete->boolean('confirme')) {
+            return back()->with('erreur', __('serveurs.cle_hote_confirmation_requise'));
+        }
+        $ligne = DB::table('machines')->where('id', $id)->first(['name', 'ip', 'port']);
+        $m = $ligne === null ? null : (array) $ligne;
+        if ($m === null) {
+            return back()->with('erreur', __('serveurs.err_introuvable'));
+        }
+
+        $n = $this->clesHote->oublie((string) $m['ip'], (int) $m['port']);
+        $this->journal->ajoute((int) $requete->session()->get('utilisateur_id', 0),
+            "Cle d'hote SSH oubliee pour '{$m['name']}' ({$m['ip']}:{$m['port']}) — {$n} ligne(s)");
+
+        return back()->with('succes', __('serveurs.cle_hote_oubliee', ['nom' => (string) $m['name']]));
     }
 
     public function supprimer(int $id): RedirectResponse

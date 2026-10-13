@@ -180,6 +180,36 @@ def restore_backup(filename):
         conn.close()
 
 
+def _ferme_les_droits():
+    """Dossier 0700, sauvegardes 0600 — y compris celles d'avant ce correctif.
+
+    Audit du 2026-10-13, M-3 : un dump porte les empreintes des mots de passe,
+    les mots de passe root des machines et les secrets TOTP. Mesure sur le poste
+    de dev : 0644 dans un dossier 0755, lisibles par TOUS les comptes de l'hote.
+    `mkdir(exist_ok=True)` ne corrige pas un dossier existant : on le resserre a
+    chaque passage, et les dumps deja presents avec lui.
+    """
+    BACKUP_DIR.mkdir(mode=0o700, parents=True, exist_ok=True)
+    os.chmod(BACKUP_DIR, 0o700)
+    for f in BACKUP_DIR.glob('rootwarden_backup_*'):
+        try:
+            if f.is_file() and not f.is_symlink():
+                os.chmod(f, 0o600)
+        except OSError as e:
+            _log.warning("Droits de %s non resserres : %s", f.name, e)
+
+
+def _ouvre_prive(chemin, mode_texte):
+    """Ouvre en ecriture un fichier CREE en 0600 — jamais lisible, meme un instant.
+
+    `os.open` avec un mode plutot qu'un `umask` : le processus est multi-thread,
+    et l'umask est global au processus.
+    """
+    fd = os.open(chemin, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    os.fchmod(fd, 0o600)   # si le fichier existait deja avec d'autres droits
+    return os.fdopen(fd, mode_texte)
+
+
 def create_backup() -> str:
     """Cree un backup mysqldump compresse. Retourne le chemin du fichier.
 
@@ -189,7 +219,7 @@ def create_backup() -> str:
     ecrit pour permettre de verifier l'integrite avant restauration.
     Note A02 : le volume /app/backups doit etre chiffre au repos (le dump
     contient hashes/secrets chiffres) - cf. OPERATIONS.md."""
-    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    _ferme_les_droits()
 
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     filename = f"rootwarden_backup_{timestamp}.sql.gz"
@@ -206,7 +236,8 @@ def create_backup() -> str:
         conn = mysql.connector.connect(**db)
         cur = conn.cursor()
 
-        with gzip.open(tmppath, 'wt', encoding='utf-8') as f:
+        with _ouvre_prive(tmppath, 'wb') as brut, \
+                gzip.open(brut, 'wt', encoding='utf-8') as f:
             f.write(f"-- RootWarden backup {timestamp}\n")
             f.write(f"-- Database: {db['database']}\n\n")
 
@@ -261,7 +292,7 @@ def create_backup() -> str:
         with open(filepath, 'rb') as fh:
             for chunk in iter(lambda: fh.read(65536), b''):
                 sha.update(chunk)
-        with open(str(filepath) + '.sha256', 'w', encoding='utf-8') as sf:
+        with _ouvre_prive(str(filepath) + '.sha256', 'w') as sf:
             sf.write(f"{sha.hexdigest()}  {filename}\n")
 
         size_mb = filepath.stat().st_size / (1024 * 1024)

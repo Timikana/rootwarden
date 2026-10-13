@@ -32,9 +32,8 @@ jobs:
     name: Lint Python (ruff)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5 (epingle par SHA, audit 2026-10-13 B-4)
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6 (epingle par SHA, audit 2026-10-13 B-4)
         with:
           python-version: "3.13"
 
@@ -56,9 +55,8 @@ jobs:
     name: Lint PHP (syntax check)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-
-      - uses: shivammathur/setup-php@v2
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5 (epingle par SHA, audit 2026-10-13 B-4)
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962  # v2 (epingle par SHA, audit 2026-10-13 B-4)
         with:
           php-version: "8.4"
 
@@ -135,9 +133,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: lint-python
     steps:
-      - uses: actions/checkout@v5
-
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5 (epingle par SHA, audit 2026-10-13 B-4)
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6 (epingle par SHA, audit 2026-10-13 B-4)
         with:
           python-version: "3.13"
 
@@ -204,9 +201,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: lint-php
     steps:
-      - uses: actions/checkout@v5
-
-      - uses: shivammathur/setup-php@v2
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5 (epingle par SHA, audit 2026-10-13 B-4)
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962  # v2 (epingle par SHA, audit 2026-10-13 B-4)
         with:
           php-version: "8.4"
           # Nommees explicitement plutot que laissees au defaut de l'image :
@@ -257,11 +253,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: [lint-python, lint-php, test-python]
     steps:
-      - uses: actions/checkout@v5
-
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5 (epingle par SHA, audit 2026-10-13 B-4)
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069  # v4 (epingle par SHA, audit 2026-10-13 B-4)
       # ⛔ CE PAS BATISSAIT L'IMAGE MORTE ET LAISSAIT LA VIVANTE SANS COUVERTURE.
       #    Mesure du 2026-09-08, apres `patch 07` :
       #      laravel/Dockerfile   cite 1 fois dans compose, 0 fois dans ce fichier
@@ -273,17 +267,55 @@ jobs:
       #    « Un outil borne a un perimetre qui se vide ne tombe pas en panne :
       #      il reussit plus vite. »
       - name: Build Laravel/Apache image
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc  # v7 (epingle par SHA, audit 2026-10-13 B-4)
         with:
           context: .
           file: ./laravel/Dockerfile
           push: false
+          # `load` : l'image doit exister dans le demon pour le pas suivant.
+          load: true
           tags: ${{ env.IMAGE_PREFIX }}-laravel:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      # ── LES EN-TETES DE SECURITE SE MESURENT SUR LA REPONSE, PAS DANS UN FICHIER ──
+      # Audit 2026-10-13, H-1 : la migration avait PERDU tous les en-tetes que le
+      # legacy posait, et rien ne l'a vu — aucun test ne les exigeait. Ce pas
+      # demarre l'image REELLE et lit la reponse HTTPS de `/robots.txt` (statique :
+      # la mesure ne depend ni de PHP ni de la base). Il echoue si un seul en-tete
+      # manque, ou si PHP annonce sa version.
+      - name: En-tetes de securite servis par le portail
+        env:
+          IMG: ${{ env.IMAGE_PREFIX }}-laravel:${{ github.sha }}
+        run: |
+          set -eu
+          T="${RUNNER_TEMP:-$(mktemp -d)}"
+          docker run -d --name rw-entetes -p 127.0.0.1:18443:443 \
+            -e SSL_MODE=auto -e SERVER_NAME=localhost \
+            -v "$PWD/laravel:/var/www/html" "$IMG"
+          for i in $(seq 1 180); do
+            curl -sk -o /dev/null https://127.0.0.1:18443/robots.txt && break
+            sleep 2
+          done
+          echec=0
+          # Deux reponses, deux natures : un fichier STATIQUE (Apache seul) et une
+          # route PHP. `X-Powered-By` n'est emis que par PHP : le chercher sur un
+          # fichier statique serait un controle qui ne peut pas echouer.
+          for chemin in /robots.txt /connexion; do
+            curl -sk -D "$T/entetes" -o /dev/null "https://127.0.0.1:18443$chemin" || true
+            echo "== $chemin"; tr -d '\r' < "$T/entetes"
+            for h in 'Strict-Transport-Security: max-age=' 'X-Content-Type-Options: nosniff' \
+                     'X-Frame-Options: DENY' 'Referrer-Policy:' \
+                     "Content-Security-Policy: frame-ancestors 'none'" 'Permissions-Policy:'; do
+              if grep -qiF "$h" "$T/entetes"; then echo "OK      $chemin  $h"; else echo "ABSENT  $chemin  $h"; echec=1; fi
+            done
+            if grep -qi '^X-Powered-By:' "$T/entetes"; then echo "PRESENT $chemin  X-Powered-By (version PHP divulguee)"; echec=1; fi
+          done
+          docker rm -f rw-entetes >/dev/null
+          exit "$echec"
+
       - name: Build Python/Flask image
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc  # v7 (epingle par SHA, audit 2026-10-13 B-4)
         with:
           context: ./backend
           file: ./backend/Dockerfile
@@ -299,7 +331,7 @@ jobs:
     name: Secrets scan (gitleaks)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5 (epingle par SHA, audit 2026-10-13 B-4)
         with:
           fetch-depth: 0  # full history pour scanner tous les commits
       - name: Run gitleaks
@@ -362,8 +394,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: lint-python
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5 (epingle par SHA, audit 2026-10-13 B-4)
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6 (epingle par SHA, audit 2026-10-13 B-4)
         with:
           python-version: "3.13"
       - name: Install bandit
@@ -385,8 +417,8 @@ jobs:
     name: SAST cross-langue (semgrep)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5 (epingle par SHA, audit 2026-10-13 B-4)
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6 (epingle par SHA, audit 2026-10-13 B-4)
         with:
           python-version: "3.13"
       - name: Install semgrep
@@ -428,8 +460,8 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5 (epingle par SHA, audit 2026-10-13 B-4)
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6 (epingle par SHA, audit 2026-10-13 B-4)
         with:
           python-version: "3.13"
       - name: Install semgrep
@@ -535,8 +567,8 @@ jobs:
     name: Les regles custom MORDENT (temoin forge)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5 (epingle par SHA, audit 2026-10-13 B-4)
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6 (epingle par SHA, audit 2026-10-13 B-4)
         with:
           python-version: "3.13"
       - name: Install semgrep
@@ -703,8 +735,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: lint-python
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5 (epingle par SHA, audit 2026-10-13 B-4)
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6 (epingle par SHA, audit 2026-10-13 B-4)
         with:
           python-version: "3.13"
       - name: Install pip-audit
@@ -732,8 +764,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: lint-php
     steps:
-      - uses: actions/checkout@v5
-      - uses: shivammathur/setup-php@v2
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5 (epingle par SHA, audit 2026-10-13 B-4)
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962  # v2 (epingle par SHA, audit 2026-10-13 B-4)
         with:
           php-version: "8.4"
           tools: composer
@@ -820,7 +852,7 @@ jobs:
     name: Trivy filesystem scan
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5 (epingle par SHA, audit 2026-10-13 B-4)
       - name: Trivy fs (requirements + composer + misconfig IaC)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
         with:
@@ -842,13 +874,11 @@ jobs:
     needs: build-docker
     if: github.event_name == 'push'
     steps:
-      - uses: actions/checkout@v5
-
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5 (epingle par SHA, audit 2026-10-13 B-4)
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069  # v4 (epingle par SHA, audit 2026-10-13 B-4)
       - name: Build Laravel image for scan
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc  # v7 (epingle par SHA, audit 2026-10-13 B-4)
         with:
           context: .
           file: ./laravel/Dockerfile
@@ -858,7 +888,7 @@ jobs:
           cache-from: type=gha
 
       - name: Build Python image for scan
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc  # v7 (epingle par SHA, audit 2026-10-13 B-4)
         with:
           context: ./backend
           file: ./backend/Dockerfile
@@ -905,7 +935,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5 (epingle par SHA, audit 2026-10-13 B-4)
         with:
           fetch-depth: 0
 

@@ -155,4 +155,14 @@ return [
     'imp_diverge_secret' => "Une ligne dont le mot de passe ou celui de root est vide est REFUSÉE. L'ancien portail la créait, et la machine paraissait alors porter un mot de passe alors qu'elle n'en avait pas.",
     'imp_diverge_env' => "Une valeur d'environnement, de criticité ou de type de réseau non reconnue REFUSE la ligne. L'ancien portail la remplaçait en silence par « OTHER » : une faute de frappe sur « PROD » retirait la machine de la population des machines de production, sans que rien ne le signale.",
 
+
+    // Audit 2026-10-13, H-3 : cle d'hote SSH memorisee (TOFU).
+    "cle_hote_titre" => "Clé d'hôte SSH",
+    "cle_hote_inconnue" => "Aucune clé mémorisée : elle sera enregistrée à la prochaine connexion du backend.",
+    "cle_hote_memorisee" => "Mémorisée depuis le :depuis — :type, empreinte SHA-256 :empreinte",
+    "cle_hote_aide" => "Le backend refuse toute connexion si cette machine présente une autre clé : protection contre l'usurpation. Si la machine a été RÉINSTALLÉE, oubliez sa clé : la suivante sera acceptée.",
+    "cle_hote_confirme" => "Je confirme que cette machine a été réinstallée (sinon, une usurpation est possible)",
+    "cle_hote_oublier" => "Oublier la clé d'hôte",
+    "cle_hote_oubliee" => "Clé d'hôte oubliée pour :nom : la prochaine connexion l'enregistrera à nouveau.",
+    "cle_hote_confirmation_requise" => "Confirmez que la machine a été réinstallée avant d'oublier sa clé.",
 ];

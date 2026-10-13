@@ -393,6 +393,37 @@
                        role="status" aria-live="polite"></p>
                 </section>
 
+                {{-- ═══ Clé d'hôte SSH — audit 2026-10-13, H-3 ═══════════════
+                     Le backend refuse toute connexion si la machine présente une
+                     autre clé que celle vue au premier usage. L'oublier n'a de
+                     sens que pour une machine RÉINSTALLÉE : la case `required`
+                     l'exige avant l'envoi, et le contrôleur le revérifie. --}}
+                @php($cle = $clesHote[(int) $m['id']] ?? null)
+                <section class="rw-bloc-secondaire" data-rw="serveur-cle-hote" data-id="{{ $m['id'] }}">
+                    <p class="rw-sous-titre-fort">{{ __('serveurs.cle_hote_titre') }}</p>
+                    @if ($cle)
+                        <p class="rw-aide" data-rw="serveur-cle-hote-empreinte">{{ __('serveurs.cle_hote_memorisee', [
+                            'depuis' => $cle['depuis'], 'type' => $cle['type'], 'empreinte' => substr($cle['empreinte'], 0, 16) . '…',
+                        ]) }}</p>
+                        <p class="rw-aide">{{ __('serveurs.cle_hote_aide') }}</p>
+                        @if ($peutOublierCleHote)
+                            <form method="POST" action="{{ route('serveurs.cle-hote.oublier', ['id' => $m['id']]) }}"
+                                  data-rw="serveur-cle-hote-form">
+                                @csrf
+                                <label class="rw-liste-selection__etiquette">
+                                    <input type="checkbox" name="confirme" value="1" required
+                                           data-rw="serveur-cle-hote-confirme">
+                                    <span>{{ __('serveurs.cle_hote_confirme') }}</span>
+                                </label>
+                                <button type="submit" class="rw-bouton rw-bouton--danger"
+                                        data-rw="serveur-cle-hote-oublier">{{ __('serveurs.cle_hote_oublier') }}</button>
+                            </form>
+                        @endif
+                    @else
+                        <p class="rw-aide" data-rw="serveur-cle-hote-inconnue">{{ __('serveurs.cle_hote_inconnue') }}</p>
+                    @endif
+                </section>
+
                 {{-- ═══ Étiquettes ═══════════════════════════════════════════
                      QUATRE FORMULAIRES, PAS UN `fetch`. Les quatre gestes du
                      legacy meurent sur un jeton CSRF que son enrobage de
