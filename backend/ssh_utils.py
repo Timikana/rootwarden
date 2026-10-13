@@ -411,6 +411,20 @@ def _switch_to_root_shell(client: paramiko.SSHClient, root_password: str,
 switch_to_root = _switch_to_root_shell
 
 
+def _commande_ecriture_script(b64_script: str, chemin: str) -> str:
+    """La commande qui pose un script temporaire sur la machine distante.
+
+    `(umask 077; ...)` : le fichier est CREE en 0600, jamais lisible par les
+    autres comptes de la machine, pas meme un instant. Avant (audit 2026-10-13,
+    B-2), il naissait avec l'umask par defaut puis passait en `chmod 700` : entre
+    les deux, il etait lisible — or il porte la commande, et des commandes comme
+    `... | base64 -d | chpasswd` (`configure_servers.py:928`, `:1100`) y mettent
+    un couple compte:mot de passe. Un seul ecrivain pour les deux appelants
+    (`_su_exec`, `execute_as_root_stream`) : ils ne peuvent plus diverger.
+    """
+    return f"(umask 077; printf '%s' '{b64_script}' | base64 -d > {chemin}) && chmod 700 {chemin}"
+
+
 def _su_exec(client: paramiko.SSHClient, command: str, root_password: str,
              logger=None, timeout: int = 120):
     """
@@ -445,7 +459,7 @@ def _su_exec(client: paramiko.SSHClient, command: str, root_password: str,
         # ── Etape 1 : ecrire le script temp (user normal, pas de PTY) ────────
         script = f"export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\necho {_MARKER_BEGIN}\n{command}\n_rc=$?\necho {_MARKER_END}_$_rc\nexit $_rc\n"
         b64_script = base64.b64encode(script.encode()).decode()
-        write_cmd = f"printf '%s' '{b64_script}' | base64 -d > {tmp_name} && chmod 700 {tmp_name}"
+        write_cmd = _commande_ecriture_script(b64_script, tmp_name)
 
         w_stdin, w_stdout, w_stderr = client.exec_command(write_cmd, timeout=10)
         w_stdout.read()
@@ -792,7 +806,7 @@ def execute_as_root_stream(client: paramiko.SSHClient, command: str,
         _tmp = f"/tmp/.rw_stream_{_uuid.uuid4().hex[:8]}.sh"
         _script = f"export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n{command}\n"
         _b64s = _b64.b64encode(_script.encode()).decode()
-        _wcmd = f"printf '%s' '{_b64s}' | base64 -d > {_tmp} && chmod 700 {_tmp}"
+        _wcmd = _commande_ecriture_script(_b64s, _tmp)
         _ws, _wo, _we = client.exec_command(_wcmd, timeout=10)
         _wo.read()
         _wo.channel.recv_exit_status()
@@ -912,31 +926,9 @@ def execute_command_as_root(channel_or_client, command, logger=None, timeout=120
             break
     return clean_output(output)
 
-def execute_command_as_root_exec(client, command: str, root_password: str):
-    """
-    Exécute une commande en root via ``sudo -S`` et renvoie la sortie ligne par ligne.
-
-    Contrairement à ``execute_as_root``, cette fonction est un générateur (``yield``),
-    adapté aux contextes où la sortie doit être traitée en streaming ligne à ligne
-    (ex. : mise à jour de la config Zabbix dans update_zabbix_config_exec).
-
-    Le mot de passe est toujours envoyé via stdin pour éviter toute fuite dans
-    les listes de processus (``ps aux``) ou les journaux système.
-
-    Args:
-        client (paramiko.SSHClient): Connexion SSH ouverte.
-        command (str)              : Commande shell à exécuter en root.
-        root_password (str)        : Mot de passe root en clair.
-
-    Yields:
-        str: Lignes de sortie de la commande.
-    """
-    stdin, stdout, stderr = client.exec_command(f"sudo -S sh -c {shlex.quote(command)}", get_pty=True)
-    # Passer le mot de passe via stdin
-    stdin.write(root_password + '\n')
-    stdin.flush()
-    for line in iter(stdout.readline, ""):
-        yield line
+# `execute_command_as_root_exec` RETIRE (audit 2026-10-13, B-3) : zero appelant,
+# et il ecrivait le mot de passe root dans un PTY sans le filtre d'echo de
+# `filtre_echo_mot_de_passe` — un code mort qui attendait d'etre reutilise.
 
 # ===================================================
 # Lecture de la BDD (machines, users)
