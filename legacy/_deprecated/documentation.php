@@ -1325,7 +1325,7 @@ WEBHOOK_EVENTS=cve_critical,cve_high,deploy_complete,server_offline</div>
                 </p>
                 <h3 class="font-semibold mb-2">Configuration</h3>
                 <div class="code-block mb-3"># srv-docker.env
-URL_HTTPS=https://prod.example.internal:8443     # URL interne (frontend JS)
+URL_HTTPS=https://rootwarden.interne.example:8443     # URL interne (frontend JS)
 URL_PUBLIC_HTTPS=https://portail.example.com   # URL publique (emails)</div>
                 <ul class="list-disc list-inside text-sm space-y-1 mb-3">
                     <li><strong>URL_HTTPS</strong> : utilise par le frontend JS pour les appels XHR. Doit correspondre a l'URL que les users tapent dans leur navigateur.</li>

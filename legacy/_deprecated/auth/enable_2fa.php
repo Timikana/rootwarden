@@ -86,8 +86,8 @@ $secret = $_SESSION['enrol_totp_secret'];
 $totp = TOTP::create($secret);
 
 // Configure le TOTP
-$totp->setLabel('Example - ' . $_SESSION['temp_user']['username']);
-$totp->setIssuer('Example');
+$totp->setLabel('RootWarden - ' . $_SESSION['temp_user']['username']);
+$totp->setIssuer('RootWarden');
 
 // Génère l'URI de provisioning pour le QR code
 $otpauth = $totp->getProvisioningUri();
