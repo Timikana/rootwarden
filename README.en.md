@@ -1,212 +1,109 @@
-[🇫🇷 Version francaise](README.md)
+[🇫🇷 Version française](README.md)
 
-# RootWarden v1.37.47
+# 🔐 RootWarden
 
-> **RootWarden** is a **DevSecOps** platform for centralized Linux server administration.
-> Deploy it on your infrastructure to manage SSH, updates, firewall, Fail2ban,
-> systemd services, sshd_config audit and CVE vulnerabilities - from a single interface.
+> **RootWarden** is a **self-hosted DevSecOps** platform for centralised Linux server
+> administration. From a single interface: SSH access and sudo rights, updates, firewall,
+> Fail2ban, systemd services, `sshd_config` audit, CVE vulnerabilities, monitoring and compliance.
 
-## 🚧 Ongoing migration to Laravel — TWO portals run side by side
-
-RootWarden is changing frontend. During the migration, **two interfaces run in parallel**
-against the same database and the same Python backend:
-
-| | port | role |
-|---|---|---|
-| **Laravel port** (`laravel/`) | **8444** | the target — receives pages one at a time |
-| **legacy portal** (`legacy/`) | **8443** | the reference, deprecated part by part |
-
-**Measured on 2026-08-23**: **14 of 33 menu entries ported**, **9 legacy parts archived**,
-two modules fully deprecated (`update/`, `supervision/`). The foundation is complete —
-authentication with mandatory second factor, navigation, backend gateway, FR/EN i18n.
-**The migration is not finished**, and the target is a **direct switchover in v2.0**, with
-no long coexistence.
-
-A menu entry that is not ported yet is shown with a marker and opens the legacy portal in a
-new tab: a link that changes portal without saying so betrays the user.
-
-**Two capabilities block the switchover**, each affecting 6 of 10 active accounts: **2FA
-enrolment** and the **required password change** exist only in the legacy portal. Figures
-and next steps: **[ROADMAP.md](ROADMAP.md)** (French).
-
-The work is documented under [`docs/migration/`](docs/migration/) —
-[`PARITE.md`](docs/migration/PARITE.md) lists the **93 measured divergences** between the
-two portals, each with its evidence.
-
----
-
-## 🆕 v1.24 → v1.37 — Advanced DevSecOps (⚠️ beta, dev-tested only)
-
-Post-audit wave of features. Each feature is a full vertical slice (idempotent migration + backend + UI + FR/EN i18n + docs + Puppeteer test). **Validated in development only, not yet in production** — see the warning at the top of the [CHANGELOG](CHANGELOG.md). Sensitive features are **OFF by default** (`APPROVAL_ENABLED`, `CHATOPS_ENABLED`, `TICKETING_ENABLED`). Apply migrations **052 → 061**.
-
-**Security / vulnerabilities**
-- **EPSS + CISA KEV prioritization** (v1.27) — each CVE enriched with an exploitation probability (EPSS, FIRST.org) and an "actively exploited" flag (CISA KEV); priority sorting, re-prioritize without re-scan.
-- **Compliance posture score (CIS-like)** (v1.26) — A-F grade per server (sshd + CVE + fail2ban + drift), included in CSV/PDF exports.
-- **Configuration drift detection** (v1.24) — compares desired/actual state (sudo, sshd, fail2ban) without SSH.
-
-**Governance & operations**
-- **Machine groups + bulk actions** (v1.28) — dynamic groups (env / criticality / network / tags) or static, group-wide drift/CVE scan tracked in the task center.
-- **Maintenance windows** (v1.29) — allowed time windows for mutating actions (update/reboot blocked outside the window, HTTP 423; superadmin bypass).
-- **4-eyes approval** (v1.30) — second-admin validation before destructive actions (beyond step-up 2FA).
-- **Command log / bastion** (v1.31) — trail of privileged commands actually executed (who / what / where / when / result).
-- **Task center** (v1.25) — visibility on background tasks (CVE/SSH/drift scans, backups).
-
-**Integrations**
-- **Bidirectional ChatOps** (v1.32) — fleet status + approvals from Slack/Teams (Slack signature or shared token, user mapping, 4-eyes enforced).
-- **ITSM ticketing** (v1.33) — CVE finding → Jira / ServiceNow / GLPI / generic webhook ticket (+ auto-create for KEV CVEs).
-- **Docker container watch** (v1.37) — per-server inventory + available updates: **image** side (local digest vs registry) and **git** side (commits behind + changelog).
-
-**Operations & UX**
-- **Global search** (v1.34) — servers / users / CVEs / tickets / audit in one place, + audit-log viewer (HMAC chain) reachable from the menu.
-- **Backup restore from the UI** (v1.35) — integrity test (sha256), superadmin restore with automatic safety backup.
-- **Separate Sudo / SFTP pages + plain-language help** (v1.36) — every option (chroot, ForceCommand, forwarding…) explained for non-experts.
-- **OWASP Top 10 audit of the new features** (v1.37.1) — 6 fixes (A01 access control, A03 XSS, A10 SSRF).
-
-## 🆕 v1.22.x — Per-user sudo + SFTP policies
-
-- **Fine-grained sudo per (user × server)**: dropdown of 7 presets (apt_only, restart_services, read_logs, systemctl_specific, all_nopasswd, custom, none) directly in `Administration → Access & Permissions`. NOPASSWD inline. "Advanced →" link to full UI.
-- **Per-user SFTP policies** (`/adm/server_user_policies.php`): ChrootDirectory, ForceCommand internal-sftp, AllowTcpForwarding, AllowAgentForwarding, X11Forwarding per Linux account.
-- **Systematic validation**: `visudo -cf` (sudoers) + `sshd -t` (sshd_config) BEFORE atomic `mv`. `.rwbak` backup with auto-restore on reload failure.
-- **Audit + 1-click rollback**: `policy_deployments` table with policy_snapshot JSON + before/after content. "Restore this version" button from history.
-- **Desired/actual state pattern** (v1.22.2): `user_machine_access.sudo_preset` = admin intent, applied on next SSH deploy via `configure_servers.py::add_to_sudoers()` rendered by `sudo_manager.render_policy()`.
-- **Step-up 2FA** on deploy/remove/rollback (action `policy_action`, 15 min freshness). HMAC audit_log chain with auto-scrub if content > 200 chars.
-
-## What's new in v1.21.2 (API keys UX patch)
-
-- **Redesigned creation form**: 8 quick presets + checklist of 15 modules that auto-generate the scope regexes. Advanced textarea for power users.
-- **"API Keys" button** visible in the admin toolbar (previously orphaned).
-- **"↻ Renew" button** on each revoked key: re-creates with same scope + same consumer_hint, suffix `-rYYYYMMDD-HHMMSS`. Anti-duplicate guards.
-- **`consumer_hint` field**: free-text memo "where is this key used" (`srv-docker.env:API_KEY`, `GitLab CI`, `ansible-vault`). No credential stored, just a reminder shown at renewal.
-- **Guided rotation**: UI banner + `maj.sh` warning if active non-auto-generated keys are older than 90 days (yellow) or 180 days (red). Source `created_at`.
-- Migration `047_api_keys_consumer_hint.sql` is idempotent.
-
-## What's new in v1.21.1 (bashrc UX patch)
-
-- Bashrc module: **one-click multi-server deploy** via checklist (was a single-server dropdown).
-- Vertical list with **"Last deployment"** column, color-coded (green <30d, yellow 30-90d, red >90d, italic gray if never).
-- Last deploy date pulled from `user_logs` (excludes dry-runs), rendered in browser timezone.
-- "Deploy multi" / "Dry-run multi" purple buttons activate as soon as >1 server is selected. Iterates N servers, deploys to all non-system users, aggregated results with per-server details.
-- Collateral CSP fix: rolled back the nonce in `csp_header_value()` (CSP3 was ignoring `unsafe-inline` -> all inline scripts in the repo were silently broken). Re-activation procedure documented in `legacy/includes/csp_nonce.php` for after the full inline-scripts migration.
-
-## What's new in v1.21.0 — OWASP Top 10 Security Hardening
-
-Full OWASP Top 10 audit + 30 findings patched across 3 waves. Zero regression detected via Puppeteer. See [OPERATIONS.md](OPERATIONS.md) for deployment and [CONTRIBUTING-SECURITY.md](CONTRIBUTING-SECURITY.md) for conventions.
-
-**Highlights**:
-- Python backend re-verifies role + permissions in DB on every request (no more HTTP header trust)
-- AES-256-GCM (AEAD) encryption instead of unauthenticated CBC (bit-flipping defeated)
-- Audit log hash chain : HMAC-SHA256 with dedicated `AUDIT_HMAC_KEY` (auto-generated by `env-merge.sh`)
-- Step-up auth (re-2FA) on destructive actions (delete_user, update_permissions) + automatic UI modal
-- Kill-switch `/revoke_service_account` (superadmin) : bulk userdel + sudoers purge
-- Rate limits : 2FA per IP, CVE scan per user (60s), cron schedule min 10 min
-- SSRF guard on external URLs (OpenCVE, NVD, webhooks) + machine IP blocklist (loopback, 169.254.x, etc.)
-- `api_proxy.php` explicit route whitelist (anti-IDOR on new blueprints)
-- `shlex.quote` on all shell arguments (anti-RCE in Wazuh, Graylog, bashrc)
-- bcrypt cost 12, centralized log scrubber (passwords/tokens/secrets never in clear)
-- CSP nonces (CSP3 ignores unsafe-inline when nonce present)
-- Hardened `docker-compose.prod.yml` : `cap_drop ALL`, `read_only`, `tmpfs`, user 1000 (non-root)
-- `maj.sh` verifies commit GPG signature (strict mode opt-in via `MAJ_REQUIRE_SIGNED=1`)
-- 10 custom Semgrep rules (`.semgrep/rules-rootwarden.yml`) blocking in CI for anti-regression
-- Full operational documentation (`OPERATIONS.md`)
+**Version 2.0** — Laravel web portal, Python backend driving the fleet over SSH. The exact
+number is shown at the bottom of the portal menu; history is in [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
 ## Features
 
-### Server Management
-- **SSH Keys** - Mass deployment, key age tracking (alert > 90 days)
-- **Linux Updates** - APT update/upgrade with real-time streaming, `su -c` fallback if sudo unavailable
-- **iptables Firewall** - View, edit, save/restore rules from database
-- **Fail2ban** - Service detection (SSH/FTP/Apache/Nginx/Mail), jail activation, ban/unban IP, auto-install
-- **systemd Services** - Start, stop, restart Linux services. journalctl logs, auto-categorization, protected services
-- **SSH Audit** - Scan sshd_config, security scoring (A-F), one-click fixes, config editor, backups/restore, toggle directives ON/OFF, reload sshd
-- **Multi-agent Supervision** - Deploy and configure monitoring agents via SSH. Supports Zabbix Agent 2, Centreon Monitoring Agent, Prometheus Node Exporter and Telegraf. Global config per platform, per-server overrides, remote config editor, backups/restore, multi-agent badges, scan all agents in one click
-- **Standardized Bashrc** - Deploy a unified `.bashrc` per Linux user (figlet banner, sysinfo table, alerts, git-aware prompt, aliases). Overwrite or merge mode (custom blocks preserved via `~/.bashrc.local`). Automatic backup, one-click restore, post-deploy syntax check, sha256 idempotence, colorized diff preview.
-- **Graylog Sidecar** - Deploy the Graylog Sidecar (filebeat/nxlog/winlogbeat) over SSH. Central server configuration, editable YAML/XML collector templates with YAML validation, auto-registration with the Graylog manager.
-- **Wazuh Agent** - Deploy + enroll the Wazuh agent with the manager. Group management, per-server FIM / active response / SCA / rootcheck options, editable rules / decoders / CDB lists (xmllint validation). Manager API integration to push rules.
-- **Docker containers** (v1.37) - Per-server container inventory (`docker ps`/`inspect`) + update watch: image digest vs registry (Docker Hub/GHCR/internal) and git commits behind with changelog
-- **Groups & bulk actions** (v1.28) - Dynamic groups (env/criticality/network/tags) or static, group-wide drift/CVE scan
-- **Maintenance windows** (v1.29) - Allowed time windows for mutating actions (update/reboot)
-- **Custom Tags** - Label your servers (web, db, production, dmz...) and filter by tag
+The portal menu has four sections. Each entry only appears to accounts holding the matching
+permission.
 
-### CVE Vulnerability Scanning
-- **OpenCVE** - Supports cloud (app.opencve.io) and on-prem v2 (Bearer token)
-- **EPSS + CISA KEV prioritization** (v1.27) - exploitation probability (EPSS) + "actively exploited" flag (KEV), priority score, dedicated sorting and badges
-- **Finding → ITSM ticket** (v1.33) - Jira / ServiceNow / GLPI / webhook, + auto-create for KEV CVEs
-- **Real-time Streaming** - JSON-lines, per-package progress
-- **Filters** - By severity (CRITICAL/HIGH/MEDIUM) and year
-- **CSV Export** - One-click download per server
-- **Global Summary** - Fleet overview at the top of the page
+### Fleet & access
+- **Platform SSH key** — an Ed25519 keypair owned by RootWarden, deployed as a service account on
+  the servers: no password needed once in place.
+- **Remote users** — inventory of the accounts present on each server, classification, removal.
+- **SSH keys** — deploys users' keys to a selection of servers, with a **mandatory pre-check**:
+  nothing is deployed if a single machine fails, and the reason is shown.
+- **Sudo rights** — sudo policies per user and per server (presets: no sudo, service restart, apt,
+  log reading, full sudo).
+- **SFTP/SSH access** — per-user access restrictions.
 
-### Security & Compliance
-- **Ed25519 Platform Keypair** - Passwordless SSH auth, progressive migration, secrets removal from DB
-- **rootwarden Service Account** - Dedicated Linux user with sudoers NOPASSWD:ALL, zero password required
-- **Password Reset by Email** - "Forgot password" link on login page, 1h token, PHPMailer
-- **Secure Startup (start.sh)** - Auto chmod 600 on .env, default secret detection, password masking in Docker logs
-- **force_password_change** - Mandatory password change on first login (superadmin and new users)
-- **Secure First Run** - install.sh generates passwords instead of hardcoding in DB
-- **Dual Encryption** - libsodium (sodium:) + AES-256-CBC (aes:), PHP ↔ Python compatible
-- **HKDF Key Derivation** - Separate derived keys for passwords (rootwarden-aes) and TOTP secrets (rootwarden-totp)
-- **Encrypted TOTP in DB** - 2FA secrets encrypted (Sodium/AES), backward-compatible plaintext
-- **2FA TOTP** - Mandatory multi-factor authentication
-- **RBAC** - 3 roles (user, admin, superadmin) + 13 granular permissions
-- **DB-verified Auth** - checkAuth/checkPermission verify against database on every request, session = UI cache only
-- **Anti-escalation** - Self-edit protection on all admin endpoints, superadmin non-modifiable, last superadmin protected
-- **Unified CSRF** - checkCsrfToken() supports POST body, X-CSRF-TOKEN header, JSON body (timing-safe)
-- **Dual SSH Auth** - Keypair mode (sudo NOPASSWD) + password mode (su -c via temp script), auto-detection
-- **Password Expiry** - Configurable per user (Global/Exempt/30-365 days)
-- **Session Timeout** - Auto-logout after inactivity (configurable)
-- **Audit Log** - All admin actions logged, CSV export, filters
-- **Login History** - All attempts tracked (IP, user-agent, status)
-- **Compliance Report** - Printable HTML + CSV with SHA-256 hash
-- **Terms & Privacy** - Professional pages with GDPR compliance (access/rectification/erasure/portability)
-- **Auto DB Backup** - Compressed mysqldump, configurable retention
-- **Locally Compiled Tailwind** - CSP without unsafe-eval, no external CDN
-- **Isolated Docker Network** - Database on internal network only, no internet access
-- **Restricted MySQL Privileges** - Application user without ALL PRIVILEGES (SELECT/INSERT/UPDATE/DELETE + migrations)
-- **Two-layer brute-force protection** - IP rate limit (5/10min) + per-user lockout with **progressive backoff** (3=1min, 4=5min, 5=15min, 6=1h, 7+=4h). Password spraying detection (>= 5 distinct usernames/10min from same IP → superadmin alert). Admin "Unlock" button.
-- **Tamper-evident audit log** - Every `user_logs` row sealed with an SHA2-256 hash chain (prev_hash | user_id | action | unix_ts). `/adm/api/audit_verify.php` recomputes the chain and flags any alteration (MISMATCH / PREV_BROKEN). "Verify integrity" button in audit log.
-- **Segmented API keys** - `api_keys` table with route-regex scope (e.g. `["^/cve/", "^/list_machines$"]`). Format `rw_live_XXXXXX_...`, stored as SHA-256. Superadmin CRUD UI with rotation + soft revocation + `last_used_at`/`last_used_ip` tracking. Zero-downtime fallback to legacy `Config.API_KEY` until the table is populated.
-- **CI supply-chain security** - gitleaks (committed secrets), bandit (Python SAST), pip-audit + composer audit (SCA), trivy fs (repo) + trivy image (containers). `auto-tag` depends on all scans → no release on critical CVE.
-- **Server-side session revocation** - `verify.php` checks `active_sessions` on every request → "Revoke" / "Sign out others" has an immediate effect, invalidating stolen cookies.
-- **Password history + HIBP** - Refuses reuse of the last 5 passwords (`password_history` table). Opt-in HaveIBeenPwned check via k-anonymity API (first 5 SHA1 hex sent, configurable threshold).
-- **GDPR self-service** - `/profile/export.php` route: any user downloads their personal data as JSON (profile + logs + sessions + prefs, hashes masked). Admin endpoint `/adm/api/anonymize_user.php`: soft-delete preserving audit log (art. 17.3.e).
-- **28+ Security Fixes (3 Audits)** - SQLi, CSRF, XSS, timing attack, etc.
+### Operations
+- **Updates** — live `apt update/upgrade`, pending packages, scheduled security updates, delayed
+  reboot.
+- **Services** — start, stop, restart systemd services, `journalctl` logs.
+- **Monitoring** — deploys and configures Zabbix Agent 2, Centreon, Prometheus Node Exporter and
+  Telegraf agents; reusable profiles, per-server overrides.
+- **Bashrc** — standardised per-user `.bashrc`, with backup and restore.
+- **Docker containers** — container inventory and image update watch.
+- **Graylog** — deploys Graylog Sidecar and its collectors.
 
-### Notifications
-- **Webhooks** - Slack, Teams, Discord, generic (critical CVEs, offline servers, deployments)
-- **Email** - HTML CVE reports, user welcome email (SMTP)
+### Security
+- **CVE scan** — through OpenCVE (cloud or on-prem), **EPSS + CISA KEV** prioritisation,
+  remediation tracking, ITSM ticket creation (Jira, ServiceNow, GLPI, webhook), CSV export.
+- **Compliance** — printable report and CSV with a SHA-256 fingerprint.
+- **Config drift** — detects configuration deviations.
+- **Firewall** — view, edit, history and restore of iptables rules.
+- **Fail2ban** — install, jails, IP ban and unban.
+- **SSH audit** — `sshd_config` grading (A to F), fixes, backup and restore.
+- **Wazuh** — agent deployment and enrolment, rules and decoders.
 
-### Dashboard
-- **Security Alerts** - Users without 2FA, old SSH keys, offline servers, critical CVEs
-- **Fleet Status** - Each server with OS version, status, CVEs, last check
-- **Quick Access** - Shortcuts to modules based on permissions
+### Administration
+- **Accounts and permissions** — 3 roles (user, admin, superadmin) and fine-grained permissions,
+  permanent or **temporary**.
+- **Groups & bulk actions** — dynamic or static groups, actions on a whole group.
+- **Four-eyes approvals** — sensitive actions require a second administrator's sign-off.
+- **Maintenance windows**, **task centre**, **database backups**.
+- **Audit log** sealed by a hash chain (tampering is detectable) and **command log**.
+- **Global search** and **ChatOps** (Slack, Teams, generic webhook).
+
+### Portal security
+- **Mandatory TOTP second factor** for every account, with replay protection.
+- **Re-authentication** (step-up) before sensitive actions.
+- Account lockout and per-IP attempt limiting.
+- Password history and optional HaveIBeenPwned check.
+- Server-side revocable sessions, remote sign-out.
+- API keys segmented by scope, stored hashed.
+- Self-service GDPR export of one's personal data.
+- Interface in **French and English**.
 
 ---
 
-## Tech Stack
+## Architecture
+
+```
+browser ──HTTPS 8443──▶ laravel (portal, Apache)
+                           │  authenticated gateway
+                           ▼
+                        python (backend API, internal network)  ──SSH──▶ Linux servers
+                           │
+                           ▼
+                          db (MySQL, internal network)
+```
+
+- Only the portal is published (`8443` over HTTPS, `8080` redirects to HTTPS).
+- The backend and the database are only reachable from the internal Docker network.
+- The portal never talks to servers directly: every action goes through the backend, with rights
+  checked in the database on each call.
+
+## Tech stack
 
 | Component | Technology |
-|-----------|-----------|
-| Frontend | PHP 8.4 + Apache, Tailwind CSS (locally compiled), htmx 2.0.4, vanilla JS |
-| Backend API | Python 3.13, Flask, Hypercorn (ASGI) |
-| Database | MySQL 9.2 |
-| Containerization | Docker Compose |
-| Docker Network | Dual (internal + external) |
-| Encryption | libsodium (PyNaCl) + AES-256-CBC |
-| API Proxy | PHP → Python (eliminates CORS, hides API_KEY) |
-| i18n | 1424 keys FR/EN, 19 modules per language |
-| Tests | pytest (139 tests), ruff (Python linter), php -l (PHP lint) |
-| CI/CD | GitHub Actions (lint → test → Docker build) |
+|-----------|------------|
+| Portal | Laravel 13, PHP 8.4, Apache — hand-written CSS and JavaScript, no build step |
+| Backend | Python 3.13, Flask, Hypercorn, Paramiko |
+| Database | MySQL 9.2 (schema managed in `mysql/migrations/`) |
+| Deployment | Docker Compose |
+| Tests | PHPUnit, pytest, Puppeteer E2E suites |
+| CI | GitHub Actions: tests, lint, semgrep, bandit, gitleaks, Trivy, pip-audit, composer audit |
 
 ---
 
 ## Installation
 
-### Prerequisites
-- Docker + Docker Compose
+### Requirements
+- Docker and Docker Compose
+- Git
 
-### Quick Start
+### Getting started
 
 ```bash
 git clone https://github.com/Timikana/rootwarden.git
@@ -217,48 +114,66 @@ chmod 600 srv-docker.env
 ./start.sh -d
 ```
 
-> The `start.sh` script automatically secures permissions and checks for default secrets.
+The portal is then served at **https://localhost:8443**.
 
-### Access
-- **Laravel port (the target): http://localhost:8444** — see "Ongoing migration" above
-- Legacy portal (the reference, being deprecated): **https://localhost:8443**
-- Superadmin account: auto-generated password on first run.
-  Check: `docker exec <php_container> cat /var/www/html/.first_run_credentials`
-  Password change is mandatory on first login.
+> ⚠️ **Known limitation — first account.** Automatic creation of the first superadmin account has
+> not yet been carried over to the Laravel portal: on a fresh database, no account exists. A
+> dedicated command is being prepared. Existing installations are not affected.
 
-### Preprod Environment (optional)
+### Operations scripts
+
+| Script | When to use it | What it does |
+|--------|----------------|--------------|
+| `./start.sh [-d]` | Start / restart | env merge, `chmod 600`, warning on default secrets, `docker compose up` |
+| `./stop.sh [-v]` | Stop | `docker compose down` (asks for confirmation with `-v`, which deletes volumes) |
+| `./maj.sh` | Update | `git pull` → env merge → build → migrations → `up -d` → backend restart |
+
+`./maj.sh --check` shows what would be done without running anything.
+
+**Env merge** (`scripts/env-merge.sh`, called by `start.sh` and `maj.sh`): keys present in
+`srv-docker.env.example` and missing from your `srv-docker.env` are appended with their comment.
+**Your existing values are never changed.**
+
+### Optional modules
 
 ```bash
-# Adds a Debian test server + mock OpenCVE
-docker-compose --profile preprod up -d
+# In srv-docker.env
+WAZUH_ENABLED=false
 ```
 
-### Key Environment Variables
+A disabled module disappears from the menu, and the backend no longer exposes its routes.
 
-| Variable | Description |
-|----------|-----------|
-| `SECRET_KEY` | AES/Sodium encryption key (hex 64 chars) |
-| `API_KEY` | Frontend → backend authentication |
-| `OPENCVE_URL` | OpenCVE URL (cloud or on-prem) |
-| `OPENCVE_TOKEN` | Bearer token for OpenCVE v2 on-prem |
-| `WEBHOOK_URL` | Webhook URL for Slack/Teams/Discord |
-| `SESSION_TIMEOUT` | Session timeout in minutes (default 30) |
-| `SSL_MODE` | auto / custom / disabled |
-| `INIT_SUPERADMIN_PASSWORD` | Initial superadmin password (empty = auto-generated, recommended) |
-| `URL_HTTPS` | Internal URL (frontend JS) - e.g. `https://lagoon:8443` |
-| `URL_PUBLIC_HTTPS` | Public URL for outgoing emails (optional, behind reverse-proxy) - e.g. `https://cleopatre-ssh.magiline.fr` |
+### Pre-production environment (optional)
 
-See `srv-docker.env.example` for the full list.
+```bash
+# Adds a Debian test server and a fake OpenCVE
+docker compose --profile preprod up -d
+```
+
+### Main environment variables
+
+| Variable | Purpose |
+|----------|---------|
+| `SECRET_KEY` | Encryption key for secrets stored in the database (hex, 64 characters) |
+| `API_KEY` | Portal authentication to the backend |
+| `APP_URL` | Public address of the portal (links in emails) |
+| `OPENCVE_URL` / `OPENCVE_TOKEN` | Vulnerability source (cloud or on-prem) |
+| `WEBHOOK_URL` | Slack, Teams, Discord or generic notifications |
+| `MAIL_*` | Email (SMTP) — **disabled by default**: set `MAIL_MAILER=smtp` to send |
+| `SSL_MODE` | Portal certificate: `auto`, `custom` or `disabled` |
+| `BACKUP_ENABLED` | Automatic database backups |
+
+The full, commented list is in [`srv-docker.env.example`](srv-docker.env.example).
 
 ---
 
-## Migrations
+## Database migrations
 
 ```bash
-# Check migration status
+# Migration status
 docker exec rootwarden_python python /app/db_migrate.py --status
 
-# Apply pending migrations
+# Apply pending migrations (./maj.sh already does it)
 docker exec rootwarden_python python /app/db_migrate.py
 ```
 
@@ -266,93 +181,72 @@ docker exec rootwarden_python python /app/db_migrate.py
 
 ## Documentation
 
-Full technical documentation available in the application: **https://localhost:8443/documentation.php**
-
-Reference files:
-- `ARCHITECTURE.md` - Map of all files, DB tables, data flows
-- `CHANGELOG.md` - Version history (Semantic Versioning)
+- In the portal: menu **Other → Documentation**.
+- [`ARCHITECTURE.md`](ARCHITECTURE.md) — files, tables, data flows.
+- [`OPERATIONS.md`](OPERATIONS.md) — day-to-day operations.
+- [`CHANGELOG.md`](CHANGELOG.md) — version history.
+- [`docs/migration/`](docs/migration/) — log of the migration to Laravel.
+- [`obsidian-rootwarden/`](obsidian-rootwarden/obsidian-rootwarden-vault/) — Obsidian vault (open
+  the folder as a vault, graph view with `Ctrl+G`).
 
 ---
 
-## Production Hardening
+## Securing a production installation
 
-### Pre-deployment Checklist
+1. **Unique secrets** — generate every key with `openssl rand -hex 32`.
+2. **`./start.sh`** rather than `docker compose up`: it sets `chmod 600`, flags secrets left at
+   their default value and asks for confirmation before starting.
+3. **Production mode** — in `laravel/.env`: `APP_ENV=production` and `APP_DEBUG=false`.
+4. **Secure cookies** — `SESSION_SECURE_COOKIE=true` in `srv-docker.env`.
+5. **Certificate** — `SSL_MODE=custom` with your own certificate.
+6. **Host access** — restrict SSH access to the Docker host to administrators: root on the host
+   gives access to everything.
+7. **Backups** — `BACKUP_ENABLED=true` with a suitable retention.
+8. **Alerts** — configure a webhook for critical CVEs and unreachable servers.
 
-1. **Unique secrets** - Generate all keys with `openssl rand -hex 32`
-2. **start.sh** - Use `./start.sh` instead of `docker-compose up` (auto chmod + secret verification)
-3. **File permissions** - `chmod 600 srv-docker.env` (automatic via start.sh on Linux)
-4. **Remove initial credentials** - After first login:
-   ```bash
-   docker exec <php_container> rm /var/www/html/.first_run_credentials
-   ```
-5. **Clear INIT_SUPERADMIN_PASSWORD** - Remove the value from srv-docker.env after installation
-6. **SSL** - Use SSL_MODE=custom with your own certificates (Let's Encrypt, enterprise cert)
-7. **Host access** - Restrict SSH access to the Docker host to infrastructure admins only
-8. **Backups** - Enable BACKUP_ENABLED=true with appropriate retention
-9. **Monitoring** - Configure webhooks (Slack/Teams) for CVE alerts and offline servers
+To report a vulnerability: see [`CONTRIBUTING-SECURITY.md`](CONTRIBUTING-SECURITY.md).
 
 ---
 
 ## FAQ / Troubleshooting
 
-### Can't login after `docker-compose down -v`
+### The portal shows a 500 error right after installation
 
-A `down -v` deletes volumes (database). On restart, `init.sql` creates accounts
-with invalid placeholders. `install.sh` must run to generate real passwords.
-If the `legacy/.installed` flag still exists (bind mount), remove it:
+Check that `laravel/.env` exists and holds an `APP_KEY`:
 
 ```bash
-rm -f legacy/.installed
-./start.sh -d
-docker exec <php_container> cat /var/www/html/.first_run_credentials
+docker exec rootwarden_laravel grep -c '^APP_KEY=base64:' /var/www/html/.env
 ```
 
-### Python container won't start (unhealthy / FileNotFoundError SSL)
+If it is missing, copy `laravel/.env.example` to `laravel/.env`, set `APP_ENV=production` and
+`APP_DEBUG=false`, then restart the `laravel` container: the key is generated at startup.
 
-Backend SSL certificates are auto-generated at startup. If the error persists
-after a `git pull`, the Docker image is cached with old code:
+### The Python backend does not start after a `git pull`
+
+The Docker image is cached with the old code:
 
 ```bash
-docker compose down
 docker compose build --no-cache python
 docker compose up -d
 ```
 
-### Default passwords don't work
+### The CVE scan returns no vulnerability
 
-Passwords are no longer hardcoded in `init.sql`. They are generated by
-`install.sh` on first run. Use `start.sh` to start and check initial credentials:
+Check the server's **CVSS threshold**: a `9+` threshold hides every HIGH and MEDIUM CVE.
+Also check `OPENCVE_URL` and `OPENCVE_TOKEN`.
 
-```bash
-docker exec <php_container> cat /var/www/html/.first_run_credentials
-```
+### `docker compose down -v`: what happens?
 
-### Navigation is blocked during CVE scan / update
+| | Database | Platform SSH keypair |
+|---|---|---|
+| without `-v` | kept | kept |
+| with `-v` | **deleted** | **deleted** |
 
-Fixed in v1.9.1 (`session_write_close()` in `api_proxy.php`).
-Update if you're on an older version.
-
-### CVE scan returns 0 vulnerabilities when there are some
-
-Check the **CVSS threshold**: the per-server dropdown (next to the Scan button)
-may differ from the global threshold. A `9+` (CRITICAL) threshold will filter
-all HIGH and MEDIUM CVEs. Lower to `0+` to see everything.
-
-Also check your browser isn't using cached JS (Ctrl+Shift+R).
-
-### `docker compose down -v` - what happens?
-
-| Flag `-v` | DB Data | SSH Keypair | Sessions | Passwords |
-|-----------|---------|-------------|----------|-----------|
-| Without `-v` | Preserved | Preserved | Preserved | Preserved |
-| With `-v` | **Deleted** | **Deleted** | Deleted | Re-generated by install.sh via start.sh |
-
-**Never use `-v` in production** unless you want to start from scratch.
-After `down -v`, restart with `./start.sh -d` to re-generate credentials.
+**Never use `-v` in production**, unless you want to start from scratch.
 
 ---
 
-## Support the Project
+## Support the project
 
 If RootWarden is useful to you, you can support its development:
 
@@ -363,7 +257,3 @@ If RootWarden is useful to you, you can support its development:
 ## License
 
 MIT
-
----
-
-*RootWarden v1.20.0 - 2026-05-05*

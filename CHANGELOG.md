@@ -60,6 +60,34 @@ passage l'exécute. Ensuite, un seul suffit.
 Contrôle : `composer audit --locked` → « No security vulnerability advisories found ». Suite
 complète : 472 tests, 1 738 assertions, 0 échec.
 
+---
+
+## README — réécrit sur la v2.0, et ce qu'il publiait de trop
+
+Le README annonçait la **v1.37.47**, décrivait la migration comme « en cours » avec **deux
+portails qui coexistent** (le legacy est éteint depuis septembre), empilait les nouveautés de la
+v1.21 à la v1.37, et documentait des procédures du conteneur legacy qui n'existe plus
+(`.first_run_credentials`, `legacy/.installed`, port 8444).
+
+Réécrit, en français et en anglais (31 titres de chaque côté) :
+
+- fonctionnalités rangées selon les **quatre sections réelles du menu** (`App\Support\Navigation`) ;
+- architecture et stack actuelles : Laravel 13 / PHP 8.4, Python 3.13 / Flask, MySQL 9.2 ;
+  seul le portail est publié ;
+- variables réellement lues : `APP_URL` remplace `URL_PUBLIC_HTTPS`, et `SESSION_TIMEOUT`,
+  `INIT_SUPERADMIN_PASSWORD` disparaissent (0 lecture dans le portail, le backend et les
+  entrypoints) ;
+- deux affirmations devenues fausses retirées : « CSP sans unsafe-eval » (le portail ne pose
+  aucune CSP aujourd'hui) et « Tailwind compilé localement » (CSS écrit à la main).
+
+**Le dépôt est public.** L'ancien README publiait l'adresse de la production dans le tableau des
+variables. Elle n'y figure plus.
+
+**Limitation écrite telle quelle** : une installation neuve ne crée plus de premier compte. Le
+seul créateur était `legacy/_deprecated/php/install.sh`, archivé avec le legacy, et le portail
+n'a aucune commande de remplacement. Le README le dit au lieu de décrire une procédure qui
+n'existe plus.
+
 ## Clés SSH — le pré-contrôle refusait toutes les machines, et mon test le confirmait
 
 Une fois la panne TLS levée, « Déployer » refusait Eos : une machine saine, SSH authentifié,
