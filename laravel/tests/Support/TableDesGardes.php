@@ -328,8 +328,11 @@ class TableDesGardes
 
             // Routes du cadre, pas du portage.
             'GET up'             => 'sonde de sante du cadre',
-            'GET storage/{path}' => 'service de fichiers du cadre',
-            'PUT storage/{path}' => 'service de fichiers du cadre',
+            // `GET` et `PUT storage/{path}` ont ete RETIREES (audit 2026-10-13,
+            // M-2 : `filesystems.disks.local.serve = false`). Tant qu'elles
+            // existaient, l'affirmation ci-dessus — « le seul chemin public qui
+            // ecrit » — etait FAUSSE : `PUT storage/{path}` ecrivait aussi, garde
+            // par la seule signature APP_KEY.
         ];
     }
 
