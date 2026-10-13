@@ -116,9 +116,17 @@ chmod 600 srv-docker.env
 
 The portal is then served at **https://localhost:8443**.
 
-> ⚠️ **Known limitation — first account.** Automatic creation of the first superadmin account has
-> not yet been carried over to the Laravel portal: on a fresh database, no account exists. A
-> dedicated command is being prepared. Existing installations are not affected.
+### First account
+
+A fresh database holds a `superadmin` account **with no usable password**. To give it one:
+
+```bash
+docker exec -u www-data rootwarden_laravel php artisan rootwarden:premier-compte
+```
+
+The password is shown **only once**. It must be changed at first sign-in, where the second factor
+(TOTP) is enrolled. The command refuses to run if a usable superadmin already exists: it is only
+meant to bootstrap an installation.
 
 ### Operations scripts
 

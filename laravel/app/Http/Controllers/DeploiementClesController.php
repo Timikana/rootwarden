@@ -80,7 +80,7 @@ class DeploiementClesController extends Controller
                 'echecs' => $verdict['echecs'],
                 'raisons' => $verdict['raisons'],
                 // CHAQUE MACHINE AVEC SA RAISON. Le message nommait la machine et
-                // taisait le motif : l'exploitant cherchait sur Eos un defaut qui
+                // taisait le motif : l'exploitant cherchait sur la machine un defaut qui
                 // n'y etait pas (2026-10-05).
                 'message' => __('ssh.err_preflight_echoue', [
                     'machines' => implode(' ; ', array_map(

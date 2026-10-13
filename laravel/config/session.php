@@ -169,7 +169,12 @@ return [
     |
     */
 
-    'secure' => env('SESSION_SECURE_COOKIE'),
+    // Defaut : SECURISE, sauf portail servi en clair (`SSL_MODE=disabled`, ou
+    // un cookie `Secure` casserait la connexion). Sans defaut, la valeur etait
+    // `null` en production (mesure 2026-10-05) et la premiere requete HTTP
+    // emportait le cookie en clair. Audit 2026-10-13, M-1 ;
+    // garde par `DurcissementPortailTest`.
+    'secure' => env('SESSION_SECURE_COOKIE', env('SSL_MODE', 'auto') !== 'disabled'),
 
     /*
     |--------------------------------------------------------------------------

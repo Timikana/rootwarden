@@ -58,6 +58,9 @@ return [
         'max_tentatives_2fa' => 5,
         // Echecs de second facteur par IP sur 10 minutes avant blocage.
         'max_echecs_ip' => 10,
+        // Audit 2026-10-13, B-7 : echecs du second facteur par COMPTE, toutes IP
+        // confondues, sur dix minutes.
+        'max_echecs_compte' => 10,
     ],
 
     /*

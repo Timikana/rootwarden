@@ -34,7 +34,7 @@ from configure_servers import (
     _motif_nom_invalide,
     _valid_username as _valid_username_decouvert,
 )
-from ssh_utils import ssh_session, execute_as_root, ensure_sudo_installed
+from ssh_utils import ssh_session, execute_as_root, ensure_sudo_installed, politique_cle_hote
 from config import Config
 
 bp = Blueprint('ssh', __name__)
@@ -876,7 +876,7 @@ def deploy_platform_key():
                 # Tester la connexion en keypair
                 try:
                     test_client = paramiko.SSHClient()
-                    test_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                    test_client.set_missing_host_key_policy(politique_cle_hote())
                     from ssh_key_manager import get_platform_private_key
                     pkey = get_platform_private_key()
                     test_client.connect(hostname=m['ip'], port=m['port'], username=ssh_user, pkey=pkey, look_for_keys=False, allow_agent=False)
@@ -965,7 +965,7 @@ def deploy_platform_key():
                             # cas observe en prod sur serveurs hardenes).
                             def _try_sa_login():
                                 sa_test = paramiko.SSHClient()
-                                sa_test.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                                sa_test.set_missing_host_key_policy(politique_cle_hote())
                                 sa_test.connect(
                                     hostname=m['ip'], port=m['port'], username=sa_name,
                                     pkey=pkey, look_for_keys=False, allow_agent=False, timeout=10
@@ -1447,7 +1447,7 @@ def deploy_service_account():
             try:
                 pkey = get_platform_private_key()
                 test_client = paramiko.SSHClient()
-                test_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                test_client.set_missing_host_key_policy(politique_cle_hote())
                 test_client.connect(
                     hostname=m['ip'], port=m['port'], username='rootwarden',
                     pkey=pkey, look_for_keys=False, allow_agent=False, timeout=10
@@ -1546,7 +1546,7 @@ def test_platform_key():
             return jsonify({'success': False, 'auth_method': 'none', 'message': 'Keypair non generee'})
 
         client = paramiko.SSHClient()
-        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        client.set_missing_host_key_policy(politique_cle_hote())
         client.connect(hostname=m['ip'], port=m['port'], username=m['user'], pkey=pkey, look_for_keys=False, allow_agent=False, timeout=10)
         client.close()
         return jsonify({'success': True, 'auth_method': 'keypair', 'message': f"Connexion keypair OK sur {label}"})
@@ -1827,8 +1827,8 @@ def scan_server_users():
             # ecrits par RootWarden via `printf '%s'` n'ont PAS de newline
             # finale -> le marqueur ###ENDUSER### colle sur la derniere cle,
             # le parser ne le voit pas -> les cles de l'user ne sont jamais
-            # enregistrees. Bug observe sur 4 users (rootwarden, gbroussier,
-            # kduplouy, cleopatre) v1.19.0.
+            # enregistrees. Bug observe sur 4 comptes (rootwarden et trois
+            # comptes d'administrateurs) v1.19.0.
             dump_script = (
                 "awk -F: '{print $6\":\"$1}' /etc/passwd | "
                 "while IFS=: read home user; do "
@@ -2025,7 +2025,7 @@ def scan_server_users():
             # Nettoyage des "fantomes" : users qui existaient en inventaire
             # mais qui ne sont plus sur le serveur (userdel manuel depuis une
             # autre console, compte systeme supprime, etc.). Sans ca, un
-            # compte comme `cleopatre` reste visible a vie dans l'UI.
+            # compte comme `ancien-compte` reste visible a vie dans l'UI.
             # On identifie les fantomes = rows en DB non-touchees par ce scan.
             #
             # ══ E-183 : LE SENS DU REPLI CHANGE, ET C'EST DELIBERE ═══════════

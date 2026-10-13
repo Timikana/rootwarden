@@ -28,9 +28,36 @@ chown -R www-data:www-data storage bootstrap/cache 2>/dev/null || true
 # ATTENTION : elle ne sert QU'A Laravel. Le chiffrement des donnees metier
 # (mots de passe machines, secrets TOTP) utilise la SECRET_KEY partagee avec le
 # backend Python et n'a rien a voir avec APP_KEY.
+# ── `.env` ABSENT : LE CREER, EN MODE PRODUCTION ─────────────────────────────
+# Incident du 2026-10-01 (audit M-6) : `laravel/.env` est gitignore et RIEN ne
+# le creait. La condition ci-dessous (`[ -f .env ]`) etait fausse, la cle n'etait
+# jamais generee, et le portail rendait 500 sur toutes les pages — en silence.
+# Copier `.env.example` tel quel n'aurait pas suffi : il porte `APP_ENV=local`
+# et `APP_DEBUG=true`, c'est-a-dire des traces completes servies au public.
+# On force donc production/false, SAUF si l'exploitant a demande le mode debug
+# (`DEBUG_MODE=true`, la variable qui active deja le profil preprod de maj.sh).
+if [ ! -f .env ] && [ -f .env.example ]; then
+    echo "[laravel] .env absent : creation depuis .env.example"
+    cp .env.example .env
+    if [ "${DEBUG_MODE:-false}" = "true" ]; then
+        echo "[laravel]   DEBUG_MODE=true : APP_ENV/APP_DEBUG laisses a leurs valeurs de dev" >&2
+    else
+        sed -i 's/^APP_ENV=.*/APP_ENV=production/; s/^APP_DEBUG=.*/APP_DEBUG=false/' .env
+        echo "[laravel]   APP_ENV=production, APP_DEBUG=false"
+    fi
+    # Contient APP_KEY : lisible par Apache (www-data), par personne d'autre.
+    chown root:www-data .env 2>/dev/null || true
+    chmod 640 .env
+fi
+
 if [ -f .env ] && ! grep -q '^APP_KEY=base64:' .env; then
     echo "[laravel] generation de APP_KEY..."
     php artisan key:generate --force --no-interaction || true
+fi
+# VERIFIER apres le geste, pas croire la commande : sans cle, CHAQUE page rend
+# 500. On le dit fort ici plutot que de le laisser decouvrir au navigateur.
+if [ -f .env ] && ! grep -q '^APP_KEY=base64:' .env; then
+    echo "[laravel] ⛔ APP_KEY ABSENTE apres generation : le portail rendra 500 sur toutes les pages" >&2
 fi
 
 # ── Compilation des vues ─────────────────────────────────────────────────────
@@ -75,6 +102,11 @@ SSL_MODE="${SSL_MODE:-auto}"
 SERVER_NAME="${SERVER_NAME:-localhost}"
 SERVER_ADMIN="${SERVER_ADMIN:-admin@localhost}"
 CERT_DIR="/var/www/certs"
+# Exportees ICI, pour les DEUX modes TLS : `rootwarden-laravel.conf` (Dockerfile)
+# lit `${SERVER_ADMIN}` quel que soit le mode. Exportees seulement dans la
+# branche TLS, elles levaient `AH00111` avec SSL_MODE=disabled (mesure du
+# 2026-10-13, deja present avant l'audit).
+export SERVER_NAME SERVER_ADMIN
 
 # ⚠ CE DEFAUT N'EST PAS UN CONFORT : SANS LUI, APACHE NE DEMARRE PAS.
 # Apache leve `AH00111` sur une variable inconnue et s'arrete. Une installation
@@ -84,6 +116,18 @@ CERT_DIR="/var/www/certs"
 # port n'est pas celui qu'Apache ecoute (443), c'est celui que l'HOTE PUBLIE, et
 # il ne sert qu'a construire la redirection HTTP -> HTTPS.
 LARAVEL_HTTPS_PORT="${LARAVEL_HTTPS_PORT:-8443}"
+
+# HSTS_MAX_AGE est lu par Apache (`zz-rootwarden-securite.conf`). ⚠ SANS
+# DEFINITION, APACHE NE DEMARRE PAS (AH00111, cf. ci-dessus) : le defaut est
+# donc pose ICI, pour les deux modes TLS. Une valeur non numerique retombe sur
+# le defaut, en le disant, plutot que d'emettre un en-tete invalide.
+HSTS_MAX_AGE="${HSTS_MAX_AGE:-86400}"
+case "$HSTS_MAX_AGE" in
+    ''|*[!0-9]*)
+        echo "[laravel] ⚠ HSTS_MAX_AGE='${HSTS_MAX_AGE}' n'est pas un nombre - defaut 86400" >&2
+        HSTS_MAX_AGE=86400 ;;
+esac
+export HSTS_MAX_AGE
 
 if [ "$SSL_MODE" = "disabled" ]; then
     # Choix EXPLICITE, pour un deploiement derriere un frontal qui termine le TLS.

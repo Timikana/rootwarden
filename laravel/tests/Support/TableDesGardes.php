@@ -254,6 +254,8 @@ class TableDesGardes
             ['POST', 'serveurs/{id}/notes', ['role:2', 'perm:can_admin_portal']],
             ['POST', 'serveurs/{id}/notes/{note}/supprimer', ['role:2', 'perm:can_admin_portal']],
             ['POST', 'serveurs/{id}/supprimer', ['role:2', 'perm:can_admin_portal']],
+            // Audit 2026-10-13, H-3 : oublier la cle d'hote = accepter la suivante. Role 3.
+            ['POST', 'serveurs/{id}/cle-hote/oublier', ['role:3', 'perm:can_admin_portal']],
             ['GET', 'services', ['role:1', 'perm:can_manage_services']],
             ['GET', 'supervision', ['role:2', 'perm:can_manage_supervision']],
             ['POST', 'supervision/configuration', ['role:2', 'perm:can_manage_supervision']],
@@ -328,8 +330,11 @@ class TableDesGardes
 
             // Routes du cadre, pas du portage.
             'GET up'             => 'sonde de sante du cadre',
-            'GET storage/{path}' => 'service de fichiers du cadre',
-            'PUT storage/{path}' => 'service de fichiers du cadre',
+            // `GET` et `PUT storage/{path}` ont ete RETIREES (audit 2026-10-13,
+            // M-2 : `filesystems.disks.local.serve = false`). Tant qu'elles
+            // existaient, l'affirmation ci-dessus — « le seul chemin public qui
+            // ecrit » — etait FAUSSE : `PUT storage/{path}` ecrivait aussi, garde
+            // par la seule signature APP_KEY.
         ];
     }
 

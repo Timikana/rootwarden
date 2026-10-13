@@ -121,10 +121,18 @@ chmod 600 srv-docker.env
 
 Le portail est alors servi sur **https://localhost:8443**.
 
-> ⚠️ **Limitation connue — premier compte.** La création automatique du premier compte
-> superadmin n'a pas encore été reprise dans le portail Laravel : sur une base neuve, aucun compte
-> n'existe. Une commande dédiée est en préparation. Les installations existantes ne sont pas
-> concernées.
+### Premier compte
+
+Une base neuve contient un compte `superadmin` **sans mot de passe utilisable**. Pour lui en
+donner un :
+
+```bash
+docker exec -u www-data rootwarden_laravel php artisan rootwarden:premier-compte
+```
+
+Le mot de passe est affiché **une seule fois**. Il devra être changé à la première connexion, et
+le second facteur (TOTP) sera enrôlé à ce moment-là. La commande refuse d'agir si un superadmin
+utilisable existe déjà : elle ne sert qu'à amorcer une installation.
 
 ### Scripts d'exploitation
 

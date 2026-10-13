@@ -37,6 +37,17 @@ else
     exit 1
 fi
 
+# ── Durcissement des conteneurs (audit 2026-10-13, H-4) ─────────────────────
+# `COMPOSE_DURCI=true` dans srv-docker.env ajoute docker-compose.prod.yml a
+# TOUTES les commandes compose de ce script. Option absente : commandes
+# inchangees. Voir scripts/compose-durci.sh.
+source "${SCRIPT_DIR}/scripts/compose-durci.sh"
+_DURCI=$(drapeaux_compose_durci "${ENV_FILE}" "${SCRIPT_DIR}")
+if [ -n "$_DURCI" ]; then
+    DC="${DC} ${_DURCI}"
+    echo -e "${GREEN}[RootWarden]${NC} Durcissement des conteneurs ACTIF (docker-compose.prod.yml)"
+fi
+
 # ── Verification du fichier .env ─────────────────────────────────────────────
 if [ ! -f "${ENV_FILE}" ]; then
     echo -e "${RED}[ERREUR]${NC} Fichier srv-docker.env introuvable."

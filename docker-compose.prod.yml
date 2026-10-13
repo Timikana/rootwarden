@@ -1,68 +1,54 @@
 # ================================================================
-# docker-compose.prod.yml - override pour deploiement production
+# docker-compose.prod.yml - durcissement des conteneurs en production
 #
-# Apporte le hardening recommande par les audits securite :
+# Applique par `./maj.sh` et `./start.sh` quand `COMPOSE_DURCI=true` dans
+# srv-docker.env (audit 2026-10-13, H-4). Manuellement :
+#   docker compose --env-file srv-docker.env -f docker-compose.yml -f docker-compose.prod.yml up -d
 #
-# Audit v1.17.0 - FIND-3 :
-#   - retire les bind-mounts ./backend:/app et ./legacy:/var/www/html
-#     qui defaisaient le hardening de l'image baked
-#   - le code applicatif reste celui baked dans l'image construite
-#     en CI ; les volumes nommes/persistants pour data/logs/keys sont
-#     conserves
+# ── CE FICHIER NE DEMARRAIT PAS, ET RIEN NE L'APPELAIT ─────────────────────
 #
-# Audit OWASP 2026-05-19 - A05-NEW-01/02/03 :
-#   - cap_drop ALL + cap_add minimaux (no kernel privileges hors ce qui
-#     est strictement necessaire au binding ports 80/443 et au lifecycle
-#     gosu/su d'Apache)
-#   - read_only: true filesystem + tmpfs sur /tmp et /var/run
-#   - security_opt: no-new-privileges deja present, conserve
-#   - ports MySQL non exposes (deja le cas en dev)
+# Mesure du 2026-10-13, stack complete lancee avec cet overlay (projet compose
+# isole, base vide) — les DEUX services applicatifs redemarraient en boucle :
+#   laravel  « cannot create /etc/apache2/sites-available/000-default.conf:
+#             Read-only file system » : l'entrypoint ecrit le vhost TLS dans
+#             /etc, rendu en lecture seule par `read_only: true` ;
+#   python   « failed switching to "rootwarden": operation not permitted » :
+#             `cap_drop: ALL` retirait SETUID/SETGID, dont `gosu` a besoin.
+# Aucun script ne l'incluant, personne ne l'avait vu. Le brancher tel quel
+# aurait mis la production hors service.
 #
-# Usage :
-#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# ⚠ ET SON EN-TETE MENTAIT : il disait RETIRER les montages `./backend:/app`.
+# Une surcharge compose ne retire pas un montage du fichier de base, elle s'y
+# ajoute — verifie sur le conteneur : `./backend -> /app` reste monte. C'est
+# d'ailleurs voulu ici : `./maj.sh` met le code a jour par `git pull`.
 #
-# En dev local, ne pas inclure ce fichier - le bind-mount facilite
-# le hot-reload du code et certains hardenings cassent les tests.
+# ── CE QUI EST APPLIQUE ───────────────────────────────────────────────────
+#   python  read_only + tmpfs, cap_drop ALL + le strict necessaire a
+#           l'entrypoint (chown/chmod en root, puis gosu vers rootwarden)
+#   db      cap_drop ALL + le necessaire a MySQL
+#   laravel cap_drop ALL + le necessaire a Apache — SANS read_only : le code est
+#           monte en ECRITURE (./laravel), donc un systeme racine en lecture
+#           seule protege peu, et ses tmpfs (sessions, vues) deconnectaient tout
+#           le monde a chaque redemarrage.
+#   no-new-privileges : deja pose par docker-compose.yml sur les trois.
 # ================================================================
 
 services:
   python:
-    volumes:
-      # Retire ./backend:/app (utilise l'image baked)
-      # Retire ./mysql/migrations:/app/migrations:ro (deja inclus dans l'image)
-      # Conserve uniquement les volumes pour data persistante :
-      - ./backend/logs:/app/logs
-      - ./backend/ssl:/app/ssl
-      - ./backups:/app/backups
-      - platform_ssh_keys:/app/platform_ssh
-      - ./mysql/migrations:/app/migrations:ro
-    # Patch A05-NEW-01/02/03 hardening
-    # NOTE : pas de `user:` ici. Le conteneur demarre root (entrypoint.sh fait
-    # chown des volumes + gen cert), puis DROP les privileges via `gosu
-    # rootwarden`. L'uid de rootwarden vient de `useradd -r` (plage systeme, PAS
-    # 1000) -> forcer user:"1000:1000" cassait gosu (setuid impossible depuis un
-    # uid non-root different) et provoquait un crashloop du backend en prod.
     read_only: true
     tmpfs:
       - /tmp:size=64M,mode=1777
       - /var/run:size=8M
-    # `security_opt: no-new-privileges` est deja declare dans la BASE pour ce
-    # service. Le re-declarer ici le DOUBLONNE : docker CONCATENE les listes en
-    # superposition, et rend « items at 0 and 1 are equal » -> fichier INVALIDE.
-    # Mesure du 2026-09-04 : c'est ce qui empechait cette superposition d'etre
-    # employee du tout.
     cap_drop:
       - ALL
-    # Python n'a pas besoin de capabilities pour ses binds (Hypercorn 5000 = >1024)
-
+    cap_add:
+      - CHOWN          # entrypoint : chown des logs, du certificat backend
+      - DAC_OVERRIDE   # entrypoint : chmod sur des fichiers d'autres proprietaires
+      - FOWNER
+      - SETUID         # gosu rootwarden
+      - SETGID
 
   db:
-    # Patch A05-NEW-01/02/03 hardening minimal MySQL
-    # `security_opt: no-new-privileges` est deja declare dans la BASE pour ce
-    # service. Le re-declarer ici le DOUBLONNE : docker CONCATENE les listes en
-    # superposition, et rend « items at 0 and 1 are equal » -> fichier INVALIDE.
-    # Mesure du 2026-09-04 : c'est ce qui empechait cette superposition d'etre
-    # employee du tout.
     cap_drop:
       - ALL
     cap_add:
@@ -71,61 +57,14 @@ services:
       - CHOWN
       - DAC_OVERRIDE
       - FOWNER
-    # MySQL ecrit dans /var/lib/mysql, /var/run/mysqld : pas de read_only here.
 
-  # ── Le PORTAIL v2.0 ─────────────────────────────────────────
-  # Ajoute le 2026-09-04. `prod.yml` a ete ecrit quand `laravel` n'existait pas :
-  # apres la bascule, ce conteneur devient LE portail et il etait le SEUL service
-  # de production sans `cap_drop`, sans `read_only` et sans `tmpfs` — alors que le
-  # `php` legacy qu'il REMPLACE les porte tous. La bascule etait donc, sur ce point
-  # precis, une regression de durcissement de la porte d'entree.
-  #
-  # Meme patron que `php` ci-dessus : c'est aussi une image `php:8.4-apache`.
   laravel:
-    volumes:
-      # Retire ./laravel:/var/www/html (utilise l'image baked), comme `php`.
-      # Les journaux sont MONTES et non mis en tmpfs : un `read_only` qui perd la
-      # trace d'audit a chaque redemarrage echange une garde contre une autre.
-      # C'est dans ce fichier qu'on a lu les 28 `Utime failed` du 2026-09-03.
-      - ./laravel/storage/logs:/var/www/html/storage/logs
-      # Le numero de version garde sa source unique, en lecture seule.
-
-    read_only: true
-
-    # ⚠ Les CINQ chemins que `docker-entrypoint.sh` ecrit (lignes 24-25 et 59).
-    # `storage/logs` est exclu : il est monte ci-dessus.
-    #
-    # ⚠ Et une consequence a connaitre : avec un tmpfs sur `storage/framework/views`,
-    # le cache de vues est reconstruit A CHAQUE DEMARRAGE par l'entrypoint, EN ROOT.
-    # La ligne 59 (`chown -R www-data:www-data storage/framework/views`) n'est donc
-    # PAS une commodite ici : elle est la CONDITION de ce bloc. Sans elle, PHP tourne
-    # en www-data et ne peut pas reecrire un compile root -> `Utime failed` -> 500 sur
-    # toute page incluant le socle, soit toutes. Mesure le 2026-09-03 : 111 des 151
-    # compiles appartenaient a root, et ca a servi 28 pages d'erreur en sept minutes.
-    tmpfs:
-      - /tmp:size=128M,mode=1777
-      - /var/run:size=8M
-      - /var/lock:size=8M
-      - /var/log/apache2:size=64M
-      - /var/www/html/storage/framework/views:size=64M,uid=33,gid=33
-      - /var/www/html/storage/framework/cache:size=64M,uid=33,gid=33
-      - /var/www/html/storage/framework/sessions:size=32M,uid=33,gid=33
-      - /var/www/html/bootstrap/cache:size=32M,uid=33,gid=33
-
-    # `security_opt: no-new-privileges` est deja declare dans la BASE pour ce
-    # service. Le re-declarer ici le DOUBLONNE : docker CONCATENE les listes en
-    # superposition, et rend « items at 0 and 1 are equal » -> fichier INVALIDE.
-    # Mesure du 2026-09-04 : c'est ce qui empechait cette superposition d'etre
-    # employee du tout.
-
-    # Apache reste root pour lier le port 80 — meme raison que `php`, et c'est
-    # pourquoi il n'y a PAS de directive `user:` ici. Les capacites sont reduites
-    # a ce que le fork Apache exige, et rien de plus.
     cap_drop:
       - ALL
     cap_add:
-      - NET_BIND_SERVICE
-      - CHOWN
-      - SETUID
+      - NET_BIND_SERVICE   # Apache ecoute 80/443
+      - CHOWN              # entrypoint : chown storage, bootstrap/cache, .env
+      - SETUID             # Apache passe en www-data
       - SETGID
-      - DAC_OVERRIDE  # Apache lit /etc/apache2/* apres passage en www-data
+      - DAC_OVERRIDE       # Apache lit /etc/apache2/* apres passage en www-data
+      - FOWNER             # entrypoint : chmod 640 sur .env

@@ -919,6 +919,10 @@ Route::middleware(['memorisation', 'session.authentifiee', 'session.revoquee', '
         ->middleware(['role:2', 'perm:can_admin_portal'])->name('serveurs.importer');
     Route::post('/serveurs/{id}/modifier', [ServeursController::class, 'modifier'])
         ->whereNumber('id')->middleware(['role:2', 'perm:can_admin_portal'])->name('serveurs.modifier');
+    // Audit 2026-10-13, H-3 : oublier la cle d'hote SSH d'une machine
+    // reinstallee. Role 3 : c'est accepter la prochaine cle presentee.
+    Route::post('/serveurs/{id}/cle-hote/oublier', [ServeursController::class, 'oublierCleHote'])
+        ->whereNumber('id')->middleware(['role:3', 'perm:can_admin_portal'])->name('serveurs.cle-hote.oublier');
     Route::post('/serveurs/{id}/supprimer', [ServeursController::class, 'supprimer'])
         ->whereNumber('id')->middleware(['role:2', 'perm:can_admin_portal'])->name('serveurs.supprimer');
 

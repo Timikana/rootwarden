@@ -156,7 +156,8 @@ class SecondFacteurController extends Controller
             return redirect()->route('second-facteur');
         }
 
-        if ($this->tropDeTentatives($requete) || $this->ipBloquee($requete)) {
+        if ($this->tropDeTentatives($requete) || $this->ipBloquee($requete)
+            || $this->compteBloque((string) ($temporaire['nom'] ?? ''))) {
             return back()->withErrors(['2fa_code' => __('auth.erreur_trop_de_tentatives')]);
         }
 
@@ -226,6 +227,11 @@ class SecondFacteurController extends Controller
         }
 
         if ($this->ipBloquee($requete)) {
+            return back()->withErrors(['2fa_code' => __('auth.erreur_trop_de_tentatives')]);
+        }
+
+        // Audit 2026-10-13, B-7 : la limite par COMPTE, toutes IP confondues.
+        if ($this->compteBloque((string) ($temporaire['nom'] ?? ''))) {
             return back()->withErrors(['2fa_code' => __('auth.erreur_trop_de_tentatives')]);
         }
 
@@ -372,6 +378,36 @@ class SecondFacteurController extends Controller
     }
 
     /** Compteur d'echecs par IP sur 10 minutes, partage avec le legacy. */
+    /**
+     * Les echecs du second facteur pour CE COMPTE, toutes IP confondues —
+     * audit du 2026-10-13, B-7.
+     *
+     * La limite par session tombe avec le cookie ; celle par IP tombe en
+     * repartissant les essais sur plusieurs adresses. Un attaquant qui detient
+     * deja le mot de passe pouvait donc essayer des codes TOTP sans fin. Ce
+     * compteur porte sur le compte vise : dix echecs en dix minutes, reglable.
+     * Fail-open sur une erreur de base, comme `ipBloquee` : une panne de base ne
+     * doit pas fermer la porte a tout le monde.
+     */
+    private function compteBloque(string $nom): bool
+    {
+        if ($nom === '') {
+            return false;
+        }
+        try {
+            $echecs = DB::table('login_attempts')
+                ->where('username', $nom)
+                ->where('step', self::ETAPE_2FA)
+                ->where('success', 0)
+                ->where('attempted_at', '>', now()->subMinutes(10))
+                ->count();
+
+            return $echecs >= (int) config('rootwarden.connexion.max_echecs_compte', 10);
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
     private function ipBloquee(Request $requete): bool
     {
         try {

@@ -5,6 +5,98 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## Audit de sécurité et de durcissement — 13 correctifs, chacun vu échouer avant de passer
+
+Premier audit d'ensemble du portail Laravel en production (l'audit de référence, de juin, portait
+sur le legacy). Chaque correctif a un test rejoué contre le code d'AVANT (rouge) puis après (vert).
+
+| | Constat | Correctif |
+|---|---|---|
+| C-1 | Le dépôt PUBLIC publie mot de passe ET secrets TOTP de comptes de test (dont un rôle 3) | En production, `rw-test-*` refusé au premier facteur (message identique à un mauvais mot de passe) ; un mot de passe publié impose son changement (empreintes SHA-256, jamais le clair) |
+| H-1 | **Régression** : aucun en-tête de sécurité HTTP | HSTS (durée réglable), nosniff, X-Frame-Options, Referrer-Policy, Permissions-Policy, CSP sûre appliquée + CSP cible en rapport ; `X-Powered-By` retiré ; garde CI qui lit la VRAIE réponse |
+| H-2 | Adresse de prod, noms d'hôtes, employeur, comptes réels dans les fichiers publiés | Remplacés par des valeurs neutres (l'historique git reste à traiter) |
+| H-3 | Clés d'hôte SSH jamais vérifiées (`AutoAddPolicy` ×9) | Confiance au premier usage (`ssh_host_keys`), refus AVANT tout envoi de mot de passe — prouvé avec un vrai sshd et un imposteur à la même IP ; « oublier la clé » pour une machine réinstallée |
+| H-4 | `docker-compose.prod.yml` jamais appelé — et il **ne démarrait pas** | Corrigé, vu démarrer sur une stack complète isolée, branché derrière `COMPOSE_DURCI=true` |
+| H-5 | Une installation neuve n'a aucun chemin vers une première connexion | `php artisan rootwarden:premier-compte`, portage fidèle d'`install.sh`, vérifié sur MySQL neuf |
+| M-1 | Cookie de session sans `Secure` | Sécurisé par défaut, sauf `SSL_MODE=disabled` |
+| M-2 | `GET`/`PUT /storage/{path}` sans middleware, gardés par la seule `APP_KEY` (qui a fuité) | `serve=false` : routes retirées |
+| M-3 | Sauvegardes en 0644 dans un dossier 0755 | 0600 / 0700, y compris les dumps existants |
+| M-4 | Backend tué ~1×/h par manque de mémoire | Limite 512 Mo → 1 Go |
+| M-5 | Token Telegraf stocké en clair | Chiffré à l'écriture et déchiffré à la relecture, ancien clair accepté |
+| M-6 | `.env` absent → 500 silencieux | Créé en mode production par l'entrypoint, clé vérifiée |
+| B-1 | Une clé d'API pouvait s'annoncer superadmin (`X-User-ID`) | Une clé au créateur connu agit en son nom |
+| B-2 | Script distant brièvement lisible (il peut porter `compte:mot de passe`) | Créé sous `umask 077` |
+| B-3 | Code mort écrivant le mot de passe root dans un PTY sans filtre | Retiré |
+| B-4 | 31 actions GitHub sur tag mobile | Épinglées par SHA |
+| B-7 | Second facteur limité par session et par IP seulement | Limite par compte, toutes IP confondues |
+
+**Écarté après vérification :** B-5 (`/dry_run_update` « sans bouton ») était FAUX — le bouton
+« Simuler » l'appelle (`mises-a-jour.js:892`). Le retirer l'aurait cassé.
+
+**Vu de l'extérieur :** le nom du portail n'existe pas dans le DNS public (NXDOMAIN, témoin
+`github.com` résolu) : la menace est interne.
+
+Tests : PHPUnit 472 → 502, pytest 755 → 778, 0 échec ; ruff OK ; 77 vues compilent.
+
+---
+
+## Dépendances PHP — quatre avis publiés après le dernier vert, et un vert qui aurait menti
+
+La CI rougit depuis le 2026-10-01 sur un seul job, `SCA PHP (composer audit)`. `composer.lock`
+n'avait pas bougé depuis le dernier vert (`ebd5b07d`, 0 fichier) : **quatre avis ont été publiés
+entre-temps** sur des paquets déjà verrouillés. N'importe quel commit aurait rougi.
+
+| Paquet | Avant | Après | Avis |
+|---|---|---|---|
+| `laravel/framework` | 13.25.0 | 13.34.0 | XSS dans la page de débogage (bas) |
+| `league/commonmark` | 2.10.0 | 2.10.3 | contournement `DisallowedRawHtml` (moyen), DoS quadratique (haut) |
+| `league/flysystem` | 3.35.2 | 3.36.0 | contournement du contrôle de chemin (bas) |
+| `league/flysystem-local` | 3.31.0 | 3.35.3 | suit `flysystem` |
+
+**Exposition mesurée : faible.** Le portage n'appelle ni Markdown ni `Storage::` (0 occurrence
+dans `app/` et `resources/views/`) : `commonmark` et `flysystem` sont transitifs. La page de
+débogage n'existe qu'avec `APP_DEBUG=true`, et la production est à `false` depuis le 2026-10-01.
+
+**La mise à jour est volontairement ÉTROITE.** Un premier essai avec `--with-dependencies` tirait
+45 paquets dont **deux majeures non demandées** — Guzzle 7 → 8, le client HTTP sous la passerelle
+et sous le déploiement de clés, et `brick/math` 0.18 → 1.0. Écarté : un correctif de sécurité
+n'emporte pas de changement de version majeure en passager. Le lockfile change sur exactement
+quatre paquets.
+
+### `./maj.sh` installe désormais les paquets — un vert de CI ne suffisait pas
+
+`vendor/` n'est pas suivi par git, et l'entrypoint ne lance `composer install` que si
+`vendor/autoload.php` est absent (`docker-entrypoint.sh:18-21`). Un `./maj.sh` apportait le nouveau
+`composer.lock` et **laissait les anciens paquets en service**, CI verte à l'appui.
+
+Nouvelle **étape 5a** : `maj.sh` demande à composer ce qu'il ferait (`--dry-run`), installe s'il y
+a quelque chose à faire, redémarre `laravel` (l'entrypoint remet les droits à `www-data`), puis
+**redemande** pour vérifier. Rien à faire → rien installé, rien redémarré. Le code retour ne
+discrimine rien (0 dans les deux cas, mesuré) : c'est le nombre d'opérations qui décide, lu par
+`scripts/compte-operations-composer.sh`, et une sortie non reconnue fait installer par précaution.
+
+Deux défauts de `maj.sh` corrigés au passage, tous deux mesurés :
+
+- **il ne se relançait pas après s'être mis à jour.** `git pull` pose un nouvel inode et bash
+  finit de lire l'ancien : une étape ajoutée n'aurait tourné qu'à la mise à jour SUIVANTE. Il se
+  relance maintenant une fois, sur la version tirée, après la vérification GPG ;
+- **il finissait par « OK » en vert après un échec.** Un échec d'installation est désormais
+  retenu, le script termine ses autres étapes, puis finit en rouge avec un code retour 1.
+
+Banc : `maj.sh` joué en entier avec un faux `docker` reproduisant les sorties réelles —
+en retard (installe, redémarre, vérifie), à jour (rien), échec (rouge, `rc=1`), `--check` (rien).
+Relance éprouvée sur un vrai `git pull` dans un dépôt local jetable : une relance quand `maj.sh`
+change, zéro quand il ne change pas.
+
+⚠ **Cette fois seulement, `./maj.sh` deux fois.** Le `maj.sh` installé sur l'hôte est l'ANCIEN :
+c'est lui qui tire cette version et il finit avec son propre contenu, sans l'étape 5a. Le second
+passage l'exécute. Ensuite, un seul suffit.
+
+Contrôle : `composer audit --locked` → « No security vulnerability advisories found ». Suite
+complète : 472 tests, 1 738 assertions, 0 échec.
+
+---
+
 ## README — réécrit sur la v2.0, et ce qu'il publiait de trop
 
 Le README annonçait la **v1.37.47**, décrivait la migration comme « en cours » avec **deux
@@ -33,7 +125,7 @@ n'existe plus.
 
 ## Clés SSH — le pré-contrôle refusait toutes les machines, et mon test le confirmait
 
-Une fois la panne TLS levée, « Déployer » refusait Eos : une machine saine, SSH authentifié,
+Une fois la panne TLS levée, « Déployer » refusait une machine saine, SSH authentifié,
 scannée, rien en attente. Trois défauts dans `DeploiementCles::preflight()`.
 
 **1. Le compte des comptes à déployer était lu au mauvais endroit.** Le backend rend
@@ -41,14 +133,14 @@ scannée, rien en attente. Trois défauts dans `DeploiementCles::preflight()`.
 dans chaque résultat de machine, où il n'existe pas : `?? 0` rendait 0 partout, et **toutes les
 machines étaient refusées**. L'ancienne interface lisait bien la racine (`main.js:177`). Son zéro
 porte désormais un message de PARC (`ssh.err_aucun_compte_avec_cle`, 409), et non l'échec d'une
-machine qui ferait chercher sur Eos un défaut qui n'y est pas.
+machine qui ferait chercher sur la machine un défaut qui n'y est pas.
 
 **2. Les erreurs par machine étaient ignorées.** Le backend signale dans `errors` un audit
 d'inventaire échoué (`ssh.py:780-784`, « Ne pas déployer sans l'avoir relue ») sur une machine
 dont `ssh_ok` vaut `true`. Une fois le défaut 1 corrigé, cette machine aurait été **acceptée** —
 celle dont la liste des accès à révoquer n'a pas pu être établie. Une erreur suffit désormais,
 comme dans le legacy (`main.js:132-138`), et **la raison voyage jusqu'à l'écran** :
-« en échec pour : Eos (Audit d'inventaire indisponible…) ».
+« en échec pour : srv-a (Audit d'inventaire indisponible…) ».
 
 **3. `$vide + ['erreur' => 'aucune_machine']` rendait une erreur NULLE.** L'union PHP garde la
 clé de gauche, et `$vide` porte déjà `erreur => null`. Mesuré : `NULL` avec `+`, la bonne valeur
@@ -22539,7 +22631,7 @@ depuis la migration vers l'API Python (pas une régression récente).
 
 ## [1.37.11] - 2026-08-06 — Fix : deploy sudoers TOUJOURS annulé en mode legacy (« visudo -cf refuse la politique ») + ligne droits sudo absente sans refresh
 
-**Symptômes (prod, EAU-ACTU)** :
+**Symptômes (prod, un serveur du parc)** :
 1. Chaque déploiement de clé SSH loggait `[user] visudo -cf refuse la politique -
    deploy annulé` pour TOUS les utilisateurs → **aucun fichier sudoers installé**
    → « j'ai mis NOPASSWD mais sudo demande toujours le mot de passe ». (Le fix
@@ -23870,10 +23962,10 @@ Nouvelle page `/adm/server_user_policies.php` (superadmin only) qui permet de co
 ## [1.21.7] - 2026-05-27 — Hotfixes pentest + reverse-proxy + UX
 
 ### Fix : reset password via reverse-proxy (HAProxy)
-- Symptome (LAGOON) : email de reset mdp contient `https://cleopatre-ssh.magiline.fr:8443/auth/reset_password.php?...` mais l'HAProxy public ecoute sur **443**, pas 8443. L'utilisateur tombe sur `Could not connect to server` au TCP.
-- Cause : `URL_HTTPS` servait pour le frontend JS (URL interne `lagoon:8443`) ET pour les emails (qui doivent referencer l'URL publique). Ces deux usages divergent des qu'il y a un reverse-proxy.
+- Symptome (production) : email de reset mdp contient `https://portail.example.com:8443/auth/reset_password.php?...` mais l'HAProxy public ecoute sur **443**, pas 8443. L'utilisateur tombe sur `Could not connect to server` au TCP.
+- Cause : `URL_HTTPS` servait pour le frontend JS (URL interne `hote-interne:8443`) ET pour les emails (qui doivent referencer l'URL publique). Ces deux usages divergent des qu'il y a un reverse-proxy.
 - Fix : nouvelle variable d'env optionnelle `URL_PUBLIC_HTTPS`. Si definie, `forgot_password.php` l'utilise pour construire le lien email. Fallback sur `URL_HTTPS` si absente (retrocompat).
-- Deploiement : editer `srv-docker.env` -> `URL_PUBLIC_HTTPS=https://cleopatre-ssh.magiline.fr` (sans port si HAProxy ecoute en 443), puis `docker compose restart php`.
+- Deploiement : editer `srv-docker.env` -> `URL_PUBLIC_HTTPS=https://portail.example.com` (sans port si HAProxy ecoute en 443), puis `docker compose restart php`.
 
 ### Fix : unlock_user laissait le rate-limit IP actif
 - Symptome : superadmin clique "Deverrouiller" sur un compte lock 120 min -> l'user retombe sur "Trop de tentatives, ressayer dans 10 minutes" sans pouvoir se logger.
@@ -23900,7 +23992,7 @@ Nouvelle page `/adm/server_user_policies.php` (superadmin only) qui permet de co
 ## [1.21.6] - 2026-05-26 — Backend auto-bootstrap api_key
 
 ### Fix critique : 401 persistant apres maj.sh
-- Symptome : sur LAGOON, malgre le hotfix v1.21.4/v1.21.5 dans `maj.sh`, le backend Python continuait a logger `API key refusee : DB indisponible ou table vide et API_KEY_BOOTSTRAP non active (fail-closed)`. Cause possible : `maj.sh` execute mais avec une version anterieure du script (etape 5c absente), ou container `rootwarden_db` down au moment du check.
+- Symptome : en production, malgre le hotfix v1.21.4/v1.21.5 dans `maj.sh`, le backend Python continuait a logger `API key refusee : DB indisponible ou table vide et API_KEY_BOOTSTRAP non active (fail-closed)`. Cause possible : `maj.sh` execute mais avec une version anterieure du script (etape 5c absente), ou container `rootwarden_db` down au moment du check.
 - Fix : deplacement du bootstrap legacy api_key de `maj.sh` (etape shell) VERS le backend Python lui-meme (`backend/bootstrap_api_key.py`). A chaque demarrage du container `rootwarden_python`, on verifie qu'une cle active matche le SHA-256 de `Config.API_KEY` ; sinon on INSERT `proxy-internal-legacy-bootstrap-YYYYMMDD`.
 - Avantages : plus de dependance shell, plus besoin du flag `API_KEY_BOOTSTRAP=1`, idempotent, best-effort (ne bloque pas le boot).
 - L'etape 5c de `maj.sh` reste en ceinture-bretelle.
@@ -24081,7 +24173,7 @@ deja autorise) + rollback complet (backup `.bak.rw` + `sshd -t` + restore si fai
 Et auto-fix dans `deploy_service_account` : si `paramiko.AuthenticationException`
 sur le test SSH du compte rootwarden, trigger automatique de
 `_ensure_sshd_allows_user(rootwarden)` puis retry. Resout les serveurs hardenes
-type SRV-WEB qui bloquaient silencieusement.
+type (port SSH non standard) qui bloquaient silencieusement.
 
 ### Documentation API enrichie
 
