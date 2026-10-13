@@ -68,6 +68,12 @@ RUN set -eux; \
 # Le vhost final est GENERE au demarrage par l'entrypoint (envsubst) : les chemins
 # de certificat et le port HTTPS publie ne sont pas connus a la construction.
 COPY laravel/apache-ssl.conf.tmpl /etc/apache2/sites-available/apache-ssl.conf.tmpl
+
+# En-tetes de securite HTTP (audit 2026-10-13, H-1). Fichier GLOBAL — valable
+# aussi avec SSL_MODE=disabled — et prefixe `zz-` pour etre charge APRES
+# `security.conf` : la derniere definition gagne. Voir le fichier.
+COPY laravel/apache-securite.conf /etc/apache2/conf-available/zz-rootwarden-securite.conf
+RUN a2enconf zz-rootwarden-securite
 # Le repertoire existe des la construction ; son CONTENU vient du volume ./certs,
 # partage avec le service `php` — un seul certificat pour les deux portails.
 RUN mkdir -p /var/www/certs
