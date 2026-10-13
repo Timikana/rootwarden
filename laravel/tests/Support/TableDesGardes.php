@@ -254,6 +254,8 @@ class TableDesGardes
             ['POST', 'serveurs/{id}/notes', ['role:2', 'perm:can_admin_portal']],
             ['POST', 'serveurs/{id}/notes/{note}/supprimer', ['role:2', 'perm:can_admin_portal']],
             ['POST', 'serveurs/{id}/supprimer', ['role:2', 'perm:can_admin_portal']],
+            // Audit 2026-10-13, H-3 : oublier la cle d'hote = accepter la suivante. Role 3.
+            ['POST', 'serveurs/{id}/cle-hote/oublier', ['role:3', 'perm:can_admin_portal']],
             ['GET', 'services', ['role:1', 'perm:can_manage_services']],
             ['GET', 'supervision', ['role:2', 'perm:can_manage_supervision']],
             ['POST', 'supervision/configuration', ['role:2', 'perm:can_manage_supervision']],

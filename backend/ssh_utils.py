@@ -186,6 +186,86 @@ def _is_safe_ssh_host(host: str) -> bool:
     return True
 
 
+# ══ CLES D'HOTE SSH : CONFIANCE AU PREMIER USAGE — audit du 2026-10-13, H-3 ══
+#
+# Le backend se connectait avec `paramiko.AutoAddPolicy()` sur NEUF sites : il
+# acceptait sans verification la cle de n'importe quel hote, puis lui envoyait le
+# mot de passe SSH et le mot de passe ROOT. Une usurpation ARP sur le LAN, ou la
+# reprise de l'IP d'une machine retiree, recoltait les mots de passe root du parc.
+# (`ROADMAP.md:280` le classait « decision de conception » : reouverte.)
+#
+# paramiko verifie la cle PENDANT l'echange de cles, AVANT toute authentification :
+# un refus ici garantit qu'AUCUN secret ne part vers l'imposteur.
+#
+#   premiere connexion  -> cle enregistree (`ssh_host_keys`) et acceptee
+#   meme cle            -> acceptee
+#   cle DIFFERENTE      -> CleHoteChangee : refus, journalise
+#   base injoignable    -> refus (fail-closed) : sans base, le backend n'agit pas
+#
+# `SSH_HOST_KEY_POLICY=auto` restaure l'ancien comportement : un INTERRUPTEUR
+# d'urgence, journalise a chaque connexion, pas un mode de fonctionnement.
+
+class CleHoteChangee(paramiko.SSHException):
+    """La cle presentee par l'hote differe de celle memorisee : refus."""
+
+
+def _empreinte_cle(cle) -> str:
+    import hashlib
+    return hashlib.sha256(cle.asbytes()).hexdigest()
+
+
+class PolitiqueTofu(paramiko.MissingHostKeyPolicy):
+    """Confiance au premier usage, memoire en base (`ssh_host_keys`)."""
+
+    def missing_host_key(self, client, hostname, key):
+        _log = logging.getLogger(__name__)
+        empreinte = _empreinte_cle(key)
+        conn = mysql.connector.connect(**db_config)   # injoignable -> leve : refus
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT fingerprint_sha256 FROM ssh_host_keys WHERE hote = %s", (hostname,))
+            ligne = cur.fetchone()
+            if ligne is None:
+                cur.execute(
+                    "INSERT INTO ssh_host_keys (hote, key_type, key_b64, fingerprint_sha256) "
+                    "VALUES (%s, %s, %s, %s)",
+                    (hostname, key.get_name(), key.get_base64(), empreinte))
+                conn.commit()
+                _log.warning("Cle d'hote SSH ENREGISTREE (premier usage) : %s %s sha256=%s",
+                             hostname, key.get_name(), empreinte)
+                return
+            if ligne[0] == empreinte:
+                cur.execute("UPDATE ssh_host_keys SET last_seen = NOW() WHERE hote = %s", (hostname,))
+                conn.commit()
+                return
+            _log.error("Cle d'hote SSH CHANGEE pour %s : memorisee sha256=%s, presentee sha256=%s "
+                       "- connexion REFUSEE (usurpation possible, ou machine reinstallee)",
+                       hostname, ligne[0], empreinte)
+            raise CleHoteChangee(
+                f"Cle d'hote SSH CHANGEE pour {hostname} : connexion refusee. Si la machine a "
+                f"ete reinstallee, oubliez sa cle depuis la page Serveurs ; sinon, une "
+                f"usurpation est possible.")
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+
+def politique_cle_hote():
+    """LA politique de cle d'hote, pour TOUS les clients paramiko du backend.
+
+    Un seul fabricant : aucun site ne peut garder `AutoAddPolicy` par oubli
+    (`tests/test_cle_hote_tofu.py` le verifie sur tout le backend).
+    """
+    import os
+    if os.getenv('SSH_HOST_KEY_POLICY', 'tofu').strip().lower() == 'auto':
+        logging.getLogger(__name__).warning(
+            "SSH_HOST_KEY_POLICY=auto : cles d'hote NON verifiees (interrupteur d'urgence)")
+        return paramiko.AutoAddPolicy()
+    return PolitiqueTofu()
+
+
 def connect_ssh(host: str, username: str, password: str, port: int = 22,
                 logger=None, force_password: bool = False,
                 service_account: bool = False) -> paramiko.SSHClient:
@@ -223,7 +303,7 @@ def connect_ssh(host: str, username: str, password: str, port: int = 22,
         raise ValueError(f"Host SSH refuse (loopback/link-local) : {host}")
 
     client = paramiko.SSHClient()
-    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    client.set_missing_host_key_policy(politique_cle_hote())
 
     def _enable_keepalive(c):
         """Active le keepalive SSH (30s) pour eviter les timeouts sur les operations longues."""
@@ -247,6 +327,10 @@ def connect_ssh(host: str, username: str, password: str, port: int = 22,
                 _enable_keepalive(client)
                 _logger.info("SSH service account auth OK → %s:%d", host, port)
                 return client
+        except CleHoteChangee:
+            # Un refus de cle d'hote n'est pas un echec d'authentification : les
+            # tentatives suivantes verraient la meme cle. On s'arrete ICI.
+            raise
         except paramiko.AuthenticationException:
             _logger.debug("SSH service account auth echouee pour %s:%d - fallback", host, port)
             try:
@@ -254,7 +338,7 @@ def connect_ssh(host: str, username: str, password: str, port: int = 22,
             except Exception:
                 pass
             client = paramiko.SSHClient()
-            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            client.set_missing_host_key_policy(politique_cle_hote())
         except Exception as e:
             _logger.debug("SSH service account non disponible (%s) - fallback", e)
             try:
@@ -262,7 +346,7 @@ def connect_ssh(host: str, username: str, password: str, port: int = 22,
             except Exception:
                 pass
             client = paramiko.SSHClient()
-            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            client.set_missing_host_key_policy(politique_cle_hote())
 
     # Tentative 1 : keypair plateforme
     if not force_password:
@@ -279,6 +363,8 @@ def connect_ssh(host: str, username: str, password: str, port: int = 22,
                 _enable_keepalive(client)
                 _logger.info("SSH keypair auth OK → %s:%d (user=%s)", host, port, username)
                 return client
+        except CleHoteChangee:
+            raise
         except paramiko.AuthenticationException:
             _logger.debug("SSH keypair auth echouee pour %s:%d - fallback password", host, port)
             # Fermer et recreer le client pour le fallback
@@ -287,7 +373,7 @@ def connect_ssh(host: str, username: str, password: str, port: int = 22,
             except Exception:
                 pass
             client = paramiko.SSHClient()
-            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            client.set_missing_host_key_policy(politique_cle_hote())
         except Exception as e:
             _logger.debug("SSH keypair non disponible (%s) - fallback password", e)
             try:
@@ -295,7 +381,7 @@ def connect_ssh(host: str, username: str, password: str, port: int = 22,
             except Exception:
                 pass
             client = paramiko.SSHClient()
-            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            client.set_missing_host_key_policy(politique_cle_hote())
 
     # Tentative 2 : password (fallback ou force)
     if not password:

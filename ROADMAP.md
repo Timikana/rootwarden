@@ -277,8 +277,8 @@ oubliait cinq.
 ## Dette technique connue, documentée, non bloquante
 
 - **CSP** conserve `'unsafe-inline'` (migration vers un nonce à faire avec test navigateur) ;
-- **clé d'hôte SSH** : `AutoAddPolicy`, pas de TOFU/`known_hosts` — décision de conception ;
-- **CI** : actions GitHub à épingler par SHA, images de base par digest ;
+- ~~**clé d'hôte SSH** : `AutoAddPolicy`, pas de TOFU/`known_hosts` — décision de conception~~ **rouverte et corrigée** (audit du 2026-10-13, H-3) : confiance au premier usage, clé mémorisée en base (`ssh_host_keys`), refus avant toute authentification si elle change ; interrupteur d'urgence `SSH_HOST_KEY_POLICY=auto` ;
+- **CI** : ~~actions GitHub à épingler par SHA~~ fait (audit 2026-10-13, B-4) ; images de base par digest : reste à faire ;
 - routes mutantes par machine (`fail2ban`, `services`, `iptables`) gardées par
   `require_machine_access` seul — à durcir en `require_role(2)` si le rôle 1 doit être
   lecteur seul (décision de gouvernance) ;
