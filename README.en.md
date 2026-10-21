@@ -90,7 +90,7 @@ browser ──HTTPS 8443──▶ laravel (portal, Apache)
 |-----------|------------|
 | Portal | Laravel 13, PHP 8.4, Apache — hand-written CSS and JavaScript, no build step |
 | Backend | Python 3.13, Flask, Hypercorn, Paramiko |
-| Database | MySQL 9.2 (schema managed in `mysql/migrations/`) |
+| Database | MySQL 9.7 LTS (schema managed in `mysql/migrations/`) |
 | Deployment | Docker Compose |
 | Tests | PHPUnit, pytest, Puppeteer E2E suites |
 | CI | GitHub Actions: tests, lint, semgrep, bandit, gitleaks, Trivy, pip-audit, composer audit |

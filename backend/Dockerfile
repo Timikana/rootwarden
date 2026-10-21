@@ -35,8 +35,9 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 # Installer les dependances Python dans le venv
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt && \
-    pip install --no-cache-dir gunicorn
+# `gunicorn` n'est plus installe : le backend tourne sous hypercorn, et gunicorn
+# n'etait reference NULLE PART (mesure du 2026-10-21) — de la surface inutile.
+RUN pip install --no-cache-dir -r requirements.txt
 
 
 # ── Stage 2 : Runtime ────────────────────────────────────────
@@ -53,6 +54,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copier le virtualenv depuis le builder
 COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
+# PIP N'A RIEN A FAIRE DANS L'IMAGE QUI TOURNE. Il ne sert qu'a la construction
+# (etage builder). Present deux fois (venv et image Python de base), il embarque
+# ses propres copies de certifi, msgpack, urllib3 et setuptools (`pip/_vendor`) :
+# Trivy y relevait 1 faille critique et 4 hautes (2026-10-21) — jamais appelees a
+# l'execution, mais une surface et un bruit inutiles a chaque scan.
+RUN /opt/venv/bin/python -m pip uninstall -y pip \
+ && /usr/local/bin/python -m pip uninstall -y pip
 
 # Creer un utilisateur non-root pour le runtime
 RUN groupadd -r rootwarden && useradd -r -g rootwarden -d /app -s /sbin/nologin rootwarden
