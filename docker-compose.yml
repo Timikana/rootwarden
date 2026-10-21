@@ -179,7 +179,16 @@ services:
   # Pour accéder depuis un client SQL local, décommentez "ports".
   # ─────────────────────────────────────────────────────────────
   db:
-    image: mysql:9.2.0
+    # MySQL 9.7 LTS (audit 2026-10-21). L'image `mysql:9.2.0` n'avait recu AUCUNE
+    # mise a jour depuis le 2025-04-01 (version Innovation, abandonnee) : Trivy y
+    # relevait 5 failles critiques et 171 hautes corrigeables. Le tag `9.7` suit les
+    # correctifs de la LTS ; `./maj.sh` le retelecharge et fait un dump VERIFIE avant
+    # tout changement d'image (scripts/sauvegarde-avant-changement-db.sh) : la
+    # conversion 9.2 -> 9.7 du dossier de donnees est IRREVERSIBLE.
+    # Eprouve le 2026-10-21 : base 9.2.0 + 66 migrations + donnees, puis 9.7.2 sur le
+    # meme volume -> « Server upgrade from 90200 to 90702 completed », 64 tables
+    # CHECK TABLE OK, backend et portail connectes avec le compte applicatif.
+    image: mysql:9.7
     container_name: rootwarden_db
     restart: unless-stopped
     security_opt:
