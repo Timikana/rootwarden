@@ -434,7 +434,9 @@ class PasserelleTest extends TestCase
         $this->assertTrue(RoutesBackend::estUnFlux('/update'));
         $this->assertTrue(RoutesBackend::estUnFlux('/update/'));
         $this->assertTrue(RoutesBackend::estUnFlux('/supervision/zabbix/deploy'));
-        $this->assertFalse(RoutesBackend::estUnFlux('/update-logs'));
+        // Correspondance EXACTE, pas par prefixe : `/update` est un flux,
+        // `/update_zabbix` non.
+        $this->assertFalse(RoutesBackend::estUnFlux('/update_zabbix'));
         $this->assertFalse(RoutesBackend::estUnFlux('/list_machines'));
     }
 }

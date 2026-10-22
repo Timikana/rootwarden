@@ -99,7 +99,7 @@ final class AutorisationsPasserelle
     /**
      * Les chemins relayes MORCEAU PAR MORCEAU, et l'entree qui les autorise.
      *
-     * Quatre des sept ne sont PAS des entrees de liste blanche : ils passent par
+     * Quatre d'entre eux ne sont PAS des entrees de liste blanche : ils passent par
      * l'espace de noms `/supervision/`. C'est pour cette raison que cette liste
      * s'enumere depuis `EN_FLUX` et non depuis la liste blanche.
      *

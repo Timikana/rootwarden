@@ -378,6 +378,29 @@ class RoutesBackend
         '/supervision/centreon/deploy',
         '/supervision/prometheus/deploy',
         '/supervision/telegraf/deploy',
+        /*
+         * 2026-10-22 : SIX FLUX DU BACKEND ETAIENT BUFFERISES PAR LA PASSERELLE.
+         *
+         * Le backend les ecrit morceau par morceau, et trois ecrans les lisent
+         * morceau par morceau (`getReader()`) : le scan CVE d'une machine, le
+         * journal du deploiement des cles SSH, le scan Docker du parc. Absents
+         * de cette liste, ils etaient lus EN ENTIER avant d'etre rendus : rien a
+         * l'ecran jusqu'a la fin, puis tout d'un coup — et une erreur de
+         * passerelle au-dela de 120 s, alors que le travail continuait.
+         *
+         * Le journal `/logs` se ferme apres 30 s sans ligne nouvelle, `/update-logs`
+         * et `/iptables-logs` apres 10 min : tous trois sont bornes cote backend.
+         *
+         * `FluxDuBackendTest` confronte desormais cette liste aux routes qui
+         * rendent un flux dans `backend/routes/` : une route en flux ajoutee
+         * sans etre relayee fait echouer la CI.
+         */
+        '/cve_scan',
+        '/cve_scan_all',
+        '/docker/scan_all',
+        '/logs',
+        '/update-logs',
+        '/iptables-logs',
     ];
 
     /** Le chemin doit-il etre relaye morceau par morceau ? */
