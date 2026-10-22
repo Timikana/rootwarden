@@ -5,6 +5,23 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## Les journaux arrivent en direct — deux causes, mesurées
+
+Retour d'exploitation : « les logs ne remontent pas en live, c'est long, sur beaucoup de modules ».
+Deux causes indépendantes, qui s'additionnaient.
+
+| | Constat | Correctif |
+|---|---|---|
+| 1 | La passerelle lisait **en entier** six réponses que le backend écrit morceau par morceau : scan CVE d'une machine, journal du déploiement des clés SSH, scan Docker du parc, scan CVE du parc, journaux des mises à jour et d'iptables. Rien à l'écran avant la fin, puis une erreur de passerelle au-delà de 120 s alors que le travail continuait | Relayées morceau par morceau (`RoutesBackend::EN_FLUX`). Un test confronte désormais cette liste aux routes en flux de `backend/routes/` : une route en flux ajoutée sans relais fait échouer la CI |
+| 2 | Sur les machines où le **compte de service** est déployé, les commandes tournaient sans pseudo-terminal : sortie tamponnée par blocs, et **stderr jamais lu** — les messages d'erreur n'apparaissaient pas | Pseudo-terminal, comme la branche mot de passe. Mesuré sur un sshd isolé : quatre lignes espacées d'une seconde arrivaient ensemble à 4,1 s, elles arrivent une par seconde ; le message d'erreur est rendu |
+
+En pseudo-terminal, `dpkg -l`, `systemctl status` ou `journalctl` lancent un pager qui attend une
+touche : le flux ne se fermait jamais (vu sur le banc). Les pagers sont neutralisés dans les deux
+branches. Contrôle de non-régression : `apt list`, que la simulation de mise à jour analyse, rend
+126 paquets sur 126, cinq fois de suite, avant comme après.
+
+---
+
 ## Sauvegarde de la base : elle tuait le backend toutes les heures — et plus aucun dump depuis août
 
 **Impact.** Sur une installation dont la table `cve_findings` est volumineuse, la sauvegarde

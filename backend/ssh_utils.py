@@ -646,6 +646,15 @@ def _su_exec(client: paramiko.SSHClient, command: str, root_password: str,
             pass
 
 
+# Prefixe des commandes de `execute_as_root_stream`, qui tournent dans un PTY.
+#
+# Face a un terminal, `dpkg -l`, `systemctl status`, `journalctl` ou `git log`
+# lancent un PAGER et attendent une touche qui ne viendra jamais : le flux reste
+# ouvert sans fin et tient un thread du backend. Mesure du 2026-10-22 sur un sshd
+# isole : `dpkg -l` en PTY -> processus `pager` encore vivant apres 3 minutes.
+_SANS_PAGER = "export PAGER=cat SYSTEMD_PAGER=cat DPKG_PAGER=cat GIT_PAGER=cat; "
+
+
 # Erreurs stderr qui indiquent que sudo n'est pas utilisable sur ce serveur
 _SUDO_UNAVAILABLE = (
     'sudo: command not found',
@@ -823,7 +832,7 @@ def execute_as_root_stream(client: paramiko.SSHClient, command: str,
     Exécute une commande en root via ``sudo -S`` et renvoie la sortie en streaming.
 
     Si connecté via le compte de service rootwarden (NOPASSWD sudo),
-    exécute directement ``sudo sh -c`` sans envoyer de mot de passe ni PTY.
+    exécute directement ``sudo sh -c`` sans envoyer de mot de passe, avec PTY.
 
     Utilise ``exec_command`` avec PTY → stdout et stderr fusionnés, sortie en temps réel.
     ``select.select`` évite tout blocage ; exit_status_ready() détecte la fin de commande.
@@ -831,12 +840,23 @@ def execute_as_root_stream(client: paramiko.SSHClient, command: str,
     _log = logger or logging.getLogger(__name__)
     _ansi_re = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
 
-    # Compte de service rootwarden : NOPASSWD sudo, pas de PTY ni password
+    # Compte de service rootwarden : NOPASSWD sudo, pas de mot de passe.
+    #
+    # ══ LE PTY, AUSSI ICI (2026-10-22) ══════════════════════════════════════
+    # Sans pseudo-terminal, la sortie standard distante est un TUBE : les
+    # programmes la tamponnent par blocs, et stderr n'etait jamais lu. Mesure sur
+    # un sshd isole, quatre lignes espacees d'une seconde a travers `grep` :
+    #     sans PTY  t=4,1 s  les quatre lignes ensemble ; stderr PERDU
+    #     avec PTY  une ligne par seconde ; stderr fusionne dans le flux
+    # C'est le chemin de toutes les machines ou le compte de service est
+    # deploye — donc celui ou « les journaux n'arrivent pas en direct ». La
+    # branche mot de passe ci-dessous a toujours utilise un PTY : les commandes
+    # sont deja eprouvees dans ce mode.
     if getattr(client, '_rootwarden_auth_method', '') == 'service_account':
-        nopasswd_cmd = f"sudo sh -c {shlex.quote(command)}"
+        nopasswd_cmd = f"sudo sh -c {shlex.quote(_SANS_PAGER + command)}"
         _log.info("execute_as_root_stream (service_account): %s", command[:60])
         try:
-            stdin, stdout, stderr = client.exec_command(nopasswd_cmd)
+            stdin, stdout, stderr = client.exec_command(nopasswd_cmd, get_pty=True)
             yield "Début de l'exécution...\n"
             while True:
                 r, _, _ = select.select([stdout.channel], [], [], 0.5)
@@ -884,13 +904,13 @@ def execute_as_root_stream(client: paramiko.SSHClient, command: str,
     can_sudo = _sudo_rc == 0 and not any(msg in _sudo_err for msg in _SUDO_UNAVAILABLE)
 
     if can_sudo:
-        root_cmd = f"sudo -S -p '' sh -c {shlex.quote(command)}"
+        root_cmd = f"sudo -S -p '' sh -c {shlex.quote(_SANS_PAGER + command)}"
     else:
         # Fallback su : ecrire un script temp pour les memes raisons que _su_exec
         import base64 as _b64
         import uuid as _uuid
         _tmp = f"/tmp/.rw_stream_{_uuid.uuid4().hex[:8]}.sh"
-        _script = f"export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n{command}\n"
+        _script = f"export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n{_SANS_PAGER}{command}\n"
         _b64s = _b64.b64encode(_script.encode()).decode()
         _wcmd = _commande_ecriture_script(_b64s, _tmp)
         _ws, _wo, _we = client.exec_command(_wcmd, timeout=10)
