@@ -30,6 +30,10 @@ _log = logging.getLogger(__name__)
 
 BACKUP_DIR = Path('/app/backups')
 
+# Lignes lues a la fois par `create_backup` : la memoire ne depend plus de la
+# taille des tables.
+_LIGNES_PAR_PAQUET = 500
+
 # Nom de backup valide : rootwarden_backup_YYYYMMDD_HHMMSS.sql.gz (anti path-traversal)
 _BACKUP_NAME_RE = re.compile(r'^rootwarden_backup_\d{8}_\d{6}\.sql\.gz$')
 
@@ -260,12 +264,22 @@ def create_backup() -> str:
 
                 # INSERT rows
                 # Meme `table`, meme raison qu'au SHOW CREATE ci-dessus.
+                #
+                # PAR PAQUETS, JAMAIS `fetchall()` (2026-10-26). La table entiere
+                # etait chargee en memoire avant d'etre ecrite : le pic du
+                # processus suivait la taille de la PLUS GROSSE table. Mesure sur
+                # MySQL isole, lignes de 1 Ko : 50 000 lignes -> 85 Mo,
+                # 200 000 -> 251 Mo. Dans un conteneur limite en memoire, une
+                # base assez grosse fait tuer le backend par le noyau (OOM).
+                # Par paquets : 31 Mo pour 50 000 lignes comme pour 800 000 (meme banc).
                 # nosemgrep: rw-sql-fstring-execute
                 cur.execute(f"SELECT * FROM `{table}`")
-                rows = cur.fetchall()
-                if rows:
-                    cols = [desc[0] for desc in cur.description]
-                    col_names = ', '.join(f'`{c}`' for c in cols)
+                cols = [desc[0] for desc in cur.description]
+                col_names = ', '.join(f'`{c}`' for c in cols)
+                while True:
+                    rows = cur.fetchmany(_LIGNES_PAR_PAQUET)
+                    if not rows:
+                        break
                     for row in rows:
                         vals = []
                         for v in row:
@@ -350,9 +364,25 @@ def cleanup_old_backups():
         _log.info("Purge backups: %d fichier(s) supprime(s) (retention %d jours)", deleted, retention)
 
 
-def run_backup():
-    """Point d'entree pour le scheduler."""
+def sauvegarde_due(maintenant=None) -> bool:
+    """Une sauvegarde automatique est-elle due ? Oui si aucune n'existe pour ce jour.
+
+    Le scheduler appelle `run_backup()` UNE FOIS PAR HEURE, et la sauvegarde
+    tournait a chaque appel — alors que `BACKUP_ENABLED` est documente comme un
+    « backup quotidien » (srv-docker.env.example). Vingt-quatre dumps par jour,
+    720 sur la retention de 30 jours par defaut. Une sauvegarde manuelle du jour
+    compte : elle est aussi complete.
+    """
     if os.environ.get('BACKUP_ENABLED', '').lower() != 'true':
+        return False
+    jour = (maintenant or datetime.now()).strftime('%Y%m%d')
+    # `*.sql.gz` exclut les `.tmp` (sauvegarde interrompue) et les `.sha256`.
+    return not any(BACKUP_DIR.glob(f'rootwarden_backup_{jour}_*.sql.gz'))
+
+
+def run_backup():
+    """Point d'entree pour le scheduler : au plus une sauvegarde par jour."""
+    if not sauvegarde_due():
         return
     try:
         create_backup()
