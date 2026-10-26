@@ -18,7 +18,10 @@ Variables d'environnement :
 
 import os
 import re
+import sys
 import gzip
+import json
+import time
 import hashlib
 import logging
 from datetime import datetime, timedelta
@@ -57,42 +60,72 @@ def _sha256_file(path):
     return sha.hexdigest()
 
 
-def _split_sql(text):
-    """Decoupe un script SQL en statements en respectant les chaines simples
-    quotees et l'echappement backslash (format produit par create_backup).
-    Plus robuste qu'un split('; ') : un ';' dans une donnee ne casse rien."""
-    stmts, buf, in_str, esc = [], [], False, False
-    for ch in text:
-        if in_str:
-            buf.append(ch)
-            if esc:
-                esc = False
-            elif ch == '\\':
-                esc = True
+# Caracteres qui changent l'etat du decoupage ; tous les autres sont recopies.
+_SPECIAUX_SQL = re.compile(r"[';\\]")
+
+
+def _nettoie_statement(brut):
+    """Retire les lignes de commentaire pures ; rend None si rien ne reste."""
+    stmt = brut.strip()
+    if not stmt:
+        return None
+    lines = [ln for ln in stmt.splitlines() if not ln.strip().startswith('--')]
+    return '\n'.join(lines).strip() or None
+
+
+def _iter_sql(morceaux):
+    """Decoupe un script SQL en statements, MORCEAU PAR MORCEAU.
+
+    Memes regles que le decoupage d'avant (chaines simples quotees, echappement
+    backslash, lignes `--` retirees), mais sans jamais tenir le script entier :
+    `verify_backup` et `restore_backup` lisaient tout le dump decompresse puis
+    construisaient la liste de TOUS ses statements. Une base dont la sauvegarde
+    tient en memoire bornee doit aussi pouvoir se relire en memoire bornee.
+    Un echappement coupe entre deux morceaux est reporte au suivant.
+    """
+    buf, in_str, report = [], False, False
+    for texte in morceaux:
+        if not texte:
+            continue
+        echappe = 0 if report else -1   # index du caractere echappe
+        report = False
+        debut = 0
+        for m in _SPECIAUX_SQL.finditer(texte):
+            i, ch = m.start(), m.group()
+            if in_str:
+                if i == echappe:
+                    continue
+                if ch == '\\':
+                    if i + 1 < len(texte):
+                        echappe = i + 1
+                    else:
+                        report = True
+                elif ch == "'":
+                    in_str = False
             elif ch == "'":
-                in_str = False
-        else:
-            if ch == "'":
                 in_str = True
-                buf.append(ch)
             elif ch == ';':
-                stmt = ''.join(buf).strip()
+                buf.append(texte[debut:i])
+                stmt = _nettoie_statement(''.join(buf))
+                buf, debut = [], i + 1
                 if stmt:
-                    stmts.append(stmt)
-                buf = []
-            else:
-                buf.append(ch)
-    tail = ''.join(buf).strip()
-    if tail:
-        stmts.append(tail)
-    # Retire les lignes de commentaire pures
-    out = []
-    for s in stmts:
-        lines = [ln for ln in s.splitlines() if not ln.strip().startswith('--')]
-        cleaned = '\n'.join(lines).strip()
-        if cleaned:
-            out.append(cleaned)
-    return out
+                    yield stmt
+        buf.append(texte[debut:])
+    stmt = _nettoie_statement(''.join(buf))
+    if stmt:
+        yield stmt
+
+
+def _split_sql(text):
+    """Decoupe un script SQL complet en liste de statements (voir `_iter_sql`)."""
+    return list(_iter_sql([text]))
+
+
+def _lit_par_morceaux(path, taille=1 << 20):
+    """Le dump decompresse, par morceaux de texte d'environ 1 Mo."""
+    with gzip.open(path, 'rt', encoding='utf-8') as f:
+        for morceau in iter(lambda: f.read(taille), ''):
+            yield morceau
 
 
 def verify_backup(filename):
@@ -115,11 +148,10 @@ def verify_backup(filename):
         result['error'] = 'sha256 ne correspond pas (backup corrompu)'
         return result
     try:
-        with gzip.open(path, 'rt', encoding='utf-8') as f:
-            content = f.read()
-        stmts = _split_sql(content)
-        result['statements'] = len(stmts)
-        result['tables'] = sum(1 for s in stmts if s.upper().startswith('CREATE TABLE'))
+        for stmt in _iter_sql(_lit_par_morceaux(path)):
+            result['statements'] += 1
+            if stmt.upper().startswith('CREATE TABLE'):
+                result['tables'] += 1
         result['valid'] = result['tables'] > 0
         if not result['valid']:
             result['error'] = 'aucune table trouvee dans le dump'
@@ -154,16 +186,13 @@ def restore_backup(filename):
         _log.warning("Backup de securite pre-restauration echoue: %s", e)
 
     import mysql.connector
-    with gzip.open(path, 'rt', encoding='utf-8') as f:
-        content = f.read()
-    stmts = _split_sql(content)
 
     conn = mysql.connector.connect(**Config.DB_CONFIG)
     applied = 0
     try:
         cur = conn.cursor()
         cur.execute("SET FOREIGN_KEY_CHECKS=0")
-        for s in stmts:
+        for s in _iter_sql(_lit_par_morceaux(path)):
             cur.execute(s)
             # Consommer d'eventuels resultats (DDL n'en a pas, mais par securite)
             try:
@@ -238,6 +267,10 @@ def create_backup() -> str:
     try:
         import mysql.connector
         conn = mysql.connector.connect(**db)
+        # Une vue COHERENTE de toute la base, comme `mysqldump --single-transaction` :
+        # sans elle, une table lue a 00:01 et une autre a 00:04 peuvent se
+        # contredire (un scan et ses findings ecrits entre les deux).
+        conn.start_transaction(consistent_snapshot=True, readonly=True)
         cur = conn.cursor()
 
         with _ouvre_prive(tmppath, 'wb') as brut, \
@@ -353,42 +386,179 @@ def cleanup_old_backups():
         except Exception as e:
             _log.warning("Erreur suppression %s: %s", f.name, e)
 
-    # Purger aussi les .tmp orphelins (backups interrompus).
-    for tmp in BACKUP_DIR.glob('rootwarden_backup_*.sql.gz.tmp'):
-        try:
-            tmp.unlink()
-        except Exception:
-            pass
+    nettoie_tmp_orphelins()
 
     if deleted > 0:
         _log.info("Purge backups: %d fichier(s) supprime(s) (retention %d jours)", deleted, retention)
 
 
+# ══ L'ETAT DE LA SAUVEGARDE AUTOMATIQUE ═══════════════════════════════════
+#
+# 2026-10-26, constat en production : la sauvegarde etait tuee par le noyau
+# (memoire) a chaque tentative, toutes les heures, depuis deux mois et demi.
+# AUCUNE trace : un processus tue n'ecrit pas « Backup echoue », et le seul
+# reste etait un `.tmp` vide — 1 686 au total. Le dernier dump valide datait
+# d'aout ; rien ne le signalait.
+#
+# Ce fichier est ecrit AVANT le dump. S'il dit encore « en_cours » au demarrage
+# suivant, la sauvegarde a ete interrompue : c'est le redemarrage qui la
+# declare en echec, puisque le processus tue ne le pourra jamais.
+_NOM_ETAT = '.etat-sauvegarde.json'
+
+# Un `.tmp` que personne n'a ecrit depuis une heure est orphelin. Un dump EN
+# COURS (une sauvegarde manuelle dans un autre worker) l'ecrit sans cesse.
+_TMP_ORPHELIN_APRES_S = 3600
+
+# Au-dela, une sauvegarde quotidienne est en retard.
+_RETARD_HEURES = 26
+
+
+def _active() -> bool:
+    return os.environ.get('BACKUP_ENABLED', '').lower() == 'true'
+
+
+def _lit_etat() -> dict:
+    try:
+        with open(BACKUP_DIR / _NOM_ETAT, encoding='utf-8') as f:
+            etat = json.load(f)
+        return etat if isinstance(etat, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def _ecrit_etat(etat: dict) -> None:
+    """Ecriture atomique : un etat a moitie ecrit vaudrait un etat perdu."""
+    BACKUP_DIR.mkdir(mode=0o700, parents=True, exist_ok=True)
+    provisoire = BACKUP_DIR / (_NOM_ETAT + '.ecriture')
+    with _ouvre_prive(provisoire, 'w') as f:
+        json.dump(etat, f, ensure_ascii=False)
+    os.replace(provisoire, BACKUP_DIR / _NOM_ETAT)
+
+
 def sauvegarde_due(maintenant=None) -> bool:
-    """Une sauvegarde automatique est-elle due ? Oui si aucune n'existe pour ce jour.
+    """Une sauvegarde automatique est-elle due aujourd'hui ?
 
     Le scheduler appelle `run_backup()` UNE FOIS PAR HEURE, et la sauvegarde
     tournait a chaque appel — alors que `BACKUP_ENABLED` est documente comme un
-    « backup quotidien » (srv-docker.env.example). Vingt-quatre dumps par jour,
-    720 sur la retention de 30 jours par defaut. Une sauvegarde manuelle du jour
-    compte : elle est aussi complete.
+    « backup quotidien » (srv-docker.env.example). Desormais :
+      - une sauvegarde du jour (automatique ou manuelle) suffit ;
+      - UNE tentative automatique par jour, REUSSIE OU NON. Une tentative qui a
+        echoue — ou qui a ete tuee — n'est pas relancee avant le lendemain : la
+        relancer a l'heure suivante reproduirait l'echec, en boucle, comme en
+        production. L'echec reste visible (`etat_sauvegarde`).
     """
-    if os.environ.get('BACKUP_ENABLED', '').lower() != 'true':
+    if not _active():
         return False
     jour = (maintenant or datetime.now()).strftime('%Y%m%d')
     # `*.sql.gz` exclut les `.tmp` (sauvegarde interrompue) et les `.sha256`.
-    return not any(BACKUP_DIR.glob(f'rootwarden_backup_{jour}_*.sql.gz'))
+    if any(BACKUP_DIR.glob(f'rootwarden_backup_{jour}_*.sql.gz')):
+        return False
+    tentee = str(_lit_etat().get('debut', ''))[:10].replace('-', '')
+    return tentee != jour
 
 
 def run_backup():
-    """Point d'entree pour le scheduler : au plus une sauvegarde par jour."""
+    """Point d'entree pour le scheduler : au plus une tentative par jour."""
     if not sauvegarde_due():
         return
+    debut = datetime.now().isoformat(timespec='seconds')
+    _ecrit_etat({'statut': 'en_cours', 'debut': debut})
     try:
-        create_backup()
+        chemin = create_backup()
+    except Exception as e:
+        # `create_backup` a deja journalise « Backup echoue » et retire son .tmp.
+        _ecrit_etat({'statut': 'echec', 'debut': debut,
+                     'fin': datetime.now().isoformat(timespec='seconds'),
+                     'cause': str(e)[:300]})
+        return
+    _ecrit_etat({'statut': 'ok', 'debut': debut,
+                 'fin': datetime.now().isoformat(timespec='seconds'),
+                 'fichier': os.path.basename(chemin)})
+    try:
         cleanup_old_backups()
     except Exception as e:
-        _log.error("Backup echoue: %s", e)
+        _log.warning("Rotation des sauvegardes echouee : %s", e)
+
+
+def signale_sauvegarde_interrompue() -> bool:
+    """Au demarrage du scheduler : une tentative restee « en_cours » a ete tuee.
+
+    Rend True si elle a ete declaree en echec (et journalisee comme telle).
+    """
+    etat = _lit_etat()
+    if etat.get('statut') != 'en_cours':
+        return False
+    cause = ("interrompue : le processus s'est arrete pendant la sauvegarde "
+             "(memoire insuffisante ou redemarrage)")
+    _ecrit_etat({**etat, 'statut': 'echec', 'cause': cause})
+    _log.error("Backup echoue: sauvegarde automatique commencee le %s %s",
+               etat.get('debut', '?'), cause)
+    return True
+
+
+def nettoie_tmp_orphelins(maintenant=None) -> int:
+    """Supprime les `.tmp` que personne n'ecrit plus ; rend leur nombre."""
+    limite = (maintenant or time.time()) - _TMP_ORPHELIN_APRES_S
+    retires = 0
+    for tmp in BACKUP_DIR.glob('rootwarden_backup_*.sql.gz.tmp'):
+        try:
+            if tmp.stat().st_mtime < limite:
+                tmp.unlink()
+                retires += 1
+        except OSError:
+            pass
+    if retires:
+        _log.warning("Sauvegardes : %d fichier(s) .tmp orphelin(s) supprime(s) "
+                     "(sauvegardes interrompues)", retires)
+    return retires
+
+
+def _plus_recente(tentative, derniere_mtime) -> bool:
+    """La tentative a-t-elle commence apres la derniere sauvegarde reussie ?"""
+    if derniere_mtime is None:
+        return True
+    try:
+        return datetime.fromisoformat(str(tentative.get('debut'))).timestamp() > derniere_mtime
+    except ValueError:
+        return True
+
+
+def etat_sauvegarde(maintenant=None) -> dict:
+    """L'etat de la sauvegarde automatique, pour la supervision.
+
+    `niveau` : `desactivee`, `ok`, `en_cours`, `echec` (la derniere tentative a
+    echoue), `en_retard` (aucune sauvegarde depuis plus de 26 h).
+    """
+    maintenant = maintenant or datetime.now()
+    reussies = list(BACKUP_DIR.glob('rootwarden_backup_*.sql.gz')) if BACKUP_DIR.exists() else []
+    derniere = max((f.stat().st_mtime for f in reussies), default=None)
+    age_h = None if derniere is None else round(
+        (maintenant.timestamp() - derniere) / 3600, 1)
+    tentative = _lit_etat()
+    orphelins = sum(1 for _ in BACKUP_DIR.glob('rootwarden_backup_*.sql.gz.tmp')) \
+        if BACKUP_DIR.exists() else 0
+
+    if not _active():
+        niveau = 'desactivee'
+    elif tentative.get('statut') == 'en_cours':
+        niveau = 'en_cours'
+    elif tentative.get('statut') == 'echec' and _plus_recente(tentative, derniere):
+        # Un echec suivi d'une sauvegarde reussie (manuelle) n'est plus l'etat.
+        niveau = 'echec'
+    elif age_h is None or age_h > _RETARD_HEURES:
+        niveau = 'en_retard'
+    else:
+        niveau = 'ok'
+
+    return {
+        'niveau': niveau,
+        'active': _active(),
+        'derniere_reussie': None if derniere is None
+        else datetime.fromtimestamp(derniere).isoformat(timespec='seconds'),
+        'age_heures': age_h,
+        'derniere_tentative': tentative or None,
+        'tmp_orphelins': orphelins,
+    }
 
 
 def list_backups() -> list:
@@ -407,6 +577,13 @@ def list_backups() -> list:
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
+    if '--etat' in sys.argv[1:]:
+        # Pour une supervision sur l'hote :
+        #   docker exec rootwarden_python python /app/db_backup.py --etat
+        # Sortie 1 si la derniere tentative a echoue ou si la sauvegarde est en retard.
+        etat = etat_sauvegarde()
+        print(json.dumps(etat, ensure_ascii=False, indent=2))
+        sys.exit(1 if etat['niveau'] in ('echec', 'en_retard') else 0)
     path = create_backup()
     print(f"Backup cree: {path}")
     cleanup_old_backups()

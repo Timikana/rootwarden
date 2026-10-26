@@ -408,40 +408,6 @@ def _run_scheduled_ssh_audit(schedule: dict):
         conn.close()
 
 
-def _purge_cve_scans(cur) -> int:
-    """Purge les vieux scans CVE et retourne le nombre de lignes supprimees.
-
-    Retention basee sur la DUREE (CVE_SCAN_RETENTION_DAYS, defaut 90 j) et non
-    sur un nombre de scans. Le diagramme "Tendances CVE (30 jours)" groupe par
-    JOUR : une retention en nombre (CVE_SCAN_RETENTION=10 scans/machine)
-    effondrait tout l'historique sur une seule date des que plusieurs scans
-    tombaient le meme jour (planification horaire ou re-scans manuels en rafale),
-    d'ou le symptome "un seul point affiche". On conserve en plus AU MOINS
-    CVE_SCAN_RETENTION scans recents par machine (machine scannee rarement +
-    comparaison des 2 derniers scans). Une ligne n'est supprimee que si elle est
-    A LA FOIS hors des N plus recents de sa machine ET plus vieille que la
-    fenetre de retention -> la fenetre du diagramme (>= 30 j) est toujours
-    preservee tant que CVE_SCAN_RETENTION_DAYS >= 30.
-    """
-    cve_min_keep = int(os.environ.get('CVE_SCAN_RETENTION', '10'))
-    cve_retention_days = int(os.environ.get('CVE_SCAN_RETENTION_DAYS', '90'))
-    cur.execute(
-        """
-        DELETE s FROM cve_scans s
-        LEFT JOIN (
-            SELECT id FROM (
-                SELECT id, ROW_NUMBER() OVER (PARTITION BY machine_id ORDER BY scan_date DESC) as rn
-                FROM cve_scans
-            ) ranked WHERE rn <= %s
-        ) keep ON s.id = keep.id
-        WHERE keep.id IS NULL
-          AND s.scan_date < DATE_SUB(NOW(), INTERVAL %s DAY)
-        """,
-        (cve_min_keep, cve_retention_days),
-    )
-    return cur.rowcount
-
-
 def _purge_old_logs():
     """Purge les logs et historiques anciens selon LOG_RETENTION_DAYS."""
     retention_days = int(os.environ.get('LOG_RETENTION_DAYS', '0'))
@@ -498,11 +464,9 @@ def _purge_old_logs():
         except Exception:
             pass
 
-        # Purge des vieux scans CVE (retention en DUREE + plancher par machine)
-        try:
-            total_deleted += _purge_cve_scans(cur)
-        except Exception as e:
-            _log.debug("CVE scan purge skipped: %s", e)
+        # La retention des scans CVE n'est PLUS ici : cette fonction s'arrete
+        # quand LOG_RETENTION_DAYS vaut 0 (defaut), et elle ne tournait donc
+        # jamais. Voir `retention_cve.py` et `_purge_cve_bornee`.
 
         conn.commit()
         conn.close()
@@ -516,6 +480,27 @@ def _purge_old_logs():
 import os
 _purge_counter = 0
 _PURGE_INTERVAL = 60  # toutes les 60 iterations = 1h
+
+
+# Duree maximale de la retention CVE par passage horaire.
+_BUDGET_RETENTION_CVE_S = 120
+
+
+def _purge_cve_bornee():
+    """Retention des scans CVE, par lots, au plus `_BUDGET_RETENTION_CVE_S` par heure."""
+    conn = None
+    try:
+        from retention_cve import purge
+        conn = _get_db()
+        purge(conn, budget_s=_BUDGET_RETENTION_CVE_S)
+    except Exception as e:
+        _log.error("Retention CVE echouee : %s", e)
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
 
 def _drift_scan_all():
@@ -677,6 +662,14 @@ def _scheduler_loop_with_purge():
         # taches orphelines ne seraient sinon jamais expirees.
         if not stale_swept:
             _expire_stale_tasks()
+            # Une sauvegarde tuee (memoire) n'a rien pu journaliser : c'est ICI
+            # qu'elle est declaree en echec, et que ses .tmp sont retires.
+            try:
+                from db_backup import signale_sauvegarde_interrompue, nettoie_tmp_orphelins
+                signale_sauvegarde_interrompue()
+                nettoie_tmp_orphelins()
+            except Exception as e:
+                _log.error("Sauvegardes : controle au demarrage impossible : %s", e)
             stale_swept = True
 
         # Scans CVE + audits SSH planifies
@@ -774,6 +767,10 @@ def _scheduler_loop_with_purge():
                         run_backup()
             except Exception as bk_err:
                 _log.debug("Backup skip: %s", bk_err)
+
+            # Retention des scans CVE : APRES la sauvegarde (ce qui est supprime
+            # a d'abord ete sauvegarde), et independante de LOG_RETENTION_DAYS.
+            _purge_cve_bornee()
 
             # Notification email pour mots de passe expirant bientot
             try:
