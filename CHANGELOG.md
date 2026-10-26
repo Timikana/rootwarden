@@ -5,6 +5,26 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## Une machine injoignable n'est plus annoncée « clé non déployée »
+
+Constat en production : le pare-feu d'une machine rejetait le SSH, et RootWarden annonçait
+« Pas de password et keypair non deployee ». Les tentatives par clé avalaient toute erreur, réseau
+compris ; la tentative par mot de passe, faute de mot de passe en base, inventait une cause
+d'authentification. Le diagnostic est parti sur la clé alors que le problème était le réseau.
+
+| Cas (sshd isolé) | Avant | Après |
+|---|---|---|
+| Adresse sans route | 6,1 s — « keypair non deployee » | 3,1 s — « injoignable : [Errno 113] No route to host » |
+| Port fermé | « keypair non deployee » | « injoignable : [Errno 111] Connection refused » |
+| Clé refusée, sans mot de passe | « keypair non deployee » | inchangé |
+| Clé refusée, bon mot de passe | connecté par mot de passe | inchangé |
+
+Une machine injoignable arrête les replis (ils frapperaient au même port). Les trois tentatives ont
+désormais un délai de connexion de 10 s ; seule la première en avait un, et derrière un pare-feu qui
+jette les paquets les deux autres attendaient le délai du système.
+
+---
+
 ## Les journaux arrivent en direct — deux causes, mesurées
 
 Retour d'exploitation : « les logs ne remontent pas en live, c'est long, sur beaucoup de modules ».
