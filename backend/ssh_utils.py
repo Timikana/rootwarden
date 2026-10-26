@@ -209,6 +209,40 @@ class CleHoteChangee(paramiko.SSHException):
     """La cle presentee par l'hote differe de celle memorisee : refus."""
 
 
+class MachineInjoignable(paramiko.SSHException):
+    """La connexion TCP au port SSH n'a pas abouti : aucune authentification
+    n'a ete tentee, et aucune autre methode n'en aboutirait davantage."""
+
+
+# Delai de la connexion TCP, pour les trois tentatives de `connect_ssh`. Seule la
+# premiere en avait un : derriere un pare-feu qui JETTE les paquets, les deux
+# suivantes attendaient le delai du systeme (environ deux minutes chacune).
+_DELAI_CONNEXION_TCP = 10
+
+
+def _connecte(client, host, port, **kwargs):
+    """`client.connect`, ou `MachineInjoignable` si la couche TCP echoue.
+
+    2026-10-26, constat en production : une machine dont le pare-feu rejetait
+    le SSH (« No route to host ») etait annoncee « Pas de password et keypair
+    non deployee ». Les deux tentatives par cle avalaient TOUTE erreur en
+    niveau debug, puis la tentative par mot de passe, faute de mot de passe en
+    base, inventait une cause d'authentification. Refus de connexion, absence
+    de route, delai depasse, nom introuvable : ce sont des `OSError`, levees
+    avant tout echange SSH — les replis frapperaient au meme port.
+    """
+    try:
+        client.connect(hostname=host, port=port, timeout=_DELAI_CONNEXION_TCP, **kwargs)
+    except OSError as e:
+        # `NoValidConnectionsError` ne rend que « Unable to connect » : la cause
+        # qui distingue un port ferme (« Connection refused ») d'un pare-feu
+        # (« No route to host ») est dans `errors`, une par adresse essayee.
+        causes = getattr(e, 'errors', None)
+        cause = '; '.join(sorted({str(x) for x in causes.values()})) if causes else str(e)
+        raise MachineInjoignable(
+            f"Machine injoignable en SSH sur {host}:{port} : {cause}") from e
+
+
 def _empreinte_cle(cle) -> str:
     import hashlib
     return hashlib.sha256(cle.asbytes()).hexdigest()
@@ -317,19 +351,16 @@ def connect_ssh(host: str, username: str, password: str, port: int = 22,
             from ssh_key_manager import get_platform_private_key
             pkey = get_platform_private_key()
             if pkey:
-                client.connect(
-                    hostname=host, port=port, username=Config.NOM_COMPTE_SERVICE,
-                    pkey=pkey,
-                    look_for_keys=False, allow_agent=False,
-                    timeout=10
-                )
+                _connecte(client, host, port, username=Config.NOM_COMPTE_SERVICE,
+                          pkey=pkey, look_for_keys=False, allow_agent=False)
                 client._rootwarden_auth_method = 'service_account'
                 _enable_keepalive(client)
                 _logger.info("SSH service account auth OK → %s:%d", host, port)
                 return client
-        except CleHoteChangee:
-            # Un refus de cle d'hote n'est pas un echec d'authentification : les
-            # tentatives suivantes verraient la meme cle. On s'arrete ICI.
+        except (CleHoteChangee, MachineInjoignable):
+            # Un refus de cle d'hote, ou une machine injoignable, n'est pas un
+            # echec d'authentification : les tentatives suivantes verraient la
+            # meme cle, ou le meme port ferme. On s'arrete ICI.
             raise
         except paramiko.AuthenticationException:
             _logger.debug("SSH service account auth echouee pour %s:%d - fallback", host, port)
@@ -354,16 +385,13 @@ def connect_ssh(host: str, username: str, password: str, port: int = 22,
             from ssh_key_manager import get_platform_private_key
             pkey = get_platform_private_key()
             if pkey:
-                client.connect(
-                    hostname=host, port=port, username=username,
-                    pkey=pkey,
-                    look_for_keys=False, allow_agent=False
-                )
+                _connecte(client, host, port, username=username,
+                          pkey=pkey, look_for_keys=False, allow_agent=False)
                 client._rootwarden_auth_method = 'keypair'
                 _enable_keepalive(client)
                 _logger.info("SSH keypair auth OK → %s:%d (user=%s)", host, port, username)
                 return client
-        except CleHoteChangee:
+        except (CleHoteChangee, MachineInjoignable):
             raise
         except paramiko.AuthenticationException:
             _logger.debug("SSH keypair auth echouee pour %s:%d - fallback password", host, port)
@@ -390,11 +418,8 @@ def connect_ssh(host: str, username: str, password: str, port: int = 22,
         )
 
     try:
-        client.connect(
-            hostname=host, port=port, username=username,
-            password=password,
-            look_for_keys=False, allow_agent=False
-        )
+        _connecte(client, host, port, username=username,
+                  password=password, look_for_keys=False, allow_agent=False)
         client._rootwarden_auth_method = 'password'
         _enable_keepalive(client)
         _logger.info("SSH password auth OK → %s:%d (user=%s)", host, port, username)
