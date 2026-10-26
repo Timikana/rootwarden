@@ -5,6 +5,52 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## Sauvegarde de la base : elle tuait le backend toutes les heures — et plus aucun dump depuis août
+
+**Impact.** Sur une installation dont la table `cve_findings` est volumineuse, la sauvegarde
+automatique (`BACKUP_ENABLED=true`) n'aboutissait plus : le backend était tué par le noyau (mémoire)
+à chaque tentative, toutes les heures, sans un mot au journal. Constat en production : 22 arrêts en
+24 h, chacun environ 48 s après « Backup MySQL en cours », 1 686 fichiers `.tmp` vides, **aucune
+sauvegarde valide depuis le 7 août**. Toute action en cours à ce moment (déploiement de clés, scan)
+était coupée. Relever la limite mémoire du conteneur n'y changeait rien.
+
+| | Avant | Après |
+|---|---|---|
+| Lecture des tables | chaque table chargée **en entier** avant d'être écrite | par paquets de 500 lignes, dans un instantané cohérent (comme `mysqldump --single-transaction`) |
+| Fréquence | à **chaque heure** — la doc promettait un backup quotidien | **une tentative par jour** ; un échec n'est pas relancé avant le lendemain |
+| Échec | invisible : un processus tué n'écrit rien | l'état est écrit **avant** le dump ; au redémarrage, une sauvegarde interrompue est journalisée `Backup echoue` et ses `.tmp` orphelins retirés |
+| Supervision | rien | `GET /admin/backups/etat` (authentifiée) et `python /app/db_backup.py --etat` : sortie 1 si échec ou retard > 26 h |
+| Vérification et restauration | le dump entier lu en mémoire | lus morceau par morceau, découpage identique à l'ancien |
+| Rétention des scans CVE | ne tournait **jamais** par défaut : elle dépendait de `LOG_RETENTION_DAYS` (défaut 0) | indépendante ; par lots, au plus 2 min par heure, **après** la sauvegarde |
+
+**Mesures** sur une base isolée (schéma complet, 800 000 findings, 815 Mo), conteneur limité à
+400 Mo :
+
+| | Ancien code | Nouveau code |
+|---|---|---|
+| Sauvegarde | **tuée** (OOM), `.tmp` de 0 octet, rien au journal — le symptôme de production | réussie en 31 s, pic **32 Mo** |
+| Vérification du dump | **tuée** (OOM) : la restauration de cette sauvegarde aurait tué le backend | 18 s, pic 24 Mo |
+| Restauration complète | — | 440 s, pic 37 Mo ; `CHECKSUM TABLE` identique sur chaque table comparée |
+| Sauvegarde tuée en plein dump | — | au redémarrage : `Backup echoue … interrompue`, pas de nouvelle tentative le jour même, `--etat` sort 1 |
+| Rétention | 624 scans supprimés en une requête | mêmes 624 scans et 3 120 findings, en 32 lots ; scans gardés identiques |
+
+### Consigne de mise à jour
+
+1. `./maj.sh --release`. La première sauvegarde a lieu au premier passage horaire du scheduler.
+2. Vérifier : `docker exec rootwarden_python python /app/db_backup.py --etat` doit rendre
+   `"niveau": "ok"` dans l'heure.
+3. Rétention CVE : elle démarre d'elle-même, **après** la sauvegarde, et supprime les scans hors
+   fenêtre (`CVE_SCAN_RETENTION_DAYS`, 90 jours par défaut ; `0` pour la désactiver). Pour mesurer
+   d'abord, puis rattraper d'un coup hors heures :
+   ```bash
+   docker exec rootwarden_python python /app/retention_cve.py --compte
+   docker exec rootwarden_python python /app/retention_cve.py --purger
+   ```
+   InnoDB ne rend l'espace disque qu'après `OPTIMIZE TABLE cve_findings`, à jouer hors heures.
+4. Les `.tmp` orphelins sont retirés au premier démarrage.
+
+---
+
 ## Audit de sécurité et de durcissement — 13 correctifs, chacun vu échouer avant de passer
 
 Premier audit d'ensemble du portail Laravel en production (l'audit de référence, de juin, portait

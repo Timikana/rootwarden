@@ -65,6 +65,9 @@ def db_backup_reel(tmp_path, monkeypatch):
         monkeypatch.setattr(mod, 'BACKUP_DIR', tmp_path / 'backups')
 
         class _Connexion:
+            def start_transaction(self, **_k):
+                pass
+
             def cursor(self):
                 return _Curseur(journal)
 
@@ -107,7 +110,7 @@ def test_une_sauvegarde_du_jour_suffit(db_backup_reel, monkeypatch):
     monkeypatch.setenv('BACKUP_ENABLED', 'true')
     _depose(db_backup_reel, f"rootwarden_backup_{datetime.now():%Y%m%d}_020000.sql.gz")
     appels = []
-    monkeypatch.setattr(db_backup_reel, 'create_backup', lambda: appels.append(1))
+    monkeypatch.setattr(db_backup_reel, 'create_backup', lambda: appels.append(1) or 'rootwarden_backup_x.sql.gz')
 
     db_backup_reel.run_backup()
 
@@ -121,7 +124,7 @@ def test_sans_sauvegarde_du_jour_elle_est_faite(db_backup_reel, monkeypatch):
     _depose(db_backup_reel, 'rootwarden_backup_20000101_020000.sql.gz')
     _depose(db_backup_reel, f"rootwarden_backup_{datetime.now():%Y%m%d}_020000.sql.gz.tmp")
     appels = []
-    monkeypatch.setattr(db_backup_reel, 'create_backup', lambda: appels.append(1))
+    monkeypatch.setattr(db_backup_reel, 'create_backup', lambda: appels.append(1) or 'rootwarden_backup_x.sql.gz')
     monkeypatch.setattr(db_backup_reel, 'cleanup_old_backups', lambda: None)
 
     db_backup_reel.run_backup()
