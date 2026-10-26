@@ -4,6 +4,7 @@ routes/admin.py - Routes d'administration.
 Routes :
     GET  /admin/backups               - Liste les backups
     POST /admin/backups               - Cree un backup
+    GET  /admin/backups/etat          - Etat de la sauvegarde automatique (supervision)
     POST /server_lifecycle            - Met a jour le statut lifecycle
     POST /exclude_user                - Exclut un user de la synchronisation
     GET  /admin/temp_permissions      - Liste les permissions temporaires actives
@@ -41,6 +42,20 @@ def create_backup():
         return jsonify({'success': True, 'path': path})
     except Exception as e:
         return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+
+
+@bp.route('/admin/backups/etat', methods=['GET'])
+@require_api_key
+@require_role(2)
+@threaded_route
+def etat_backups():
+    """Etat de la sauvegarde automatique : derniere reussie, derniere tentative.
+
+    Authentifiee, et pas dans `/test` : la sonde de vie n'est exemptee de cle
+    que parce qu'elle ne rend AUCUN detail d'etat (voir routes/monitoring.py).
+    """
+    from db_backup import etat_sauvegarde
+    return jsonify({'success': True, **etat_sauvegarde()})
 
 
 @bp.route('/admin/backups/verify', methods=['POST'])

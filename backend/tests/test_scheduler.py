@@ -84,28 +84,35 @@ class _CaptureCursor:
     def execute(self, sql, params=None):
         self.executed = (sql, params)
 
+    def fetchall(self):
+        return []
+
 
 class TestPurgeCveScans:
     """Regression du diagramme "Tendances CVE (30 jours)" : la purge doit etre
     basee sur la DUREE (>= la fenetre du diagramme), pas sur un nombre de scans,
     sinon l'historique journalier s'effondre a un seul point (le dernier).
+
+    2026-10-26 : la selection a quitte le scheduler pour `retention_cve`
+    (purge par lots, independante de LOG_RETENTION_DAYS). Le predicat et ses
+    deux premiers parametres sont INCHANGES ; le troisieme est la taille du lot.
     """
 
     def test_retention_par_defaut_en_duree_et_plancher(self, sched, monkeypatch):
         monkeypatch.delenv('CVE_SCAN_RETENTION', raising=False)
         monkeypatch.delenv('CVE_SCAN_RETENTION_DAYS', raising=False)
         cur = _CaptureCursor()
-        sched._purge_cve_scans(cur)
+        __import__('retention_cve').scans_a_purger(cur, 20)
         _, params = cur.executed
         # (plancher scans/machine, fenetre de retention en jours)
-        assert params == (10, 90)
+        assert params == (10, 90, 20)
 
     def test_fenetre_couvre_le_diagramme_30j(self, sched, monkeypatch):
         # Spec anti-regression : la retention par defaut DOIT couvrir >= 30 jours,
         # sinon le diagramme perd des barres.
         monkeypatch.delenv('CVE_SCAN_RETENTION_DAYS', raising=False)
         cur = _CaptureCursor()
-        sched._purge_cve_scans(cur)
+        __import__('retention_cve').scans_a_purger(cur, 20)
         _, params = cur.executed
         assert params[1] >= 30
 
@@ -114,7 +121,7 @@ class TestPurgeCveScans:
         # plus recents de sa machine (keep.id IS NULL) ET plus vieille que la
         # fenetre de retention (scan_date < DATE_SUB ... INTERVAL %s DAY).
         cur = _CaptureCursor()
-        sched._purge_cve_scans(cur)
+        __import__('retention_cve').scans_a_purger(cur, 20)
         sql = ' '.join(cur.executed[0].split()).lower()
         assert 'row_number() over (partition by machine_id order by scan_date desc)' in sql
         assert 'rn <= %s' in sql
@@ -125,9 +132,9 @@ class TestPurgeCveScans:
         monkeypatch.setenv('CVE_SCAN_RETENTION', '3')
         monkeypatch.setenv('CVE_SCAN_RETENTION_DAYS', '45')
         cur = _CaptureCursor()
-        sched._purge_cve_scans(cur)
+        __import__('retention_cve').scans_a_purger(cur, 20)
         _, params = cur.executed
-        assert params == (3, 45)
+        assert params == (3, 45, 20)
 
 
 class TestAdvanceSchedule:
