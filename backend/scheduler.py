@@ -763,16 +763,15 @@ def _scheduler_loop_with_purge():
                     purge_old_tasks(_retention)
             except Exception:
                 pass
-            # Backup quotidien (suivi comme tache seulement si BACKUP_ENABLED,
-            # sinon run_backup() est un no-op et creerait une tache vide chaque heure)
+            # Backup quotidien : suivi comme tache seulement quand il est DU
+            # (BACKUP_ENABLED et aucune sauvegarde du jour) — sinon run_backup()
+            # ne fait rien et creerait une tache vide chaque heure.
             try:
-                from db_backup import run_backup
-                if os.environ.get('BACKUP_ENABLED', '').lower() == 'true':
+                from db_backup import run_backup, sauvegarde_due
+                if sauvegarde_due():
                     from task_tracker import track
                     with track('db_backup', 'Backup BDD'):
                         run_backup()
-                else:
-                    run_backup()
             except Exception as bk_err:
                 _log.debug("Backup skip: %s", bk_err)
 
