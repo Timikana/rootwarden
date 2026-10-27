@@ -20,7 +20,7 @@ return [
     'title' => 'Prise en main',
     'intro' => 'Suivez ces étapes pour configurer RootWarden après l\'installation.',
     'step1_title' => 'Connexion et sécurisation du compte',
-    'step1_text' => 'Connectez-vous avec les identifiants générés au premier démarrage (affichés dans les journaux Docker). Changez votre mot de passe et configurez le second facteur, qui est obligatoire.',
+    'step1_text' => 'Sur une installation neuve, créez le mot de passe du compte superadmin avec « docker exec -u www-data rootwarden_laravel php artisan rootwarden:premier-compte » : il n\'est affiché qu\'une fois. À la première connexion, changez-le et enrôlez le second facteur, qui est obligatoire.',
     'step2_title' => 'Ajouter vos serveurs',
     'step2_text' => 'Dans Admin > Serveurs, ajoutez chaque serveur Linux avec son adresse, son port SSH, son utilisateur et son mot de passe. Les identifiants sont chiffrés en AES-256 en base de données.',
     'step3_title' => 'Relever les comptes distants',

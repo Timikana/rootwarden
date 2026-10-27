@@ -9,7 +9,7 @@ return [
     'title' => 'Getting Started',
     'intro' => 'Follow these steps to configure RootWarden after installation.',
     'step1_title' => 'Login and secure your account',
-    'step1_text' => 'Log in with the credentials generated at first startup (shown in Docker logs). Change your password and configure mandatory 2FA.',
+    'step1_text' => 'On a fresh installation, create the superadmin password with « docker exec -u www-data rootwarden_laravel php artisan rootwarden:premier-compte »: it is shown only once. At first sign-in, change it and enrol the second factor, which is mandatory.',
     'step2_title' => 'Add your servers',
     'step2_text' => 'In Admin > Servers, add each Linux server with its IP, SSH port, username and password. Credentials are AES-256 encrypted in the database.',
     'step3_title' => 'Scan remote users',
