@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\Droits;
 use App\Services\StepUp;
+use App\Support\RelaisFlux;
 use App\Support\RoutesBackend;
 use Illuminate\Http\Request;
 // Type de retour : l'ancetre commun de Response et JsonResponse. Annoncer
@@ -151,7 +152,9 @@ class PasserelleController extends Controller
         if ($enFlux) {
             $corps = $reponse->toPsrResponse()->getBody();
 
-            return response()->stream(function () use ($corps) {
+            $inactiviteMax = (int) config('rootwarden.backend.delai_flux', 900);
+
+            return response()->stream(function () use ($corps, $inactiviteMax) {
                 // MESURE : sans ceci, rien n'arrive avant la fin. Apache
                 // applique `AddOutputFilterByType DEFLATE text/plain`, et
                 // compresser oblige a accumuler toute la reponse — les en-tetes
@@ -161,11 +164,9 @@ class PasserelleController extends Controller
                 }
                 @ini_set('zlib.output_compression', '0');
 
-                while (! $corps->eof()) {
-                    $morceau = $corps->read(8192);
-                    if ($morceau === '') {
-                        continue;
-                    }
+                // Lecture NON BLOQUANTE : `read(8192)` sur la socket TLS du
+                // backend attendait 8 Ko ou la fin. Voir `RelaisFlux`.
+                RelaisFlux::relaie($corps, function (string $morceau): void {
                     echo $morceau;
                     // Sans ces deux appels, le morceau reste dans les tampons
                     // de PHP et d'Apache jusqu'a la fin de la reponse — ce qui
@@ -174,7 +175,7 @@ class PasserelleController extends Controller
                         @ob_flush();
                     }
                     flush();
-                }
+                }, $inactiviteMax, fn (): bool => connection_aborted() === 1);
             }, $reponse->status(), [
                 'Content-Type'      => $reponse->header('Content-Type') ?: 'text/plain',
                 'Cache-Control'     => 'no-cache',

@@ -5,6 +5,26 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## Reprise module par module sur une pile neuve — la vraie cause des « logs pas en direct »
+
+Toutes les pages et les gestes principaux rejoués sur une installation neuve et isolée (base vide,
+un serveur de test, aucune machine réelle) : 60 pages sans erreur, 16 gestes. Ce qui a été trouvé :
+
+| | Constat (mesuré) | Correctif |
+|---|---|---|
+| 1 | **La passerelle retenait TOUS les flux** : `read(8192)` sur la socket TLS du backend attend 8 Ko ou la fin. « Début de l'exécution… » disponible à 0,29 s était rendu à 7,5 s, avec tout le reste. C'est la cause de fond des journaux qui « ne remontent pas en direct », sur tous les écrans | Lecture non bloquante (`RelaisFlux`), délai d'inactivité et arrêt si le navigateur part. Dans le navigateur : « Simuler » premier morceau à **0,36 s** (au lieu de 7,3 s) ; journal des clés à 1,3 s (au lieu de 31,7 s) |
+| 2 | **Le scan CVE d'une machine échouait** dès qu'il dépassait 120 s (« service momentanément injoignable ») | Avec le relais en flux : scan de 5 min 40 réussi, 166 morceaux, le premier à 0,27 s |
+| 3 | Le déploiement d'un agent de supervision lisait sa réponse **en entier** avant de l'afficher | Journal affiché au fil de l'eau ; verdict calculé comme avant sur le texte complet |
+| 4 | Une machine injoignable rendait « Erreur interne » ; les comptes distants affichaient « Scan non concluant. Lectures qui ont échoué : . » | Les causes de connexion SSH sont dites (« Machine injoignable … No route to host ») ; toute autre exception reste masquée |
+| 5 | Installation neuve : les 4 workers jouaient les migrations **en même temps** — 4 deadlocks, 2 migrations et 2 workers en échec | Verrou nommé MySQL : 0 deadlock, 4 workers sur 4 à jour (base neuve, 2 essais) |
+| 6 | L'aide « premiers pas » renvoyait aux journaux Docker pour le premier mot de passe | Renvoie à `php artisan rootwarden:premier-compte` |
+
+Restent à arbitrer, non modifiés : le preflight du déploiement de clés compte les comptes ayant une
+clé sur TOUT le portail, alors que le déploiement ne pose que ceux qui ont accès aux machines
+cochées — il peut donc annoncer un succès sans rien poser pour un compte sans accès.
+
+---
+
 ## Une machine injoignable n'est plus annoncée « clé non déployée »
 
 Constat en production : le pare-feu d'une machine rejetait le SSH, et RootWarden annonçait

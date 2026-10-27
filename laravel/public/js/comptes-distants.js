@@ -303,6 +303,15 @@
                     // Ni JSON, ni reseau : on ne sait meme pas ce qui a echoue.
                     dit('[data-rw="distants-scan-etat"]', libelles.scan_echec);
                     if (zone) { zone.className = 'rw-annonce rw-annonce--echec'; }
+                } else if (d.success !== true && ! d.lectures) {
+                    // PAS DE RELEVE DU TOUT — machine injoignable, cle refusee,
+                    // refus du backend. Le dire « non concluant » avec une liste
+                    // de lectures VIDE envoyait chercher un releve partiel qui
+                    // n'a jamais commence (constat du 2026-10-27, pile isolee).
+                    // Le message du backend porte la cause : on l'affiche.
+                    dit('[data-rw="distants-scan-etat"]',
+                        (libelles.scan_echec || '') + (d.message ? ' ' + d.message : ''));
+                    if (zone) { zone.className = 'rw-annonce rw-annonce--echec'; }
                 } else if (d.success !== true) {
                     var lectures = d.lectures || {};
                     var manquantes = sourcesManquantes(lectures);

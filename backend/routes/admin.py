@@ -16,7 +16,7 @@ Routes :
 
 from flask import Blueprint, jsonify, request
 
-from routes.helpers import require_api_key, require_role, threaded_route, get_db_connection
+from routes.helpers import require_api_key, require_role, threaded_route, get_db_connection, erreur_interne
 
 bp = Blueprint('admin', __name__)
 
@@ -41,7 +41,7 @@ def create_backup():
         cleanup_old_backups()
         return jsonify({'success': True, 'path': path})
     except Exception as e:
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 @bp.route('/admin/backups/etat', methods=['GET'])

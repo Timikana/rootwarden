@@ -29,7 +29,7 @@ import time
 import traceback
 import paramiko
 from flask import Blueprint, jsonify, request, Response
-from routes.helpers import require_api_key, require_role, require_machine_access, check_machine_access, threaded_route, get_db_connection, server_decrypt_password, logger, encryption, get_current_user
+from routes.helpers import require_api_key, require_role, require_machine_access, check_machine_access, threaded_route, get_db_connection, server_decrypt_password, logger, encryption, get_current_user, erreur_interne
 from configure_servers import (
     _motif_nom_invalide,
     _valid_username as _valid_username_decouvert,
@@ -1773,7 +1773,7 @@ def server_users_inventory():
         })
     except Exception as e:
         logger.error("server_users_inventory(%s): %s", machine_id, e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 @bp.route('/scan_server_users', methods=['POST'])
@@ -2236,7 +2236,7 @@ def scan_server_users():
         return jsonify(reponse)
     except Exception as e:
         logger.error("scan_server_users(%s): %s", machine_id, e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 @bp.route('/sshd_allow_user', methods=['POST'])
@@ -2384,7 +2384,7 @@ def server_user_keys():
         return jsonify({'success': True, 'keys': keys, 'count': len(keys)})
     except Exception as e:
         logger.error("server_user_keys(%s, %s): %s", machine_id, username, e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
     finally:
         conn.close()
 
@@ -2942,7 +2942,7 @@ def delete_remote_user():
 
     except Exception as e:
         logger.error("[delete_remote_user] %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 def _cleanup_user_inventory(machine_id, username):
