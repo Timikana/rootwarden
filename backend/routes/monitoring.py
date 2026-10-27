@@ -16,7 +16,7 @@ import re
 import socket
 from flask import Blueprint, jsonify, request
 
-from routes.helpers import require_api_key, require_role, require_machine_access, threaded_route, get_db_connection, server_decrypt_password, logger, get_current_user
+from routes.helpers import require_api_key, require_role, require_machine_access, threaded_route, get_db_connection, server_decrypt_password, logger, get_current_user, erreur_interne
 
 from ssh_utils import ssh_session, validate_machine_id
 from server_checks import parse_os_release
@@ -57,7 +57,7 @@ def list_machines():
         return jsonify({"success": True, "machines": machines}), 200
     except Exception as e:
         logger.error("[list_machines] Erreur: %s", e)
-        return jsonify({"success": False, "message": "Erreur interne"}), 500
+        return erreur_interne(e)
 
 
 @bp.route('/server_status', methods=['POST'])
@@ -120,7 +120,7 @@ def server_status():
         return jsonify({'success': True, 'ip': ip, 'status': status})
     except Exception as e:
         logger.error("[server_status] Erreur: %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 @bp.route('/linux_version', methods=['POST'])
@@ -185,7 +185,7 @@ def check_linux_version():
         return jsonify({"success": True, "concluante": True, "machine_id": machine_id, "version": version_str})
     except Exception as e:
         logger.error("[linux_version] Erreur: %s", e)
-        return jsonify({"success": False, "message": "Erreur interne"}), 500
+        return erreur_interne(e)
 
 
 @bp.route('/last_reboot', methods=['POST'])
@@ -224,7 +224,7 @@ def last_reboot():
             conn.commit()
         return jsonify({'success': True, 'last_reboot': last_reboot_time, 'reboot_required': reboot_required}), 200
     except Exception as e:
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 @bp.route('/reboot_server', methods=['POST'])
@@ -352,7 +352,7 @@ def reboot_server():
         }), 200
     except Exception as e:
         logger.error("reboot_server(%s): %s", machine_id, e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 @bp.route('/filter_servers', methods=['GET'])
@@ -398,7 +398,7 @@ def filter_servers_route():
         return jsonify({"success": True, "machines": machines})
     except Exception as e:
         logger.error("[filter_servers] Erreur: %s", e)
-        return jsonify({"success": False, "message": "Erreur interne"}), 500
+        return erreur_interne(e)
 
 
 @bp.route('/cve_trends', methods=['GET'])

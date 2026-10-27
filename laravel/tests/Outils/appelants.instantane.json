@@ -19,7 +19,7 @@
     "chatops.js": "607141666c99b287",
     "cle-plateforme.js": "847da8fc8e2f3f9c",
     "cles-ssh.js": "c216fadc962238f9",
-    "comptes-distants.js": "9520ed9b433918f4",
+    "comptes-distants.js": "df7c311899286458",
     "comptes.js": "b5ddfcc26808cb7f",
     "derive-config.js": "d9d473c325b78901",
     "distants-cles.js": "e3ef5aa6131077c5",
@@ -50,7 +50,7 @@
     "serveurs.js": "75ac0ff9843b8717",
     "services.js": "a8fc3aa9607c974c",
     "step-up.js": "d4a4ecccbf870548",
-    "supervision.js": "e1ee09190066011e",
+    "supervision.js": "de6642f7969ec1de",
     "taches.js": "e2f38dc14fa64973",
     "tickets.js": "1b9803433b017d1e",
     "wazuh.js": "150c5e47c0f94c5f"
