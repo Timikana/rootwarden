@@ -339,9 +339,12 @@ class InventaireDesGardesTest extends TestCase
             //    ce gel l'exige : le step-up y est inchange.
             // ⚠ 598 -> 629 et 623 -> 654 le 2026-09-09 : `sudoGlobal()` inseree
             //    plus haut (troisieme et dernier geste perdu). RELUS.
+            // ⚠ 88 -> 89 le 2026-10-27 : un `use App\Support\RelaisFlux;` ajoute
+            //    en tete de la passerelle (relais des flux au fil de l'eau). Site
+            //    RELU a sa nouvelle place : le step-up y est inchange.
             'ComptesController.php:629',      // compte_supprimer
             'ComptesController.php:654',      // compte_anonymiser
-            'PasserelleController.php:88',    // generique, action DERIVEE du chemin
+            'PasserelleController.php:89',    // generique, action DERIVEE du chemin
             'PermissionsController.php:165',  // permission_definir
             'PortailController.php:196',      // profil_effacement (E-449)
         ], $sites,

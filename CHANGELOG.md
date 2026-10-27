@@ -5,6 +5,63 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## Reprise module par module sur une pile neuve — la vraie cause des « logs pas en direct »
+
+Toutes les pages et les gestes principaux rejoués sur une installation neuve et isolée (base vide,
+un serveur de test, aucune machine réelle) : 60 pages sans erreur, 16 gestes. Ce qui a été trouvé :
+
+| | Constat (mesuré) | Correctif |
+|---|---|---|
+| 1 | **La passerelle retenait TOUS les flux** : `read(8192)` sur la socket TLS du backend attend 8 Ko ou la fin. « Début de l'exécution… » disponible à 0,29 s était rendu à 7,5 s, avec tout le reste. C'est la cause de fond des journaux qui « ne remontent pas en direct », sur tous les écrans | Lecture non bloquante (`RelaisFlux`), délai d'inactivité et arrêt si le navigateur part. Dans le navigateur : « Simuler » premier morceau à **0,36 s** (au lieu de 7,3 s) ; journal des clés à 1,3 s (au lieu de 31,7 s) |
+| 2 | **Le scan CVE d'une machine échouait** dès qu'il dépassait 120 s (« service momentanément injoignable ») | Avec le relais en flux : scan de 5 min 40 réussi, 166 morceaux, le premier à 0,27 s |
+| 3 | Le déploiement d'un agent de supervision lisait sa réponse **en entier** avant de l'afficher | Journal affiché au fil de l'eau ; verdict calculé comme avant sur le texte complet |
+| 4 | Une machine injoignable rendait « Erreur interne » ; les comptes distants affichaient « Scan non concluant. Lectures qui ont échoué : . » | Les causes de connexion SSH sont dites (« Machine injoignable … No route to host ») ; toute autre exception reste masquée |
+| 5 | Installation neuve : les 4 workers jouaient les migrations **en même temps** — 4 deadlocks, 2 migrations et 2 workers en échec | Verrou nommé MySQL : 0 deadlock, 4 workers sur 4 à jour (base neuve, 2 essais) |
+| 6 | L'aide « premiers pas » renvoyait aux journaux Docker pour le premier mot de passe | Renvoie à `php artisan rootwarden:premier-compte` |
+
+Restent à arbitrer, non modifiés : le preflight du déploiement de clés compte les comptes ayant une
+clé sur TOUT le portail, alors que le déploiement ne pose que ceux qui ont accès aux machines
+cochées — il peut donc annoncer un succès sans rien poser pour un compte sans accès.
+
+---
+
+## Une machine injoignable n'est plus annoncée « clé non déployée »
+
+Constat en production : le pare-feu d'une machine rejetait le SSH, et RootWarden annonçait
+« Pas de password et keypair non deployee ». Les tentatives par clé avalaient toute erreur, réseau
+compris ; la tentative par mot de passe, faute de mot de passe en base, inventait une cause
+d'authentification. Le diagnostic est parti sur la clé alors que le problème était le réseau.
+
+| Cas (sshd isolé) | Avant | Après |
+|---|---|---|
+| Adresse sans route | 6,1 s — « keypair non deployee » | 3,1 s — « injoignable : [Errno 113] No route to host » |
+| Port fermé | « keypair non deployee » | « injoignable : [Errno 111] Connection refused » |
+| Clé refusée, sans mot de passe | « keypair non deployee » | inchangé |
+| Clé refusée, bon mot de passe | connecté par mot de passe | inchangé |
+
+Une machine injoignable arrête les replis (ils frapperaient au même port). Les trois tentatives ont
+désormais un délai de connexion de 10 s ; seule la première en avait un, et derrière un pare-feu qui
+jette les paquets les deux autres attendaient le délai du système.
+
+---
+
+## Les journaux arrivent en direct — deux causes, mesurées
+
+Retour d'exploitation : « les logs ne remontent pas en live, c'est long, sur beaucoup de modules ».
+Deux causes indépendantes, qui s'additionnaient.
+
+| | Constat | Correctif |
+|---|---|---|
+| 1 | La passerelle lisait **en entier** six réponses que le backend écrit morceau par morceau : scan CVE d'une machine, journal du déploiement des clés SSH, scan Docker du parc, scan CVE du parc, journaux des mises à jour et d'iptables. Rien à l'écran avant la fin, puis une erreur de passerelle au-delà de 120 s alors que le travail continuait | Relayées morceau par morceau (`RoutesBackend::EN_FLUX`). Un test confronte désormais cette liste aux routes en flux de `backend/routes/` : une route en flux ajoutée sans relais fait échouer la CI |
+| 2 | Sur les machines où le **compte de service** est déployé, les commandes tournaient sans pseudo-terminal : sortie tamponnée par blocs, et **stderr jamais lu** — les messages d'erreur n'apparaissaient pas | Pseudo-terminal, comme la branche mot de passe. Mesuré sur un sshd isolé : quatre lignes espacées d'une seconde arrivaient ensemble à 4,1 s, elles arrivent une par seconde ; le message d'erreur est rendu |
+
+En pseudo-terminal, `dpkg -l`, `systemctl status` ou `journalctl` lancent un pager qui attend une
+touche : le flux ne se fermait jamais (vu sur le banc). Les pagers sont neutralisés dans les deux
+branches. Contrôle de non-régression : `apt list`, que la simulation de mise à jour analyse, rend
+126 paquets sur 126, cinq fois de suite, avant comme après.
+
+---
+
 ## Sauvegarde de la base : elle tuait le backend toutes les heures — et plus aucun dump depuis août
 
 **Impact.** Sur une installation dont la table `cve_findings` est volumineuse, la sauvegarde
