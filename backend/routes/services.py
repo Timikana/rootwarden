@@ -16,7 +16,7 @@ import re
 import logging
 from flask import Blueprint, jsonify, request
 
-from routes.helpers import resolve_ssh_creds as _resolve_ssh_creds
+from routes.helpers import resolve_ssh_creds as _resolve_ssh_creds, erreur_interne
 from routes.helpers import (
     require_api_key, require_role, require_permission, require_machine_access, threaded_route, get_db_connection,
     server_decrypt_password, logger,
@@ -114,7 +114,7 @@ def services_list():
             return jsonify({'success': True, 'services': services, 'total': len(services)})
     except Exception as e:
         logger.error("[services/list] %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 @bp.route('/services/status', methods=['POST'])
@@ -141,7 +141,7 @@ def services_status():
         return jsonify({'success': False, 'message': str(e)}), 400
     except Exception as e:
         logger.error("[services/status] %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 @bp.route('/services/start', methods=['POST'])
@@ -178,7 +178,7 @@ def services_start():
         return jsonify({'success': False, 'message': str(e)}), 400
     except Exception as e:
         logger.error("[services/start] %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 @bp.route('/services/stop', methods=['POST'])
@@ -215,7 +215,7 @@ def services_stop():
         return jsonify({'success': False, 'message': str(e)}), 400
     except Exception as e:
         logger.error("[services/stop] %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 @bp.route('/services/restart', methods=['POST'])
@@ -252,7 +252,7 @@ def services_restart():
         return jsonify({'success': False, 'message': str(e)}), 400
     except Exception as e:
         logger.error("[services/restart] %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 @bp.route('/services/enable', methods=['POST'])
@@ -289,7 +289,7 @@ def services_enable():
         return jsonify({'success': False, 'message': str(e)}), 400
     except Exception as e:
         logger.error("[services/enable] %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 @bp.route('/services/disable', methods=['POST'])
@@ -326,7 +326,7 @@ def services_disable():
         return jsonify({'success': False, 'message': str(e)}), 400
     except Exception as e:
         logger.error("[services/disable] %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 @bp.route('/services/logs', methods=['POST'])
@@ -357,4 +357,4 @@ def services_logs():
         return jsonify({'success': False, 'message': str(e)}), 400
     except Exception as e:
         logger.error("[services/logs] %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)

@@ -209,6 +209,40 @@ class CleHoteChangee(paramiko.SSHException):
     """La cle presentee par l'hote differe de celle memorisee : refus."""
 
 
+class MachineInjoignable(paramiko.SSHException):
+    """La connexion TCP au port SSH n'a pas abouti : aucune authentification
+    n'a ete tentee, et aucune autre methode n'en aboutirait davantage."""
+
+
+# Delai de la connexion TCP, pour les trois tentatives de `connect_ssh`. Seule la
+# premiere en avait un : derriere un pare-feu qui JETTE les paquets, les deux
+# suivantes attendaient le delai du systeme (environ deux minutes chacune).
+_DELAI_CONNEXION_TCP = 10
+
+
+def _connecte(client, host, port, **kwargs):
+    """`client.connect`, ou `MachineInjoignable` si la couche TCP echoue.
+
+    2026-10-26, constat en production : une machine dont le pare-feu rejetait
+    le SSH (« No route to host ») etait annoncee « Pas de password et keypair
+    non deployee ». Les deux tentatives par cle avalaient TOUTE erreur en
+    niveau debug, puis la tentative par mot de passe, faute de mot de passe en
+    base, inventait une cause d'authentification. Refus de connexion, absence
+    de route, delai depasse, nom introuvable : ce sont des `OSError`, levees
+    avant tout echange SSH — les replis frapperaient au meme port.
+    """
+    try:
+        client.connect(hostname=host, port=port, timeout=_DELAI_CONNEXION_TCP, **kwargs)
+    except OSError as e:
+        # `NoValidConnectionsError` ne rend que « Unable to connect » : la cause
+        # qui distingue un port ferme (« Connection refused ») d'un pare-feu
+        # (« No route to host ») est dans `errors`, une par adresse essayee.
+        causes = getattr(e, 'errors', None)
+        cause = '; '.join(sorted({str(x) for x in causes.values()})) if causes else str(e)
+        raise MachineInjoignable(
+            f"Machine injoignable en SSH sur {host}:{port} : {cause}") from e
+
+
 def _empreinte_cle(cle) -> str:
     import hashlib
     return hashlib.sha256(cle.asbytes()).hexdigest()
@@ -317,19 +351,16 @@ def connect_ssh(host: str, username: str, password: str, port: int = 22,
             from ssh_key_manager import get_platform_private_key
             pkey = get_platform_private_key()
             if pkey:
-                client.connect(
-                    hostname=host, port=port, username=Config.NOM_COMPTE_SERVICE,
-                    pkey=pkey,
-                    look_for_keys=False, allow_agent=False,
-                    timeout=10
-                )
+                _connecte(client, host, port, username=Config.NOM_COMPTE_SERVICE,
+                          pkey=pkey, look_for_keys=False, allow_agent=False)
                 client._rootwarden_auth_method = 'service_account'
                 _enable_keepalive(client)
                 _logger.info("SSH service account auth OK → %s:%d", host, port)
                 return client
-        except CleHoteChangee:
-            # Un refus de cle d'hote n'est pas un echec d'authentification : les
-            # tentatives suivantes verraient la meme cle. On s'arrete ICI.
+        except (CleHoteChangee, MachineInjoignable):
+            # Un refus de cle d'hote, ou une machine injoignable, n'est pas un
+            # echec d'authentification : les tentatives suivantes verraient la
+            # meme cle, ou le meme port ferme. On s'arrete ICI.
             raise
         except paramiko.AuthenticationException:
             _logger.debug("SSH service account auth echouee pour %s:%d - fallback", host, port)
@@ -354,16 +385,13 @@ def connect_ssh(host: str, username: str, password: str, port: int = 22,
             from ssh_key_manager import get_platform_private_key
             pkey = get_platform_private_key()
             if pkey:
-                client.connect(
-                    hostname=host, port=port, username=username,
-                    pkey=pkey,
-                    look_for_keys=False, allow_agent=False
-                )
+                _connecte(client, host, port, username=username,
+                          pkey=pkey, look_for_keys=False, allow_agent=False)
                 client._rootwarden_auth_method = 'keypair'
                 _enable_keepalive(client)
                 _logger.info("SSH keypair auth OK → %s:%d (user=%s)", host, port, username)
                 return client
-        except CleHoteChangee:
+        except (CleHoteChangee, MachineInjoignable):
             raise
         except paramiko.AuthenticationException:
             _logger.debug("SSH keypair auth echouee pour %s:%d - fallback password", host, port)
@@ -390,11 +418,8 @@ def connect_ssh(host: str, username: str, password: str, port: int = 22,
         )
 
     try:
-        client.connect(
-            hostname=host, port=port, username=username,
-            password=password,
-            look_for_keys=False, allow_agent=False
-        )
+        _connecte(client, host, port, username=username,
+                  password=password, look_for_keys=False, allow_agent=False)
         client._rootwarden_auth_method = 'password'
         _enable_keepalive(client)
         _logger.info("SSH password auth OK → %s:%d (user=%s)", host, port, username)
@@ -646,6 +671,15 @@ def _su_exec(client: paramiko.SSHClient, command: str, root_password: str,
             pass
 
 
+# Prefixe des commandes de `execute_as_root_stream`, qui tournent dans un PTY.
+#
+# Face a un terminal, `dpkg -l`, `systemctl status`, `journalctl` ou `git log`
+# lancent un PAGER et attendent une touche qui ne viendra jamais : le flux reste
+# ouvert sans fin et tient un thread du backend. Mesure du 2026-10-22 sur un sshd
+# isole : `dpkg -l` en PTY -> processus `pager` encore vivant apres 3 minutes.
+_SANS_PAGER = "export PAGER=cat SYSTEMD_PAGER=cat DPKG_PAGER=cat GIT_PAGER=cat; "
+
+
 # Erreurs stderr qui indiquent que sudo n'est pas utilisable sur ce serveur
 _SUDO_UNAVAILABLE = (
     'sudo: command not found',
@@ -823,7 +857,7 @@ def execute_as_root_stream(client: paramiko.SSHClient, command: str,
     Exécute une commande en root via ``sudo -S`` et renvoie la sortie en streaming.
 
     Si connecté via le compte de service rootwarden (NOPASSWD sudo),
-    exécute directement ``sudo sh -c`` sans envoyer de mot de passe ni PTY.
+    exécute directement ``sudo sh -c`` sans envoyer de mot de passe, avec PTY.
 
     Utilise ``exec_command`` avec PTY → stdout et stderr fusionnés, sortie en temps réel.
     ``select.select`` évite tout blocage ; exit_status_ready() détecte la fin de commande.
@@ -831,12 +865,23 @@ def execute_as_root_stream(client: paramiko.SSHClient, command: str,
     _log = logger or logging.getLogger(__name__)
     _ansi_re = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
 
-    # Compte de service rootwarden : NOPASSWD sudo, pas de PTY ni password
+    # Compte de service rootwarden : NOPASSWD sudo, pas de mot de passe.
+    #
+    # ══ LE PTY, AUSSI ICI (2026-10-22) ══════════════════════════════════════
+    # Sans pseudo-terminal, la sortie standard distante est un TUBE : les
+    # programmes la tamponnent par blocs, et stderr n'etait jamais lu. Mesure sur
+    # un sshd isole, quatre lignes espacees d'une seconde a travers `grep` :
+    #     sans PTY  t=4,1 s  les quatre lignes ensemble ; stderr PERDU
+    #     avec PTY  une ligne par seconde ; stderr fusionne dans le flux
+    # C'est le chemin de toutes les machines ou le compte de service est
+    # deploye — donc celui ou « les journaux n'arrivent pas en direct ». La
+    # branche mot de passe ci-dessous a toujours utilise un PTY : les commandes
+    # sont deja eprouvees dans ce mode.
     if getattr(client, '_rootwarden_auth_method', '') == 'service_account':
-        nopasswd_cmd = f"sudo sh -c {shlex.quote(command)}"
+        nopasswd_cmd = f"sudo sh -c {shlex.quote(_SANS_PAGER + command)}"
         _log.info("execute_as_root_stream (service_account): %s", command[:60])
         try:
-            stdin, stdout, stderr = client.exec_command(nopasswd_cmd)
+            stdin, stdout, stderr = client.exec_command(nopasswd_cmd, get_pty=True)
             yield "Début de l'exécution...\n"
             while True:
                 r, _, _ = select.select([stdout.channel], [], [], 0.5)
@@ -884,13 +929,13 @@ def execute_as_root_stream(client: paramiko.SSHClient, command: str,
     can_sudo = _sudo_rc == 0 and not any(msg in _sudo_err for msg in _SUDO_UNAVAILABLE)
 
     if can_sudo:
-        root_cmd = f"sudo -S -p '' sh -c {shlex.quote(command)}"
+        root_cmd = f"sudo -S -p '' sh -c {shlex.quote(_SANS_PAGER + command)}"
     else:
         # Fallback su : ecrire un script temp pour les memes raisons que _su_exec
         import base64 as _b64
         import uuid as _uuid
         _tmp = f"/tmp/.rw_stream_{_uuid.uuid4().hex[:8]}.sh"
-        _script = f"export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n{command}\n"
+        _script = f"export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n{_SANS_PAGER}{command}\n"
         _b64s = _b64.b64encode(_script.encode()).decode()
         _wcmd = _commande_ecriture_script(_b64s, _tmp)
         _ws, _wo, _we = client.exec_command(_wcmd, timeout=10)

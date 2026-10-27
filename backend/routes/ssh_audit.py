@@ -17,7 +17,7 @@ import datetime
 import threading
 from flask import Blueprint, jsonify, request
 
-from routes.helpers import resolve_ssh_creds as _resolve_ssh_creds
+from routes.helpers import resolve_ssh_creds as _resolve_ssh_creds, erreur_interne
 from routes.helpers import (
     require_api_key, require_role, require_permission, require_machine_access,
     threaded_route, get_db_connection,
@@ -181,7 +181,7 @@ def ssh_audit_scan():
     except Exception as e:
         logger.error("[ssh-audit/scan] %s", e)
         logger.error("[ssh_audit] %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 def _run_scan_all_background(machines, audited_by, task_id):
@@ -257,7 +257,7 @@ def ssh_audit_scan_all():
         conn.close()
     except Exception as e:
         logger.error("[ssh-audit/scan-all] BDD: %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
     if not machines:
         return jsonify({'success': True, 'queued': 0, 'background': True,
@@ -310,7 +310,7 @@ def ssh_audit_fleet():
         return jsonify({'success': True, 'results': rows, 'total': len(rows)})
     except Exception as e:
         logger.error("[ssh-audit/fleet] %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 @bp.route('/ssh-audit/results', methods=['GET'])
@@ -356,7 +356,7 @@ def ssh_audit_results():
     except Exception as e:
         logger.error("[ssh-audit/results] %s", e)
         logger.error("[ssh_audit] %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 @bp.route('/ssh-audit/config', methods=['POST'])
@@ -405,7 +405,7 @@ def ssh_audit_config():
     except Exception as e:
         logger.error("[ssh-audit/config] %s", e)
         logger.error("[ssh_audit] %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 @bp.route('/ssh-audit/fix', methods=['POST'])
@@ -465,7 +465,7 @@ def ssh_audit_fix():
     except Exception as e:
         logger.error("[ssh-audit/fix] %s", e)
         logger.error("[ssh_audit] %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 @bp.route('/ssh-audit/policies', methods=['GET'])
@@ -543,7 +543,7 @@ def ssh_audit_policies_get():
     except Exception as e:
         logger.error("[ssh-audit/policies] %s", e)
         logger.error("[ssh_audit] %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 @bp.route('/ssh-audit/policies', methods=['POST'])
@@ -618,7 +618,7 @@ def ssh_audit_policies_set():
     except Exception as e:
         logger.error("[ssh-audit/policies] %s", e)
         logger.error("[ssh_audit] %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 @bp.route('/ssh-audit/save-config', methods=['POST'])
@@ -651,7 +651,7 @@ def ssh_audit_save_config():
     except Exception as e:
         logger.error("[ssh-audit/save-config] %s", e)
         logger.error("[ssh_audit] %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 @bp.route('/ssh-audit/toggle', methods=['POST'])
@@ -688,7 +688,7 @@ def ssh_audit_toggle():
     except Exception as e:
         logger.error("[ssh-audit/toggle] %s", e)
         logger.error("[ssh_audit] %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 @bp.route('/ssh-audit/backups', methods=['POST'])
@@ -710,7 +710,7 @@ def ssh_audit_backups():
     except Exception as e:
         logger.error("[ssh-audit/backups] %s", e)
         logger.error("[ssh_audit] %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 @bp.route('/ssh-audit/restore', methods=['POST'])
@@ -743,7 +743,7 @@ def ssh_audit_restore():
     except Exception as e:
         logger.error("[ssh-audit/restore] %s", e)
         logger.error("[ssh_audit] %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 @bp.route('/ssh-audit/reload', methods=['POST'])
@@ -772,7 +772,7 @@ def ssh_audit_reload():
     except Exception as e:
         logger.error("[ssh-audit/reload] %s", e)
         logger.error("[ssh_audit] %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 # ── Routes : Planification scans SSH Audit ───────────────────────────────────
@@ -813,7 +813,7 @@ def list_ssh_schedules():
         return jsonify({'success': True, 'schedules': rows})
     except Exception as e:
         logger.error("[ssh-audit/schedules] %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 @bp.route('/ssh-audit/schedules', methods=['POST'])
@@ -940,7 +940,7 @@ def create_ssh_schedule():
         return jsonify({'success': True, 'message': 'Planification creee', 'next_run': str(next_run)})
     except Exception as e:
         logger.error("[ssh-audit/schedules POST] %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 @bp.route('/ssh-audit/schedules/<int:schedule_id>', methods=['DELETE'])
@@ -987,7 +987,7 @@ def delete_ssh_schedule(schedule_id):
                         'message': 'Planification supprimee'})
     except Exception as e:
         logger.error("[ssh-audit/schedules DELETE] %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 @bp.route('/ssh-audit/schedules/<int:schedule_id>/toggle', methods=['POST'])
@@ -1006,7 +1006,7 @@ def toggle_ssh_schedule(schedule_id):
         return jsonify({'success': True, 'message': 'Planification mise a jour'})
     except Exception as e:
         logger.error("[ssh-audit/schedules toggle] %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 # ── Route : Historique scores (tendances) ────────────────────────────────────
@@ -1047,4 +1047,4 @@ def ssh_audit_trends():
         return jsonify({'success': True, 'trends': rows})
     except Exception as e:
         logger.error("[ssh-audit/trends] %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)

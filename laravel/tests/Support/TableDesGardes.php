@@ -33,7 +33,7 @@ namespace Tests\Support;
  *     ComptesController:539      compte_anonymiser
  *     PermissionsController:165  permission_definir
  *     PortailController:196      profil_effacement      (E-449)
- *     PasserelleController:88    generique, action DERIVEE du chemin
+ *     PasserelleController:89    generique, action DERIVEE du chemin
  *
  * Cinq sites, quatre actions nommees du portage et une garde generique de
  * passerelle. **Une route de cette table peut donc etre plus gardee qu'elle n'y

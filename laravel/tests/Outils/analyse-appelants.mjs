@@ -220,8 +220,37 @@ function rendLeCorps(fonction) {
  *   2. sinon, un `.json()` OU un `JSON.parse` -> ce n'est PAS un flux ;
  *   3. sinon, du texte -> c'est un flux ;
  *   4. sinon -> ce n'est pas un flux.
+ *
+ * UN CRAN PLUS HAUT, comme `cheminsDesAppelants` (2026-10-27). `supervision.js`
+ * a confie sa lecture a un helper, `litEnDirect(reponse, journal)`, qui lit par
+ * `getReader()` pour afficher le journal au fil de l'eau. La fonction englobante
+ * ne contenait plus ni `.text()` ni `getReader()` : trois sites classes `flux`
+ * passaient a `ignore` — une fausse accusation, sans que rien n'ait change dans
+ * ce qu'ils verifient. Un appel a une fonction DECLAREE DANS LE MEME FICHIER
+ * compte donc comme sa lecture, a un seul niveau ; un helper importe d'ailleurs
+ * reste non suivi, comme pour les chemins.
+ *
+ * ⚠ ET SEULEMENT S'IL LIT LE FLUX D'UN DE SES PARAMETRES. La premiere version
+ * comptait tout helper qui lisait UN flux : `cles-ssh.js` `declenche()` passait
+ * alors d'`ignore` a `flux`, parce qu'il appelle une fonction qui lit le flux du
+ * JOURNAL — un autre `fetch` —, pas la reponse du deploiement. Un faux
+ * dedouanement, celui que cet instrument existe pour refuser.
  */
-function litUnFlux(fonction) {
+function litLeFluxDeSonParametre(d) {
+    const params = new Set((d.params || []).filter(x => x.type === 'Identifier').map(x => x.name));
+    let lu = false;
+    parcours(d, (n) => {
+        if (lu || n.type !== 'CallExpression' || n.callee?.type !== 'MemberExpression') return;
+        const nom = n.callee.property?.name;
+        if (nom !== 'getReader' && nom !== 'text') return;
+        let racine = n.callee.object;
+        while (racine?.type === 'MemberExpression') racine = racine.object;
+        if (racine?.type === 'Identifier' && params.has(racine.name)) lu = true;
+    });
+    return lu;
+}
+
+function litUnFlux(fonction, arbre = null) {
     let texte = false;
     let json = false;
     let lecteur = false;
@@ -237,6 +266,16 @@ function litUnFlux(fonction) {
         if (nom === 'json') json = true;
         if (nom === 'getReader') lecteur = true;
     });
+    if (arbre && !lecteur) {
+        parcours(fonction, (n) => {
+            if (lecteur || n.type !== 'CallExpression' || n.callee?.type !== 'Identifier'
+                || n.arguments.length === 0) return;
+            parcours(arbre, (d) => {
+                if (!lecteur && d.type === 'FunctionDeclaration' && d.id?.name === n.callee.name
+                    && d !== fonction && litLeFluxDeSonParametre(d)) lecteur = true;
+            });
+        });
+    }
     return lecteur || (texte && !json);
 }
 
@@ -472,7 +511,7 @@ for (const nom of fichiers) {
 
         const englobante = fonctionEnglobante(parents, arbre);
         const verifie = consulte(englobante, 'success');
-        const flux = !verifie && litUnFlux(englobante);
+        const flux = !verifie && litUnFlux(englobante, arbre);
         const delegue = !verifie && !flux && rendLeCorps(englobante);
         appels.push({
             fichier: nom,

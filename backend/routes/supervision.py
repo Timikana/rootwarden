@@ -29,7 +29,7 @@ from flask import Blueprint, jsonify, request, Response
 from routes.helpers import (
     require_api_key, require_role, require_machine_access, require_permission,
     threaded_route, get_db_connection, server_decrypt_password, get_current_user, logger,
-    check_machine_access,
+    check_machine_access, erreur_interne,
 )
 from ssh_utils import ssh_session, validate_machine_id, execute_as_root, execute_as_root_stream
 
@@ -723,7 +723,7 @@ def get_config():
         return jsonify({'success': True, 'config': result})
     except Exception as e:
         logger.error("[supervision/config GET] %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 @bp.route('/supervision/config', methods=['POST'])
@@ -819,7 +819,7 @@ def save_config():
         return jsonify({'success': True, 'message': 'Configuration sauvegardee'})
     except Exception as e:
         logger.error("[supervision/config POST] %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 # ── Routes : Deploiement agent ───────────────────────────────────────────────
@@ -1080,7 +1080,7 @@ def zabbix_version():
     except Exception as e:
         logger.error("[supervision/zabbix/version] %s", e)
         logger.error("[supervision] %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 def _sonde_concluante(rc, sortie):
@@ -1351,7 +1351,7 @@ def zabbix_config_read():
             return jsonify({'success': True, 'config': out, 'path': config_path})
     except Exception as e:
         logger.error("[supervision] %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 @bp.route('/supervision/zabbix/config/save', methods=['POST'])
@@ -1423,7 +1423,7 @@ def zabbix_config_save():
             })
     except Exception as e:
         logger.error("[supervision] %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 @bp.route('/supervision/zabbix/backups', methods=['POST'])
@@ -1473,7 +1473,7 @@ def zabbix_list_backups():
             })
     except Exception as e:
         logger.error("[supervision] %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 @bp.route('/supervision/zabbix/restore', methods=['POST'])
@@ -1565,7 +1565,7 @@ def zabbix_restore_backup():
                             'message': f'Backup {backup_name} restaure et agent redemarre.'})
     except Exception as e:
         logger.error("[supervision] %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 # ── Routes : Overrides ───────────────────────────────────────────────────────
@@ -1581,7 +1581,7 @@ def get_overrides(machine_id):
         return jsonify({'success': True, 'overrides': overrides})
     except Exception as e:
         logger.error("[supervision] %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 @bp.route('/supervision/overrides/<int:machine_id>', methods=['POST'])
@@ -1635,7 +1635,7 @@ def save_overrides(machine_id):
                         'message': 'Overrides sauvegardes'})
     except Exception as e:
         logger.error("[supervision] %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 # ── Routes : Liste des machines ──────────────────────────────────────────────
@@ -1660,7 +1660,7 @@ def list_machines():
         return jsonify({'success': True, 'machines': machines})
     except Exception as e:
         logger.error("[supervision] %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 @bp.route('/supervision/agents', methods=['GET'])
@@ -1675,7 +1675,7 @@ def get_all_agents():
         return jsonify({'success': True, 'agents': {str(k): v for k, v in agents.items()}})
     except Exception as e:
         logger.error("[supervision] %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 @bp.route('/supervision/agents/<int:machine_id>', methods=['GET'])
@@ -1689,7 +1689,7 @@ def get_machine_agents_route(machine_id):
         return jsonify({'success': True, 'agents': agents.get(machine_id, {})})
     except Exception as e:
         logger.error("[supervision] %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1887,7 +1887,7 @@ def supervision_scan_all():
             machines = cur.fetchall()
     except Exception as e:
         logger.error("[supervision/scan-all] BDD: %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
     # Le parc IMPLICITE est filtre ici : voir la docstring.
     machines = [m for m in machines if check_machine_access(m['id'])]
@@ -2083,7 +2083,7 @@ def generic_version(platform):
         })
     except Exception as e:
         logger.error("[supervision] %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 @bp.route('/supervision/<platform>/uninstall', methods=['POST'])
@@ -2242,7 +2242,7 @@ def generic_config_read(platform):
             return jsonify({'success': True, 'config': out, 'path': config_path})
     except Exception as e:
         logger.error("[supervision] %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 @bp.route('/supervision/<platform>/config/save', methods=['POST'])
@@ -2337,7 +2337,7 @@ def generic_config_save(platform):
             })
     except Exception as e:
         logger.error("[supervision] %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 @bp.route('/supervision/<platform>/backups', methods=['POST'])
@@ -2384,7 +2384,7 @@ def generic_backups(platform):
             return jsonify({'success': True, 'backups': sorted(backups, key=lambda b: b['filename'], reverse=True)})
     except Exception as e:
         logger.error("[supervision] %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 @bp.route('/supervision/<platform>/restore', methods=['POST'])
@@ -2449,7 +2449,7 @@ def generic_restore(platform):
                             'message': f'Backup {backup_name} restaure et {service_name} redemarre.'})
     except Exception as e:
         logger.error("[supervision] %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 @bp.route('/supervision/config/<platform>', methods=['GET'])
@@ -2473,7 +2473,7 @@ def get_platform_config(platform):
             result['updated_at'] = str(result['updated_at'])
         return jsonify({'success': True, 'config': result})
     except Exception as e:
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 @bp.route('/supervision/config/<platform>', methods=['POST'])
@@ -2555,7 +2555,7 @@ def save_platform_config(platform):
         return jsonify({'success': True, 'message': f'Configuration {platform} sauvegardee'})
     except Exception as e:
         logger.error("[supervision/config/%s POST] %s", platform, e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 # Routes Profils de supervision (catalogue metadata)
 # Appendues a la fin de supervision.py
@@ -2607,7 +2607,7 @@ def list_profiles():
         return jsonify({'success': True, 'profiles': profiles})
     except Exception as e:
         logger.error("[supervision/profiles GET] %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 @bp.route('/supervision/profiles', methods=['POST'])
@@ -2664,7 +2664,7 @@ def delete_profile(pid):
         return jsonify({'success': True})
     except Exception as e:
         logger.error("[supervision/profiles DELETE] %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 @bp.route('/supervision/profiles/assignments', methods=['GET'])
@@ -2693,7 +2693,7 @@ def profile_assignments():
                         'assignments': {str(r['machine_id']): r['profile_id'] for r in rows}})
     except Exception as e:
         logger.error("[supervision/profiles/assignments] %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 @bp.route('/supervision/machines/<int:mid>/profile', methods=['GET', 'POST', 'DELETE'])
@@ -2741,4 +2741,4 @@ def machine_profile(mid):
         return jsonify({'success': True})
     except Exception as e:
         logger.error("[supervision/machines/%s/profile] %s", mid, e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
