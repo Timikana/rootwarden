@@ -164,7 +164,9 @@ class AppelantsDuBackendTest extends TestCase
              * d'un clic — c'est exactement ce que fait le legacy.* L'analyseur
              * cherche des chemins de passerelle ; il a raison de ne pas en trouver.
              */
-            'cles-ssh.js:491',
+            // 491 -> 495 le 2026-11-02 : liste « sans cle » ajoutee au preflight,
+            // plus haut. Site RELU : `declenche()` inchange.
+            'cles-ssh.js:495',
             'journal-audit.js:73',
             /*
              * AJOUTE le 2026-09-07 avec le portage de la liste blanche des CVE.

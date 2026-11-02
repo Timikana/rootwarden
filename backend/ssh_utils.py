@@ -1079,7 +1079,9 @@ def load_data_from_db(logger=None) -> tuple[list, list]:
     Returns:
         tuple[list[dict], list[dict]]:
             - machines : liste de dicts (id, name, ip, port, user, password, root_password).
-            - users    : liste de dicts (name, active, sudo, ssh_key, allowed_servers[]).
+            - users    : liste de dicts (name, active, sudo, ssh_keys[], allowed_servers[]).
+              `ssh_keys` : [{cle, toutes, machines}] — migration 067, plusieurs cles
+              par compte, chacune posee partout ou seulement sur `machines`.
 
     Raises:
         Exception: Tout échec de connexion ou de requête MySQL est propagé après log.
@@ -1099,7 +1101,6 @@ def load_data_from_db(logger=None) -> tuple[list, list]:
                 u.name AS user_name,
                 u.active,
                 u.sudo,
-                u.ssh_key,
                 uma.machine_id,
                 uma.sudo_preset,
                 uma.sudo_nopasswd,
@@ -1109,6 +1110,21 @@ def load_data_from_db(logger=None) -> tuple[list, list]:
             LEFT JOIN user_machine_access uma ON u.id = uma.user_id
         """)
         user_machines = cursor.fetchall()
+
+        # Migration 067 : les cles et leur portee. `users.ssh_key` n'est plus lue.
+        cursor.execute("SELECT id, user_id, cle, toutes_machines FROM user_ssh_keys ORDER BY id")
+        lignes_cles = cursor.fetchall()
+        cursor.execute("SELECT key_id, machine_id FROM user_ssh_key_machines")
+        portees = {}
+        for r in cursor.fetchall():
+            portees.setdefault(r['key_id'], set()).add(r['machine_id'])
+        cles_par_compte = {}
+        for k in lignes_cles:
+            cles_par_compte.setdefault(k['user_id'], []).append({
+                'cle': k['cle'],
+                'toutes': bool(k['toutes_machines']),
+                'machines': portees.get(k['id'], set()),
+            })
 
         cursor.close()
         db.close()
@@ -1122,7 +1138,7 @@ def load_data_from_db(logger=None) -> tuple[list, list]:
                     "name": record['user_name'],
                     "active": record['active'],
                     "sudo": record['sudo'],
-                    "ssh_key": record['ssh_key'],
+                    "ssh_keys": cles_par_compte.get(uid, []),
                     "allowed_servers": [],
                     "sudo_policies": {},  # v1.22.2 : machine_id -> {preset, nopasswd, runas, custom_rules}
                 }

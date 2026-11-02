@@ -99,4 +99,5 @@ return [
     'cle_confirme' => 'Permanently remove key :empreinte from this account? It is deleted from authorized_keys on the machine: it will no longer open a session.',
     'cle_retiree' => 'Key removed from the machine.',
     'cle_echec' => 'Removal failed. The key is still in place.',
+    'cle_du_compte' => 'Account :compte — :cle',
 ];

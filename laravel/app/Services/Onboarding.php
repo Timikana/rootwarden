@@ -78,7 +78,9 @@ final class Onboarding
     {
         $compte = DB::table('users')
             ->where('id', $idCompte)
-            ->first(['totp_secret', 'ssh_key']);
+            ->first(['totp_secret']);
+        // Migration 067 : la cle vit dans `user_ssh_keys`, et il peut y en avoir plusieurs.
+        $aUneCle = DB::table('user_ssh_keys')->where('user_id', $idCompte)->exists();
 
         return [
             'machines' => (int) DB::table('machines')->count(),
@@ -89,7 +91,7 @@ final class Onboarding
                 ->whereIn('role_id', [2, 3])->where('active', 1)->count(),
 
             'second_facteur' => ($compte !== null && ! empty($compte->totp_secret)) ? 1 : 0,
-            'cle_ssh' => ($compte !== null && ! empty($compte->ssh_key)) ? 1 : 0,
+            'cle_ssh' => $aUneCle ? 1 : 0,
 
             /*
              * ⚠ LE LEGACY COMPTE `platform_keypair`, UNE TABLE QUI N'EXISTE PAS.

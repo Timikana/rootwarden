@@ -109,4 +109,5 @@ return [
     'cle_confirme' => 'Retirer définitivement la clé :empreinte de ce compte ? Elle est effacée du fichier authorized_keys sur la machine : elle n\'ouvrira plus de session.',
     'cle_retiree' => 'Clé retirée de la machine.',
     'cle_echec' => 'Le retrait a échoué. La clé est toujours en place.',
+    'cle_du_compte' => 'Compte :compte — :cle',
 ];
