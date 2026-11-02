@@ -380,8 +380,12 @@ class TestCleRetireeAuCompteInactif:
         canal = CanalFactice()
 
         with _branche(canal):
-            cs.deploy_user_config(object(), {'name': 'alice', 'active': 0, 'ssh_key': ''},
-                                  logger=logging.getLogger('epreuve.inactif'))
+            # Migration 067 : un compte inactif QUI A une cle valable partout —
+            # le cas qui compte. Il doit la perdre quand meme.
+            cle = 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDF3OcRPzDUQ29GJoN0OUlbkiu5jhEWwwQiqZwklL46Y alice'
+            cs.deploy_user_config(object(), {'name': 'alice', 'active': 0,
+                                             'ssh_keys': [{'cle': cle, 'toutes': True, 'machines': set()}]},
+                                  logger=logging.getLogger('epreuve.inactif'), machine_id=1)
 
         retraits = [c for c in canal.commandes
                     if c.startswith('rm -f') and 'authorized_keys' in c]

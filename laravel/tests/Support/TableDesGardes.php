@@ -27,12 +27,13 @@ namespace Tests\Support;
  * intergiciel la porte — une chose fausse, dans le fichier qui existe pour dire
  * le vrai.
  *
- * C'est le cas de TOUS les step-up du depot. Releve du 2026-09-06 :
+ * C'est le cas de TOUS les step-up du depot. Releve du 2026-09-06, numeros
+ * de ligne remis a jour le 2026-11-02 :
  *
- *     ComptesController:514      compte_supprimer
- *     ComptesController:539      compte_anonymiser
+ *     ComptesController:633      compte_supprimer
+ *     ComptesController:658      compte_anonymiser
  *     PermissionsController:165  permission_definir
- *     PortailController:196      profil_effacement      (E-449)
+ *     PortailController:208      profil_effacement      (E-449)
  *     PasserelleController:89    generique, action DERIVEE du chemin
  *
  * Cinq sites, quatre actions nommees du portage et une garde generique de
@@ -186,7 +187,15 @@ class TableDesGardes
              * garde.
              */
             ['POST', 'profil/courriel', []],
-            ['POST', 'profil/cle-ssh', []],
+            /*
+             * Migration 067 : plusieurs cles par compte. Memes raisons que
+             * l'ancienne `profil/cle-ssh` qu'elles remplacent : la cible EST le
+             * demandeur (session). Le retrait porte un identifiant de cle dans
+             * l'URL — `ClesPubliques::retire` exige que la cle appartienne au
+             * compte de la session, sinon elle n'est pas trouvee.
+             */
+            ['POST', 'profil/cles-ssh', []],
+            ['POST', 'profil/cles-ssh/{cle}/retirer', []],
             /*
              * ⚠ IRREVERSIBLE, ET SANS RE-AUTHENTIFICATION — a lire ensemble.
              *
@@ -348,8 +357,8 @@ class TableDesGardes
     public static function chemin(string $uri): string
     {
         return str_replace(
-            ['{id}', '{machine}', '{note}', '{username}', '{chemin?}', '{path}'],
-            ['1', '2', '1', 'compte-inexistant', 'test', 'x.txt'],
+            ['{id}', '{machine}', '{note}', '{username}', '{chemin?}', '{path}', '{cle}'],
+            ['1', '2', '1', 'compte-inexistant', 'test', 'x.txt', '1'],
             $uri,
         );
     }

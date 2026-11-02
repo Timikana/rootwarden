@@ -98,10 +98,21 @@ class ExportRgpd
                 'user',
                 fn () => DB::table('users')->where('id', $idCompte)->select(
                     'id', 'name', 'email', 'company', 'role_id', 'active', 'sudo',
-                    'created_at', 'password_updated_at', 'ssh_key', 'ssh_key_updated_at',
+                    'created_at', 'password_updated_at',
                     'password_expiry_override', 'force_password_change',
                     'failed_attempts', 'locked_until', 'last_failed_login_at',
                 )->get(),
+            ),
+            // Migration 067 : TOUTES les cles du compte, avec leur portee.
+            'ssh_keys' => $this->lit(
+                'user_ssh_keys',
+                fn () => collect((new \App\Services\ClesPubliques())->duCompte($idCompte))
+                    ->map(fn (array $c) => [
+                        'id' => $c['id'], 'libelle' => $c['libelle'], 'cle' => $c['cle'],
+                        'toutes_machines' => $c['toutes_machines'],
+                        'machines' => array_column($c['machines'], 'name'),
+                        'created_at' => $c['created_at'],
+                    ]),
             ),
             // Voir la divergence C : `SELECT *` est DELIBERE ici.
             'permissions' => $this->lit(

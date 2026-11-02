@@ -625,7 +625,9 @@ def preflight_check():
     conn2 = get_db_connection()
     try:
         cur2 = conn2.cursor(dictionary=True)
-        cur2.execute("SELECT COUNT(*) as cnt FROM users WHERE active = 1 AND ssh_key IS NOT NULL AND ssh_key != ''")
+        # Migration 067 : les cles vivent dans `user_ssh_keys` (plusieurs par compte).
+        cur2.execute("SELECT COUNT(DISTINCT k.user_id) as cnt FROM user_ssh_keys k "
+                     "JOIN users u ON u.id = k.user_id WHERE u.active = 1")
         users_with_keys = cur2.fetchone()['cnt']
     finally:
         conn2.close()
@@ -740,8 +742,23 @@ def preflight_check():
                             (m['id'],)
                         )
                         authorized = {r['name'] for r in cur_inv.fetchall()}
+
+                        # Migration 067 : qui a au moins UNE cle visant cette
+                        # machine. Un compte autorise sans aucune cle pour elle y
+                        # perd son `authorized_keys` (`deploy_user_config`) : on
+                        # l'annonce AVANT, comme une revocation.
+                        cur_inv.execute(
+                            "SELECT DISTINCT u.name FROM users u "
+                            "JOIN user_machine_access uma ON uma.user_id = u.id AND uma.machine_id = %s "
+                            "JOIN user_ssh_keys k ON k.user_id = u.id "
+                            "LEFT JOIN user_ssh_key_machines km ON km.key_id = k.id AND km.machine_id = %s "
+                            "WHERE u.active = 1 AND (k.toutes_machines = 1 OR km.machine_id IS NOT NULL)",
+                            (m['id'], m['id'])
+                        )
+                        avec_cle = {r['name'] for r in cur_inv.fetchall()}
                     finally:
                         conn_inv.close()
+                    result['comptes_sans_cle'] = sorted(authorized - avec_cle)
 
                     user_impact = []
                     for row in inventory:
@@ -2329,9 +2346,10 @@ def server_user_keys():
         {success, keys: [{type, fingerprint, comment, is_platform,
                           owner_name, owner_id, first_seen_at, last_seen_at}]}
 
-    Le cross-reference cherche dans `users.ssh_key` (cle publique stockee
-    par chaque user RootWarden) un fingerprint match -> permet d'identifier
-    "qui a depose cette cle".
+    Le cross-reference cherche dans `user_ssh_keys` (les cles publiques de
+    chaque compte RootWarden, plusieurs par compte depuis la migration 067) un
+    fingerprint match -> identifie « qui a depose cette cle », et LAQUELLE de
+    ses cles (`owner_key_label`).
     """
     machine_id = request.args.get('machine_id', type=int)
     username = (request.args.get('username') or '').strip()
@@ -2354,22 +2372,22 @@ def server_user_keys():
         """, (machine_id, username))
         rows = cur.fetchall()
 
-        # 2. Cross-reference avec users.ssh_key pour ownership
-        # Calcule le fingerprint des cles users RootWarden et match.
-        cur.execute("SELECT id, name, ssh_key FROM users WHERE active = 1 AND ssh_key IS NOT NULL AND ssh_key != ''")
-        rw_users = cur.fetchall()
-        rw_fp_map = {}  # {fingerprint: (id, name)}
-        for u in rw_users:
-            parsed = _parse_ssh_key_line(u['ssh_key'])
+        # 2. Cross-reference avec les cles des comptes RootWarden pour ownership
+        # (toutes leurs cles : un compte peut en avoir plusieurs).
+        cur.execute("SELECT u.id, u.name, k.libelle, k.cle FROM user_ssh_keys k "
+                    "JOIN users u ON u.id = k.user_id WHERE u.active = 1")
+        rw_fp_map = {}  # {fingerprint: (id, name, libelle)}
+        for u in cur.fetchall():
+            parsed = _parse_ssh_key_line(u['cle'])
             if parsed:
-                rw_fp_map[parsed['fingerprint']] = (u['id'], u['name'])
+                rw_fp_map[parsed['fingerprint']] = (u['id'], u['name'], u['libelle'])
 
         keys = []
         for r in rows:
             fp = r['fingerprint_sha256']
-            owner_id, owner_name = (None, None)
+            owner_id, owner_name, owner_label = (None, None, None)
             if fp in rw_fp_map:
-                owner_id, owner_name = rw_fp_map[fp]
+                owner_id, owner_name, owner_label = rw_fp_map[fp]
             keys.append({
                 'type': r['key_type'],
                 'fingerprint': f"SHA256:{fp}",
@@ -2377,6 +2395,7 @@ def server_user_keys():
                 'is_platform': bool(r['is_platform_key']),
                 'owner_id': owner_id,
                 'owner_name': owner_name,
+                'owner_key_label': owner_label,
                 'first_seen_at': str(r['first_seen_at']) if r['first_seen_at'] else None,
                 'last_seen_at': str(r['last_seen_at']) if r['last_seen_at'] else None,
             })

@@ -29,6 +29,8 @@
                             <td>
                                 @if ($k['is_platform_key'])
                                     <span class="rw-badge rw-badge--ok">{{ __('distants.cle_plateforme') }}</span>
+                                @elseif ($k['proprietaire'])
+                                    <span class="rw-badge rw-badge--neutre" data-rw="distants-cle-proprietaire">{{ __('distants.cle_du_compte', ['compte' => $k['proprietaire']['compte'], 'cle' => $k['proprietaire']['cle']]) }}</span>
                                 @else
                                     <span class="rw-badge rw-badge--neutre">{{ __('distants.cle_tierce') }}</span>
                                 @endif

@@ -207,24 +207,101 @@
     </section>
 
     <section class="rw-note" data-rw="profil-cle-ssh">
-        <h2 class="rw-sous-titre">{{ __('profil.cle_titre') }}</h2>
-        <p class="rw-prose rw-aide" data-rw="profil-cle-aide">{{ __('profil.cle_aide') }}</p>
-        <p class="rw-prose rw-aide" data-rw="profil-cle-vide-aide">{{ __('profil.cle_vide_aide') }}</p>
+        <h2 class="rw-sous-titre">{{ __('profil.cles_titre') }}</h2>
+        <p class="rw-prose rw-aide" data-rw="profil-cle-aide">{{ __('profil.cles_aide') }}</p>
         @if (session('cle_message'))
             <p class="rw-confirmation" data-rw="profil-cle-succes">{{ session('cle_message') }}</p>
         @endif
         @if (session('cle_erreur'))
             <p class="rw-erreur" data-rw="profil-cle-erreur">{{ session('cle_erreur') }}</p>
         @endif
-        <form method="POST" action="{{ route('profil.cle-ssh') }}" data-rw="profil-cle-form">
+
+        @if ($cles === [])
+            <p class="rw-vide" data-rw="profil-cles-vide">{{ __('profil.cles_aucune') }}</p>
+        @else
+            <div class="rw-tableau-cadre">
+                <table class="rw-tableau" data-rw="profil-cles">
+                    <thead>
+                        <tr>
+                            <th>{{ __('profil.cles_th_nom') }}</th>
+                            <th>{{ __('profil.cles_th_empreinte') }}</th>
+                            <th>{{ __('profil.cles_th_portee') }}</th>
+                            <th>{{ __('profil.cles_th_ajoutee') }}</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($cles as $c)
+                            <tr data-rw="profil-cle-{{ $c['id'] }}">
+                                <td>{{ $c['libelle'] }}</td>
+                                <td class="rw-tableau__mono">{{ $c['algo'] }} SHA256:{{ $c['empreinte'] }}</td>
+                                <td data-rw="profil-cle-portee">
+                                    @if ($c['toutes_machines'])
+                                        {{ __('profil.cles_portee_toutes') }}
+                                    @else
+                                        {{ implode(', ', array_column($c['machines'], 'name')) }}
+                                    @endif
+                                </td>
+                                <td>{{ $c['created_at'] }}</td>
+                                <td>
+                                    <form method="POST" action="{{ route('profil.cles-ssh.retirer', ['cle' => $c['id']]) }}">
+                                        @csrf
+                                        <button type="submit" class="rw-bouton rw-bouton--danger"
+                                                data-rw="profil-cle-retirer">{{ __('profil.cles_retirer') }}</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        @endif
+
+        <h3 class="rw-sous-titre">{{ __('profil.cles_ajout_titre') }}</h3>
+        <form method="POST" action="{{ route('profil.cles-ssh.ajouter') }}" data-rw="profil-cle-form">
             @csrf
             <label class="rw-champ">
-                <span>{{ __('profil.cle_label') }}</span>
-                <textarea name="cle_ssh" rows="3" data-rw="profil-cle-champ">{{ $compte['ssh_key'] ?? '' }}</textarea>
+                <span>{{ __('profil.cles_nom') }}</span>
+                <input class="rw-saisie" type="text" name="libelle" maxlength="100" required
+                       value="{{ old('libelle') }}" placeholder="{{ __('profil.cles_nom_exemple') }}"
+                       data-rw="profil-cle-nom">
             </label>
+            <label class="rw-champ">
+                <span>{{ __('profil.cle_label') }}</span>
+                <textarea class="rw-saisie" name="cle_ssh" rows="4" required data-rw="profil-cle-champ">{{ old('cle_ssh') }}</textarea>
+            </label>
+            <div class="rw-champ rw-champ--espace">
+                <span class="rw-champ__etiquette">{{ __('profil.cles_th_portee') }}</span>
+                <label class="rw-champ--case">
+                    <input type="radio" name="portee" value="toutes" data-rw="profil-cle-portee-toutes"
+                           @checked(old('portee', 'toutes') !== 'machines')>
+                    <span>{{ __('profil.cles_portee_toutes') }}</span>
+                </label>
+                <label class="rw-champ--case">
+                    <input type="radio" name="portee" value="machines" data-rw="profil-cle-portee-machines"
+                           @checked(old('portee') === 'machines')>
+                    <span>{{ __('profil.cles_portee_machines') }}</span>
+                </label>
+                @if ($machinesCles === [])
+                    <p class="rw-aide" data-rw="profil-cle-sans-acces">{{ __('profil.cles_sans_acces') }}</p>
+                @else
+                    <ul class="rw-liste-selection" data-rw="profil-cle-machines">
+                        @foreach ($machinesCles as $m)
+                            <li class="rw-liste-selection__ligne">
+                                <label class="rw-liste-selection__etiquette">
+                                    <input type="checkbox" name="machines[]" value="{{ $m['id'] }}" class="rw-case"
+                                           @checked(in_array((string) $m['id'], (array) old('machines', []), true))>
+                                    <span class="rw-liste-selection__nom">{{ $m['name'] }}</span>
+                                </label>
+                            </li>
+                        @endforeach
+                    </ul>
+                    <p class="rw-aide">{{ __('profil.cles_portee_aide') }}</p>
+                @endif
+            </div>
             <div class="rw-actions">
                 <button type="submit" class="rw-bouton"
-                        data-rw="profil-cle-enregistrer">{{ __('profil.cle_enregistrer') }}</button>
+                        data-rw="profil-cle-enregistrer">{{ __('profil.cles_ajouter') }}</button>
             </div>
         </form>
     </section>

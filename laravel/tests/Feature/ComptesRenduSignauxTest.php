@@ -70,6 +70,15 @@ class ComptesRenduSignauxTest extends TestCase
             $table->dateTime('created_at')->nullable();
             $table->dateTime('password_updated_at')->nullable();
         });
+        // Migration 067 : la liste des comptes compte leurs cles (`nb_cles`).
+        Schema::create('user_ssh_keys', function (Blueprint $table) {
+            $table->increments('id');
+            $table->integer('user_id');
+            $table->string('libelle', 100);
+            $table->text('cle');
+            $table->tinyInteger('toutes_machines')->default(1);
+            $table->dateTime('created_at')->nullable();
+        });
         /*
          * ⚠ LE GABARIT INTERROGE LA BASE, ET MA PREMIERE SONDE NE L'A PAS VU.
          *

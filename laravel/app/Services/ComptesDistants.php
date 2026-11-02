@@ -110,11 +110,28 @@ class ComptesDistants
      */
     public function cles(int $machine, string $username): array
     {
+        /*
+         * A QUI EST CETTE CLE ? Migration 067 : un compte RootWarden a plusieurs
+         * cles, et certaines ne visent qu'UN serveur. Une cle relevee sur une
+         * machine est rapprochee, par son EMPREINTE, des cles des comptes — pour
+         * dire « compte alice, cle automate-srv-web01 » au lieu de « tierce ».
+         */
+        $proprietaires = [];
+        foreach (DB::table('user_ssh_keys as k')->join('users as u', 'u.id', '=', 'k.user_id')
+                     ->get(['u.name', 'k.libelle', 'k.cle']) as $c) {
+            $e = ClesPubliques::empreinte((string) $c->cle);
+            if ($e !== '') {
+                $proprietaires[$e] = ['compte' => (string) $c->name, 'cle' => (string) $c->libelle];
+            }
+        }
+
         return DB::table('server_user_ssh_keys')
             ->where('machine_id', $machine)->where('username', $username)
             ->select('id', 'key_type', 'fingerprint_sha256', 'comment', 'is_platform_key', 'last_seen_at')
             ->orderBy('id')
-            ->get()->map(static fn ($k) => (array) $k)->all();
+            ->get()->map(static fn ($k) => (array) $k + [
+                'proprietaire' => $proprietaires[(string) $k->fingerprint_sha256] ?? null,
+            ])->all();
     }
 
     /**
