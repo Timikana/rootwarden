@@ -159,8 +159,9 @@ class InventaireDesGardesTest extends TestCase
          * Les autres n'ont pas d'objet a proteger au-dela de l'authentification :
          *   accueil, cgu (GET+POST), profil        l'ecran de tout compte
          *   profil/mot-de-passe, profil/step-up*   ses propres identifiants
- *   profil/courriel, profil/cle-ssh        SES propres coordonnees et SA
- *       propre cle — `feaaaa2`, DOSSIER-30. La cible EST le demandeur,
+ *   profil/courriel, profil/cles-ssh(/{cle}/retirer)  SES propres coordonnees
+ *       et SES propres cles (plusieurs depuis la migration 067 ; le retrait
+ *       ne trouve pas la cle d'un autre compte) — `feaaaa2`, DOSSIER-30. La cible EST le demandeur,
  *       l'identifiant vient de la SESSION. Le pendant administratif
  *       (`POST comptes/{id}/cle-ssh`) reste `role:3` : deux arites, deux
  *       gardes. Exiger un role ici interdirait a un role 1 de poser la cle
@@ -220,7 +221,8 @@ class InventaireDesGardesTest extends TestCase
             'GET profil/donnees-personnelles',
             'POST accueil/assistant/masquer',
             'POST cgu',
-            'POST profil/cle-ssh',
+            'POST profil/cles-ssh',
+            'POST profil/cles-ssh/{cle}/retirer',
             'POST profil/courriel',
             'POST profil/effacement',
             'POST profil/mot-de-passe',
@@ -342,11 +344,16 @@ class InventaireDesGardesTest extends TestCase
             // ⚠ 88 -> 89 le 2026-10-27 : un `use App\Support\RelaisFlux;` ajoute
             //    en tete de la passerelle (relais des flux au fil de l'eau). Site
             //    RELU a sa nouvelle place : le step-up y est inchange.
-            'ComptesController.php:629',      // compte_supprimer
-            'ComptesController.php:654',      // compte_anonymiser
+            // ⚠ 629 -> 633 et 654 -> 658 le 2026-11-02 : injection de
+            //    `ClesPubliques` et commentaire de `cleSsh`, plus haut. RELUS.
+            'ComptesController.php:633',      // compte_supprimer
+            'ComptesController.php:658',      // compte_anonymiser
             'PasserelleController.php:89',    // generique, action DERIVEE du chemin
             'PermissionsController.php:165',  // permission_definir
-            'PortailController.php:196',      // profil_effacement (E-449)
+            // ⚠ 196 -> 208 le 2026-11-02 : `ajouterCleSsh` / `retirerCleSsh`
+            //    remplacent `definirCleSsh` plus haut (plusieurs cles, migration
+            //    067). Site RELU : le step-up de l'effacement y est inchange.
+            'PortailController.php:208',      // profil_effacement (E-449)
         ], $sites,
             "Les gardes de step-up vivant dans un CONTROLEUR ont change.\n"
             . "`TableDesGardes` ne peut pas les exprimer : son en-tete les recense, "
