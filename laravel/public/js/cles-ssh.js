@@ -203,6 +203,10 @@
         // se distingue, au lieu de se perdre au milieu d'une fenetre de texte.
         listeNommee(bloc, L.a_revoquer || '', r.users_revoked,
             'rw-preflight__liste rw-preflight__liste--danger');
+        // Migration 067 : un compte AUTORISE dont aucune cle ne vise cette
+        // machine y perd ses cles — une revocation, donc au meme rang.
+        listeNommee(bloc, L.sans_cle || '', r.comptes_sans_cle,
+            'rw-preflight__liste rw-preflight__liste--danger');
 
         return bloc;
     }

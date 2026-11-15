@@ -6,6 +6,7 @@ use App\Services\Onboarding;
 use App\Services\AlertesAccueil;
 use App\Services\SessionsActives;
 use App\Services\Droits;
+use App\Services\ClesPubliques;
 use App\Services\Comptes;
 use App\Services\JournalAudit;
 use App\Services\Machines;
@@ -35,6 +36,7 @@ class PortailController extends Controller
         private readonly Onboarding $onboarding,
         private readonly JournalAudit $journal,
         private readonly StepUp $stepUp,
+        private readonly ClesPubliques $cles,
     ) {
     }
 
@@ -67,36 +69,46 @@ class PortailController extends Controller
     }
 
     /**
-     * Poser sa propre cle SSH. L'unique ecriture existante
-     * (`POST /comptes/{id}/cle-ssh`) est gardee `role:3` : un compte de role 1
-     * ou 2 ne pouvait pas poser la sienne, alors que la cle sert SON acces.
+     * Ajouter une de SES cles SSH — migration 067 : plusieurs cles par compte,
+     * chacune valable sur toutes ses machines ou restreinte a certaines.
      *
-     * La validation est celle du service, deja portee et deja eprouvee — on ne
-     * la redecrit pas ici. Une cle VIDE efface la cle, et c'est un geste valide
-     * que `verifieCleSsh` accepte explicitement.
+     * Le compte vise EST le demandeur : l'identifiant vient de la SESSION. La
+     * portee ne peut designer que des machines auxquelles il a acces (regle du
+     * service) ; elle restreint, elle n'ouvre rien.
      */
-    public function definirCleSsh(Request $requete): RedirectResponse
+    public function ajouterCleSsh(Request $requete): RedirectResponse
     {
         $idCompte = (int) $requete->session()->get('utilisateur_id', 0);
         if ($idCompte === 0) {
             return redirect()->route('connexion');
         }
 
-        $cle = (string) ($requete->input('cle_ssh') ?? '');
-        $err = $this->comptes->definitCleSsh($idCompte, $cle);
+        $toutes = $requete->input('portee', 'toutes') !== 'machines';
+        $err = $this->cles->ajoute($idCompte, (string) $requete->input('libelle', ''),
+            (string) $requete->input('cle_ssh', ''), $toutes, (array) $requete->input('machines', []));
         if ($err !== null) {
-            return redirect()->route('profil')->with('cle_erreur', __($err));
+            return redirect()->route('profil')->withInput($requete->only('libelle', 'cle_ssh', 'portee', 'machines'))
+                ->with('cle_erreur', __($err));
         }
 
-        $this->journal->ajoute(
-            $idCompte,
-            trim($cle) === '' ? 'profil: cle SSH retiree' : 'profil: cle SSH posee',
-        );
+        $this->journal->ajoute($idCompte, 'profil: cle SSH ajoutee (' . ($toutes ? 'toutes ses machines' : 'portee restreinte') . ')');
 
-        return redirect()->route('profil')->with(
-            'cle_message',
-            __(trim($cle) === '' ? 'profil.cle_retiree' : 'profil.cle_ok'),
-        );
+        return redirect()->route('profil')->with('cle_message', __('profil.cle_ajoutee'));
+    }
+
+    /** Retirer une de SES cles. Une cle d'un autre compte n'est pas trouvee. */
+    public function retirerCleSsh(Request $requete, int $cle): RedirectResponse
+    {
+        $idCompte = (int) $requete->session()->get('utilisateur_id', 0);
+        if ($idCompte === 0) {
+            return redirect()->route('connexion');
+        }
+        if (! $this->cles->retire($idCompte, $cle)) {
+            return redirect()->route('profil')->with('cle_erreur', __('profil.err_cle_introuvable'));
+        }
+        $this->journal->ajoute($idCompte, "profil: cle SSH #{$cle} retiree");
+
+        return redirect()->route('profil')->with('cle_message', __('profil.cle_retiree'));
     }
 
     /**
@@ -454,6 +466,8 @@ class PortailController extends Controller
              * pas. Un `??` sur une variable absente ne se signale nulle part.
              */
             'compte'           => $this->comptes->trouve((int) $requete->session()->get('utilisateur_id', 0)) ?? [],
+            'cles'             => $this->cles->duCompte((int) $requete->session()->get('utilisateur_id', 0)),
+            'machinesCles'     => $this->cles->machinesAccessibles((int) $requete->session()->get('utilisateur_id', 0)),
             'sessions'         => $sessions,
             'sessionsLisibles' => $etat['lisible'],
             'sessionsTotal'    => (int) ($etat['total'] ?? 0),

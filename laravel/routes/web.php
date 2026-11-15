@@ -222,8 +222,13 @@ Route::middleware(['memorisation', 'session.authentifiee', 'session.revoquee', '
      * `role:3`. Ici la cible EST le demandeur, donc la garde de role n'a pas
      * d'objet : un role 1 doit pouvoir poser la cle qui sert son propre acces.
      */
-    Route::post('/profil/cle-ssh', [PortailController::class, 'definirCleSsh'])
-        ->name('profil.cle-ssh');
+    // Migration 067 : PLUSIEURS cles par compte. Ajouter, retirer — toujours SES
+    // cles : le compte vient de la session, et `ClesPubliques::retire` ne trouve
+    // pas la cle d'un autre compte meme si son identifiant est soumis.
+    Route::post('/profil/cles-ssh', [PortailController::class, 'ajouterCleSsh'])
+        ->name('profil.cles-ssh.ajouter');
+    Route::post('/profil/cles-ssh/{cle}/retirer', [PortailController::class, 'retirerCleSsh'])
+        ->whereNumber('cle')->name('profil.cles-ssh.retirer');
     /*
      * ⚠ IRREVERSIBLE. Le geste execute est l'ANONYMISATION, pas une suppression :
      * `user_logs` est une chaine de hachage et retirer une ligne casserait la

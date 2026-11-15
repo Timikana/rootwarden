@@ -551,81 +551,45 @@ def user_exists(channel, username: str, logger=None) -> bool:
             logger.error(f"Erreur lors de la vérification de l'existence de l'utilisateur {username} : {e}")
         return False
 
-# def manage_ssh_keys(channel, user: dict, logger=None):
-#     """
-#     Ajoute ou supprime la clé SSH de l'utilisateur (champ `ssh_key`).
-#     """
-#     username = user['name']
-#     ssh_key = user.get('ssh_key', '')
-#     active = user.get('active', False)
+# `manage_ssh_keys` a disparu (2026-11-02) : definie, jamais appelee — avec sa version
+# commentee plus ancienne — et seconde
+# ecrivaine d'`authorized_keys`. L'unique ecrivain est `deploy_user_config`.
 
-#     authorized_keys_path = f"/home/{username}/.ssh/authorized_keys"
-#     try:
-#         if active and ssh_key:
-#             if logger:
-#                 logger.info(f"[{username}] Ajout de la clé SSH.")
-#             execute_command_as_root(channel, f"mkdir -p /home/{username}/.ssh", logger=logger)
-#             execute_command_as_root(channel, f"echo '{ssh_key}' > {authorized_keys_path}", logger=logger)
-#             execute_command_as_root(channel, f"chmod 700 /home/{username}/.ssh && chmod 600 {authorized_keys_path}", logger=logger)
-#             execute_command_as_root(channel, f"chown -R {username}:{username} /home/{username}", logger=logger)
-#         elif not active:
-#             if logger:
-#                 logger.info(f"[{username}] Suppression de la clé SSH.")
-#             execute_command_as_root(channel, f"rm -f {authorized_keys_path}", logger=logger)
-#     except Exception as e:
-#         if logger:
-#             logger.error(f"[{username}] Erreur lors de la gestion de la clé SSH : {e}")
+# Algorithmes acceptes — la meme liste que `ClesPubliques::verifieForme` cote
+# portail. Le portail valide a l'ecriture ; ce filtre est une defense de plus :
+# une ligne qui ne commence pas par un algorithme (donc qui porterait une option
+# `command=` ou `from=`) n'est jamais ecrite dans `authorized_keys`.
+_ALGOS_SSH = (
+    'ssh-rsa', 'ssh-ed25519', 'ssh-dss',
+    'ecdsa-sha2-nistp256', 'ecdsa-sha2-nistp384', 'ecdsa-sha2-nistp521',
+    'sk-ssh-ed25519@openssh.com', 'sk-ecdsa-sha2-nistp256@openssh.com',
+)
 
-def manage_ssh_keys(channel, user: dict, logger=None):
+
+def cles_pour_machine(user: dict, machine_id, logger=None) -> list:
+    """Les lignes `authorized_keys` du compte SUR CETTE MACHINE, dans l'ordre d'ajout.
+
+    Migration 067 : un compte a plusieurs cles, chacune posee sur toutes ses
+    machines (`toutes`) ou seulement sur celles de `machines`. La portee
+    RESTREINT : le compte doit de toute facon avoir acces a la machine pour que
+    cette fonction soit appelee.
     """
-    Gere le deploiement de la cle SSH de l'utilisateur.
-    Utilise base64 pour ecrire la cle sans interpolation shell (protection injection).
-    """
-    import base64 as _b64
-    username = user.get('name')
-    ssh_key = (user.get('ssh_key') or '').strip()
-    active = user.get('active', False)
-
-    if not username:
-        if logger:
-            logger.error("Nom d'utilisateur manquant dans la definition de l'utilisateur.")
-        return
-    if not _valid_username(username):
-        if logger:
-            logger.error(f"manage_ssh_keys : username invalide refuse : {username!r}")
-        return
-
-    authorized_keys_path = f"/home/{username}/.ssh/authorized_keys"
-
-    try:
-        if active and ssh_key:
+    lignes = []
+    for c in user.get('ssh_keys') or []:
+        cle = (c.get('cle') or '').strip()
+        if not cle:
+            continue
+        if not (c.get('toutes') or machine_id in (c.get('machines') or ())):
+            continue
+        if cle.split()[0] not in _ALGOS_SSH or '\n' in cle or '\r' in cle:
             if logger:
-                logger.info(f"[{username}] Deploiement de la cle SSH.")
+                logger.error(f"[{user.get('name')}] cle ignoree : forme refusee ({cle[:30]}...)")
+            continue
+        lignes.append(cle)
+    return lignes
 
-            mkdir_command = (
-                f"mkdir -p /home/{username}/.ssh && "
-                f"chown {username}:{username} /home/{username}/.ssh && "
-                f"chmod 700 /home/{username}/.ssh"
-            )
-            execute_command_as_root(channel, mkdir_command, logger=logger)
 
-            # Ecriture via base64 - aucune interpolation shell possible
-            b64_key = _b64.b64encode(ssh_key.encode()).decode()
-            key_command = (
-                f"printf '%s' '{b64_key}' | base64 -d > {authorized_keys_path} && "
-                f"chown {username}:{username} {authorized_keys_path} && "
-                f"chmod 600 {authorized_keys_path}"
-            )
-            execute_command_as_root(channel, key_command, logger=logger)
-        else:
-            if logger:
-                logger.info(f"[{username}] Suppression de la cle SSH.")
-            execute_command_as_root(channel, f"rm -f {authorized_keys_path}", logger=logger)
-    except Exception as e:
-        if logger:
-            logger.error(f"[{username}] Erreur lors du deploiement de la cle SSH : {e}")
-
-def deploy_user_config(channel, user: dict, logger=None):
+def deploy_user_config(channel, user: dict, logger=None, machine_id=None):
     """
     Met a jour la configuration de l'utilisateur en une seule operation.
 
@@ -645,13 +609,14 @@ def deploy_user_config(channel, user: dict, logger=None):
             logger.error(f"deploy_user_config : username invalide refuse : {username!r}")
         return
 
-    # --- Gestion de la cle SSH ---
+    # --- Gestion des cles SSH (migration 067 : plusieurs, chacune avec sa portee) ---
     import base64 as _b64
     authorized_keys_path = f"/home/{username}/.ssh/authorized_keys"
-    ssh_key = (user.get('ssh_key') or '').strip()
-    if user.get('active') and ssh_key:
+    lignes = cles_pour_machine(user, machine_id, logger=logger)
+    contenu = '\n'.join(lignes) + '\n' if lignes else ''
+    if user.get('active') and contenu:
         if logger:
-            logger.info(f"[{username}] Deploiement de la cle SSH.")
+            logger.info(f"[{username}] Deploiement de {len(lignes)} cle(s) SSH.")
         mkdir_command = (
             f"mkdir -p /home/{username}/.ssh && "
             f"chown {username}:{username} /home/{username}/.ssh && "
@@ -660,7 +625,7 @@ def deploy_user_config(channel, user: dict, logger=None):
         execute_command_as_root(channel, mkdir_command, logger=logger)
 
         # Ecriture via base64 - aucune interpolation shell possible
-        b64_key = _b64.b64encode(ssh_key.encode()).decode()
+        b64_key = _b64.b64encode(contenu.encode()).decode()
         key_command = (
             f"printf '%s' '{b64_key}' | base64 -d > {authorized_keys_path} && "
             f"chown {username}:{username} {authorized_keys_path} && "
@@ -668,6 +633,10 @@ def deploy_user_config(channel, user: dict, logger=None):
         )
         execute_command_as_root(channel, key_command, logger=logger)
     else:
+        # Branche aussi prise par un compte ACTIF dont aucune cle ne vise cette
+        # machine (migration 067) : ses cles y sont retirees, et le preflight
+        # l'annonce (`comptes_sans_cle`).
+        #
         # ══ C'EST ICI QU'UN COMPTE INACTIF PERD SA CLE ══════════════════════
         #
         # E-195, et cette phrase est le correctif — il n'y a pas de code a
@@ -1044,7 +1013,7 @@ class ServerConfigurator:
         Args:
             channel: Channel SSH root.
             user   (dict): Dictionnaire utilisateur avec au minimum les clés
-                           'name', 'active', 'sudo', 'ssh_key', 'allowed_servers'.
+                           'name', 'active', 'sudo', 'ssh_keys', 'allowed_servers'.
         """
         username = user.get('name')
         if not username:
@@ -1068,7 +1037,7 @@ class ServerConfigurator:
                 self.logger.info(f"[{username}] Utilisateur inactif, configuration limitée.")
 
             # Deploiement de la cle SSH uniquement (le .bashrc est gere par /bashrc/)
-            deploy_user_config(channel, user, logger=self.logger)
+            deploy_user_config(channel, user, logger=self.logger, machine_id=self.machine['id'])
 
             # Gestion des droits sudo (v1.22.2 : desired state user_machine_access)
             #

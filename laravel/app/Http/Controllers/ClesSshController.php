@@ -116,6 +116,7 @@ class ClesSshController extends Controller
             'badge_partiel' => __('ssh.badge_partiel'),
             'a_creer' => __('ssh.a_creer'),
             'a_revoquer' => __('ssh.a_revoquer'),
+            'sans_cle' => __('ssh.sans_cle'),
             'inventaire' => __('ssh.inventaire', ['nombre' => '{nombre}']),
             'url_preflight' => url('/api/gateway/preflight_check'),
             /*
