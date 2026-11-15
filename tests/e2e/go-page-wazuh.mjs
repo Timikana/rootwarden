@@ -174,7 +174,6 @@ const C = CIBLE === 'laravel'
         portee: '[data-rw="wazuh-portee"]',
         nonPorte: '[data-rw="wazuh-non-porte"]',
         npListe: '[data-rw="wazuh-np-liste"]',
-        npReserve: '[data-rw="wazuh-np-reserve"]',
         config: '[data-rw="wazuh-config"]',
         agents: '[data-rw="wazuh-agents"]',
         agent: '[data-rw="wazuh-agent"]',
@@ -184,7 +183,7 @@ const C = CIBLE === 'laravel'
         regle: '[data-rw="wazuh-regle"]',
         cgu: /\/cgu/, accepte: '[data-rw="cgu-accepter"]' }
     : { connexion: '/auth/login.php?lang=fr', page: '/wazuh/',
-        portee: null, nonPorte: null, npListe: null, npReserve: null,
+        portee: null, nonPorte: null, npListe: null,
         config: null, agents: null, agent: null, serveur: null,
         options: null, regles: null, regle: null,
         cgu: /terms\.php/, accepte: 'button[name="accept_terms"]' };
@@ -602,13 +601,11 @@ try {
         const vu = await page.evaluate((sel) => {
             const bloc = document.querySelector(sel.nonPorte);
             const liste = document.querySelector(sel.npListe);
-            const reserve = document.querySelector(sel.npReserve);
             const portee = document.querySelector(sel.portee);
 
             return {
                 bloc: bloc !== null,
                 liste: liste ? (liste.innerText || '').replace(/\s+/g, ' ').trim() : null,
-                reserve: reserve ? (reserve.innerText || '').replace(/\s+/g, ' ').trim() : null,
                 portee: portee ? (portee.innerText || '').replace(/\s+/g, ' ').trim() : null,
             };
         }, C);
@@ -654,15 +651,9 @@ try {
                 `${segments.length} segment(s) enumeres — attendu au moins 6, chacun non trivial`);
         }
         /*
-         * ET LA RESERVE SUR LE LEGACY. L'inspection a l'ecran a releve que la
-         * page previent que TROIS de ces gestes n'ont pas l'effet que leur nom
-         * suggere **y compris sur l'ancien portail**. C'est l'inverse d'une
-         * declaration fausse : une page qui previent que ce qu'elle n'offre pas
-         * ne marche pas non plus la ou elle renvoie.
+         * LA RESERVE SUR L'ANCIEN PORTAIL A ETE RETIREE avec la page concise :
+         * elle decrivait un portail qui n'est plus servi. Plus rien a mesurer.
          */
-        verifiePortage('la reserve sur l\'ancien portail est dite, pas sous-entendue',
-            vu.reserve !== null && vu.reserve.length > 0,
-            vu.reserve === null ? 'ancre de reserve absente' : 'la reserve est vide');
         /*
          * ET LA PORTEE POSITIVE, l'autre moitie de la declaration.
          *

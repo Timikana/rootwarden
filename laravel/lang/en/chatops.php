@@ -3,18 +3,18 @@
 /*
  * ChatOps: "chat identifier -> RootWarden account" mappings. Flat keys — the
  * file is loaded as one block by `@json(__('chatops'))`. The key set must stay
- * identical to `lang/fr/chatops.php`.
+ * identical to `lang/fr/chatops.php`. Writing rules: docs/REDACTION-INTERFACE.md.
  */
 return [
     'title' => 'ChatOps',
-    'desc'  => 'Maps a messaging identifier (Slack, Teams) to a RootWarden account, so that commands sent from chat run on behalf of the right person.',
+    'desc'  => 'Commands sent from Slack or Teams run on behalf of the mapped RootWarden account.',
 
-    'setup_title'      => 'What to configure',
-    'setup_url'        => 'Address to declare as the inbound webhook in your messaging platform:',
-    'setup_slack'      => 'Slack: create a slash command pointing at this address, and set the signing secret on the server side.',
-    'setup_token'      => 'Teams or generic: set a shared token on the server side and send it in the header of every request.',
+    'setup_title'      => 'Configure your messaging platform',
+    'setup_url'        => 'Inbound webhook address:',
+    'setup_slack'      => 'Slack: create a slash command pointing at this address and set CHATOPS_SLACK_SIGNING_SECRET on the server.',
+    'setup_token'      => 'Teams or generic: set CHATOPS_TOKEN on the server and send it in the X-ChatOps-Token header.',
+    'setup_activer'    => 'Then set CHATOPS_ENABLED=true.',
     'setup_commands'   => 'Recognised commands',
-    'setup_changement' => 'This address changed with the new portal: it no longer ends in "webhook.php". Update it in your messaging platform before enabling ChatOps.',
 
     'mappings_title' => 'Mappings',
     'f_platform'     => 'Platform',

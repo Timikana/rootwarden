@@ -174,7 +174,6 @@ class ScanCveController extends Controller
             'url_scan' => url('/api/gateway/cve_scan'),
             'comparaison_identique' => __('cve.comparaison_identique'),
             'fermer' => __('cve.fermer'),
-            'suivi_a_venir' => __('cve.suivi_a_venir'),
             'voir_details' => __('cve.voir_details'),
             'replier' => __('cve.replier'),
             'url_comparaison' => route('scan-cve.comparaison'),

@@ -428,7 +428,7 @@ try {
         verifie('ils nomment la sauvegarde, la FUSION et le redemarrage',
             panneau.effets.some((e) => /copie|sauvegarde/i.test(e))
             && panneau.effets.some((e) => /SURVIVENT|survive/i.test(e))
-            && panneau.effets.some((e) => /redemarr|restart/i.test(e)),
+            && panneau.effets.some((e) => /red[eé]marr|restart/i.test(e)),
             panneau.effets.join(' | ').slice(0, 130));
         /*
          * LE QUATRIEME EFFET EST CONDITIONNEL, et sa condition est mesuree : la
@@ -489,8 +489,8 @@ try {
      * « Reconfiguration reussie ». Le portage doit dire l'ECHEC DE LA COMMANDE.
      */
     verifiePortage('le portage dit ce que le FLUX a montre, pas ce que son marqueur affirme',
-        /ECHOUE|FAILED/i.test(ecran) && /127/.test(ecran),
-        (ecran.match(/[^\n]*(ECHOUE|FAILED)[^\n]*/i) || ['rien qui signale un echec'])[0].slice(0, 130));
+        /[eé]chou|FAILED/i.test(ecran) && /127/.test(ecran),
+        (ecran.match(/[^\n]*([eé]chou|FAILED)[^\n]*/i) || ['rien qui signale un echec'])[0].slice(0, 130));
     /*
      * LE DETAIL EST IMPRIME AU PASS COMME AU FAIL : il doit dire ce qu'on a
      * TROUVE. Un premier jet rendait « PASS ... — journal absent ou vide », qui

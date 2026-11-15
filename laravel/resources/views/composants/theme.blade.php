@@ -17,8 +17,8 @@
 <button class="rw-theme" type="button" data-rw="theme-bascule"
         title="{{ __('nav.theme_basculer') }}"
         aria-label="{{ __('nav.theme_basculer') }}">
-    <span class="rw-theme__soleil" aria-hidden="true">&#9728;&#65039;</span>
-    <span class="rw-theme__lune" aria-hidden="true">&#127769;</span>
+    <span class="rw-theme__soleil" aria-hidden="true">@include('composants.icone', ['nom' => 'sun'])</span>
+    <span class="rw-theme__lune" aria-hidden="true">@include('composants.icone', ['nom' => 'moon'])</span>
 </button>
 <script>
     (function () {

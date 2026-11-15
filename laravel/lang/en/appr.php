@@ -6,7 +6,7 @@
 return [
 
     'title' => 'Four-eyes approvals',
-    'desc'  => 'Destructive actions — deleting a remote account, rebooting — may require a second administrator to sign off. You cannot approve your own requests. Super administrators are exempt, which remains useful on a single-administrator install.',
+    'desc'  => "Destructive actions can require a second administrator's approval. You cannot approve your own requests; superadmins are not subject to it.",
 
     // Tabs
     'tab_pending'  => 'Pending',
@@ -25,17 +25,17 @@ return [
     // States
     'loading'    => 'Loading…',
     'empty'      => 'No request',
-    'empty_aide' => 'No request matches this tab. A request appears when an administrator starts an action subject to approval; it expires on its own once its deadline passes.',
+    'empty_aide' => "A request appears when an action subject to approval is started; it expires after its delay.",
 
     // Decisions
     'approve'      => 'Approve',
     'reject'       => 'Reject',
-    'tip_approve'  => 'Validate this request. Four-eyes rule: an administrator other than the requester.',
-    'tip_reject'   => 'Decline this request. A reason may be entered.',
+    'tip_approve'  => "Approve this request (an administrator other than the requester).",
+    'tip_reject'   => "Reject this request, with a reason if needed.",
     'own_hint'     => 'You cannot approve your own request.',
     'by'           => 'by',
     'motif'        => 'Reason',
-    'motif_indice' => 'Optional — it is kept with the decision.',
+    'motif_indice' => "Optional, kept with the decision.",
     'confirmer'    => 'Confirm rejection',
     'annuler'      => 'Cancel',
 

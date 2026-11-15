@@ -377,7 +377,6 @@ class PortailController extends Controller
         return view('accueil', [
             'onboarding' => $assistant,
             'modulesAccessibles' => $entrees->count(),
-            'modulesPortes'      => $entrees->filter(fn ($e) => isset($e['route']))->count(),
             'libelleRole'        => $this->libelleRole((int) $requete->session()->get('role_id', 0)),
             'raccourcis'         => $raccourcis,
             /*

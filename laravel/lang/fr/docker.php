@@ -1,29 +1,20 @@
 <?php
 
 /*
- * Inventaire et veille des conteneurs Docker.
- *
- * Le legacy prefixe ses cles JS par `js.docker.` parce que son `head.php`
- * injecte un dictionnaire plat. Ici le fichier est charge d'un bloc par
- * `@json(__('docker'))` : les cles sont donc PLATES, sans prefixe. Le jeu doit
- * rester identique a `lang/en/docker.php` — parite verifiee dans le meme commit.
+ * Inventaire et veille des conteneurs Docker. Cles PLATES : le fichier part d'un
+ * bloc par `@json(__('docker'))`. Regles de redaction : docs/REDACTION-INTERFACE.md.
  */
 return [
     'title' => 'Conteneurs Docker',
-    'desc'  => 'Détecte les conteneurs Docker de chaque serveur et signale les mises à jour disponibles : côté image (une version plus récente existe sur le registre) et côté git (la stack vient d\'un dépôt en retard, avec le changelog des commits).',
+    'desc'  => "Conteneurs Docker de chaque serveur et mises à jour disponibles : image plus récente sur le registre, ou stack git en retard.",
 
     'machine_libelle' => 'Serveur à scanner',
     'btn_scan_one'    => 'Scanner ce serveur',
     'btn_scan_all'    => 'Scanner tout',
-    'tip_scan_one'    => 'Ouvre une session SSH sur le serveur choisi, liste ses conteneurs et compare les empreintes d\'images.',
-    'tip_scan_all'    => 'Lance le scan sur TOUS les serveurs non archivés, l\'un après l\'autre — production comprise.',
+    'tip_scan_one'    => "Liste les conteneurs du serveur choisi et compare les empreintes d'images.",
+    'tip_scan_all'    => 'Scanne tous les serveurs non archivés, l\'un après l\'autre.',
 
-    // Le guidage dit ce que le geste fait vraiment. Le legacy le presente comme
-    // une simple lecture ; ce n'en est pas une.
-    'guide_titre'     => 'Ce que font ces boutons',
-    'guide_lecture'   => 'La page se charge sans rien scanner : elle affiche le dernier inventaire connu.',
-    'guide_scan'      => '« Scanner ce serveur » ouvre une session SSH, lance un `git fetch` dans chaque dépôt de projet compose, et interroge le registre d\'images. Ce n\'est pas une lecture inerte.',
-    'guide_scan_tout' => '« Scanner tout » fait la même chose sur TOUS les serveurs non archivés, production comprise.',
+    'guide_scan'      => "Un scan ouvre une session SSH et lance un git fetch dans chaque projet compose. « Scanner tout » vise tous les serveurs, production comprise.",
 
     'col_machine'          => 'Serveur',
     'col_container'        => 'Conteneur',
@@ -32,8 +23,8 @@ return [
     'col_image_update'     => 'MAJ image',
     'col_git'              => 'Git (stack)',
     'col_checked'          => 'Vérifié le',
-    'tip_col_image_update' => 'Compare l\'empreinte de l\'image locale à celle du registre : « MAJ dispo » signifie qu\'une version plus récente existe.',
-    'tip_col_git'          => 'Si la stack vient d\'un dépôt git : nombre de commits en retard. Cliquer pour voir le changelog.',
+    'tip_col_image_update' => "« MAJ dispo » : une image plus récente existe sur le registre.",
+    'tip_col_git'          => 'Commits de retard du dépôt git de la stack. Cliquer pour voir le changelog.',
 
     'loading'          => 'Chargement…',
     'empty'            => 'Aucun conteneur connu. Lancez un scan.',
@@ -56,15 +47,13 @@ return [
     // part AVANT que le premier scan ne tourne. Un verdict tire du statut HTTP
     // annonce donc une reussite meme si toutes les machines ont echoue.
     'scan_all_done_simple' => 'Scan terminé : :ok réussi(s) sur :total serveur(s) rapporté(s).',
-    'scan_all_interrompu' => "Le flux s'est interrompu en cours de route : :ok réussi(s) et :echecs échec(s) avaient déjà été rapportés, et les serveurs suivants n'ont PAS été traités. Ce n'est ni une réussite ni un échec global — recharge la page pour lire l'état réel.",
-    'scan_all_sans_fin' => "Le flux ne porte aucun marqueur de fin : le nombre ci-dessus est celui des serveurs qui ont RAPPORTÉ, et non celui du parc. Une interruption en cours de route est donc indiscernable d'une fin normale — recharge la page pour lire l'état réel de chaque serveur.",
+    'scan_all_interrompu' => "Le flux s'est interrompu : :ok réussi(s) et :echecs échec(s) rapportés, les serveurs suivants n'ont pas été traités. Rechargez la page pour lire l'état réel.",
+    'scan_all_sans_fin' => "Ce nombre compte les serveurs qui ont répondu, pas tout le parc : une interruption ne se distingue pas d'une fin normale. Rechargez la page pour lire l'état de chaque serveur.",
     'scan_all_echecs'      => ':n serveur(s) en échec : :noms',
-    'scan_all_illisible'   => "Le scan a été lancé, mais son compte rendu n'a pas pu être lu : impossible de dire combien de serveurs ont abouti. Recharge la page pour lire l'état réel.",
-    'scan_all_aucun'       => "Le scan n'a rendu aucun compte rendu — aucun serveur n'a été traité, ou le flux s'est interrompu avant la première réponse.",
+    'scan_all_illisible'   => "Le scan a été lancé, mais son compte rendu est illisible. Rechargez la page pour lire l'état réel.",
+    'scan_all_aucun'       => "Le scan n'a rendu aucun compte rendu : aucun serveur traité, ou flux interrompu avant la première réponse.",
     'no_docker'            => 'Docker n\'est pas installé sur ce serveur.',
     'err_load'             => 'Impossible de charger l\'inventaire.',
     'err_scan'             => 'Le scan Docker a échoué.',
-    // Le legacy n'a pas cet equivalent : son `fetch` non enveloppe n'affiche
-    // JAMAIS de message quand le reseau tombe.
     'err_reseau'           => 'Le serveur n\'a pas répondu. Réessayez dans un instant.',
 ];

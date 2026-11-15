@@ -204,8 +204,8 @@
             l'apercu ci-dessous emploie deja, pour que le geste corresponde a
             ce qu'on vient de montrer.
 
-            `/bashrc/prerequisites` n'est pas porte non plus : il installe un
-            paquet en root. L'avertissement figlet ci-dessus dit ce qui manque.
+            L'installation de figlet (`/bashrc/prerequisites`) vit dans
+            l'avertissement figlet ci-dessus.
         --}}
         <div class="rw-actions">
             <button type="button" class="rw-bouton rw-bouton--discret"

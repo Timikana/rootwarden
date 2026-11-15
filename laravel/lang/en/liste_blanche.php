@@ -9,28 +9,22 @@
 
 return [
     'titre'       => 'CVE whitelist',
-    'description' => 'A CVE listed here is accepted as a false positive and stops being '
-                     . 'reported. Every entry carries its reason, its author and its expiry: '
-                     . 'these are what stop a whitelisting from being forgotten.',
+    'description' => "Accepted false positives, with reason, author and expiry. These entries do not hide the CVEs from scan results or reports.",
 
     // ── The form ─────────────────────────────────────────────────────────
     'champ_cve'        => 'CVE identifier',
-    'champ_cve_aide'   => 'Form CVE-2024-1234. A typo creates an entry that whitelists nothing '
-                          . 'and looks like protection.',
+    'champ_cve_aide'   => "Form CVE-2024-1234.",
     'champ_motif'      => 'Reason',
-    'champ_motif_aide' => 'Why this finding is a false positive. Read by whoever picks this up '
-                          . 'later, not by you.',
+    'champ_motif_aide' => "Why this finding is a false positive.",
     'champ_machine'      => 'Machine',
-    'champ_machine_aide' => 'Leaving this empty whitelists the CVE across the WHOLE estate.',
+    'champ_machine_aide' => "\"All machines\" accepts the CVE across the whole estate.",
     'machine_toutes'     => 'All machines (global)',
     'champ_expiration'   => 'Expiry',
-    'champ_sans_expiration' => 'No expiry, deliberately',
-    'champ_expiration_aide' => 'A date, or the explicit choice not to set one. The field cannot '
-                               . 'be left empty without a decision: that is the only difference '
-                               . 'from the old portal, and it prevents the oversight — not the act.',
+    'champ_sans_expiration' => "No expiry",
+    'champ_expiration_aide' => "A date, or tick \"no expiry\".",
     'poser'    => 'Add',
     'retirer'  => 'Remove',
-    'confirmer_retrait' => 'Remove this entry? The CVE will be reported again.',
+    'confirmer_retrait' => "Remove this entry?",
 
     // ── The table ────────────────────────────────────────────────────────
     'col_cve'     => 'CVE',
@@ -47,13 +41,13 @@ return [
     // ── Refusals, one per reason returned by the service ─────────────────
     'err_cve_requis'    => 'The CVE identifier is required.',
     'err_cve_malforme'  => 'Expected form: CVE-2024-1234.',
-    'err_motif_requis'  => 'A reason is required: an entry without one cannot be re-read.',
+    'err_motif_requis'  => "A reason is required.",
     'err_motif_trop_long' => 'The reason exceeds 500 characters.',
     'err_machine_inconnue' => 'This machine does not exist.',
-    'err_expiration_a_decider' => 'Set an expiry, or explicitly tick “no expiry”.',
-    'err_expiration_contradictoire' => 'Both a date AND “no expiry”: pick one.',
+    'err_expiration_a_decider' => "Set an expiry, or tick \"no expiry\".",
+    'err_expiration_contradictoire' => "Both a date and \"no expiry\": choose one.",
     'err_date_malformee' => 'Expected date format: YYYY-MM-DD.',
-    'err_date_passee'    => 'This expiry is already past: it would whitelist zero days.',
+    'err_date_passee'    => "This expiry is already past.",
     'err_introuvable'    => 'This entry does not exist any more.',
 
     // ── Announcements ────────────────────────────────────────────────────

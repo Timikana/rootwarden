@@ -18,6 +18,9 @@
             @php($cible = route($entree['route']))
             <a class="rw-menu__lien @if (trim(parse_url($cible, PHP_URL_PATH) ?? '', '/') === $courant) rw-menu__lien--actif @endif"
                href="{{ $cible }}">
+                @if (isset(\App\Support\Navigation::ICONES[$entree['cle']]))
+                    @include('composants.icone', ['nom' => \App\Support\Navigation::ICONES[$entree['cle']]])
+                @endif
                 <span class="rw-menu__libelle">{{ __('nav.' . $entree['cle']) }}</span>
             </a>
         @else

@@ -620,8 +620,8 @@ try {
      * `|| res.message` ne se declenche jamais.
      */
     verifiePortage('le redemarrage MANQUANT est annonce, pas tu',
-        /redemarr|restart/i.test(ecran) && /PAS|not/i.test(ecran),
-        (ecran.match(/[^\n]*(redemarr|restart)[^\n]*/i) || ['rien qui parle du redemarrage'])[0].slice(0, 110));
+        /red[eé]marr|restart/i.test(ecran) && /PAS|not/i.test(ecran),
+        (ecran.match(/[^\n]*(red[eé]marr|restart)[^\n]*/i) || ['rien qui parle du redemarrage'])[0].slice(0, 110));
     verifiePortage('aucune cle de traduction ne s\'affiche en identifiant',
         ! /config_remote_saved|backup_restored|btn_restore/.test(ecran),
         (ecran.match(/config_remote_saved|backup_restored|btn_restore/g) || []).join(', ') || 'aucune');

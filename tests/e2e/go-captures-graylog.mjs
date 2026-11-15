@@ -5,8 +5,8 @@
  * Deux etats sont photographies, parce que le second porte la correction du
  * sous-lot :
  *
- *   1. l'onglet CONFIGURATION — les reglages de flotte et l'encart qui dit ce
- *      que les boutons font vraiment ;
+ *   1. l'onglet CONFIGURATION — les reglages de flotte (le guide qui dit ce
+ *      que les boutons font est replie dans l'onglet MACHINES) ;
  *   2. l'onglet MACHINES avec une CONFIRMATION OUVERTE sur « Tester ». C'est la
  *      correction : le legacy execute ce geste sans rien demander.
  *
@@ -108,7 +108,7 @@ const MESURE_CONTRASTE = () => {
     return {
         ongletActif: rapport(document.querySelector('.rw-onglet--actif')),
         pastille: rapport(document.querySelector('[data-rw="graylog-serveurs"] .rw-pastille')),
-        encart: rapport(document.querySelector('.rw-encart')),
+        guide: rapport(document.querySelector('[data-rw="graylog-guide"] > summary')),
     };
 };
 
@@ -160,12 +160,12 @@ try {
         /* ── 1. Configuration ─────────────────────────────────────────────── */
         const vuConfig = await page.evaluate(() => ({
             hote: (document.querySelector('[data-rw="graylog-hote"]') || {}).value,
-            encart: !! document.querySelector('.rw-encart'),
+            guide: !! document.querySelector('[data-rw="graylog-guide"]'),
             debordePage: document.documentElement.scrollWidth > window.innerWidth + 1,
         }));
-        constate(`[${format.nom}] configuration`, `hote « ${vuConfig.hote} », encart=${vuConfig.encart}`);
+        constate(`[${format.nom}] configuration`, `hote « ${vuConfig.hote} », guide=${vuConfig.guide}`);
         verifie(`[${format.nom}] la configuration est pre-remplie`, !! vuConfig.hote, vuConfig.hote);
-        verifie(`[${format.nom}] l'encart d'avertissement est present`, vuConfig.encart === true);
+        verifie(`[${format.nom}] le guide des boutons est present`, vuConfig.guide === true);
         verifie(`[${format.nom}] la page ne defile pas horizontalement`,
             vuConfig.debordePage === false, `deborde=${vuConfig.debordePage}`);
         await page.screenshot({ path: `${SORTIE}/${format.nom}-graylog-config.png`, fullPage: true });
@@ -249,7 +249,7 @@ try {
 
         const contrastes = await page.evaluate(MESURE_CONTRASTE);
         constate(`[${format.nom}] contrastes`,
-            `onglet ${contrastes.ongletActif}:1 · pastille ${contrastes.pastille}:1 · encart ${contrastes.encart}:1`);
+            `onglet ${contrastes.ongletActif}:1 · pastille ${contrastes.pastille}:1 · guide ${contrastes.guide}:1`);
         for (const [nom, valeur] of Object.entries(contrastes)) {
             verifie(`[${format.nom}] « ${nom} » est lisible (>= 4,5:1)`,
                 valeur !== null && valeur >= 4.5, `${valeur}:1`);

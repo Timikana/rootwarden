@@ -24,6 +24,13 @@
     --rw-succes-fond: #f0fdf4;
     --rw-avertissement: #a16207;
     --rw-avert-fond: #fefce8;
+    /* Boutons d'alerte : aplat en clair. En sombre, la couleur d'alerte est une
+       teinte CLAIRE faite pour du texte ; en aplat elle ecrasait tout l'ecran. */
+    --rw-bouton-danger-fond: var(--rw-danger);
+    --rw-bouton-danger-texte: #ffffff;
+    --rw-bouton-avert-fond: var(--rw-avertissement);
+    --rw-bouton-avert-texte: #ffffff;
+    --rw-bouton-alerte-bord: transparent;
     --rw-rayon: 10px;
     --rw-espace: 16px;
     --rw-ombre: 0 1px 3px rgba(16, 24, 40, .08), 0 8px 24px rgba(16, 24, 40, .06);
@@ -47,6 +54,11 @@
         --rw-succes-fond: #16281f;
         --rw-avertissement: #fcd34d;
         --rw-avert-fond: #2a2410;
+        --rw-bouton-danger-fond: var(--rw-danger-fond);
+        --rw-bouton-danger-texte: var(--rw-danger);
+        --rw-bouton-avert-fond: var(--rw-avert-fond);
+        --rw-bouton-avert-texte: var(--rw-avertissement);
+        --rw-bouton-alerte-bord: currentColor;
         --rw-ombre: 0 1px 3px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .35);
     }
 }
@@ -378,11 +390,9 @@ body {
 }
 
 .rw-menu__section {
-    padding: 13px 10px 5px;
-    font-size: 10px;
-    font-weight: 650;
-    letter-spacing: .08em;
-    text-transform: uppercase;
+    padding: 16px 10px 4px;
+    font-size: 12px;
+    font-weight: 550;
     color: var(--rw-texte-doux);
 }
 
@@ -755,10 +765,8 @@ body {
 .rw-filtre { display: flex; flex-direction: column; gap: 5px; }
 
 .rw-filtre__etiquette {
-    font-size: 11px;
-    font-weight: 650;
-    letter-spacing: .04em;
-    text-transform: uppercase;
+    font-size: 12px;
+    font-weight: 600;
     color: var(--rw-texte-doux);
 }
 
@@ -816,10 +824,8 @@ body {
     background: var(--rw-surface-2);
     border-bottom: 1px solid var(--rw-bordure);
     text-align: left;
-    font-size: 11px;
-    font-weight: 650;
-    letter-spacing: .04em;
-    text-transform: uppercase;
+    font-size: 12px;
+    font-weight: 600;
     color: var(--rw-texte-doux);
     white-space: nowrap;
 }
@@ -962,7 +968,11 @@ body {
 .rw-tableau__actions .rw-bouton { padding: 5px 12px; font-size: 13px; }
 
 .rw-bouton--succes { background: var(--rw-succes); color: var(--rw-accent-texte); }
-.rw-bouton--danger { background: var(--rw-danger); color: var(--rw-accent-texte); }
+.rw-bouton--danger {
+    background: var(--rw-bouton-danger-fond);
+    color: var(--rw-bouton-danger-texte);
+    border: 1px solid var(--rw-bouton-alerte-bord);
+}
 
 /*
  * Un LIEN stylé en bouton ne garde pas son soulignement : il se lit comme un
@@ -987,8 +997,9 @@ a.rw-bouton { display: inline-block; }
  * pour ce qui interrompt un service — reparation dpkg, redemarrage.
  */
 .rw-bouton--avertissement {
-    background: var(--rw-avertissement);
-    color: var(--rw-accent-texte);
+    background: var(--rw-bouton-avert-fond);
+    color: var(--rw-bouton-avert-texte);
+    border: 1px solid var(--rw-bouton-alerte-bord);
 }
 
 .rw-bouton:disabled {
@@ -1020,10 +1031,8 @@ a.rw-bouton { display: inline-block; }
     gap: 5px;
     flex: 1;
     min-width: 260px;
-    font-size: 11px;
-    font-weight: 650;
-    letter-spacing: .04em;
-    text-transform: uppercase;
+    font-size: 12px;
+    font-weight: 600;
     color: var(--rw-texte-doux);
 }
 
@@ -2585,10 +2594,8 @@ a.rw-onglet { text-decoration: none; display: inline-block; }
 }
 .rw-faits__bloc { display: flex; flex-direction: column; gap: 2px; }
 .rw-faits dt {
-    font-size: 11px;
-    font-weight: 650;
-    letter-spacing: .04em;
-    text-transform: uppercase;
+    font-size: 12px;
+    font-weight: 600;
     color: var(--rw-texte-doux);
 }
 .rw-faits dd { margin: 0; font-size: 15px; font-weight: 650; }
@@ -2956,6 +2963,11 @@ a.rw-alerte:focus-visible { outline: 2px solid var(--rw-accent); outline-offset:
         --rw-succes-fond: #16281f;
         --rw-avertissement: #fcd34d;
         --rw-avert-fond: #2a2410;
+        --rw-bouton-danger-fond: var(--rw-danger-fond);
+        --rw-bouton-danger-texte: var(--rw-danger);
+        --rw-bouton-avert-fond: var(--rw-avert-fond);
+        --rw-bouton-avert-texte: var(--rw-avertissement);
+        --rw-bouton-alerte-bord: currentColor;
         --rw-ombre: 0 1px 3px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .35);
 }
 
@@ -3146,3 +3158,39 @@ a.rw-alerte:focus-visible { outline: 2px solid var(--rw-accent); outline-offset:
     text-decoration: none;
 }
 .rw-cgu__cafe:hover { background: #ffe74d; }
+
+/* ── Detail repliable ─────────────────────────────────────────────────────
+   Ce dont une MINORITE de visites a besoin (guide, limites techniques) se
+   replie ; un avertissement sur le geste en cours ne se replie JAMAIS
+   (docs/REDACTION-INTERFACE.md). Le triangle natif reste : c'est lui que les
+   lecteurs d'ecran annoncent comme etat ouvert ou ferme. */
+.rw-details { margin: 10px 0 0; max-width: 68ch; }
+.rw-details > summary {
+    width: fit-content;
+    cursor: pointer;
+    color: var(--rw-accent);
+    font-size: 13px;
+}
+.rw-details > summary:focus-visible { outline: 2px solid var(--rw-accent); outline-offset: 2px; }
+.rw-details[open] > summary { margin-bottom: 6px; }
+.rw-details > :not(summary) { color: var(--rw-texte-doux); font-size: 13px; }
+
+/* ── Icones ───────────────────────────────────────────────────────────────
+   Un seul jeu (Lucide, sprite public/icones/lucide.svg), une seule taille, un
+   seul trait : des icones de tailles ou de styles melanges se lisent comme du
+   bruit. Elles prennent la couleur du texte voisin. */
+.rw-icone {
+    width: 16px; height: 16px;
+    flex-shrink: 0;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    vertical-align: -3px;
+}
+.rw-menu__lien .rw-icone { color: var(--rw-texte-doux); }
+.rw-menu__lien--actif .rw-icone, .rw-menu__lien:hover .rw-icone { color: currentColor; }
+[data-rw="notif-cloche"] { display: inline-flex; align-items: center; gap: 4px; color: var(--rw-texte-doux); }
+.rw-recherche > summary { display: inline-flex; align-items: center; }
+.rw-recherche > summary .rw-icone { color: var(--rw-texte-doux); vertical-align: 0; }

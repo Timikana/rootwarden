@@ -98,12 +98,6 @@
         </div>
 
         <div class="rw-tuile">
-            <span class="rw-tuile__titre">{{ __('accueil.portes_titre') }}</span>
-            <span class="rw-tuile__valeur">{{ $modulesPortes }} / {{ $modulesAccessibles }}</span>
-            <p class="rw-tuile__texte">{{ __('accueil.portes_texte') }}</p>
-        </div>
-
-        <div class="rw-tuile">
             <span class="rw-tuile__titre">{{ __('accueil.securite_titre') }}</span>
             <span class="rw-tuile__valeur">{{ __('accueil.securite_valeur') }}</span>
             <p class="rw-tuile__texte">{{ __('accueil.securite_texte') }}</p>
@@ -375,12 +369,13 @@
         correction que celle portee sur la page de la cle de plateforme, dite
         ici a l'endroit ou la question se pose pour la premiere fois.
     --}}
-    <h2 class="rw-section__entete rw-titre--espace">{{ __('accueil.sequence_titre') }}</h2>
-    <ol class="rw-liste-effets rw-liste-effets--ordonnee rw-prose" data-rw="accueil-sequence">
-        <li>{{ __('accueil.sequence_1') }}</li>
-        <li>{{ __('accueil.sequence_2') }}</li>
-        <li>{{ __('accueil.sequence_3') }}</li>
-        <li>{{ __('accueil.sequence_4') }}</li>
-    </ol>
-    <p class="rw-aide rw-prose" data-rw="accueil-sequence-aide">{{ __('accueil.sequence_aide') }}</p>
+    <details class="rw-details rw-titre--espace">
+        <summary>{{ __('accueil.sequence_titre') }}</summary>
+        <ol class="rw-liste-effets rw-liste-effets--ordonnee rw-prose" data-rw="accueil-sequence">
+            <li>{{ __('accueil.sequence_1') }}</li>
+            <li>{{ __('accueil.sequence_2') }}</li>
+            <li>{{ __('accueil.sequence_3') }}</li>
+            <li>{{ __('accueil.sequence_4') }}</li>
+        </ol>
+    </details>
 @endsection

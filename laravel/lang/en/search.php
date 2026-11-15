@@ -4,24 +4,20 @@
 
 return [
     'title' => 'Global search',
-    'desc'  => 'Search in one place across servers, users, CVEs, tickets and the audit log.',
+    'desc'  => "Servers, users, CVEs, tickets and the audit log, in a single field.",
 
-    'placeholder' => 'A server, a user, a CVE, a ticket...',
-    'tip_input'   => 'Cross-cutting search, two characters minimum.',
-    'label'       => 'Search term',
+    'placeholder' => "Server, user, CVE, ticket…",
+    'tip_input'   => "At least two characters.",
+    'label'       => "Search term",
     /* Header search panel. Every other label is REUSED from this same list, so
      * one state never gets two wordings. */
     'menu_ouvrir' => 'Search',
     'menu_voir_tout' => 'Open the full search',
 
     'guide_titre'  => 'What the search covers',
-    'guide_portee' => 'Five sources: servers, users, CVEs, tickets and the audit log. Each category returns '
-                    . 'at most ten results — the search points you somewhere, it does not replace the '
-                    . 'dedicated pages.',
-    'guide_droits' => 'It reaches across accounts and the audit log: that is why it is restricted to portal '
-                    . 'administration.',
-    'guide_liens'  => 'A result leads to the page that owns it. Pages still served by the old portal are '
-                    . 'marked with an arrow and open in a new tab.',
+    'guide_portee' => "At most ten results per category: search points you to the page that manages the item.",
+    'guide_droits' => "Reserved to portal administration, since it spans accounts and the audit log.",
+    'guide_liens'  => "Each result leads to the page that manages it.",
 
     'cat_machines' => 'Servers',
     'cat_users'    => 'Users',
@@ -29,12 +25,11 @@ return [
     'cat_tickets'  => 'Tickets',
     'cat_audit'    => 'Audit log',
 
-    'hint_min'     => 'Type at least two characters.',
-    'searching'    => 'Searching...',
-    'results_for'  => 'result(s) for',
-    'no_results'   => 'No result',
-    'no_results_aide' => 'None of the five sources contains that term. A server name, an IP address, a CVE '
-                       . 'identifier or a ticket summary give the best results.',
-    'err'          => 'The search failed.',
-    'ancien_portail' => 'opens the old portal in a new tab',
+    'hint_min'     => "Type at least two characters.",
+    'searching'    => "Searching…",
+    'results_for'  => "result(s) for",
+    'no_results'   => "No results",
+    'no_results_aide' => "Try a server name, an IP address, a CVE identifier or a word from a ticket.",
+    'err'          => "The search failed.",
+    'ancien_portail' => "old portal, in a new tab",
 ];

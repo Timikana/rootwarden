@@ -5,6 +5,32 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## Pages concises, icônes et menu corrigé
+
+Les pages étaient trop bavardes : 58 % des mots du portail étaient des textes d'aide, souvent des
+notes de développement (historique des correctifs, comparaisons avec l'ancien portail, noms internes).
+
+- **Textes** : aide visible du portail 8 162 → 3 765 mots (−54 %). Sur dix pages mesurées à l'écran, 3 070 →
+  1 692 mots affichés. Règle de rédaction dans `docs/REDACTION-INTERFACE.md` : un avertissement sur
+  une action irréversible reste visible ; guides et détails techniques se replient
+  (`<details class="rw-details">`) ; vouvoiement partout. Mesure : `scripts/mesure-verbosite.php`.
+- **Textes faux corrigés**, entre autres : la mise à jour complète garde les fichiers de
+  configuration (`--force-confold`) ; désactiver une jail fail2ban redémarre le service et perd les
+  bannissements en cours ; plusieurs actions annoncées « sur l'ancien portail » sont disponibles sur
+  la page ; une portée de planification vide ne vise plus tout le parc.
+- **Icônes** : un seul jeu en trait (Lucide 1.66.0, licence ISC), en sprite SVG servi par le portail
+  (`public/icones/lucide.svg`, aucun CDN). Une icône par entrée de menu ; les emojis de l'en-tête
+  deviennent des icônes. Chemin `/icones/` et non `/icons/`, qu'Apache réserve à ses propres icônes.
+- **Menu** : accents rétablis, « Tableau de bord », rubriques en casse normale ; plus de libellés
+  forcés en majuscules.
+
+Notes d'exploitation : aucune migration, aucun changement du backend. Signalés et non corrigés ici :
+la liste blanche CVE n'est lue par aucun filtre (elle n'a pas d'effet sur les résultats ni les
+rapports) ; les boutons « Mises à jour de sécurité » lancent une mise à jour sans filtre de
+sécurité ; la case « Nettoyer les comptes obsolètes » des serveurs n'a pas d'effet.
+
+---
+
 ## Reprise module par module sur une pile neuve — la vraie cause des « logs pas en direct »
 
 Toutes les pages et les gestes principaux rejoués sur une installation neuve et isolée (base vide,

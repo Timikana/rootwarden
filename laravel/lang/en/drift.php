@@ -3,13 +3,11 @@
 // lang/en/drift.php - Configuration drift detection.
 
 return [
-    'title' => 'Drift detection',
-    'desc'  => 'Gap between the desired state — the one RootWarden manages — and the real state of the servers. '
-             . 'The scan reaches no server: it recomputes from data already collected, so it is instant '
-             . 'and has no effect on production.',
+    'title' => "Configuration drift",
+    'desc'  => "Gap between the state RootWarden expects and the servers' actual state. Computed from data already collected: no server is contacted.",
 
     'btn_scan_all' => 'Scan the whole fleet',
-    'tip_scan_all' => 'Recomputes drift for every non-archived machine. No server is contacted.',
+    'tip_scan_all' => "Recomputes drift for all non-archived machines, without contacting any server.",
 
     'col_server'   => 'Server',
     'col_sudo'     => 'sudo',
@@ -17,35 +15,35 @@ return [
     'col_fail2ban' => 'fail2ban',
     'col_checked'  => 'Last scan',
     'col_action'   => 'Action',
-    'loading'      => 'Loading...',
+    'loading'      => "Loading…",
 
     // Summary
     'sum_servers'  => 'Servers tracked',
     'sum_clean'    => 'Compliant',
-    'sum_drifted'  => 'Drifted',
-    'sum_findings' => 'Gaps found',
-    'sum_servers_aide'  => 'Non-archived machines in the fleet',
-    'sum_clean_aide'    => 'No gap across the three categories',
-    'sum_drifted_aide'  => 'At least one gap to fix',
-    'sum_findings_aide' => 'Total categories in drift',
+    'sum_drifted'  => "Drifted",
+    'sum_findings' => "Findings",
+    'sum_servers_aide'  => "Non-archived machines",
+    'sum_clean_aide'    => "No finding",
+    'sum_drifted_aide'  => "At least one finding",
+    'sum_findings_aide' => "Total findings",
 
     // Category states
     'status_ok'      => 'Compliant',
-    'status_drift'   => 'Drift',
-    'status_unknown' => 'Never assessed',
-    'status_absent'  => 'Not assessed',
+    'status_drift'   => "Drift",
+    'status_unknown' => "Never evaluated",
+    'status_absent'  => "Not evaluated",
 
     // Actions
-    'btn_rescan' => 'Re-scan',
-    'tip_rescan' => 'Recomputes drift for this machine only',
-    'scanning'   => 'Scanning...',
-    'scanned'    => 'Machine re-scanned.',
-    'scan_done'  => 'Scan complete',
+    'btn_rescan' => "Recompute",
+    'tip_rescan' => "Recomputes drift for this machine",
+    'scanning'   => "Computing…",
+    'scanned'    => "Machine recomputed.",
+    'scan_done'  => "Computation done",
 
     // Empty states and errors
     'empty'       => 'No machine in the fleet',
-    'empty_aide'  => 'Drift is computed per machine: add a server to the fleet, then run a scan.',
+    'empty_aide'  => "Add a server, then run a computation.",
     'never'       => 'Never',
-    'err_load'    => 'Could not load drift results.',
-    'err_scan'    => 'The scan failed.',
+    'err_load'    => "Could not load drift.",
+    'err_scan'    => "The computation failed.",
 ];

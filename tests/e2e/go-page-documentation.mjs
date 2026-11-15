@@ -124,8 +124,7 @@ const COMPTES = {
 };
 
 /* Les ancres rendues QUEL QUE SOIT le role. */
-const INCONDITIONNELLES = ['doc-seuil', 'doc-guide', 'doc-securite',
-                           'doc-reste-perime', 'doc-reste-cache', 'doc-reste-lien'];
+const INCONDITIONNELLES = ['doc-seuil', 'doc-guide', 'doc-securite'];
 /* Le seuil interne de la page : `$administration = $role >= 2`. */
 const SEUIL_ADMIN = 2;
 const VERS_BACKEND = /\/(api\/gateway|api_proxy\.php)\//;

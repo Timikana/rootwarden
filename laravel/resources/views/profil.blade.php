@@ -309,10 +309,19 @@
     <section class="rw-section" data-rw="profil-rgpd">
         <h2 class="rw-sous-titre">{{ __('profil.rgpd_titre') }}</h2>
         <p class="rw-prose rw-aide">{{ __('profil.rgpd_aide') }}</p>
-        <p class="rw-prose rw-aide" data-rw="rgpd-contenu">{{ __('profil.rgpd_contenu') }}</p>
-        <p class="rw-prose rw-aide" data-rw="rgpd-protege">{{ __('profil.rgpd_protege') }}</p>
-        <p class="rw-prose rw-aide" data-rw="rgpd-borne">{{ __('profil.rgpd_borne') }}</p>
-        <p class="rw-prose rw-aide" data-rw="rgpd-trace">{{ __('profil.rgpd_trace') }}</p>
+        <details class="rw-details">
+            <summary>{{ __('profil.rgpd_details') }}</summary>
+            <p class="rw-prose" data-rw="rgpd-contenu">{{ __('profil.rgpd_contenu') }}</p>
+            <p class="rw-prose" data-rw="rgpd-protege">{{ __('profil.rgpd_protege') }}</p>
+            <p class="rw-prose" data-rw="rgpd-borne">{{ __('profil.rgpd_borne') }}</p>
+            <p class="rw-prose" data-rw="rgpd-trace">{{ __('profil.rgpd_trace') }}</p>
+        </details>
+        {{-- Le telechargement suit son propre texte, avant l'effacement : place
+             apres ce dernier, il se lisait comme la suite du geste irreversible. --}}
+        <div class="rw-actions">
+            <a class="rw-bouton" data-rw="rgpd-telecharger"
+               href="{{ route('profil.donnees-personnelles') }}">{{ __('profil.rgpd_bouton') }}</a>
+        </div>
 
         {{--
             ⚠ IRREVERSIBLE. Place APRES le bloc RGPD parce qu'il en est la
@@ -399,10 +408,6 @@
                             data-rw="profil-eff-bouton">{{ __('profil.eff_bouton') }}</button>
                 </div>
             </form>
-        </div>
-        <div class="rw-actions">
-            <a class="rw-bouton" data-rw="rgpd-telecharger"
-               href="{{ route('profil.donnees-personnelles') }}">{{ __('profil.rgpd_bouton') }}</a>
         </div>
     </section>
 

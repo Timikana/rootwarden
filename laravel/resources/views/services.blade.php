@@ -150,27 +150,6 @@
     </div>
 </div>
 
-{{--
-    ── CE QUE CET ENCART DISAIT, ET POURQUOI C'ETAIT FAUX ───────────────────
-
-    Il annoncait « les gestes sur les services ne sont pas encore portes » et
-    offrait un bouton PRINCIPAL vers `/services/` de l'ancien portail.
-
-    Les deux etaient faux, et mesures :
-      - les cinq gestes SONT portes. `pilote()` appelle `/services/<geste>` par
-        concatenation — ce qui explique qu'une recherche du chemin litteral ne
-        trouve que `/services/list` et laisse croire au contraire ;
-      - `legacy/services/` est ARCHIVE depuis le 2026-08-27 (`_deprecated/`).
-        Le bouton menait donc a un 404, en action PRINCIPALE.
-
-    *Une donnee qui ment le plus longtemps est celle que personne ne remet en
-    question.* Le lien est retire plutot que reetiquete : il n'y a plus rien au
-    bout.
---}}
-<div class="rw-encart" data-rw="services-etat-portage">
-    <p class="rw-sous-titre-fort">{{ __('services.portage_titre') }}</p>
-    <p class="rw-prose">{{ __('services.portage_texte') }}</p>
-</div>
 @endif
 
     <script id="services-textes" type="application/json">@json($textes)</script>

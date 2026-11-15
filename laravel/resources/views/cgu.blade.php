@@ -128,7 +128,7 @@
              AUCUN lecteur : deux cles mortes sur 36. Le legacy les rendait ici
              meme, avec le lien de soutien (`_deprecated/terms.php:114-124`). --}}
         <section class="rw-cgu__soutien" data-rw="cgu-soutien">
-            <span class="rw-cgu__soutien-icone" aria-hidden="true">&#9749;</span>
+            <span class="rw-cgu__soutien-icone" aria-hidden="true">@include('composants.icone', ['nom' => 'coffee'])</span>
             <div>
                 <p class="rw-cgu__soutien-titre">{{ __('cgu.support_title') }}</p>
                 <p class="rw-cgu__soutien-texte">{{ __('cgu.support_desc', ['nom' => config('app.name')]) }}</p>

@@ -42,7 +42,7 @@ return [
 
     // ── LA PAGE ELLE-MEME ────────────────────────────────────────────────
     'titre' => 'Documentation',
-    'desc'  => "Prise en main du portail, et où trouver le reste.",
+    'desc'  => "Prise en main du portail.",
 
     /*
      * ⚠ LA GARDE DE CETTE PAGE EST UN SEUIL DE ROLE, PAS UNE PERMISSION.
@@ -62,17 +62,12 @@ return [
     'seuil_admin' => "Votre rôle donne accès à l'ensemble de la documentation, y compris les sections d'infrastructure et d'API.",
 
     // ── CE QUI N'EST PAS RECOPIE, ET POURQUOI ────────────────────────────
-    'reste_titre' => 'La documentation de référence',
-    'reste_texte' => "Le reste de la documentation — architecture, chiffrement, sessions, procédures — vit encore sur l'ancien portail et n'est pas recopié ici.",
     /*
      * Mesures de l'inventaire (2026-09-01), et elles justifient de NE PAS
      * recopier : la page du legacy ne fait AUCUNE requete (`grep -c '$pdo'`
      * -> 0). Tout ce qu'elle affirme sur les routes et les droits est du HTML
      * ecrit a la main, qu'aucun mecanisme ne regenere.
      */
-    'reste_perime' => "Elle porte des références mesurées comme périmées : douze chemins de page qui ne répondent plus, et deux routes citées qui n'existent pas. Onze de ses sections décrivent des parties déjà retirées du produit.",
-    'reste_cache'  => "Cette page-ci ne la recopie pas : reproduire un texte que rien ne régénère reviendrait à figer un cache. Ce qui peut être dérivé l'est ailleurs, à partir de la source.",
-    'reste_ouvrir' => "Ouvrir la documentation de référence",
 
     // ── LA DERIVATION, PLUTOT QUE L'AFFIRMATION ──────────────────────────
     'derive_titre' => 'Les routes et les droits, dérivés',
@@ -81,7 +76,7 @@ return [
     'derive_reserve' => "Une affirmation d'autorisation ne se dérive pas d'une seule couche : le produit en compte trois, et elles ne coïncident pas toujours.",
 
     // ── LA CONSOLE D'API : NON PORTEE, ET C'EST VOULU ────────────────────
-    'console_titre' => "La console d'API n'est pas reprise",
-    'console_texte' => "L'ancien portail offre un champ libre qui compose une requête vers n'importe quelle route du produit. Elle n'élève aucun privilège — les gardes s'appliquent quand même — mais elle contourne l'interface : aucun panneau de décision, aucun nom de machine annoncé, pour des gestes qui en portent un sur leurs pages propres.",
+    'console_titre' => "Pas de console d'API libre",
+    'console_texte' => "Chaque action passe par sa page, avec sa confirmation et la machine nommée. Les droits restent ceux de la passerelle et du backend.",
 
 ];
