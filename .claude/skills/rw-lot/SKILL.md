@@ -24,9 +24,10 @@ c'est ainsi qu'on repaie les préalables un par un.
 Chacun a coûté au moins une séance de diagnostic. Ils sont dans le script, mais
 il faut savoir qu'ils existent pour comprendre un échec.
 
-1. **Le compte de développement n'est pas forcément dans le groupe `docker`.**
-   Le script passe par `sudo -n docker`. **Ne pas ajouter le compte au groupe**
-   pour contourner : l'appartenance vaut un accès root permanent.
+1. **Docker, directement ou par `sudo -n`.** Le script emploie `docker` si le
+   compte y a accès, sinon un relais `sudo -n docker`. Sur l'hôte de dev, le
+   compte est dans le groupe `docker`, par choix de l'exploitant : c'est un accès
+   équivalent à root, à ne pas reproduire sur un autre poste.
 2. **Le banc d'essai vit derrière le profil compose `preprod`.** `test-server`
    (machine 2) et `mock-opencve` ne démarrent qu'avec `--profile preprod`. Un
    `docker compose up -d` nu les laisse à terre, et les sous-lots qui les

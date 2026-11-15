@@ -95,10 +95,9 @@ reproche au legacy cinq fois.
 Ne restent ici que les pièges de l'environnement qui ne sont pas des étapes du
 lanceur :
 
-- **`utilisateur` n'est PAS dans le groupe `docker`**, contrairement à ce
-  qu'affirmait la doc de bascule — `id` le dit. Ne pas l'ajouter au groupe pour
-  contourner : l'appartenance vaut un **accès root permanent**. Le lanceur passe
-  par `sudo -n docker`.
+- **`utilisateur` est dans le groupe `docker`**, par choix de l'exploitant :
+  `docker` marche sans `sudo`. C'est un **accès équivalent à root** — ne pas le
+  reproduire sur un autre poste ; le lanceur sait aussi passer par `sudo -n docker`.
 - **Le mot de passe de `superadmin` en base n'est pas celui qu'attendent les
   suites**, et son `force_password_change` vaut 1. Ne pas y toucher : utiliser un
   compte `rw-test-*`.
