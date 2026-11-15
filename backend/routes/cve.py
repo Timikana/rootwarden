@@ -36,11 +36,16 @@ def _stream_cve_scan(machine_ids: list[int], min_cvss: float,
             fmt = ','.join(['%s'] * len(machine_ids))
             cur.execute(
                 f"SELECT id, name, ip, port, user, password, root_password, platform_key_deployed, service_account_deployed "
-                f"FROM machines WHERE id IN ({fmt})", machine_ids
+                f"FROM machines WHERE id IN ({fmt}) AND (lifecycle_status IS NULL OR lifecycle_status != 'archived')", machine_ids
             )
         else:
+            # LES MACHINES ARCHIVEES SONT EXCLUES. Sans cette clause, un scan-all
+            # se connectait EN SSH a des machines retirees du parc : l'interface
+            # les masque et le chemin planifie les excluait deja, mais le
+            # declenchement manuel les prenait toutes.
             cur.execute(
-                "SELECT id, name, ip, port, user, password, root_password, platform_key_deployed, service_account_deployed FROM machines"
+                "SELECT id, name, ip, port, user, password, root_password, platform_key_deployed, "
+                "service_account_deployed FROM machines WHERE (lifecycle_status IS NULL OR lifecycle_status != 'archived')"
             )
         machines = cur.fetchall()
     finally:

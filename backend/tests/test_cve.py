@@ -417,3 +417,46 @@ class TestWhitelistAttributionNonFalsifiable:
         # Plus de repli sur « admin » : c'est le compte reel, ou son identifiant.
         params = mock_cursor._last_params or ()
         assert 'admin' not in params or 'rw-test-admin' in params
+
+
+class TestScanManuelExclutLesArchivees:
+    """Le scan CVE manuel (cible ou tout le parc) ne lit jamais une machine archivee.
+
+    Le chemin planifie les excluait deja ; le declenchement manuel les prenait
+    toutes, et se connectait donc en SSH a des machines retirees du parc.
+    """
+
+    @staticmethod
+    def _requetes(monkeypatch, machine_ids):
+        import routes.cve as cve_mod
+        vues = []
+
+        class _Cur:
+            def execute(self, sql, params=None):
+                vues.append(' '.join(str(sql).split()))
+            def fetchall(self):
+                return []
+            def fetchone(self):
+                return None
+            def close(self):
+                pass
+
+        class _Conn:
+            def cursor(self, *a, **k):
+                return _Cur()
+            def close(self):
+                pass
+            def commit(self):
+                pass
+
+        monkeypatch.setattr(cve_mod, 'get_db_connection', lambda *a, **k: _Conn())
+        list(cve_mod._stream_cve_scan(machine_ids, 7.0))
+        return [q for q in vues if 'FROM machines' in q]
+
+    @pytest.mark.parametrize('machine_ids', [[1, 2], []])
+    def test_chaque_lecture_des_machines_ecarte_les_archivees(self, monkeypatch, machine_ids):
+        requetes = self._requetes(monkeypatch, machine_ids)
+        # Temoin : sans au moins une requete capturee, l'assertion suivante ne
+        # mesurerait rien.
+        assert requetes, 'aucune lecture de machines capturee'
+        assert all("lifecycle_status != 'archived'" in q for q in requetes), requetes
