@@ -9,8 +9,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 | | Avant | Après |
 |---|---|---|
-| `symfony/http-foundation` | 8.1.4 — **CVE-2026-108082**, ReDoS par l'en-tête `Cache-Control`, sans authentification | 8.1.9 |
-| Paquets PHP | — | 60 mises à jour mineures ou correctifs, **majeures bloquées** (Guzzle 8, brick/math 1.0) |
+| Paquets PHP | après les correctifs #95 et #98 | 65 mises à jour mineures ou correctifs, **majeures retenues** (Guzzle 8, brick/math 1.0) ; `composer audit` sans avis |
 | Image du portail (Trivy, corrigeables) | 16 critiques, 206 hautes — PHP 8.4.25 | **0** — PHP 8.4.26 |
 | Image du backend | 5 critiques, 27 hautes | **0** — pip et gunicorn retirés de l'image finale |
 | MySQL | 9.2.0, image **abandonnée depuis avril 2025** : 5 critiques, 171 hautes | **9.7 LTS** |
@@ -23,8 +22,7 @@ et la CI construit désormais avec `pull: true`.
 changement d'image de la base, et s'arrête si le dump échoue. Éprouvé sur une base isolée : mise à
 niveau réussie, 64 tables vérifiées, backend et portail connectés.
 
-PHP 8.4.27, publié le jour même, n'avait pas encore d'image Docker officielle : il arrivera au
-prochain `./maj.sh`.
+L'image du portail reprend la dernière version PHP 8.4 publiée à chaque `./maj.sh`, grâce à `--pull`.
 
 ---
 
