@@ -7,11 +7,8 @@
  */
 return [
     'title' => 'Serveurs',
-    'desc' => "Le parc de machines administrées par RootWarden : leur adresse, le compte SSH utilisé pour s'y connecter, leur environnement et leur criticité.",
+    'desc' => "Les machines administrées par RootWarden et le compte SSH qui sert à s'y connecter.",
     'compte' => ':n machine(s) au parc',
-
-    // Legende des environnements
-    'legende' => 'Environnements',
 
     // Recherche
     'filtre_label' => 'Filtrer le parc',
@@ -35,7 +32,7 @@ return [
     'res_interne' => 'Interne',
     'res_externe' => 'Externe',
     'aide_nom' => 'Lettres, chiffres, espaces, points, tirets, souligné, plus et parenthèses.',
-    'aide_ip' => "Les adresses privées sont acceptées. Le bouclage, le lien-local et le multicast sont refusés : ils ne désignent pas une machine joignable.",
+    'aide_ip' => "Adresses privées acceptées. Bouclage, lien-local, multicast et plages réservées refusés.",
     'btn_ajouter' => 'Ajouter la machine',
     'champs_requis' => 'Les champs marqués d\'une étoile sont obligatoires.',
 
@@ -43,13 +40,13 @@ return [
     'inchange' => 'Laisser vide pour ne pas changer',
     'options_deploiement' => 'Options de déploiement',
     'opt_nettoyage' => 'Nettoyer les comptes obsolètes',
-    'opt_nettoyage_aide' => 'Au prochain déploiement, les comptes de la machine qui ne correspondent plus à aucun accès seront supprimés.',
+    'opt_nettoyage_aide' => "Sans effet aujourd'hui : aucun déploiement ne supprime de compte. Un compte qui a perdu l'accès perd sa clé et ses droits sudo, mais reste sur la machine.",
     'btn_enregistrer' => 'Enregistrer',
     'btn_supprimer' => 'Retirer du parc',
 
     // Suppression
     'suppr_titre' => 'Retirer :nom du parc ?',
-    'suppr_texte' => "La machine disparaît des scans de vulnérabilités, de la supervision et des déploiements de clés. La machine elle-même n'est pas touchée : rien n'est modifié dessus, aucun accès n'est révoqué.",
+    'suppr_texte' => "La machine sort des scans, de la supervision et des déploiements de clés. Rien n'est modifié sur la machine : les comptes et les clés posés restent en place.",
     'suppr_confirmer' => 'Retirer du parc',
     'suppr_annuler' => 'Annuler',
 
@@ -65,7 +62,7 @@ return [
 
     // Etat vide
     'vide' => 'Aucune machine au parc.',
-    'vide_aide' => "Tant qu'aucune machine n'est déclarée, ni les scans de vulnérabilités ni les déploiements de clés n'ont de cible.",
+    'vide_aide' => "Ajoutez-en une avec « Ajouter une machine », ou importez un fichier CSV.",
 
 
     // Retours
@@ -123,7 +120,7 @@ return [
 
     /* ═══ Import CSV — D6e ═══════════════════════════════════════════════ */
     'imp_titre' => 'Importer des serveurs depuis un fichier CSV',
-    'imp_aide' => "Le fichier doit porter une ligne d'en-tête. Colonnes obligatoires : name, ip, user, password, root_password. Colonnes optionnelles : port, environment, criticality, network_type, tags.",
+    'imp_aide' => "Une ligne d'en-tête est exigée. Colonnes obligatoires : name, ip, user, password, root_password. Facultatives : port, environment, criticality, network_type, tags (séparées par « ; »).",
     'imp_champ' => 'fichier CSV',
     'imp_fichier' => 'Fichier CSV',
     'imp_fichier_aide' => 'Au plus :ko kio et :lignes lignes de données.',
@@ -133,8 +130,8 @@ return [
     // ⚠ CE QUE LE FICHIER CONTIENT, DIT AVANT DE LE CHOISIR. Les colonnes
     // `password` et `root_password` sont des secrets EN CLAIR dans le fichier :
     // ils sont chiffres a l'enregistrement, mais le fichier lui-meme ne l'est
-    // pas. Le legacy ne le disait nulle part.
-    'imp_secrets' => "Ce fichier contient des mots de passe en clair, dont ceux de root. Ils sont chiffrés à l'enregistrement, mais le fichier ne l'est pas : supprimez-le après l'import et ne le laissez pas dans un dossier partagé.",
+    // pas.
+    'imp_secrets' => "Ce fichier contient des mots de passe en clair, dont ceux de root, et il n'est pas chiffré. Supprimez-le après l'import.",
 
     'imp_bilan_titre' => "Résultat de l'import",
     'imp_crees' => ':n serveur(s) créé(s).',
@@ -145,22 +142,18 @@ return [
     'imp_doublon' => 'déjà présent (nom ou adresse), ignoré',
 
     // Le PLAFOND est DIT, jamais une troncature muette.
-    'imp_tronque' => "Le fichier dépasse :lignes lignes de données : les lignes suivantes n'ont PAS été traitées. Découpez-le et relancez — ce n'est ni un succès complet ni un échec.",
+    'imp_tronque' => "Le fichier dépasse :lignes lignes de données : les suivantes n'ont pas été traitées. Découpez-le et importez le reste.",
     'imp_manquantes' => 'Colonnes obligatoires absentes de la ligne d\'en-tête : :noms. Aucune ligne n\'a été traitée.',
     'imp_err_illisible' => "Le fichier n'a pas pu être ouvert. Aucune ligne n'a été traitée.",
     'imp_err_vide' => "Le fichier est vide ou n'a pas de ligne d'en-tête. Aucune ligne n'a été traitée.",
-
-    // ⚠ CES DEUX TEXTES DISENT UNE DIVERGENCE ASSUMEE avec l'ancien portail.
-    'imp_diverge_titre' => "Deux différences avec l'ancien portail",
-    'imp_diverge_secret' => "Une ligne dont le mot de passe ou celui de root est vide est REFUSÉE. L'ancien portail la créait, et la machine paraissait alors porter un mot de passe alors qu'elle n'en avait pas.",
-    'imp_diverge_env' => "Une valeur d'environnement, de criticité ou de type de réseau non reconnue REFUSE la ligne. L'ancien portail la remplaçait en silence par « OTHER » : une faute de frappe sur « PROD » retirait la machine de la population des machines de production, sans que rien ne le signale.",
+    'imp_refus' => "Une ligne est refusée si un mot de passe est vide, ou si environment (PROD, DEV, TEST, OTHER), criticality (CRITIQUE, NON CRITIQUE) ou network_type (INTERNE, EXTERNE) a une autre valeur.",
 
 
     // Audit 2026-10-13, H-3 : cle d'hote SSH memorisee (TOFU).
     "cle_hote_titre" => "Clé d'hôte SSH",
-    "cle_hote_inconnue" => "Aucune clé mémorisée : elle sera enregistrée à la prochaine connexion du backend.",
+    "cle_hote_inconnue" => "Aucune clé mémorisée : elle sera enregistrée à la prochaine connexion.",
     "cle_hote_memorisee" => "Mémorisée depuis le :depuis — :type, empreinte SHA-256 :empreinte",
-    "cle_hote_aide" => "Le backend refuse toute connexion si cette machine présente une autre clé : protection contre l'usurpation. Si la machine a été RÉINSTALLÉE, oubliez sa clé : la suivante sera acceptée.",
+    "cle_hote_aide" => "RootWarden refuse de se connecter si la machine présente une autre clé. Si elle a été réinstallée, oubliez sa clé : la suivante sera acceptée.",
     "cle_hote_confirme" => "Je confirme que cette machine a été réinstallée (sinon, une usurpation est possible)",
     "cle_hote_oublier" => "Oublier la clé d'hôte",
     "cle_hote_oubliee" => "Clé d'hôte oubliée pour :nom : la prochaine connexion l'enregistrera à nouveau.",
