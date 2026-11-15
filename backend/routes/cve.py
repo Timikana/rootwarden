@@ -487,6 +487,10 @@ def cron_preview():
         from datetime import timezone
         if not croniter.is_valid(expr):
             return jsonify({'valid': False, 'error': 'Expression cron invalide'})
+        # L'apercu annonce le refus que l'enregistrement opposerait.
+        refus = _refus_cron(expr)
+        if refus:
+            return jsonify({'valid': False, 'error': refus})
         # On fournit les datetimes en ISO 8601 UTC (suffixe Z) pour que le
         # frontend les convertisse automatiquement vers la TZ du navigateur
         # via new Date(iso).toLocaleString(). Evite le bug "il est 10h13
@@ -525,6 +529,52 @@ def cron_preview():
         return jsonify({'valid': False, 'error': str(e)[:200]})
 
 
+# ══ LE PLAFOND ANTI-FREQUENCE, UNE SEULE FONCTION POUR TOUS LES CHEMINS ══
+#
+# Un scan planifie plus frequent que toutes les 10 minutes vaut un scan par
+# minute : bannissement OpenCVE en amont, charge SSH sur le parc, production
+# comprise. Deux defauts mesures, fermes ici :
+#  - la MODIFICATION ne validait rien (ni l'expression, ni la frequence) et
+#    avalait l'echec : `* * * * *` s'ecrivait par un simple PUT ;
+#  - la CREATION ne comparait que les DEUX prochaines occurrences :
+#    `0,59 * * * *` (ecarts alternes de 59 min puis 1 min) passait si on le
+#    soumettait a la minute ou le grand ecart venait en premier.
+# On mesure donc l'ecart MINIMAL sur 1000 occurrences successives, ce qui
+# couvre les motifs horaires, quotidiens, mensuels et annuels (passage
+# 23:59 -> 00:00, 31 -> 1, decembre -> janvier) quel que soit l'instant.
+INTERVALLE_MIN_S = 600
+
+
+def _refus_cron(expr):
+    """Rend None si l'expression est acceptable, sinon le motif du refus."""
+    from croniter import croniter
+    expr = (expr or '').strip()
+    if not expr or not croniter.is_valid(expr):
+        return 'Expression cron invalide'
+    try:
+        it = croniter(expr, datetime.now())
+        precedente = it.get_next(datetime)
+        for _ in range(1000):
+            suivante = it.get_next(datetime)
+            if (suivante - precedente).total_seconds() < INTERVALLE_MIN_S:
+                return 'Frequence cron trop elevee (intervalle minimum 10 minutes)'
+            precedente = suivante
+    except Exception as e:  # expression valide mais incalculable
+        return f'Expression cron incalculable : {str(e)[:120]}'
+    return None
+
+
+def _refus_cvss(valeur):
+    """min_cvss est un DECIMAL(3,1) : nombre de 0 a 10, sinon refus (et non 500)."""
+    try:
+        v = float(valeur)
+    except (TypeError, ValueError):
+        return 'min_cvss doit etre un nombre'
+    if not 0 <= v <= 10:
+        return 'min_cvss doit etre compris entre 0 et 10'
+    return None
+
+
 # Liste fermee des portees offertes a la creation (E-388). Releve du
 # portage : PlanificationsCve::CIBLES. 'all' en est absent DES DEUX
 # cotes — il reste lisible, il n'est plus proposable.
@@ -540,6 +590,9 @@ def create_cve_schedule():
     data = request.get_json(silent=True) or {}
     name = (data.get('name') or '').strip()
     cron_expr = (data.get('cron_expression') or '0 3 * * *').strip()
+    refus = _refus_cvss(data.get('min_cvss', 7.0))
+    if refus:
+        return jsonify({'success': False, 'message': refus}), 400
     min_cvss = float(data.get('min_cvss', 7.0))
     # E-388 : pas de defaut FABRIQUE. `('target_type') or ''` et non
     # `.get(..., 'all')` : une cle presente a `null` rend None, et le
@@ -576,25 +629,12 @@ def create_cve_schedule():
     if not name:
         return jsonify({'success': False, 'message': 'Nom requis'}), 400
 
-    # Valider l'expression cron
-    try:
-        from croniter import croniter
-        if not croniter.is_valid(cron_expr):
-            raise ValueError("Expression cron invalide")
-        it = croniter(cron_expr)
-        next_run = it.get_next(datetime)
-        # Patch A04-INSEC-N1 (OWASP A04 Insecure Design) : refuse les schedules
-        # plus frequents que 10 minutes. Sans ce clamp, '* * * * *' lancait un
-        # scan par minute -> ban OpenCVE upstream + DoS interne + abus admin
-        # malveillant. 600s = compromise raisonnable (cron quotidien typique).
-        following = it.get_next(datetime)
-        if (following - next_run).total_seconds() < 600:
-            return jsonify({
-                'success': False,
-                'message': "Frequence cron trop elevee (intervalle minimum 10 minutes)"
-            }), 400
-    except Exception as e:
-        return jsonify({'success': False, 'message': f'Expression cron invalide: {e}'}), 400
+    # Patch A04-INSEC-N1 : la meme garde que la modification, voir _refus_cron.
+    refus = _refus_cron(cron_expr)
+    if refus:
+        return jsonify({'success': False, 'message': refus}), 400
+    from croniter import croniter
+    next_run = croniter(cron_expr).get_next(datetime)
 
     conn = get_db_connection()
     try:
@@ -624,6 +664,20 @@ def update_cve_schedule(schedule_id):
         if not cur.fetchone():
             return jsonify({'success': False, 'message': 'Planification introuvable'}), 404
 
+        # VALIDER AVANT D'ECRIRE. La modification acceptait n'importe quelle
+        # expression et avalait l'echec : le plafond de la creation se
+        # contournait par un simple PUT.
+        if 'cron_expression' in data:
+            refus = _refus_cron(data['cron_expression'])
+            if refus:
+                return jsonify({'success': False, 'message': refus}), 400
+        if 'min_cvss' in data:
+            refus = _refus_cvss(data['min_cvss'])
+            if refus:
+                return jsonify({'success': False, 'message': refus}), 400
+        if 'name' in data and not str(data['name'] or '').strip():
+            return jsonify({'success': False, 'message': 'Nom requis'}), 400
+
         updates = []
         params = []
         for field in ('name', 'cron_expression', 'min_cvss', 'scan_source', 'target_type', 'target_value', 'enabled'):
@@ -650,13 +704,10 @@ def update_cve_schedule(schedule_id):
                 params.append(val)
 
         if 'cron_expression' in data:
-            try:
-                from croniter import croniter
-                next_run = croniter(data['cron_expression']).get_next(datetime)
-                updates.append("next_run = %s")
-                params.append(next_run)
-            except Exception:
-                pass
+            # Deja validee ci-dessus : le calcul ne peut plus echouer en silence.
+            from croniter import croniter
+            updates.append("next_run = %s")
+            params.append(croniter(data['cron_expression'].strip()).get_next(datetime))
 
         if updates:
             params.append(schedule_id)

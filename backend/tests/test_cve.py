@@ -460,3 +460,63 @@ class TestScanManuelExclutLesArchivees:
         # mesurerait rien.
         assert requetes, 'aucune lecture de machines capturee'
         assert all("lifecycle_status != 'archived'" in q for q in requetes), requetes
+
+
+class TestPlafondAntiFrequence:
+    """Le plafond de 10 minutes vaut pour la creation, la modification et l'apercu.
+
+    Deux contournements mesures : la modification n'appliquait aucune garde
+    (`* * * * *` s'ecrivait par un PUT), et la creation ne comparait que les
+    deux prochaines occurrences (`0,59 * * * *` passait selon la minute).
+    """
+
+    def _put(self, client, admin_headers, mock_cursor, corps):
+        mock_cursor._results = [{'id': 1, 'name': 'Existante'}]
+        resp = client.put('/cve_schedules/1', headers=admin_headers, json=corps)
+        return resp, mock_cursor._last_query
+
+    @pytest.mark.parametrize('expr', ['* * * * *', '0,59 * * * *', '*/5 * * * *', 'pas du cron', ''])
+    def test_la_modification_refuse_et_n_ecrit_rien(self, client, admin_headers, mock_cursor, expr):
+        resp, derniere = self._put(client, admin_headers, mock_cursor, {'cron_expression': expr})
+        assert resp.status_code == 400, resp.get_json()
+        assert 'update cve_scan_schedules' not in derniere
+
+    def test_la_modification_accepte_une_frequence_raisonnable(self, client, admin_headers, mock_cursor):
+        resp, derniere = self._put(client, admin_headers, mock_cursor, {'cron_expression': '0 4 * * *'})
+        assert resp.status_code == 200
+        assert 'update cve_scan_schedules' in derniere and 'next_run' in derniere
+
+    @pytest.mark.parametrize('corps', [{'min_cvss': 999}, {'min_cvss': 'abc'}, {'min_cvss': -1}, {'name': '  '}])
+    def test_la_modification_refuse_les_valeurs_hors_bornes(self, client, admin_headers, mock_cursor, corps):
+        resp, derniere = self._put(client, admin_headers, mock_cursor, corps)
+        assert resp.status_code == 400
+        assert 'update cve_scan_schedules' not in derniere
+
+    def test_la_creation_refuse_les_ecarts_alternes(self, client, admin_headers, mock_db):
+        resp = client.post('/cve_schedules', headers=admin_headers, json={
+            'name': 'Alterne', 'cron_expression': '0,59 * * * *', 'min_cvss': 7.0,
+            'target_type': 'tag', 'target_value': 'production'})
+        assert resp.status_code == 400
+
+    def test_la_creation_refuse_un_cvss_non_numerique(self, client, admin_headers, mock_db):
+        resp = client.post('/cve_schedules', headers=admin_headers, json={
+            'name': 'X', 'cron_expression': '0 3 * * *', 'min_cvss': 'abc',
+            'target_type': 'tag', 'target_value': 'production'})
+        assert resp.status_code == 400
+
+    def test_l_apercu_annonce_le_refus(self, client, admin_headers, mock_db):
+        resp = client.get('/cron_preview?expr=0,59%20*%20*%20*%20*', headers=admin_headers)
+        assert resp.get_json()['valid'] is False
+
+    @pytest.mark.parametrize('expr,refus', [
+        ('0 3 * * *', False),
+        ('*/10 * * * *', False),
+        ('0,30 * * * *', False),
+        ('0,59 * * * *', True),            # passage d'heure
+        ('0,59 0,23 * * *', True),         # passage de jour, 23:59 -> 00:00
+        ('0,59 0,23 1,31 * *', True),      # passage de mois, 31 -> 1
+        ('0,59 0,23 1,31 1,12 *', True),   # passage d'annee, decembre -> janvier
+    ])
+    def test_l_ecart_minimal_est_mesure_sur_tous_les_passages(self, expr, refus):
+        from routes.cve import _refus_cron
+        assert (_refus_cron(expr) is not None) is refus, expr
