@@ -16,7 +16,7 @@ import base64
 import mysql.connector
 from flask import Blueprint, jsonify, request, Response
 
-from routes.helpers import resolve_ssh_creds as _resolve_ssh_creds
+from routes.helpers import resolve_ssh_creds as _resolve_ssh_creds, erreur_interne
 from routes.helpers import require_api_key, require_role, require_permission, require_machine_access, check_machine_access, get_current_user, threaded_route, get_db_connection, server_decrypt_password, logger
 from ssh_utils import db_config, ssh_session, execute_as_root, execute_as_root_stream
 from iptables_manager import get_iptables_rules, apply_iptables_rules
@@ -211,7 +211,7 @@ def manage_iptables():
                 return jsonify({"success": False, "message": "Action non reconnue."}), 400
     except Exception as e:
         logger.error("[iptables] %s", e)
-        return jsonify({"success": False, "message": "Erreur interne"}), 500
+        return erreur_interne(e)
 
 
 @bp.route('/iptables-validate', methods=['POST'])
@@ -260,7 +260,7 @@ def validate_iptables():
                 return jsonify({"success": False, "message": "Erreur de syntaxe.", "output": output})
     except Exception as e:
         logger.error("[iptables-validate] %s", e)
-        return jsonify({"success": False, "message": "Erreur interne"}), 500
+        return erreur_interne(e)
 
 
 @bp.route('/iptables-apply', methods=['POST'])
@@ -292,7 +292,7 @@ def manage_iptables_apply():
                 return jsonify({"success": False, "message": "Action non reconnue."}), 400
     except Exception as e:
         logger.error("[iptables-apply] %s", e)
-        return jsonify({"success": False, "message": "Erreur interne"}), 500
+        return erreur_interne(e)
 
 
 @bp.route('/iptables-restore', methods=['POST'])
@@ -335,7 +335,7 @@ def manage_iptables_restore():
             )
     except Exception as e:
         logger.error("[iptables-restore] %s", e)
-        return jsonify({"success": False, "message": "Erreur interne"}), 500
+        return erreur_interne(e)
 
 
 @bp.route('/iptables-history', methods=['GET'])
@@ -432,7 +432,7 @@ def iptables_rollback():
             )
     except Exception as e:
         logger.error("[iptables-rollback] %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
     finally:
         conn.close()
 

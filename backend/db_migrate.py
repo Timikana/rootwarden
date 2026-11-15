@@ -384,6 +384,45 @@ def _execute_migration(conn, migration: dict, dry_run: bool = False) -> None:
 # Point d'entrée principal
 # ──────────────────────────────────────────────────────────────────────────────
 
+# ══ UN SEUL PROCESSUS JOUE LES MIGRATIONS (2026-10-27) ════════════════════
+#
+# `server.py` appelle `run_migrations()` a l'import, donc dans CHACUN des
+# workers Hypercorn (4 en production), en meme temps. Sans verrou, ils lisaient
+# tous la meme liste « en attente » et l'appliquaient ensemble. Constat sur une
+# installation neuve (pile isolee) :
+#     ✗ Echec de la migration 033 : 1213 (40001): Deadlock found ...
+#     ✗ Echec de la migration 034 : 1213 (40001): Deadlock found ...
+# et le worker en echec abandonnait le reste. `maj.sh` joue les migrations avant
+# le redemarrage, ce qui masquait la course ; une installation neuve, ou un
+# `docker compose up` apres un `git pull`, y etait exposee.
+#
+# Verrou NOMME de MySQL, comme le leader du scheduler : il est porte par la
+# connexion, donc libere si le processus meurt. Les autres workers attendent,
+# puis trouvent la base a jour.
+_VERROU_MIGRATIONS = 'rootwarden_migrations'
+_ATTENTE_VERROU_S = 600
+
+
+def _prend_verrou(conn) -> bool:
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT GET_LOCK(%s, %s)", (_VERROU_MIGRATIONS, _ATTENTE_VERROU_S))
+        ligne = cur.fetchone()
+    finally:
+        cur.close()
+    return bool(ligne) and ligne[0] == 1
+
+
+def _rend_verrou(conn) -> None:
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT RELEASE_LOCK(%s)", (_VERROU_MIGRATIONS,))
+        cur.fetchall()
+        cur.close()
+    except Exception:
+        pass   # la fermeture de la connexion le libere de toute facon
+
+
 def run_migrations(dry_run: bool = False, strict: bool = False) -> bool:
     """
     Applique toutes les migrations en attente.
@@ -406,7 +445,16 @@ def run_migrations(dry_run: bool = False, strict: bool = False) -> bool:
             raise
         return False
 
+    verrou = False
     try:
+        verrou = _prend_verrou(conn)
+        if not verrou:
+            _log.error("Migrations : verrou '%s' non obtenu en %d s — un autre processus "
+                       "les joue encore ; aucune migration appliquee ici",
+                       _VERROU_MIGRATIONS, _ATTENTE_VERROU_S)
+            if strict:
+                raise RuntimeError("verrou des migrations non obtenu")
+            return False
         _ensure_tracking_table(conn)
         if not dry_run:
             _heal_bogus_premarks(conn)
@@ -447,6 +495,8 @@ def run_migrations(dry_run: bool = False, strict: bool = False) -> bool:
             raise
         return False
     finally:
+        if verrou:
+            _rend_verrou(conn)
         conn.close()
     _log.info("═══════════════════════════════════════════════════════")
 

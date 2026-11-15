@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\ClesPubliques;
 use App\Services\Comptes;
 use App\Services\MotDePasse;
 use App\Services\JournalAudit;
@@ -53,6 +54,7 @@ class ComptesController extends Controller
         private readonly JournalAudit $journal,
         private readonly StepUp $stepUp,
         private readonly MotDePasse $motDePasse,
+        private readonly ClesPubliques $cles,
     ) {
     }
 
@@ -365,7 +367,9 @@ class ComptesController extends Controller
             return response()->json(['success' => false, 'message' => __('comptes.err_inconnu')], 404);
         }
         $cle = (string) $requete->input('cle_ssh', '');
-        $err = $this->comptes->definitCleSsh($id, $cle);
+        // Sens CONSERVE : « la cle du compte » — toutes ses cles sont remplacees
+        // par celle-ci, valable partout ; une cle vide les retire toutes.
+        $err = $this->cles->remplaceParUneSeule($id, $cle, 'posee par un administrateur');
         if ($err !== null) {
             return response()->json(['success' => false, 'message' => __($err)], 422);
         }

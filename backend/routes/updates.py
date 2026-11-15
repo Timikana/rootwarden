@@ -12,7 +12,7 @@ import hashlib
 import logging
 from flask import Blueprint, jsonify, request, Response
 from config import Config
-from routes.helpers import require_api_key, require_role, require_permission, require_machine_access, threaded_route, get_db_connection, server_decrypt_password, logger, get_current_user
+from routes.helpers import require_api_key, require_role, require_permission, require_machine_access, threaded_route, get_db_connection, server_decrypt_password, logger, get_current_user, erreur_interne
 
 # ══ E-389 : LE BACKEND ETAIT PLUS PERMISSIF QUE LES DEUX PAGES QU'IL SERT ════
 #
@@ -234,7 +234,7 @@ def apt_check_lock():
             locked, details = _check_apt_lock(client, root_pass)
             return jsonify({'success': True, 'locked': locked, 'details': details})
     except Exception as e:
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 @bp.route('/dpkg_repair', methods=['POST'])
@@ -279,7 +279,7 @@ def dpkg_repair():
             return jsonify({'success': True, 'message': 'Réparation dpkg terminée', 'output': output[:3000]})
     except Exception as e:
         logger.error("[dpkg_repair] Erreur: %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -364,7 +364,7 @@ def update_server():
 
     except Exception as e:
         logger.error("[update_server] Erreur: %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -432,7 +432,7 @@ def apply_security_updates():
 
     except Exception as e:
         logger.error("[security_updates] Erreur: %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -495,7 +495,7 @@ def schedule_update():
         return jsonify({'success': True, 'message': 'Tâche planifiée avec succès'}), 200
     except Exception as e:
         logging.error(f"[schedule_update] Erreur: {e}")
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -615,7 +615,7 @@ def apt_update():
 
     except Exception as e:
         logger.error("[apt_update] Erreur: %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -709,7 +709,7 @@ def custom_update():
 
     except Exception as e:
         logger.error("[custom_update] Erreur: %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -836,7 +836,7 @@ def schedule_advanced_update():
         return jsonify({'success': True, 'message': 'Planification avancée enregistrée avec succès.'}), 200
     except Exception as e:
         logging.error(f"[schedule_advanced_update] Erreur: {e}")
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1001,7 +1001,7 @@ def schedule_advanced_security_update():
         return jsonify({'success': True, 'message': 'Mise à jour de sécurité planifiée avec succès'}), 200
     except Exception as e:
         logger.error("[schedule_advanced_security_update] Erreur: %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1054,7 +1054,7 @@ def update_security_exec():
             conn.commit()
         return jsonify({'success': True, 'message': 'Date de dernière exécution mise à jour'}), 200
     except Exception as e:
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1148,7 +1148,7 @@ def dry_run_update():
 
     except Exception as e:
         logger.error("[dry_run_update] Erreur: %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1237,4 +1237,4 @@ def pending_packages():
 
     except Exception as e:
         logger.error("[pending_packages] Erreur: %s", e)
-        return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+        return erreur_interne(e)

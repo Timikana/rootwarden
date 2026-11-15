@@ -24,9 +24,10 @@ c'est ainsi qu'on repaie les préalables un par un.
 Chacun a coûté au moins une séance de diagnostic. Ils sont dans le script, mais
 il faut savoir qu'ils existent pour comprendre un échec.
 
-1. **Le compte de développement n'est pas forcément dans le groupe `docker`.**
-   Le script passe par `sudo -n docker`. **Ne pas ajouter le compte au groupe**
-   pour contourner : l'appartenance vaut un accès root permanent.
+1. **Docker, directement ou par `sudo -n`.** Le script emploie `docker` si le
+   compte y a accès, sinon un relais `sudo -n docker`. Sur l'hôte de dev, le
+   compte est dans le groupe `docker`, par choix de l'exploitant : c'est un accès
+   équivalent à root, à ne pas reproduire sur un autre poste.
 2. **Le banc d'essai vit derrière le profil compose `preprod`.** `test-server`
    (machine 2) et `mock-opencve` ne démarrent qu'avec `--profile preprod`. Un
    `docker compose up -d` nu les laisse à terre, et les sous-lots qui les
@@ -40,7 +41,7 @@ il faut savoir qu'ils existent pour comprendre un échec.
    compteur **par IP** en base (seuil 10 sur 10 min). Enchaîner les suites le fait
    déborder tout seul.
 5. **Il faut attendre le basculement de la fenêtre TOTP entre deux suites.** Le
-   garde anti-rejeu est **par compte et en base** : il traverse les suites.
+   garde anti-rejeu est **par compte**, persistant (cache applicatif, pilote fichier) : il traverse les suites.
 6. **`go-vague0-legacy` vise `superadmin`**, dont le mot de passe en base n'est pas
    celui qu'attend la suite et dont `force_password_change` vaut 1. Le script le
    joue avec `rw-test-super`.

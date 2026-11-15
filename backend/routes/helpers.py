@@ -179,6 +179,29 @@ def threaded_route(func):
     return wrapper
 
 
+# Causes de CONNEXION SSH dont le message est rendu au portail (voir `erreur_interne`).
+# Reconnues par leur NOM et non par isinstance : `ssh_utils` est remplace par un
+# simulacre dans les tests des routes, et ses classes n'y existent pas.
+_ERREURS_DE_CONNEXION = ('MachineInjoignable', 'CleHoteChangee', 'AuthenticationException',
+                         'BadAuthenticationType', 'NoValidConnectionsError')
+
+
+def erreur_interne(e):
+    """Reponse d'une route qui a attrape une exception : « Erreur interne », sauf
+    pour une cause de connexion SSH, qui est DITE.
+
+    2026-10-27, constat en production : une machine dont le pare-feu rejetait le
+    SSH etait annoncee « cle non deployee », puis, une fois ce message corrige,
+    « Erreur interne » — la cause exacte (`[Errno 113] No route to host`) etait
+    au journal du backend et nulle part a l'ecran. Ces messages ne portent que
+    l'adresse et le port d'une machine que l'administrateur a lui-meme declaree ;
+    toute autre exception reste masquee. Le code HTTP ne change pas.
+    """
+    if type(e).__name__ in _ERREURS_DE_CONNEXION:
+        return jsonify({'success': False, 'message': str(e)[:300]}), 500
+    return jsonify({'success': False, 'message': 'Erreur interne'}), 500
+
+
 def get_db_connection():
     """Retourne une connexion MySQL."""
     from ssh_utils import db_config

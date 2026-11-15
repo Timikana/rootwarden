@@ -66,13 +66,36 @@ class Conformite
      */
     public function comptes(): array
     {
-        return DB::table('users as u')
+        /*
+         * MIGRATION 067 : plusieurs cles par compte, dans `user_ssh_keys`.
+         *
+         * `ssh_key` et `ssh_key_updated_at` restent DEUX CHAMPS, AU MEME RANG :
+         * ils entrent dans l'empreinte (D-2, decision d'exploitant en attente),
+         * et `json_encode` suit l'ordre des proprietes. Ils sont remplis depuis
+         * la nouvelle table — les cles du compte, une par ligne, et la date de la
+         * PLUS ANCIENNE (celle qui compte pour la rotation). Un compte repris par
+         * la migration (une cle, date reprise) rend donc les MEMES valeurs
+         * qu'avant, et la meme empreinte.
+         */
+        $comptes = DB::table('users as u')
             ->join('roles as r', 'u.role_id', '=', 'r.id')
-            ->select('u.name', 'u.email', 'u.active', 'u.sudo', 'u.ssh_key',
-                     'u.ssh_key_updated_at', 'u.totp_secret', 'u.password_updated_at',
-                     'u.created_at', 'r.name as role_name')
+            ->select('u.name', 'u.email', 'u.active', 'u.sudo', DB::raw('NULL as ssh_key'),
+                     DB::raw('NULL as ssh_key_updated_at'), 'u.totp_secret', 'u.password_updated_at',
+                     'u.created_at', 'r.name as role_name', 'u.id as id_cles')
             ->orderBy('u.name')
             ->get()->all();
+
+        $cles = DB::table('user_ssh_keys')->orderBy('id')->get(['user_id', 'cle', 'created_at'])->groupBy('user_id');
+        foreach ($comptes as $c) {
+            $siennes = $cles[$c->id_cles] ?? collect();
+            if ($siennes->isNotEmpty()) {
+                $c->ssh_key = $siennes->pluck('cle')->implode("\n");
+                $c->ssh_key_updated_at = (string) $siennes->min('created_at');
+            }
+            unset($c->id_cles);
+        }
+
+        return $comptes;
     }
 
     /** @return array<string,int> */

@@ -38,6 +38,9 @@ def db_backup_reel(tmp_path, monkeypatch):
                 return []          # SHOW TABLES : base vide, le dump reste valide
 
         class _Connexion:
+            def start_transaction(self, **_k):
+                pass
+
             def cursor(self):
                 return _Curseur()
 

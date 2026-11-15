@@ -108,7 +108,9 @@ class Comptes
     {
         return DB::table('users')
             ->select('id', 'name', 'email', 'company', 'role_id', 'active', 'sudo',
-                'ssh_key', 'ssh_key_updated_at', 'failed_attempts', 'locked_until',
+                // Plus `ssh_key` : les cles vivent dans `user_ssh_keys` (migration 067).
+                DB::raw('(SELECT COUNT(*) FROM user_ssh_keys k WHERE k.user_id = users.id) AS nb_cles'),
+                'failed_attempts', 'locked_until',
                 'totp_secret', 'force_password_change', 'password_updated_at',
                 // L'exemption d'expiration : la vue la RESTITUE dans son
                 // selecteur, sinon rouvrir la page reproposerait « suivre la
@@ -266,7 +268,7 @@ class Comptes
         return implode('', $car);
     }
 
-    /* ═══ Clé SSH — un seul ecrivain, et il valide ══════════════════════════ */
+    /* ═══ Clé SSH — la regle de forme ; l ecrivain est ClesPubliques ════════ */
 
     /**
      * Valide la FORME d'une cle publique : algorithme dans la liste fermee, corps
@@ -278,50 +280,10 @@ class Comptes
      */
     public function verifieCleSsh(string $cle): ?string
     {
-        $cle = trim($cle);
-        if ($cle === '') {
-            return null; // une cle vide efface la cle : c'est un geste valide
-        }
-        if (str_contains($cle, "\n") || str_contains($cle, "\r")) {
-            return 'comptes.err_cle_lignes';
-        }
-        $morceaux = preg_split('/\s+/', $cle);
-        if (count($morceaux) < 2) {
-            return 'comptes.err_cle_forme';
-        }
-        if (! in_array($morceaux[0], self::ALGOS_SSH, true)) {
-            return 'comptes.err_cle_algo';
-        }
-        if (preg_match('#^[A-Za-z0-9+/]+={0,2}$#', $morceaux[1]) !== 1) {
-            return 'comptes.err_cle_base64';
-        }
-
-        return null;
+        return ClesPubliques::verifieForme($cle);
     }
 
-    /**
-     * L'UNIQUE ecriture de la cle SSH. Stockee TELLE QUELLE — l'echappement
-     * appartient au rendu. Le legacy a trois ecrivains, dont un qui applique
-     * `htmlspecialchars` a l'ecriture (E-115).
-     */
-    public function definitCleSsh(int $id, string $cle): ?string
-    {
-        if (($err = $this->verifieCleSsh($cle)) !== null) {
-            return $err;
-        }
-        $cle = trim($cle);
-        DB::table('users')->where('id', $id)->update([
-            'ssh_key' => $cle === '' ? null : $cle,
-            'ssh_key_updated_at' => now(),
-            // Meme raison qu'a `changeCourriel` : sans cette ligne, poser sa cle
-            // repousserait l'echeance de son mot de passe. La correction est ICI
-            // et non dans l'appelant, pour que les DEUX chemins en beneficient —
-            // la route d'administration comme le libre-service.
-            'password_updated_at' => DB::raw('password_updated_at'),
-        ]);
-
-        return null;
-    }
+    // `definitCleSsh` a disparu : l'unique ecrivain des cles est `ClesPubliques`.
 
     /**
      * Change l'adresse de courriel d'un compte.
@@ -698,8 +660,8 @@ class Comptes
             $actifs = DB::table('users')->where('active', 1);
 
             $sansCle = DB::table('users')->where('active', 1)
-                ->where(function ($q) {
-                    $q->whereNull('ssh_key')->orWhere('ssh_key', '');
+                ->whereNotExists(function ($q) {
+                    $q->select(DB::raw(1))->from('user_ssh_keys as k')->whereColumn('k.user_id', 'users.id');
                 })->count();
 
             return [
@@ -755,12 +717,14 @@ class Comptes
         }
 
         try {
+            // Un compte compte UNE fois, des qu'une de ses cles a plus de 90 jours.
             $n = DB::table('users')
                 ->where('active', 1)
-                ->whereNotNull('ssh_key')
-                ->where('ssh_key', '<>', '')
-                ->whereNotNull('ssh_key_updated_at')
-                ->where('ssh_key_updated_at', '<', now()->subDays(90))
+                ->whereExists(function ($q) {
+                    $q->select(DB::raw(1))->from('user_ssh_keys as k')
+                        ->whereColumn('k.user_id', 'users.id')
+                        ->where('k.created_at', '<', now()->subDays(90));
+                })
                 ->count();
 
             return ['lisible' => true, 'cles_anciennes' => $n];
@@ -870,10 +834,13 @@ class Comptes
     {
         $marque = 'compte-anonymise-' . $id;
         DB::transaction(function () use ($id, $marque): void {
+            (new ClesPubliques())->retireTout($id);
             DB::table('users')->where('id', $id)->update([
                 'name' => $marque,
                 'email' => null,
                 'company' => null,
+                // L'ancienne colonne est videe aussi : une donnee personnelle
+                // ne survit pas a l'anonymisation, meme dans une colonne abandonnee.
                 'ssh_key' => null,
                 'ssh_key_updated_at' => null,
                 'totp_secret' => null,
@@ -1084,13 +1051,12 @@ class Comptes
 
         $mdp = $this->genereMotDePasse();
         try {
-            DB::table('users')->insert([
+            $idCree = DB::table('users')->insertGetId([
                 'name' => $nom,
                 'email' => $courriel,
                 // `cout()` et non un `config()` recopie : ce service porte deja
                 // le cout, « lu la ou le legacy le lit » dit son commentaire.
                 'password' => password_hash($mdp, PASSWORD_BCRYPT, ['cost' => $this->cout()]),
-                'ssh_key' => ($data['ssh_key'] ?? '') !== '' ? $data['ssh_key'] : null,
                 'role_id' => $role,
                 'active' => ($data['active'] ?? '') === '' ? 1 : (int) $data['active'],
                 'sudo' => $sudo,
@@ -1130,6 +1096,19 @@ class Comptes
         }
 
         $bilan['crees']++;
+        /*
+         * LA CLE DU CSV PASSE PAR LA REGLE. Avant la migration 067, elle etait
+         * inseree TELLE QUELLE dans `users.ssh_key` — sans la validation que le
+         * profil et l'ecriture administrative imposent (options `command=`,
+         * `from=`...). Une cle refusee laisse le compte cree, sans cle, et le dit.
+         */
+        $cleCsv = $data['ssh_key'] ?? '';
+        if ($cleCsv !== '') {
+            $errCle = (new ClesPubliques())->remplaceParUneSeule($idCree, $cleCsv, 'import CSV');
+            if ($errCle !== null) {
+                $bilan['erreurs'][] = ['ligne' => $ligne, 'nom' => $nom, 'texte' => __('comptes.imp_cle_refusee', ['raison' => __($errCle)])];
+            }
+        }
         // LE SECRET NE VA QUE LA. Ni dans `erreurs`, ni dans le journal.
         $secrets[] = ['nom' => $nom, 'mdp' => $mdp];
         /*

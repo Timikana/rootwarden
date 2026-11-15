@@ -163,4 +163,5 @@ return [
     'step_up_code' => 'Code à six chiffres',
     'step_up_valider' => 'Confirmer',
     'lien_cles_api' => "Gérer les clés d'API",
+    'imp_cle_refusee' => 'Clé SSH refusée, compte créé sans clé : :raison',
 ];

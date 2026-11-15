@@ -55,18 +55,6 @@ Decisions et mesures : `docs/migration/{INVENTAIRE,ARCHITECTURE-UI,DEPRECIATION}
   migration : ils figeraient des valeurs encore en mouvement.
 - **Apres modification** : `config:clear` apres un changement de config,
   `view:clear` + `view:cache` apres un changement de vue.
-- **Sur un hote Windows, le bind mount est ~258x plus lent que le systeme de
-  fichiers du conteneur** : 9 300 ms contre 36 ms pour lire 1 500 fichiers PHP
-  (mesure du 2026-08-17). Le legacy charge ~5 fichiers par page, Laravel
-  plusieurs centaines : une premiere requete a froid depasse 6 s, puis retombe
-  a 0,17 s une fois le cache du systeme chaud. Consequences :
-  - la sonde du conteneur a un delai de 20 s, pas 5 s — avec 5 s elle echouait
-    toujours et le conteneur restait « unhealthy » en permanence sans qu'aucun
-    defaut applicatif n'existe ;
-  - **toute mesure de latence faite sur cet hote est suspecte.** Comparer
-    Laravel au legacy sur ce poste compare surtout leur nombre de fichiers
-    charges. L'ecart releve precedemment sur la recherche (2,2 s contre 24 ms)
-    doit etre re-mesure ailleurs avant d'etre traite comme un defaut.
 - **`@json` multiligne casse le PHP compile.** Le garder sur une ligne.
 - **Une cle de traduction absente rend son IDENTIFIANT a l'ecran**, sans
   erreur. Mesurer les cles MORTES : trois pieces justes peuvent donner un
@@ -86,14 +74,10 @@ supprimait jamais rien.
 Parite FR/EN **stricte**, dans le meme commit. Point de depart mesure au
 2026-08-17 : 2 545 cles FR = 2 545 cles EN cote legacy.
 
-Cote legacy le PHP appelle `t('module.cle')` et le JS `__('cle')` (injecte par
-`head.php`) — ne pas confondre : une recherche de `__(` dans le PHP ne trouve
-rien et le silence passe pour un zero.
-
 ## Tests
 
-- Test de caracterisation **vert sur le legacy d'abord**, puis le MEME test
-  vert sur Laravel. Divergence voulue -> CHANGELOG + attendu PAR CIBLE.
+- Le legacy n'est plus servi : un test se juge sur le portage seul. Un ecart
+  voulu avec l'ancien comportement -> CHANGELOG.
 - **Suivre les liens DU MENU**, jamais une liste d'URL ecrite a la main : sept
   404 ont vecu dans le menu sans qu'aucune suite ne les voie.
 - **Mesurer un booleen, pas une longueur.** La longueur du texte d'une page
@@ -114,8 +98,6 @@ rien et le silence passe pour un zero.
   genere `APP_KEY` au premier demarrage.
 - Toute nouvelle variable va dans `srv-docker.env.example` : les exploitants la
   recuperent automatiquement via `./maj.sh`.
-- `MSYS_NO_PATHCONV=1` devant tout `docker exec` portant un chemin absolu :
-  Git Bash traduit `/var/www/html` en `C:/Program Files/Git/var/www/html`.
 
 ## Authentification — ce que le legacy fait vraiment
 
@@ -134,8 +116,8 @@ Mesure par `tests/e2e/go-socle-auth.mjs` (13 PASS / 1 ecart connu cote legacy) :
   reussite comptait comme un echec.
 - **Le garde anti-rejeu TOTP est INERTE** — voir `docs/migration/PARITE.md`
   E-01. `$_SESSION['last_totp_hash']` n'est pose que dans la branche de succes
-  puis supprime dans la meme requete. Le portage doit porter ce garde par
-  COMPTE, en base, jamais par session : un garde de session ne peut rien contre
+  puis supprime dans la meme requete. Le portage porte ce garde par
+  COMPTE, dans le cache applicatif (pilote fichier, `App\Services\Totp`), jamais par session : un garde de session ne peut rien contre
   un rejeu venu d'une session neuve.
 - Step-up : `stepUpVerify($action, 900)`, cle `_step_up_<action>` par ACTION,
   limitation a 5 tentatives, anti-rejeu `_step_up_last_totp`.
@@ -215,11 +197,6 @@ Mesure par `tests/e2e/go-socle-auth.mjs` (13 PASS / 1 ecart connu cote legacy) :
   ATTENDU. La propriete a mesurer est qu'une requete **cross-site** soit
   refusee — et le navigateur interdisant de forger `Sec-Fetch-Site`, il faut
   rejouer la requete depuis Node avec les cookies de session.
-- **Ne pas sonder le legacy avec des requetes mutantes.** Un POST refuse par son
-  controle CSRF invalide la session ; son JS de sondage part alors vers la page
-  de connexion, et cette navigation DETRUIT le contexte d'execution : le
-  `page.evaluate` en cours ne rend jamais et tout le lot expire sans rien
-  mesurer.
 
 ## i18n
 
@@ -271,30 +248,17 @@ noms de champ.
 | Passerelle vers le backend (filtrage par segment) | fait | passerelle 10 / 5+1 |
 | i18n (bascule FR/EN, parite verifiee) | fait | i18n 23 |
 
-NON PORTE, et signale a l'ecran plutot que silencieusement absent : enrolement
-d'un second facteur, re-authentification ponctuelle (step-up), politique de mot
-de passe, reinitialisation. Un compte sans secret TOTP arrive sur une impasse
-explicite renvoyant vers l'ancien portail.
+Portes depuis : enrolement du second facteur (`/second-facteur/enrolement`),
+re-authentification ponctuelle (`RoutesBackend::MOTIFS_STEP_UP`), politique de
+mot de passe (`App\Services\MotDePasse`), reinitialisation
+(`/mot-de-passe-oublie`). Il n'y a plus d'ancien portail vers lequel renvoyer.
 
 ### Pages metier
 
-| Page | Route | Garde | Archivee |
-|---|---|---|---|
-| Supervision (V1 : page + 4 onglets) | `supervision` | `role:2` + `perm:can_manage_supervision` | NON, V2..V12 y vivent |
-| Journal des commandes | `journal-commandes` | `role:2` + `perm:can_admin_portal` | oui, 2026-08-18 |
-| Approbations a quatre yeux | `approbations` | `role:2` + `perm:can_admin_portal` | oui, 2026-08-18 |
-| Derive de configuration | `derive-config` | `role:2` + `perm:can_view_compliance` | oui, 2026-08-18 |
-| Sauvegardes de la base | `sauvegardes` | `role:2` + `perm:can_admin_portal` | oui, 2026-08-18 |
-| Centre de taches | `taches` | `role:2` SEUL (comme le legacy) | oui, 2026-08-18 |
-| Ticketing ITSM | `tickets` | `role:2` + `perm:can_admin_portal` | oui, 2026-08-18 |
-| Recherche globale | `recherche` | `role:2` + `perm:can_admin_portal` | oui, 2026-08-18 |
-| Scan de vulnerabilites CVE | `scan-cve` | `role:1` + `perm:can_scan_cve` | non — `security/` porte a S7a sur 7 |
-| Cles SSH | `cles-ssh` | `role:1` + `perm:can_deploy_keys` | non — `ssh/` porte a K3 sur 4 |
-
-Le cycle d'archivage est eprouve : `git mv legacy/<partie> legacy/_deprecated/`,
-puis l'URL du legacy doit rendre **404** — c'est la preuve que plus rien ne la
-sert. Penser aussi a rediriger l'entree du menu DU LEGACY vers le nouveau
-portail (`LARAVEL_URL`), sans quoi on installe soi-meme un 404 dans un menu.
+Toutes les parties metier du legacy sont archivees : aucun `.php` metier hors de
+`legacy/_deprecated/`, `legacy/vendor/` et `legacy/lang/`. La liste des pages
+portees et de leurs gardes se lit dans `App\Support\Navigation` et
+`routes/web.php`, pas ici.
 
 ### Une LISTE A COCHER n'est pas un tableau
 
@@ -864,7 +828,9 @@ Deux routes de constat, deux formes opposees :
 | `/pending_packages` | le backend DECOUPE la sortie | des noms et des versions |
 | `/dry_run_update` | `Response(generate(), 'text/plain')` | le flux SSH **tel quel** |
 
-La seconde porte le mot de passe root en ligne 2 (E-17). Elle n'est pas portee.
+La seconde a porte le mot de passe root en ligne 2 (E-17). Elle n'est relayee
+(`RoutesBackend::EN_FLUX`) que depuis que le backend filtre cet echo par
+`filtre_echo_mot_de_passe()`.
 
 Regle : avant de porter une capacite qui affiche une sortie de commande,
 regarder si le backend FILTRE ou s'il DIFFUSE. Un flux brut affiche a l'ecran
@@ -879,7 +845,8 @@ l'autre passe.
 
 Se mefier des defenses qui portent sur une POSITION (« la premiere ligne »)
 plutot que sur le CONTENU (« tant que la ligne est le secret »). Une position se
-decale ; un contenu, non.
+decale ; un contenu, non. La defense en place, `filtre_echo_mot_de_passe()`,
+filtre sur le contenu.
 
 ### Un etat vide ne doit pas promettre ce que la fonction ne prouve pas
 
@@ -1082,11 +1049,10 @@ Deux pieges rencontres :
  - Apache applique `AddOutputFilterByType DEFLATE text/plain`, et compresser
    oblige a accumuler. `apache_setenv('no-gzip', '1')` dans la fermeture.
 
-MESURE A GARDER EN TETE : le backend livre son corps d'un seul tenant entre
-conteneurs (en-tetes a 0,5 s, tout le corps a 7,5 s). Le relais par morceaux ne
-bufferise pas de notre cote, mais il n'y a AUCUNE progression ligne a ligne
-aujourd'hui — ni dans le portage, ni dans le legacy. Ne pas promettre un direct
-qu'on n'a pas mesure.
+Le relais lit le corps SANS BLOQUER (`App\Support\RelaisFlux`) : un
+`read(8192)` sur la socket TLS du backend attendait 8 Ko ou la fin et figeait
+l'ecran. Mesurer la progression sur la cible reelle, en TLS : le HTTP clair ne
+reproduit pas le blocage.
 
 ### Verifier l'absence d'un secret sans le manipuler
 
@@ -1344,7 +1310,8 @@ etaient des fragments de champ, pas des cellules. Avec un decoupage correct, auc
 
 ### Se reconnecter avec le MEME compte dans la meme fenetre TOTP echoue — sur le portage seulement
 
-Le portage porte un garde anti-rejeu **par compte, en base**. Rouvrir une session pour le meme
+Le portage porte un garde anti-rejeu **par compte**, persistant (cache
+applicatif, pilote fichier — `App\Services\Totp`). Rouvrir une session pour le meme
 compte moins de 30 s apres rejoue le meme code : le garde refuse, la session reste anonyme, et
 chaque appel part alors vers la page de connexion — qui rend **200 en HTML**. Treize assertions ont
 echoue ainsi sur un portage qui fonctionnait, avec pour seul indice un `text/html` la ou on attendait
@@ -1588,25 +1555,11 @@ Ne pas confondre avec ne pas mesurer : le journal du legacy doit dire
 
 ## Detail
 
-Module `security/` : **S1 a S6 portes** (v1.37.27), S7 — le scan lui-meme, FLUX +
-SSH + destructif — en dernier. Le portage LIT ET ECRIT LA BASE directement, avec
+Module `security/` : le portage LIT ET ECRIT LA BASE directement, avec
 **deux exceptions declarees**, toutes deux parce qu'elles appellent des services
 EXTERNES : la creation de ticket (fournisseur ITSM) et la re-priorisation
 (FIRST.org + catalogue CISA). Toute action destructrice passe par une decision
 EN LIGNE qui nomme sa consequence chiffree.
-
-Socle complet. Sept pages metier portees et archivees, module `update/` en cours
-(module `update/` porte ET ARCHIVE le 2026-08-20 — premier module, sept sous-lots.
-Restent security/, supervision/, iptables/, adm/) — toutes celles du meme
-gabarit. Le cycle est rode et se
-deroule d'une traite : caracterisation verte sur le legacy, portage, meme test
-vert sur Laravel, verification en cliquant, captures REGARDEES, archivage,
-rejeu du LOT, commit.
-
-Reference consultable sur la branche abandonnee `laravel` (22 vagues, 2 825
-assertions vertes) : `git show laravel:docs/migration/{AUTH,GATEWAY,LAYOUT,DESIGN-SYSTEM,PORTAGE}.md`
-et `git show laravel:laravel/resources/views/components/rw/<nom>.blade.php`
-(7 composants). A consulter, jamais a recopier telle quelle.
 
 ## Module `supervision/` — PORTE EN ENTIER (V1 a V12, 2026-08-23)
 

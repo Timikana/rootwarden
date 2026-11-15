@@ -14,6 +14,38 @@
 (function () {
     'use strict';
 
+    /*
+     * Lit un flux AU FIL DE L'EAU et le verse dans `journal` a mesure, puis rend
+     * le texte COMPLET — sur lequel le verdict se calcule, exactement comme avant.
+     *
+     * `reponse.text()` attendait la fin du flux : un deploiement d'agent, relaye
+     * morceau par morceau par la passerelle (jusqu'a 900 s), n'affichait rien
+     * avant d'etre termine (constat du 2026-10-27).
+     */
+    function litEnDirect(reponse, journal) {
+        if (! reponse.body || ! reponse.body.getReader) { return reponse.text(); }
+        var lecteur = reponse.body.getReader();
+        var decodeur = new TextDecoder();
+        var texte = '';
+        if (journal) { journal.textContent = ''; journal.hidden = false; }
+        function suite() {
+            return lecteur.read().then(function (morceau) {
+                if (morceau.done) {
+                    texte += decodeur.decode();
+                    if (journal) { journal.textContent = texte; }
+                    return texte;
+                }
+                texte += decodeur.decode(morceau.value, { stream: true });
+                if (journal) {
+                    journal.textContent = texte;
+                    journal.scrollTop = journal.scrollHeight;
+                }
+                return suite();
+            });
+        }
+        return suite();
+    }
+
     var libelles = {};
     try {
         libelles = JSON.parse(document.getElementById('superv-libelles').textContent);
@@ -807,7 +839,7 @@
                     return null;
                 }
 
-                return reponse.text();
+                return litEnDirect(reponse, journalDesinst);
             }).then(function (texte) {
                 if (texte === null || texte === undefined) { return null; }
                 if (journalDesinst) {
@@ -983,7 +1015,7 @@
                     return null;
                 }
 
-                return reponse.text();
+                return litEnDirect(reponse, journalReconf);
             }).then(function (texte) {
                 if (texte === null || texte === undefined) { return; }
                 if (journalReconf) {
@@ -1594,7 +1626,7 @@
                     return null;
                 }
 
-                return reponse.text();
+                return litEnDirect(reponse, journalDepl);
             }).then(function (texte) {
                 if (texte === null || texte === undefined) { return null; }
                 if (journalDepl) {

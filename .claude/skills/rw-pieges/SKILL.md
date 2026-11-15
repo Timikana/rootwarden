@@ -37,11 +37,10 @@ toucher à la zone concernée.
   `test-server` : le drapeau annulait la seule raison d'être du conteneur, et
   faisait passer un mot de passe pourtant CORRECT pour invalide. Retiré de ce
   service, conservé sur les autres.
-- **Le mot de passe root fuit dans le flux de `/security_updates`** (ligne 2,
-  3 essais sur 3), par l'écho du terminal, malgré la défense « Patch A09 » de
-  `execute_as_root_stream` qui ne l'attrape pas sur le chemin `mode=sudo`.
-  Les journaux sont propres (`log_scrub.py`) ; la fuite est dans la réponse
-  HTTP affichée par l'interface. NON CORRIGÉ — arbitrage en attente.
+- **L'écho du terminal peut porter le mot de passe root dans un flux.** Une
+  défense par POSITION (« la première ligne ») ratait le second écho. La
+  défense en place filtre sur le CONTENU : `filtre_echo_mot_de_passe()`
+  (`backend/ssh_utils.py`, test `backend/tests/test_ssh_echo_mot_de_passe.py`).
 
 ## Scheduler / tâches de fond
 - **`next_run` AVANT l'exécution** : persister last_run/next_run PUIS exécuter
@@ -78,42 +77,13 @@ toucher à la zone concernée.
   sur `;`) ; commentaires d'en-tête OK.
 
 ## Frontend
-- **Tailwind compilé localement avec purge** : une classe jamais utilisée
-  (ex. `rose-*`, `lime-*`) est absente du CSS prod → `grep -r "bg-X" legacy/`
-  avant d'employer une classe, sinon recompiler. (Ne concerne que le legacy :
-  le portage Laravel n'a pas d'etape de construction, cf `ARCHITECTURE-UI.md`.)
 - Après une action AJAX, mettre à jour le DOM complet (badges, lignes
   conditionnelles rendues par PHP) — pas seulement le style du bouton, sinon
   « il faut F5 » (cf sudo-row v1.37.11, profils supervision v1.37.15).
 - Contrat JSON : vérifier la clé réelle renvoyée par le backend Python
   (`machines` vs `servers` legacy PHP). (v1.37.12)
 
-## Poste de développement Windows
-
-- **Git Bash traduit les chemins POSIX en chemins Windows.** Trois dégâts
-  constatés le même jour (2026-08-17) :
-  - `docker exec … ls /var/www/html/x` devient
-    `C:/Program Files/Git/var/www/html/x` → « No such file » trompeur ;
-  - un `/var/www/html/...` passé à un script a créé l'arborescence parasite
-    `www/C:/Program Files/Git/var/www/html/` dans le dépôt ;
-  - `docker exec … curl -o /dev/null` a écrit la réponse dans un fichier
-    littéralement nommé **`nul`** au répertoire de travail du conteneur — donc
-    dans le bind mount, donc dans le dépôt. `nul` est un **nom de périphérique
-    réservé** sous Windows : `git add` échoue avec
-    `error: open("…/nul"): No such file or directory`, et `rm` ne suffit pas.
-    Suppression : `[System.IO.File]::Delete("\\?\" + $chemin)` en PowerShell.
-
-  Parade : `MSYS_NO_PATHCONV=1` devant tout appel portant un chemin absolu, et
-  `-o /tmp/x` plutôt que `-o /dev/null` dans un `docker exec`.
-
-- **Le bind mount est ~258× plus lent que le système de fichiers du conteneur**
-  (9 300 ms contre 36 ms pour lire 1 500 fichiers PHP). Conséquence directe :
-  toute mesure de latence faite sur ce poste compare surtout des nombres de
-  fichiers chargés. Voir la skill `rw-laravel`.
-
-## Poste de développement VM Debian (depuis le 2026-08-20)
-
-Les pièges Windows ci-dessus ne s'appliquent plus.
+## Poste de développement VM Debian
 
 **Les six prérequis d'exécution du LOT — relais docker, profil compose `preprod`,
 `E2E_BASE` dans les deux sens, `login_attempts`, fenêtre TOTP, cas de vague 0 —
@@ -125,13 +95,9 @@ reproche au legacy cinq fois.
 Ne restent ici que les pièges de l'environnement qui ne sont pas des étapes du
 lanceur :
 
-- **`utilisateur` n'est PAS dans le groupe `docker`**, contrairement à ce
-  qu'affirmait la doc de bascule — `id` le dit. Ne pas l'ajouter au groupe pour
-  contourner : l'appartenance vaut un **accès root permanent**. Le lanceur passe
-  par `sudo -n docker`.
-- **L'identité git n'est pas configurée** : le premier commit échoue sur
-  « Identité d'auteur inconnue ». La régler **localement au dépôt**, sur celle de
-  l'historique, jamais en `--global`.
+- **`utilisateur` est dans le groupe `docker`**, par choix de l'exploitant :
+  `docker` marche sans `sudo`. C'est un **accès équivalent à root** — ne pas le
+  reproduire sur un autre poste ; le lanceur sait aussi passer par `sudo -n docker`.
 - **Le mot de passe de `superadmin` en base n'est pas celui qu'attendent les
   suites**, et son `force_password_change` vaut 1. Ne pas y toucher : utiliser un
   compte `rw-test-*`.
@@ -144,10 +110,8 @@ lanceur :
   le piège de `mysqladmin ping` sous une forme neuve, et en pire : **une session
   réussie ne prouve pas que le démon est prêt** — le contrôle d'attente avait
   obtenu un `uid 0`, et la session suivante est tombée quand même.
-- **La RAM a été portée à 6 Go** le 2026-08-20 (5,8 Gio vus par le système,
-  hot-add sans redémarrage). Le plancher est franchi. Cela ne rend PAS l'exécution
-  parallèle des suites possible : c'est le garde anti-rejeu par compte qui
-  l'interdit, pas la mémoire.
+- **Les suites ne tournent pas en parallèle**, quelle que soit la mémoire : c'est
+  le garde anti-rejeu TOTP par compte qui l'interdit.
 
 ## Outillage de shell
 
@@ -168,7 +132,7 @@ lanceur :
 
 ## Suites E2E : le garde anti-rejeu TRAVERSE les suites
 
-Le portage porte un garde anti-rejeu TOTP **par compte et en base**. Il ne
+Le portage porte un garde anti-rejeu TOTP **par compte**, persistant (cache applicatif, pilote fichier). Il ne
 s'arrete donc pas au bord d'une suite : **deux suites consecutives qui ouvrent
 une session avec le meme compte dans la meme fenetre de 30 s rejouent le meme
 code.** La seconde est refusee, la session reste anonyme, et chaque appel part
@@ -194,23 +158,23 @@ suite verte sur le legacy ne prouve donc rien du portage.
 
 ## Une ecriture de test peut ARMER un declencheur
 
-Avant d'ecrire dans une table, chercher **qui la CONSOMME**. En S4, ecrire une
+Avant d'ecrire dans une table, chercher **qui la CONSOMME**. Ecrire une
 planification arme le scheduler — demarre **sans condition** par
-`backend/server.py:240-247`, aucune variable d'environnement ne le gouverne. Il
+`backend/server.py`, aucune variable d'environnement ne le gouverne. Il
 tourne donc comme thread dans `rootwarden_python`, **invisible a `ps`**, se
-reveille toutes les 60 s (`scheduler.py:30`) et prend toute ligne
+reveille toutes les 60 s et prend toute ligne
 `enabled = 1 AND (next_run IS NULL OR next_run <= now)`. Un test qui cree une
 planification par minute **declenche un vrai scan SSH** — sur `srv-zabbix`, qui
 est en production.
 
 La parade n'est pas un nettoyage rapide : c'est une cible **inoffensive par
 construction**. Ici, `target_type = 'tag'` avec un tag **qui n'existe pas** — la
-branche fait une jointure INTERNE sur `machine_tags` (`scheduler.py:190-197`),
-donc zero machine et zero SSH.
+branche fait une jointure INTERNE sur `machine_tags`, donc zero machine et zero
+SSH — a condition que `target_value` soit RENSEIGNE.
 
-**Et le choix de la cible sure se LIT, il ne se devine pas** : `all` scannerait
-tout le parc, et `machines` avec une liste vide ou illisible **retombe sur tout le
-parc** (`scheduler.py:198-209`) — c'est un piege deguise en cible restreinte.
+**Et le choix de la cible sure se LIT, il ne se devine pas** : `all` scanne tout
+le parc ; une portee vide ou illisible ne scanne plus rien (`WHERE 1=0`). Relire
+la selection de cible dans `backend/scheduler.py` avant de s'y fier.
 
 Nettoyer quand meme, en ENTREE et dans un `finally`, et **directement en base** :
 passer par la route de suppression demanderait une session valide au moment du
@@ -991,7 +955,8 @@ partir une requete vers une adresse qu'on n'a pas choisie.
 
 Une suite qui se connecte **deux fois** avec le meme compte (une passe FR, une
 passe EN) rejoue le meme code si les deux connexions tombent dans la meme
-fenetre de 30 s. Le garde etant par COMPTE et EN BASE, un contexte de navigateur
+fenetre de 30 s. Le garde etant par COMPTE et persistant (cache applicatif,
+pilote fichier — `App\Services\Totp`), un contexte de navigateur
 neuf n'y change rien : la seconde session n'est pas authentifiee et **la page
 servie est celle de connexion**.
 
