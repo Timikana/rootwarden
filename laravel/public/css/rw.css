@@ -3146,3 +3146,19 @@ a.rw-alerte:focus-visible { outline: 2px solid var(--rw-accent); outline-offset:
     text-decoration: none;
 }
 .rw-cgu__cafe:hover { background: #ffe74d; }
+
+/* ── Detail repliable ─────────────────────────────────────────────────────
+   Ce dont une MINORITE de visites a besoin (guide, limites techniques) se
+   replie ; un avertissement sur le geste en cours ne se replie JAMAIS
+   (docs/REDACTION-INTERFACE.md). Le triangle natif reste : c'est lui que les
+   lecteurs d'ecran annoncent comme etat ouvert ou ferme. */
+.rw-details { margin: 10px 0 0; max-width: 68ch; }
+.rw-details > summary {
+    width: fit-content;
+    cursor: pointer;
+    color: var(--rw-accent);
+    font-size: 13px;
+}
+.rw-details > summary:focus-visible { outline: 2px solid var(--rw-accent); outline-offset: 2px; }
+.rw-details[open] > summary { margin-bottom: 6px; }
+.rw-details > :not(summary) { color: var(--rw-texte-doux); font-size: 13px; }

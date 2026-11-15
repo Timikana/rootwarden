@@ -108,15 +108,9 @@ class ClePlateforme
         $sansMotDePasse = array_filter($machines, fn ($m) => ! $vrai($m->a_mot_de_passe)
             && ! $vrai($m->a_mot_de_passe_root));
 
-        // LE DRAPEAU, garde pour pouvoir dire qu'il diverge.
-        $drapeauSupprime = array_filter($machines, fn ($m) => ! $vrai($m->ssh_password_required));
-
         // SANS RETOUR : la cle est le seul acces restant.
         $sansRetour = array_filter($machines, fn ($m) => $vrai($m->platform_key_deployed)
             && ! $vrai($m->a_mot_de_passe) && ! $vrai($m->a_mot_de_passe_root));
-
-        $divergentes = array_filter($machines, fn ($m) => ! $vrai($m->ssh_password_required)
-            && ($vrai($m->a_mot_de_passe) || $vrai($m->a_mot_de_passe_root)));
 
         return [
             'total'            => $total,
@@ -124,10 +118,7 @@ class ClePlateforme
             'compte_service'   => count($compteService),
             'en_attente'       => $total - count($cle),
             'sans_mot_de_passe' => count($sansMotDePasse),
-            'drapeau_supprime' => count($drapeauSupprime),
             'sans_retour'      => count($sansRetour),
-            'divergentes'      => count($divergentes),
-            'noms_divergentes' => array_values(array_map(fn ($m) => $m->name, $divergentes)),
             'noms_sans_retour' => array_values(array_map(fn ($m) => $m->name, $sansRetour)),
             // La barre de progression : deux segments, en POURCENTAGE d'un total
             // qui peut valoir zero — un parc vide ne divise pas.
