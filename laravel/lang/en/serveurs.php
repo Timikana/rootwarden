@@ -38,9 +38,6 @@ return [
 
     // Edit
     'inchange' => 'Leave empty to keep unchanged',
-    'options_deploiement' => 'Deployment options',
-    'opt_nettoyage' => 'Clean up stale accounts',
-    'opt_nettoyage_aide' => "No effect today: no deployment deletes an account. An account that lost access loses its key and sudo rights, but stays on the machine.",
     'btn_enregistrer' => 'Save',
     'btn_supprimer' => 'Remove from estate',
 

@@ -5,6 +5,17 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## Libellés qui disent ce que fait le portail
+
+- **« Mises à jour de sécurité » devient « Mettre à jour les paquets »** : la commande lancée met à
+  jour tous les paquets disponibles, pas seulement les correctifs de sécurité. Le libellé promettait
+  un tri qui n'a pas lieu. Le mot de confirmation devient `PAQUETS` (`PACKAGES` en anglais).
+- **La case « Nettoyer les comptes obsolètes » est retirée** de la fiche serveur : aucun code ne
+  lisait cette option. Pire, enregistrer une machine la remettait à 0, puisque la case décochée
+  n'est pas envoyée. La colonne n'est plus modifiée à l'enregistrement, et un test le vérifie.
+
+---
+
 ## La liste blanche CVE agit enfin
 
 Elle était écrite (portail et `POST /cve_whitelist`) et lue par personne : une CVE blanchie restait

@@ -26,7 +26,7 @@ return [
     'th_last_check'    => 'Dernier contrôle',
     'th_ip_port'       => 'Adresse',
     'th_status'        => 'Disponibilité',
-    'th_secu_schedule' => 'MAJ sécurité planifiée',
+    'th_secu_schedule' => "Mise à jour planifiée",
     'th_last_exec'     => 'Dernière exécution',
     'th_last_reboot'   => 'Dernier redémarrage',
     'th_env'           => 'Environnement',
@@ -88,8 +88,8 @@ return [
     // Planification
     'btn_planifier'      => 'Planifier',
     'tip_planifier'      => "Écrit un cron sur la machine : apt-get upgrade à l'heure choisie.",
-    'btn_planifier_secu' => 'Planifier sécurité',
-    'tip_planifier_secu' => "Écrit un cron sur la machine et affiche la date dans la colonne « MAJ sécurité planifiée ».",
+    'btn_planifier_secu' => "Planifier la mise à jour",
+    'tip_planifier_secu' => "Écrit un cron sur la machine et affiche la date dans la colonne « Mise à jour planifiée ».",
 
     'f_date'   => 'Date',
     'f_time'   => 'Heure',
@@ -105,9 +105,9 @@ return [
     'tip_save_sched' => "Écrit le fichier cron sur la machine, en root, et redémarre cron.",
 
     'titre_general' => 'Planifier une mise à jour',
-    'titre_secu'    => 'Planifier une mise à jour de sécurité',
+    'titre_secu'    => "Planifier une mise à jour des paquets",
     'desc_general'  => 'Sur :machine — apt-get update puis apt-get upgrade, journalisé dans /var/log/auto_update.log.',
-    'desc_secu'     => 'Sur :machine — apt-get update puis apt-get upgrade, journalisé dans /var/log/auto_security_update.log. La date apparaît dans la colonne « MAJ sécurité planifiée ».',
+    'desc_secu'     => "Sur :machine — apt-get update puis apt-get upgrade (tous les paquets installés, sans filtre de sécurité), journalisé dans /var/log/auto_security_update.log. La date apparaît dans la colonne « Mise à jour planifiée ».",
 
     'apercu_incomplet' => 'Choisissez une date et une heure pour voir ce qui sera écrit sur la machine.',
     'apercu_daily'     => 'Tous les jours à :heure',
@@ -163,15 +163,15 @@ return [
     // Simulation et mises a jour de securite
     'btn_simulation' => 'Simuler',
     'tip_simulation' => "Montre ce qu'une mise à jour changerait, sans rien installer. Rafraîchit l'index des paquets.",
-    'btn_secu_action' => 'Mises à jour de sécurité',
+    'btn_secu_action' => "Mettre à jour les paquets",
     'tip_secu_action' => 'Met à jour les paquets installés (apt-get upgrade), sans en retirer.',
 
-    'secu_titre'        => 'Appliquer les mises à jour de sécurité',
+    'secu_titre'        => "Mettre à jour les paquets installés",
     'secu_machines'     => ':nombre machine(s) : :machines',
     'secu_consequences' => "Les paquets ayant une version plus récente sont mis à jour, sans en retirer aucun ni redémarrer la machine. Un service peut être relancé.",
     'secu_verrous'      => "Si apt ou dpkg tourne déjà, il est arrêté de force, ses verrous sont supprimés et la base dpkg réparée : une installation en cours sera interrompue.",
-    'secu_consigne'     => 'Recopiez SECURITE pour activer le bouton',
-    'secu_mot'          => 'SECURITE',
+    'secu_consigne'     => "Recopiez PAQUETS pour activer le bouton",
+    'secu_mot'          => "PAQUETS",
     'btn_secu_confirmer' => 'Appliquer',
 
     'flux_debut'         => 'Connexion à :machine...',
@@ -182,8 +182,8 @@ return [
     'simulation_en_cours' => 'Simulation en cours...',
     'simulation_fin'      => "Simulation terminée sur :nombre machine(s). Rien n'a été installé.",
 
-    'secu_en_cours' => 'Mises à jour de sécurité en cours...',
-    'secu_fin'      => 'Mises à jour de sécurité terminées sur :nombre machine(s).',
+    'secu_en_cours' => "Mise à jour des paquets en cours...",
+    'secu_fin'      => "Paquets mis à jour sur :nombre machine(s).",
 
     // Mise a jour complete et reparation dpkg
     'btn_complete' => 'Mise à jour complète',

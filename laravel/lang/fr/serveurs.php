@@ -38,9 +38,6 @@ return [
 
     // Modification
     'inchange' => 'Laisser vide pour ne pas changer',
-    'options_deploiement' => 'Options de déploiement',
-    'opt_nettoyage' => 'Nettoyer les comptes obsolètes',
-    'opt_nettoyage_aide' => "Sans effet aujourd'hui : aucun déploiement ne supprime de compte. Un compte qui a perdu l'accès perd sa clé et ses droits sudo, mais reste sur la machine.",
     'btn_enregistrer' => 'Enregistrer',
     'btn_supprimer' => 'Retirer du parc',
 

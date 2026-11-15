@@ -363,13 +363,13 @@ if (CIBLE === 'laravel') {
 
     await page.evaluate(() => {
         const champ = document.querySelector('[data-rw="securite-confirmation"]');
-        champ.value = 'SECURITE';
+        champ.value = 'PAQUETS';
         champ.dispatchEvent(new Event('input', { bubbles: true }));
     });
     verifie('le mot attendu active le bouton',
         await page.evaluate(() =>
             document.querySelector('[data-rw="securite-confirmer"]').disabled) === false,
-        '« SECURITE » saisi');
+        '« PAQUETS » saisi');
 
     await page.evaluate(() =>
         document.querySelector('[data-rw="securite-confirmer"]').click());

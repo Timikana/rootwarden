@@ -506,7 +506,7 @@ class Serveurs
      * @param  array<string, mixed>  $brut
      * @return string|null cle i18n de l'erreur, ou null si la machine est modifiee
      */
-    public function modifie(int $id, array $brut, bool $nettoieComptes): ?string
+    public function modifie(int $id, array $brut, ?bool $nettoieComptes = null): ?string
     {
         if (DB::table('machines')->where('id', $id)->doesntExist()) {
             return 'serveurs.err_introuvable';
@@ -520,8 +520,11 @@ class Serveurs
             'environment' => $brut['environment'],
             'criticality' => $brut['criticality'],
             'network_type' => $brut['network_type'],
-            'cleanup_users' => $nettoieComptes ? 1 : 0,
         ];
+        // null : l'option n'est pas offerte, la colonne n'est pas touchee.
+        if ($nettoieComptes !== null) {
+            $valeurs['cleanup_users'] = $nettoieComptes ? 1 : 0;
+        }
 
         $mdp = SecretExploitation::chiffre(trim((string) ($brut['password'] ?? '')));
         if ($mdp !== null) {
