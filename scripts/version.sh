@@ -44,7 +44,7 @@
 #
 # Usage :
 #   scripts/version.sh              affiche la version derivee
-#   scripts/version.sh --ecrire     l'ecrit aussi dans legacy/version.txt
+#   scripts/version.sh --ecrire     l'ecrit aussi dans laravel/version.txt
 #   scripts/version.sh --epreuve    joue les proprietes sur un depot jetable
 # ==============================================================================
 
@@ -118,7 +118,7 @@ epreuve() {
     git -C "$tmp" init -q -b principale
     git -C "$tmp" config user.email epreuve@local
     git -C "$tmp" config user.name epreuve
-    mkdir -p "$tmp/legacy" "$tmp/scripts"
+    mkdir -p "$tmp/scripts"
     cp "$RACINE/scripts/version.sh" "$tmp/scripts/version.sh"
 
     echo "1.38" > "$tmp/$FICHIER_JALON"

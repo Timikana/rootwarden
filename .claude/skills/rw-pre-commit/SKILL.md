@@ -7,8 +7,7 @@ description: Checklist OBLIGATOIRE avant chaque commit feature/fix RootWarden - 
 
 A derouler AVANT chaque commit de feature ou de fix. Aucune etape n'est optionnelle.
 
-> Le portail servi est `laravel/`. Le legacy n'est plus servi : `legacy/_deprecated/`
-> est une archive, ne plus la modifier.
+> Le portail servi est `laravel/`. Le legacy est retire du depot (tag `legacy-final`).
 
 ## 1. Versioning
 - La version se DERIVE (`scripts/version.sh`) : `MAJEUR.MINEUR` vient de `VERSION-JALON`, seul fichier ecrit a la main et seulement aux jalons ; le correctif se compte. Ne jamais assigner un numero.

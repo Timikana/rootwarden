@@ -28,8 +28,8 @@ base et le même backend :
   des valeurs encore en mouvement ;
 - `laravel/.env` est généré au premier démarrage (`APP_KEY`) et **n'est pas versionné**. Toute
   variable nouvelle passe par `srv-docker.env.example`, que `./maj.sh` fusionne ;
-- **une partie archivée rend 404**, et c'est voulu : c'est la preuve que plus rien ne la sert.
-  Les parties archivées vivent sous `legacy/_deprecated/`.
+- l'ancien portail (`legacy/`) est retiré du dépôt ; son dernier état est conservé par le tag
+  `legacy-final`.
 
 **État et suite des opérations : [ROADMAP.md](ROADMAP.md).** Il porte aussi les décisions en
 attente, dont **le rétroportage vers `main` de `v1.37.16` et `v1.37.17`, deux correctifs de
@@ -238,7 +238,7 @@ Tu dois alors POST `/auth/step_up_verify.php` avec le code TOTP puis retry.
 | Déploiements SSH | `backend/logs/deployment.log` | ✅ (via configure_servers.py) |
 | Iptables | `backend/logs/iptables.log` | ✅ |
 | APT updates | `backend/logs/update_servers.log` | ✅ |
-| PHP | `legacy/logs/*.log` | (Apache standard) |
+| Portail | `laravel/storage/logs/laravel.log` | (Laravel) |
 | Audit (DB) | table `user_logs` | HMAC-SHA256 chained |
 
 ### Forwarding GELF (optionnel)

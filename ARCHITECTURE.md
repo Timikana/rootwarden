@@ -2,36 +2,35 @@
 
 > ⚠️ Branche `main` = **bêta** (features v1.24→v1.37 validées en dev seulement).
 
-## DEUX FRONTENDS, un seul backend — la migration vers Laravel
-
-**C'est le fait structurant le plus important du dépôt aujourd'hui, et il n'apparaissait
-nulle part dans ce document jusqu'au 2026-08-23.**
+## UN portail, un backend — la migration vers Laravel est terminée
 
 ```
                     ┌──────────────────────┐
-   :8443  ────────► │  legacy/   PHP 8.4   │ ──┐   l'ANCIEN portail,
-                    │  (déprécié par part) │   │   déprécié partie par partie
-                    └──────────────────────┘   │
-                                               ├──► backend Python/Flask
-                    ┌──────────────────────┐   │    (hypercorn, 4 workers)
-   :8444  ────────► │  laravel/  Laravel13 │ ──┘         │
-                    │  (la CIBLE)          │             ▼
-                    └──────────────────────┘         MySQL (63 tables)
+   :8443  ────────► │  laravel/  Laravel13 │ ──► backend Python/Flask
+                    │  PHP 8.5             │     (hypercorn, 4 workers)
+                    └──────────────────────┘          │
+                                                      ▼
+                                                   MySQL 9.7
 ```
 
-Les deux frontends lisent et écrivent **la même base** et joignent **le même backend**. La
-cible est une **bascule directe en v2.0** : le legacy s'éteint d'un coup, pas après une
-longue coexistence.
+L'ancien portail PHP (`legacy/`) a été porté partie par partie, archivé, puis retiré du
+dépôt. Son dernier état est conservé par le tag **`legacy-final`** :
+
+    git checkout legacy-final -- legacy/<chemin>     # relire un fichier de l'ancien portail
+
+Le code du portage cite encore des chemins `legacy/…` en commentaire, pour dire ce qu'il
+remplace : ils se lisent dans ce tag. Les liens que le backend écrit encore au format de
+l'ancien portail (notifications, recherche) sont traduits par `App\Support\LiensLegacy`.
 
 ### Ce qui appartient à qui
 
-| | legacy `legacy/` | portage `laravel/` |
-|---|---|---|
-| accès au backend | `api_proxy.php` + liste blanche | `App\Http\Controllers\PasserelleController` + `App\Support\RoutesBackend` |
-| garde d'authentification | `auth/verify.php`, inclus par chaque page | middleware Laravel + `App\Services\Droits` (lecture **en base**, jamais la session) |
-| menu | décrit **deux fois** (barre latérale + tiroir mobile) | **source unique** `App\Support\Navigation`, un seul partiel rendu deux fois |
-| schéma MySQL | — | **aucune migration Laravel** : la base appartient au backend Python et évolue par `mysql/migrations/*.sql` |
-| CSS | Tailwind compilé | écrit à la main, jetons + classes `.rw-*`, **aucune étape de construction** |
+| | portail `laravel/` |
+|---|---|
+| accès au backend | `App\Http\Controllers\PasserelleController` + `App\Support\RoutesBackend` |
+| garde d'authentification | middleware Laravel + `App\Services\Droits` (lecture **en base**, jamais la session) |
+| menu | **source unique** `App\Support\Navigation`, un seul partiel rendu deux fois |
+| schéma MySQL | **aucune migration Laravel** : la base appartient au backend Python et évolue par `mysql/migrations/*.sql` |
+| CSS | écrit à la main, jetons + classes `.rw-*`, **aucune étape de construction** |
 
 ### Règles structurelles du portage
 
@@ -56,13 +55,8 @@ longue coexistence.
 
 ### Où en est la migration
 
-**14 entrées de menu portées sur 33**, **9 parties du legacy archivées** dans
-`legacy/_deprecated/`, deux modules entièrement dépréciés (`update/`, `supervision/`).
-Une partie archivée doit rendre **404** — c'est la preuve que plus rien ne la sert — et son
-entrée de menu doit mener au portage.
-
-Chiffres à jour, ce qui reste et ce qui bloque : **[ROADMAP.md](ROADMAP.md)**.
-Écarts mesurés entre les deux portails : **[`docs/migration/PARITE.md`](docs/migration/PARITE.md)**
+Terminée. Le registre du retrait, partie par partie, est
+**[`docs/migration/DEPRECIATION.md`](docs/migration/DEPRECIATION.md)**.
 (93 entrées, chacune avec sa preuve).
 Méthode d'un sous-lot : **[`docs/migration/METHODE-SOUS-LOT.md`](docs/migration/METHODE-SOUS-LOT.md)**.
 
@@ -856,8 +850,7 @@ Python → decrypt_password() essaie OLD_SECRET_KEY en fallback
 │   ├── 📄 Dockerfile
 │   └── 📄 app.py
 ├── 📄 test-server/                   Conteneur Debian SSH pour tests preprod
-│   ├── 📄 Dockerfile
-│   └── 📄 seed_test_machine.php
+│   └── 📄 Dockerfile
 └── 📁 mysql/migrations/
     ├── 📄 004_add_user_email.sql     Colonne email dans users
     ├── 📄 005_add_ssh_key_date.sql   Colonne ssh_key_updated_at dans users

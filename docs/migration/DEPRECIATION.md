@@ -861,3 +861,32 @@ reference a inscrire** : la formule courte « +2 par entree » est fausse en gen
 | Partie | Suite, cible legacy |
 |---|---|
 | `services/` | reference d'archivage **5** — a mesurer au rejeu |
+
+---
+
+## La disparition — faite le 2026-11-15
+
+Le dossier ne contenait plus que `_deprecated/` (235 fichiers) et plus aucun service ne le
+montait. Les trois gestes de « La disparition, a la fin » :
+
+1. tag `legacy-final` sur `5c15eb2c`, le dernier commit ou `legacy/` existe ;
+2. `rootwarden_php` etait deja retire du compose (patch 07, applique le 2026-09-08) ;
+3. `legacy/` retire en un commit.
+
+Ce qui lisait encore le dossier, et ce qui en a ete fait :
+
+| Lecteur | Geste |
+|---|---|
+| `ci.yml`, job PHP syntax check | la ligne `find legacy/` retiree ; le temoin « ensemble vide = echec » reste |
+| `.semgrepignore`, `.gitleaks.toml` | exemptions du dossier retirees : il n'y a plus rien a exempter |
+| `scripts/eteindre-le-legacy.sh` | retire : sa sequence est terminee |
+| `scripts/rejouer-lot.sh` | cible par defaut = portage seul ; `--legacy` refuse |
+| `scripts/version.sh` | le depot jetable de `--epreuve` ne cree plus `legacy/` |
+| `scripts/sync-obsidian-vault.py` | inchange : il teste deja l'existence du dossier |
+| `test-server/seed_test_machine.php` | retire : il chargeait `db.php` et `adm/includes/crypto.php` du legacy et ne s'executait que dans `rootwarden_php`, retire le 2026-09-08 ; aucun appelant |
+| `.gitignore` | les exceptions qui visaient du code suivi retirees ; `legacy/` entier reste ignore, car un hote installe avant garde sur disque `version.txt`, `logs/` et `.first_run_credentials` |
+
+Relire un fichier de l'ancien portail :
+
+    git show legacy-final:legacy/_deprecated/<partie>/<fichier>
+

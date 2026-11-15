@@ -6,10 +6,10 @@ description: Conventions du portage RootWarden vers Laravel - schema partage san
 # Portage RootWarden vers Laravel
 
 Le frontend Laravel (`laravel/`) est le portail SERVI : il occupe `8080/8443`
-depuis l'echange de ports du 2026-09-06. Le legacy (`legacy/`) est passe sur
-`8444/8446`, et il est ETEINT — zero `.php` metier servi hors
-`legacy/_deprecated/` (214 fichiers archives, mesure du 2026-09-08). **Il n'est
-plus la reference : la reference est le portage.**
+depuis l'echange de ports du 2026-09-06. Le legacy (`legacy/`) est RETIRE du
+depot ; son dernier etat se lit dans le tag `legacy-final`
+(`git show legacy-final:legacy/<chemin>`). **Il n'est plus la reference : la
+reference est le portage.**
 
 ⚠ DATER toute trace de `8444` avant de l'interpreter. Avant le 2026-09-06 elle
 designait le PORTAGE ; depuis, elle designe le legacy. Une valeur juste a
@@ -255,8 +255,8 @@ mot de passe (`App\Services\MotDePasse`), reinitialisation
 
 ### Pages metier
 
-Toutes les parties metier du legacy sont archivees : aucun `.php` metier hors de
-`legacy/_deprecated/`, `legacy/vendor/` et `legacy/lang/`. La liste des pages
+Toutes les parties metier du legacy ont ete portees, puis le dossier retire
+(tag `legacy-final`). La liste des pages
 portees et de leurs gardes se lit dans `App\Support\Navigation` et
 `routes/web.php`, pas ici.
 

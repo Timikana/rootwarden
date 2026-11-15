@@ -374,3 +374,8 @@ coup pour rien.
     2 DEJA MARQUES   04 · QUARANTAINE
     3 REELS          01 · 03 (independants, eprouves ensemble)
                      07 (etendu a DEUX fichiers compose, eprouve de bout en bout)
+
+## `08-version-txt-hors-du-legacy` — retiré le 2026-11-15
+
+Sans objet : le compose ne monte plus `legacy/version.txt` et `laravel/version.txt` est la seule
+cible de `scripts/ecrire-version.sh`. Le dossier `legacy/` est retiré (tag `legacy-final`).

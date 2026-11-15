@@ -318,8 +318,8 @@ grep -cE "^\s*\['cle' *=>" $n                              # 32 entrees au total
 grep -E "^\s*\['cle' *=>" $n | grep -cE "'legacy' *=>"     # 6 restantes
 grep -E "^\s*\['cle' *=>" $n | grep -cE "'route' *=>"      # 26 portees
 
-# parties archivees
-ls legacy/_deprecated/
+# parties archivees (le dossier est retire : elles se lisent dans le tag)
+git ls-tree --name-only legacy-final legacy/_deprecated/
 
 # le LOT (~95 min), lance en arriere-plan puis attendu dans un appel SEPARE
 setsid ./scripts/rejouer-lot.sh > /tmp/lot.out 2>&1 < /dev/null &
