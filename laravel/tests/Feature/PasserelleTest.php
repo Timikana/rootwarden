@@ -193,6 +193,11 @@ class PasserelleTest extends TestCase
         yield '/cve_ (racine)'       => ['/cve_scan', true];
         yield '/fail2ban/ (espace)'  => ['/fail2ban/status', true];
         yield '/fail2banXYZ REFUSE'  => ['/fail2banXYZ', false];
+        // Les planifications lues et retirees sur la machine : la route et son
+        // sous-chemin passent, un nom qui la prolonge non.
+        yield '/scheduled_updates'          => ['/scheduled_updates', true];
+        yield '/scheduled_updates/remove'   => ['/scheduled_updates/remove', true];
+        yield '/scheduled_updatesX REFUSE'  => ['/scheduled_updatesX', false];
     }
 
     // ─────────────────────────────────────────────────────────────────────────

@@ -211,6 +211,16 @@
         <h2 class="rw-sous-titre-fort" id="sched-titre" data-rw="titre-planification"></h2>
         <p class="rw-sous-titre rw-prose" id="sched-machine" data-rw="machine-planification"></p>
 
+        {{-- Ce qui est DEJA sur la machine, lu sur la machine elle-meme : la base
+             ne garde que la planification actuelle, et deux anciennes routes y
+             posaient des fichiers cron que rien ne montrait. --}}
+        <div class="rw-planifs-machine" data-rw="planifs-machine">
+            <h3 class="rw-champ__etiquette">{{ __('maj.existantes_titre') }}</h3>
+            <p class="rw-sous-titre" id="sched-existantes-etat" role="status" aria-live="polite"
+               data-rw="planifs-machine-etat"></p>
+            <ul class="rw-planifs-machine__liste" id="sched-existantes" data-rw="planifs-machine-liste" hidden></ul>
+        </div>
+
         <div class="rw-grille rw-grille--compacte">
             <label class="rw-champ">
                 <span class="rw-champ__etiquette">{{ __('maj.f_date') }}</span>
@@ -310,7 +320,7 @@
     {{-- @json sur UNE SEULE ligne : multiligne, il casse le PHP compile. --}}
     <script id="maj-libelles" type="application/json">@json($libelles)</script>
 
-    @php($planif = ['titre_secu' => __('maj.titre_secu'), 'desc_secu' => __('maj.desc_secu'), 'apercu_incomplet' => __('maj.apercu_incomplet'), 'apercu_daily' => __('maj.apercu_daily'), 'apercu_weekly' => __('maj.apercu_weekly'), 'apercu_monthly' => __('maj.apercu_monthly'), 'apercu_none' => __('maj.apercu_none'), 'reserve_annuel' => __('maj.reserve_annuel'), 'sched_incomplet' => __('maj.sched_incomplet'), 'sched_en_cours' => __('maj.sched_en_cours'), 'sched_pose' => __('maj.sched_pose'), 'sched_ok' => __('maj.sched_ok'), 'sched_err' => __('maj.sched_err'), 'jours' => [__('maj.j_lundi'), __('maj.j_mardi'), __('maj.j_mercredi'), __('maj.j_jeudi'), __('maj.j_vendredi'), __('maj.j_samedi'), __('maj.j_dimanche')]])
+    @php($planif = ['titre_secu' => __('maj.titre_secu'), 'desc_secu' => __('maj.desc_secu'), 'apercu_incomplet' => __('maj.apercu_incomplet'), 'apercu_daily' => __('maj.apercu_daily'), 'apercu_weekly' => __('maj.apercu_weekly'), 'apercu_monthly' => __('maj.apercu_monthly'), 'apercu_none' => __('maj.apercu_none'), 'reserve_annuel' => __('maj.reserve_annuel'), 'sched_incomplet' => __('maj.sched_incomplet'), 'sched_en_cours' => __('maj.sched_en_cours'), 'sched_pose' => __('maj.sched_pose'), 'sched_ok' => __('maj.sched_ok'), 'sched_err' => __('maj.sched_err'), 'existantes_lecture' => __('maj.existantes_lecture'), 'existantes_aucune' => __('maj.existantes_aucune'), 'existantes_err' => __('maj.existantes_err'), 'fichiers' => ['auto_security_update_advanced' => __('maj.fichier_auto_security_update_advanced'), 'auto_update_advanced' => __('maj.fichier_auto_update_advanced'), 'auto_update' => __('maj.fichier_auto_update')], 'btn_retirer' => __('maj.btn_retirer'), 'btn_confirmer_retrait' => __('maj.btn_confirmer_retrait'), 'btn_annuler' => __('maj.btn_cancel'), 'retrait_en_cours' => __('maj.retrait_en_cours'), 'retrait_ok' => __('maj.retrait_ok'), 'retrait_err' => __('maj.retrait_err'), 'jours' => [__('maj.j_lundi'), __('maj.j_mardi'), __('maj.j_mercredi'), __('maj.j_jeudi'), __('maj.j_vendredi'), __('maj.j_samedi'), __('maj.j_dimanche')]])
     <script id="maj-planif-libelles" type="application/json">@json($planif)</script>
 
     @php($journal = ['suivre' => __('maj.suivre'), 'suivre_aide' => __('maj.suivre_aide'), 'vide' => __('maj.journal_vide')])

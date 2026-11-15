@@ -5,6 +5,32 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## Mises à jour : les planifications déjà posées sur la machine se voient et se retirent
+
+Trois routes du backend écrivent un fichier dans `/etc/cron.d/` : la planification actuelle, l'ancien
+bouton « Planifier » (`auto_update_advanced`) et l'ancienne planification par intervalle
+(`auto_update`). La base ne garde que la première ; les deux autres restaient sur les machines sans
+que rien ne les montre.
+
+- Le panneau « Planifier » lit désormais les trois fichiers sur la machine et affiche ceux qui
+  existent, avec leur expression cron. La commande n'est pas renvoyée : celle de la planification
+  actuelle contient le jeton du rappel.
+- Chaque fichier se retire depuis le panneau, avec une confirmation dans la ligne. Le retrait est
+  vérifié en relisant la machine. Retirer la planification actuelle efface aussi sa date dans la
+  colonne « Planification ».
+- Backend : `POST /scheduled_updates` et `POST /scheduled_updates/remove`, gardés comme la
+  planification (`can_update_linux` et accès à la machine). Le fichier se désigne par une clé dans une
+  liste fermée, jamais par un chemin.
+- La description du panneau citait encore la colonne « Mise à jour planifiée », renommée
+  « Planification ».
+- L'aperçu et le journal annonçaient `30 03 * * 2` quand la machine recevait `30 3 * * 2` : le
+  backend écrit des entiers. L'aperçu dit désormais exactement ce qui est écrit.
+- `go-page-update-u4` se rejoue sur une pile isolée (`E2E_MACHINE_EPREUVE`, `E2E_PY_CONTENEUR`) et
+  vérifie le panneau : lecture, confirmation, retrait relu sur la machine. Rejouée sur un serveur
+  SSH de test : 17/17.
+
+---
+
 ## L'ancien portail est retiré du dépôt
 
 `legacy/` ne contenait plus que des parties archivées (235 fichiers) que plus aucun service ne

@@ -34,6 +34,7 @@ import { createHmac } from 'crypto';
 import { execFileSync } from 'child_process';
 import { readFileSync } from 'fs';
 import { constateArchivage, verifieMenuLegacy } from './archive.mjs';
+import { litEnBase } from './lib-base.mjs';
 
 const BASE = baseDeclaree('http://localhost:8444');
 const MDP = process.env.E2E_TEST_PASS || 'RootWarden@2026-Test!';
@@ -84,8 +85,13 @@ const CIBLE = (() => {
 })();
 const PAGE = CIBLE === 'laravel' ? '/mises-a-jour' : '/update/';
 
-const MACHINE_TEST = 2;
-const NOM_TEST = 'Test-Server-Debian';
+// La machine d'epreuve et le conteneur du backend se designent, comme dans u1 :
+// une pile isolee n'a ni la machine 2 ni `rootwarden_python`. Le nom se LIT en
+// base, au lieu d'etre ecrit en dur.
+const MACHINE_TEST = Number(process.env.E2E_MACHINE_EPREUVE || 2);
+if (MACHINE_TEST === 1) throw new Error('la machine 1 est la PRODUCTION : jamais designee');
+const CONTENEUR_BACKEND = process.env.E2E_PY_CONTENEUR || 'rootwarden_python';
+const NOM_TEST = (litEnBase(`SELECT name FROM rootwarden.machines WHERE id = ${MACHINE_TEST}`)[0] || '').trim();
 
 const SECRET_ADMIN = 'KRSXG5BAKBSWY3DPEHPK3PXPKRSXG5BAKBSWY3DPEHPK3PXPKRSX';
 
@@ -100,8 +106,10 @@ const RECURRENCE = 'weekly';
  *   schedule_advanced_update          : weekly -> "* * 1", TOUJOURS lundi
  *   schedule_advanced_security_update : weekly -> jour de la DATE, ici mardi (2)
  */
-const CRON_GENERAL = '30 03 * * 1';
-const CRON_SECURITE = '30 03 * * 2';
+// `f"{_minute} {_heure}"` sur des ENTIERS : pas de zero initial. L'attendu
+// `30 03` a vecu jusqu'au 2026-11-15 sans etre compare au fichier.
+const CRON_GENERAL = '30 3 * * 1';
+const CRON_SECURITE = '30 3 * * 2';
 
 const FICHIER_GENERAL = '/etc/cron.d/auto_update_advanced';
 const FICHIER_SECURITE = '/etc/cron.d/auto_security_update_advanced';
@@ -109,7 +117,7 @@ const FICHIER_SECURITE = '/etc/cron.d/auto_security_update_advanced';
 const AIDE_CRON = readFileSync('cron-machine.py');
 
 function surLaMachine(...args) {
-    return execFileSync('docker', ['exec', '-i', 'rootwarden_python', 'python', '-', ...args],
+    return execFileSync('docker', ['exec', '-i', CONTENEUR_BACKEND, 'python', '-', ...args],
         { input: AIDE_CRON, encoding: 'utf-8' }).trim();
 }
 
@@ -343,7 +351,9 @@ const { ctx, page } = await connecte('rw-test-admin', SECRET_ADMIN);
 const reponses = [];
 const demandes = [];
 page.on('request', (r) => {
-    if (/schedule_/.test(r.url())) demandes.push({ url: r.url(), corps: r.postData() || '' });
+    // `schedule` et non `schedule_` : les lectures et retraits du panneau
+    // (`/scheduled_updates`) designent aussi une machine.
+    if (/schedule/.test(r.url())) demandes.push({ url: r.url(), corps: r.postData() || '' });
 });
 page.on('response', (r) => {
     if (/schedule_/.test(r.url())) reponses.push({ url: r.url(), statut: r.status() });
@@ -408,7 +418,7 @@ if (CIBLE === 'legacy') {
 
 // ── Planification de SECURITE ───────────────────────────────────────────────
 const securite = await planifie(page, 'securite', reponses);
-verifie('l\'action « planifier securite » est presente sur la ligne de la machine 2',
+verifie(`l'action « planifier securite » est presente sur la ligne de la machine ${MACHINE_TEST}`,
     securite.ouvert);
 // Reportees de la planification generale retiree : le formulaire restant doit
 // tenir les memes proprietes.
@@ -426,9 +436,11 @@ verifie('le cron de securite ne met a jour QUE la securite',
     /--only-upgrade/.test(fichierSecurite) && /auto_security_update\.log/.test(fichierSecurite),
     'apt-get upgrade --with-new-pkgs --only-upgrade');
 
+// Les DEUX moities : l'apercu ET le fichier. Ne comparer que l'apercu a
+// l'attendu laissait passer un apercu `30 03` devant un fichier `30 3`.
 verifiePortage('l\'apercu de securite annoncait exactement ce qui a ete ecrit',
-    securite.apercu.includes(CRON_SECURITE),
-    `apercu et fichier portent « ${CRON_SECURITE} »`);
+    securite.apercu.includes(CRON_SECURITE) && fichierSecurite.includes(CRON_SECURITE),
+    `apercu « ${securite.apercu} », fichier « ${fichierSecurite.split(' root ')[0]} »`);
 
 // La date planifiee est aussi ecrite en base : la colonne doit la montrer.
 const colonne = await (async () => {
@@ -445,6 +457,54 @@ const colonne = await (async () => {
 })();
 verifiePortage('la colonne « MAJ securite planifiee » montre la date posee en base',
     /2026-09-15/.test(colonne), `colonne : « ${colonne} »`);
+
+// ── Le panneau lit la machine, et en retire un fichier ───────────────────────
+// Le panneau « Planifier » montre ce qui est DEJA dans /etc/cron.d/, lu sur la
+// machine. Le retrait se juge par un lecteur INDEPENDANT du portail
+// (`cron-machine.py`), pas par ce que l'ecran affiche ensuite.
+if (CIBLE === 'laravel') {
+    const lisPanneau = async () => {
+        const limite = Date.now() + 60000;
+        let e = null;
+        while (Date.now() < limite) {
+            e = await page.evaluate(() => ({
+                etat: document.getElementById('sched-existantes-etat')?.textContent.trim() || '',
+                secu: document.querySelector('[data-rw="planif-machine-auto_security_update_advanced"]')?.innerText || '',
+                lignes: document.querySelectorAll('#sched-existantes li').length,
+            }));
+            if (!/\.\.\.$/.test(e.etat)) return e;
+            await dors(400);
+        }
+        return e;
+    };
+    await page.evaluate((s) => document.querySelector(s).click(), CHAMPS.laravel.securite.ouvre);
+    const ouvert = await lisPanneau();
+    verifie('le panneau montre la planification posee, lue sur la machine',
+        ouvert.secu.includes(CRON_SECURITE) && ouvert.secu.includes(FICHIER_SECURITE),
+        `ligne : « ${ouvert.secu.replace(/\s+/g, ' ').trim()} »`);
+    verifie('la commande ne sort pas de la machine (jeton du rappel)',
+        !/X-Update-Token|curl/.test(ouvert.secu), 'seule l\'expression cron est rendue');
+
+    await page.evaluate(() => document.querySelector('[data-rw="retirer-auto_security_update_advanced"]').click());
+    await dors(200);
+    const avantConfirmation = surLaMachine('lit', String(MACHINE_TEST), FICHIER_SECURITE);
+    verifie('un premier clic ne retire rien : il demande confirmation',
+        avantConfirmation !== 'ABSENT'
+        && !!(await page.$('[data-rw="confirmer-retrait-auto_security_update_advanced"]')),
+        `fichier toujours la : ${avantConfirmation !== 'ABSENT'}`);
+    await page.evaluate(() => document.querySelector('[data-rw="confirmer-retrait-auto_security_update_advanced"]').click());
+    await dors(1000);
+    const apres = await lisPanneau();
+    const fichierApres = surLaMachine('lit', String(MACHINE_TEST), FICHIER_SECURITE);
+    verifie('le retrait efface le fichier SUR LA MACHINE (relu hors portail)',
+        fichierApres === 'ABSENT', `cron-machine.py : ${fichierApres === 'ABSENT' ? 'ABSENT' : 'present'}`);
+    verifie('le panneau relu ne montre plus la planification retiree',
+        apres.secu === '', `${apres.lignes} ligne(s), etat « ${apres.etat} »`);
+    const colonneApres = await page.evaluate((id) =>
+        document.querySelector(`tr[data-machine-id="${id}"] .maj-secu-date`)?.textContent.trim() || '', MACHINE_TEST);
+    verifie('la colonne « Planification » ne montre plus la date retiree',
+        !/2026-09-15/.test(colonneApres), `colonne : « ${colonneApres} »`);
+}
 
 // ── Perimetre ───────────────────────────────────────────────────────────────
 verifie('la machine 1, en production, n\'est jamais designee',

@@ -101,7 +101,7 @@ return [
     'tip_save_sched' => 'Writes the cron file on the machine, as root, and restarts cron.',
 
     'titre_secu'    => "Schedule a package update",
-    'desc_secu'     => "On :machine — apt-get update then apt-get upgrade (all installed packages, no security filter), logged to /var/log/auto_security_update.log. The date shows in the \"Update scheduled\" column.",
+    'desc_secu'     => "On :machine — apt-get update then apt-get upgrade (all installed packages, no security filter), logged to /var/log/auto_security_update.log. The date shows in the \"Scheduling\" column.",
 
     'apercu_incomplet' => 'Pick a date and a time to see what will be written on the machine.',
     'apercu_daily'     => 'Every day at :heure',
@@ -124,6 +124,20 @@ return [
     'sched_pose'      => 'Cron written: :cron',
     'sched_ok'        => 'Schedule saved on :machine.',
     'sched_err'       => 'Writing the cron file failed.',
+
+    // Schedules read on the machine
+    'existantes_titre'   => 'Already on the machine',
+    'existantes_lecture' => "Reading the machine's cron files...",
+    'existantes_aucune'  => 'No update schedule on this machine.',
+    'existantes_err'     => 'Could not read: :message',
+    'fichier_auto_security_update_advanced' => 'Current schedule',
+    'fichier_auto_update_advanced'          => 'Old "Schedule" button (Monday when weekly, 1st when monthly)',
+    'fichier_auto_update'                   => 'Old interval schedule',
+    'btn_retirer'           => 'Remove',
+    'btn_confirmer_retrait' => 'Confirm removal',
+    'retrait_en_cours'      => 'Removing...',
+    'retrait_ok'            => ':fichier removed from :machine.',
+    'retrait_err'           => 'Removal failed.',
 
     // Reboot
     'btn_reboot_action' => 'Reboot',

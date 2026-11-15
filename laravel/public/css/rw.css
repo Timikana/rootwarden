@@ -1551,6 +1551,28 @@ a.rw-bouton { display: inline-block; }
 
 .rw-apercu--reserve { border-left-color: var(--rw-avertissement); }
 
+/*
+ * Les planifications lues sur la machine elle-meme, dans le panneau
+ * « Planifier ». Une ligne par fichier cron present, son retrait a droite.
+ */
+.rw-planifs-machine { margin: 0 0 16px; }
+.rw-planifs-machine__liste {
+    list-style: none;
+    margin: 8px 0 0;
+    padding: 0;
+    border: 1px solid var(--rw-bordure);
+    border-radius: 8px;
+}
+.rw-planifs-machine__ligne {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+}
+.rw-planifs-machine__ligne + .rw-planifs-machine__ligne { border-top: 1px solid var(--rw-bordure); }
+.rw-planifs-machine__corps { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.rw-planifs-machine__actions { display: flex; gap: 8px; flex-shrink: 0; }
+
 /* ─────────────────────────────────────────────────────────────────────────────
    Rapport de conformite (module security/, sous-lot S2a)
    ───────────────────────────────────────────────────────────────────────────── */
