@@ -111,6 +111,7 @@ class RoutesBackend
         '/apt_check_lock', '/apt_update', '/security_updates',
         '/dpkg_repair', '/custom_update', '/dry_run_update', '/pending_packages',
         '/schedule_update', '/schedule_advanced_update', '/schedule_advanced_security_update',
+        '/scheduled_updates',
         '/iptables', '/iptables-',
         '/fail2ban/', '/ssh-audit/', '/supervision/', '/graylog/', '/wazuh/',
         '/services/', '/admin/', '/bashrc/',

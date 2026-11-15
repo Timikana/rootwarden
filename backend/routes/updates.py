@@ -1005,6 +1005,172 @@ def schedule_advanced_security_update():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Planifications presentes sur la machine : lecture et retrait
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# Trois routes de ce module ecrivent un fichier `cron.d`, et la base n'en garde
+# qu'une trace (`maj_secu_date`, pour la seule planification de securite) :
+#
+#     /schedule_update                      -> /etc/cron.d/auto_update
+#     /schedule_advanced_update             -> /etc/cron.d/auto_update_advanced
+#     /schedule_advanced_security_update    -> /etc/cron.d/auto_security_update_advanced
+#
+# Le portail n'appelle plus que la troisieme. Les deux autres fichiers restent sur
+# les machines ou ils ont ete poses, et RIEN ne les montrait : ces deux routes les
+# lisent sur la machine elle-meme, et retirent celui qu'on designe.
+#
+# LISTE FERMEE : la requete designe un fichier par sa CLE, jamais par un chemin.
+# Les commandes sont des litteraux assembles ici, a l'import ; aucune donnee de
+# requete n'atteint le shell.
+_FICHIERS_PLANIFICATION = {
+    'auto_update': '/etc/cron.d/auto_update',
+    'auto_update_advanced': '/etc/cron.d/auto_update_advanced',
+    'auto_security_update_advanced': '/etc/cron.d/auto_security_update_advanced',
+}
+_MARQUE_PRESENT = '__RW_PRESENT__'
+_LECTURE_PLANIFICATION = {
+    cle: "if [ -f " + chemin + " ]; then echo " + _MARQUE_PRESENT + "; cat " + chemin + "; fi"
+    for cle, chemin in _FICHIERS_PLANIFICATION.items()
+}
+_RETRAIT_PLANIFICATION = {
+    cle: "rm -f -- " + chemin for cle, chemin in _FICHIERS_PLANIFICATION.items()
+}
+
+
+def _expressions_cron(contenu):
+    """
+    Les expressions de planification d'un fichier `cron.d`, SANS leur commande.
+
+    La commande ne sort pas de la machine : celle de la planification de securite
+    porte `X-Update-Token`, le jeton qui authentifie le rappel du cron. Seuls les
+    cinq champs de date (ou un `@reboot`, `@daily`...) sont rendus. Les lignes
+    vides, les commentaires et les affectations (`SHELL=...`) sont ecartes.
+    """
+    expressions = []
+    for ligne in contenu.splitlines():
+        ligne = ligne.strip()
+        if not ligne or ligne.startswith('#'):
+            continue
+        champs = ligne.split()
+        if '=' in champs[0]:
+            continue
+        if champs[0].startswith('@'):
+            expressions.append(champs[0])
+        elif len(champs) >= 6:
+            expressions.append(' '.join(champs[:5]))
+    return expressions
+
+
+def _lit_planifications(client):
+    """Lit les trois fichiers sur la machine. Rend {cle: [expressions] ou None si absent}."""
+    lues = {}
+    for cle, commande in _LECTURE_PLANIFICATION.items():
+        _stdin, stdout, _stderr = client.exec_command(commande, timeout=15)
+        sortie = stdout.read().decode('utf-8', errors='replace')
+        lignes = sortie.splitlines()
+        if not lignes or lignes[0].strip() != _MARQUE_PRESENT:
+            lues[cle] = None
+        else:
+            lues[cle] = _expressions_cron('\n'.join(lignes[1:]))
+    return lues
+
+
+def _machine_ssh(machine_id):
+    with get_db_connection() as conn:
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute(
+            "SELECT ip, port, user, password, root_password, service_account_deployed FROM machines WHERE id = %s",
+            (machine_id,)
+        )
+        return cursor.fetchone()
+
+
+@bp.route('/scheduled_updates', methods=['POST'])
+@require_api_key
+@require_permission('can_update_linux')
+@require_machine_access
+@threaded_route
+def scheduled_updates():
+    """
+    Les planifications de mise a jour presentes sur une machine.
+
+    Rend `planifications` : une entree par fichier connu, `present` et ses
+    `expressions` cron. Lecture seule : les fichiers sont en 0644, aucun root.
+    """
+    data = request.json or {}
+    try:
+        machine_id = validate_machine_id(data.get('machine_id'))
+    except ValueError as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+    try:
+        row = _machine_ssh(machine_id)
+        if not row:
+            return jsonify({'success': False, 'message': 'Machine introuvable'}), 404
+        ssh_password = server_decrypt_password(row['password'], logger=logger)
+        with ssh_session(row['ip'], row['port'], row['user'], ssh_password, logger=logger,
+                         service_account=row.get('service_account_deployed', False)) as client:
+            lues = _lit_planifications(client)
+        planifications = [
+            {'fichier': cle, 'present': lues[cle] is not None, 'expressions': lues[cle] or []}
+            for cle in _FICHIERS_PLANIFICATION
+        ]
+        return jsonify({'success': True, 'planifications': planifications}), 200
+    except Exception as e:
+        logger.error("[scheduled_updates] Erreur: %s", e)
+        return erreur_interne(e)
+
+
+@bp.route('/scheduled_updates/remove', methods=['POST'])
+@require_api_key
+@require_permission('can_update_linux')
+@require_machine_access
+@threaded_route
+def scheduled_updates_remove():
+    """
+    Retire UN fichier de planification, designe par sa cle, puis redemarre cron.
+
+    Le retrait est VERIFIE : le fichier est relu apres `rm`, et la route echoue
+    s'il est encore la. Retirer la planification de securite efface aussi
+    `machines.maj_secu_date`, pour que la colonne du portail ne montre plus une
+    date qui ne s'executera pas.
+    """
+    data = request.json or {}
+    try:
+        machine_id = validate_machine_id(data.get('machine_id'))
+    except ValueError as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+    cle = data.get('fichier')
+    if not isinstance(cle, str) or cle not in _FICHIERS_PLANIFICATION:
+        return jsonify({'success': False, 'message': 'Fichier de planification inconnu'}), 400
+    try:
+        row = _machine_ssh(machine_id)
+        if not row:
+            return jsonify({'success': False, 'message': 'Machine introuvable'}), 404
+        ssh_password = server_decrypt_password(row['password'], logger=logger)
+        root_password = server_decrypt_password(row['root_password'], logger=logger)
+        with ssh_session(row['ip'], row['port'], row['user'], ssh_password, logger=logger,
+                         service_account=row.get('service_account_deployed', False)) as client:
+            # Un litteral de la liste fermee, lie a un nom : le recensement des
+            # commandes root (`test_commandes_root_indirectes.py`) le resout.
+            commande_retrait = _RETRAIT_PLANIFICATION[cle]
+            execute_as_root(client, commande_retrait, root_password)
+            restant = _lit_planifications(client)[cle]
+            if restant is not None:
+                return jsonify({'success': False,
+                                'message': 'Le fichier est toujours present apres le retrait'}), 500
+            execute_as_root(client, "systemctl restart cron 2>/dev/null || service cron restart 2>/dev/null || true", root_password)
+        if cle == 'auto_security_update_advanced':
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("UPDATE machines SET maj_secu_date = NULL WHERE id = %s", (machine_id,))
+                conn.commit()
+        return jsonify({'success': True, 'message': 'Planification retiree'}), 200
+    except Exception as e:
+        logger.error("[scheduled_updates_remove] Erreur: %s", e)
+        return erreur_interne(e)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Security exec callback (called by cron after update)
 # ─────────────────────────────────────────────────────────────────────────────
 

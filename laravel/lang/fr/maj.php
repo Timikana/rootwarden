@@ -101,7 +101,7 @@ return [
     'tip_save_sched' => "Écrit le fichier cron sur la machine, en root, et redémarre cron.",
 
     'titre_secu'    => "Planifier une mise à jour des paquets",
-    'desc_secu'     => "Sur :machine — apt-get update puis apt-get upgrade (tous les paquets installés, sans filtre de sécurité), journalisé dans /var/log/auto_security_update.log. La date apparaît dans la colonne « Mise à jour planifiée ».",
+    'desc_secu'     => "Sur :machine — apt-get update puis apt-get upgrade (tous les paquets installés, sans filtre de sécurité), journalisé dans /var/log/auto_security_update.log. La date apparaît dans la colonne « Planification ».",
 
     'apercu_incomplet' => 'Choisissez une date et une heure pour voir ce qui sera écrit sur la machine.',
     'apercu_daily'     => 'Tous les jours à :heure',
@@ -124,6 +124,20 @@ return [
     'sched_pose'      => 'Cron posé : :cron',
     'sched_ok'        => 'Planification enregistrée sur :machine.',
     'sched_err'       => "L'écriture du cron a échoué.",
+
+    // Planifications lues sur la machine
+    'existantes_titre'   => 'Déjà posé sur la machine',
+    'existantes_lecture' => 'Lecture des fichiers cron de la machine...',
+    'existantes_aucune'  => 'Aucune planification de mise à jour sur cette machine.',
+    'existantes_err'     => 'Lecture impossible : :message',
+    'fichier_auto_security_update_advanced' => 'Planification actuelle',
+    'fichier_auto_update_advanced'          => 'Ancien bouton « Planifier » (lundi en hebdomadaire, 1er du mois en mensuel)',
+    'fichier_auto_update'                   => 'Ancienne planification par intervalle',
+    'btn_retirer'           => 'Retirer',
+    'btn_confirmer_retrait' => 'Confirmer le retrait',
+    'retrait_en_cours'      => 'Retrait en cours...',
+    'retrait_ok'            => ':fichier retiré de :machine.',
+    'retrait_err'           => 'Le retrait a échoué.',
 
     // Redemarrage
     'btn_reboot_action' => 'Redémarrer',

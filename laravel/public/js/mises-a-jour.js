@@ -555,6 +555,8 @@
     const titrePlanif = document.getElementById('sched-titre');
     const machinePlanif = document.getElementById('sched-machine');
     const boutonEnregistrer = document.getElementById('sched-save');
+    const etatExistantes = document.getElementById('sched-existantes-etat');
+    const listeExistantes = document.getElementById('sched-existantes');
 
     /** Machine en cours d'edition ; null quand le formulaire est ferme. */
     let planifEnCours = null;
@@ -630,6 +632,7 @@
 
         formulaire.hidden = false;
         montreApercu();
+        lisPlanificationsMachine(id, nom);
         formulaire.scrollIntoView({ block: 'nearest' });
         champDate.focus();
     }
@@ -637,6 +640,129 @@
     function fermePlanification() {
         planifEnCours = null;
         formulaire.hidden = true;
+    }
+
+    /*
+     * CE QUI EST DEJA SUR LA MACHINE. La base ne garde que la planification
+     * actuelle (`maj_secu_date`) ; l'ancien bouton « Planifier » et la
+     * planification par intervalle posaient leurs propres fichiers cron, que
+     * rien ne montrait. On les lit donc sur la machine, a chaque ouverture.
+     *
+     * Le numero de lecture ecarte une reponse arrivee apres qu'on a ouvert le
+     * panneau d'une AUTRE machine : sans lui, la liste de A s'afficherait sous
+     * le nom de B.
+     */
+    let lectureCourante = 0;
+
+    /** L'etat de la lecture ; vide, son paragraphe disparait avec sa marge. */
+    function ecritEtatExistantes(texte) {
+        etatExistantes.textContent = texte;
+        etatExistantes.hidden = !texte;
+    }
+
+    async function lisPlanificationsMachine(id, nom) {
+        const numero = ++lectureCourante;
+        listeExistantes.hidden = true;
+        listeExistantes.replaceChildren();
+        ecritEtatExistantes(planif.existantes_lecture);
+
+        const res = await appelle('/scheduled_updates', {
+            method: 'POST',
+            body: JSON.stringify({ machine_id: id }),
+        });
+        if (numero !== lectureCourante) return;
+
+        const c = res.corps;
+        if (!res.ok || !c || c.success === false) {
+            ecritEtatExistantes(planif.existantes_err
+                .replace(':message', (c && c.message) || String(res.statut)));
+            return;
+        }
+        rendPlanifications(id, nom, (c.planifications || []).filter((p) => p.present));
+    }
+
+    function rendPlanifications(id, nom, presentes) {
+        listeExistantes.replaceChildren();
+        if (!presentes.length) {
+            ecritEtatExistantes(planif.existantes_aucune);
+            listeExistantes.hidden = true;
+            return;
+        }
+        ecritEtatExistantes('');
+        for (const p of presentes) {
+            const li = document.createElement('li');
+            li.className = 'rw-planifs-machine__ligne';
+            li.dataset.rw = 'planif-machine-' + p.fichier;
+
+            const corpsLigne = document.createElement('div');
+            corpsLigne.className = 'rw-planifs-machine__corps';
+            const titre = sousValeur(planif.fichiers[p.fichier] || p.fichier, 'rw-tableau__fort');
+            const chemin = sousValeur('/etc/cron.d/' + p.fichier, 'rw-code rw-tableau__discret');
+            corpsLigne.append(titre, chemin);
+            for (const e of p.expressions || []) {
+                corpsLigne.append(sousValeur(e, 'rw-code'));
+            }
+
+            const actions = document.createElement('div');
+            actions.className = 'rw-planifs-machine__actions';
+            actions.append(boutonRetrait(id, nom, p.fichier, actions));
+
+            li.append(corpsLigne, actions);
+            listeExistantes.append(li);
+        }
+        listeExistantes.hidden = false;
+    }
+
+    /*
+     * Retirer se decide DANS la ligne : un premier clic remplace le bouton par
+     * « Confirmer le retrait » et « Annuler ». Aucune boite native.
+     */
+    function boutonRetrait(id, nom, fichier, actions) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'rw-bouton rw-bouton--danger-discret rw-bouton--minuscule';
+        b.textContent = planif.btn_retirer;
+        b.dataset.rw = 'retirer-' + fichier;
+        b.addEventListener('click', () => {
+            const confirmer = document.createElement('button');
+            confirmer.type = 'button';
+            confirmer.className = 'rw-bouton rw-bouton--danger rw-bouton--minuscule';
+            confirmer.textContent = planif.btn_confirmer_retrait;
+            confirmer.dataset.rw = 'confirmer-retrait-' + fichier;
+            const annuler = document.createElement('button');
+            annuler.type = 'button';
+            annuler.className = 'rw-bouton rw-bouton--discret rw-bouton--minuscule';
+            annuler.textContent = planif.btn_annuler;
+            annuler.addEventListener('click', () => actions.replaceChildren(boutonRetrait(id, nom, fichier, actions)));
+            confirmer.addEventListener('click', () => retire(id, nom, fichier, confirmer, annuler));
+            actions.replaceChildren(annuler, confirmer);
+            confirmer.focus();
+        });
+        return b;
+    }
+
+    async function retire(id, nom, fichier, confirmer, annuler) {
+        confirmer.disabled = true;
+        annuler.disabled = true;
+        confirmer.textContent = planif.retrait_en_cours;
+        const libelle = planif.fichiers[fichier] || fichier;
+
+        const res = await appelle('/scheduled_updates/remove', {
+            method: 'POST',
+            body: JSON.stringify({ machine_id: id, fichier: fichier }),
+        });
+        const c = res.corps;
+        if (!res.ok || !c || c.success === false) {
+            journal((c && c.message) || planif.retrait_err, 'error', nom);
+            dit((c && c.message) || planif.retrait_err, 'echec');
+        } else {
+            journal(planif.retrait_ok.replace(':fichier', '/etc/cron.d/' + fichier).replace(':machine', nom), 'ok', nom);
+            dit(planif.retrait_ok.replace(':fichier', libelle).replace(':machine', nom), 'ok');
+            // Retirer la planification actuelle efface aussi sa date en base.
+            if (fichier === 'auto_security_update_advanced') await relit(filtresCourants());
+        }
+        // L'etat affiche est celui que la MACHINE rend, relu apres le geste.
+        if (planifEnCours && planifEnCours.id === id) await lisPlanificationsMachine(id, nom);
     }
 
     async function enregistrePlanification() {
