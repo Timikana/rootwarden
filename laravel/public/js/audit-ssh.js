@@ -429,8 +429,7 @@
      * — rien n'est ecrit, ni sur la machine ni en base — mais ce n'est pas une
      * lecture locale, et le panneau le dit AVANT le clic.
      *
-     * L'ECRITURE, elle, reste NON PORTEE : `np_config` le declare toujours, et
-     * `np_config_detail` garde sa reserve, qui porte precisement sur elle —
+     * L'ECRITURE reste absente (`cfg_lecture_seule` le dit a l'ecran) :
      * ecrire dans `sshd_config` et recharger le service peut couper le seul
      * canal dont RootWarden dispose pour y revenir.
      *
@@ -665,13 +664,10 @@
             /*
              * LE PANNEAU AVANT L'ECRITURE. Ce qu'on arme ouvre des sessions
              * SSH reelles, a repetition, sans personne devant l'ecran :
-             * `np_planif_detail` le dit, et `planif_cible_ambigue` dit que
-             * « tout le parc » est a la fois un choix legitime et ce que
-             * produit une cible incomplete.
+             * `np_planif_detail` le dit.
              */
             ouvrePanneau(t('np_planif_detail'), [
                 porteeAnnoncee(type, valeur),
-                type === 'all' ? t('planif_cible_ambigue') : '',
             ], t('planif_conf_titre'));
             /*
              * LE LIEN VERS L'ANCIEN PORTAIL N'A AUCUN OBJET ICI : ce geste est
