@@ -14,7 +14,7 @@
 return [
 
     'title' => 'Comptes du portail',
-    'desc' => "Créer un compte, fixer un mot de passe, déverrouiller un accès, réinitialiser un second facteur.",
+    'desc' => "Les comptes qui se connectent à ce portail : création, mot de passe, rôle, suspension.",
 
     'col_nom' => 'Nom',
     'col_courriel' => 'Courriel',
@@ -44,7 +44,7 @@ return [
     'mdp_change' => 'Mot de passe enregistré. Le compte devra le changer à la prochaine connexion.',
 
     'secret_titre' => 'Mot de passe généré — il ne sera plus affiché.',
-    'secret_aide' => "Transmettez-le par un canal sûr. Il n'est écrit ni dans la page, ni dans le journal.",
+    'secret_aide' => "Transmettez-le par un canal sûr.",
     'compris' => "J'ai noté",
 
     'deverrouiller' => 'Déverrouiller',
@@ -69,7 +69,7 @@ return [
     'suspendu' => 'Compte suspendu. Il ne peut plus se connecter, et son accès aux machines sera retiré au prochain déploiement.',
     'err_auto_activite' => "Vous ne pouvez pas suspendre votre propre compte.",
     'err_dernier_superadmin' => "Impossible de suspendre le dernier superadministrateur actif : personne ne pourrait rouvrir le portail.",
-    'err_actif_requis' => "L'état voulu (actif) doit être indiqué : une absence n'est pas une suspension.",
+    'err_actif_requis' => "L'état voulu (actif) doit être indiqué.",
 
     'totp_reinitialiser' => 'Réinitialiser la 2FA',
     'totp_question' => "Réinitialiser le second facteur de « :nom » ? L'utilisateur devra enrôler un nouvel authentificateur avant de pouvoir se connecter.",
@@ -90,11 +90,8 @@ return [
      * laisserait pas choisir.
      */
     'exp_titre'   => "Expiration du mot de passe",
-    'exp_aide'    => "Réservé au superadministrateur, et jamais sur son propre compte.",
     'exp_globale' => "Suivre la règle globale",
     'exp_exempte' => "Exempter ce compte",
-    'exp_jours'   => "Durée propre au compte (en jours)",
-    'exp_valider' => "Enregistrer",
     'exp_pose'    => "Expiration enregistrée. L'échéance est recalculée depuis la date du dernier changement de mot de passe.",
     'exp_valeur'  => "Valeur d'expiration invalide : attendu une durée positive, zéro pour exempter, ou rien pour suivre la règle globale.",
     /*
@@ -103,16 +100,16 @@ return [
      * fait pas — zéro comparaison avec l'identifiant de session dans tout le
      * fichier. Le message dit la raison, pas seulement le refus.
      */
-    'exp_pas_soi' => "Vous ne pouvez pas modifier l'expiration de votre propre mot de passe : s'exempter soi-même d'une règle de sécurité doit passer par quelqu'un d'autre.",
+    'exp_pas_soi' => "Vous ne pouvez pas modifier l'expiration de votre propre mot de passe : demandez-le à un autre superadministrateur.",
 
     'imp_valider' => 'Importer les comptes',
-    'imp_roles_aide' => 'La colonne « role » accepte : :roles. Toute autre valeur donne le rôle le plus faible.',
-    'imp_courriel_exige' => 'L\'adresse de courriel est OBLIGATOIRE ici, alors que l\'ancien portail l\'acceptait vide — un compte sans adresse et sans mot de passe connu n\'a ni accès ni récupération.',
-    'imp_mdp_avert' => 'Le mot de passe de chaque compte créé est affiché UNE SEULE FOIS ci-dessous. Il n\'est enregistré nulle part et ne sera plus jamais affiché : recopiez-le avant de quitter cette page. La personne devra le changer à sa première connexion — il a transité par cet écran, il ne doit pas rester le sien.',
+    'imp_roles_aide' => "La colonne « role » accepte : :roles. Toute autre valeur donne le rôle « Utilisateur ».",
+    'imp_courriel_exige' => "L'adresse de courriel est obligatoire : sans elle, le compte ne peut pas récupérer son accès.",
+    'imp_mdp_avert' => "Chaque mot de passe n'est affiché qu'une fois, ici : recopiez-le avant de quitter la page. La personne devra le changer à sa première connexion.",
     'imp_bilan_titre' => 'Bilan de l\'import',
     'imp_lues' => ':n ligne(s) lue(s).',
     'imp_crees' => ':n compte(s) créé(s).',
-    'imp_tronque' => 'Le fichier dépasse :max lignes : les suivantes n\'ont PAS été traitées.',
+    'imp_tronque' => "Le fichier dépasse :max lignes : les suivantes n'ont pas été traitées.",
     'imp_manquantes' => 'Colonnes obligatoires absentes de l\'en-tête : :colonnes. Rien n\'a été importé.',
     'imp_erreurs_titre' => ':n ligne(s) à signaler',
     'imp_ligne' => 'Ligne :n',
@@ -124,7 +121,7 @@ return [
     'imp_err_ecriture' => 'La création a échoué en base : ligne ignorée.',
     'imp_err_role' => 'La valeur « :valeur » de la colonne « role » n\'est pas un rôle : le compte a été créé avec le rôle « Utilisateur ». Valeurs acceptées : :roles.',
     'imp_rang_ramene' => 'Compte créé, mais avec le rôle « Utilisateur » : vous ne pouvez créer qu\'un rôle inférieur au vôtre.',
-    'imp_sudo_refuse' => 'Compte créé SANS sudo : accorder sudo demande le rôle « Superadministrateur ».',
+    'imp_sudo_refuse' => "Compte créé sans sudo : accorder sudo demande le rôle « Super-administrateur ».",
     'err_nom' => "Le nom est obligatoire et ne peut dépasser 255 caractères.",
     'err_nom_pris' => 'Ce nom est déjà utilisé par un autre compte.',
     'err_inconnu' => "Ce compte n'existe pas.",
@@ -146,7 +143,7 @@ return [
     'anonymiser_plutot' => 'Anonymiser à la place',
     'suppr_question' => 'Supprimer le compte « :nom » ?',
     'suppr_sans_journal' => "Ce compte ne porte aucune ligne de journal : sa suppression n'emporte rien d'autre.",
-    'suppr_avec_journal' => "Ce compte porte :nombre ligne(s) de journal d'audit. Les supprimer romprait la chaîne de scellement — la suppression est donc refusée. L'anonymisation efface les données personnelles et conserve le journal.",
+    'suppr_avec_journal' => "Ce compte porte :nombre ligne(s) de journal d'audit : le supprimer romprait la chaîne de scellement. Anonymisez-le : ses données personnelles sont effacées, le journal est conservé.",
     'suppr_consigne' => 'Pour confirmer, saisissez exactement : :nom',
     'anon_question' => "Anonymiser le compte « :nom » ? Les données personnelles seront effacées ; le journal d'audit sera conservé.",
     'supprime' => 'Compte « :nom » supprimé.',

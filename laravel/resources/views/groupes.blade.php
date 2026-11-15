@@ -5,24 +5,12 @@
     <p class="rw-sous-titre rw-prose">{{ __('groups.desc') }}</p>
 
     {{--
-        ═══ CE QUE LA PAGE PEUT FAIRE AUJOURD'HUI ═══════════════════════════
-
-        R1 ne porte que la LECTURE. Le dire en tete plutot que de le laisser
-        decouvrir bouton par bouton : une capacite absente doit etre DECLAREE,
-        pas devinee.
-
-        La seconde phrase n'est pas une limite du portage, c'est une propriete
-        du produit : un role 2 porteur de `can_admin_portal` peut viser tout le
-        parc, `srv-zabbix` comprise. Aucune table d'acces par machine
-        n'intervient sur ces routes — `check_machine_access` rend `True` des le
-        role 2, donc `@require_machine_access` y serait inerte. Ce n'est pas un
-        defaut, c'est une decision de conception que la page doit dire.
+        UNE PROPRIETE DU PRODUIT, PAS UNE LIMITE DU PORTAGE : un role 2 porteur
+        de `can_admin_portal` peut viser tout le parc. Aucune table d'acces par
+        machine n'intervient sur ces routes — `check_machine_access` rend `True`
+        des le role 2. La page le dit.
     --}}
-    <div class="rw-carte rw-carte--pleine" data-rw="groupes-portee">
-        <h2 class="rw-sous-titre-fort">{{ __('groups.portee_titre') }}</h2>
-        <p class="rw-prose">{{ __('groups.portee_texte') }}</p>
-        <p class="rw-prose">{{ __('groups.parc_entier') }}</p>
-    </div>
+    <p class="rw-prose rw-aide" data-rw="groupes-portee">{{ __('groups.parc_entier') }}</p>
 
     <div class="rw-actions">
         <button type="button" class="rw-bouton rw-bouton--discret"
@@ -157,13 +145,9 @@
                  l'affiche, apres avoir annonce la portee resolue. --}}
             <button type="button" class="rw-bouton rw-bouton--succes"
                     data-rw="groupes-panneau-confirmer" hidden>{{ __('groups.btn_enregistrer') }}</button>
-            {{-- ACTION PRINCIPALE : le lien vers l'ancien portail. Un panneau
-                 dont la seule issue serait « Fermer » ne serait pas une
-                 decision. Marqueur `↗` comme dans le menu. --}}
-            @if ($lienLegacy)
-                <a class="rw-bouton" data-rw="groupes-panneau-legacy"
-                   href="{{ $lienLegacy }}" target="_blank" rel="noopener">{{ __('groups.np_ouvrir') }} ↗</a>
-            @endif
+            {{-- Le lien vers l'ancien portail est retire : sa cible est
+                 archivee et rend 404 depuis le 2026-09-05. Le script tolere
+                 l'absence de `groupes-panneau-legacy`. --}}
         </div>
     </div>
 

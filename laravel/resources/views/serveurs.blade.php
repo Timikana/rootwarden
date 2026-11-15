@@ -12,19 +12,6 @@
         @if (session('erreur')){{ session('erreur') }}@endif
     </p>
 
-    {{-- L'ENCART « CE QUE CET ONGLET NE FAIT PAS ENCORE » A ETE RETIRE ICI,
-         et son commentaire disait deja le contraire de sa voisine : il citait
-         etiquettes, notes, cycle de vie et test de connexion comme non portes
-         alors que `reste_texte` annoncait les deux derniers PORTES. Les quatre
-         le sont (D6b, D6d), et l'import CSV l'est par ce sous-lot : il ne reste
-         RIEN a declarer.
-
-         Un encart de manque dont l'enumeration est vide ne se vide pas, il
-         DISPARAIT -- sans quoi il envoie encore vers l'ancien portail pour des
-         gestes que la page fait. Les trois cles `reste_*` sont retirees des
-         deux catalogues dans le meme commit : une cle sans lecteur devient une
-         declaration que personne ne relit. --}}
-
     {{-- ═══ Ajout ═══════════════════════════════════════════════════════════ --}}
     <section class="rw-carte rw-carte--pleine">
         <details data-rw="serveurs-ajout-bloc">
@@ -118,17 +105,9 @@
                 {{ __('serveurs.imp_secrets') }}
             </p>
 
-            {{-- LES DEUX DIVERGENCES SONT ANNONCEES AVANT L'IMPORT, pas
-                 decouvertes dans le bilan : une ligne refusee que l'ancien
-                 portail aurait creee doit etre PREVUE, sinon le refus passe
-                 pour un defaut du portage. --}}
-            <div class="rw-encart" data-rw="serveurs-import-diverge">
-                <p><strong>{{ __('serveurs.imp_diverge_titre') }}</strong></p>
-                <ul class="rw-liste">
-                    <li class="rw-prose">{{ __('serveurs.imp_diverge_secret') }}</li>
-                    <li class="rw-prose">{{ __('serveurs.imp_diverge_env') }}</li>
-                </ul>
-            </div>
+            {{-- LES REGLES DE REFUS SONT ANNONCEES AVANT L'IMPORT, pas
+                 decouvertes dans le bilan. --}}
+            <p class="rw-prose rw-aide" data-rw="serveurs-import-diverge">{{ __('serveurs.imp_refus') }}</p>
 
             <form method="POST" action="{{ route('serveurs.importer') }}"
                   enctype="multipart/form-data" data-rw="serveurs-import-formulaire">
@@ -156,9 +135,6 @@
                 </div>
             </form>
 
-            {{-- LE BILAN EST COMPTE, ET IL NOMME LES LIGNES REFUSEES. Un
-                 « import termine » sans compte ni detail laisse croire que tout
-                 est passe : c'est le defaut que `docker/scan_all` a paye. --}}
             {{-- LE BILAN EST COMPTE, ET IL NOMME LES LIGNES REFUSEES. Un
                  « import termine » sans compte ni detail laisse croire que tout
                  est passe : c'est le defaut que `docker/scan_all` a paye.
