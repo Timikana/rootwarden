@@ -19,8 +19,10 @@ au jour du premier build ; aucun correctif PHP ni Debian n'arrivait jamais en pr
 et la CI construit désormais avec `pull: true`.
 
 **MySQL 9.2 → 9.7 est irréversible.** `maj.sh` fait maintenant un dump complet et vérifié avant tout
-changement d'image de la base, et s'arrête si le dump échoue. Éprouvé sur une base isolée : mise à
-niveau réussie, 64 tables vérifiées, backend et portail connectés.
+changement d'image de la base, et s'arrête si le dump échoue. Éprouvé le 2026-11-15 sur une base
+isolée au schéma actuel (migrations jusqu'à 067) : conversion 9.2.0 → 9.7.4 réussie, 66 tables
+`CHECK TABLE` OK, connexion et lecture par le portail et le backend. Le dump, rechargé dans un
+MySQL 9.2 neuf, redonne la même base : le retour arrière est éprouvé.
 
 L'image du portail reprend la dernière version PHP 8.4 publiée à chaque `./maj.sh`, grâce à `--pull`.
 
