@@ -23,6 +23,7 @@ return [
     'col_etat' => 'État',
     'col_mdp' => 'Mot de passe',
     'col_actions' => 'Actions',
+    'actions_pour' => 'Actions pour :compte',
 
     'role_1' => 'Utilisateur',
     'role_2' => 'Administrateur',

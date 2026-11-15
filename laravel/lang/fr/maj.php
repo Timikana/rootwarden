@@ -32,9 +32,11 @@ return [
     'th_env'           => 'Environnement',
     'th_criticality'   => 'Criticité',
     'th_network'       => 'Réseau',
-    'th_actions'       => 'Relevés',
+    'th_actions'       => 'Actions',
 
     // Releves par machine
+    'btn_actions'  => 'Actions',
+    'actions_pour' => 'Actions pour :machine',
     'btn_version' => 'Version',
     'tip_version' => 'Lit la version Linux de la machine, sans la modifier.',
     'btn_statut'  => 'Disponibilité',

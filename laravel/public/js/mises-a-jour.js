@@ -141,6 +141,47 @@
         return b;
     }
 
+    /**
+     * Le menu d'actions de la ligne (public/js/menu-ligne.js). Les boutons y
+     * gardent leur `data-rw` et leurs gestionnaires.
+     */
+    function menuLigne(id, nom, boutons) {
+        const conteneur = document.createElement('div');
+        conteneur.className = 'rw-menu-ligne';
+
+        const liste = document.createElement('div');
+        liste.className = 'rw-menu-ligne__liste';
+        liste.id = 'maj-menu-' + id;
+        liste.setAttribute('popover', 'auto');
+        liste.append(...boutons);
+
+        const ouvre = document.createElement('button');
+        ouvre.type = 'button';
+        ouvre.className = 'rw-bouton rw-bouton--discret rw-bouton--minuscule rw-menu-ligne__bouton';
+        ouvre.setAttribute('popovertarget', liste.id);
+        ouvre.setAttribute('aria-expanded', 'false');
+        ouvre.setAttribute('aria-label', (libelles.actions_pour || '').replace(':machine', nom));
+        ouvre.dataset.rw = 'maj-menu-' + id;
+        ouvre.append(document.createTextNode(libelles.btn_actions || ''), icone('chevron-down'));
+
+        conteneur.append(ouvre, liste);
+        return conteneur;
+    }
+
+    /** Une icone du sprite, a l'adresse versionnee que la page emploie deja. */
+    function icone(nom) {
+        const ns = 'http://www.w3.org/2000/svg';
+        const svg = document.createElementNS(ns, 'svg');
+        svg.setAttribute('class', 'rw-icone');
+        svg.setAttribute('aria-hidden', 'true');
+        svg.setAttribute('focusable', 'false');
+        const use = document.createElementNS(ns, 'use');
+        const sprite = (document.querySelector('use[href*="/icones/lucide.svg"]')?.getAttribute('href') || '/icones/lucide.svg').split('#')[0];
+        use.setAttribute('href', sprite + '#i-' + nom);
+        svg.appendChild(use);
+        return svg;
+    }
+
     function rend(machines, filtreActif) {
         if (!machines.length) {
             if (filtreActif) message(libelles.vide_filtre, libelles.vide_filtre_aide);
@@ -168,9 +209,9 @@
 
             tr.appendChild(cellule(m.name ?? '', 'server-name rw-tableau__fort'));
 
+            // Le menu porte sa propre disposition : la cellule reste une cellule.
             const tdActions = document.createElement('td');
-            tdActions.className = 'rw-tableau__actions rw-tableau__actions--releves';
-            tdActions.append(
+            tdActions.append(menuLigne(id, m.name ?? '', [
                 boutonReleve(libelles.btn_version, libelles.tip_version, 'version-' + id,
                              (b) => releveVersion(id, tr, b)),
                 boutonReleve(libelles.btn_statut, libelles.tip_statut, 'statut-' + id,
@@ -182,7 +223,7 @@
                 boutonReleve(libelles.btn_planifier_secu, libelles.tip_planifier_secu,
                              'planifier-secu-' + id,
                              () => ouvrePlanification(id, m.name ?? '', 'securite')),
-            );
+            ]));
             tr.appendChild(tdActions);
 
             tr.appendChild(cellule(m.linux_version || libelles.non_verifie, 'linux-version'));

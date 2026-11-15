@@ -162,7 +162,9 @@
             tr.appendChild(tdEtat);
 
             const tdDecision = document.createElement('td');
-            tdDecision.className = 'rw-tableau__actions';
+            const groupeDecision = document.createElement('div');
+            groupeDecision.className = 'rw-tableau__actions';
+            tdDecision.appendChild(groupeDecision);
             if (d.status === 'pending') {
                 const approuver = document.createElement('button');
                 approuver.type = 'button';
@@ -185,10 +187,10 @@
                 rejeter.title = libelles.tip_reject;
                 rejeter.addEventListener('click', () => ouvreRejet(tr, d));
 
-                tdDecision.appendChild(approuver);
-                tdDecision.appendChild(rejeter);
+                groupeDecision.appendChild(approuver);
+                groupeDecision.appendChild(rejeter);
             } else if (d.approver) {
-                tdDecision.appendChild(cellule(libelles.by + ' ' + d.approver, 'rw-tableau__discret'));
+                groupeDecision.appendChild(cellule(libelles.by + ' ' + d.approver, 'rw-tableau__discret'));
             }
             tr.appendChild(tdDecision);
 

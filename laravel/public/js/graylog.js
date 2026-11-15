@@ -304,7 +304,9 @@
             tr.appendChild(cellule(m.last_deploy_at));
 
             const td = document.createElement('td');
-            td.className = 'rw-tableau__actions';
+            const groupe = document.createElement('div');
+            groupe.className = 'rw-tableau__actions';
+            td.appendChild(groupe);
             /*
              * LES TROIS BOUTONS DE LIGNE RESTENT DISCRETS.
              *
@@ -325,7 +327,7 @@
                 b.dataset.machine = String(m.id);
                 b.textContent = libelle;
                 b.addEventListener('click', () => ouvreConfirmation(tr, m, geste));
-                td.appendChild(b);
+                groupe.appendChild(b);
             });
             tr.appendChild(td);
             tbody.appendChild(tr);

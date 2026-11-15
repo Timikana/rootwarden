@@ -1316,28 +1316,37 @@ a.rw-bouton { display: inline-block; }
  */
 .rw-bouton--minuscule { padding: 4px 8px; font-size: 12px; }
 
-/*
- * La colonne d'actions se REPLIE dans une largeur bornee.
- *
- * Elle tenait sur une ligne tant qu'elle portait trois relevés ; U4 y a ajoute
- * les deux planifications. Cinq boutons en file poussaient la colonne entiere
- * hors du champ — a 1920 px, seul le premier restait visible, et la borner ne
- * changeait rien : elle etait DERNIERE de treize colonnes. Elle est donc
- * remontee juste apres le nom du serveur, et se replie dans une largeur bornee.
- * Une capacite qu'on n'atteint qu'en decouvrant le defilement horizontal n'est
- * pas offerte ; les donnees, elles, se parcourent en defilant sans dommage.
- *
- * `flex-wrap` reste pose sur la VARIANTE : `.rw-tableau__actions` sert aussi
- * aux pages d'approbation et de sauvegarde, ou le repli n'a rien a faire.
- */
-.rw-tableau__actions--releves {
-    flex-wrap: wrap;
-    /* Plancher ET plafond : sans plancher, le tableau donne a la colonne sa
-       largeur minimale et empile les cinq boutons un par ligne. */
-    min-width: 300px;
-    max-width: 340px;
-    white-space: normal;
+/* ── Menu d'actions d'une ligne (public/js/menu-ligne.js) ──────────────────
+ * La liste est un `popover` : premier plan, hors du cadre du tableau qui
+ * defile et l'aurait rognee. Position fixe calculee par le script. */
+.rw-menu-ligne { display: inline-flex; gap: 8px; align-items: center; white-space: nowrap; }
+.rw-menu-ligne__bouton { display: inline-flex; align-items: center; gap: 4px; }
+.rw-menu-ligne__bouton .rw-icone { width: 14px; height: 14px; }
+.rw-menu-ligne__liste {
+    position: fixed;
+    inset: auto;
+    margin: 0;
+    min-width: 200px;
+    padding: 4px;
+    border: 1px solid var(--rw-bordure);
+    border-radius: var(--rw-rayon);
+    background: var(--rw-surface);
+    color: var(--rw-texte);
+    box-shadow: var(--rw-ombre);
 }
+.rw-menu-ligne__liste:popover-open { display: flex; flex-direction: column; }
+.rw-menu-ligne__liste > .rw-bouton {
+    justify-content: flex-start;
+    width: 100%;
+    border-color: transparent;
+    background: transparent;
+    text-align: left;
+}
+.rw-menu-ligne__liste > .rw-bouton:hover:not(:disabled),
+.rw-menu-ligne__liste > .rw-bouton:focus-visible { background: var(--rw-surface-2); }
+/* Sans fond plein, un geste destructeur garde sa couleur par le TEXTE. */
+.rw-menu-ligne__liste > .rw-bouton--danger { color: var(--rw-danger); }
+.rw-menu-ligne__liste > .rw-bouton--avertissement { color: var(--rw-avertissement); }
 
 /* ══════════════════════════════════════════════════════════════════════════
    Journal d'execution (module update/, sous-lot U2)

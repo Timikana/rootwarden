@@ -229,151 +229,171 @@
                                     data-rw="compte-mdp-generer-{{ $c['id'] }}"
                                     data-id="{{ $c['id'] }}">{{ __('comptes.mdp_generer') }}</button>
                         </td>
-                        <td class="rw-tableau__actions">
-                            {{--
-                                L'EXEMPTION D'EXPIRATION — superadministrateur
-                                seulement, et JAMAIS sur son propre compte.
+                        <td>
+                            <div class="rw-tableau__actions">
+                                {{--
+                                    L'EXEMPTION D'EXPIRATION — superadministrateur
+                                    seulement, et JAMAIS sur son propre compte.
 
-                                ⚠ LE CONTROLE N'EST PAS RENDU SUR SA PROPRE LIGNE.
-                                Le serveur refuse deja ce cas (`exp_pas_soi`), mais
-                                offrir un selecteur qui rendra 403 apprend seulement
-                                que le produit se contredit. **Un geste qu'on ne
-                                rend pas ne se contourne pas ; un geste qu'on rend
-                                et que le serveur refuse est une promesse rompue.**
+                                    ⚠ LE CONTROLE N'EST PAS RENDU SUR SA PROPRE LIGNE.
+                                    Le serveur refuse deja ce cas (`exp_pas_soi`), mais
+                                    offrir un selecteur qui rendra 403 apprend seulement
+                                    que le produit se contredit. **Un geste qu'on ne
+                                    rend pas ne se contourne pas ; un geste qu'on rend
+                                    et que le serveur refuse est une promesse rompue.**
 
-                                Liste FERMEE : trois choix, pas une saisie libre.
-                                Le legacy accepte n'importe quel entier, negatif
-                                compris — et `-1` poserait une echeance dans le
-                                PASSE, donc un compte expire a l'instant meme.
-                            --}}
-                            @if ($estSuperadmin && (int) $c['id'] !== (int) session('utilisateur_id'))
-                                <label class="rw-visuellement-cache"
-                                       for="exp-{{ $c['id'] }}">{{ __('comptes.exp_titre') }}</label>
-                                <select id="exp-{{ $c['id'] }}" class="rw-saisie rw-saisie--compacte"
-                                        data-rw="compte-expiration-{{ $c['id'] }}" data-id="{{ $c['id'] }}">
-                                    <option value=""@selected($c['password_expiry_override'] === null)>{{ __('comptes.exp_globale') }}</option>
-                                    <option value="0"@selected((int) $c['password_expiry_override'] === 0 && $c['password_expiry_override'] !== null)>{{ __('comptes.exp_exempte') }}</option>
-                                    @foreach ([30, 60, 90, 180, 365] as $j)
-                                        <option value="{{ $j }}"@selected((int) $c['password_expiry_override'] === $j)>{{ $j }} j</option>
-                                    @endforeach
-                                </select>
-                            @endif
-                            @if (! empty($c['locked_until']))
-                                <button type="button" class="rw-bouton rw-bouton--minuscule"
-                                        data-rw="compte-deverrouiller-{{ $c['id'] }}"
-                                        data-id="{{ $c['id'] }}">{{ __('comptes.deverrouiller') }}</button>
-                            @endif
-                            {{-- SUSPENDRE / ACTIVER — geste PERDU a l'extinction du
-                                 legacy (`adm/api/toggle_user.php`), reporte le
-                                 2026-09-09. Sans lui, suspendre un compte le temps
-                                 d'un preavis imposait de le DETRUIRE : la seule
-                                 ecriture vivante de `users.active` etait celle de
-                                 l'anonymisation, irreversible.
+                                    Liste FERMEE : trois choix, pas une saisie libre.
+                                    Le legacy accepte n'importe quel entier, negatif
+                                    compris — et `-1` poserait une echeance dans le
+                                    PASSE, donc un compte expire a l'instant meme.
+                                --}}
+                                @if ($estSuperadmin && (int) $c['id'] !== (int) session('utilisateur_id'))
+                                    <label class="rw-visuellement-cache"
+                                           for="exp-{{ $c['id'] }}">{{ __('comptes.exp_titre') }}</label>
+                                    <select id="exp-{{ $c['id'] }}" class="rw-saisie rw-saisie--compacte"
+                                            data-rw="compte-expiration-{{ $c['id'] }}" data-id="{{ $c['id'] }}">
+                                        <option value=""@selected($c['password_expiry_override'] === null)>{{ __('comptes.exp_globale') }}</option>
+                                        <option value="0"@selected((int) $c['password_expiry_override'] === 0 && $c['password_expiry_override'] !== null)>{{ __('comptes.exp_exempte') }}</option>
+                                        @foreach ([30, 60, 90, 180, 365] as $j)
+                                            <option value="{{ $j }}"@selected((int) $c['password_expiry_override'] === $j)>{{ $j }} j</option>
+                                        @endforeach
+                                    </select>
+                                @endif
+                                {{-- ROLE — second geste PERDU a l'extinction du legacy
+                                     (`adm/includes/manage_roles.php`), reporte le
+                                     2026-09-09. Sans lui, promouvoir un compte imposait
+                                     de le RECREER, donc de perdre son historique.
 
-                                 La condition est celle du selecteur d'expiration
-                                 juste au-dessus : superadministrateur, et pas sur
-                                 soi-meme. Les deux autres gardes du legacy vivent
-                                 dans le service, ou elles peuvent LIRE la base —
-                                 dont celle qui refuse de suspendre le DERNIER
-                                 superadministrateur actif.
+                                     ⚠ LA CONDITION REPREND LES GARDES DU SERVICE, pour
+                                     ne pas afficher un controle qui refusera toujours :
+                                       · pas sur soi-meme          (garde 5)
+                                       · un role 2 ne voit pas le
+                                         selecteur d'un role 3     (garde 3)
+                                     et les OPTIONS reprennent la garde 4 : un non-
+                                     superadmin ne se voit offrir que les roles
+                                     STRICTEMENT inferieurs au sien. Un role 2 n'a donc
+                                     qu'une option, `user` — c'est exact, et c'est
+                                     visible.
 
-                                 ⚠ `data-actif` porte l'etat VOULU, pas l'etat
-                                 courant : l'API prend un booleen explicite et non
-                                 une bascule, donc le geste est idempotent. Le
-                                 libelle, lui, depend de l'etat courant. --}}
-                            @if ($estSuperadmin && (int) $c['id'] !== (int) session('utilisateur_id'))
-                                <button type="button" class="rw-bouton rw-bouton--minuscule"
-                                        data-rw="compte-activite-{{ $c['id'] }}"
-                                        data-id="{{ $c['id'] }}"
-                                        data-actif="{{ (int) $c['active'] ? '0' : '1' }}"
-                                >{{ (int) $c['active'] ? __('comptes.suspendre') : __('comptes.activer') }}</button>
-                            @endif
-                            {{-- ROLE — second geste PERDU a l'extinction du legacy
-                                 (`adm/includes/manage_roles.php`), reporte le
-                                 2026-09-09. Sans lui, promouvoir un compte imposait
-                                 de le RECREER, donc de perdre son historique.
+                                     `data-precedent` sert au retour arriere : six gardes
+                                     peuvent refuser, et un selecteur qui garde le choix
+                                     refuse afficherait un etat que la base ne porte pas. --}}
+                                @php($peutChangerLeRole = (int) $c['id'] !== (int) session('utilisateur_id')
+                                    && ($estSuperadmin || (int) $c['role_id'] < 3))
+                                @if ($peutChangerLeRole)
+                                    <label class="rw-visuellement-cache"
+                                           for="role-{{ $c['id'] }}">{{ __('comptes.role_titre') }}</label>
+                                    <select id="role-{{ $c['id'] }}" class="rw-saisie rw-saisie--compacte"
+                                            data-rw="compte-role-{{ $c['id'] }}" data-id="{{ $c['id'] }}"
+                                            data-precedent="{{ (int) $c['role_id'] }}">
+                                        @foreach ($roles as $r)
+                                            @if ($roleAuteur >= 3 || $r < $roleAuteur)
+                                                <option value="{{ $r }}"@selected((int) $c['role_id'] === $r)>{{ __('comptes.role_' . $r) }}</option>
+                                            @endif
+                                        @endforeach
+                                    </select>
+                                @endif
+                                {{-- LES BOUTONS DANS UN MENU, LES REGLAGES EN PLACE. Jusqu'a six
+                                     boutons par ligne, dont deux destructeurs, en
+                                     pleine couleur : le menu les range, les gestes
+                                     destructeurs en dernier. Les selecteurs (expiration,
+                                     role) restent visibles : ce sont des etats, pas des
+                                     actions. `public/js/menu-ligne.js` place la liste. --}}
+                                {{-- Le menu n'est rendu que s'il porte au moins un geste : chaque
+                                     condition ci-dessous est celle d'un bouton de la liste. --}}
+                                @php($soi = (int) $c['id'] === (int) session('utilisateur_id'))
+                                @if (! empty($c['locked_until']) || ($estSuperadmin && (! $soi || ! empty($c['totp_secret']))))
+                                    <div class="rw-menu-ligne">
+                                        <button type="button" class="rw-bouton rw-bouton--discret rw-bouton--minuscule rw-menu-ligne__bouton"
+                                                popovertarget="compte-menu-{{ $c['id'] }}" aria-expanded="false"
+                                                aria-label="{{ __('comptes.actions_pour', ['compte' => $c['name']]) }}"
+                                                data-rw="compte-menu-{{ $c['id'] }}">{{ __('comptes.col_actions') }}@include('composants.icone', ['nom' => 'chevron-down'])</button>
+                                        <div class="rw-menu-ligne__liste" id="compte-menu-{{ $c['id'] }}" popover="auto">
+                                            @if (! empty($c['locked_until']))
+                                                <button type="button" class="rw-bouton rw-bouton--minuscule"
+                                                        data-rw="compte-deverrouiller-{{ $c['id'] }}"
+                                                        data-id="{{ $c['id'] }}">{{ __('comptes.deverrouiller') }}</button>
+                                            @endif
+                                            {{-- SUSPENDRE / ACTIVER — geste PERDU a l'extinction du
+                                                 legacy (`adm/api/toggle_user.php`), reporte le
+                                                 2026-09-09. Sans lui, suspendre un compte le temps
+                                                 d'un preavis imposait de le DETRUIRE : la seule
+                                                 ecriture vivante de `users.active` etait celle de
+                                                 l'anonymisation, irreversible.
 
-                                 ⚠ LA CONDITION REPREND LES GARDES DU SERVICE, pour
-                                 ne pas afficher un controle qui refusera toujours :
-                                   · pas sur soi-meme          (garde 5)
-                                   · un role 2 ne voit pas le
-                                     selecteur d'un role 3     (garde 3)
-                                 et les OPTIONS reprennent la garde 4 : un non-
-                                 superadmin ne se voit offrir que les roles
-                                 STRICTEMENT inferieurs au sien. Un role 2 n'a donc
-                                 qu'une option, `user` — c'est exact, et c'est
-                                 visible.
+                                                 La condition est celle du selecteur d'expiration
+                                                 juste au-dessus : superadministrateur, et pas sur
+                                                 soi-meme. Les deux autres gardes du legacy vivent
+                                                 dans le service, ou elles peuvent LIRE la base —
+                                                 dont celle qui refuse de suspendre le DERNIER
+                                                 superadministrateur actif.
 
-                                 `data-precedent` sert au retour arriere : six gardes
-                                 peuvent refuser, et un selecteur qui garde le choix
-                                 refuse afficherait un etat que la base ne porte pas. --}}
-                            @php($peutChangerLeRole = (int) $c['id'] !== (int) session('utilisateur_id')
-                                && ($estSuperadmin || (int) $c['role_id'] < 3))
-                            @if ($peutChangerLeRole)
-                                <label class="rw-visuellement-cache"
-                                       for="role-{{ $c['id'] }}">{{ __('comptes.role_titre') }}</label>
-                                <select id="role-{{ $c['id'] }}" class="rw-saisie rw-saisie--compacte"
-                                        data-rw="compte-role-{{ $c['id'] }}" data-id="{{ $c['id'] }}"
-                                        data-precedent="{{ (int) $c['role_id'] }}">
-                                    @foreach ($roles as $r)
-                                        @if ($roleAuteur >= 3 || $r < $roleAuteur)
-                                            <option value="{{ $r }}"@selected((int) $c['role_id'] === $r)>{{ __('comptes.role_' . $r) }}</option>
-                                        @endif
-                                    @endforeach
-                                </select>
-                            @endif
-                            {{-- SUDO GLOBAL — troisieme et dernier geste perdu a
-                                 l'extinction (`adm/api/toggle_sudo.php`), reporte le
-                                 2026-09-09. Il etait POSABLE a la creation et jamais
-                                 retirable : un compte cree avec `sudo = 1` gardait un
-                                 `NOPASSWD ALL` permanent sur toute machine accessible
-                                 SANS politique par machine.
+                                                 ⚠ `data-actif` porte l'etat VOULU, pas l'etat
+                                                 courant : l'API prend un booleen explicite et non
+                                                 une bascule, donc le geste est idempotent. Le
+                                                 libelle, lui, depend de l'etat courant. --}}
+                                            @if ($estSuperadmin && (int) $c['id'] !== (int) session('utilisateur_id'))
+                                                <button type="button" class="rw-bouton rw-bouton--minuscule"
+                                                        data-rw="compte-activite-{{ $c['id'] }}"
+                                                        data-id="{{ $c['id'] }}"
+                                                        data-actif="{{ (int) $c['active'] ? '0' : '1' }}"
+                                                >{{ (int) $c['active'] ? __('comptes.suspendre') : __('comptes.activer') }}</button>
+                                            @endif
+                                            {{-- SUDO GLOBAL — troisieme et dernier geste perdu a
+                                                 l'extinction (`adm/api/toggle_sudo.php`), reporte le
+                                                 2026-09-09. Il etait POSABLE a la creation et jamais
+                                                 retirable : un compte cree avec `sudo = 1` gardait un
+                                                 `NOPASSWD ALL` permanent sur toute machine accessible
+                                                 SANS politique par machine.
 
-                                 ⚠ C'est un REPLI, pas le mecanisme principal :
-                                 `configure_servers.py:1086-1094` ne le consulte que
-                                 si le compte n'a aucune politique pour la machine.
-                                 Le libelle le dit — « global » — pour qu'on ne le
-                                 confonde pas avec les prereglages par machine de la
-                                 page des permissions. --}}
-                            @if ($estSuperadmin && (int) $c['id'] !== (int) session('utilisateur_id'))
-                                <button type="button" class="rw-bouton rw-bouton--minuscule"
-                                        data-rw="compte-sudo-{{ $c['id'] }}"
-                                        data-id="{{ $c['id'] }}"
-                                        data-sudo="{{ (int) $c['sudo'] ? '0' : '1' }}"
-                                >{{ (int) $c['sudo'] ? __('comptes.sudo_retirer') : __('comptes.sudo_donner') }}</button>
-                            @endif
-                            {{-- LES DEUX GESTES COTE A COTE. Le legacy n'en offre
-                                 qu'un — le destructeur — alors qu'il PORTE
-                                 l'anonymisation, gardee et commentee, sans aucun
-                                 appelant (E-117).
-                                 DEBORDEMENT MESURE ET NON RESOLU : ces deux
-                                 boutons portent le tableau au-dela du cadre a
-                                 1400 px, et « Anonymiser » y est coupe. Le cadre
-                                 defile et le signale, mais la regle du chantier
-                                 veut que la colonne actionnable ne cede jamais.
-                                 A reprendre avec D5, qui rendra ce tableau a sa
-                                 largeur en sortant les colonnes d'appoint. --}}
-                            @if ($estSuperadmin)
-                                <button type="button" class="rw-bouton rw-bouton--minuscule rw-bouton--danger"
-                                        data-rw="compte-supprimer-{{ $c['id'] }}"
-                                        data-id="{{ $c['id'] }}"
-                                        data-nom="{{ $c['name'] }}">{{ __('comptes.supprimer') }}</button>
-                                <button type="button" class="rw-bouton rw-bouton--minuscule rw-bouton--avertissement"
-                                        data-rw="compte-anonymiser-{{ $c['id'] }}"
-                                        data-id="{{ $c['id'] }}"
-                                        data-nom="{{ $c['name'] }}">{{ __('comptes.anonymiser') }}</button>
-                            @endif
-                            @if ($estSuperadmin && ! empty($c['totp_secret']))
-                                {{-- AUCUNE BOITE NATIVE : la decision se prend en page.
-                                     Le legacy pose un `confirm()` dont le texte francais
-                                     contient une apostrophe qui casse le script — la
-                                     confirmation ne s'affiche donc jamais et l'action part
-                                     quand meme (E-114). --}}
-                                <button type="button" class="rw-bouton rw-bouton--minuscule rw-bouton--avertissement"
-                                        data-rw="compte-totp-{{ $c['id'] }}"
-                                        data-id="{{ $c['id'] }}"
-                                        data-nom="{{ $c['name'] }}">{{ __('comptes.totp_reinitialiser') }}</button>
-                            @endif
+                                                 ⚠ C'est un REPLI, pas le mecanisme principal :
+                                                 `configure_servers.py:1086-1094` ne le consulte que
+                                                 si le compte n'a aucune politique pour la machine.
+                                                 Le libelle le dit — « global » — pour qu'on ne le
+                                                 confonde pas avec les prereglages par machine de la
+                                                 page des permissions. --}}
+                                            @if ($estSuperadmin && (int) $c['id'] !== (int) session('utilisateur_id'))
+                                                <button type="button" class="rw-bouton rw-bouton--minuscule"
+                                                        data-rw="compte-sudo-{{ $c['id'] }}"
+                                                        data-id="{{ $c['id'] }}"
+                                                        data-sudo="{{ (int) $c['sudo'] ? '0' : '1' }}"
+                                                >{{ (int) $c['sudo'] ? __('comptes.sudo_retirer') : __('comptes.sudo_donner') }}</button>
+                                            @endif
+                                            @if ($estSuperadmin && ! empty($c['totp_secret']))
+                                                {{-- AUCUNE BOITE NATIVE : la decision se prend en page.
+                                                     Le legacy pose un `confirm()` dont le texte francais
+                                                     contient une apostrophe qui casse le script — la
+                                                     confirmation ne s'affiche donc jamais et l'action part
+                                                     quand meme (E-114). --}}
+                                                <button type="button" class="rw-bouton rw-bouton--minuscule rw-bouton--avertissement"
+                                                        data-rw="compte-totp-{{ $c['id'] }}"
+                                                        data-id="{{ $c['id'] }}"
+                                                        data-nom="{{ $c['name'] }}">{{ __('comptes.totp_reinitialiser') }}</button>
+                                            @endif
+                                            {{-- LES DEUX GESTES COTE A COTE. Le legacy n'en offre
+                                                 qu'un — le destructeur — alors qu'il PORTE
+                                                 l'anonymisation, gardee et commentee, sans aucun
+                                                 appelant (E-117).
+                                                 Le debordement qu'ils causaient (« Anonymiser »
+                                                 coupe a 1400 px) est resolu par le menu : les
+                                                 gestes destructeurs y viennent EN DERNIER,
+                                                 l'anonymisation avant la suppression. --}}
+                                            {{-- Jamais sur soi : `Comptes::refusePourquoi()` refuse les deux
+                                                 gestes (`err_soi_meme`). Les offrir promettait un refus. --}}
+                                            @if ($estSuperadmin && ! $soi)
+                                                <button type="button" class="rw-bouton rw-bouton--minuscule rw-bouton--avertissement"
+                                                        data-rw="compte-anonymiser-{{ $c['id'] }}"
+                                                        data-id="{{ $c['id'] }}"
+                                                        data-nom="{{ $c['name'] }}">{{ __('comptes.anonymiser') }}</button>
+                                                <button type="button" class="rw-bouton rw-bouton--minuscule rw-bouton--danger"
+                                                        data-rw="compte-supprimer-{{ $c['id'] }}"
+                                                        data-id="{{ $c['id'] }}"
+                                                        data-nom="{{ $c['name'] }}">{{ __('comptes.supprimer') }}</button>
+                                            @endif
+                                        </div>
+                                    </div>
+                                @endif
+                            </div>
                         </td>
                     </tr>
                 @endforeach
@@ -437,5 +457,6 @@
     @php($libelles = ['err_reseau' => __('comptes.err_reseau'), 'totp_question' => __('comptes.totp_question'), 'mdp_vide' => __('comptes.err_mdp_vide'), 'suppr_question' => __('comptes.suppr_question'), 'suppr_sans_journal' => __('comptes.suppr_sans_journal'), 'suppr_avec_journal' => __('comptes.suppr_avec_journal'), 'suppr_consigne' => __('comptes.suppr_consigne'), 'anon_question' => __('comptes.anon_question')])
     {{-- @json sur UNE SEULE ligne : multiligne, il casse le PHP compile. --}}
     <script id="comptes-libelles" type="application/json">@json($libelles)</script>
+    <script src="/js/menu-ligne.js?v={{ @filemtime(public_path('js/menu-ligne.js')) ?: '0' }}"></script>
     <script src="/js/comptes.js?v={{ @filemtime(public_path('js/comptes.js')) ?: '0' }}"></script>
 @endsection

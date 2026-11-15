@@ -250,13 +250,15 @@
                                                      un attribut `onclick` — 671
                                                      caracteres mesures, `notes`
                                                      d'exploitation comprise. --}}
-                                                <td class="rw-tableau__actions">
-                                                    <a class="rw-bouton rw-bouton--discret"
-                                                       href="{{ route('supervision', ['profil' => $profil->id]) }}#config-{{ $plateforme }}"
-                                                       data-rw="superv-profil-modifier-{{ $profil->id }}">{{ __('superv.profil_modifier') }}</a>
-                                                    <button type="button" class="rw-bouton rw-bouton--discret"
-                                                            data-rw="superv-profil-supprimer-{{ $profil->id }}"
-                                                            data-cible="profil-suppression-{{ $profil->id }}">{{ __('superv.profil_supprimer') }}</button>
+                                                <td>
+                                                    <div class="rw-tableau__actions">
+                                                        <a class="rw-bouton rw-bouton--discret"
+                                                           href="{{ route('supervision', ['profil' => $profil->id]) }}#config-{{ $plateforme }}"
+                                                           data-rw="superv-profil-modifier-{{ $profil->id }}">{{ __('superv.profil_modifier') }}</a>
+                                                        <button type="button" class="rw-bouton rw-bouton--discret"
+                                                                data-rw="superv-profil-supprimer-{{ $profil->id }}"
+                                                                data-cible="profil-suppression-{{ $profil->id }}">{{ __('superv.profil_supprimer') }}</button>
+                                                    </div>
                                                 </td>
                                             </tr>
                                             {{-- LA DECISION SE PREND DANS LA PAGE,
@@ -461,89 +463,102 @@
                                                     data-machine="{{ $m->id }}"
                                                     aria-label="{{ __('superv.profil_colonne') }}"></select>
                                         </td>
-                                        <td class="rw-tableau__actions">
-                                            <button type="button" class="rw-bouton rw-bouton--discret"
-                                                    data-rw="superv-detecter-version"
-                                                    data-machine="{{ $m->id }}"
-                                                    data-nom="{{ $m->name }}">{{ __('superv.version_detecter') }}</button>
-                                            {{-- LES REGLAGES SONT UNE ADRESSE, pas un
-                                                 enregistrement pose dans le DOM : le serveur
-                                                 pre-remplit le formulaire depuis `?reglages=<id>`.
-                                                 Meme principe qu'en V5 pour les profils. --}}
-                                            <a class="rw-bouton rw-bouton--discret"
-                                               data-rw="superv-reglages-lien-{{ $m->id }}"
-                                               href="{{ route('supervision', ['reglages' => $m->id]) }}#reglages">{{ __('superv.reglages_lien') }}</a>
-                                            {{-- SOUS-LOT V10 : la reconfiguration, PAR LIGNE.
-                                                 Le legacy l'offre aussi « sur la selection », et
-                                                 SANS AUCUNE confirmation — la ou `deploy` et
-                                                 `uninstall` ouvrent au moins un `confirm()`. Ici
-                                                 pas de case a cocher (V6), donc pas d'action de
-                                                 masse : une ligne, une machine, un panneau. --}}
-                                            {{-- UNE REGLE APPLIQUEE PAR LE BACKEND SE REND
-                                                 VISIBLE. `zabbix_reconfigure` refuse (400) tant
-                                                 qu'aucune configuration globale n'existe. Un
-                                                 bouton cliquable pour se faire refuser fait
-                                                 decider dans le vide : il est DESACTIVE, avec
-                                                 l'explication en infobulle. --}}
-                                            <button type="button" class="rw-bouton rw-bouton--discret"
-                                                    data-rw="superv-reconfigurer"
-                                                    data-machine="{{ $m->id }}"
-                                                    data-nom="{{ $m->name }}"
-                                                    @disabled(($configuration['zabbix'] ?? null) === null)
-                                                    @if (($configuration['zabbix'] ?? null) === null) title="{{ __('superv.reconf_sans_config') }}" @endif
-                                                    >{{ __('superv.reconf_bouton') }}</button>
-                                            {{-- SOUS-LOT V11 : LE GESTE QUI DETRUIT.
-                                                 Par ligne, comme les autres (aucune case a
-                                                 cocher — V6). Cote legacy c'est un `confirm()`
-                                                 natif qui affiche la chaine `confirm_uninstall`,
-                                                 la cle etant absente de `js.php` : on demande
-                                                 donc de confirmer une DESTRUCTION avec un
-                                                 identifiant a l'ecran. Remplace ici par un
-                                                 panneau, pas deplace. --}}
-                                            <button type="button" class="rw-bouton rw-bouton--discret"
-                                                    data-rw="superv-desinstaller"
-                                                    data-machine="{{ $m->id }}"
-                                                    data-nom="{{ $m->name }}"
-                                                    {{-- L'ENVIRONNEMENT VOYAGE AVEC LE GESTE. Vu a
-                                                         l'image : le panneau nommait la machine sans
-                                                         dire qu'elle etait en PRODUCTION. V8 avait
-                                                         etabli qu'on NOMME la production plutot que
-                                                         de la compter ; c'est sur le geste qui
-                                                         DETRUIT que ca compte le plus. --}}
-                                                    data-environnement="{{ strtoupper((string) ($m->environment ?? '')) }}"
-                                                    >{{ __('superv.desinst_bouton') }}</button>
-                                            {{-- SOUS-LOT V12 : LE DEPLOIEMENT.
-                                                 Par ligne, comme tout le reste. Le legacy
-                                                 l'offre AUSSI sur la selection (case a cocher
-                                                 + « Deployer la selection »), derriere un
-                                                 `confirm()` natif qui affiche la chaine
-                                                 `confirm_deploy`. Cette traduction EXISTE
-                                                 pourtant, en FR et en EN — dans
-                                                 `lang/*/supervision.php`, donc hors de
-                                                 l'espace `js.` que `getJsTranslations('js.')`
-                                                 charge. Elle est ecrite, correcte, et
-                                                 inaccessible.
+                                        <td>
+                                            {{-- UN GESTE PRINCIPAL VISIBLE, LES AUTRES DANS UN MENU.
+                                                 Cinq boutons par ligne poussaient le tableau
+                                                 hors du champ (270 px mesures a 1400). Les
+                                                 boutons gardent `data-rw` et gestionnaires ;
+                                                 `public/js/menu-ligne.js` place la liste. --}}
+                                            <div class="rw-menu-ligne">
+                                                {{-- SOUS-LOT V12 : LE DEPLOIEMENT.
+                                                     Par ligne, comme tout le reste. Le legacy
+                                                     l'offre AUSSI sur la selection (case a cocher
+                                                     + « Deployer la selection »), derriere un
+                                                     `confirm()` natif qui affiche la chaine
+                                                     `confirm_deploy`. Cette traduction EXISTE
+                                                     pourtant, en FR et en EN — dans
+                                                     `lang/*/supervision.php`, donc hors de
+                                                     l'espace `js.` que `getJsTranslations('js.')`
+                                                     charge. Elle est ecrite, correcte, et
+                                                     inaccessible.
 
-                                                 L'ETAT DESACTIVE SUIT LA PLATEFORME, il n'est
-                                                 pas fige sur Zabbix : `zabbix_deploy` refuse
-                                                 (400) sans configuration globale, mais
-                                                 `generic_deploy` installe quand meme. Un
-                                                 bouton grise pour la mauvaise raison est un
-                                                 mensonge de plus. --}}
-                                            <button type="button" class="rw-bouton rw-bouton--discret"
-                                                    data-rw="superv-deployer"
-                                                    data-machine="{{ $m->id }}"
-                                                    data-nom="{{ $m->name }}"
-                                                    data-environnement="{{ strtoupper((string) ($m->environment ?? '')) }}"
-                                                    {{-- `refuse_sans_config` DECRIT LE BACKEND (Zabbix refuse
-                                                         sans configuration globale) ; il ne dit pas si le bouton
-                                                         doit etre grise ICI. Les confondre desactivait le bouton
-                                                         Zabbix EN PERMANENCE, meme configuration posee. L'etat
-                                                         bloque est la conjonction des deux : le backend refuserait,
-                                                         ET la configuration manque. --}}
-                                                    @disabled($boutonsBloques['deploiement'][$plateformeInitiale] ?? false)
-                                                    @if ($boutonsBloques['deploiement'][$plateformeInitiale] ?? false) title="{{ __('superv.depl_sans_config') }}" @endif
-                                                    >{{ __('superv.depl_bouton') }}</button>
+                                                     L'ETAT DESACTIVE SUIT LA PLATEFORME, il n'est
+                                                     pas fige sur Zabbix : `zabbix_deploy` refuse
+                                                     (400) sans configuration globale, mais
+                                                     `generic_deploy` installe quand meme. Un
+                                                     bouton grise pour la mauvaise raison est un
+                                                     mensonge de plus. --}}
+                                                <button type="button" class="rw-bouton rw-bouton--discret"
+                                                        data-rw="superv-deployer"
+                                                        data-machine="{{ $m->id }}"
+                                                        data-nom="{{ $m->name }}"
+                                                        data-environnement="{{ strtoupper((string) ($m->environment ?? '')) }}"
+                                                        {{-- `refuse_sans_config` DECRIT LE BACKEND (Zabbix refuse
+                                                             sans configuration globale) ; il ne dit pas si le bouton
+                                                             doit etre grise ICI. Les confondre desactivait le bouton
+                                                             Zabbix EN PERMANENCE, meme configuration posee. L'etat
+                                                             bloque est la conjonction des deux : le backend refuserait,
+                                                             ET la configuration manque. --}}
+                                                        @disabled($boutonsBloques['deploiement'][$plateformeInitiale] ?? false)
+                                                        @if ($boutonsBloques['deploiement'][$plateformeInitiale] ?? false) title="{{ __('superv.depl_sans_config') }}" @endif
+                                                        >{{ __('superv.depl_bouton') }}</button>
+                                                <button type="button" class="rw-bouton rw-bouton--discret rw-menu-ligne__bouton"
+                                                        popovertarget="superv-menu-{{ $m->id }}" aria-expanded="false"
+                                                        aria-label="{{ __('superv.menu_plus_pour', ['machine' => $m->name]) }}"
+                                                        data-rw="superv-menu-{{ $m->id }}">{{ __('superv.menu_plus') }}@include('composants.icone', ['nom' => 'chevron-down'])</button>
+                                                <div class="rw-menu-ligne__liste" id="superv-menu-{{ $m->id }}" popover="auto">
+                                                    <button type="button" class="rw-bouton rw-bouton--discret"
+                                                            data-rw="superv-detecter-version"
+                                                            data-machine="{{ $m->id }}"
+                                                            data-nom="{{ $m->name }}">{{ __('superv.version_detecter') }}</button>
+                                                    {{-- LES REGLAGES SONT UNE ADRESSE, pas un
+                                                         enregistrement pose dans le DOM : le serveur
+                                                         pre-remplit le formulaire depuis `?reglages=<id>`.
+                                                         Meme principe qu'en V5 pour les profils. --}}
+                                                    <a class="rw-bouton rw-bouton--discret"
+                                                       data-rw="superv-reglages-lien-{{ $m->id }}"
+                                                       href="{{ route('supervision', ['reglages' => $m->id]) }}#reglages">{{ __('superv.reglages_lien') }}</a>
+                                                    {{-- SOUS-LOT V10 : la reconfiguration, PAR LIGNE.
+                                                         Le legacy l'offre aussi « sur la selection », et
+                                                         SANS AUCUNE confirmation — la ou `deploy` et
+                                                         `uninstall` ouvrent au moins un `confirm()`. Ici
+                                                         pas de case a cocher (V6), donc pas d'action de
+                                                         masse : une ligne, une machine, un panneau. --}}
+                                                    {{-- UNE REGLE APPLIQUEE PAR LE BACKEND SE REND
+                                                         VISIBLE. `zabbix_reconfigure` refuse (400) tant
+                                                         qu'aucune configuration globale n'existe. Un
+                                                         bouton cliquable pour se faire refuser fait
+                                                         decider dans le vide : il est DESACTIVE, avec
+                                                         l'explication en infobulle. --}}
+                                                    <button type="button" class="rw-bouton rw-bouton--discret"
+                                                            data-rw="superv-reconfigurer"
+                                                            data-machine="{{ $m->id }}"
+                                                            data-nom="{{ $m->name }}"
+                                                            @disabled(($configuration['zabbix'] ?? null) === null)
+                                                            @if (($configuration['zabbix'] ?? null) === null) title="{{ __('superv.reconf_sans_config') }}" @endif
+                                                            >{{ __('superv.reconf_bouton') }}</button>
+                                                    {{-- SOUS-LOT V11 : LE GESTE QUI DETRUIT.
+                                                         Par ligne, comme les autres (aucune case a
+                                                         cocher — V6). Cote legacy c'est un `confirm()`
+                                                         natif qui affiche la chaine `confirm_uninstall`,
+                                                         la cle etant absente de `js.php` : on demande
+                                                         donc de confirmer une DESTRUCTION avec un
+                                                         identifiant a l'ecran. Remplace ici par un
+                                                         panneau, pas deplace. --}}
+                                                    <button type="button" class="rw-bouton rw-bouton--discret"
+                                                            data-rw="superv-desinstaller"
+                                                            data-machine="{{ $m->id }}"
+                                                            data-nom="{{ $m->name }}"
+                                                            {{-- L'ENVIRONNEMENT VOYAGE AVEC LE GESTE. Vu a
+                                                                 l'image : le panneau nommait la machine sans
+                                                                 dire qu'elle etait en PRODUCTION. V8 avait
+                                                                 etabli qu'on NOMME la production plutot que
+                                                                 de la compter ; c'est sur le geste qui
+                                                                 DETRUIT que ca compte le plus. --}}
+                                                            data-environnement="{{ strtoupper((string) ($m->environment ?? '')) }}"
+                                                            >{{ __('superv.desinst_bouton') }}</button>
+                                                </div>
+                                            </div>
                                         </td>
                                     </tr>
                                 @endforeach
@@ -1116,5 +1131,6 @@
     </section>
 
     <script id="superv-libelles" type="application/json">@json($libelles)</script>
+    <script src="{{ asset('js/menu-ligne.js') }}" defer></script>
     <script src="{{ asset('js/supervision.js') }}" defer></script>
 @endsection
