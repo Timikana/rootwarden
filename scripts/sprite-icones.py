@@ -12,7 +12,7 @@ ICONES = sorted(set("""
 layout-dashboard key-round users key shield-check folder-lock refresh-cw server-cog activity
 terminal container scroll-text bug clipboard-check git-compare brick-wall ban scan-search radar
 user-cog users-round badge-check wrench list-checks database-backup file-clock square-terminal
-search message-square circle-user book-open plug bell moon sun chevron-right info triangle-alert coffee
+search message-square circle-user book-open plug bell moon sun chevron-right info triangle-alert coffee shield
 """.split()))
 
 paquet = pathlib.Path(sys.argv[1])

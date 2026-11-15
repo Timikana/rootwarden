@@ -55,6 +55,8 @@ return [
     // Etats
     'non_verifie' => 'Non vérifié',
     'inconnu'     => 'Inconnu',
+    'en_ligne'    => 'En ligne',
+    'hors_ligne'  => 'Hors ligne',
     'aucune'      => 'N/A',
     'en_cours'    => 'Relevé en cours...',
 

@@ -187,14 +187,16 @@
         </p>
     @else
         <div class="rw-grille" data-rw="accueil-indicateurs">
+            {{-- LA COULEUR DIT L'ETAT, jamais la decoration : une tuile sans
+                 enjeu (le nombre de machines) reste neutre. --}}
             @foreach ([
-                ['machines', $indicateurs['machines'], 'ind_machines', null],
-                ['en-ligne', $indicateurs['en_ligne'], 'ind_en_ligne', null],
-                ['hors-ligne', $indicateurs['hors_ligne'], 'ind_hors_ligne', null],
-                ['inconnu', $indicateurs['inconnu'], 'ind_inconnu', 'ind_inconnu_aide'],
-                ['cle', $indicateurs['cle'], 'ind_cle', null],
-            ] as [$cle, $valeur, $libelle, $aide])
-                <div class="rw-tuile" data-rw="accueil-ind-{{ $cle }}">
+                ['machines', $indicateurs['machines'], 'ind_machines', null, null],
+                ['en-ligne', $indicateurs['en_ligne'], 'ind_en_ligne', null, $indicateurs['en_ligne'] > 0 ? 'ok' : null],
+                ['hors-ligne', $indicateurs['hors_ligne'], 'ind_hors_ligne', null, $indicateurs['hors_ligne'] > 0 ? 'alerte' : null],
+                ['inconnu', $indicateurs['inconnu'], 'ind_inconnu', 'ind_inconnu_aide', $indicateurs['inconnu'] > 0 ? 'attention' : null],
+                ['cle', $indicateurs['cle'], 'ind_cle', null, $indicateurs['machines'] > 0 ? ($indicateurs['cle'] >= $indicateurs['machines'] ? 'ok' : 'attention') : null],
+            ] as [$cle, $valeur, $libelle, $aide, $etat])
+                <div @class(['rw-tuile', 'rw-tuile--' . $etat => $etat]) data-rw="accueil-ind-{{ $cle }}">
                     <span class="rw-tuile__valeur">{{ $valeur }}</span>
                     <p class="rw-tuile__texte">{{ __('accueil.' . $libelle) }}</p>
                     @if ($aide)
@@ -253,7 +255,7 @@
                 <span class="rw-tuile__valeur">{{ $cve['cve'] }}</span>
                 <p class="rw-tuile__texte" data-rw="accueil-cve-nombre-libelle">{{ $cve['machine'] !== '' ? __('accueil.ind_cve_nombre_machine', ['machine' => $cve['machine']]) : __('accueil.ind_cve_nombre') }}</p>
             </div>
-            <div class="rw-tuile" data-rw="accueil-cve-critiques">
+            <div @class(['rw-tuile', (int) $cve['critiques'] > 0 ? 'rw-tuile--alerte' : 'rw-tuile--ok']) data-rw="accueil-cve-critiques">
                 <span class="rw-tuile__valeur">{{ $cve['critiques'] }}</span>
                 <p class="rw-tuile__texte">{{ __('accueil.ind_cve_critiques') }}</p>
             </div>
@@ -283,7 +285,7 @@
                 <span class="rw-tuile__valeur">{{ $comptes['actifs'] }}</span>
                 <p class="rw-tuile__texte">{{ __('accueil.ind_actifs') }}</p>
             </div>
-            <div class="rw-tuile" data-rw="accueil-comptes-sans-cle">
+            <div @class(['rw-tuile', 'rw-tuile--attention' => $comptes['sans_cle'] > 0]) data-rw="accueil-comptes-sans-cle">
                 <span class="rw-tuile__valeur">{{ $comptes['sans_cle'] }}</span>
                 <p class="rw-tuile__texte">{{ __('accueil.ind_sans_cle') }}</p>
                 @if ($comptes['actifs'] > 0 && $comptes['sans_cle'] === $comptes['actifs'])
@@ -294,7 +296,7 @@
                 @endif
             </div>
             @if ($comptes['sans_2fa'] !== null)
-                <div class="rw-tuile" data-rw="accueil-comptes-sans-2fa">
+                <div @class(['rw-tuile', 'rw-tuile--alerte' => $comptes['sans_2fa'] > 0]) data-rw="accueil-comptes-sans-2fa">
                     <span class="rw-tuile__valeur">{{ $comptes['sans_2fa'] }}</span>
                     <p class="rw-tuile__texte">{{ __('accueil.ind_sans_2fa') }}</p>
                     <p class="rw-aide" data-rw="accueil-comptes-sans-2fa-aide">{{ __('accueil.ind_sans_2fa_aide') }}</p>

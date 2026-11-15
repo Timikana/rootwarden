@@ -188,7 +188,9 @@
             tr.appendChild(cellule(m.linux_version || libelles.non_verifie, 'linux-version'));
             tr.appendChild(cellule(horodatage(m.last_checked) || libelles.non_verifie, 'last-checked rw-tableau__discret'));
             tr.appendChild(cellule(`${m.ip ?? ''}:${m.port ?? ''}`, 'rw-tableau__discret'));
-            tr.appendChild(cellule(m.online_status || libelles.inconnu, 'online-status'));
+            const tdEtat = cellule('', 'online-status');
+            tdEtat.replaceChildren(pastilleEtat(m.online_status));
+            tr.appendChild(tdEtat);
             tr.appendChild(cellule(horodatage(m.maj_secu_date) || libelles.aucune, 'maj-secu-date rw-tableau__discret'));
             tr.appendChild(cellule(horodatage(m.maj_secu_last_exec_date) || libelles.aucune, 'maj-secu-lastexec-date rw-tableau__discret'));
 
@@ -255,6 +257,22 @@
     }
 
     /** Ecrit une cellule de la ligne, sans toucher aux autres. */
+    /* LA DISPONIBILITE EST UN ETAT : une pastille coloree, pas « ONLINE » brut.
+       Le backend rend ONLINE / OFFLINE (casse variable) ; le reste est inconnu. */
+    function pastilleEtat(valeur) {
+        const v = String(valeur || '').toLowerCase();
+        const s = document.createElement('span');
+        s.className = 'rw-pastille ' + (v === 'online' ? 'rw-pastille--ok' : v === 'offline' ? 'rw-pastille--echec' : 'rw-pastille--neutre');
+        s.textContent = v === 'online' ? libelles.en_ligne : v === 'offline' ? libelles.hors_ligne : libelles.inconnu;
+        s.title = String(valeur || '');
+        return s;
+    }
+
+    function ecritEtat(tr, valeur) {
+        const td = tr.querySelector('.online-status');
+        if (td) td.replaceChildren(pastilleEtat(valeur));
+    }
+
     function ecrit(tr, classe, valeur) {
         const td = tr.querySelector('.' + classe);
         if (td) td.textContent = valeur;
@@ -291,7 +309,7 @@
     function releveStatut(id, tr, bouton) {
         return releve(bouton,
             () => appelle('/server_status', { method: 'POST', body: JSON.stringify({ machine_id: id }) }),
-            (c) => { if (c.status || c.online_status) ecrit(tr, 'online-status', c.status || c.online_status); });
+            (c) => { if (c.status || c.online_status) ecritEtat(tr, c.status || c.online_status); });
     }
 
     function releveRedemarrage(id, tr, bouton) {

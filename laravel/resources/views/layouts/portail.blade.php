@@ -27,7 +27,7 @@
 <div class="rw-portail">
 
     <aside class="rw-laterale">
-        <a class="rw-laterale__marque" href="{{ route('accueil') }}">{{ config('app.name') }}</a>
+        <a class="rw-laterale__marque" href="{{ route('accueil') }}">@include('composants.icone', ['nom' => 'shield', 'classe' => 'rw-marque__icone']){{ config('app.name') }}</a>
 
         {{-- La legende explique la fleche UNE FOIS, au lieu de repeter
              « ancien portail » sur chaque entree non portee. --}}

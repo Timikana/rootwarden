@@ -5,6 +5,33 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## Couleur qui informe, hiérarchie resserrée
+
+La refonte manquait de couleur, et la couleur présente ne disait rien : un bleu générique partout,
+des chiffres bons ou mauvais affichés pareil. Audit mesuré sur les styles calculés (règles du projet
+« unslop »), avant → après :
+
+| | Avant | Après |
+|---|---|---|
+| Tailles de police | 10 (11 à 26 px, dont 22,5) | 6 : 12, 13, 14, 16, 20, 24 |
+| Graisses | 400, 550, 600, 650, 700 | 400, 500, 600 |
+| Rayons | 8 valeurs | 4, 6, 8 px (+ pastilles) |
+| Nombres non alignés | 47 | 0 (`tabular-nums`) |
+
+- **Palette** : accent bleu-cyan propre à RootWarden (au lieu du bleu par défaut), gris légèrement
+  teintés, troisième rôle de texte (`--rw-texte-discret`). Toutes les paires texte/fond ≥ 4,5:1, en
+  clair et en sombre.
+- **La couleur dit l'état** : les tuiles se colorent seulement quand leur nombre appelle quelque
+  chose — vert (en ligne, conformes), ambre (état inconnu, clé absente), rouge (hors ligne,
+  CVE critiques, échecs). Accueil, dérive, tâches.
+- **Mises à jour** : la disponibilité est une pastille (En ligne / Hors ligne / Inconnu) au lieu de
+  « ONLINE » brut ; les cinq boutons de relevé tiennent sur deux ou trois lignes au lieu de cinq.
+- **Hiérarchie** : corps à 14 px ; les titres de section (16 px) n'étaient plus stylés et prenaient
+  22,5 px gras, plus gros que le titre de page (20 px). Boutons à 36 px de haut, 14 px, graisse 500.
+- **Marque** : écusson dans la barre latérale, seul usage « décoratif » de l'accent.
+
+---
+
 ## PHP 8.5, Guzzle 8, PHPUnit 13 : les montées de version majeure retenues jusqu'ici
 
 | | Avant | Après |
