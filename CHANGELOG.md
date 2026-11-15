@@ -10,7 +10,7 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 Les pages étaient trop bavardes : 58 % des mots du portail étaient des textes d'aide, souvent des
 notes de développement (historique des correctifs, comparaisons avec l'ancien portail, noms internes).
 
-- **Textes** : aide visible du portail 8 162 → 4 273 mots. Sur dix pages mesurées à l'écran, 3 070 →
+- **Textes** : aide visible du portail 8 162 → 3 765 mots (−54 %). Sur dix pages mesurées à l'écran, 3 070 →
   1 692 mots affichés. Règle de rédaction dans `docs/REDACTION-INTERFACE.md` : un avertissement sur
   une action irréversible reste visible ; guides et détails techniques se replient
   (`<details class="rw-details">`) ; vouvoiement partout. Mesure : `scripts/mesure-verbosite.php`.
