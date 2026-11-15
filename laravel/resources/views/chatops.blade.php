@@ -11,20 +11,21 @@
         </div>
     </div>
 
-    {{-- CE QU'IL FAUT CONFIGURER, ET OÙ. Le legacy affiche la même URL, mais
-         sans dire qu'elle a changé. Après la bascule, l'adresse du webhook n'est
-         plus `/chatops/webhook.php` : il faut la reporter dans Slack. --}}
+    {{-- L'ADRESSE RESTE VISIBLE, la procedure se replie : elle ne sert qu'a la
+         mise en service. --}}
     <div class="rw-encart rw-prose">
-        <strong>{{ __('chatops.setup_title') }}</strong>
         <p>{{ __('chatops.setup_url') }}</p>
         <p class="rw-journal" data-rw="chatops-webhook">{{ $urlWebhook }}</p>
-        <ul class="rw-liste-guide">
-            <li>{{ __('chatops.setup_slack') }}</li>
-            <li>{{ __('chatops.setup_token') }}</li>
-            <li>{{ __('chatops.setup_commands') }} : <code>status</code>, <code>approvals</code>,
-                <code>approve &lt;id&gt;</code>, <code>reject &lt;id&gt;</code>, <code>help</code></li>
-            <li><strong>{{ __('chatops.setup_changement') }}</strong></li>
-        </ul>
+        <details class="rw-details">
+            <summary>{{ __('chatops.setup_title') }}</summary>
+            <ul class="rw-liste-guide">
+                <li>{{ __('chatops.setup_slack') }}</li>
+                <li>{{ __('chatops.setup_token') }}</li>
+                <li>{{ __('chatops.setup_activer') }}</li>
+                <li>{{ __('chatops.setup_commands') }} : <code>status</code>, <code>approvals</code>,
+                    <code>approve &lt;id&gt;</code>, <code>reject &lt;id&gt;</code>, <code>help</code></li>
+            </ul>
+        </details>
     </div>
 
     <section class="rw-section">

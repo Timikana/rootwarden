@@ -4,74 +4,22 @@
     <h1 class="rw-titre">{{ __('wazuh.title') }}</h1>
     <p class="rw-sous-titre rw-prose">{{ __('wazuh.subtitle') }}</p>
 
+    {{-- CE QUE LA PAGE FAIT, ET LES ACTIONS SUR LES MACHINES QU'ELLE N'OFFRE PAS.
+         Elles sont NOMMEES, pas comptees : un compte se desynchronise des que
+         l'une d'elles est portee. Aucune n'a de bouton ici, pas meme grise. --}}
     <div class="rw-carte rw-carte--pleine" data-rw="wazuh-portee">
-        <h2 class="rw-sous-titre-fort">{{ __('wazuh.portee_titre') }}</h2>
         <p class="rw-prose">{{ __('wazuh.portee_texte') }}</p>
-    </div>
-
-    {{--
-        ══ CE QUE R2 NE PORTE PAS — NOMME, PAS COMPTE ═══════════════════════
-
-        ⚠ CE BLOC EST PASSE DE NEUF GESTES A SIX, ET LE COMPTE N'EST PAS LE
-        SUJET. R1 enumerait neuf absences ; trois d'entre elles sont portees
-        ici. **Une phrase qui promet plus de manques qu'il n'y en a est aussi
-        fausse qu'une qui en promet moins** — et elle envoie chercher sur
-        l'ancien portail un geste qui vit desormais sur celui-ci.
-
-        Les six qui restent ont toutes la MEME raison, et c'est la seule qui
-        vaille : **elles ouvrent une session SSH sur la machine.** Aucune n'a
-        de bouton ici, pas meme grise — un bouton inerte est une promesse.
-
-        « Neuf gestes ne sont pas portes » serait invérifiable ET
-        infalsifiable. Et un COMPTE ecrit a cote d'une enumeration se
-        desynchronise des que l'un des gestes est porte : ici il n'y a pas de
-        compte, l'enumeration est la seule source.
-
-        ⚠ La reserve qui suit n'est pas une precaution de style. Trois de ces
-        gestes n'ont pas l'effet que leur nom suggere, MEME sur l'ancien
-        portail — releve par lecture du backend :
-
-          - `group` ne transmet jamais le groupe : la seule commande distante
-            est un redemarrage, et l'agent qui redemarre se re-inscrit aupres
-            du manager, qui lui assigne ce qu'il veut ;
-          - `options` et `rules` (POST) n'atteignent AUCUNE machine. La page
-            relit ce qu'elle a ecrit, donc l'ecran CONFIRME, et la boucle se
-            referme sans que rien ne soit applique.
-
-        Renvoyer quelqu'un vers l'ancien portail sans le dire serait
-        l'envoyer croire un ecran qui se trompe.
-    --}}
-    <div class="rw-carte rw-carte--pleine" data-rw="wazuh-non-porte">
-        <h2 class="rw-sous-titre-fort">{{ __('wazuh.np_titre') }}</h2>
-        <p class="rw-prose" data-rw="wazuh-np-liste">{{ __('wazuh.np_liste') }}</p>
-        <p class="rw-aide rw-prose" data-rw="wazuh-np-reserve">{{ __('wazuh.np_reserve') }}</p>
-        <p class="rw-tuile__lien">
-            @if ($lienLegacy)
-                <a class="rw-lien" href="{{ $lienLegacy }}" target="_blank" rel="noopener"
-                   data-rw="wazuh-np-lien">{{ __('wazuh.np_ouvrir') }} ↗</a>
-            @endif
-        </p>
+        <div data-rw="wazuh-non-porte">
+            <p class="rw-sous-titre-fort">{{ __('wazuh.np_titre') }}</p>
+            <p class="rw-aide rw-prose" data-rw="wazuh-np-liste">{{ __('wazuh.np_liste') }}</p>
+        </div>
     </div>
 
     <h2 class="rw-section__entete rw-titre--espace">{{ __('wazuh.config_title') }}</h2>
     <p class="rw-prose">{{ __('wazuh.config_desc') }}</p>
 
-    {{--
-        ⚠ CE QU'ENREGISTRER VEUT DIRE — ET LES TROIS GESTES DE CETTE PAGE NE
-        DISENT PAS LA MEME CHOSE.
-
-        Mesure du 2026-09-05, « qui LIT ce que ce geste ECRIT » :
-
-            wazuh_config           lu par install() et install_all()
-                                   -> effet DIFFERE, reel
-            wazuh_machine_options  2 occurrences dans TOUT le depot : son
-                                   propre SELECT et son propre INSERT
-            wazuh_rules            lu par list_rules et get_rule seulement
-
-        Un « Enregistre. » identique sur les trois ferait croire trois fois la
-        meme chose, et deux fois ce serait faux. La phrase d'effet est donc
-        ATTACHEE A CHAQUE GESTE, jamais mutualisee.
-    --}}
+    {{-- LA PHRASE D'EFFET EST ATTACHEE A CHAQUE GESTE : la configuration est lue
+         a l'installation, les options et les regles ne sont lues par rien. --}}
     <p class="rw-prose rw-aide" data-rw="wazuh-config-effet">{{ __('wazuh.enr_config_effet') }}</p>
 
     <div data-rw="wazuh-config">

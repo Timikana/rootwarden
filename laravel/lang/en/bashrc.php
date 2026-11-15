@@ -1,18 +1,15 @@
 <?php
 
 /**
- * Standardised `.bashrc` deployment — sub-batch B1.
+ * Standardised `.bashrc` deployment — English.
  *
- * This module has NO security defect (see `MODULE-BASHRC.md` §3). The three
- * corrections the port makes are about PRESENTATION, and these strings carry two
- * of them: telling the production machine apart, and stating a zero counter
- * rather than showing it as a digit.
+ * Same key set as lang/fr/bashrc.php. Writing rules: docs/REDACTION-INTERFACE.md.
+ * Texts read by the JS travel through the controller's `$textes` block.
  */
 
 return [
     'titre'       => '.bashrc deployment',
-    'intro'       => 'This page installs a standardised `.bashrc` file on the accounts of the '
-                     . 'machines you choose. That file runs on EVERY login of those accounts.',
+    'intro'       => 'Installs a standardised `.bashrc` on the chosen accounts; it runs on every login.',
     'onglet_deploiement' => 'Deployment',
     'onglet_historique'  => 'History',
     'onglet_gabarit'     => 'Template',
@@ -23,64 +20,59 @@ return [
     'col_ip'          => 'Address',
     'col_etat'        => 'Last deployment',
     'jamais'          => 'never deployed',
-    'simule_le'       => 'simulated on :date by :auteur — nothing was written',
+    'simule_le'       => 'simulated on :date by :auteur, nothing was written',
     'deploye_le'      => 'deployed on :date by :auteur',
 
-    // ── THE SENSITIVE MACHINE, WHICH MUST NOT BLEND INTO THE LIST ─────────
+    // ── THE SENSITIVE MACHINE ──────────────────────────────────────────────
     'sensible'        => 'Production',
-    'sensible_titre'  => 'Production or critical machine',
-    'sensible_aide'   => 'Deploying to this machine replaces the `.bashrc` of the chosen accounts, '
-                         . 'including `root`\'s if it is selected.',
-    'avert_titre'     => 'A production machine is in this list',
-    'avert_un'        => 'One of the :total machines offered is in production or marked critical. '
-                         . 'It is flagged in the table.',
-    'avert_plusieurs' => ':nb of the :total machines offered are in production or marked critical. '
-                         . 'They are flagged in the table.',
+    'sensible_aide'   => 'A deployment replaces the `.bashrc` of the chosen accounts, including `root`\'s if ticked.',
+    'avert_titre'     => 'This list includes production',
+    'avert_un'        => 'One of the :total machines is in production or critical; it is flagged in the table.',
+    'avert_plusieurs' => ':nb of the :total machines are in production or critical; they are flagged in the table.',
 
     // ── THE COUNTER, WHICH IS STATED ───────────────────────────────────────
-    'aucune_selection' => 'No machine selected — a deployment would deploy nothing.',
+    'aucune_selection' => 'No machine selected.',
     'selection_une'    => '1 machine selected.',
     'selection_n'      => ':nb machines selected.',
     'selection_prod'   => ':nb machines selected, :prod of them in production.',
 
     'vide_titre'  => 'No machine in the estate',
-    'vide_texte'  => 'No active machine is registered. Add one from server administration before '
-                     . 'deploying anything.',
+    'vide_texte'  => 'Add a machine from the Servers page.',
     'vide_action' => 'Open servers',
 
     'comptes_titre' => 'Machine accounts',
-    'comptes_choisir' => 'Tick one machine above to read its accounts.',
-    'comptes_plusieurs' => 'Several machines are ticked. Accounts are read one machine at a time: tick only one.',
-    'comptes_chargement' => 'Reading accounts on the machine…',
-    'comptes_echec' => 'The accounts could not be read. Is the machine reachable?',
-    'comptes_aucun' => 'This machine exposes no eligible account (UID 0 or >= 1000, with a shell).',
+    'comptes_choisir' => 'Tick a machine to read its accounts.',
+    'comptes_plusieurs' => 'Tick a single machine to read its accounts.',
+    'comptes_chargement' => 'Reading accounts…',
+    'comptes_echec' => 'Could not read the accounts. Check that the machine is reachable.',
+    'comptes_aucun' => 'No eligible account (UID 0 or ≥ 1000, with a shell).',
     'col_compte' => 'Account',
     'col_uid' => 'UID',
     'col_home' => 'Home directory',
     'col_bashrc' => 'Current file',
     'bashrc_absent' => 'absent',
     'tout' => 'Tick all',
-    'tout_avec_root' => '"Tick all" also selects root.',
+    'tout_avec_root' => '(root included)',
     'compte_root' => 'administrator',
-    'compte_root_aide' => 'The machine\'s administrator account. Deploying to root replaces the file that runs on every administrator login.',
+    'compte_root_aide' => 'Administrator account: its .bashrc runs on every root login.',
     'apercu' => 'Preview (diff)',
-    'apercu_aide' => 'Reads the file present on the machine and shows what would change. Writes nothing.',
+    'apercu_aide' => 'Shows what would change, without writing anything.',
     'apercu_titre' => 'What would change',
     'apercu_chargement' => 'Reading the remote file…',
-    'apercu_echec' => 'The preview could not be built.',
+    'apercu_echec' => 'Could not build the preview.',
     'apercu_vide' => 'Tick at least one account to see what would change.',
     'apercu_taille' => ':avant o → :apres o',
 
     'perso' => 'customised',
-    'perso_aide' => 'This account has blocks marked "USER CUSTOM" in its file. In "merge" mode those are the ONLY parts kept; everything else is replaced.',
+    'perso_aide' => 'Only the "USER CUSTOM" blocks are kept (in ~/.bashrc.local); the rest of the file is replaced.',
 
     'gabarit_titre' => 'The deployed template',
-    'gabarit_intro' => 'This file is the one every machine will receive at the next deployment. It runs on every login of the accounts concerned.',
+    'gabarit_intro' => 'Every machine will receive this file at the next deployment.',
     'gabarit_lignes' => 'Lines',
     'gabarit_octets' => 'Bytes',
     'gabarit_sha' => 'Fingerprint',
     'gabarit_chargement' => 'Reading the template…',
-    'gabarit_echec' => 'The template could not be read.',
+    'gabarit_echec' => 'Could not read the template.',
     'gabarit_modifie' => 'Unsaved changes.',
     'gabarit_enregistrer' => 'Save',
     'gabarit_annuler' => 'Discard changes',
@@ -90,50 +82,35 @@ return [
     'gabarit_confirmer' => 'Save this template? Every machine will receive it at the next deployment.',
     'danger_titre' => 'Forms recognised as destructive',
     'danger_reconnu' => 'Recognised:',
-    'danger_portee' => 'This recognition covers eight known forms. It checks neither what the rest of the file does, nor what this one will do once deployed — only its syntax is checked on saving.',
+    'danger_portee' => 'Only eight known forms are detected; on saving, only the syntax is checked.',
     'danger_confirmer' => 'This template contains forms recognised as destructive. Save it anyway?',
 
-    /* See the note in `lang/fr/bashrc.php`: the enumeration is the single
-     * source, and it is paired against the 7 routes of
-     * `backend/routes/bashrc.py`. Called by this page: `users`, `preview`,
-     * `template`. Called by nobody, hence absent: `deploy`, `prerequisites`
-     * (POST -- it INSTALLS), `restore`, `backups`. */
-
-
-
-    /* B4 — les deux ecritures (2026-09-07). `overwrite` et
-       `/bashrc/prerequisites` ne sont PAS construits : voir public/js/bashrc.js. */
+    // ── THE WRITES ─────────────────────────────────────────────────────────
     'col_action' => 'Action',
     'deploy' => 'Deploy',
-    'deploy_aide' => 'Writes the standardised .bashrc to the selected accounts. Existing custom content is moved to ~/.bashrc.local, and a timestamped backup is created.',
-    'deploy_confirme' => 'Deploy the standardised .bashrc to :nombre account(s) — :comptes?\\n\\nA timestamped backup is created and custom content is moved to ~/.bashrc.local: nothing is lost.',
+    'deploy_aide' => 'Writes the standardised .bashrc to the ticked accounts, after a timestamped backup of the old one.',
+    'deploy_confirme' => "Deploy the standardised .bashrc to :nombre account(s): :comptes?\n\nThe old file is backed up; \"USER CUSTOM\" blocks are moved to ~/.bashrc.local.",
     'deploy_en_cours' => 'Deploying…',
-    'deploy_fait' => 'Deployment complete. The account list has been reloaded.',
+    'deploy_fait' => 'Deployment complete.',
     'deploy_echec' => 'Deployment failed. The remote .bashrc was not replaced.',
-    'deploy_sans_cible' => 'Pick a machine and at least one account before deploying.',
+    'deploy_sans_cible' => 'Choose a machine and at least one account.',
     'restore' => 'Restore',
-    'restore_aide' => 'Restores the most recent backup of this account\'s .bashrc.',
-    'restore_confirme' => 'Restore :sauvegarde for :compte?\\n\\nDated :date, :taille bytes. There are :nombre backup(s) for this account; the most recent one will be restored.\\n\\nThe current .bashrc of :compte will be replaced.',
+    'restore_aide' => 'Restores the most recent backup of this account.',
+    // The JS replaces only the FIRST occurrence of each placeholder.
+    'restore_confirme' => "Restore :sauvegarde for :compte?\n\nDated :date, :taille bytes; the most recent of :nombre backup(s).\n\nThe current .bashrc will be replaced.",
     'restore_en_cours' => 'Restoring :compte…',
     'restore_fait' => 'Backup restored for :compte.',
-    'restore_echec' => 'Restoring :compte failed — there may be no backup.',
-    'figlet_absent' => 'figlet is not installed on this machine: the .bashrc banner will not render. The rest of the file works. Installing the package is not offered here.',
+    'restore_echec' => 'Restoring :compte failed.',
+    'figlet_absent' => 'figlet is not installed: the .bashrc banner will not render. The rest works.',
 
-    /* La liste des sauvegardes, lue AVANT la confirmation de restauration. */
     'restore_lecture' => 'Reading backups for :compte…',
-    'restore_aucune' => 'No backup for :compte — there is nothing to restore. A backup is created on every deployment.',
+    'restore_aucune' => 'No backup for :compte: nothing to restore.',
 
-    /*
-     * ══ L'INSTALLATION DE figlet — ISO-PERIMETRE ═════════════════════
-     *
-     * Le legacy l'offrait. Elle avait ete perdue par un arbitrage que
-     * l'exploitant a annule. Le SIGNAL existait deja (`figlet_absent`) ;
-     * ce qui manquait etait le geste.
-     */
+    // ── INSTALLING figlet ──────────────────────────────────────────────────
     'figlet_installer' => "Install figlet",
-    'figlet_confirme' => "Install figlet on this machine?\n\nThe package will be installed by the machine's package manager. This cannot be undone from this screen.",
+    'figlet_confirme' => "Install figlet on this machine?\n\nThe package will be installed by the package manager. This page cannot uninstall it.",
     'figlet_en_cours' => "Installing figlet…",
-    'figlet_fait' => "figlet is installed. The account list is reloaded to confirm it.",
-    'figlet_echec' => "Installing figlet failed. The package is not present on the machine.",
+    'figlet_fait' => "figlet is installed.",
+    'figlet_echec' => "Installing figlet failed.",
 
 ];
