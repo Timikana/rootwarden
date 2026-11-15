@@ -19,11 +19,7 @@
 @endphp
 
 <h1 class="rw-titre">{{ __('sftp.titre') }}</h1>
-
-<div class="rw-encart">
-    <p class="rw-sous-titre-fort">{{ __('sftp.intro_titre') }}</p>
-    <p class="rw-prose">{{ __('sftp.intro') }}</p>
-</div>
+<p class="rw-sous-titre rw-prose">{{ __('sftp.intro') }}</p>
 
 <div class="rw-section">
     <form method="get" action="{{ route('acces-sftp') }}" class="rw-barre-filtres" data-rw="sftp-filtres">

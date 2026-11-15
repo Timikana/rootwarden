@@ -173,15 +173,13 @@
         for (const e of r.errors || []) {
             texte(bloc, 'rw-annonce rw-annonce--echec', String(e));
         }
-        // LE PREREQUIS MANQUANT MENE A L'ENDROIT OU ON LE CORRIGE. `adm/` n'etant
-        // pas porte, le lien est explicitement inter-portails.
-        if (r.scan_required) {
+        // LE PREREQUIS MANQUANT MENE A L'ENDROIT OU ON LE CORRIGE : la page des
+        // comptes distants, servie par ce portail (lien interne, sans marqueur).
+        if (r.scan_required && L.url_comptes_distants) {
             const a = document.createElement('a');
             a.className = 'rw-lien';
-            a.href = L.url_comptes_distants || '#';
-            a.target = '_blank';
-            a.rel = 'noopener';
-            a.textContent = (L.lien_comptes_distants || '') + ' \u2197';
+            a.href = L.url_comptes_distants;
+            a.textContent = L.lien_comptes_distants || '';
             bloc.appendChild(a);
         }
 

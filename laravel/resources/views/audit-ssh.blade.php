@@ -4,11 +4,6 @@
     <h1 class="rw-titre">{{ __('ssh_audit.titre') }}</h1>
     <p class="rw-sous-titre rw-prose">{{ __('ssh_audit.desc') }}</p>
 
-    <div class="rw-carte rw-carte--pleine" data-rw="audit-ssh-portee">
-        <h2 class="rw-sous-titre-fort">{{ __('ssh_audit.portee_titre') }}</h2>
-        <p class="rw-prose">{{ __('ssh_audit.portee_texte') }}</p>
-    </div>
-
     {{--
         ═══ LE SELECTEUR, BORNE COMME LE LEGACY ═════════════════════════════
 
@@ -41,26 +36,17 @@
             @endif
         </div>
 
-        {{-- ⚠ CE COMMENTAIRE DISAIT « LES TROIS GESTES NE SONT PAS PORTES »,
-             et il est devenu faux en deux temps : A3 a porte l'affichage de
-             `sshd_config`, A4 le releve d'un serveur. Il n'en reste qu'UN non
-             porte — le releve de TOUT LE PARC — et sa route n'accepte aucun
-             `machine_id` : sa portee EST le parc, production comprise. Elle
-             est reservee a l'exploitant.
-
-             Un commentaire qui compte est un compte qui se desynchronise ;
-             celui-ci enonce desormais l'etat, pas un nombre. --}}
+        {{-- Le releve de TOUT LE PARC n'est pas offert : sa route n'accepte
+             aucun `machine_id`, sa portee EST le parc, production comprise.
+             Son bouton ouvre un panneau qui le dit. Pas de marqueur `↗` : il
+             ne mene nulle part ailleurs. --}}
         <div class="rw-actions--groupe">
             <button type="button" class="rw-bouton rw-bouton--discret"
-                    {{-- A4 : marqueur `↗` retire avec sa raison d'etre. --}}
                     data-rw="audit-ssh-relever">{{ __('ssh_audit.btn_relever') }}</button>
             <button type="button" class="rw-bouton rw-bouton--discret"
-                    {{-- A3 : le marqueur `↗` est retire avec la raison de
-                         l'afficher. Il annoncait un depart vers l'ancien
-                         portail ; la lecture est portee. --}}
                     data-rw="audit-ssh-config">{{ __('ssh_audit.btn_config') }}</button>
             <button type="button" class="rw-bouton rw-bouton--avertissement"
-                    data-rw="audit-ssh-parc">{{ __('ssh_audit.btn_parc') }} ↗</button>
+                    data-rw="audit-ssh-parc">{{ __('ssh_audit.btn_parc') }}</button>
         </div>
     @endif
 
@@ -82,10 +68,6 @@
                  panneau precedent agit sur autre chose que ce qu'on a lu. --}}
             <button type="button" class="rw-bouton rw-bouton--avertissement"
                     data-rw="audit-ssh-panneau-confirmer" hidden>{{ __('ssh_audit.planif_valider') }}</button>
-            @if ($lienLegacy)
-                <a class="rw-bouton" data-rw="audit-ssh-panneau-legacy"
-                   href="{{ $lienLegacy }}" target="_blank" rel="noopener">{{ __('ssh_audit.np_ouvrir') }} ↗</a>
-            @endif
         </div>
     </div>
 
@@ -116,7 +98,6 @@
     </div>
 
     <h2 class="rw-section__entete rw-titre--espace">{{ __('ssh_audit.politique_titre') }}</h2>
-    <p class="rw-prose">{{ __('ssh_audit.politique_desc') }}</p>
     {{--
         ⚠ SEC-013 — POURQUOI L'ECRITURE N'EST PAS OFFERTE ICI.
 
@@ -127,8 +108,8 @@
         ECRIRE une, sur n'importe quelle machine. La passerelle ne peut pas les
         separer : elle compare des CHEMINS, jamais des methodes.
 
-        On le DIT plutot que de laisser croire a un oubli — une capacite
-        absente doit etre declaree, et celle-ci l'est pour une raison.
+        L'ecran dit seulement « lecture seule » : la raison est une note de
+        securite, pas une consigne pour l'administrateur.
     --}}
     <p class="rw-aide rw-prose" data-rw="audit-ssh-politique-lecture-seule">{{ __('ssh_audit.politique_lecture_seule') }}</p>
     <div data-rw="audit-ssh-politique">
@@ -137,11 +118,9 @@
 
     @if ($administration)
         <h2 class="rw-section__entete rw-titre--espace">{{ __('ssh_audit.flotte_titre') }}</h2>
-        {{-- Cette vue N'EST PAS bornee au perimetre : `GET /ssh-audit/fleet`
-             porte `@require_role(2)` et lit tout le parc. Le dire, plutot que
-             de laisser croire que le tableau suit la meme borne que le
-             selecteur juste au-dessus. --}}
-        <p class="rw-aide rw-prose" data-rw="audit-ssh-flotte-reserve">{{ __('ssh_audit.flotte_reserve') }}</p>
+        {{-- `GET /ssh-audit/fleet` lit tout le parc, mais la borne du
+             selecteur ne mord qu'au role 1 : pour l'administration les deux
+             listes coincident, il n'y a rien a signaler. --}}
         <div data-rw="audit-ssh-flotte">
             <p class="rw-vide__texte">{{ __('ssh_audit.chargement') }}</p>
         </div>
@@ -169,10 +148,6 @@
              backend. --}}
         <div class="rw-carte rw-carte--pleine" data-rw="audit-ssh-planif-bloc" hidden>
             <h3 class="rw-section__entete">{{ __('ssh_audit.planif_form_titre') }}</h3>
-
-            {{-- LA CAPACITÉ RÉDUITE EST DITE AVANT LE CHOIX, pas découverte
-                 après. Quatre périodicités, et l'ancien portail pour le reste. --}}
-            <p class="rw-aide rw-prose" data-rw="audit-ssh-planif-bornee">{{ __('ssh_audit.planif_freq_bornee') }}</p>
 
             <div class="rw-champ">
                 <label class="rw-champ__etiquette" for="audit-ssh-planif-nom">{{ __('ssh_audit.planif_f_nom') }}</label>
@@ -236,10 +211,9 @@
              `GET /ssh-audit/fleet` et les quatre `/schedules` portent
              `@require_role(2)`. Ne rien rendre au role 1 laisserait croire que
              la fonction n'existe pas, ou qu'elle a disparu — alors qu'elle
-             existe et lui est fermee. Deux phrases valent mieux qu'un silence. --}}
+             existe et lui est fermee. Une phrase vaut mieux qu'un silence. --}}
         <div class="rw-carte rw-carte--pleine" data-rw="audit-ssh-reserve-admin">
-            <p class="rw-prose">{{ __('ssh_audit.flotte_reserve') }}</p>
-            <p class="rw-prose">{{ __('ssh_audit.planifs_reserve') }}</p>
+            <p class="rw-prose">{{ __('ssh_audit.reserve_admin') }}</p>
         </div>
     @endif
 

@@ -1,120 +1,95 @@
 <?php
 
 /**
- * Droits sudo par compte distant — sous-lot D9a.
+ * Droits sudo par compte distant.
  *
  * ATTENTION AVANT DE MODIFIER UNE AIDE DE PREREGLAGE. Ces textes decrivent une
- * portee de privileges. Le legacy affirmait sous `apt_only` « Il ne peut pas
- * toucher au reste du systeme » alors que `backend/sudo_manager.py:80-84`
- * documente le contraire — « ce preset est EQUIVALENT ROOT ».
- *
- * `tests/e2e/go-adm-politiques.mjs` relit ce module dans le conteneur a chaque
- * execution et refuse que l'ecran le contredise. Une aide qui adoucit la portee
- * d'un prereglage classe 'root' fait donc ECHOUER le LOT — c'est voulu.
+ * portee de privileges. `tests/e2e/go-adm-politiques.mjs` relit
+ * `backend/sudo_manager.py` dans le conteneur a chaque execution et refuse que
+ * l'ecran le contredise : l'aide d'un prereglage classe 'root' doit dire root.
+ * Redaction : docs/REDACTION-INTERFACE.md.
  */
 
 return [
     'titre'          => 'Droits sudo par compte distant',
-    'intro_titre'    => 'A quoi sert cette page ?',
-    'intro'          => 'Le « sudo » permet a un compte ordinaire d\'executer certaines commandes '
-                        . 'en tant qu\'administrateur (root). Vous choisissez ici, pour UN compte sur '
-                        . 'UNE machine, ce qu\'il aura le droit de faire — puis vous confirmez avant '
-                        . 'que quoi que ce soit ne soit ecrit sur la machine.',
+    'intro'          => "Choisissez ce qu'un compte distant peut exécuter en root sur une machine. Rien n'est écrit avant votre confirmation.",
     'machine'        => 'Machine',
     'compte'         => 'Compte distant',
-    'aucun_compte'   => 'Aucun compte gere sur cette machine',
-    'vide_titre'     => 'Aucun compte a qui accorder des droits',
-    'vide_texte'     => 'Cette machine n\'a aucun compte au statut « gere » ou « a examiner ». '
-                        . 'Lancez un inventaire depuis les comptes distants, puis classez '
-                        . 'les comptes concernes.',
+    'aucun_compte'   => 'Aucun compte géré sur cette machine',
+    'vide_titre'     => 'Aucun compte à qui accorder des droits',
+    'vide_texte'     => "Cette machine n'a aucun compte « géré » ou « à examiner ». Lancez un inventaire depuis les comptes distants, puis classez les comptes.",
     'vide_action'    => 'Ouvrir les comptes distants',
 
     'choix'          => 'Ce que le compte pourra faire',
-    'prereglage'     => 'Prereglage',
-    'regles_libres'  => 'Regles saisies',
-    'regles_aide'    => 'Une ligne par regle, au format sudoers. Seule la SYNTAXE sera verifiee '
-                        . '(`visudo -cf`) : la portee reelle de ce que vous ecrivez n\'est pas analysee.',
-    'services'       => 'Services autorises',
-    'services_aide'  => 'Separes par des virgules. Exemple : nginx, php8.2-fpm, redis-server',
+    'prereglage'     => 'Préréglage',
+    'regles_libres'  => 'Règles saisies',
+    'regles_aide'    => "Une règle par ligne, au format sudoers. Seule la syntaxe est vérifiée, pas la portée.",
+    'services'       => 'Services autorisés',
+    'services_aide'  => 'Séparés par des virgules.',
     'nopasswd'       => 'Sans demander de mot de passe (NOPASSWD)',
-    'nopasswd_aide'  => 'Coche, le compte n\'aura aucun mot de passe a saisir pour ces commandes.',
-    'runas'          => 'Executer en tant que',
+    'nopasswd_aide'  => "Aucun mot de passe ne sera demandé pour ces commandes.",
+    'runas'          => 'Exécuter en tant que',
 
-    // ── LA PORTEE, telle que le module la documente ────────────────────────
-    'portee_root'         => 'Donne un acces root',
-    'portee_root_detail'  => 'Ce prereglage permet a terme d\'obtenir les pleins pouvoirs sur la machine.',
-    'portee_borne'        => 'Portee bornee',
-    'portee_borne_detail' => 'Liste de commandes fermee, durcie par le module qui la produit.',
-    'portee_inconnu'         => 'Portee non analysee',
-    'portee_inconnu_detail'  => 'Vous ecrivez la regle vous-meme ; seule sa syntaxe sera verifiee.',
+    // ── La portee, telle que sudo_manager.py la documente ──────────────────
+    'portee_root'         => 'Donne un accès root',
+    'portee_root_detail'  => "Ce préréglage permet d'obtenir les pleins pouvoirs sur la machine.",
+    'portee_borne'        => 'Portée bornée',
+    'portee_borne_detail' => 'Liste de commandes fermée.',
+    'portee_inconnu'         => 'Portée non analysée',
+    'portee_inconnu_detail'  => 'Vous écrivez la règle ; seule sa syntaxe est vérifiée.',
 
-    'aide_all_nopasswd'       => 'Acces root complet, sans mot de passe : la regle ecrite est '
-                                 . 'litteralement « tout, en tant que root ». A reserver aux comptes de service.',
-    'aide_apt_only'           => 'Autorise « apt » a installer et mettre a jour des logiciels. '
-                                 . 'CELA EQUIVAUT A UN ACCES ROOT : l\'installation d\'un paquet execute '
-                                 . 'ses scripts de mainteneur en tant que root, ce qui permet d\'obtenir '
-                                 . 'un interpreteur root via un paquet fabrique pour cela. Il n\'existe pas '
-                                 . 'de moyen sur de « limiter a apt ». A n\'accorder qu\'a des operateurs '
-                                 . 'a qui vous confieriez deja root.',
-    'aide_restart_services'   => 'Autorise a redemarrer, recharger et consulter l\'etat de services systemd, '
-                                 . 'sans restriction sur lesquels.',
-    'aide_read_logs'          => 'Lecture des journaux seulement : « tail » et « cat » sous /var/log, et '
-                                 . '« journalctl » sans pagination. Le module a retire « less », qui '
-                                 . 'permettait d\'ouvrir un interpreteur root.',
-    'aide_systemctl_specific' => 'Redemarrer, recharger et consulter l\'etat des SEULS services que vous '
-                                 . 'nommez ci-dessous.',
-    'aide_custom'             => 'Regles ecrites a la main. Leur portee n\'est pas analysee : elles peuvent '
-                                 . 'donner root sans que rien ne le signale.',
+    'aide_all_nopasswd'       => "Toutes les commandes en root. À réserver aux comptes de service.",
+    'aide_apt_only'           => "Autorise apt à installer et mettre à jour des logiciels. Équivaut à un accès root : un paquet fabriqué peut ouvrir un interpréteur root.",
+    'aide_restart_services'   => "Redémarrer, recharger et consulter l'état de n'importe quel service systemd.",
+    'aide_read_logs'          => "Lecture des journaux : tail et cat sous /var/log, journalctl sans pagination.",
+    'aide_systemctl_specific' => "Redémarrer, recharger et consulter l'état des seuls services nommés ci-dessous.",
+    'aide_custom'             => "Règles écrites à la main. Leur portée n'est pas analysée : elles peuvent donner root sans que rien ne le signale.",
 
-    'preset_all_nopasswd'       => 'Acces root complet',
-    'preset_restart_services'   => 'Redemarrage de services',
-    'preset_apt_only'           => 'Mises a jour APT',
+    'preset_all_nopasswd'       => 'Accès root complet',
+    'preset_restart_services'   => 'Redémarrage de services',
+    'preset_apt_only'           => 'Mises à jour APT',
     'preset_read_logs'          => 'Lecture des journaux',
-    'preset_systemctl_specific' => 'Services nommes',
-    'preset_custom'             => 'Regles libres',
+    'preset_systemctl_specific' => 'Services nommés',
+    'preset_custom'             => 'Règles libres',
 
-    // ── LES GESTES ─────────────────────────────────────────────────────────
-    'deployer'       => 'Deployer…',
+    // ── Les gestes ─────────────────────────────────────────────────────────
+    'deployer'       => 'Déployer…',
     'auditer'        => 'Auditer',
     'retirer'        => 'Retirer…',
-    'aide_deployer'  => 'Ecrit la configuration sur la machine, apres validation de sa syntaxe.',
-    'aide_auditer'   => 'Lit le fichier reellement present sur la machine. Ne modifie rien.',
-    'aide_retirer'   => 'Supprime cette configuration de la machine ; le compte perd ces droits.',
+    'aide_deployer'  => "Écrit la configuration sur la machine, après validation de sa syntaxe.",
+    'aide_auditer'   => "Lit le fichier présent sur la machine. Ne modifie rien.",
+    'aide_retirer'   => "Supprime cette configuration de la machine ; le compte perd ces droits.",
 
-    // ── LA CONFIRMATION, QUI MANQUAIT ──────────────────────────────────────
-    'confirmer_titre'   => 'Confirmer le deploiement',
-    'confirmer_intro'   => 'Ceci va ecrire un fichier sudoers sur la machine. Verifiez avant de valider :',
+    // ── Les confirmations ──────────────────────────────────────────────────
+    'confirmer_titre'   => 'Confirmer le déploiement',
+    'confirmer_intro'   => "Un fichier sudoers va être écrit sur la machine.",
     'confirmer_machine' => 'Machine',
     'confirmer_compte'  => 'Compte',
     'confirmer_portee'  => 'Ce que cela accorde',
-    'confirmer_root'    => 'Ce prereglage donne un acces root a ce compte.',
-    'confirmer_valider' => 'Deployer sur la machine',
+    'confirmer_root'    => 'Ce préréglage donne un accès root à ce compte.',
+    'confirmer_valider' => 'Déployer sur la machine',
     'confirmer_annuler' => 'Annuler',
     'retirer_titre'     => 'Confirmer le retrait',
-    'retirer_intro'     => 'Le fichier sudoers de ce compte sera supprime de la machine. '
-                           . 'Le compte perdra les droits qu\'il accordait.',
+    'retirer_intro'     => "Le fichier sudoers de ce compte sera supprimé de la machine. Le compte perdra ces droits.",
     'retirer_valider'   => 'Retirer de la machine',
-    'reauth'            => 'Une re-authentification vous sera demandee avant l\'envoi.',
+    'reauth'            => "Une re-authentification vous sera demandée avant l'envoi.",
 
-    // ── L'HISTORIQUE ───────────────────────────────────────────────────────
+    // ── L'historique ───────────────────────────────────────────────────────
     'historique'        => 'Historique et restauration',
     'hist_date'         => 'Date',
     'hist_auteur'       => 'Par',
-    'hist_etat'         => 'Etat',
-    'hist_fichier'      => 'Fichier',
-    'hist_regle'        => 'Regle ecrite',
-    'hist_vide'         => 'Aucun deploiement enregistre pour ce compte.',
-    'etat_applied'      => 'Appliquee',
-    'etat_rolled_back'  => 'Annulee',
-    'etat_failed'       => 'Echouee',
-    'etat_superseded'   => 'Remplacee',
-    'derniere'          => 'Derniere ecriture',
-    'jamais'            => 'jamais deployee',
-    'rollback_titre' => 'Restaurer une version anterieure',
-    'rollback_texte' => 'Restaure le sudoers exact d\'avant ce deploiement. Le contenu est celui qui a ete sauvegarde, pas une reconstitution. Une re-authentification est exigee.',
-    'resultat'          => 'Resultat',
-
-    /* L'annulation d'un deploiement, rouverte le 2026-09-07. */
+    'hist_etat'         => 'État',
+    'hist_regle'        => 'Règle écrite',
+    'hist_vide'         => 'Aucun déploiement enregistré pour ce compte.',
+    'etat_applied'      => 'Appliquée',
+    'etat_rolled_back'  => 'Annulée',
+    'etat_failed'       => 'Échouée',
+    'etat_superseded'   => 'Remplacée',
+    'derniere'          => 'Dernière écriture',
+    'jamais'            => 'jamais déployée',
+    'rollback_titre' => 'Restaurer une version antérieure',
+    'rollback_texte' => "Réécrit sur la machine le sudoers exact d'avant ce déploiement. Re-authentification exigée.",
+    'resultat'          => 'Résultat',
     'rollback' => 'Annuler',
-    'rollback_confirme' => 'Annuler ce deploiement et restaurer le sudoers precedent ?\\n\\nLe contenu exact d\'avant est reecrit sur la machine — ce ne sont pas des regles retapees, ce sont les octets sauvegardes. Une re-authentification sera demandee.',
+    'rollback_confirme' => "Annuler ce déploiement et réécrire sur la machine le sudoers précédent ? Une re-authentification sera demandée.",
 ];
