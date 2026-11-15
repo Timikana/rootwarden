@@ -27,6 +27,8 @@ parcourt 20 à 28 % des mots d'une page ; chaque phrase de trop fait concurrence
 9. **Ne pas répéter** ce que la page dit déjà ailleurs.
 10. **Un texte raccourci doit rester vrai** : revérifier dans le code chaque fait
     gardé. Un texte faux se corrige ou se supprime.
+11. **Vouvoiement**, comme le reste du portail : « Rechargez la page », « Votre
+    rôle ».
 
 ## Comment s'y prendre, page par page
 

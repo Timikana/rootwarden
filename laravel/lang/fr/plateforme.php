@@ -55,7 +55,7 @@ return [
     'jamais' => "jamais",
     'sensible' => "Production",
     'vide_titre' => "Aucune machine au parc",
-    'vide_texte' => "Ajoute une machine depuis la page Serveurs.",
+    'vide_texte' => "Ajoutez une machine depuis la page Serveurs.",
     'details' => "Détails",
 
     // ── Le test de connexion ─────────────────────────────────────────────
@@ -90,7 +90,7 @@ return [
     'parc_rien' => "Rien à faire : toutes les machines ont la clé et le compte d'administration, sans mot de passe conservé.",
 
     'refusees_titre' => ":n machine(s) exclue(s) de l'effacement",
-    'refusees_texte' => "Elles n'ont pas de compte d'administration : sans mot de passe, RootWarden ne pourrait plus y passer root. Reprends d'abord le compte d'administration.",
+    'refusees_texte' => "Elles n'ont pas de compte d'administration : sans mot de passe, RootWarden ne pourrait plus y passer root. Reprenez d'abord le compte d'administration.",
 
     'champ_mdp' => "Mot de passe SSH à réenregistrer",
     'champ_mdp_aide' => "Enregistré chiffré, jamais réaffiché. Le mot de passe root se ressaisit depuis la page Serveurs.",
@@ -101,13 +101,13 @@ return [
     'geste_journal' => "Journal des actions",
     'geste_journal_vide' => "Aucune action lancée.",
     'geste_en_cours' => "En cours sur :cibles…",
-    'geste_echec_reseau' => "Pas de réponse (:message). L'action peut être encore en cours : ne la relance pas. Recharge la page, puis « Tester » la machine.",
-    'geste_sans_verdict' => "Réponse illisible : l'action a peut-être eu lieu. Ne la relance pas. Recharge la page, puis « Tester » la machine.",
+    'geste_echec_reseau' => "Pas de réponse (:message). L'action peut être encore en cours : ne la relancez pas. Rechargez la page, puis testez la machine.",
+    'geste_sans_verdict' => "Réponse illisible : l'action a peut-être eu lieu. Ne la relancez pas. Rechargez la page, puis testez la machine.",
     'geste_ligne_ok' => ":machine : réussi — :message",
     'geste_ligne_echec' => ":machine : échoué — :message",
     'geste_bilan' => ":ok réussite(s) sur :total.",
     'ressaisie_mdp_vide' => "Aucun mot de passe saisi : rien n'a été envoyé.",
-    'confirmer_saisie_manquante' => "Remplis le champ avant de confirmer.",
+    'confirmer_saisie_manquante' => "Remplissez le champ avant de confirmer.",
     'effacement_bilan' => ":ok effacement(s) sur :total.",
     'effacement_interrompu' => "Interrompu après :fait machine(s) sur :total : les suivantes n'ont pas été traitées.",
 
@@ -154,7 +154,7 @@ return [
             'effets' => [
                 "retire ses droits sudo, puis supprime le compte et son répertoire",
                 "la clé reste autorisée pour l'utilisateur SSH et pour root",
-                "en cas de clé compromise, fais plutôt tourner la clé",
+                "en cas de clé compromise, faites plutôt tourner la clé",
                 "exige la validation d'un second administrateur",
             ],
         ],
@@ -175,16 +175,16 @@ return [
     'parc_btn_revoquer' => "Supprimer le compte d'administration sur :n machine(s)",
     'champ_motif' => "Motif",
     'champ_motif_aide' => "Inscrit au journal d'audit (200 caractères maximum).",
-    'motif_vide' => "Indique un motif : rien n'a été envoyé.",
+    'motif_vide' => "Indiquez un motif : rien n'a été envoyé.",
     'geste_approbation_attente' => "Demande de validation envoyée à un second administrateur (page Approbations). Rien n'a encore été retiré.",
     'geste_approbation_absente' => "Bloqué : cette action exige un second administrateur, et aucun n'est disponible. :message",
-    'revoquer_asymetrie' => "Ton rôle peut accorder ce compte d'administration, mais seul un superadmin peut le supprimer.",
+    'revoquer_asymetrie' => "Votre rôle peut accorder ce compte d'administration, mais seul un superadmin peut le supprimer.",
 
     // Les limites de chaque geste, affichees dans son panneau.
     'bornes' => [
         'rotation' => "L'archive de l'ancienne clé est dans le même volume Docker que la clé actuelle, et ce volume n'est pas sauvegardé par RootWarden.",
         'revoquer' => "Si le serveur refuse la connexion du compte « rootwarden » (sshd durci) et que le mot de passe root a été effacé, la suppression échoue. Elle peut être relancée sans risque.",
-        'compte_service' => "Échoue si le compte a été supprimé après l'effacement des mots de passe : RootWarden n'a alors plus aucun moyen de passer root. Ressaisis d'abord le mot de passe root depuis la page Serveurs.",
+        'compte_service' => "Échoue si le compte a été supprimé après l'effacement des mots de passe : RootWarden n'a alors plus aucun moyen de passer root. Ressaisissez d'abord le mot de passe root depuis la page Serveurs.",
     ],
 
     // Ce que le backend, seul a pouvoir dechiffrer, dit des mots de passe.
@@ -202,19 +202,19 @@ return [
     'rotation_titre' => "Faire tourner la clé",
     'rotation_aide' => "Agit sur tout le parc en une fois. Réservé aux superadmins, avec validation d'un second administrateur.",
     'btn_rotation' => "Faire tourner la clé de plateforme",
-    'rotation_remede' => "La rotation ne retire pas l'ancienne clé des machines. Si la clé est compromise, retire aussi l'ancienne, machine par machine.",
+    'rotation_remede' => "La rotation ne retire pas l'ancienne clé des machines. Si la clé est compromise, retirez aussi l'ancienne, machine par machine.",
     'rotation_remede_ou' => "Le retrait se fait depuis la page Comptes distants, clé par clé. RootWarden refuse par défaut d'y retirer la clé de plateforme active.",
     'rotation_remede_parc' => "Il n'y a volontairement pas de retrait sur tout le parc : il couperait l'accès de RootWarden à toutes les machines.",
     'rotation_jamais_exercee' => "Cette action n'a jamais été testée en conditions réelles.",
     'rotation_sans_retour' => "⚠ :n machine(s) n'ont plus que cette clé pour accès : :noms. Si le redéploiement échoue, elles deviennent injoignables.",
     'rotation_sans_retour_aucune' => "Aucune machine ne dépend uniquement de cette clé.",
-    'rotation_jours_inconnus' => "Durée de l'archive inconnue : considère cette action comme sans retour.",
+    'rotation_jours_inconnus' => "Durée de l'archive inconnue : considérez cette action comme sans retour.",
     'credential_divergence_root' => ":n machine(s) avec un mot de passe root enregistré mais vide : :noms. À ressaisir depuis la page Serveurs.",
     'credential_indetermine_root' => ":n machine(s) dont le mot de passe root n'a pas pu être déchiffré : :noms.",
     'badge_root_vide_reel' => "root vide en réalité",
     'badge_root_illisible' => "root illisible",
 
-    'geste_sudoers_orphelin' => "⚠ :machine : compte supprimé, mais ses droits sudo sont restés sur la machine. Relance l'action pour les retirer.",
+    'geste_sudoers_orphelin' => "⚠ :machine : compte supprimé, mais ses droits sudo sont restés sur la machine. Relancez l'action pour les retirer.",
     'champ_recopie' => "Pour confirmer, recopie le nombre de machines concernées",
     'champ_recopie_aide' => "Le bouton s'active quand le nombre correspond.",
 ];
