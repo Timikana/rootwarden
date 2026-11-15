@@ -212,9 +212,36 @@ fi
 # ── Etape 3 : rebuild Docker ─────────────────────────────────────────────────
 if [ "$DO_BUILD" -eq 1 ]; then
     echo -e "${GREEN}[maj 3/5]${NC} docker compose build..."
-    run ${DC} --env-file "${ENV_FILE}" build
+    # `--pull` : SANS LUI, LES CORRECTIFS DES IMAGES DE BASE N'ARRIVENT JAMAIS.
+    # `docker compose build` reutilise l'image de base deja presente sur l'hote :
+    # `php:8.4-apache` et `python:3.13-slim` restaient figes au jour du premier
+    # build. Mesure du 2026-10-21 : image en service PHP 8.4.25 contre 8.4.27 publie,
+    # et Trivy y relevait 16 failles critiques + 206 hautes corrigeables — 0 apres
+    # reconstruction avec --pull.
+    run ${DC} --env-file "${ENV_FILE}" build --pull
 else
     echo -e "${GREEN}[maj 3/5]${NC} docker build SKIP (--no-build)"
+fi
+
+# ── Etape 3b : l'image de la base — dump VERIFIE avant tout changement ───────
+#
+# Audit 2026-10-21. Un changement d'image MySQL (9.2.0 -> 9.7 LTS) convertit le
+# dossier de donnees au premier demarrage : IRREVERSIBLE. `up -d` le ferait en
+# silence. On retelecharge l'image visee (les correctifs de la LTS arrivent ainsi),
+# puis, si elle differe de celle en service, on fait un dump COMPLET et on le
+# verifie. S'il echoue, la mise a jour S'ARRETE ici, avant que la base ne change.
+echo -e "${GREEN}[maj 3b]${NC} Image de la base de donnees..."
+IMG_DB=$(grep -E '^[[:space:]]+image:[[:space:]]*mysql:' "${SCRIPT_DIR}/docker-compose.yml" | head -1 | awk '{print $2}')
+if [ -z "$IMG_DB" ]; then
+    echo -e "${RED}[maj]${NC} image de la base introuvable dans docker-compose.yml : arret par precaution." >&2
+    exit 1
+fi
+run ${DC} --env-file "${ENV_FILE}" pull db || \
+    echo -e "  ${YELLOW}!${NC} pull de ${IMG_DB} impossible - comparaison avec l'image locale"
+source "${SCRIPT_DIR}/scripts/sauvegarde-avant-changement-db.sh"
+if ! sauvegarde_si_image_db_change rootwarden_db "$IMG_DB" "${SCRIPT_DIR}/backups" "$DRY_RUN"; then
+    echo -e "${RED}[maj]${NC} Sauvegarde de la base IMPOSSIBLE : mise a jour interrompue AVANT tout changement." >&2
+    exit 1
 fi
 
 # ── Etape 4 : Migrations DB ──────────────────────────────────────────────────

@@ -5,6 +5,29 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## Mises à jour de sécurité — PHP, images, MySQL : ce qui arrivait, et ce qui n'arrivait jamais
+
+| | Avant | Après |
+|---|---|---|
+| Paquets PHP | après les correctifs #95 et #98 | 65 mises à jour mineures ou correctifs, **majeures retenues** (Guzzle 8, brick/math 1.0) ; `composer audit` sans avis |
+| Image du portail (Trivy, corrigeables) | 16 critiques, 206 hautes — PHP 8.4.25 | **0** — PHP 8.4.26 |
+| Image du backend | 5 critiques, 27 hautes | **0** — pip et gunicorn retirés de l'image finale |
+| MySQL | 9.2.0, image **abandonnée depuis avril 2025** : 5 critiques, 171 hautes | **9.7 LTS** |
+
+**La cause de fond : `maj.sh` construisait sans `--pull`.** Les images de base restaient figées
+au jour du premier build ; aucun correctif PHP ni Debian n'arrivait jamais en production. Corrigé,
+et la CI construit désormais avec `pull: true`.
+
+**MySQL 9.2 → 9.7 est irréversible.** `maj.sh` fait maintenant un dump complet et vérifié avant tout
+changement d'image de la base, et s'arrête si le dump échoue. Éprouvé le 2026-11-15 sur une base
+isolée au schéma actuel (migrations jusqu'à 067) : conversion 9.2.0 → 9.7.4 réussie, 66 tables
+`CHECK TABLE` OK, connexion et lecture par le portail et le backend. Le dump, rechargé dans un
+MySQL 9.2 neuf, redonne la même base : le retour arrière est éprouvé.
+
+L'image du portail reprend la dernière version PHP 8.4 publiée à chaque `./maj.sh`, grâce à `--pull`.
+
+---
+
 ## Pages concises, icônes et menu corrigé
 
 Les pages étaient trop bavardes : 58 % des mots du portail étaient des textes d'aide, souvent des

@@ -272,6 +272,7 @@ jobs:
           context: .
           file: ./laravel/Dockerfile
           push: false
+          pull: true   # image de base RETELECHARGEE : Trivy doit scanner ce qui part en prod
           # `load` : l'image doit exister dans le demon pour le pas suivant.
           load: true
           tags: ${{ env.IMAGE_PREFIX }}-laravel:${{ github.sha }}
@@ -320,6 +321,7 @@ jobs:
           context: ./backend
           file: ./backend/Dockerfile
           push: false
+          pull: true   # image de base RETELECHARGEE : Trivy doit scanner ce qui part en prod
           tags: ${{ env.IMAGE_PREFIX }}-python:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -883,6 +885,7 @@ jobs:
           context: .
           file: ./laravel/Dockerfile
           push: false
+          pull: true   # image de base RETELECHARGEE : Trivy doit scanner ce qui part en prod
           load: true
           tags: rootwarden-laravel:scan
           cache-from: type=gha
@@ -893,6 +896,7 @@ jobs:
           context: ./backend
           file: ./backend/Dockerfile
           push: false
+          pull: true   # image de base RETELECHARGEE : Trivy doit scanner ce qui part en prod
           load: true
           tags: rootwarden-python:scan
           cache-from: type=gha
