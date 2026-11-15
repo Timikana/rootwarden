@@ -103,6 +103,7 @@
      */
     function ligne(f, mid) {
         const tr = document.createElement('tr');
+        if (f.b) { tr.className = 'rw-ligne-blanchie'; }
 
         const tdCve = document.createElement('td');
         tdCve.className = 'rw-cve-id';
@@ -195,6 +196,14 @@
      */
     function marquesEnrichissement(f) {
         const marques = [];
+
+        if (f.b) {
+            const lb = document.createElement('span');
+            lb.className = 'rw-pastille rw-pastille--neutre';
+            lb.textContent = L.blanchie || '';
+            lb.title = L.blanchie_aide || '';
+            marques.push(lb);
+        }
 
         if (f.k) {
             const kev = document.createElement('span');

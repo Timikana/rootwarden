@@ -200,7 +200,7 @@ class AppelantsDuBackendTest extends TestCase
              * nomme l'absence d'UN lecteur, pas l'absence de lecture.
              */
             'planification-cve.js:204',   // routes Laravel
-            'scan-cve.js:713',            // route Laravel
+            'scan-cve.js:722',            // route Laravel
         ];
 
         $reels = array_map(

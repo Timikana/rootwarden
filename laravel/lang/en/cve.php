@@ -78,6 +78,8 @@ return [
     'export_csv'              => 'Export as CSV',
     // ── EPSS / KEV enrichment — sub-batch S6 ────────────────────────────────
     'tri_explication' => "Vulnerabilities known to be actively exploited (KEV) are listed first.",
+    'blanchie' => "Whitelisted",
+    'blanchie_aide' => "Whitelisted: recorded, but left out of counters, notifications and tickets.",
     'kev_aide' => 'Actively exploited — CISA Known Exploited Vulnerabilities catalog',
     'kev_depuis' => 'in the catalog since :date',
     'epss_aide' => 'EPSS: probability of exploitation within 30 days',

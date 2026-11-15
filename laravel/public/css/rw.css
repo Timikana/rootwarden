@@ -3231,3 +3231,7 @@ a.rw-alerte:focus-visible { outline: 2px solid var(--rw-accent); outline-offset:
 
 /* Une seule graisse forte, 600 : les titres et `strong` du navigateur sont a 700. */
 h1, h2, h3, h4, strong, b { font-weight: 600; }
+
+/* Une CVE en liste blanche reste listee (on sait ce qui a ete ecarte), mais en
+   retrait : elle ne compte plus. Le texte garde un contraste lisible. */
+.rw-ligne-blanchie td { color: var(--rw-texte-discret); }
