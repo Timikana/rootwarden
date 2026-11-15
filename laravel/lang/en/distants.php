@@ -1,39 +1,38 @@
 <?php
 
 /**
- * Remote accounts — `adm/` module, sub-lot D8.
- *
- * STRICT PARITY with `lang/fr/distants.php`: same keys, same order.
+ * Remote accounts. STRICT PARITY with `lang/fr/distants.php`.
+ * Writing rules: docs/REDACTION-INTERFACE.md.
  */
 return [
     'title' => 'Remote accounts',
-    'desc' => 'The system accounts present on a machine, as the last scan found them. This page reads the database: it only reaches the machine when you ask it to.',
+    'desc' => "The system accounts of a machine, as the last scan found them.",
     'champ_machine' => 'Machine',
     'btn_choisir' => 'Show',
-    'scan_aide' => 'The scan opens an SSH session to the machine, enumerates its accounts and refreshes the inventory. It is never started on page load.',
+    'scan_aide' => "Opens an SSH session to the machine and refreshes the inventory.",
     'btn_scanner' => 'Scan the machine',
     'scan_en_cours' => 'Scanning…',
     'scan_fait' => 'Scan finished. Reload to see the updated inventory.',
     'illisible_ligne' => "unreadable name: :motif",
-    'illisible_classable' => "Classifying it is still possible and is the only action that unblocks: classifying changes a status in the database, it does not reach the machine.",
-    'illisible_hors_gestes' => "These accounts are removed from the remote-action selector: the backend refuses them, and offering an action that cannot succeed is not an offer.",
-    'illisible_divergence' => "⚠ :nombre account(s) returned by the inventory have no row in the table below — the two reads disagree. Reload the page.",
+    'illisible_classable' => "Classifying it is still possible: it is the only way to unblock it.",
+    'illisible_hors_gestes' => "These accounts are not offered to machine actions: the server would refuse them.",
+    'illisible_divergence' => "⚠ :nombre inventory account(s) have no row in the table. Reload the page.",
     'illisibles_titre' => "Accounts with an unreadable name found on this machine",
-    'illisibles_texte' => "No remote action can target these accounts: their name is interpolated into paths run as root, and the backend refuses them. The name comes from the machine's /etc/passwd — it is a signal worth looking at, not a RootWarden error. Accounts concerned — :nombre in total: :liste.",
-    'illisibles_bloquant' => "⚠ As long as one of these accounts stays « awaiting review », it BLOCKS key deployment — the pre-flight check does count them, deliberately: excluding a row would have loosened a guard. Classifying them is the only way to unblock.",
+    'illisibles_texte' => "No machine action can target these accounts. Their name comes from the machine's /etc/passwd: it deserves a look. :nombre account(s): :liste.",
+    'illisibles_bloquant' => "⚠ As long as one of these accounts stays « awaiting review », it blocks key deployment. Classify it to unblock.",
     'motif_vide' => "empty name",
     'motif_trop_long' => "name longer than 32 characters",
     'motif_composant_de_chemin' => "not a name but a path component",
     'motif_caracteres_interdits' => "characters not allowed in an account name",
     'motif_inconnu' => "reason not recognised by this screen",
-    'scan_non_concluant' => "Scan not conclusive. Reads that failed: :sources. The inventory shown is the one from the last successful scan — it has NOT been modified.",
-    'scan_comptes_lus' => "The accounts themselves were read: it is the key counts that are stale.",
+    'scan_non_concluant' => "Scan not conclusive. Failed reads: :sources. The inventory shown was not modified.",
+    'scan_comptes_lus' => "The accounts were read; only the key counts are stale.",
     'scan_source_comptes' => "the account list",
     'scan_source_cles_root' => "the keys read as root",
     'scan_source_cles_utilisateur' => "the keys read by the service account",
     'scan_echec' => 'The scan did not complete.',
     'en_attente_titre' => ':n account(s) await review.',
-    'en_attente_aide' => 'The scan found them without knowing what to make of them. Classifying them is FINAL: « awaiting review » is never set again.',
+    'en_attente_aide' => "Classifying is final: an account never goes back to « awaiting review ».",
     'btn_classer_masse' => 'Classify the :n as « :statut »',
     'rien_en_attente' => 'No account awaits review on this machine.',
     'liste_titre' => ':n account(s) on :machine',
@@ -42,7 +41,6 @@ return [
     'col_shell' => 'Shell',
     'col_cles' => 'Keys',
     'col_statut' => 'Status',
-    'col_action' => 'Classify',
     'cle_plateforme' => 'RootWarden key',
     'cle_tierce' => 'third-party key',
     'n_cles' => ':n key(s)',
@@ -53,9 +51,9 @@ return [
     'statut_pending_review' => 'awaiting review',
     'btn_classer' => 'Classify',
     'vide' => 'No account found on this machine.',
-    'vide_aide' => 'Run a scan: until one has happened, the inventory is empty and nothing says what the machine hosts.',
+    'vide_aide' => "Run a scan to list the machine's accounts.",
     'gestes_titre' => 'Actions on the machine',
-    'gestes_aide' => 'These three actions MODIFY the remote machine. Pick the account, then confirm in the panel: it names what the action commits to.',
+    'gestes_aide' => "These actions modify the machine. Pick the account, then confirm in the panel.",
     'geste_compte' => 'Target account',
     'geste_choisir' => '— pick an account —',
     'btn_retirer_cles' => 'Erase its keys',
@@ -65,10 +63,10 @@ return [
     'confirmer' => 'Confirm',
     'geste_sans_compte' => 'Pick an account first.',
     'geste_en_cours' => 'Action running…',
-    'geste_fait' => "The request went out and the server accepted it. That is not proof the action took effect on the machine: for « Erase its keys », the backend does not check its own effect and answers « succeeded » without looking. Run a scan again to read the real state.",
+    'geste_fait' => "Action finished. Run a scan again to read the machine's state.",
     'geste_echec' => 'The action did not complete.',
     'cles_titre' => 'Keys of :nom',
-    'cles_desc' => 'Only fingerprints are kept: the database does not store the keys themselves.',
+    'cles_desc' => "Only fingerprints are kept, not the keys.",
     'col_type' => 'Type',
     'col_empreinte' => 'SHA-256 fingerprint',
     'col_commentaire' => 'Comment',
@@ -81,22 +79,18 @@ return [
 
     // Panneaux de decision — les trois gestes qui MODIFIENT la machine
     'panneau_cles_titre' => 'Erase all keys of :nom?',
-    'panneau_cles_texte' => "The `authorized_keys` file of :nom will be emptied on :machine. Every key-based access to that account stops immediately, including RootWarden's if it relied on one.",
+    'panneau_cles_texte' => "The authorized_keys file of :nom will be emptied on :machine: all key-based access to this account stops. If the RootWarden key is among them, the erase is refused.",
     'panneau_sshd_titre' => 'Allow :nom in sshd?',
-    'panneau_sshd_texte' => 'The `AllowUsers` directive of :machine will be changed and sshd reloaded. A mistake here can cut SSH access to the machine.',
+    'panneau_sshd_texte' => "The AllowUsers directive of :machine will be changed and sshd reloaded. The configuration is validated first, and restored on failure.",
     'panneau_suppr_titre' => 'Delete account :nom?',
-    'panneau_suppr_texte' => '`userdel` will run on :machine, AND ITS HOME DIRECTORY WILL BE DELETED WITH IT. This cannot be undone: neither the account, nor its files, nor its keys can be restored from RootWarden.',
+    'panneau_suppr_texte' => "userdel will run on :machine, deleting the home directory. Irreversible: neither the account, its files nor its keys can be restored.",
 
-    // A non-measurement announced in advance is a fact; announced afterwards,
-    // it is an excuse. Said on the PAGE because the person about to click is
-    // the one who needs it — and they do not read the changelog.
-    'gestes_jamais_exerces' => "These three actions have never yet been performed from this interface. They are wired and confirmed by a panel, but their correct behaviour has not been observed on a machine — the old portal remains the only proven route.",
+    'gestes_jamais_exerces' => "These three actions have not yet been proven on a machine from this portal.",
 
-    /* Retrait d'UNE cle SSH precise (2026-09-06). Le champ `force` du backend
-       n'est jamais construit : voir public/js/distants-cles.js. */
+    // Retrait d'UNE cle precise : `force` n'est jamais envoye (distants-cles.js).
     'col_action' => 'Action',
     'cle_retirer' => 'Remove',
-    'cle_confirme' => 'Permanently remove key :empreinte from this account? It is deleted from authorized_keys on the machine: it will no longer open a session.',
+    'cle_confirme' => "Permanently remove key :empreinte from this account? It is deleted from the machine's authorized_keys file.",
     'cle_retiree' => 'Key removed from the machine.',
     'cle_echec' => 'Removal failed. The key is still in place.',
     'cle_du_compte' => 'Account :compte — :cle',
