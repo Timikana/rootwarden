@@ -34,8 +34,8 @@
                     <th>{{ __('docker.col_container') }}</th>
                     <th>{{ __('docker.col_image') }}</th>
                     <th>{{ __('docker.col_state') }}</th>
-                    <th title="{{ __('docker.tip_col_image_update') }}">{{ __('docker.col_image_update') }}</th>
-                    <th title="{{ __('docker.tip_col_git') }}">{{ __('docker.col_git') }}</th>
+                    <th>{{ __('docker.col_image_update') }}</th>
+                    <th>{{ __('docker.col_git') }}</th>
                     <th>{{ __('docker.col_checked') }}</th>
                 </tr>
             </thead>
@@ -44,6 +44,10 @@
             </tbody>
         </table>
     </div>
+    {{-- Ce que disent les deux colonnes de mise a jour, sous le tableau plutot
+         qu'en infobulle d'en-tete : invisible au toucher, et un en-tete n'est
+         pas un endroit ou l'on survole. --}}
+    <p class="rw-aide rw-prose" data-rw="docker-legende">{{ __('docker.tip_col_image_update') }} {{ __('docker.tip_col_git') }}</p>
 
     <p class="rw-annonce" data-rw="docker-message" role="status" aria-live="polite"></p>
 

@@ -380,7 +380,10 @@ try {
     const depart = await releve(page);
 
     verifie('la page porte un titre', depart.titre.length > 0, depart.titre);
-    verifie('le tableau a treize colonnes', depart.colonnes === 13, `${depart.colonnes}`);
+    // Le portage regroupe : adresse et contexte sous le nom, planification et
+    // derniere execution dans une cellule. Les VALEURS restent lues par classe.
+    const colonnesAttendues = CIBLE === 'laravel' ? 8 : 13;
+    verifie(`le tableau a ${colonnesAttendues} colonnes`, depart.colonnes === colonnesAttendues, `${depart.colonnes}`);
     verifie('les trois filtres sont presents',
             depart.filtres.environnement && depart.filtres.criticite && depart.filtres.reseau,
             JSON.stringify(depart.filtres));

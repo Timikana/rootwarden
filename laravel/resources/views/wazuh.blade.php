@@ -229,7 +229,7 @@
                 geste destructeur est derriere une decision qui NOMME la regle —
                 `confirm()` est proscrit ici, et surtout il ne nomme rien.
             --}}
-            <button type="button" class="rw-bouton rw-bouton--danger" data-rw="wazuh-regle-supprimer" disabled>{{ __('wazuh.delete') }}</button>
+            <button type="button" class="rw-bouton rw-bouton--danger-discret" data-rw="wazuh-regle-supprimer" disabled>{{ __('wazuh.delete') }}</button>
         </div>
         <button type="button" class="rw-bouton" data-rw="wazuh-regle-enregistrer">{{ __('wazuh.save') }}</button>
     </div>

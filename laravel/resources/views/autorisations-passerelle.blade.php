@@ -49,11 +49,11 @@
                     <tr>
                         <td class="rw-tableau__mono">{{ $e['motif'] }}</td>
                         <td>
-                            {{-- LA PORTEE S'ECRIT EN MOT, et son sens est dans le
-                                 `title` : « espace de noms » sans explication ne
-                                 dit pas qu'un prefixe suffit a passer. --}}
-                            <span class="rw-pastille rw-pastille--{{ $e['espace'] ? 'attente' : 'neutre' }}"
-                                  title="{{ $e['espace'] ? __('autorisations.portee_espace_aide') : __('autorisations.portee_route_aide') }}">
+                            {{-- LA PORTEE S'ECRIT EN MOT, et son sens est dans la
+                                 legende sous le tableau : « espace de noms » sans
+                                 explication ne dit pas qu'un prefixe suffit a passer.
+                                 Une fois, pas en infobulle sur chacune des lignes. --}}
+                            <span class="rw-pastille rw-pastille--{{ $e['espace'] ? 'attente' : 'neutre' }}">
                                 {{ $e['espace'] ? __('autorisations.portee_espace') : __('autorisations.portee_route') }}
                             </span>
                         </td>
@@ -62,6 +62,11 @@
             </tbody>
         </table>
     </div>
+    <p class="rw-aide rw-prose" data-rw="passerelle-legende-portee">
+        <span class="rw-pastille rw-pastille--neutre">{{ __('autorisations.portee_route') }}</span> {{ __('autorisations.portee_route_aide') }}
+        <br>
+        <span class="rw-pastille rw-pastille--attente">{{ __('autorisations.portee_espace') }}</span> {{ __('autorisations.portee_espace_aide') }}
+    </p>
 
     {{-- ── LA RESERVE A L'ADMINISTRATION ───────────────────────────────── --}}
     <h2 class="rw-section__entete rw-titre--espace">{{ __('autorisations.admin_titre') }}</h2>

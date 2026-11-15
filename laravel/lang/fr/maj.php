@@ -24,14 +24,10 @@ return [
     'th_name'          => 'Serveur',
     'th_linux'         => 'Version Linux',
     'th_last_check'    => 'Dernier contrôle',
-    'th_ip_port'       => 'Adresse',
     'th_status'        => 'Disponibilité',
-    'th_secu_schedule' => "Mise à jour planifiée",
-    'th_last_exec'     => 'Dernière exécution',
+    'th_planification' => 'Planification',
+    'planif_execution' => 'Dernière exécution :',
     'th_last_reboot'   => 'Dernier redémarrage',
-    'th_env'           => 'Environnement',
-    'th_criticality'   => 'Criticité',
-    'th_network'       => 'Réseau',
     'th_actions'       => 'Actions',
 
     // Releves par machine
@@ -188,6 +184,7 @@ return [
     'secu_fin'      => "Paquets mis à jour sur :nombre machine(s).",
 
     // Mise a jour complete et reparation dpkg
+    'btn_autres'   => 'Autres actions',
     'btn_complete' => 'Mise à jour complète',
     'tip_complete' => 'Met à jour tous les paquets (apt full-upgrade), quitte à en installer ou en retirer.',
     'btn_dpkg'     => 'Réparation dpkg',
