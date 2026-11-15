@@ -135,6 +135,25 @@ class Navigation
     ];
 
     /**
+     * L'icone de chaque entree, par cle. Une table a part plutot qu'un champ de
+     * plus par entree : le menu reste lisible, et une entree sans icone se rend
+     * quand meme. Les noms sont ceux du sprite (scripts/sprite-icones.py).
+     */
+    public const ICONES = [
+        'dashboard' => 'layout-dashboard', 'platform_key' => 'key-round', 'remote_users' => 'users',
+        'ssh_keys' => 'key', 'sudo_policies' => 'shield-check', 'sftp_policies' => 'folder-lock',
+        'updates' => 'refresh-cw', 'services' => 'server-cog', 'supervision' => 'activity',
+        'bashrc' => 'terminal', 'docker' => 'container', 'graylog' => 'scroll-text',
+        'cve_scan' => 'bug', 'compliance' => 'clipboard-check', 'drift' => 'git-compare',
+        'iptables' => 'brick-wall', 'fail2ban' => 'ban', 'ssh_audit' => 'scan-search',
+        'wazuh' => 'radar', 'admin' => 'user-cog', 'groups' => 'users-round',
+        'approvals' => 'badge-check', 'maintenance' => 'wrench', 'tasks' => 'list-checks',
+        'backups' => 'database-backup', 'audit_log' => 'file-clock', 'commandlog' => 'square-terminal',
+        'search' => 'search', 'chatops' => 'message-square', 'profil' => 'circle-user',
+        'documentation' => 'book-open', 'api_docs' => 'plug',
+    ];
+
+    /**
      * Rend les sections visibles pour un jeu de droits donne, entrees filtrees.
      * Une section vide n'est pas rendue : un intitule de section sans rien
      * dessous laisse croire qu'un contenu a disparu.

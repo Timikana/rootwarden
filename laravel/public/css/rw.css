@@ -378,11 +378,9 @@ body {
 }
 
 .rw-menu__section {
-    padding: 13px 10px 5px;
-    font-size: 10px;
-    font-weight: 650;
-    letter-spacing: .08em;
-    text-transform: uppercase;
+    padding: 16px 10px 4px;
+    font-size: 12px;
+    font-weight: 550;
     color: var(--rw-texte-doux);
 }
 
@@ -755,10 +753,8 @@ body {
 .rw-filtre { display: flex; flex-direction: column; gap: 5px; }
 
 .rw-filtre__etiquette {
-    font-size: 11px;
-    font-weight: 650;
-    letter-spacing: .04em;
-    text-transform: uppercase;
+    font-size: 12px;
+    font-weight: 600;
     color: var(--rw-texte-doux);
 }
 
@@ -816,10 +812,8 @@ body {
     background: var(--rw-surface-2);
     border-bottom: 1px solid var(--rw-bordure);
     text-align: left;
-    font-size: 11px;
-    font-weight: 650;
-    letter-spacing: .04em;
-    text-transform: uppercase;
+    font-size: 12px;
+    font-weight: 600;
     color: var(--rw-texte-doux);
     white-space: nowrap;
 }
@@ -1020,10 +1014,8 @@ a.rw-bouton { display: inline-block; }
     gap: 5px;
     flex: 1;
     min-width: 260px;
-    font-size: 11px;
-    font-weight: 650;
-    letter-spacing: .04em;
-    text-transform: uppercase;
+    font-size: 12px;
+    font-weight: 600;
     color: var(--rw-texte-doux);
 }
 
@@ -2585,10 +2577,8 @@ a.rw-onglet { text-decoration: none; display: inline-block; }
 }
 .rw-faits__bloc { display: flex; flex-direction: column; gap: 2px; }
 .rw-faits dt {
-    font-size: 11px;
-    font-weight: 650;
-    letter-spacing: .04em;
-    text-transform: uppercase;
+    font-size: 12px;
+    font-weight: 600;
     color: var(--rw-texte-doux);
 }
 .rw-faits dd { margin: 0; font-size: 15px; font-weight: 650; }
@@ -3162,3 +3152,23 @@ a.rw-alerte:focus-visible { outline: 2px solid var(--rw-accent); outline-offset:
 .rw-details > summary:focus-visible { outline: 2px solid var(--rw-accent); outline-offset: 2px; }
 .rw-details[open] > summary { margin-bottom: 6px; }
 .rw-details > :not(summary) { color: var(--rw-texte-doux); font-size: 13px; }
+
+/* ── Icones ───────────────────────────────────────────────────────────────
+   Un seul jeu (Lucide, sprite public/icones/lucide.svg), une seule taille, un
+   seul trait : des icones de tailles ou de styles melanges se lisent comme du
+   bruit. Elles prennent la couleur du texte voisin. */
+.rw-icone {
+    width: 16px; height: 16px;
+    flex-shrink: 0;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    vertical-align: -3px;
+}
+.rw-menu__lien .rw-icone { color: var(--rw-texte-doux); }
+.rw-menu__lien--actif .rw-icone, .rw-menu__lien:hover .rw-icone { color: currentColor; }
+[data-rw="notif-cloche"] { display: inline-flex; align-items: center; gap: 4px; color: var(--rw-texte-doux); }
+.rw-recherche > summary { display: inline-flex; align-items: center; }
+.rw-recherche > summary .rw-icone { color: var(--rw-texte-doux); vertical-align: 0; }
