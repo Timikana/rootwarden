@@ -20,20 +20,9 @@
         </div>
     </div>
 
-    {{-- LE GUIDAGE DIT CE QUE LE GESTE FAIT VRAIMENT.
-         Le legacy presente « scanner » comme une simple lecture. Ce n'en est pas
-         une : le backend ouvre une session SSH, lance un `git fetch` dans chaque
-         depot de projet compose, et interroge le registre distant. Et « tout
-         scanner » vise TOUTES les machines, production comprise. Nommer la
-         production sur le geste qui coute. --}}
-    <div class="rw-encart rw-prose">
-        <strong>{{ __('docker.guide_titre') }}</strong>
-        <ul class="rw-liste-guide">
-            <li>{{ __('docker.guide_lecture') }}</li>
-            <li>{{ __('docker.guide_scan') }}</li>
-            <li>{{ __('docker.guide_scan_tout') }}</li>
-        </ul>
-    </div>
+    {{-- Aucun panneau ne confirme « Scanner tout » : ce que le scan engage se
+         dit donc ici, avant le clic. --}}
+    <p class="rw-aide rw-prose" data-rw="docker-portee">{{ __('docker.guide_scan') }}</p>
 
     <div class="rw-grille rw-grille--compacte" data-rw="docker-synthese" id="docker-summary"></div>
 

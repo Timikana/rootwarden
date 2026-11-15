@@ -475,7 +475,7 @@ try {
         return { porte: true, texte };
     }, MACHINE_PROD);
     verifiePortage('le panneau NOMME la production quand la ligne en est une',
-        surProd.porte && /srv-zabbix/i.test(surProd.texte) && /PRODUCTION/.test(surProd.texte),
+        surProd.porte && /srv-zabbix/i.test(surProd.texte) && /production/i.test(surProd.texte),
         surProd.porte ? (surProd.texte || 'aucun avertissement') : 'pas de bouton par ligne');
     verifie('ouvrir un panneau n\'envoie AUCUNE requete de deploiement',
         requetesDeploy === requetesAvant,
@@ -516,13 +516,15 @@ try {
     verifiePortage('le panneau ENUMERE les etapes plutot que d\'en compter',
         surDev.items.length >= 8, `${surDev.items.length} etape(s)`);
     verifiePortage('il dit que deployer commence par PURGER l\'agent en place',
-        surDev.items.some((i) => /PURGES/.test(i)),
+        surDev.items.some((i) => /purg/i.test(i)),
         surDev.items.find((i) => /purg/i.test(i)) || 'aucune etape ne parle de purge');
     verifiePortage('il nomme l\'effet SORTANT : le depot a joindre sur Internet',
         surDev.items.some((i) => i.includes('repo.zabbix.com')),
         surDev.items.find((i) => /depot/i.test(i)) || 'aucun depot nomme');
-    verifiePortage('et il previent que l\'inventaire sera ecrit MEME en cas d\'echec',
-        surDev.items.some((i) => /inventaire/i.test(i) && /echou/i.test(i)),
+    // Le backend n'inscrit l'agent qu'apres un deploiement sans echec (E-90,
+    // `_conclut_geste`) : le panneau le dit, au lieu de l'inverse.
+    verifiePortage('et il dit que l\'inventaire n\'est ecrit que si toutes les etapes reussissent',
+        surDev.items.some((i) => /inventaire/i.test(i) && /r[eé]uss/i.test(i)),
         surDev.items.find((i) => /inventaire/i.test(i)) || 'rien sur l\'inventaire');
 
     /* ══ LE GESTE, POUR DE VRAI, SUR LA MACHINE DE DEVELOPPEMENT ═══════════ */
@@ -560,14 +562,13 @@ try {
     }
     constate('verdict de la commande', verdict.slice(0, 200) || '(aucun)');
     verifiePortage('le portage conclut a l\'ECHEC, en citant les codes du flux',
-        /ECHOU/i.test(verdict) && /127/.test(verdict) && /100/.test(verdict),
+        /[eé]chou/i.test(verdict) && /127/.test(verdict) && /100/.test(verdict),
         verdict.slice(0, 160) || '(aucun verdict)');
     constate('resultat de la verification apres coup', verification.slice(0, 220) || '(aucune)');
     verifiePortage('la VERIFICATION dit qu\'AUCUN agent n\'est detecte',
         /AUCUN agent/i.test(verification), verification.slice(0, 160) || '(aucune)');
-    verifiePortage('et elle dit que c\'est l\'INVENTAIRE qui a tort',
-        /inventaire/i.test(verification) && /tort/i.test(verification),
-        verification.slice(0, 160) || '(aucune)');
+    // « c'est l'inventaire qui a tort » n'est plus affirme : depuis E-90 un
+    // deploiement en echec n'ecrit rien a l'inventaire (voir plus bas).
 
     /* ── L'INVENTAIRE, ET POURQUOI IL FINIT JUSTE ──────────────────────────
      *
