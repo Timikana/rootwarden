@@ -95,7 +95,7 @@
 
     function tuile(valeur, titre, aide, ton) {
         const div = document.createElement('div');
-        div.className = 'rw-tuile';
+        div.className = 'rw-tuile' + (ton ? ' rw-tuile--' + ton : '');
         const v = document.createElement('div');
         v.className = 'rw-tuile__valeur' + (ton ? ' rw-tuile__valeur--' + ton : '');
         v.textContent = String(valeur);

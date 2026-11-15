@@ -7,23 +7,24 @@
  */
 
 :root {
-    --rw-fond: #f4f6f9;
+    --rw-fond: #f3f6f7;
     --rw-surface: #ffffff;
-    --rw-surface-2: #f8fafc;
-    --rw-bordure: #d7dee8;
+    --rw-surface-2: #f6f9fa;
+    --rw-bordure: #d6e0e3;
     /* Bord de defilement : sombre en clair, clair en sombre. */
-    --rw-bord-defilement: rgba(15, 23, 42, .28);
-    --rw-texte: #16202e;
-    --rw-texte-doux: #5b6b80;
-    --rw-accent: #1d4ed8;
+    --rw-bord-defilement: rgba(14, 40, 48, .25);
+    --rw-texte: #12232b;
+    --rw-texte-doux: #4c626d;
+    --rw-texte-discret: #5f737c;
+    --rw-accent: #0b6f80;
     --rw-accent-texte: #ffffff;
-    --rw-accent-doux: #e8efff;
-    --rw-danger: #b91c1c;
-    --rw-danger-fond: #fef2f2;
-    --rw-succes: #15803d;
-    --rw-succes-fond: #f0fdf4;
-    --rw-avertissement: #a16207;
-    --rw-avert-fond: #fefce8;
+    --rw-accent-doux: #e3f3f5;
+    --rw-danger: #b42318;
+    --rw-danger-fond: #fef3f2;
+    --rw-succes: #1f7a3a;
+    --rw-succes-fond: #eefbf1;
+    --rw-avertissement: #975406;
+    --rw-avert-fond: #fff8eb;
     /* Boutons d'alerte : aplat en clair. En sombre, la couleur d'alerte est une
        teinte CLAIRE faite pour du texte ; en aplat elle ecrasait tout l'ecran. */
     --rw-bouton-danger-fond: var(--rw-danger);
@@ -31,29 +32,30 @@
     --rw-bouton-avert-fond: var(--rw-avertissement);
     --rw-bouton-avert-texte: #ffffff;
     --rw-bouton-alerte-bord: transparent;
-    --rw-rayon: 10px;
+    --rw-rayon: 8px;
     --rw-espace: 16px;
     --rw-ombre: 0 1px 3px rgba(16, 24, 40, .08), 0 8px 24px rgba(16, 24, 40, .06);
 }
 
 @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
-        --rw-fond: #0f1722;
-        --rw-surface: #17202e;
-        --rw-surface-2: #1c2637;
-        --rw-bordure: #2a3746;
-        --rw-bord-defilement: rgba(148, 173, 209, .40);
-        --rw-texte: #e8eef6;
-        --rw-texte-doux: #9fb0c4;
-        --rw-accent: #5b8cff;
-        --rw-accent-texte: #0b1220;
-        --rw-accent-doux: #1b2942;
-        --rw-danger: #fca5a5;
-        --rw-danger-fond: #2a1618;
-        --rw-succes: #6ee7a8;
-        --rw-succes-fond: #16281f;
-        --rw-avertissement: #fcd34d;
-        --rw-avert-fond: #2a2410;
+        --rw-fond: #0c1518;
+        --rw-surface: #121d21;
+        --rw-surface-2: #172429;
+        --rw-bordure: #25363c;
+        --rw-bord-defilement: rgba(150, 190, 200, .35);
+        --rw-texte: #e3eef0;
+        --rw-texte-doux: #9db3ba;
+        --rw-texte-discret: #869ca3;
+        --rw-accent: #3cc3d4;
+        --rw-accent-texte: #06181c;
+        --rw-accent-doux: #12323a;
+        --rw-danger: #f4a19a;
+        --rw-danger-fond: #2b1715;
+        --rw-succes: #74d99a;
+        --rw-succes-fond: #13281b;
+        --rw-avertissement: #f2c86b;
+        --rw-avert-fond: #2a2210;
         --rw-bouton-danger-fond: var(--rw-danger-fond);
         --rw-bouton-danger-texte: var(--rw-danger);
         --rw-bouton-avert-fond: var(--rw-avert-fond);
@@ -70,7 +72,7 @@ body {
     min-height: 100vh;
     background: var(--rw-fond);
     color: var(--rw-texte);
-    font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font: 14px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -123,7 +125,7 @@ body {
 .rw-titre {
     margin: 0 0 4px;
     font-size: 20px;
-    font-weight: 650;
+    font-weight: 600;
     letter-spacing: -.01em;
 }
 
@@ -161,7 +163,7 @@ body {
     display: block;
     margin-bottom: 6px;
     font-size: 13px;
-    font-weight: 550;
+    font-weight: 500;
     color: var(--rw-texte-doux);
 }
 
@@ -184,7 +186,7 @@ body {
 /* Le code TOTP se lit chiffre par chiffre : chasse fixe et lettres espacees. */
 .rw-saisie--code {
     font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
-    font-size: 22px;
+    font-size: 20px;
     letter-spacing: .35em;
     text-align: center;
 }
@@ -213,25 +215,29 @@ body {
 
 .rw-actions__gauche { margin-right: auto; }
 
+/* 36 px de haut, 14 px, graisse 500 : un bouton se lit sans crier. Le gras et
+   la taille sont reserves aux titres. */
 .rw-bouton {
-    padding: 10px 18px;
-    border: 0;
-    border-radius: 8px;
+    padding: 8px 14px;
+    border: 1px solid transparent;
+    border-radius: 6px;
     background: var(--rw-accent);
     color: var(--rw-accent-texte);
     font: inherit;
-    font-weight: 600;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 18px;
     cursor: pointer;
 }
 
 .rw-bouton:hover { filter: brightness(1.07); }
-.rw-bouton:focus-visible { outline: 2px solid var(--rw-texte); outline-offset: 2px; }
+.rw-bouton:focus-visible { outline: 2px solid var(--rw-accent); outline-offset: 2px; }
 
 .rw-bouton--discret {
     background: transparent;
     color: var(--rw-texte-doux);
     border: 1px solid var(--rw-bordure);
-    font-weight: 550;
+    font-weight: 500;
 }
 
 .rw-bouton--discret:hover { background: var(--rw-surface-2); color: var(--rw-texte); filter: none; }
@@ -353,11 +359,13 @@ body {
 }
 
 .rw-laterale__marque {
-    display: block;
+    display: flex;
+    align-items: center;
+    gap: 8px;
     flex-shrink: 0;
     padding: 15px 18px;
-    font-weight: 650;
-    font-size: 15px;
+    font-weight: 600;
+    font-size: 14px;
     color: var(--rw-texte);
     text-decoration: none;
     border-bottom: 1px solid var(--rw-bordure);
@@ -373,7 +381,7 @@ body {
     padding: 9px 14px;
     border-bottom: 1px solid var(--rw-bordure);
     background: var(--rw-surface-2);
-    font-size: 11px;
+    font-size: 12px;
     line-height: 1.4;
     color: var(--rw-texte-doux);
 }
@@ -392,7 +400,7 @@ body {
 .rw-menu__section {
     padding: 16px 10px 4px;
     font-size: 12px;
-    font-weight: 550;
+    font-weight: 500;
     color: var(--rw-texte-doux);
 }
 
@@ -401,7 +409,7 @@ body {
     align-items: center;
     gap: 8px;
     padding: 7px 10px;
-    border-radius: 7px;
+    border-radius: 6px;
     color: var(--rw-texte);
     text-decoration: none;
     font-size: 14px;
@@ -482,7 +490,7 @@ body {
  */
 .rw-entete__titre {
     font-weight: 600;
-    font-size: 15px;
+    font-size: 14px;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -549,8 +557,8 @@ body {
 .rw-tuile__texte { font-size: 13px; color: var(--rw-texte-doux); margin: 0; }
 
 .rw-tuile__valeur {
-    font-size: 26px;
-    font-weight: 650;
+    font-size: 24px;
+    font-weight: 600;
     letter-spacing: -.02em;
     line-height: 1.15;
 }
@@ -632,7 +640,7 @@ body {
     flex-shrink: 0;
     padding: 13px 16px;
     border-bottom: 1px solid var(--rw-bordure);
-    font-weight: 650;
+    font-weight: 600;
 }
 
 .rw-tiroir__fermer {
@@ -698,17 +706,17 @@ body {
     gap: 2px;
     padding: 2px;
     border: 1px solid var(--rw-bordure);
-    border-radius: 7px;
+    border-radius: 6px;
     background: var(--rw-surface-2);
-    font-size: 11px;
-    font-weight: 650;
+    font-size: 12px;
+    font-weight: 600;
     letter-spacing: .04em;
 }
 
 .rw-langues__lien,
 .rw-langues__actif {
     padding: 3px 8px;
-    border-radius: 5px;
+    border-radius: 6px;
     line-height: 1.2;
 }
 
@@ -861,10 +869,10 @@ body {
 .rw-badge {
     display: inline-block;
     padding: 2px 7px;
-    border-radius: 5px;
+    border-radius: 6px;
     background: var(--rw-accent-doux);
     color: var(--rw-accent);
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 600;
     white-space: nowrap;
 }
@@ -873,8 +881,8 @@ body {
     display: inline-block;
     padding: 2px 9px;
     border-radius: 999px;
-    font-size: 11px;
-    font-weight: 650;
+    font-size: 12px;
+    font-weight: 600;
     white-space: nowrap;
 }
 
@@ -932,7 +940,7 @@ body {
     margin: 20px 0 16px;
     padding: 3px;
     border: 1px solid var(--rw-bordure);
-    border-radius: 9px;
+    border-radius: 8px;
     background: var(--rw-surface-2);
     width: fit-content;
 }
@@ -940,12 +948,12 @@ body {
 .rw-onglet {
     padding: 7px 14px;
     border: 0;
-    border-radius: 7px;
+    border-radius: 6px;
     background: transparent;
     color: var(--rw-texte-doux);
     font: inherit;
     font-size: 14px;
-    font-weight: 550;
+    font-weight: 500;
     cursor: pointer;
 }
 
@@ -1146,8 +1154,8 @@ a.rw-bouton { display: inline-block; }
 }
 
 .rw-annonce:empty { display: none; }
-.rw-annonce--ok    { color: var(--rw-succes); font-weight: 550; }
-.rw-annonce--echec { color: var(--rw-danger); font-weight: 550; }
+.rw-annonce--ok    { color: var(--rw-succes); font-weight: 500; }
+.rw-annonce--echec { color: var(--rw-danger); font-weight: 500; }
 
 /*
  * Detail d'un ecart, sous sa pastille. Le legacy le cache dans un attribut
@@ -1230,7 +1238,7 @@ a.rw-bouton { display: inline-block; }
     display: block;
     margin-bottom: 6px;
     font-size: 13px;
-    font-weight: 550;
+    font-weight: 500;
     color: var(--rw-texte-doux);
 }
 
@@ -1241,7 +1249,7 @@ a.rw-bouton { display: inline-block; }
  * d'une regle que le backend appliquera — par exemple qu'un ticket manuel
  * existe deja pour la machine choisie et que creer le rouvrira.
  */
-.rw-annonce--attention { color: var(--rw-avertissement); font-weight: 550; }
+.rw-annonce--attention { color: var(--rw-avertissement); font-weight: 500; }
 
 /* ══════════════════════════════════════════════════════════════════════════
    Recherche globale
@@ -1277,7 +1285,7 @@ a.rw-bouton { display: inline-block; }
 .rw-resultat:hover { background: var(--rw-surface-2); }
 .rw-resultat:focus-visible { outline: 2px solid var(--rw-accent); outline-offset: -2px; }
 
-.rw-resultat__titre  { font-size: 14px; font-weight: 550; }
+.rw-resultat__titre  { font-size: 14px; font-weight: 500; }
 .rw-resultat__detail { margin-top: 2px; font-size: 12px; color: var(--rw-texte-doux); }
 
 /*
@@ -1321,8 +1329,8 @@ a.rw-bouton { display: inline-block; }
     flex-wrap: wrap;
     /* Plancher ET plafond : sans plancher, le tableau donne a la colonne sa
        largeur minimale et empile les cinq boutons un par ligne. */
-    min-width: 210px;
-    max-width: 230px;
+    min-width: 300px;
+    max-width: 340px;
     white-space: normal;
 }
 
@@ -1360,8 +1368,8 @@ a.rw-bouton { display: inline-block; }
 
 .rw-sous-titre-fort {
     margin: 0;
-    font-size: 17px;
-    font-weight: 650;
+    font-size: 16px;
+    font-weight: 600;
     letter-spacing: -.01em;
 }
 
@@ -1532,6 +1540,9 @@ a.rw-bouton { display: inline-block; }
 }
 .rw-section:first-of-type { margin-top: 18px; }
 .rw-section__entete {
+    font-size: 16px;
+    font-weight: 600;
+    margin-top: 0;
     display: flex;
     align-items: baseline;
     justify-content: space-between;
@@ -1545,7 +1556,7 @@ a.rw-bouton { display: inline-block; }
 .rw-badge--ok        { background: var(--rw-succes-fond);   color: var(--rw-succes); }
 .rw-badge--attention { background: var(--rw-avert-fond);    color: var(--rw-avertissement); }
 .rw-badge--alerte    { background: var(--rw-danger-fond);                                        color: var(--rw-danger); }
-.rw-badge--note      { min-width: 2.1em; text-align: center; font-size: 13px; font-weight: 700; }
+.rw-badge--note      { min-width: 2.1em; text-align: center; font-size: 13px; font-weight: 600; }
 
 /* UN COMPTE DE ZERO NE DOIT PAS CRIER. La pastille de base est a la couleur
    d'accent : un « 0 » machines assignees y prenait le meme poids visuel qu'un
@@ -1672,7 +1683,7 @@ a.rw-bouton { display: inline-block; }
 .rw-repliable__chevron {
     display: inline-block;
     color: var(--rw-texte-doux);
-    font-size: 15px;
+    font-size: 14px;
     line-height: 1;
     transition: transform .15s ease;
 }
@@ -1819,7 +1830,7 @@ a.rw-bouton { display: inline-block; }
 .rw-badge--kev {
     background: var(--rw-danger);
     color: var(--rw-accent-texte);
-    font-weight: 700;
+    font-weight: 600;
     letter-spacing: .02em;
 }
 
@@ -1829,7 +1840,7 @@ a.rw-bouton { display: inline-block; }
  * probable qu'improbable, et la valeur cesse d'etre un chiffre parmi d'autres.
  */
 .rw-cve-epss {
-    font-size: 11px;
+    font-size: 12px;
     color: var(--rw-texte-doux);
     white-space: nowrap;
 }
@@ -1886,7 +1897,7 @@ a.rw-bouton { display: inline-block; }
 
 .rw-jauge {
     height: 6px;
-    border-radius: 3px;
+    border-radius: 4px;
     background: var(--rw-surface-2);
     border: 1px solid var(--rw-bordure);
     overflow: hidden;
@@ -1931,7 +1942,7 @@ a.rw-bouton { display: inline-block; }
 }
 .rw-liste-selection__etiquette:hover { background: var(--rw-surface-2); }
 .rw-liste-selection__corps { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.rw-liste-selection__nom { font-weight: 550; display: flex; align-items: center; gap: 6px; }
+.rw-liste-selection__nom { font-weight: 500; display: flex; align-items: center; gap: 6px; }
 .rw-liste-selection__detail {
     font-size: 12px;
     color: var(--rw-texte-doux);
@@ -2005,7 +2016,7 @@ a.rw-bouton { display: inline-block; }
     padding: 12px 14px;
 }
 .rw-preflight__entete { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; }
-.rw-preflight__titre { margin: 8px 0 2px; font-weight: 550; }
+.rw-preflight__titre { margin: 8px 0 2px; font-weight: 500; }
 .rw-preflight__liste {
     margin: 0 0 4px;
     padding-left: 22px;
@@ -2013,7 +2024,7 @@ a.rw-bouton { display: inline-block; }
     color: var(--rw-texte-doux);
 }
 /* Une revocation n'est pas une information de meme poids qu'une version d'OS. */
-.rw-preflight__liste--danger { color: var(--rw-danger); font-weight: 550; }
+.rw-preflight__liste--danger { color: var(--rw-danger); font-weight: 500; }
 
 /*
  * JOURNAL DE DEPLOIEMENT — sous-lot K3 du module `ssh/`.
@@ -2038,7 +2049,7 @@ a.rw-bouton { display: inline-block; }
     white-space: pre-wrap;
     word-break: break-word;
 }
-.rw-journal__erreur { color: var(--rw-danger); font-weight: 550; }
+.rw-journal__erreur { color: var(--rw-danger); font-weight: 500; }
 .rw-journal__fin { color: var(--rw-texte-doux); font-style: italic; margin-top: 6px; }
 
 /* ── Enrôlement du second facteur ─────────────────────────────────────────
@@ -2050,7 +2061,7 @@ a.rw-bouton { display: inline-block; }
 .rw-qr {
     background: #fff;
     padding: 12px;
-    border-radius: 10px;
+    border-radius: 8px;
     width: fit-content;
     margin: 0 auto 14px;
     line-height: 0;
@@ -2222,7 +2233,7 @@ a.rw-onglet { text-decoration: none; display: inline-block; }
 .rw-diff__ligne { display: block; }
 .rw-diff__ligne--ajout   { background: color-mix(in srgb, var(--rw-succes) 14%, transparent); }
 .rw-diff__ligne--retrait { background: color-mix(in srgb, var(--rw-danger) 12%, transparent); }
-.rw-diff__ligne--entete  { color: var(--rw-texte-doux); font-weight: 650; }
+.rw-diff__ligne--entete  { color: var(--rw-texte-doux); font-weight: 600; }
 
 /*
  * Une zone de saisie qui contient du CODE. Posee au sous-lot B3 de `bashrc/`.
@@ -2322,8 +2333,8 @@ a.rw-onglet { text-decoration: none; display: inline-block; }
     gap: 3px;
 }
 .rw-frise__valeur {
-    font-size: 11px;
-    font-weight: 650;
+    font-size: 12px;
+    font-weight: 600;
     color: var(--rw-texte-doux);
     line-height: 1;
 }
@@ -2356,7 +2367,7 @@ a.rw-onglet { text-decoration: none; display: inline-block; }
     flex: 1 1 0;
     min-width: 10px;
     text-align: center;
-    font-size: 10px;
+    font-size: 12px;
     color: var(--rw-texte-doux);
     white-space: nowrap;
     overflow: hidden;
@@ -2374,7 +2385,7 @@ a.rw-onglet { text-decoration: none; display: inline-block; }
     display: inline-block;
     width: 10px;
     height: 10px;
-    border-radius: 2px;
+    border-radius: 4px;
     margin-left: 10px;
 }
 .rw-frise__cle:first-child { margin-left: 0; }
@@ -2493,7 +2504,7 @@ a.rw-onglet { text-decoration: none; display: inline-block; }
     background: var(--rw-surface-2);
     border: 1px solid var(--rw-bordure);
     font-size: 13px;
-    font-weight: 700;
+    font-weight: 600;
     color: var(--rw-texte-doux);
 }
 
@@ -2565,7 +2576,7 @@ a.rw-onglet { text-decoration: none; display: inline-block; }
     background: var(--rw-surface-2);
     border-style: dashed;
 }
-.rw-liste-etats__nom { font-weight: 650; min-width: 8ch; }
+.rw-liste-etats__nom { font-weight: 600; min-width: 8ch; }
 .rw-liste-etats__jails {
     display: flex;
     gap: 5px;
@@ -2598,7 +2609,7 @@ a.rw-onglet { text-decoration: none; display: inline-block; }
     font-weight: 600;
     color: var(--rw-texte-doux);
 }
-.rw-faits dd { margin: 0; font-size: 15px; font-weight: 650; }
+.rw-faits dd { margin: 0; font-size: 14px; font-weight: 600; }
 
 .rw-champ--espace { margin-top: 14px; }
 .rw-titre--espace { margin-top: 16px; }
@@ -2788,12 +2799,12 @@ html { scroll-padding-top: var(--rw-defilement-marge); }
 .rw-alertes {
     display: grid;
     gap: 8px;
-    margin: 0 0 24px;
+    margin: 24px 0;
 }
 
 .rw-alertes__titre {
     margin: 0 0 2px;
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 600;
 }
 
@@ -2804,7 +2815,7 @@ html { scroll-padding-top: var(--rw-defilement-marge); }
     min-width: 0;
     padding: 10px 14px;
     border: 1px solid;
-    border-radius: 10px;
+    border-radius: 8px;
     font-size: 14px;
     text-decoration: none;
 }
@@ -2821,7 +2832,7 @@ html { scroll-padding-top: var(--rw-defilement-marge); }
 /* LE NOMBRE PORTE L'INFORMATION : c'est le texte qui cede, jamais lui. */
 .rw-alerte__nombre {
     flex-shrink: 0;
-    font-weight: 700;
+    font-weight: 600;
     font-size: 16px;
     font-variant-numeric: tabular-nums;
 }
@@ -2848,7 +2859,7 @@ a.rw-alerte:focus-visible { outline: 2px solid var(--rw-accent); outline-offset:
 .rw-alertes__illisible {
     padding: 10px 14px;
     border: 1px dashed var(--rw-avertissement);
-    border-radius: 10px;
+    border-radius: 8px;
     background: var(--rw-avert-fond);
     color: var(--rw-avertissement);
     font-size: 13px;
@@ -2947,22 +2958,23 @@ a.rw-alerte:focus-visible { outline: 2px solid var(--rw-accent); outline-offset:
  * bloc `@media` par script. Deux listes ecrites a la main divergent.
  */
 :root[data-theme="dark"] {
-        --rw-fond: #0f1722;
-        --rw-surface: #17202e;
-        --rw-surface-2: #1c2637;
-        --rw-bordure: #2a3746;
-        --rw-bord-defilement: rgba(148, 173, 209, .40);
-        --rw-texte: #e8eef6;
-        --rw-texte-doux: #9fb0c4;
-        --rw-accent: #5b8cff;
-        --rw-accent-texte: #0b1220;
-        --rw-accent-doux: #1b2942;
-        --rw-danger: #fca5a5;
-        --rw-danger-fond: #2a1618;
-        --rw-succes: #6ee7a8;
-        --rw-succes-fond: #16281f;
-        --rw-avertissement: #fcd34d;
-        --rw-avert-fond: #2a2410;
+        --rw-fond: #0c1518;
+        --rw-surface: #121d21;
+        --rw-surface-2: #172429;
+        --rw-bordure: #25363c;
+        --rw-bord-defilement: rgba(150, 190, 200, .35);
+        --rw-texte: #e3eef0;
+        --rw-texte-doux: #9db3ba;
+        --rw-texte-discret: #869ca3;
+        --rw-accent: #3cc3d4;
+        --rw-accent-texte: #06181c;
+        --rw-accent-doux: #12323a;
+        --rw-danger: #f4a19a;
+        --rw-danger-fond: #2b1715;
+        --rw-succes: #74d99a;
+        --rw-succes-fond: #13281b;
+        --rw-avertissement: #f2c86b;
+        --rw-avert-fond: #2a2210;
         --rw-bouton-danger-fond: var(--rw-danger-fond);
         --rw-bouton-danger-texte: var(--rw-danger);
         --rw-bouton-avert-fond: var(--rw-avert-fond);
@@ -2985,7 +2997,7 @@ a.rw-alerte:focus-visible { outline: 2px solid var(--rw-accent); outline-offset:
     color: var(--rw-texte-doux);
     cursor: pointer;
     line-height: 1;
-    font-size: 15px;
+    font-size: 14px;
 }
 .rw-theme:hover { color: var(--rw-texte); border-color: var(--rw-accent); }
 .rw-theme__soleil, .rw-theme__lune { display: none; }
@@ -3019,7 +3031,7 @@ a.rw-alerte:focus-visible { outline: 2px solid var(--rw-accent); outline-offset:
     background: var(--rw-accent);
     color: var(--rw-accent-texte);
     font-size: 12px;
-    font-weight: 700;
+    font-weight: 600;
     letter-spacing: .3px;
     user-select: none;
 }
@@ -3141,7 +3153,7 @@ a.rw-alerte:focus-visible { outline: 2px solid var(--rw-accent); outline-offset:
     padding-top: 16px;
     border-top: 1px solid var(--rw-bordure);
 }
-.rw-cgu__soutien-icone { font-size: 26px; line-height: 1.1; }
+.rw-cgu__soutien-icone { font-size: 24px; line-height: 1.1; }
 .rw-cgu__soutien-titre { font-weight: 600; margin: 0 0 2px; }
 .rw-cgu__soutien-texte { color: var(--rw-texte-doux); font-size: 13px; margin: 0; }
 
@@ -3194,3 +3206,28 @@ a.rw-alerte:focus-visible { outline: 2px solid var(--rw-accent); outline-offset:
 [data-rw="notif-cloche"] { display: inline-flex; align-items: center; gap: 4px; color: var(--rw-texte-doux); }
 .rw-recherche > summary { display: inline-flex; align-items: center; }
 .rw-recherche > summary .rw-icone { color: var(--rw-texte-doux); vertical-align: 0; }
+
+/* ── La couleur dit l'etat ────────────────────────────────────────────────
+   Une tuile ne se colore que si son nombre APPELLE quelque chose : vert quand
+   tout va bien, ambre a regarder, rouge a traiter. Une tuile sans enjeu reste
+   neutre — un ecran ou tout est colore ne signale plus rien. */
+.rw-tuile--ok, .rw-tuile--attention, .rw-tuile--alerte { border-left-width: 3px; }
+.rw-tuile--ok        { border-left-color: var(--rw-succes); }
+.rw-tuile--attention { border-left-color: var(--rw-avertissement); }
+.rw-tuile--alerte    { border-left-color: var(--rw-danger); }
+.rw-tuile--ok .rw-tuile__valeur        { color: var(--rw-succes); }
+.rw-tuile--attention .rw-tuile__valeur { color: var(--rw-avertissement); }
+.rw-tuile--alerte .rw-tuile__valeur    { color: var(--rw-danger); }
+
+/* Chiffres a chasse fixe : une colonne de nombres s'aligne et ne « danse »
+   pas quand une valeur change. */
+.rw-tableau, .rw-tuile__valeur, .rw-tableau__mono { font-variant-numeric: tabular-nums; }
+
+/* Troisieme role de texte : metadonnees, horodatages, aides secondaires. */
+.rw-texte-discret { color: var(--rw-texte-discret); }
+
+/* La marque : le seul endroit ou l'accent sert d'identite plutot que d'etat. */
+.rw-marque__icone { width: 20px; height: 20px; color: var(--rw-accent); stroke-width: 2; }
+
+/* Une seule graisse forte, 600 : les titres et `strong` du navigateur sont a 700. */
+h1, h2, h3, h4, strong, b { font-weight: 600; }

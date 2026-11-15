@@ -55,6 +55,8 @@ return [
     // States
     'non_verifie' => 'Not checked',
     'inconnu'     => 'Unknown',
+    'en_ligne'    => 'Online',
+    'hors_ligne'  => 'Offline',
     'aucune'      => 'N/A',
     'en_cours'    => 'Reading...',
 
