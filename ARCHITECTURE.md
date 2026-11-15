@@ -850,8 +850,7 @@ Python → decrypt_password() essaie OLD_SECRET_KEY en fallback
 │   ├── 📄 Dockerfile
 │   └── 📄 app.py
 ├── 📄 test-server/                   Conteneur Debian SSH pour tests preprod
-│   ├── 📄 Dockerfile
-│   └── 📄 seed_test_machine.php
+│   └── 📄 Dockerfile
 └── 📁 mysql/migrations/
     ├── 📄 004_add_user_email.sql     Colonne email dans users
     ├── 📄 005_add_ssh_key_date.sql   Colonne ssh_key_updated_at dans users

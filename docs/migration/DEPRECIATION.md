@@ -883,6 +883,7 @@ Ce qui lisait encore le dossier, et ce qui en a ete fait :
 | `scripts/rejouer-lot.sh` | cible par defaut = portage seul ; `--legacy` refuse |
 | `scripts/version.sh` | le depot jetable de `--epreuve` ne cree plus `legacy/` |
 | `scripts/sync-obsidian-vault.py` | inchange : il teste deja l'existence du dossier |
+| `test-server/seed_test_machine.php` | retire : il chargeait `db.php` et `adm/includes/crypto.php` du legacy et ne s'executait que dans `rootwarden_php`, retire le 2026-09-08 ; aucun appelant |
 | `.gitignore` | les exceptions qui visaient du code suivi retirees ; `legacy/` entier reste ignore, car un hote installe avant garde sur disque `version.txt`, `logs/` et `.first_run_credentials` |
 
 Relire un fichier de l'ancien portail :
