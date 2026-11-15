@@ -4,29 +4,17 @@
     <h1 class="rw-titre">{{ __('autorisations.title') }}</h1>
     <p class="rw-sous-titre rw-prose">{{ __('autorisations.desc') }}</p>
 
-    {{-- ── CE QUE LA PAGE N'EST PAS, DIT AVANT SON CONTENU ─────────────────
-
-         Un titre qui promettrait une reference d'API serait la meme faute un
-         etage plus haut que celle qu'on vient de retirer. La reserve est donc
-         posee AVANT les tableaux, pas en note de bas de page. --}}
-    <div class="rw-encart" data-rw="passerelle-pas-reference">
-        <p class="rw-sous-titre-fort">{{ __('autorisations.pas_reference_titre') }}</p>
-        <p class="rw-prose">{{ __('autorisations.pas_reference_texte') }}</p>
-    </div>
-
-    {{-- ── LES TROIS COUCHES, ET CELLE QUE LA PAGE DECRIT ──────────────────
-
-         Trois couches d'autorisation ont deja diverge dans ce produit. Une page
-         qui les melangerait refabriquerait le defaut qu'elle documente : chaque
-         enonce nomme donc la sienne, et la troisieme est declaree INVISIBLE
-         plutot que devinee. --}}
-    <h2 class="rw-section__entete rw-titre--espace">{{ __('autorisations.couches_titre') }}</h2>
-    <ol class="rw-liste-effets rw-liste-effets--ordonnee rw-prose" data-rw="passerelle-couches">
-        <li>{{ __('autorisations.couche_1') }}</li>
-        <li><strong>{{ __('autorisations.couche_2') }}</strong></li>
-        <li>{{ __('autorisations.couche_3') }}</li>
-    </ol>
-    <p class="rw-aide rw-prose">{{ __('autorisations.couches_aide') }}</p>
+    {{-- LE PERIMETRE SE REPLIE : utile a la premiere lecture. Chaque couche y est
+         nommee, et la troisieme declaree invisible plutot que devinee. --}}
+    <details class="rw-details" data-rw="passerelle-couches">
+        <summary>{{ __('autorisations.couches_titre') }}</summary>
+        <ol class="rw-liste-effets rw-liste-effets--ordonnee">
+            <li>{{ __('autorisations.couche_1') }}</li>
+            <li><strong>{{ __('autorisations.couche_2') }}</strong></li>
+            <li>{{ __('autorisations.couche_3') }}</li>
+        </ol>
+        <p data-rw="passerelle-pas-reference">{{ __('autorisations.pas_reference_texte') }}</p>
+    </details>
 
     {{-- ── LES COMPTEURS, TOUS DERIVES ─────────────────────────────────── --}}
     <div class="rw-grille rw-titre--espace">
@@ -43,17 +31,6 @@
             </div>
         @endforeach
     </div>
-
-    {{-- ── POURQUOI CETTE PAGE REMPLACE UN FICHIER AU LIEU DE LE PORTER ─── --}}
-    <h2 class="rw-section__entete rw-titre--espace">{{ __('autorisations.remplace_titre') }}</h2>
-    <p class="rw-prose">{{ __('autorisations.remplace_texte') }}</p>
-    <p class="rw-prose">{{ __('autorisations.remplace_detail') }}</p>
-    <p class="rw-prose">{{ __('autorisations.remplace_raison') }}</p>
-    {{-- LE SILENCE HERITE EST NOMME. Une page derivee qui ne dirait rien des 64
-         routes non documentees heriterait du silence du fichier qu'elle
-         remplace — et un document qui omet ce qu'il ne sait pas est plus
-         trompeur qu'un document date. --}}
-    <p class="rw-aide rw-prose" data-rw="passerelle-silence">{{ __('autorisations.remplace_silence') }}</p>
 
     {{-- ── LA LISTE BLANCHE ────────────────────────────────────────────── --}}
     <h2 class="rw-section__entete rw-titre--espace">{{ __('autorisations.blanche_titre') }}</h2>
@@ -120,7 +97,6 @@
     {{-- ── LE RELAIS EN FLUX ───────────────────────────────────────────── --}}
     <h2 class="rw-section__entete rw-titre--espace">{{ __('autorisations.flux_titre') }}</h2>
     <p class="rw-aide rw-prose">{{ __('autorisations.flux_aide') }}</p>
-    <p class="rw-aide rw-prose" data-rw="passerelle-flux-espace">{{ __('autorisations.flux_par_espace') }}</p>
 
     <ul class="rw-liste-effets rw-prose" data-rw="passerelle-flux">
         @foreach ($flux as $f)

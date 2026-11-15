@@ -99,9 +99,10 @@ final class AutorisationsPasserelle
     /**
      * Les chemins relayes MORCEAU PAR MORCEAU, et l'entree qui les autorise.
      *
-     * Quatre d'entre eux ne sont PAS des entrees de liste blanche : ils passent par
-     * l'espace de noms `/supervision/`. C'est pour cette raison que cette liste
-     * s'enumere depuis `EN_FLUX` et non depuis la liste blanche.
+     * Huit d'entre eux ne sont PAS des entrees de liste blanche : ils passent par
+     * un espace de noms (`/supervision/`, `/cve_`, `/docker/`, `/iptables-`).
+     * C'est pour cette raison que cette liste s'enumere depuis `EN_FLUX` et non
+     * depuis la liste blanche.
      *
      * @return list<array{chemin:string,autorise:bool}>
      */
