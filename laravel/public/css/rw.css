@@ -24,6 +24,13 @@
     --rw-succes-fond: #f0fdf4;
     --rw-avertissement: #a16207;
     --rw-avert-fond: #fefce8;
+    /* Boutons d'alerte : aplat en clair. En sombre, la couleur d'alerte est une
+       teinte CLAIRE faite pour du texte ; en aplat elle ecrasait tout l'ecran. */
+    --rw-bouton-danger-fond: var(--rw-danger);
+    --rw-bouton-danger-texte: #ffffff;
+    --rw-bouton-avert-fond: var(--rw-avertissement);
+    --rw-bouton-avert-texte: #ffffff;
+    --rw-bouton-alerte-bord: transparent;
     --rw-rayon: 10px;
     --rw-espace: 16px;
     --rw-ombre: 0 1px 3px rgba(16, 24, 40, .08), 0 8px 24px rgba(16, 24, 40, .06);
@@ -47,6 +54,11 @@
         --rw-succes-fond: #16281f;
         --rw-avertissement: #fcd34d;
         --rw-avert-fond: #2a2410;
+        --rw-bouton-danger-fond: var(--rw-danger-fond);
+        --rw-bouton-danger-texte: var(--rw-danger);
+        --rw-bouton-avert-fond: var(--rw-avert-fond);
+        --rw-bouton-avert-texte: var(--rw-avertissement);
+        --rw-bouton-alerte-bord: currentColor;
         --rw-ombre: 0 1px 3px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .35);
     }
 }
@@ -956,7 +968,11 @@ body {
 .rw-tableau__actions .rw-bouton { padding: 5px 12px; font-size: 13px; }
 
 .rw-bouton--succes { background: var(--rw-succes); color: var(--rw-accent-texte); }
-.rw-bouton--danger { background: var(--rw-danger); color: var(--rw-accent-texte); }
+.rw-bouton--danger {
+    background: var(--rw-bouton-danger-fond);
+    color: var(--rw-bouton-danger-texte);
+    border: 1px solid var(--rw-bouton-alerte-bord);
+}
 
 /*
  * Un LIEN stylé en bouton ne garde pas son soulignement : il se lit comme un
@@ -981,8 +997,9 @@ a.rw-bouton { display: inline-block; }
  * pour ce qui interrompt un service — reparation dpkg, redemarrage.
  */
 .rw-bouton--avertissement {
-    background: var(--rw-avertissement);
-    color: var(--rw-accent-texte);
+    background: var(--rw-bouton-avert-fond);
+    color: var(--rw-bouton-avert-texte);
+    border: 1px solid var(--rw-bouton-alerte-bord);
 }
 
 .rw-bouton:disabled {
@@ -2946,6 +2963,11 @@ a.rw-alerte:focus-visible { outline: 2px solid var(--rw-accent); outline-offset:
         --rw-succes-fond: #16281f;
         --rw-avertissement: #fcd34d;
         --rw-avert-fond: #2a2410;
+        --rw-bouton-danger-fond: var(--rw-danger-fond);
+        --rw-bouton-danger-texte: var(--rw-danger);
+        --rw-bouton-avert-fond: var(--rw-avert-fond);
+        --rw-bouton-avert-texte: var(--rw-avertissement);
+        --rw-bouton-alerte-bord: currentColor;
         --rw-ombre: 0 1px 3px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .35);
 }
 
