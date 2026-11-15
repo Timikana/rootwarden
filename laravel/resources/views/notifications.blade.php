@@ -41,7 +41,7 @@
                 <option value="read" @selected($filtres['etat'] === 'read')>{{ __('notif.lues') }}</option>
             </select>
         </label>
-        <button type="submit" class="rw-bouton" data-rw="notif-filtrer">{{ __('notif.filtrer') }}</button>
+        <button type="submit" class="rw-bouton rw-bouton--discret" data-rw="notif-filtrer">{{ __('notif.filtrer') }}</button>
         <a class="rw-bouton rw-bouton--discret" href="{{ route('notifications') }}">{{ __('notif.reinitialiser') }}</a>
     </form>
 

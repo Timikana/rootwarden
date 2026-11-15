@@ -354,7 +354,7 @@
         suppression: { chemin: '/delete_remote_user', titre: 'panneau_suppr_titre', texte: 'panneau_suppr_texte' },
     };
 
-    function ouvre(nomGeste) {
+    function ouvre(nomGeste, libelleAction) {
         if (! panneau || ! choix) { return; }
         var compte = choix.value;
         if (! compte) {
@@ -371,6 +371,12 @@
         dit('[data-rw="distant-panneau-texte"]',
             (libelles[g.texte] || '').replace('__NOM__', compte).replace('__MACHINE__', machine));
         dit('[data-rw="distant-geste-etat"]', '');
+        // Le bouton dit l'EFFET (« Supprimer le compte »), pas « Confirmer ».
+        var bc = document.querySelector('[data-rw="distant-confirmer"]');
+        if (bc) {
+            if (bc.dataset.defaut === undefined) { bc.dataset.defaut = bc.textContent; }
+            bc.textContent = libelleAction || bc.dataset.defaut;
+        }
         panneau.hidden = false;
         panneau.scrollIntoView({ block: 'center', behavior: 'smooth' });
     }
@@ -378,7 +384,7 @@
     [['distant-retirer-cles', 'cles'], ['distant-sshd', 'sshd'], ['distant-supprimer', 'suppression']]
         .forEach(function (paire) {
             var b = document.querySelector('[data-rw="' + paire[0] + '"]');
-            if (b) { b.addEventListener('click', function () { ouvre(paire[1]); }); }
+            if (b) { b.addEventListener('click', function () { ouvre(paire[1], b.textContent.trim()); }); }
         });
 
     var annuler = document.querySelector('[data-rw="distant-annuler"]');

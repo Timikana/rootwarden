@@ -25,7 +25,7 @@ return [
     'step_up_titre' => 'Confirm with your second factor',
     'step_up_aide' => "Enter the six-digit code from your authenticator.",
     'step_up_code' => 'Six-digit code',
-    'step_up_valider' => 'Confirm',
+    'step_up_valider' => "Verify code",
     'annuler' => 'Cancel',
     'err_soi_meme' => 'You cannot change your own rights.',
     'err_rang' => 'You cannot change an account whose role is equal to or above yours.',

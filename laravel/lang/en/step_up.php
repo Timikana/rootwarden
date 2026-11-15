@@ -20,7 +20,7 @@ return [
     'panneau_titre'   => 'Confirm with your second factor',
     'panneau_aide'    => "This action writes to a real machine. Enter your six-digit code: it is valid for fifteen minutes, for this action only.",
     'panneau_code'    => 'Six-digit code',
-    'panneau_valider' => 'Confirm',
+    'panneau_valider' => "Verify code",
     'panneau_annuler' => 'Cancel',
     'panneau_echec'   => 'The re-authentication did not succeed.',
 ];
