@@ -94,7 +94,6 @@ jobs:
             find laravel/app laravel/config laravel/routes laravel/database \
                  laravel/tests laravel/bootstrap laravel/public \
                  -name "*.php" -type f 2>/dev/null
-            find legacy/ -name "*.php" -type f -not -path "legacy/_deprecated/*" 2>/dev/null
           )
           n=$(printf '%s\n' "$fichiers" | grep -c . || true)
 

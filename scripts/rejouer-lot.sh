@@ -1631,11 +1631,13 @@ joue() {
 }
 
 # ── Ce qu'on joue ───────────────────────────────────────────────────────────
-CIBLES=(laravel legacy) ; NOMMEES=()
+# Le legacy n'est plus servi ni suivi (tag legacy-final) : la cible par defaut
+# est le portage seul, et `--legacy` refuse au lieu de mesurer un portail absent.
+CIBLES=(laravel) ; NOMMEES=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --laravel) CIBLES=(laravel) ;;
-    --legacy)  CIBLES=(legacy) ;;
+    --legacy)  echo "--legacy : l'ancien portail est retire (tag legacy-final), plus rien a rejouer." >&2 ; exit 2 ;;
     --*)       echo "option inconnue : $1" >&2 ; exit 2 ;;
     *)         NOMMEES+=("$1") ;;
   esac

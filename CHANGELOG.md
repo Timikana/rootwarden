@@ -5,6 +5,23 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## L'ancien portail est retiré du dépôt
+
+`legacy/` ne contenait plus que des parties archivées (235 fichiers) que plus aucun service ne
+servait. Le dossier est retiré ; son dernier état est conservé par le tag **`legacy-final`** :
+
+    git show legacy-final:legacy/_deprecated/<partie>/<fichier>
+
+- La CI ne cherche plus de PHP dans `legacy/`, et les exemptions de semgrep et gitleaks qui
+  visaient l'archive sont retirées.
+- `scripts/eteindre-le-legacy.sh` est retiré : sa séquence est terminée.
+- `scripts/rejouer-lot.sh` ne joue plus que le portail Laravel ; `--legacy` refuse.
+- `legacy/` reste dans `.gitignore` : un serveur installé avant ce retrait garde sur disque des
+  fichiers que git ignorait, dont `legacy/.first_run_credentials`, qui contient des secrets.
+  Ils peuvent être supprimés à la main.
+
+---
+
 ## Mises à jour : une seule planification, celle qui suit la date
 
 La page offrait deux boutons qui écrivent le même `apt-get upgrade` en cron. Le premier,
