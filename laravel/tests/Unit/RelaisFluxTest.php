@@ -72,16 +72,19 @@ class RelaisFluxTest extends TestCase
     #[Test]
     public function temoin_la_lecture_par_8_ko_attend_la_fin(): void
     {
-        // Ce que faisait la passerelle. Si ce temoin cessait de bloquer (autre
-        // version de PHP), le test ci-dessus ne prouverait plus rien.
-        $corps = $this->flux(1_500_000);
+        // Un lecteur qui attend 8 Ko ou la fin, sur la ressource que le relais
+        // detache. Le temoin ne passe plus par `read()` de Guzzle : depuis Guzzle 8
+        // (ChunkedBodyStream), `read(8192)` rend le premier morceau sans attendre,
+        // et le temoin d'origine a cesse de bloquer — comme il etait ecrit pour le
+        // signaler. Ce qui doit rester prouve, c'est que CE banc distingue un
+        // lecteur bloquant du relais : sinon le test ci-dessus ne prouverait rien.
+        $ressource = $this->flux(1_500_000)->detach();
+        $this->assertTrue(is_resource($ressource), 'le corps n\'expose plus de ressource');
+        stream_set_blocking($ressource, true);
         $t0 = microtime(true);
-        $premier = '';
-        while ($premier === '' && ! $corps->eof()) {
-            $premier = $corps->read(8192);
-        }
+        $premier = stream_get_contents($ressource, 8192);
 
-        $this->assertGreaterThan(1.2, microtime(true) - $t0, 'read(8192) ne bloque plus : revoir le test');
+        $this->assertGreaterThan(1.2, microtime(true) - $t0, 'la lecture bloquante n\'attend plus : revoir le banc');
         $this->assertSame("debut\nfin\n", $premier);
     }
 

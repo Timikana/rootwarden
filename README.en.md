@@ -88,7 +88,7 @@ browser ──HTTPS 8443──▶ laravel (portal, Apache)
 
 | Component | Technology |
 |-----------|------------|
-| Portal | Laravel 13, PHP 8.4, Apache — hand-written CSS and JavaScript, no build step |
+| Portal | Laravel 13, PHP 8.5, Apache — hand-written CSS and JavaScript, no build step |
 | Backend | Python 3.13, Flask, Hypercorn, Paramiko |
 | Database | MySQL 9.7 LTS (schema managed in `mysql/migrations/`) |
 | Deployment | Docker Compose |

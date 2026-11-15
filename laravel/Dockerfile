@@ -11,16 +11,18 @@
 #   - pas d'open_basedir : Laravel a besoin de vendor/, storage/, bootstrap/
 #   - aucune modification du service legacy, qui doit rester deployable
 # =============================================================================
-FROM php:8.4-apache
+FROM php:8.5-apache
 
 # Extensions requises par Laravel + acces MySQL (meme base que le legacy).
+# OPcache n'est plus dans la liste : il est integre au moteur depuis PHP 8.5, et
+# `docker-php-ext-install opcache` y fait echouer la construction.
 RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
         libicu-dev libzip-dev zlib1g-dev unzip git curl \
         openssl gettext-base; \
     docker-php-ext-configure intl; \
-    docker-php-ext-install -j"$(nproc)" pdo_mysql intl zip opcache; \
+    docker-php-ext-install -j"$(nproc)" pdo_mysql intl zip; \
     apt-get clean; \
     rm -rf /var/lib/apt/lists/*
 
