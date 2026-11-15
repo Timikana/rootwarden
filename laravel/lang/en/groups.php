@@ -7,11 +7,11 @@
  */
 return [
     'titre' => 'Groups and bulk actions',
-    'desc'  => 'Group your servers by a dynamic rule (environment, criticality, network, lifecycle, tags) or by a static list, then run bulk operations tracked in the task centre.',
+    'desc'  => "Group servers by criteria or by list, then run actions on the whole group.",
 
     'chargement' => 'Loading…',
     'vide_titre'  => 'No group',
-    'vide_texte'  => 'No group exists yet. A group gathers servers, then serves as the target of a bulk action.',
+    'vide_texte'  => "Create one with « New group ».",
     'err_charge'  => 'The list of groups could not be read.',
 
     'membres'       => 'Members',
@@ -36,8 +36,7 @@ return [
 
     // A SHARED PANEL MUST NAME ITS TARGET — see fr.
     'np_sur_groupe' => 'Target group: :nom',
-    'np_titre'      => 'Not ported yet',
-    'np_ouvrir'     => 'Open in the old portal',
+    'np_titre'      => "Not available here",
     'np_fermer'     => 'Close',
     // R4: deleting a group IS ported. `np_supprimer_detail` does NOT move — it
     // carries the REASSURING fact, and that is the one that matters most: the
@@ -49,7 +48,7 @@ return [
     // deleted. `supprimer_introuvable` exists for that case.
     'supprimer_titre'      => 'Delete this group?',
     'supprimer_membres'    => 'This group gathers :n server(s) today.',
-    'supprimer_definitif'  => 'This deletion cannot be undone: the group and its memberships disappear, and it will have to be recreated.',
+    'supprimer_definitif'  => "Permanent deletion: the group will have to be recreated.",
     'supprimer_valider'    => 'Delete the group',
     'supprimer_fait'       => 'Group ":nom" is deleted. The servers it gathered were not modified.',
     'supprimer_introuvable' => 'No group was deleted: ":nom" no longer existed. The list is reloaded.',
@@ -60,7 +59,7 @@ return [
     // `np_cve` and its satellites do NOT move: the CVE scan opens one SSH
     // session per machine and sends one email per machine with results.
     'der_titre'  => 'Run a drift scan',
-    'der_texte'  => 'This action opens NO SSH session: it re-reads data already in the database and updates each member\'s drift record. The scheduler already does the same work every hour across the whole fleet.',
+    'der_texte'  => "Opens no SSH session: re-reads the data in the database and updates each member's drift record. The scheduler already does this every hour.",
     'der_lancer' => 'Run the drift scan',
 
     // The number shown is the RESOLVED one, never the expected one: a group
@@ -68,24 +67,22 @@ return [
     // group with no criteria, hence `1=1`, hence the whole fleet.
     'resolu_nombre'   => 'This group resolves to :n server(s) today.',
     'resolu_prod'     => '⚠ Production is among them: :noms.',
-    'resolu_reresolu' => 'The number shown is today\'s. A dynamic group is re-resolved when the action starts: a machine added to the fleet in between would enter the action without ever having been shown here.',
+    'resolu_reresolu' => "Number computed now: a dynamic group is recomputed at launch and may include a machine added in between.",
 
     // No announced scope, no confirmation offered.
-    'der_illisible' => 'The scope could not be read: there is no way to say how many servers this scan would cover. Running it is therefore not offered.',
+    'der_illisible' => "Unable to read this group's scope: running the scan is not offered.",
     'der_vide'      => 'This group resolves to no server today: a scan would record nothing.',
     'der_lance'     => ':n server(s) queued. Follow them in the task centre.',
     'der_echoue'    => 'The drift scan could not be started. :message',
 
-    'np_cve'        => 'The bulk CVE scan is not ported to this interface yet.',
-    'np_cve_detail' => 'This action opens a real SSH session on EVERY member of the group, and each machine whose scan completes triggers a report sent by email. This is not a read: it is as many connections and as many sends as the group has servers.',
+    'np_cve'        => "The bulk CVE scan is not available on this page.",
+    'np_cve_detail' => "It would open an SSH session on every group member and send an email report for each scanned machine.",
     'np_cve_membres' => 'This group resolves to :n server(s) today.',
     'np_cve_prod'   => '⚠ Production is among them: :noms.',
-    'np_cve_derive' => 'The number shown is today\'s. A dynamic group is re-resolved when the action starts: a machine added to the fleet in between would enter the action without ever having been shown here.',
+    'np_cve_derive' => "Number computed now: a dynamic group is recomputed at launch and may include a machine added in between.",
 
-    'portee_titre' => 'What this page can do today',
-    // R2: creation IS ported now — see fr.
-    'portee_texte' => 'Reading groups, their members, creation, deletion and the bulk drift scan are ported. Only the bulk CVE scan still goes through the old portal — its button explains what it engages before sending you there.',
-    'parc_entier'  => 'An administrator role can target the whole fleet: no machine assignment bounds bulk actions.',
+    // Any role >= 2 passes check_machine_access — see fr.
+    'parc_entier'  => "Bulk actions can target the whole fleet: per-machine access does not limit them.",
 
     // R2 — creating a group. E-274 closed by construction: saving goes through
     // the decision panel, which announces the resolved scope. See fr.
@@ -102,12 +99,11 @@ return [
     'f_membres' => 'Machines in the group',
     'btn_enregistrer' => 'Save',
     'btn_annuler' => 'Cancel',
-    'portee_aucun_filtre' => 'No criterion is ticked: this group will contain EVERY machine in the fleet, production included.',
+    'portee_aucun_filtre' => "No criterion ticked: this group will contain every machine in the fleet, production included.",
     'portee_filtres' => 'Criteria kept: :liste',
     'portee_statique' => ':n machine(s) named.',
     'portee_statique_vide' => 'No machine named: the group will be empty.',
-    'portee_archivees' => "The server-side fleet computation does not exclude archived machines: a group with no criterion may contain some.",
+    'portee_archivees' => "A group with no criterion also includes archived machines.",
     'err_nom' => 'A name is required.',
-    'cree' => 'Group created.',
     'err_creation' => 'The group could not be created.',
 ];
