@@ -182,7 +182,7 @@
             tr.appendChild(cellule(
                 t.started_at ? new Date(t.started_at).toLocaleString() : '—',
                 'rw-tableau__discret'));
-            tr.appendChild(cellule(duree(t.started_at, t.finished_at), 'rw-tableau__discret'));
+            tr.appendChild(cellule(duree(t.started_at, t.finished_at), 'rw-tableau__discret rw-tableau__nombre'));
 
             corps.appendChild(tr);
         }

@@ -37,7 +37,7 @@
             <thead>
                 <tr>
                     <th>{{ __('backup.col_file') }}</th>
-                    <th>{{ __('backup.col_size') }}</th>
+                    <th class="rw-tableau__nombre">{{ __('backup.col_size') }}</th>
                     <th>{{ __('backup.col_date') }}</th>
                     <th>{{ __('backup.col_action') }}</th>
                 </tr>

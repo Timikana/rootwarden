@@ -273,6 +273,8 @@ return [
     'depl_sans_config' => 'No global configuration: deployment would be refused.',
     'depl_sans_config_aide' => 'Save the Zabbix global configuration first under the "Global configuration" tab.',
     'depl_sans_config_generique' => 'No global configuration for this platform: the agent will be installed without being configured.',
+    'bloque_les_deux' => "No global configuration for this platform: “Deploy” and “Reconfigure” stay disabled. Save it first in the “Global configuration” tab.",
+    'bloque_reconf' => "No global configuration for this platform: “Reconfigure” stays disabled. Save it first in the “Global configuration” tab.",
     'depl_cout' => 'Deploy the :plateforme agent on :nom. Steps on the machine:',
     'depl_production' => ':nom is in production. Some steps interrupt monitoring while they run.',
     'depl_effet_purge' => 'Zabbix agents already installed are purged.',

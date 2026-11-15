@@ -61,7 +61,7 @@
                 {{-- « Jamais evalue » plutot qu'un tiret : un « - » se lit aussi
                      bien « zero » que « erreur ». --}}
                 <span class="rw-tuile__valeur" data-rw="tuile-valeur">{{ $scoreSshMoyen !== null ? $scoreSshMoyen . '/100' : __('conformite.never') }}</span>
-                <p class="rw-tuile__texte">{{ __('conformite.tuile_ssh_texte') }}</p>
+                <p class="rw-tuile__texte">{{ $scoreSshMoyen !== null ? __('conformite.tuile_ssh_texte') : __('conformite.tuile_ssh_aucun') }}</p>
             </div>
             <div class="rw-tuile">
                 <span class="rw-tuile__titre">{{ __('conformite.supervision_coverage') }}</span>
@@ -86,7 +86,7 @@
                     <tr>
                         <th>{{ __('conformite.th_server') }}</th>
                         <th class="rw-colonne-secondaire">{{ __('conformite.th_ip') }}</th>
-                        <th>{{ __('conformite.th_score') }}</th>
+                        <th class="rw-tableau__nombre">{{ __('conformite.th_score') }}</th>
                         <th>{{ __('conformite.th_grade') }}</th>
                         <th>{{ __('conformite.th_gaps') }}</th>
                     </tr>
@@ -105,7 +105,7 @@
                                 <p class="rw-detail-ecart rw-etroit-seul">{{ $p['reasons'] }}</p>
                             </td>
                             <td class="rw-tableau__discret rw-colonne-secondaire">{{ $p['ip'] }}</td>
-                            <td>{{ $p['score'] }}/100</td>
+                            <td class="rw-tableau__nombre">{{ $p['score'] }}/100</td>
                             <td><span class="rw-badge rw-badge--note {{ in_array($p['grade'], ['D', 'F'], true) ? 'rw-badge--alerte' : ($p['grade'] === 'A' ? 'rw-badge--ok' : 'rw-badge--attention') }}">{{ $p['grade'] }}</span></td>
                             <td class="rw-tableau__discret rw-colonne-secondaire">{{ $p['reasons'] }}</td>
                         </tr>
@@ -128,9 +128,9 @@
                     <tr>
                         <th>{{ __('conformite.th_server') }}</th>
                         <th class="rw-colonne-secondaire">{{ __('conformite.th_ip') }}</th>
-                        <th>{{ __('conformite.th_critical') }}</th>
-                        <th>{{ __('conformite.th_high') }}</th>
-                        <th>{{ __('conformite.th_total') }}</th>
+                        <th class="rw-tableau__nombre">{{ __('conformite.th_critical') }}</th>
+                        <th class="rw-tableau__nombre">{{ __('conformite.th_high') }}</th>
+                        <th class="rw-tableau__nombre">{{ __('conformite.th_total') }}</th>
                         <th>{{ __('conformite.th_last_scan') }}</th>
                     </tr>
                 </thead>
@@ -139,9 +139,9 @@
                         <tr>
                             <td class="rw-tableau__fort">{{ $s->name }}</td>
                             <td class="rw-tableau__discret rw-colonne-secondaire">{{ $s->ip }}</td>
-                            <td>{{ (int) ($s->critical_count ?? 0) }}</td>
-                            <td>{{ (int) ($s->high_count ?? 0) }}</td>
-                            <td>{{ (int) ($s->cve_count ?? 0) }}</td>
+                            <td class="rw-tableau__nombre">{{ (int) ($s->critical_count ?? 0) }}</td>
+                            <td class="rw-tableau__nombre">{{ (int) ($s->high_count ?? 0) }}</td>
+                            <td class="rw-tableau__nombre">{{ (int) ($s->cve_count ?? 0) }}</td>
                             <td class="rw-tableau__discret">{{ $s->last_scan ? date('d/m/Y H:i', strtotime((string) $s->last_scan)) : __('conformite.never') }}</td>
                         </tr>
                     @endforeach
@@ -182,7 +182,7 @@
                         <th>{{ __('conformite.th_role') }}</th>
                         <th>{{ __('conformite.th_2fa') }}</th>
                         <th>{{ __('conformite.th_ssh_key') }}</th>
-                        <th>{{ __('conformite.th_key_age') }}</th>
+                        <th class="rw-tableau__nombre">{{ __('conformite.th_key_age') }}</th>
                         <th>{{ __('conformite.th_last_pwd') }}</th>
                     </tr>
                 </thead>
@@ -200,7 +200,7 @@
                             <td>{!! $c->ssh_key
                                 ? '<span class="rw-badge rw-badge--ok">&#10003;</span>'
                                 : '<span class="rw-tableau__discret">&mdash;</span>' !!}</td>
-                            <td class="{{ $ageCle !== null && $ageCle > 90 ? 'rw-tableau__fort' : 'rw-tableau__discret' }}">{{ $ageCle !== null ? $ageCle . ' j' : '—' }}</td>
+                            <td class="rw-tableau__nombre {{ $ageCle !== null && $ageCle > 90 ? 'rw-tableau__fort' : 'rw-tableau__discret' }}">{{ $ageCle !== null ? $ageCle . ' j' : '—' }}</td>
                             <td class="rw-tableau__discret">{{ $c->password_updated_at ? date('d/m/Y', strtotime((string) $c->password_updated_at)) : '—' }}</td>
                         </tr>
                     @endforeach
@@ -247,10 +247,10 @@
                     <thead>
                         <tr>
                             <th>{{ __('conformite.th_server') }}</th>
-                            <th>{{ __('conformite.th_score') }}</th>
+                            <th class="rw-tableau__nombre">{{ __('conformite.th_score') }}</th>
                             <th>{{ __('conformite.th_grade') }}</th>
-                            <th>{{ __('conformite.th_critical') }}</th>
-                            <th>{{ __('conformite.th_high') }}</th>
+                            <th class="rw-tableau__nombre">{{ __('conformite.th_critical') }}</th>
+                            <th class="rw-tableau__nombre">{{ __('conformite.th_high') }}</th>
                             <th>{{ __('conformite.th_date') }}</th>
                         </tr>
                     </thead>
@@ -259,10 +259,10 @@
                             <tr>
                                 <td class="rw-tableau__fort">{{ $a->name }}
                                     <span class="rw-tableau__discret">{{ $a->ip }}</span></td>
-                                <td>{{ $a->score }}</td>
+                                <td class="rw-tableau__nombre">{{ $a->score }}</td>
                                 <td><span class="rw-badge rw-badge--note {{ in_array($a->grade, ['D', 'F'], true) ? 'rw-badge--alerte' : ($a->grade === 'A' ? 'rw-badge--ok' : 'rw-badge--attention') }}">{{ $a->grade }}</span></td>
-                                <td>{{ (int) ($a->critical_count ?? 0) }}</td>
-                                <td>{{ (int) ($a->high_count ?? 0) }}</td>
+                                <td class="rw-tableau__nombre">{{ (int) ($a->critical_count ?? 0) }}</td>
+                                <td class="rw-tableau__nombre">{{ (int) ($a->high_count ?? 0) }}</td>
                                 <td class="rw-tableau__discret">{{ $a->audited_at ? date('d/m/Y H:i', strtotime((string) $a->audited_at)) : '—' }}</td>
                             </tr>
                         @endforeach

@@ -35,6 +35,7 @@ class JournalAuditController extends Controller
         // scalaire, le reste retombe sur la premiere page.
         $demandee = $requete->query('page', 1);
         $page = min($pages, max(1, is_scalar($demandee) ? (int) $demandee : 1));
+        $peutSceller = (int) session('role_id', 0) === 3;
 
         return view('journal-audit', [
             'filtres' => $filtres,
@@ -48,7 +49,8 @@ class JournalAuditController extends Controller
             'pages' => $pages,
             'filtre' => array_filter($filtres, static fn (string $v): bool => $v !== '') !== [],
             'lignes' => $this->journal->lignes($filtres, $page),
-            'peutSceller' => (int) session('role_id', 0) === 3,
+            'peutSceller' => $peutSceller,
+            'horsChaine' => $peutSceller ? $this->journal->nombreHorsChaine() : 0,
         ]);
     }
 

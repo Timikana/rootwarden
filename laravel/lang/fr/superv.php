@@ -273,6 +273,8 @@ return [
     'depl_sans_config' => 'Aucune configuration globale : le déploiement serait refusé.',
     'depl_sans_config_aide' => "Enregistrez d'abord la configuration globale de Zabbix dans l'onglet « Configuration globale ».",
     'depl_sans_config_generique' => "Aucune configuration globale pour cette plateforme : l'agent sera installé sans être configuré.",
+    'bloque_les_deux' => "Aucune configuration globale pour cette plateforme : « Déployer » et « Reconfigurer » restent grisés. Enregistrez-la d'abord dans l'onglet « Configuration globale ».",
+    'bloque_reconf' => "Aucune configuration globale pour cette plateforme : « Reconfigurer » reste grisé. Enregistrez-la d'abord dans l'onglet « Configuration globale ».",
     'depl_cout' => "Déployer l'agent :plateforme sur :nom. Étapes sur la machine :",
     'depl_production' => ':nom est en production. Certaines étapes interrompent la supervision en cours.',
     'depl_effet_purge' => 'Les agents Zabbix déjà installés sont purgés.',

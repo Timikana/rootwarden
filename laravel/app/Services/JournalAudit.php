@@ -246,6 +246,17 @@ class JournalAudit
         ];
     }
 
+    /**
+     * Lignes hors chaine (`self_hash` NUL) : le MEME predicat que `parcourt()`,
+     * sans parcourir la table. L'ecran l'affiche ; il etait fige dans le
+     * catalogue (« 1484 », mesure du 2026-09-05) et aurait menti au premier
+     * ecart.
+     */
+    public function nombreHorsChaine(): int
+    {
+        return DB::table('user_logs')->whereNull('self_hash')->count();
+    }
+
     /** Le verdict d'integrite, sans rien ecrire. */
     public function verifie(): array
     {

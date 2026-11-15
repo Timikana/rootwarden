@@ -26,9 +26,12 @@
                      Les lignes non chainees le sont PAR CONSTRUCTION : les rattacher
                      exigerait de reecrire le `prev_hash` de toutes les autres, donc de
                      detruire la propriete que la chaine porte. L'etat se DIT ; il ne se
-                     repare pas. --}}
+                     repare pas. Le compte vient de la base : fige dans le catalogue,
+                     il aurait menti au premier ecart. A zero, il n'y a rien a dire. --}}
+            @endif
+            @if ($peutSceller && $horsChaine > 0)
                 <span class="rw-etiquette rw-etiquette--neutre" data-rw="audit-scellement-etat"
-                      title="{{ __('audit.scellement_impossible_tip') }}">{{ __('audit.scellement_impossible') }}</span>
+                      title="{{ __('audit.scellement_impossible_tip') }}">{{ trans_choice('audit.scellement_impossible', $horsChaine, ['nombre' => app()->getLocale() === 'en' ? number_format($horsChaine) : number_format($horsChaine, 0, ',', ' ')]) }}</span>
             @endif
             <a class="rw-bouton rw-bouton--discret" data-rw="audit-export-csv"
                href="{{ route('journal-audit.csv', array_filter([
