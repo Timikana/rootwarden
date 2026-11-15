@@ -18,60 +18,60 @@
  */
 
 return [
-    'title'         => 'Rapport de conformite',
-    'desc'          => 'Rapport de conformite du parc. La page est imprimable ; les exports CSV et PDF portent chacun une empreinte SHA-256 du rapport, calculee au moment de sa generation.',
-    'generated_by'  => 'Genere le',
+    'title'         => "Rapport de conformité",
+    'desc'          => "Imprimable ; les exports CSV et PDF portent l'empreinte SHA-256 du rapport, calculée à sa génération.",
+    'generated_by'  => "Généré le",
     'btn_print'     => 'Imprimer',
     'btn_csv'       => 'Exporter en CSV',
     'btn_pdf'       => 'Exporter en PDF',
 
     // Resume executif
-    'section_summary'     => 'Resume executif',
+    'section_summary'     => "Résumé",
     'servers'             => 'Serveurs',
     'online'              => 'en ligne',
-    '2fa_active'          => '2FA activee',
-    'old_ssh_keys'        => 'Cles SSH de plus de 90 jours',
-    'overdue_deadlines'   => 'Echeances depassees',
+    '2fa_active'          => "2FA activée",
+    'old_ssh_keys'        => "Clés SSH de plus de 90 jours",
+    'overdue_deadlines'   => "Échéances dépassées",
     'ssh_audit_avg'       => 'Score SSH moyen',
     'supervision_coverage' => 'Couverture de supervision',
 
     // Posture consolidee
-    'section_posture' => 'Posture de conformite par serveur',
-    'posture_desc'    => 'Note consolidee de 0 a 100, agregeant l\'audit sshd, les CVE critiques et hautes, la presence de fail2ban et la derive de configuration. Le plus bas se lit en premier.',
+    'section_posture' => "Posture de conformité par serveur",
+    'posture_desc'    => "Note de 0 à 100 : audit sshd, CVE critiques et hautes, fail2ban et dérive de configuration. Les plus basses en premier.",
     'posture_avg'     => 'Posture moyenne du parc',
-    'posture_empty'   => 'Aucun serveur a evaluer.',
+    'posture_empty'   => "Aucun serveur à évaluer.",
 
     // Les ecarts, qui etaient en dur dans le code du legacy
-    'ecart_sshd_non_audite' => 'sshd non audite',
+    'ecart_sshd_non_audite' => "sshd non audité",
     'ecart_cve_critiques'   => ':nombre CVE critique(s)',
     'ecart_cve_hautes'      => ':nombre CVE haute(s)',
     'ecart_fail2ban'        => 'fail2ban absent',
-    'ecart_derives'         => ':nombre derive(s) de configuration',
+    'ecart_derives'         => ":nombre dérive(s) de configuration",
     'ecart_aucun'           => 'conforme',
 
     // Sections
-    'section_cve'         => 'Vulnerabilites CVE',
-    'section_remediation' => 'Remediation',
+    'section_cve'         => "Vulnérabilités CVE",
+    'section_remediation' => "Remédiation",
     'section_auth'        => 'Authentification',
-    'section_firewall'    => 'Pare-feu — derniers changements',
-    'section_ssh_audit'   => 'Audit SSH — scores de securite',
-    'section_supervision' => 'Supervision — agents deployes',
+    'section_firewall'    => "Pare-feu — derniers changements",
+    'section_ssh_audit'   => "Audit SSH — scores de sécurité",
+    'section_supervision' => "Supervision — agents déployés",
 
     // En-tetes de colonnes
     'th_server'    => 'Serveur',
     'th_ip'        => 'IP',
     'th_critical'  => 'Critiques',
-    'th_high'      => 'Elevees',
+    'th_high'      => "Élevées",
     'th_total'     => 'Total',
     'th_last_scan' => 'Dernier scan',
     'th_score'     => 'Score',
     'th_grade'     => 'Note',
-    'th_gaps'      => 'Ecarts',
+    'th_gaps'      => "Écarts",
     'th_user'      => 'Utilisateur',
-    'th_role'      => 'Role',
+    'th_role'      => "Rôle",
     'th_2fa'       => '2FA',
-    'th_ssh_key'   => 'Cle SSH',
-    'th_key_age'   => 'Age de la cle',
+    'th_ssh_key'   => "Clé SSH",
+    'th_key_age'   => "Âge de la clé",
     'th_last_pwd'  => 'Dernier mot de passe',
     'th_date'      => 'Date',
     'th_agents'    => 'Agents',
@@ -79,18 +79,18 @@ return [
     // Remediation
     'rem_open'        => 'Ouvertes',
     'rem_in_progress' => 'En cours',
-    'rem_resolved'    => 'Resolues',
-    'rem_accepted'    => 'Acceptees',
-    'rem_wont_fix'    => 'Non corrigees',
+    'rem_resolved'    => "Résolues",
+    'rem_accepted'    => "Acceptées",
+    'rem_wont_fix'    => "Non corrigées",
 
     // Legendes des tuiles : elles disent ce que le nombre MESURE.
     // Premier jet : des cles d'en-tete de colonne reutilisees comme legendes
     // (« Utilisateur » sous « 4 / 10 », « Age de la cle » sous « 0 »). Seule la
     // CAPTURE l'a montre — aucune assertion ne voit qu'un libelle ne veut rien dire.
-    'tuile_serveurs_texte'    => 'du parc, archivees comprises',
+    'tuile_serveurs_texte'    => "du parc, archivées comprises",
     'tuile_2fa_texte'         => 'des comptes actifs',
-    'tuile_cles_texte'        => 'cles a renouveler',
-    'tuile_echeances_texte'   => 'remediations en retard',
+    'tuile_cles_texte'        => "clés à renouveler",
+    'tuile_echeances_texte'   => "remédiations en retard",
     'tuile_ssh_texte'         => 'moyenne des derniers audits',
     'tuile_supervision_texte' => 'serveurs portant un agent',
 
@@ -106,7 +106,7 @@ return [
     'csv_age_cle'            => 'Age de la cle (jours)',
     'th_statut'              => 'Statut',
     'th_environnement'       => 'Environnement',
-    'th_derniere_maj'        => 'Derniere verification',
+    'th_derniere_maj'        => "Dernière vérification",
     'th_actif'               => 'Actif',
     'oui'                    => 'Oui',
     'non'                    => 'Non',
@@ -115,6 +115,6 @@ return [
     'never'            => 'Jamais',
     'by'               => 'par',
     'sans_config'      => 'sans configuration',
-    'footer_generated' => 'Rapport genere le',
+    'footer_generated' => "Rapport généré le",
     'empreinte'        => 'Empreinte SHA-256 du rapport',
 ];

@@ -17,7 +17,7 @@
 
 return [
     'title'         => 'Compliance report',
-    'desc'          => 'Compliance report for the fleet. The page is printable; the CSV and PDF exports each carry a SHA-256 digest of the report, computed when it is generated.',
+    'desc'          => "Printable; CSV and PDF exports carry the report's SHA-256 fingerprint, computed when it is generated.",
     'generated_by'  => 'Generated on',
     'btn_print'     => 'Print',
     'btn_csv'       => 'Export as CSV',
@@ -35,7 +35,7 @@ return [
 
     // Consolidated posture
     'section_posture' => 'Compliance posture per server',
-    'posture_desc'    => 'Consolidated score from 0 to 100, aggregating the sshd audit, critical and high CVEs, whether fail2ban is present, and configuration drift. The lowest reads first.',
+    'posture_desc'    => "Score from 0 to 100: sshd audit, critical and high CVEs, fail2ban and configuration drift. Lowest first.",
     'posture_avg'     => 'Fleet average posture',
     'posture_empty'   => 'No server to assess.',
 

@@ -91,7 +91,6 @@ class DocumentationController extends Controller
              * a corrige deux fois ailleurs (supervision le 03/09, /profil le 05/09).
              * La vue garde le nul et n'affiche plus le renvoi.
              */
-            'lienLegacy' => null,
         ]);
     }
 }

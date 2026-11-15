@@ -9,7 +9,7 @@
 return [
 
     'title' => 'Approbations à quatre yeux',
-    'desc'  => "Les actions destructrices — suppression d'un compte distant, redémarrage — peuvent exiger l'aval d'un second administrateur. Vous ne pouvez pas approuver vos propres demandes. Le superadministrateur n'y est pas soumis, ce qui reste utile sur une installation à un seul administrateur.",
+    'desc'  => "Les actions destructrices peuvent exiger l'aval d'un second administrateur. On n'approuve pas ses propres demandes ; les superadmins n'y sont pas soumis.",
 
     // Onglets
     'tab_pending'  => 'En attente',
@@ -28,17 +28,17 @@ return [
     // Etats
     'loading'    => 'Chargement…',
     'empty'      => 'Aucune demande',
-    'empty_aide' => "Aucune demande ne correspond à cet onglet. Une demande naît quand un administrateur lance une action soumise à approbation ; elle expire d'elle-même passé son délai.",
+    'empty_aide' => "Une demande apparaît quand une action soumise à approbation est lancée ; elle expire passé son délai.",
 
     // Decisions
     'approve'      => 'Approuver',
     'reject'       => 'Rejeter',
-    'tip_approve'  => 'Valider cette demande. Règle des quatre yeux : un administrateur autre que le demandeur.',
-    'tip_reject'   => 'Refuser cette demande. Un motif peut être saisi.',
+    'tip_approve'  => "Valider cette demande (un administrateur autre que le demandeur).",
+    'tip_reject'   => "Refuser cette demande, avec un motif si besoin.",
     'own_hint'     => 'Vous ne pouvez pas approuver votre propre demande.',
     'by'           => 'par',
     'motif'        => 'Motif',
-    'motif_indice' => 'Facultatif — il sera conservé avec la décision.',
+    'motif_indice' => "Facultatif, conservé avec la décision.",
     'confirmer'    => 'Confirmer le rejet',
     'annuler'      => 'Annuler',
 

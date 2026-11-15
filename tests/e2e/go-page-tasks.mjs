@@ -395,7 +395,7 @@ try {
      * page le dit — jamais un entre-deux muet.
      */
     const honnete = statutFiltre === 200
-        ? apresFiltre.statuts.every(x => /echec|error/i.test(x))
+        ? apresFiltre.statuts.every(x => /[eé]chec|error/i.test(x))
         : (apresFiltre.nbLignes === 0 && apresFiltre.texteCorps.length > 3);
 
     verifiePortage("un filtre en echec ne laisse pas des lignes non filtrees a l'ecran",

@@ -6,7 +6,7 @@
 return [
 
     'title' => 'Command log',
-    'desc'  => 'Bastion-style trail: privileged commands actually run by RootWarden on remote servers — who, what, where, when, result. Read-only.',
+    'desc'  => "Privileged commands run by RootWarden on servers: who, what, where, when, result.",
 
     // Filters
     'all_machines' => 'All machines',
@@ -25,7 +25,7 @@ return [
     // States
     'loading'    => 'Loading…',
     'empty'      => 'No command logged',
-    'empty_aide' => 'No privileged command has been run with these filters yet. Widen the selection, or start an action on a machine from the update or maintenance modules.',
+    'empty_aide' => "Widen the filters, or run an action on a machine (updates, maintenance).",
     'failed'     => 'Failed',
     'system'     => 'system',
     'en_cours'   => 'running',

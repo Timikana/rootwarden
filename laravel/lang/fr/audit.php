@@ -48,17 +48,17 @@ return [
 
     // Export
     'btn_export_csv' => 'Exporter CSV',
-    'export_hint' => "Exporte TOUS les résultats filtrés, pas seulement la page affichée.",
+    'export_hint' => "Exporte tous les résultats filtrés, pas seulement la page affichée.",
 
     // Intégrité de la chaîne
     'btn_verify' => "Vérifier l'intégrité",
     'btn_verify_tip' => "Recalcule la chaîne de hachage et signale la première incohérence. Lecture seule : rien n'est écrit.",
     'btn_seal' => 'Sceller les orphelines',
-    'btn_seal_tip' => "Rattache à la chaîne les lignes insérées sans scellement. IRRÉVERSIBLE : une ligne scellée ne se descelle pas.",
+    'btn_seal_tip' => "Rattache à la chaîne les lignes insérées sans scellement. Irréversible : une ligne scellée ne se descelle pas.",
 
     'verif_en_cours' => "Vérification de la chaîne en cours…",
     'scellement_impossible' => "1484 événements hors chaîne",
-    'scellement_impossible_tip' => "Ces lignes ont été écrites sans chaînage. Elles ne peuvent pas y être rattachées après coup : il faudrait réécrire l'empreinte de toutes les autres, et la chaîne perdrait la propriété qu'elle porte. La chaîne des lignes scellées, elle, est intacte.",
+    'scellement_impossible_tip' => "Lignes écrites sans chaînage : elles ne peuvent plus y être rattachées. La chaîne des lignes scellées reste intacte.",
     'chaine_intacte' => "Chaîne intacte : :scellees lignes scellées, :orphelines non scellées, tête = :tete",
     'chaine_rompue' => "Incohérence à la ligne #:ligne (:type) : attendu :attendu, trouvé :trouve. Aucune écriture n'a eu lieu.",
 

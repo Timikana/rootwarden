@@ -4,14 +4,14 @@
     <h1 class="rw-titre">{{ __('search.title') }}</h1>
     <p class="rw-sous-titre rw-prose">{{ __('search.desc') }}</p>
 
-    <div class="rw-encart rw-prose">
-        <strong>{{ __('search.guide_titre') }}</strong>
+    <details class="rw-details">
+        <summary>{{ __('search.guide_titre') }}</summary>
         <ul class="rw-liste-guide">
             <li>{{ __('search.guide_portee') }}</li>
             <li>{{ __('search.guide_droits') }}</li>
             <li>{{ __('search.guide_liens') }}</li>
         </ul>
-    </div>
+    </details>
 
     {{-- Le champ prend la largeur : c'est l'objet principal de la page. --}}
     <label class="rw-champ rw-recherche">
