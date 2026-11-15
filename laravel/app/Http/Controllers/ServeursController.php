@@ -161,12 +161,9 @@ class ServeursController extends Controller
         $brut['password'] = (string) $requete->input('password', '');
         $brut['root_password'] = (string) $requete->input('root_password', '');
 
-        // UNE CASE NON COCHEE N'EST PAS SOUMISE. `boolean()` rend false sur un
-        // champ absent comme sur « 0 » : c'est exactement la lecture du legacy
-        // (`isset($_POST['cleanup_users']) ? 1 : 0`), et elle ne depend pas de
-        // `ConvertEmptyStringsToNull`, qui rendrait « vide » indiscernable
-        // d'« absent » si on lisait `input()`.
-        $erreur = $this->serveurs->modifie($id, $brut, $requete->boolean('cleanup_users'));
+        // `cleanup_users` n'est plus offert (option sans effet) : null laisse la
+        // colonne telle quelle au lieu de la remettre a 0 a chaque enregistrement.
+        $erreur = $this->serveurs->modifie($id, $brut, null);
         if ($erreur !== null) {
             return back()->with('erreur', __($erreur));
         }

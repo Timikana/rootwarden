@@ -304,16 +304,10 @@
                         </label>
                     </div>
 
-                    <p class="rw-etiquette">{{ __('serveurs.options_deploiement') }}</p>
-                    <label class="rw-champ rw-champ--case">
-                        <input type="checkbox" name="cleanup_users" value="1"
-                               @if ($m['cleanup_users'] ?? 1) checked @endif
-                               data-rw="serveur-edit-nettoyage">
-                        <span>
-                            <span class="rw-etiquette">{{ __('serveurs.opt_nettoyage') }}</span>
-                            <span class="rw-aide">{{ __('serveurs.opt_nettoyage_aide') }}</span>
-                        </span>
-                    </label>
+                    {{-- LA CASE « NETTOYER LES COMPTES OBSOLETES » EST RETIREE : aucun
+                         code ne lisait `cleanup_users` (seul un SELECT la ramenait, et
+                         `clean_up_users` n'a aucun appelant). Une option sans effet
+                         laisse croire a une protection qui n'existe pas. --}}
 
                     <div class="rw-actions">
                         <button type="button" class="rw-bouton rw-bouton--danger rw-actions__gauche"

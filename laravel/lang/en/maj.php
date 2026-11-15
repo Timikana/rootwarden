@@ -26,7 +26,7 @@ return [
     'th_last_check'    => 'Last check',
     'th_ip_port'       => 'Address',
     'th_status'        => 'Availability',
-    'th_secu_schedule' => 'Security update scheduled',
+    'th_secu_schedule' => "Update scheduled",
     'th_last_exec'     => 'Last run',
     'th_last_reboot'   => 'Last reboot',
     'th_env'           => 'Environment',
@@ -88,8 +88,8 @@ return [
     // Scheduling
     'btn_planifier'      => 'Schedule',
     'tip_planifier'      => 'Writes a cron file on the machine: apt-get upgrade at the chosen time.',
-    'btn_planifier_secu' => 'Schedule security',
-    'tip_planifier_secu' => 'Writes a cron file on the machine and shows the date in the "Security update scheduled" column.',
+    'btn_planifier_secu' => "Schedule the update",
+    'tip_planifier_secu' => "Writes a cron file on the machine and shows the date in the \"Update scheduled\" column.",
 
     'f_date'   => 'Date',
     'f_time'   => 'Time',
@@ -105,9 +105,9 @@ return [
     'tip_save_sched' => 'Writes the cron file on the machine, as root, and restarts cron.',
 
     'titre_general' => 'Schedule an update',
-    'titre_secu'    => 'Schedule a security update',
+    'titre_secu'    => "Schedule a package update",
     'desc_general'  => 'On :machine — apt-get update then apt-get upgrade, logged to /var/log/auto_update.log.',
-    'desc_secu'     => 'On :machine — apt-get update then apt-get upgrade, logged to /var/log/auto_security_update.log. The date shows in the "Security update scheduled" column.',
+    'desc_secu'     => "On :machine — apt-get update then apt-get upgrade (all installed packages, no security filter), logged to /var/log/auto_security_update.log. The date shows in the \"Update scheduled\" column.",
 
     'apercu_incomplet' => 'Pick a date and a time to see what will be written on the machine.',
     'apercu_daily'     => 'Every day at :heure',
@@ -163,15 +163,15 @@ return [
     // Simulation and security updates
     'btn_simulation' => 'Dry run',
     'tip_simulation' => 'Shows what an update would change, without installing anything. Refreshes the package index.',
-    'btn_secu_action' => 'Security updates',
+    'btn_secu_action' => "Update packages",
     'tip_secu_action' => 'Upgrades the installed packages (apt-get upgrade), without removing any.',
 
-    'secu_titre'        => 'Apply the security updates',
+    'secu_titre'        => "Update installed packages",
     'secu_machines'     => ':nombre machine(s): :machines',
     'secu_consequences' => 'Packages with a newer version are upgraded, without removing any and without rebooting the machine. A service may be restarted.',
     'secu_verrous'      => 'If apt or dpkg is already running, it is force-stopped, its locks removed and the dpkg database repaired: an installation in progress will be interrupted.',
-    'secu_consigne'     => 'Type SECURITY to enable the button',
-    'secu_mot'          => 'SECURITY',
+    'secu_consigne'     => "Type PACKAGES to enable the button",
+    'secu_mot'          => "PACKAGES",
     'btn_secu_confirmer' => 'Apply',
 
     'flux_debut'         => 'Connecting to :machine...',
@@ -182,8 +182,8 @@ return [
     'simulation_en_cours' => 'Dry run in progress...',
     'simulation_fin'      => 'Simulation finished on :nombre machine(s). Nothing was installed.',
 
-    'secu_en_cours' => 'Security updates in progress...',
-    'secu_fin'      => 'Security updates complete on :nombre machine(s).',
+    'secu_en_cours' => "Package update in progress...",
+    'secu_fin'      => "Packages updated on :nombre machine(s).",
 
     // Full upgrade and dpkg repair
     'btn_complete' => 'Full upgrade',
