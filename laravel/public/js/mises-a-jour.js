@@ -113,7 +113,7 @@
         corps.replaceChildren();
         const tr = document.createElement('tr');
         const td = document.createElement('td');
-        td.colSpan = 13;
+        td.colSpan = 8;
         td.className = 'rw-tableau__message';
         const t = document.createElement('div');
         t.className = 'rw-tableau__message-titre';
@@ -168,6 +168,14 @@
         return conteneur;
     }
 
+    /** Une valeur lisible par sa classe, dans une cellule qui en porte plusieurs. */
+    function sousValeur(texte, classe) {
+        const s = document.createElement('span');
+        s.className = classe;
+        s.textContent = texte;
+        return s;
+    }
+
     /** Une icone du sprite, a l'adresse versionnee que la page emploie deja. */
     function icone(nom) {
         const ns = 'http://www.w3.org/2000/svg';
@@ -207,7 +215,24 @@
             tdCase.appendChild(coche);
             tr.appendChild(tdCase);
 
-            tr.appendChild(cellule(m.name ?? '', 'server-name rw-tableau__fort'));
+            // TREIZE COLONNES EN HUIT. L'adresse et le contexte (environnement,
+            // criticite, reseau) se lisent sous le nom ; la planification et sa
+            // derniere execution partagent une cellule. Chaque valeur garde sa
+            // CLASSE : `ecrit()` et les suites la retrouvent par elle.
+            const tdNom = document.createElement('td');
+            const nom = document.createElement('span');
+            nom.className = 'server-name rw-tableau__fort';
+            nom.textContent = m.name ?? '';
+            const contexte = document.createElement('span');
+            contexte.className = 'rw-tableau__sous-ligne';
+            contexte.append(
+                sousValeur(`${m.ip ?? ''}:${m.port ?? ''}`, 'ip-port'), ' · ',
+                sousValeur(m.environment || 'OTHER', 'environment'), ' · ',
+                sousValeur(m.criticality || 'NON CRITIQUE', 'criticality'), ' · ',
+                sousValeur(m.network_type || 'INTERNE', 'network-type'),
+            );
+            tdNom.append(nom, contexte);
+            tr.appendChild(tdNom);
 
             // Le menu porte sa propre disposition : la cellule reste une cellule.
             const tdActions = document.createElement('td');
@@ -228,20 +253,22 @@
 
             tr.appendChild(cellule(m.linux_version || libelles.non_verifie, 'linux-version'));
             tr.appendChild(cellule(horodatage(m.last_checked) || libelles.non_verifie, 'last-checked rw-tableau__discret'));
-            tr.appendChild(cellule(`${m.ip ?? ''}:${m.port ?? ''}`, 'rw-tableau__discret'));
             const tdEtat = cellule('', 'online-status');
             tdEtat.replaceChildren(pastilleEtat(m.online_status));
             tr.appendChild(tdEtat);
-            tr.appendChild(cellule(horodatage(m.maj_secu_date) || libelles.aucune, 'maj-secu-date rw-tableau__discret'));
-            tr.appendChild(cellule(horodatage(m.maj_secu_last_exec_date) || libelles.aucune, 'maj-secu-lastexec-date rw-tableau__discret'));
+            const tdPlanif = document.createElement('td');
+            tdPlanif.className = 'rw-tableau__discret';
+            const execution = document.createElement('span');
+            execution.className = 'rw-tableau__sous-ligne';
+            execution.append(`${libelles.planif_execution || ''} `,
+                sousValeur(horodatage(m.maj_secu_last_exec_date) || libelles.aucune, 'maj-secu-lastexec-date'));
+            tdPlanif.append(sousValeur(horodatage(m.maj_secu_date) || libelles.aucune, 'maj-secu-date'), execution);
+            tr.appendChild(tdPlanif);
 
             const tdRedemarrage = cellule(horodatage(m.last_reboot) || libelles.aucune, 'last-reboot rw-tableau__discret');
             tdRedemarrage.id = 'last-reboot-' + id;
             tr.appendChild(tdRedemarrage);
 
-            tr.appendChild(cellule(m.environment || 'OTHER', 'environment'));
-            tr.appendChild(cellule(m.criticality || 'NON CRITIQUE', 'criticality'));
-            tr.appendChild(cellule(m.network_type || 'INTERNE', 'network-type'));
 
             corps.appendChild(tr);
         }

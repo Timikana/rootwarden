@@ -24,14 +24,10 @@ return [
     'th_name'          => 'Server',
     'th_linux'         => 'Linux version',
     'th_last_check'    => 'Last check',
-    'th_ip_port'       => 'Address',
     'th_status'        => 'Availability',
-    'th_secu_schedule' => "Update scheduled",
-    'th_last_exec'     => 'Last run',
+    'th_planification' => 'Scheduling',
+    'planif_execution' => 'Last run:',
     'th_last_reboot'   => 'Last reboot',
-    'th_env'           => 'Environment',
-    'th_criticality'   => 'Criticality',
-    'th_network'       => 'Network',
     'th_actions'       => 'Actions',
 
     // Per-machine readings
@@ -188,6 +184,7 @@ return [
     'secu_fin'      => "Packages updated on :nombre machine(s).",
 
     // Full upgrade and dpkg repair
+    'btn_autres'   => 'More actions',
     'btn_complete' => 'Full upgrade',
     'tip_complete' => 'Upgrades every package (apt full-upgrade), installing or removing others if needed.',
     'btn_dpkg'     => 'Repair dpkg',

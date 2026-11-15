@@ -146,7 +146,10 @@
                                     <form method="POST" action="{{ route('profil.sessions.fermer') }}" class="rw-actions__gauche">
                                         @csrf
                                         <input type="hidden" name="empreinte" value="{{ $s['empreinte'] }}">
-                                        <button type="submit" class="rw-bouton rw-bouton--minuscule rw-bouton--danger"
+                                        {{-- Discret, pas rouge : fermer une session n'efface aucune donnee,
+                                             et une liste de vingt boutons rouges noyait les vrais
+                                             gestes destructeurs de la page. --}}
+                                        <button type="submit" class="rw-bouton rw-bouton--minuscule rw-bouton--discret"
                                                 data-rw="profil-session-fermer">{{ __('profil.sessions_revoquer') }}</button>
                                     </form>
                                 @endif

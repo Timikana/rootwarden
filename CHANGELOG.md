@@ -5,6 +5,30 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## Unslop, cinquième passe : audit mesuré des 32 pages
+
+- **Mises à jour** :
+  - la barre d'actions n'a plus qu'une action principale (« Mettre à jour les paquets ») ; mise à
+    jour complète, réparation dpkg et redémarrage passent dans « Autres actions » ;
+  - le tableau passe de 13 à 8 colonnes : l'adresse et le contexte (environnement, criticité,
+    réseau) se lisent sous le nom du serveur, et la planification partage une cellule avec sa
+    dernière exécution. Débordement à 1400 px : 172 px (580 auparavant).
+- **Rythme vertical** : sur 16 pages, une carte, un encart ou un tableau touchait l'élément
+  précédent (0 px d'écart). Une seule règle leur donne 16 px.
+- **Scan CVE sur mobile** : la page entière débordait de 246 px. Le tableau de la liste blanche
+  portait une classe de défilement inexistante (`rw-tableau-defilant`).
+- **Profil** : fermer une session devient un bouton discret. Vingt boutons rouges noyaient les
+  vrais gestes destructeurs.
+- **Gestes destructeurs** : le bouton qui ouvre la décision est rouge par le texte
+  (`rw-bouton--danger-discret`) ; le rouge plein reste au bouton qui confirme (comptes distants,
+  règles Wazuh).
+- **Explications sorties des infobulles** : la source du scan CVE planifié, la portée « toutes
+  les machines » de la liste blanche, les colonnes de mise à jour Docker, la portée des routes de
+  la passerelle (expliquée une fois au lieu de 66).
+- **Séparateur parasite** au-dessus du titre de la supervision et des clés SSH, supprimé.
+
+---
+
 ## Unslop, quatrième passe : les actions de ligne dans un menu
 
 - **Un menu « Actions » par ligne** remplace les rangées de boutons :

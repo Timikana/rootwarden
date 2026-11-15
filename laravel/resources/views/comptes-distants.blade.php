@@ -194,7 +194,7 @@
                         data-rw="distant-retirer-cles">{{ __('distants.btn_retirer_cles') }}</button>
                 <button type="button" class="rw-bouton rw-bouton--discret"
                         data-rw="distant-sshd">{{ __('distants.btn_sshd') }}</button>
-                <button type="button" class="rw-bouton rw-bouton--danger"
+                <button type="button" class="rw-bouton rw-bouton--danger-discret"
                         data-rw="distant-supprimer">{{ __('distants.btn_supprimer') }}</button>
             </div>
 

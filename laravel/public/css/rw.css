@@ -848,6 +848,9 @@ body {
 
 .rw-tableau__discret { font-size: 12px; color: var(--rw-texte-doux); white-space: nowrap; }
 
+/* Une seconde ligne de cellule : le contexte d'une valeur, sans colonne a lui. */
+.rw-tableau__sous-ligne { display: block; margin-top: 2px; font-size: 12px; font-weight: 400; color: var(--rw-texte-doux); white-space: nowrap; }
+
 /* Une QUANTITE se compare chiffre a chiffre : alignee a droite, unites comprises.
    Un identifiant (port, UID) n'en est pas une et reste a gauche. */
 .rw-tableau th.rw-tableau__nombre,
@@ -986,6 +989,15 @@ body {
     color: var(--rw-bouton-danger-texte);
     border: 1px solid var(--rw-bouton-alerte-bord);
 }
+/* Le bouton qui OUVRE une decision destructrice, pas celui qui la confirme :
+   rouge par le texte, a cote de boutons discrets. Le rouge plein reste au
+   bouton de confirmation du panneau. */
+.rw-bouton--danger-discret {
+    background: transparent;
+    color: var(--rw-danger);
+    border: 1px solid var(--rw-bordure);
+}
+.rw-bouton--danger-discret:hover:not(:disabled) { background: var(--rw-danger-fond); }
 
 /*
  * Un LIEN stylé en bouton ne garde pas son soulignement : il se lit comme un
@@ -1553,6 +1565,10 @@ a.rw-bouton { display: inline-block; }
     border-top: 1px solid var(--rw-bordure);
 }
 .rw-section:first-of-type { margin-top: 16px; }
+/* Une section qui porte l'EN-TETE DE PAGE n'est pas une section suivante : son
+   trait de separation se dessinait au-dessus du titre (supervision, cles SSH,
+   conformite, chatops). */
+.rw-section:has(> .rw-entete-page:first-child) { margin-top: 0; padding-top: 0; border-top: 0; }
 .rw-section__entete {
     font-size: 16px;
     font-weight: 600;
@@ -3249,3 +3265,10 @@ h1, h2, h3, h4, strong, b { font-weight: 600; }
 /* Une CVE en liste blanche reste listee (on sait ce qui a ete ecarte), mais en
    retrait : elle ne compte plus. Le texte garde un contraste lisible. */
 .rw-ligne-blanchie td { color: var(--rw-texte-discret); }
+
+/* ══ Rythme vertical ═══════════════════════════════════════════════════════
+ * Une carte, un encart ou un cadre de tableau qui SUIT un autre element s'en
+ * ecarte de 16 px. Mesure avant : 0 px sur 16 pages (une aide, une barre
+ * d'actions ou une autre carte collees au bloc suivant). Le premier enfant
+ * n'est pas concerne : son ecart est celui de son conteneur. */
+* + :is(.rw-carte, .rw-encart, .rw-tableau-cadre) { margin-top: 16px; }

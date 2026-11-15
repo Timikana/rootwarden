@@ -89,7 +89,7 @@
                         <label class="rw-etiquette-champ">
                             <span class="rw-champ__etiquette">{{ __('planif.champ_source') }}</span>
                             <select id="sched-source" class="rw-saisie rw-saisie--compacte"
-                                    title="{{ __('planif.source_aide') }}">
+                                    aria-describedby="sched-source-aide">
                                 <option value="fast">{{ __('planif.source_fast') }}</option>
                                 <option value="hybrid" selected>{{ __('planif.source_hybrid') }}</option>
                                 <option value="precise">{{ __('planif.source_precise') }}</option>
@@ -120,6 +120,9 @@
                             <span class="rw-aide" data-rw="planif-portee-exigee">{{ __('planif.portee_exigee') }}</span>
                         </label>
                     </div>
+                    {{-- Ce que chaque source implique se lit sans survol : le choix
+                         engage la duree du scan et le taux de faux positifs. --}}
+                    <p class="rw-aide" id="sched-source-aide">{{ __('planif.source_aide') }}</p>
 
                     {{-- Selection multiple : masquee tant que la cible ne la
                          demande pas. Une liste vide est refusee par le service
@@ -229,7 +232,7 @@
                     <label class="rw-etiquette-champ">
                         <span class="rw-champ__etiquette">{{ __('liste_blanche.champ_machine') }}</span>
                         <select class="rw-saisie rw-saisie--compacte"
-                                title="{{ __('liste_blanche.champ_machine_aide') }}"
+                                aria-describedby="lb-machine-aide"
                                 data-rw="lb-machine">
                             {{-- L'option GLOBALE est offerte, mais elle n'est PAS le
                                  defaut : elle blanchit tout le parc, et un defaut a
@@ -239,6 +242,8 @@
                             @endforeach
                             <option value="">{{ __('liste_blanche.machine_toutes') }}</option>
                         </select>
+                        {{-- La portee GLOBALE se dit sans survol : c'est elle qui engage. --}}
+                        <span class="rw-aide" id="lb-machine-aide">{{ __('liste_blanche.champ_machine_aide') }}</span>
                     </label>
                     <label class="rw-etiquette-champ">
                         <span class="rw-champ__etiquette">{{ __('liste_blanche.champ_expiration') }}</span>
@@ -267,7 +272,7 @@
 
                 <div data-rw="lb-annonce" aria-live="polite"></div>
 
-                <div class="rw-tableau-defilant">
+                <div class="rw-tableau-cadre">
                     <table class="rw-tableau">
                         <thead>
                             <tr>
