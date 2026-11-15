@@ -20,7 +20,12 @@
  */
 import { execFileSync } from 'child_process';
 
-const ENV = '/home/utilisateur/Documents/Gestion_SSH_KEY/srv-docker.env';
+// La base visee se DECLARE : par defaut la pile de developpement, sinon une pile
+// isolee (`E2E_DB_CONTENEUR=rwiso_db E2E_ENV=<chemin>/srv-docker.env`). Une
+// suite qui lirait une autre base que celle du portail qu'elle pilote mesurerait
+// un etat sans rapport avec ce qu'elle a fait.
+const ENV = process.env.E2E_ENV || '/home/utilisateur/Documents/Gestion_SSH_KEY/srv-docker.env';
+const CONTENEUR = process.env.E2E_DB_CONTENEUR || 'rootwarden_db';
 
 let motDePasse = null;
 function mdp() {
@@ -37,7 +42,7 @@ function interroge(requete) {
     const secret = mdp();
     try {
         return execFileSync('docker',
-            ['exec', 'rootwarden_db', 'mysql', '-uroot', `-p${secret}`, '-N', '-B',
+            ['exec', CONTENEUR, 'mysql', '-uroot', `-p${secret}`, '-N', '-B',
              '-e', requete],
             { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] });
     } catch (e) {
