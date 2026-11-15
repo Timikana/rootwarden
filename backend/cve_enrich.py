@@ -229,26 +229,42 @@ def enrich_findings(findings: list[dict]) -> dict:
                    (ou 'cvss_score').
 
     Returns:
-        dict de stats {'epss': n, 'kev': n} (nombre de findings enrichis).
-        Best-effort : en cas d'echec reseau, les findings restent partiellement
-        ou non enrichis, mais on calcule toujours un priority_score base sur le
-        CVSS seul (pour avoir un tri coherent).
+        dict de stats : {'epss': n, 'kev': n, 'epss_echoue': bool,
+        'kev_echoue': bool}.
+
+        Best-effort pour le CALCUL : en cas d'echec reseau les findings restent
+        non enrichis, et un `priority_score` fonde sur le CVSS seul est tout de
+        meme calcule pour garder un tri coherent.
+
+        MAIS L'ECHEC EST DESORMAIS SIGNALE, et c'est le point. Un appelant qui
+        PERSISTE le resultat doit pouvoir refuser de le faire : ecrire un
+        enrichissement vide sur des findings deja enrichis **efface** le drapeau
+        KEV des CVE reellement exploitees et annule les scores EPSS. C'est
+        l'appelant qui decide, parce que la reponse depend de lui — pendant un
+        scan, des findings neufs sans enrichissement sont normaux ; pendant une
+        re-priorisation, c'est une destruction de donnees.
     """
     if not findings:
-        return {'epss': 0, 'kev': 0}
+        return {'epss': 0, 'kev': 0, 'epss_echoue': False, 'kev_echoue': False}
 
     cve_ids = [f.get('cve_id', '') for f in findings if f.get('cve_id')]
 
     epss_map: dict[str, dict] = {}
     kev_map: dict[str, str] = {}
+    epss_echoue = kev_echoue = False
     try:
         epss_map = get_epss_client().get_scores(cve_ids)
     except Exception as e:
-        _log.debug("EPSS enrichment failed globally: %s", e)
+        # WARNING et non DEBUG : une panne d'enrichissement change ce que l'ecran
+        # affiche et ce que l'appelant peut persister sans detruire. La journaliser
+        # en debug la rendait invisible en exploitation.
+        _log.warning("Enrichissement EPSS indisponible : %s", e)
+        epss_echoue = True
     try:
         kev_map = get_kev_catalog().get_map()
     except Exception as e:
-        _log.debug("KEV enrichment failed globally: %s", e)
+        _log.warning("Enrichissement KEV indisponible : %s", e)
+        kev_echoue = True
 
     n_epss = n_kev = 0
     for f in findings:
@@ -276,4 +292,5 @@ def enrich_findings(findings: list[dict]) -> dict:
         f['priority_score'] = score
         f['priority_label'] = label
 
-    return {'epss': n_epss, 'kev': n_kev}
+    return {'epss': n_epss, 'kev': n_kev,
+            'epss_echoue': epss_echoue, 'kev_echoue': kev_echoue}

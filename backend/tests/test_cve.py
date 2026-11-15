@@ -255,3 +255,268 @@ class TestCveRemediation:
     def test_remediation_stats_no_api_key(self, client):
         resp = client.get('/cve_remediation/stats')
         assert resp.status_code == 401
+
+
+class TestCveReprioritizeNeDetruitPas:
+    """`/cve_reprioritize` ne doit pas ecraser l'enrichissement qu'il n'a pas pu lire.
+
+    `enrich_findings` rattrape lui-meme les echecs EPSS et KEV et rend
+    normalement, si bien que la branche 503 de la route etait inatteignable pour
+    une panne reseau. L'UPDATE ecrivait alors `kev = 0` pour TOUS les findings et
+    `epss_score` a NULL — un clic pendant une coupure vers CISA effacait le
+    drapeau des CVE reellement exploitees, et l'ecran affichait
+    « Re-priorisation terminee ».
+    """
+
+    def _prepare(self, mock_cursor):
+        """Un scan complet ET un finding, dans UNE SEULE ligne.
+
+        Le curseur factice rend `_results[0]` pour `fetchone` et la liste ENTIERE
+        pour `fetchall` : deux formes de lignes ne peuvent donc pas cohabiter. Une
+        ligne portant a la fois `id` (lu comme le scan) et `cve_id`/`cvss_score`
+        (lus comme le finding) satisfait les deux lectures.
+        """
+        mock_cursor._results = [
+            {'id': 42, 'cve_id': 'CVE-2024-0001', 'cvss_score': 9.8},
+        ]
+
+    def test_refuse_d_ecrire_quand_kev_est_indisponible(self, client, admin_headers, mock_cursor):
+        self._prepare(mock_cursor)
+        faux = {'epss': 0, 'kev': 0, 'epss_echoue': False, 'kev_echoue': True}
+        with patch('cve_enrich.enrich_findings', return_value=faux):
+            resp = client.post('/cve_reprioritize', headers=admin_headers,
+                               json={'machine_id': 1})
+        assert resp.status_code == 503
+        assert 'KEV' in resp.get_json()['message']
+        # ET RIEN N'A ETE ECRIT : la derniere requete n'est pas un UPDATE des
+        # findings. Un 503 qui aurait quand meme ecrit ne vaudrait rien.
+        assert 'update cve_findings' not in mock_cursor._last_query
+
+    def test_refuse_d_ecrire_quand_epss_est_indisponible(self, client, admin_headers, mock_cursor):
+        self._prepare(mock_cursor)
+        faux = {'epss': 0, 'kev': 0, 'epss_echoue': True, 'kev_echoue': False}
+        with patch('cve_enrich.enrich_findings', return_value=faux):
+            resp = client.post('/cve_reprioritize', headers=admin_headers,
+                               json={'machine_id': 1})
+        assert resp.status_code == 503
+        assert 'EPSS' in resp.get_json()['message']
+        assert 'update cve_findings' not in mock_cursor._last_query
+
+    def test_ecrit_normalement_quand_l_enrichissement_a_reussi(self, client, admin_headers, mock_cursor):
+        """Le chemin nominal doit rester intact : le refus ne doit pas tout bloquer."""
+        self._prepare(mock_cursor)
+        bon = {'epss': 1, 'kev': 1, 'epss_echoue': False, 'kev_echoue': False}
+        with patch('cve_enrich.enrich_findings', return_value=bon):
+            resp = client.post('/cve_reprioritize', headers=admin_headers,
+                               json={'machine_id': 1})
+        assert resp.status_code == 200
+        assert resp.get_json()['success'] is True
+
+    def test_reprioritize_exige_la_permission(self, client, mock_cursor, api_headers):
+        """La seule ECRITURE du module qui n'avait ni role ni permission.
+
+        Un role 1 disposant d'une machine attribuee pouvait reecrire les six
+        colonnes d'enrichissement de tous les findings du dernier scan — alors que
+        la page qui porte le bouton exige `can_scan_cve` depuis toujours. La garde
+        protegeait la page, pas la requete.
+
+        On simule un compte SANS la permission : `role_id < 3` et un jeu de
+        permissions vide.
+        """
+        self._prepare(mock_cursor)
+        with patch('routes.helpers.get_current_user', return_value=(10, 1)), \
+             patch('routes.helpers.get_user_permissions', return_value={}):
+            resp = client.post('/cve_reprioritize', headers=api_headers,
+                               json={'machine_id': 1})
+        assert resp.status_code == 403
+        # Et rien n'a ete ecrit : un 403 qui aurait quand meme reecrit les
+        # findings ne prouverait rien.
+        assert 'update cve_findings' not in mock_cursor._last_query
+
+
+class TestRequireMachineAccessLitToutesLesSources:
+    """Le garde d'acces doit controler TOUTE machine presente dans la requete.
+
+    L'ancienne resolution enchainait les sources par `or` et gardait la PREMIERE
+    trouvee -- le corps JSON avant la query string. Or `cve_results`,
+    `cve_history` et `cve_compare` lisent EXCLUSIVEMENT `request.args`. Un GET
+    portant un corps avec une machine autorisee et une query avec celle d'autrui
+    faisait donc autoriser l'une et servir l'autre. Flask parse le corps d'un GET
+    des que le `Content-Type` est `application/json`.
+    """
+
+    @staticmethod
+    def _acces(mid):
+        """Machine 1 autorisee, tout le reste refuse."""
+        try:
+            return int(mid) == 1
+        except (TypeError, ValueError):
+            return False
+
+    def test_refuse_quand_la_query_porte_une_machine_interdite(self, client, api_headers, mock_cursor):
+        """LE CONTOURNEMENT : corps autorise, query interdite."""
+        mock_cursor._results = []
+        with patch('routes.helpers.check_machine_access', side_effect=self._acces):
+            resp = client.get('/cve_results?machine_id=99', headers=api_headers,
+                              json={'machine_id': 1})
+        assert resp.status_code == 403
+
+    def test_refuse_quand_le_corps_porte_une_machine_interdite(self, client, api_headers, mock_cursor):
+        """Et la symetrie : query autorisee, corps interdit. Les deux comptent."""
+        mock_cursor._results = []
+        with patch('routes.helpers.check_machine_access', side_effect=self._acces):
+            resp = client.get('/cve_results?machine_id=1', headers=api_headers,
+                              json={'machine_id': 99})
+        assert resp.status_code == 403
+
+    def test_autorise_une_source_unique_legitime(self, client, api_headers, mock_cursor):
+        """Non-regression : un appel normal n'a qu'une source, et il passe."""
+        mock_cursor._results = []
+        with patch('routes.helpers.check_machine_access', side_effect=self._acces):
+            resp = client.get('/cve_results?machine_id=1', headers=api_headers)
+        assert resp.status_code != 403
+
+    def test_lit_l_identifiant_du_CHEMIN(self, client, api_headers, mock_cursor):
+        """`/supervision/machines/<mid>/profile` porte son id dans l'URL.
+
+        Le decorateur ne regardait ni le chemin ni les `kwargs` : il ne trouvait
+        donc aucun identifiant et laissait tout passer.
+        """
+        mock_cursor._results = []
+        with patch('routes.helpers.check_machine_access', side_effect=self._acces):
+            resp = client.get('/supervision/machines/99/profile', headers=api_headers)
+        assert resp.status_code == 403
+
+
+class TestWhitelistAttributionNonFalsifiable:
+    """Blanchir une CVE est une decision qui s'assume : elle doit porter le nom de
+    qui l'a prise.
+
+    Avant : `whitelisted_by = (data.get('whitelisted_by') or 'admin').strip()`.
+    Le client choisissait donc le nom sous lequel l'acceptation de risque etait
+    signee — n'importe quel nom, ou « admin » par defaut s'il omettait le champ.
+    """
+
+    def test_le_nom_envoye_par_le_client_est_ignore(self, client, admin_headers, mock_cursor):
+        mock_cursor._results = [{'name': 'rw-test-admin'}]
+        resp = client.post('/cve_whitelist', headers=admin_headers, json={
+            'cve_id': 'CVE-2024-0002', 'reason': 'faux positif',
+            'whitelisted_by': 'quelqun-dautre',
+        })
+        assert resp.status_code == 200
+        params = mock_cursor._last_params or ()
+        assert 'quelqun-dautre' not in params, (
+            "le nom fourni par le client a ete persiste")
+
+    def test_l_auteur_vient_de_la_session(self, client, admin_headers, mock_cursor):
+        mock_cursor._results = [{'name': 'rw-test-admin'}]
+        resp = client.post('/cve_whitelist', headers=admin_headers, json={
+            'cve_id': 'CVE-2024-0003', 'reason': 'faux positif',
+        })
+        assert resp.status_code == 200
+        # Plus de repli sur « admin » : c'est le compte reel, ou son identifiant.
+        params = mock_cursor._last_params or ()
+        assert 'admin' not in params or 'rw-test-admin' in params
+
+
+class TestScanManuelExclutLesArchivees:
+    """Le scan CVE manuel (cible ou tout le parc) ne lit jamais une machine archivee.
+
+    Le chemin planifie les excluait deja ; le declenchement manuel les prenait
+    toutes, et se connectait donc en SSH a des machines retirees du parc.
+    """
+
+    @staticmethod
+    def _requetes(monkeypatch, machine_ids):
+        import routes.cve as cve_mod
+        vues = []
+
+        class _Cur:
+            def execute(self, sql, params=None):
+                vues.append(' '.join(str(sql).split()))
+            def fetchall(self):
+                return []
+            def fetchone(self):
+                return None
+            def close(self):
+                pass
+
+        class _Conn:
+            def cursor(self, *a, **k):
+                return _Cur()
+            def close(self):
+                pass
+            def commit(self):
+                pass
+
+        monkeypatch.setattr(cve_mod, 'get_db_connection', lambda *a, **k: _Conn())
+        list(cve_mod._stream_cve_scan(machine_ids, 7.0))
+        return [q for q in vues if 'FROM machines' in q]
+
+    @pytest.mark.parametrize('machine_ids', [[1, 2], []])
+    def test_chaque_lecture_des_machines_ecarte_les_archivees(self, monkeypatch, machine_ids):
+        requetes = self._requetes(monkeypatch, machine_ids)
+        # Temoin : sans au moins une requete capturee, l'assertion suivante ne
+        # mesurerait rien.
+        assert requetes, 'aucune lecture de machines capturee'
+        assert all("lifecycle_status != 'archived'" in q for q in requetes), requetes
+
+
+class TestPlafondAntiFrequence:
+    """Le plafond de 10 minutes vaut pour la creation, la modification et l'apercu.
+
+    Deux contournements mesures : la modification n'appliquait aucune garde
+    (`* * * * *` s'ecrivait par un PUT), et la creation ne comparait que les
+    deux prochaines occurrences (`0,59 * * * *` passait selon la minute).
+    """
+
+    def _put(self, client, admin_headers, mock_cursor, corps):
+        mock_cursor._results = [{'id': 1, 'name': 'Existante'}]
+        resp = client.put('/cve_schedules/1', headers=admin_headers, json=corps)
+        return resp, mock_cursor._last_query
+
+    @pytest.mark.parametrize('expr', ['* * * * *', '0,59 * * * *', '*/5 * * * *', 'pas du cron', ''])
+    def test_la_modification_refuse_et_n_ecrit_rien(self, client, admin_headers, mock_cursor, expr):
+        resp, derniere = self._put(client, admin_headers, mock_cursor, {'cron_expression': expr})
+        assert resp.status_code == 400, resp.get_json()
+        assert 'update cve_scan_schedules' not in derniere
+
+    def test_la_modification_accepte_une_frequence_raisonnable(self, client, admin_headers, mock_cursor):
+        resp, derniere = self._put(client, admin_headers, mock_cursor, {'cron_expression': '0 4 * * *'})
+        assert resp.status_code == 200
+        assert 'update cve_scan_schedules' in derniere and 'next_run' in derniere
+
+    @pytest.mark.parametrize('corps', [{'min_cvss': 999}, {'min_cvss': 'abc'}, {'min_cvss': -1}, {'name': '  '}])
+    def test_la_modification_refuse_les_valeurs_hors_bornes(self, client, admin_headers, mock_cursor, corps):
+        resp, derniere = self._put(client, admin_headers, mock_cursor, corps)
+        assert resp.status_code == 400
+        assert 'update cve_scan_schedules' not in derniere
+
+    def test_la_creation_refuse_les_ecarts_alternes(self, client, admin_headers, mock_db):
+        resp = client.post('/cve_schedules', headers=admin_headers, json={
+            'name': 'Alterne', 'cron_expression': '0,59 * * * *', 'min_cvss': 7.0,
+            'target_type': 'tag', 'target_value': 'production'})
+        assert resp.status_code == 400
+
+    def test_la_creation_refuse_un_cvss_non_numerique(self, client, admin_headers, mock_db):
+        resp = client.post('/cve_schedules', headers=admin_headers, json={
+            'name': 'X', 'cron_expression': '0 3 * * *', 'min_cvss': 'abc',
+            'target_type': 'tag', 'target_value': 'production'})
+        assert resp.status_code == 400
+
+    def test_l_apercu_annonce_le_refus(self, client, admin_headers, mock_db):
+        resp = client.get('/cron_preview?expr=0,59%20*%20*%20*%20*', headers=admin_headers)
+        assert resp.get_json()['valid'] is False
+
+    @pytest.mark.parametrize('expr,refus', [
+        ('0 3 * * *', False),
+        ('*/10 * * * *', False),
+        ('0,30 * * * *', False),
+        ('0,59 * * * *', True),            # passage d'heure
+        ('0,59 0,23 * * *', True),         # passage de jour, 23:59 -> 00:00
+        ('0,59 0,23 1,31 * *', True),      # passage de mois, 31 -> 1
+        ('0,59 0,23 1,31 1,12 *', True),   # passage d'annee, decembre -> janvier
+    ])
+    def test_l_ecart_minimal_est_mesure_sur_tous_les_passages(self, expr, refus):
+        from routes.cve import _refus_cron
+        assert (_refus_cron(expr) is not None) is refus, expr

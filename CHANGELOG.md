@@ -17,6 +17,25 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## Six correctifs de sécurité du backend CVE, ouverts depuis le 21 août
+
+Écrits sur une branche de relecture le 2026-08-21 et jamais fusionnés. Chacun a été revérifié sur
+le code actuel : les tests ajoutés échouent sur `main` avant correctif et passent après.
+
+| Défaut | Correctif |
+|---|---|
+| Le plafond de fréquence des scans planifiés (10 min) se contournait par une **modification** (aucune validation, erreur avalée) et, à la création, par un motif à écarts alternés (`0,59 * * * *`) | Une seule fonction mesure l'écart **minimal** sur 1 000 occurrences ; création, modification et aperçu l'appliquent ; `min_cvss` borné à [0, 10] (400 au lieu d'un 500) |
+| `POST /cve_whitelist` acceptait **n'importe quel nom de signataire** (`whitelisted_by` lu dans la requête) | Le signataire vient de l'identité de la requête, jamais du corps |
+| `cve_reprioritize` n'exigeait **aucune permission** | `can_scan_cve` exigé, comme la page Scan CVE |
+| Une panne du catalogue KEV ou EPSS faisait **effacer** le drapeau KEV de toutes les CVE | Pas d'écriture quand un fournisseur est indisponible |
+| La garde d'accès machine ignorait l'identifiant passé **dans l'URL** | Toutes les sources sont lues |
+| Le scan CVE **manuel** se connectait en SSH à des machines **archivées** | Les deux requêtes de `_stream_cve_scan` les écartent (le scheduler le faisait déjà) |
+
+Le portail n'est pas touché : il écrit la liste blanche en base avec le nom de la session, et
+l'appel de re-priorisation porte déjà `can_scan_cve`.
+
+---
+
 ## Couleur qui informe, hiérarchie resserrée
 
 La refonte manquait de couleur, et la couleur présente ne disait rien : un bleu générique partout,
