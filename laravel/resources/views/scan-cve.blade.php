@@ -40,17 +40,14 @@
                     <span class="rw-tuile__titre">{{ __('cve.critiques') }}</span>
                     <span class="rw-tuile__valeur {{ $resume['critiques'] > 0 ? 'rw-tuile__valeur--alerte' : 'rw-tuile__valeur--ok' }}"
                           data-rw="tuile-valeur">{{ $resume['critiques'] }}</span>
-                    <p class="rw-tuile__texte">{{ __('cve.tuile_critiques_aide') }}</p>
                 </div>
                 <div class="rw-tuile">
                     <span class="rw-tuile__titre">{{ __('cve.hautes') }}</span>
                     <span class="rw-tuile__valeur" data-rw="tuile-valeur">{{ $resume['hautes'] }}</span>
-                    <p class="rw-tuile__texte">{{ __('cve.tuile_hautes_aide') }}</p>
                 </div>
                 <div class="rw-tuile">
                     <span class="rw-tuile__titre">{{ __('cve.moyennes') }}</span>
                     <span class="rw-tuile__valeur" data-rw="tuile-valeur">{{ $resume['moyennes'] }}</span>
-                    <p class="rw-tuile__texte">{{ __('cve.tuile_moyennes_aide') }}</p>
                 </div>
             </div>
         </section>
@@ -101,7 +98,7 @@
                         <label class="rw-etiquette-champ">
                             <span class="rw-champ__etiquette">{{ __('planif.champ_cible') }}</span>
                             {{-- L'OPTION « tout le parc » A ETE RETIREE, et c'est une
-                                 capacite en moins — donc elle se declare, ci-dessous.
+                                 capacite en moins ; `portee_exigee` dit seulement quoi choisir.
 
                                  Elle etait le premier choix de la liste, et le
                                  defaut a quatre etages jusqu'a
@@ -125,9 +122,8 @@
                     </div>
 
                     {{-- Selection multiple : masquee tant que la cible ne la
-                         demande pas. Une liste vide serait refusee par le
-                         service — et pour cause, cote scheduler une cible
-                         `machines` illisible retombe sur TOUT le parc. --}}
+                         demande pas. Une liste vide est refusee par le service
+                         (le planificateur, lui, l'ignorerait : WHERE 1=0). --}}
                     <div id="sched-multi-list" class="rw-barre-filtres" hidden>
                         @foreach ($machines as $m)
                             <label class="rw-case">
@@ -259,7 +255,6 @@
                 <label class="rw-etiquette-champ rw-etiquette-champ--large">
                     <span class="rw-champ__etiquette">{{ __('liste_blanche.champ_motif') }}</span>
                     <input type="text" class="rw-saisie" maxlength="500"
-                           title="{{ __('liste_blanche.champ_motif_aide') }}"
                            data-rw="lb-motif">
                 </label>
                 <p class="rw-aide">{{ __('liste_blanche.champ_motif_aide') }}</p>
