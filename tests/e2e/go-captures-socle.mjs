@@ -185,7 +185,7 @@ for (const format of LARGEURS) {
     //     ce que le backend ecrira. AUCUN envoi : la capture ne touche pas la
     //     machine, elle ouvre le formulaire et pose les champs.
     await page.evaluate(() => {
-        document.querySelector('[data-rw="planifier-2"]')?.click();
+        document.querySelector('[data-rw="planifier-secu-2"]')?.click();
         const pose = (id, v) => {
             const el = document.getElementById(id);
             if (!el) return;

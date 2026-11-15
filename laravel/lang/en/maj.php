@@ -84,9 +84,7 @@ return [
     'paquets_fin_partielle' => 'Reading complete, but :nombre machine(s) did not answer.',
 
     // Scheduling
-    'btn_planifier'      => 'Schedule',
-    'tip_planifier'      => 'Writes a cron file on the machine: apt-get upgrade at the chosen time.',
-    'btn_planifier_secu' => "Schedule the update",
+    'btn_planifier_secu' => 'Schedule',
     'tip_planifier_secu' => "Writes a cron file on the machine and shows the date in the \"Update scheduled\" column.",
 
     'f_date'   => 'Date',
@@ -102,9 +100,7 @@ return [
     'btn_save_sched' => 'Save the schedule',
     'tip_save_sched' => 'Writes the cron file on the machine, as root, and restarts cron.',
 
-    'titre_general' => 'Schedule an update',
     'titre_secu'    => "Schedule a package update",
-    'desc_general'  => 'On :machine — apt-get update then apt-get upgrade, logged to /var/log/auto_update.log.',
     'desc_secu'     => "On :machine — apt-get update then apt-get upgrade (all installed packages, no security filter), logged to /var/log/auto_security_update.log. The date shows in the \"Update scheduled\" column.",
 
     'apercu_incomplet' => 'Pick a date and a time to see what will be written on the machine.',
@@ -114,8 +110,6 @@ return [
     'apercu_none'      => 'On :jour/:mois at :heure',
 
     'reserve_annuel'  => '— and every year after that: cron has no year field, so "do not repeat" never stops.',
-    'reserve_lundi'   => '— general scheduling always puts the weekly job on Monday.',
-    'reserve_premier' => '— general scheduling always puts the monthly job on the first of the month.',
 
     'j_lundi'    => 'Monday',
     'j_mardi'    => 'Tuesday',

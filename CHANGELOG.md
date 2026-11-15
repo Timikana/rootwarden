@@ -5,6 +5,20 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## Mises à jour : une seule planification, celle qui suit la date
+
+La page offrait deux boutons qui écrivent le même `apt-get upgrade` en cron. Le premier,
+« Planifier », imposait le lundi en hebdomadaire et le 1er du mois en mensuel, quel que soit le
+jour choisi, et sa date n'était affichée nulle part. Il est retiré. Le bouton restant, renommé
+« Planifier », suit le jour choisi et inscrit la date dans la colonne « Planification ».
+
+⚠ Les planifications déjà posées par l'ancien bouton restent sur les machines, dans
+`/etc/cron.d/auto_update_advanced`. Le portail ne les affiche pas : il faut les retirer à la main
+s'il y en a. La route backend `/schedule_advanced_update` existe toujours ; le portail ne l'appelle
+plus.
+
+---
+
 ## Unslop, cinquième passe : audit mesuré des 32 pages
 
 - **Mises à jour** :
