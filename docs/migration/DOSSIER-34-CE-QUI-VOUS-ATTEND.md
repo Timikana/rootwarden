@@ -127,7 +127,6 @@ et le runner refuse de démarrer sinon.**
 ## ✅ CE QUI EST TOMBÉ DEPUIS LA VERSION DE 23:40
 
     conteneurs recrees          version 2.0.11 servie · inode 1998793 des DEUX cotes
-    adresse de contact          mainteneur@example.com, en service
     durcissement Apache         `Server: Apache` — plus de version ni d'IP interne
     sonde de vie du legacy      visait la racine archivee — healthy en 10 s
     poussee                     Migration-Laravel a jour
