@@ -84,9 +84,7 @@ return [
     'paquets_fin_partielle' => "Constat terminé, mais :nombre machine(s) n'ont pas répondu.",
 
     // Planification
-    'btn_planifier'      => 'Planifier',
-    'tip_planifier'      => "Écrit un cron sur la machine : apt-get upgrade à l'heure choisie.",
-    'btn_planifier_secu' => "Planifier la mise à jour",
+    'btn_planifier_secu' => 'Planifier',
     'tip_planifier_secu' => "Écrit un cron sur la machine et affiche la date dans la colonne « Mise à jour planifiée ».",
 
     'f_date'   => 'Date',
@@ -102,9 +100,7 @@ return [
     'btn_save_sched' => 'Enregistrer la planification',
     'tip_save_sched' => "Écrit le fichier cron sur la machine, en root, et redémarre cron.",
 
-    'titre_general' => 'Planifier une mise à jour',
     'titre_secu'    => "Planifier une mise à jour des paquets",
-    'desc_general'  => 'Sur :machine — apt-get update puis apt-get upgrade, journalisé dans /var/log/auto_update.log.',
     'desc_secu'     => "Sur :machine — apt-get update puis apt-get upgrade (tous les paquets installés, sans filtre de sécurité), journalisé dans /var/log/auto_security_update.log. La date apparaît dans la colonne « Mise à jour planifiée ».",
 
     'apercu_incomplet' => 'Choisissez une date et une heure pour voir ce qui sera écrit sur la machine.',
@@ -114,8 +110,6 @@ return [
     'apercu_none'      => 'Le :jour/:mois à :heure',
 
     'reserve_annuel'  => "— et chaque année ensuite : cron n'a pas de champ année, « ne pas répéter » ne s'arrête jamais.",
-    'reserve_lundi'   => "— la planification générale place toujours l'hebdomadaire le lundi.",
-    'reserve_premier' => '— la planification générale place toujours le mensuel le premier du mois.',
 
     'j_lundi'    => 'lundis',
     'j_mardi'    => 'mardis',

@@ -364,42 +364,58 @@ const nbLignes = await (async () => {
 verifie('le parc est rendu', nbLignes > 0, `${nbLignes} ligne(s)`);
 
 // ── Planification GENERALE ──────────────────────────────────────────────────
-const generale = await planifie(page, 'generale', reponses);
-verifie('l\'action « planifier » est presente sur la ligne de la machine 2', generale.ouvert);
-
-verifiePortage('avant la date et l\'heure, l\'enregistrement est refuse',
-    generale.boutonInactif === true, `bouton desactive : ${generale.boutonInactif}`);
-verifiePortage('l\'apercu dit ce qui manque tant que la date n\'est pas choisie',
-    /date|pick/i.test(generale.apercuAvant), `« ${generale.apercuAvant} »`);
-
-const routeGenerale = generale.reponse ? generale.reponse.url.split('/').pop() : 'aucune';
-constate('route appelee par la planification generale', routeGenerale);
-constate('statut rendu', generale.reponse ? String(generale.reponse.statut) : 'aucune reponse');
-
-const fichierGeneral = surLaMachine('lit', String(MACHINE_TEST), FICHIER_GENERAL);
-
+// Cote portage elle a ete RETIREE : elle forcait le lundi (hebdomadaire) et le
+// 1er du mois (mensuel) quel que soit le jour choisi, et sa date n'etait
+// affichee nulle part. Seule la planification « de securite », qui suit la
+// date et l'inscrit en base, reste offerte. Le legacy garde son constat (E-18).
 if (CIBLE === 'legacy') {
-    // E-18 : le formulaire envoie date/time/repeat a une route qui attend
-    // `interval_minutes`. Elle refuse avant toute session SSH.
-    verifie('la planification generale du legacy est refusee et n\'ecrit rien',
-        generale.reponse?.statut === 400 && fichierGeneral === 'ABSENT',
-        `statut ${generale.reponse?.statut}, fichier ${fichierGeneral}`);
+    const generale = await planifie(page, 'generale', reponses);
+    verifie('l\'action « planifier » est presente sur la ligne de la machine 2', generale.ouvert);
+
+    verifiePortage('avant la date et l\'heure, l\'enregistrement est refuse',
+        generale.boutonInactif === true, `bouton desactive : ${generale.boutonInactif}`);
+    verifiePortage('l\'apercu dit ce qui manque tant que la date n\'est pas choisie',
+        /date|pick/i.test(generale.apercuAvant), `« ${generale.apercuAvant} »`);
+
+    const routeGenerale = generale.reponse ? generale.reponse.url.split('/').pop() : 'aucune';
+    constate('route appelee par la planification generale', routeGenerale);
+    constate('statut rendu', generale.reponse ? String(generale.reponse.statut) : 'aucune reponse');
+
+    const fichierGeneral = surLaMachine('lit', String(MACHINE_TEST), FICHIER_GENERAL);
+
+    if (CIBLE === 'legacy') {
+        // E-18 : le formulaire envoie date/time/repeat a une route qui attend
+        // `interval_minutes`. Elle refuse avant toute session SSH.
+        verifie('la planification generale du legacy est refusee et n\'ecrit rien',
+            generale.reponse?.statut === 400 && fichierGeneral === 'ABSENT',
+            `statut ${generale.reponse?.statut}, fichier ${fichierGeneral}`);
+    } else {
+        verifie('la planification generale ecrit le cron attendu sur la machine',
+            generale.reponse?.statut === 200 && fichierGeneral.includes(CRON_GENERAL),
+            `« ${fichierGeneral.split(' root ')[0]} »`);
+        verifie('l\'apercu annoncait exactement ce qui a ete ecrit',
+            generale.apercu.includes(CRON_GENERAL) && fichierGeneral.includes(CRON_GENERAL),
+            `apercu et fichier portent « ${CRON_GENERAL} »`);
+        verifie('l\'ecart entre le mot choisi et ce que cron sait exprimer est dit',
+            /lundi|Monday/i.test(generale.apercu),
+            'le 15/09/2026 est un mardi, le cron general tombe le lundi');
+    }
+
 } else {
-    verifie('la planification generale ecrit le cron attendu sur la machine',
-        generale.reponse?.statut === 200 && fichierGeneral.includes(CRON_GENERAL),
-        `« ${fichierGeneral.split(' root ')[0]} »`);
-    verifie('l\'apercu annoncait exactement ce qui a ete ecrit',
-        generale.apercu.includes(CRON_GENERAL) && fichierGeneral.includes(CRON_GENERAL),
-        `apercu et fichier portent « ${CRON_GENERAL} »`);
-    verifie('l\'ecart entre le mot choisi et ce que cron sait exprimer est dit',
-        /lundi|Monday/i.test(generale.apercu),
-        'le 15/09/2026 est un mardi, le cron general tombe le lundi');
+    verifie('la planification generale n\'est plus offerte (elle forcait lundi et 1er du mois)',
+        ! (await page.$(CHAMPS.laravel.generale.ouvre)), CHAMPS.laravel.generale.ouvre);
 }
 
 // ── Planification de SECURITE ───────────────────────────────────────────────
 const securite = await planifie(page, 'securite', reponses);
 verifie('l\'action « planifier securite » est presente sur la ligne de la machine 2',
     securite.ouvert);
+// Reportees de la planification generale retiree : le formulaire restant doit
+// tenir les memes proprietes.
+verifiePortage('avant la date et l\'heure, l\'enregistrement est refuse (securite)',
+    securite.boutonInactif === true, `bouton desactive : ${securite.boutonInactif}`);
+verifiePortage('l\'apercu dit ce qui manque tant que la date n\'est pas choisie (securite)',
+    /date|pick/i.test(securite.apercuAvant), `« ${securite.apercuAvant} »`);
 
 const fichierSecurite = surLaMachine('lit', String(MACHINE_TEST), FICHIER_SECURITE);
 verifie('la planification de securite ecrit le cron attendu sur la machine',

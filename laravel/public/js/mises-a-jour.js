@@ -243,11 +243,9 @@
                              (b) => releveStatut(id, tr, b)),
                 boutonReleve(libelles.btn_reboot, libelles.tip_reboot, 'reboot-' + id,
                              (b) => releveRedemarrage(id, tr, b)),
-                boutonReleve(libelles.btn_planifier, libelles.tip_planifier, 'planifier-' + id,
-                             () => ouvrePlanification(id, m.name ?? '', 'generale')),
                 boutonReleve(libelles.btn_planifier_secu, libelles.tip_planifier_secu,
                              'planifier-secu-' + id,
-                             () => ouvrePlanification(id, m.name ?? '', 'securite')),
+                             () => ouvrePlanification(id, m.name ?? '')),
             ]));
             tr.appendChild(tdActions);
 
@@ -540,6 +538,12 @@
        (`* * 1`) et le mensuel le PREMIER du mois (`1 * *`), quelle que soit la
        date choisie — la planification de securite, elle, suit la date. Le
        formulaire montre l'expression reellement ecrite AVANT le geste.
+
+       LA PLANIFICATION GENERALE A ETE RETIREE du portage (2026-11-15) : elle
+       forcait le lundi et le 1er du mois et sa date n'etait affichee nulle
+       part, a cote d'une planification qui fait le meme `apt-get upgrade` en
+       suivant la date choisie. Seule `/schedule_advanced_security_update`
+       reste appelee ; la route generale existe toujours cote backend.
        ═════════════════════════════════════════════════════════════════════ */
 
     const planif = JSON.parse(document.getElementById('maj-planif-libelles')?.textContent || '{}');
@@ -552,7 +556,7 @@
     const machinePlanif = document.getElementById('sched-machine');
     const boutonEnregistrer = document.getElementById('sched-save');
 
-    /** Machine et nature en cours d'edition ; null quand le formulaire est ferme. */
+    /** Machine en cours d'edition ; null quand le formulaire est ferme. */
     let planifEnCours = null;
 
     /**
@@ -562,7 +566,7 @@
      * cet apercu et le fichier pose sur la machine est un defaut : le test de
      * U4 compare les deux.
      */
-    function calculeCron(nature, date, heureChoisie, recurrence) {
+    function calculeCron(date, heureChoisie, recurrence) {
         // `heureChoisie` et non `heure` : `heure()` est l'horloge du journal.
         const [hh, mm] = heureChoisie.split(':');
         const [, mois, jour] = date.split('-');
@@ -573,31 +577,17 @@
             return { cron: `${mm} ${hh} * * *`, texte: planif.apercu_daily, reserve: '' };
         }
         if (recurrence === 'weekly') {
-            if (nature === 'securite') {
-                return {
-                    cron: `${mm} ${hh} * * ${jourCron}`,
-                    texte: planif.apercu_weekly.replace(':jour', planif.jours[jourCron - 1]),
-                    reserve: '',
-                };
-            }
             return {
-                cron: `${mm} ${hh} * * 1`,
-                texte: planif.apercu_weekly.replace(':jour', planif.jours[0]),
-                reserve: jourCron === 1 ? '' : planif.reserve_lundi,
+                cron: `${mm} ${hh} * * ${jourCron}`,
+                texte: planif.apercu_weekly.replace(':jour', planif.jours[jourCron - 1]),
+                reserve: '',
             };
         }
         if (recurrence === 'monthly') {
-            if (nature === 'securite') {
-                return {
-                    cron: `${mm} ${hh} ${jour} * *`,
-                    texte: planif.apercu_monthly.replace(':jour', String(parseInt(jour, 10))),
-                    reserve: '',
-                };
-            }
             return {
-                cron: `${mm} ${hh} 1 * *`,
-                texte: planif.apercu_monthly.replace(':jour', '1'),
-                reserve: parseInt(jour, 10) === 1 ? '' : planif.reserve_premier,
+                cron: `${mm} ${hh} ${jour} * *`,
+                texte: planif.apercu_monthly.replace(':jour', String(parseInt(jour, 10))),
+                reserve: '',
             };
         }
         return {
@@ -618,18 +608,17 @@
             boutonEnregistrer.disabled = true;
             return;
         }
-        const r = calculeCron(planifEnCours.nature, d, h, champRecurrence.value);
+        const r = calculeCron(d, h, champRecurrence.value);
         const heureTexte = r.texte.replace(':heure', h);
         zoneApercu.textContent = heureTexte + '  —  ' + r.cron + (r.reserve ? '  ' + r.reserve : '');
         zoneApercu.className = 'rw-apercu' + (r.reserve ? ' rw-apercu--reserve' : '');
         boutonEnregistrer.disabled = false;
     }
 
-    function ouvrePlanification(id, nom, nature) {
-        planifEnCours = { id: id, nom: nom, nature: nature };
-        titrePlanif.textContent = nature === 'securite' ? planif.titre_secu : planif.titre_general;
-        machinePlanif.textContent = (nature === 'securite' ? planif.desc_secu : planif.desc_general)
-            .replace(':machine', nom);
+    function ouvrePlanification(id, nom) {
+        planifEnCours = { id: id, nom: nom };
+        titrePlanif.textContent = planif.titre_secu;
+        machinePlanif.textContent = planif.desc_secu.replace(':machine', nom);
         fermeLesAutresPanneaux('schedule-form');
         // Repartir d'un etat connu, comme les trois autres panneaux : sans
         // cela, la date saisie pour une AUTRE machine reste dans le champ et
@@ -656,12 +645,9 @@
         const h = champHeure.value;
         if (!d || !h) { dit(planif.sched_incomplet, 'echec'); return; }
 
-        const nature = planifEnCours.nature;
         const nom = planifEnCours.nom;
-        const attendu = calculeCron(nature, d, h, champRecurrence.value);
-        const chemin = nature === 'securite'
-            ? '/schedule_advanced_security_update'
-            : '/schedule_advanced_update';
+        const attendu = calculeCron(d, h, champRecurrence.value);
+        const chemin = '/schedule_advanced_security_update';
 
         const initial = boutonEnregistrer.textContent;
         boutonEnregistrer.disabled = true;
@@ -698,7 +684,7 @@
         // La planification de securite ecrit AUSSI `machines.maj_secu_date` :
         // relire le parc plutot que d'ecrire la cellule nous-memes, pour que la
         // colonne montre ce que la BASE contient.
-        if (nature === 'securite') await relit(filtresCourants());
+        await relit(filtresCourants());
 
         dit(planif.sched_ok.replace(':machine', nom), 'ok');
     }
