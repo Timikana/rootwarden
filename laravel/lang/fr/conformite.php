@@ -92,6 +92,7 @@ return [
     'tuile_cles_texte'        => "clés à renouveler",
     'tuile_echeances_texte'   => "remédiations en retard",
     'tuile_ssh_texte'         => 'moyenne des derniers audits',
+    'tuile_ssh_aucun'         => 'aucun serveur audité',
     'tuile_supervision_texte' => 'serveurs portant un agent',
 
     // Export CSV (sous-lot S2c). Les marqueurs de section sont TRADUITS, comme

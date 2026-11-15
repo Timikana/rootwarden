@@ -937,6 +937,8 @@ class SupervisionController extends Controller
             'reconf_bloque' => json_encode($this->boutonsBloques()['reconfiguration']),
             'depl_sans_config' => __('superv.depl_sans_config'),
             'reconf_sans_config' => __('superv.reconf_sans_config'),
+            'bloque_les_deux' => __('superv.bloque_les_deux'),
+            'bloque_reconf' => __('superv.bloque_reconf'),
         ];
     }
 }

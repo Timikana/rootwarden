@@ -391,6 +391,14 @@
             <article class="rw-carte rw-carte--pleine">
                 <h3 class="rw-sous-titre">{{ __('superv.deploiement_titre') }}</h3>
                 <p class="rw-aide rw-prose">{{ __('superv.deploiement_description') }}</p>
+                {{-- LA RAISON D'UN BOUTON GRISE SE LIT SANS SURVOL : un bouton desactive
+                     n'affiche pas toujours son infobulle, et jamais au toucher. Le
+                     deploiement n'est bloque que si la reconfiguration l'est aussi,
+                     d'ou deux messages seulement. `majBoutonsBloques()` le tient a
+                     jour quand la plateforme change. --}}
+                @php($blocageDepl = $boutonsBloques['deploiement'][$plateformeInitiale] ?? false)
+                @php($blocageReconf = $boutonsBloques['reconfiguration'][$plateformeInitiale] ?? false)
+                <p class="rw-avertissement" data-rw="superv-boutons-bloques" @if (! $blocageDepl && ! $blocageReconf) hidden @endif>{{ $blocageDepl ? __('superv.bloque_les_deux') : __('superv.bloque_reconf') }}</p>
 
                 @if (count($machines) === 0)
                     <div class="rw-vide">

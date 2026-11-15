@@ -5,6 +5,25 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## Unslop, troisième passe : ce qui compte se lit sans survol
+
+- **Le journal d'audit compte vraiment ses lignes hors chaîne.** L'étiquette affichait
+  « 1484 événements hors chaîne » sur toutes les installations : ce nombre avait été mesuré une
+  fois sur une base, puis écrit en dur dans les traductions. Il est désormais compté en base, avec
+  le même critère que la vérification de chaîne, et l'étiquette disparaît à zéro.
+- **Supervision : la raison des boutons grisés est écrite.** Sans configuration globale, un avis
+  dit que « Déployer » et « Reconfigurer » restent grisés et où enregistrer cette configuration.
+  Jusqu'ici, la raison n'était que dans l'infobulle d'un bouton désactivé, qui ne s'affiche ni au
+  toucher ni toujours à la souris.
+- **Clé de plateforme : le badge « rootwarden » est expliqué sous le tableau.** Ce compte a un
+  accès root sans mot de passe ; l'information n'est plus réservée au survol.
+- **Les quantités sont alignées à droite** : scores, CVE critiques, élevées et totales, âge des
+  clés (conformité), durée des tâches, taille des sauvegardes.
+- Rapport de conformité : sans audit SSH, la tuile du score moyen dit « aucun serveur audité » au
+  lieu de « moyenne des derniers audits ».
+
+---
+
 ## Libellés qui disent ce que fait le portail
 
 - **« Mises à jour de sécurité » devient « Mettre à jour les paquets »** : la commande lancée met à

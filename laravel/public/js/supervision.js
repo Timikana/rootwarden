@@ -291,6 +291,7 @@
      */
     function majBoutonsBloques() {
         var plateforme = choixPlateforme ? choixPlateforme.value : 'zabbix';
+        var bloques = {};
         [
             { data: 'depl_bloque', selecteur: 'superv-deployer', titre: 'depl_sans_config' },
             { data: 'reconf_bloque', selecteur: 'superv-reconfigurer', titre: 'reconf_sans_config' },
@@ -304,6 +305,7 @@
                 table[plateforme] = true;
             }
             var bloque = table[plateforme] === true;
+            bloques[geste.data] = bloque;
             [].slice.call(document.querySelectorAll('[data-rw="' + geste.selecteur + '"]'))
                 .forEach(function (bouton) {
                     bouton.disabled = bloque;
@@ -314,6 +316,12 @@
                     }
                 });
         });
+        // L'avis visible dit la meme chose que les infobulles, sans survol.
+        var avis = document.querySelector('[data-rw="superv-boutons-bloques"]');
+        if (avis) {
+            avis.hidden = ! bloques.depl_bloque && ! bloques.reconf_bloque;
+            avis.textContent = bloques.depl_bloque ? (libelles.bloque_les_deux || '') : (libelles.bloque_reconf || '');
+        }
     }
 
     /* ── Les panneaux de decision, ouverts sous leur ligne ──────────────────

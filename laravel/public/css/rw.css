@@ -848,6 +848,11 @@ body {
 
 .rw-tableau__discret { font-size: 12px; color: var(--rw-texte-doux); white-space: nowrap; }
 
+/* Une QUANTITE se compare chiffre a chiffre : alignee a droite, unites comprises.
+   Un identifiant (port, UID) n'en est pas une et reste a gauche. */
+.rw-tableau th.rw-tableau__nombre,
+.rw-tableau td.rw-tableau__nombre { text-align: right; white-space: nowrap; }
+
 /* Message pleine largeur : chargement, erreur, ou etat vide. */
 .rw-tableau__message { padding: 32px 20px; text-align: center; color: var(--rw-texte-doux); }
 .rw-tableau__message-titre { font-weight: 600; color: var(--rw-texte); margin-bottom: 8px; }

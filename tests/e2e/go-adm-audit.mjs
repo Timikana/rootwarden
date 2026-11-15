@@ -436,9 +436,13 @@ try {
             verifie('le bouton de scellement a bien ete RETIRE (E-415)', ! s,
                 s ? 'le bouton est encore rendu : la decision E-415 a ete defaite'
                   : 'absent, comme decide');
-            verifie('et l\'etiquette qui le remplace est rendue', !! etat,
-                etat ? 'audit-scellement-etat present'
-                     : 'ni bouton ni etiquette : l\'ecran ne dit plus rien de l\'etat');
+            // L'etiquette porte le compte de la BASE et disparait a zero : sa
+            // presence se juge contre ce compte, pas dans l'absolu.
+            const nues = compteEnBase('SELECT COUNT(*) FROM rootwarden.user_logs WHERE self_hash IS NULL');
+            const texte = etat ? await page.evaluate(e => e.textContent, etat) : '';
+            verifie('et l\'etiquette suit le compte des lignes hors chaine', ! Number.isNaN(nues)
+                && (nues > 0 ? texte.replace(/\D/g, '') === String(nues) : ! etat),
+                `${nues} ligne(s) nue(s) en base, etiquette ${etat ? `« ${texte.trim()} »` : 'absente'}`);
         } else {
             verifie('le role 3 voit « Sceller les orphelines »', !! s);
         }

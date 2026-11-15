@@ -90,6 +90,7 @@ return [
     'tuile_cles_texte'        => 'keys to rotate',
     'tuile_echeances_texte'   => 'remediations past due',
     'tuile_ssh_texte'         => 'average of the latest audits',
+    'tuile_ssh_aucun'         => 'no server audited',
     'tuile_supervision_texte' => 'servers carrying an agent',
 
     // Export CSV (sous-lot S2c). Les marqueurs de section sont TRADUITS, comme

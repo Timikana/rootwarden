@@ -40,7 +40,7 @@
                     <th>{{ __('tasks.col_type') }}</th>
                     <th>{{ __('tasks.col_label') }}</th>
                     <th>{{ __('tasks.col_started') }}</th>
-                    <th>{{ __('tasks.col_duration') }}</th>
+                    <th class="rw-tableau__nombre">{{ __('tasks.col_duration') }}</th>
                 </tr>
             </thead>
             <tbody id="task-tbody">

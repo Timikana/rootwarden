@@ -178,7 +178,7 @@
             tdNom.appendChild(code);
             tr.appendChild(tdNom);
 
-            tr.appendChild(cellule((b.size_mb != null ? b.size_mb : '?') + ' MB'));
+            tr.appendChild(cellule((b.size_mb != null ? b.size_mb : '?') + ' MB', 'rw-tableau__nombre'));
             tr.appendChild(cellule(
                 b.created_at ? new Date(b.created_at).toLocaleString() : '—',
                 'rw-tableau__discret'));

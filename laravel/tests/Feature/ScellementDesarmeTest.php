@@ -237,42 +237,30 @@ class ScellementDesarmeTest extends TestCase
     }
 
     // ══════════════════════════════════════════════════════════════════════
-    // ⚠ CE QUE LA MESURE A TROUVE, ET QUI N'ETAIT PAS DEMANDE
+    // LE COMPTE AFFICHE VIENT DE LA BASE
     // ══════════════════════════════════════════════════════════════════════
 
-    public function test_le_COMPTE_est_fige_dans_le_catalogue_et_derivera(): void
+    public function test_le_COMPTE_affiche_est_derive_de_la_base(): void
     {
         /*
-         * ⚠ « 1484 evenements hors chaine » est ECRIT EN DUR dans les deux
-         * catalogues. C'est un nombre MESURE, pose a cote de la grandeur qu'il
-         * pretend decrire, et rien ne les relie.
-         *
-         * Il est juste aujourd'hui : `audit_chain.py` a repris les 11 sites
-         * d'insertion nue et le compte restant est 0, donc les nues ne
-         * grandissent plus. **Mais si une seule reapparait, le libelle ment — et
-         * il mentira en silence**, puisque aucun mecanisme ne le remesure.
-         *
-         * C'est la famille du `scroll-padding-top: 64px` pose sur un en-tete qui
-         * rend 65 : *une constante posee a cote d'une grandeur qu'elle doit
-         * decrire finit par diverger, et personne ne remesure un nombre qui a
-         * l'air juste.*
-         *
-         * CE TEST NE DEMANDE PAS DE CORRECTIF — la forme derivee coute une
-         * substitution de jeton et c'est un arbitrage de produit. Il verrouille
-         * LE FAIT que le nombre est fige, pour que le jour ou on le derive, on
-         * le fasse en connaissance de cause plutot que par hasard.
+         * « 1484 evenements hors chaine » etait ECRIT EN DUR dans les deux
+         * catalogues (mesure du 2026-09-05). Le test precedent verrouillait ce
+         * fait en attendant l'arbitrage ; la propriete retenue est la derivation :
+         * le libelle porte un jeton, et le nombre est celui de `parcourt()`.
          */
         foreach (['fr', 'en'] as $langue) {
-            $cles = require base_path("lang/$langue/audit.php");
-            $libelle = (string) $cles['scellement_impossible'];
+            $libelle = (string) (require base_path("lang/$langue/audit.php"))['scellement_impossible'];
 
-            $this->assertMatchesRegularExpression('/\d{3,}/', $libelle,
-                "[$langue] le compte n'est plus ecrit en dur : s'il est DERIVE "
-                . 'maintenant, remplacer ce test par la propriete retenue — il '
-                . 'verrouillait une observation, pas une intention.');
-            $this->assertStringNotContainsString(':', $libelle,
-                "[$langue] un jeton est apparu dans le libelle : le compte est "
-                . 'peut-etre derive, verifier avant de conclure');
+            $this->assertStringContainsString(':nombre', $libelle, "[$langue] le compte n'est plus derive");
+            $this->assertDoesNotMatchRegularExpression('/\d{3,}/', $libelle,
+                "[$langue] un nombre est de nouveau ecrit en dur");
         }
+
+        // Le MEME predicat que le parcours : 2 nues sur 5 dans le jeu de setUp.
+        $this->assertSame($this->journal()->scelle(false)['orphelines'], $this->journal()->nombreHorsChaine());
+        $this->assertSame(2, $this->journal()->nombreHorsChaine(), 'temoin : le jeu de setUp porte 2 lignes nues');
+
+        $vue = (string) file_get_contents(base_path('resources/views/journal-audit.blade.php'));
+        $this->assertStringContainsString('$horsChaine > 0', $vue, "l'etiquette s'affiche meme a zero");
     }
 }

@@ -285,6 +285,15 @@
             </tbody>
         </table>
     </div>
+    {{-- LE BADGE ROUGE SE LIT SANS SURVOL : « root sans mot de passe » ne doit pas
+         dependre d'une infobulle, invisible au toucher. Une fois, sous le tableau,
+         et seulement s'il y a un badge a expliquer. --}}
+    @if ($compteurs['compte_service'] > 0)
+        <p class="rw-aide rw-prose" data-rw="cle-legende-compte-service">
+            <span class="rw-badge rw-badge--alerte">{{ __('plateforme.compte_service_pose') }}</span>
+            {{ __('plateforme.compte_service_aide') }}
+        </p>
+    @endif
     <p class="rw-aide rw-prose">{{ __('plateforme.tester_aide') }}</p>
 
     {{--
