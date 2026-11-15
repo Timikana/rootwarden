@@ -268,6 +268,8 @@ return [
     // ── Deploiement ──────────────────────────────────────────────────────
     // Les etapes sont rendues par plateforme (`etapesDuDeploiement()`).
     'depl_bouton' => 'Déployer',
+    'menu_plus' => 'Plus',
+    'menu_plus_pour' => 'Autres actions pour :machine',
     'depl_titre' => "Déploiement de l'agent",
     'depl_description' => "Installe l'agent sur un serveur et y écrit sa configuration (globale, profil, réglages du serveur).",
     'depl_sans_config' => 'Aucune configuration globale : le déploiement serait refusé.',

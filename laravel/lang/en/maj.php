@@ -32,9 +32,11 @@ return [
     'th_env'           => 'Environment',
     'th_criticality'   => 'Criticality',
     'th_network'       => 'Network',
-    'th_actions'       => 'Readings',
+    'th_actions'       => 'Actions',
 
     // Per-machine readings
+    'btn_actions'  => 'Actions',
+    'actions_pour' => 'Actions for :machine',
     'btn_version' => 'Version',
     'tip_version' => 'Reads the Linux version of the machine, without changing it.',
     'btn_statut'  => 'Availability',

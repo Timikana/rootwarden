@@ -222,13 +222,15 @@
                                 defi de cette page s'en occupe — c'est celui des deux gestes
                                 voisins, pas une seconde implementation.
                             --}}
-                            <td class="rw-tableau__actions">
-                                @if (in_array($h->status, ['applied', 'superseded'], true))
-                                    <button type="button" class="rw-bouton rw-bouton--danger rw-bouton--minuscule"
-                                            data-rw="sftp-rollback"
-                                            data-deploiement="{{ $h->id }}"
-                                            title="{{ __('sftp.rollback_texte') }}">{{ __('sftp.rollback') }}</button>
-                                @endif
+                            <td>
+                                <div class="rw-tableau__actions">
+                                    @if (in_array($h->status, ['applied', 'superseded'], true))
+                                        <button type="button" class="rw-bouton rw-bouton--danger rw-bouton--minuscule"
+                                                data-rw="sftp-rollback"
+                                                data-deploiement="{{ $h->id }}"
+                                                title="{{ __('sftp.rollback_texte') }}">{{ __('sftp.rollback') }}</button>
+                                    @endif
+                                </div>
                             </td>
                         </tr>
                     @endforeach

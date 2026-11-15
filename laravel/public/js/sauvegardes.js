@@ -184,7 +184,9 @@
                 'rw-tableau__discret'));
 
             const tdActions = document.createElement('td');
-            tdActions.className = 'rw-tableau__actions';
+            const groupeActions = document.createElement('div');
+            groupeActions.className = 'rw-tableau__actions';
+            tdActions.appendChild(groupeActions);
 
             const controler = document.createElement('button');
             controler.type = 'button';
@@ -193,7 +195,7 @@
             controler.title = libelles.tip_verify;
             controler.dataset.rw = 'controler';
             controler.addEventListener('click', () => controle(b.filename, controler));
-            tdActions.appendChild(controler);
+            groupeActions.appendChild(controler);
 
             // Le backend reserve la restauration au role 3. Ne pas proposer ce
             // qui sera refuse — la garde reste la sienne, pas celle du bouton.
@@ -205,7 +207,7 @@
                 restaurer.title = libelles.tip_restore;
                 restaurer.dataset.rw = 'restaurer';
                 restaurer.addEventListener('click', () => ouvreRestauration(tr, b));
-                tdActions.appendChild(restaurer);
+                groupeActions.appendChild(restaurer);
             }
 
             tr.appendChild(tdActions);

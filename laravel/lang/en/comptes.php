@@ -22,6 +22,7 @@ return [
     'col_etat' => 'Status',
     'col_mdp' => 'Password',
     'col_actions' => 'Actions',
+    'actions_pour' => 'Actions for :compte',
 
     'role_1' => 'User',
     'role_2' => 'Administrator',

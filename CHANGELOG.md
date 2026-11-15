@@ -5,6 +5,26 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## Unslop, quatrième passe : les actions de ligne dans un menu
+
+- **Un menu « Actions » par ligne** remplace les rangées de boutons :
+  - mises à jour : cinq boutons empilés sur trois rangées, tableau débordant de 768 px ; la ligne
+    tient désormais sur une rangée ;
+  - supervision : « Déployer » reste visible, les quatre autres gestes passent dans « Plus » ;
+    le tableau ne déborde plus (270 px auparavant) ;
+  - comptes : jusqu'à six boutons en pleine couleur ; les listes d'expiration et de rôle restent
+    en place, et les gestes destructeurs viennent en dernier, colorés par leur texte.
+
+  Le menu est un `popover` natif : il n'est pas rogné par le cadre du tableau qui défile, et se
+  ferme au clic extérieur, à Échap, après un choix ou au défilement.
+- **Comptes** : « Supprimer » et « Anonymiser » ne sont plus proposés sur son propre compte. Le
+  serveur les refusait toujours (« Vous ne pouvez pas agir sur votre propre compte »).
+- **Les traits du tableau sont continus sous les cellules d'actions** : la disposition en flex
+  passe de la cellule à un conteneur intérieur, et la cellule redevient une cellule de tableau
+  (11 tableaux concernés).
+
+---
+
 ## Unslop, troisième passe : ce qui compte se lit sans survol
 
 - **Le journal d'audit compte vraiment ses lignes hors chaîne.** L'étiquette affichait

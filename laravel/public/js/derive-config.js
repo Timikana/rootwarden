@@ -176,7 +176,9 @@
             tr.appendChild(tdQuand);
 
             const tdAction = document.createElement('td');
-            tdAction.className = 'rw-tableau__actions';
+            const groupeAction = document.createElement('div');
+            groupeAction.className = 'rw-tableau__actions';
+            tdAction.appendChild(groupeAction);
             const bouton = document.createElement('button');
             bouton.type = 'button';
             bouton.className = 'rw-bouton rw-bouton--discret';
@@ -184,7 +186,7 @@
             bouton.title = libelles.tip_rescan;
             bouton.dataset.rw = 'rescan-' + m.machine_id;
             bouton.addEventListener('click', () => rescanne(m.machine_id, bouton));
-            tdAction.appendChild(bouton);
+            groupeAction.appendChild(bouton);
             tr.appendChild(tdAction);
 
             corps.appendChild(tr);

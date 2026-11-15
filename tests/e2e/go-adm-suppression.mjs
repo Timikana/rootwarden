@@ -406,11 +406,15 @@ try {
         // TROISIEME fois le meme piege : chaque compte est une carte `<details>`
         // REPLIEE (`manage_users.php:219`), et le bouton vit dans son corps.
         // `page.$()` le trouve, le clic echoue sur « not clickable ». Deplier
-        // D'ABORD, puis ASSERTER que le bouton a une boite.
+        // D'ABORD, puis ASSERTER que le bouton a une boite. Cote portage, le
+        // bouton vit dans le menu d'actions de la ligne (un `popover`) : meme
+        // piege, meme parade — l'ouvrir.
         await page.evaluate((sel) => {
             const b = document.querySelector(sel);
             const carte = b ? b.closest('details') : null;
             if (carte) carte.open = true;
+            const menu = b ? b.closest('[popover]') : null;
+            if (menu && ! menu.matches(':popover-open')) menu.showPopover();
         }, C.supprimer(idEpr));
         const visible = await page.evaluate((sel) => {
             const b = document.querySelector(sel);

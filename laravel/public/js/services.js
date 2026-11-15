@@ -186,8 +186,10 @@
         var tdDescription = document.createElement('td');
         tdDescription.textContent = svc.description;
         var tdActions = document.createElement('td');
-        tdActions.className = 'rw-tableau__actions';
-        actions(svc).forEach(function (b) { tdActions.appendChild(b); });
+        var groupeActions = document.createElement('div');
+        groupeActions.className = 'rw-tableau__actions';
+        tdActions.appendChild(groupeActions);
+        actions(svc).forEach(function (b) { groupeActions.appendChild(b); });
 
         [tdNom, tdEtat, tdBoot, tdCategorie, tdDescription, tdActions]
             .forEach(function (t) { tr.appendChild(t); });
