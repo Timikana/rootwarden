@@ -84,6 +84,23 @@ class ListeBlancheCve
      * laissant active — un blanchiment invisible est exactement ce que cette page
      * existe pour empecher.
      */
+    /**
+     * Les CVE en liste blanche ACTIVE pour une machine : entree globale ou propre
+     * a la machine, non expiree. Meme regle que `backend/liste_blanche_cve.py`,
+     * qui retire ces CVE des compteurs, des notifications et des tickets.
+     *
+     * @return array<string,true> identifiant en majuscules => true
+     */
+    public function cvesActives(int $machineId): array
+    {
+        $ids = DB::table('cve_whitelist')
+            ->where(fn ($q) => $q->whereNull('machine_id')->orWhere('machine_id', $machineId))
+            ->where(fn ($q) => $q->whereNull('expires_at')->orWhere('expires_at', '>=', now()->toDateString()))
+            ->pluck('cve_id')->all();
+
+        return array_fill_keys(array_map(static fn ($c) => strtoupper(trim((string) $c)), $ids), true);
+    }
+
     public function liste(): array
     {
         return DB::table('cve_whitelist as w')

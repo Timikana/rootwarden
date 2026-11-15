@@ -9,7 +9,7 @@
 
 return [
     'titre'       => 'CVE whitelist',
-    'description' => "Accepted false positives, with reason, author and expiry. These entries do not hide the CVEs from scan results or reports.",
+    'description' => "Accepted false positives, with reason, author and expiry. A whitelisted CVE stays listed in scan results but is no longer counted, notified or turned into a ticket, from the next scan on.",
 
     // ── The form ─────────────────────────────────────────────────────────
     'champ_cve'        => 'CVE identifier',

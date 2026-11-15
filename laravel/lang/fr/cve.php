@@ -78,6 +78,8 @@ return [
     'export_csv'              => 'Exporter en CSV',
     // ── Enrichissement EPSS / KEV — sous-lot S6 ─────────────────────────────
     'tri_explication' => "Les vulnérabilités activement exploitées (KEV) sont classées en tête.",
+    'blanchie' => "Liste blanche",
+    'blanchie_aide' => "En liste blanche : enregistrée, mais absente des compteurs, des notifications et des tickets.",
     'kev_aide' => 'Activement exploitee — catalogue CISA des vulnerabilites exploitees connues',
     'kev_depuis' => 'au catalogue depuis le :date',
     'epss_aide' => "EPSS : probabilite d'exploitation dans les 30 jours",

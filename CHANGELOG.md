@@ -5,6 +5,21 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## La liste blanche CVE agit enfin
+
+Elle était écrite (portail et `POST /cve_whitelist`) et lue par personne : une CVE blanchie restait
+comptée, notifiée et pouvait ouvrir un ticket automatique KEV.
+
+- **Au scan** (`backend/liste_blanche_cve.py`) : les CVE blanchies pour la machine (entrée propre à
+  la machine ou globale, non expirée) sont enregistrées mais **retirées des compteurs** du scan
+  (tuiles, rapport de conformité), de la **notification** webhook et des **tickets** KEV
+  automatiques. Une panne de lecture n'écarte rien : jamais une alerte en moins.
+- **À l'affichage** : la CVE reste dans le tableau du scan, en retrait, avec une pastille
+  « Liste blanche » qui explique ce qu'elle ne fait plus.
+- Effet à partir du scan suivant : les scans déjà enregistrés gardent leurs compteurs.
+
+---
+
 ## Unslop, seconde passe : boutons qui disent leur effet, espacements sur la grille
 
 - **Les boutons de confirmation disent ce qu'ils font** : « Déployer la clé », « Supprimer le

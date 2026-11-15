@@ -146,6 +146,7 @@ class ScanCveController extends Controller
             // ── Enrichissement EPSS / KEV (sous-lot S6) ──────────────────────
             'kev_aide' => __('cve.kev_aide'),
             'kev_depuis' => __('cve.kev_depuis', ['date' => '{date}']),
+            'blanchie' => __('cve.blanchie'), 'blanchie_aide' => __('cve.blanchie_aide'),
             'epss_aide' => __('cve.epss_aide'),
             'priorite_aide' => __('cve.priorite_aide', ['libelle' => '{libelle}']),
             'non_enrichi' => __('cve.non_enrichi'),

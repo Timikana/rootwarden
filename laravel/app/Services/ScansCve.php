@@ -206,7 +206,13 @@ class ScansCve
      */
     public function findingsPourAffichage(int $scanId): array
     {
+        $scan = $this->parId($scanId);
+        $blanchies = $scan === null ? [] : app(ListeBlancheCve::class)->cvesActives((int) $scan->machine_id);
+
         return array_map(static fn ($f) => [
+            // EN LISTE BLANCHE : la ligne reste visible (on sait ce qui a ete
+            // ecarte et pourquoi), mais elle ne compte plus.
+            'b' => isset($blanchies[strtoupper(trim((string) $f->cve_id))]),
             'c' => (string) $f->cve_id,
             'p' => (string) ($f->package_name ?? ''),
             'v' => (string) ($f->package_version ?? ''),

@@ -9,7 +9,7 @@
 
 return [
     'titre'       => 'Liste blanche des CVE',
-    'description' => "Faux positifs acceptés, avec motif, auteur et échéance. Ces entrées ne masquent pas les CVE dans les résultats de scan ni dans les rapports.",
+    'description' => "Faux positifs acceptés, avec motif, auteur et échéance. Une CVE blanchie reste listée dans les résultats, mais n'est plus comptée, notifiée ni transformée en ticket, à partir du scan suivant.",
 
     // ── Le formulaire ────────────────────────────────────────────────────
     'champ_cve'        => 'Identifiant CVE',

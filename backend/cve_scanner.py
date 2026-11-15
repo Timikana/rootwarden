@@ -1020,6 +1020,16 @@ def scan_server(ssh_client, machine_id: int, machine_name: str,
                        'package': pkg['name'], 'cve_count': 0, 'step': 'scan',
                        'total_cve_found': total_cve_found}
 
+        # LISTE BLANCHE. Les CVE blanchies restent ENREGISTREES (tracabilite, et la
+        # remediation ne doit pas les croire corrigees), mais ne comptent plus :
+        # ni dans les compteurs du scan, ni dans la notification, ni pour un
+        # ticket automatique. Avant ce module, la table n'etait lue par personne.
+        from liste_blanche_cve import cves_blanchies, marque, actifs
+        n_blanchies = marque(findings, cves_blanchies(machine_id))
+        if n_blanchies:
+            yield {'type': 'progress', 'machine_id': machine_id, 'step': 'scan',
+                   'message': f"{n_blanchies} CVE en liste blanche : enregistree(s), non comptee(s)"}
+
         # Enrichissement EPSS (FIRST.org) + CISA KEV : annote chaque finding
         # avec une probabilite d'exploitation et un score de priorite consolide.
         # Best-effort : si les API sont injoignables, on garde les findings tels
@@ -1043,7 +1053,7 @@ def scan_server(ssh_client, machine_id: int, machine_name: str,
             if Config.TICKETING_AUTO_KEV:
                 try:
                     from routes.tickets import create_or_get_ticket
-                    for f in findings:
+                    for f in actifs(findings):
                         if f.get('kev'):
                             summ = f"[CVE/KEV] {f['cve_id']} sur {machine_name} ({f['package']})"
                             desc = (f"CVE {f['cve_id']} activement exploitee (CISA KEV). "
@@ -1068,10 +1078,11 @@ def scan_server(ssh_client, machine_id: int, machine_name: str,
         try:
             from webhooks import notify_cve_scan
             counts = {s: 0 for s in ('CRITICAL', 'HIGH', 'MEDIUM')}
-            for f in findings:
+            comptes = actifs(findings)
+            for f in comptes:
                 if f.get('severity') in counts:
                     counts[f['severity']] += 1
-            notify_cve_scan(machine_name, len(findings), counts['CRITICAL'], counts['HIGH'], counts['MEDIUM'], total)
+            notify_cve_scan(machine_name, len(comptes), counts['CRITICAL'], counts['HIGH'], counts['MEDIUM'], total)
         except Exception as wh_err:
             _log.debug("Webhook notification skipped: %s", wh_err)
 
@@ -1144,8 +1155,12 @@ def _save_scan(machine_id: int, findings: list[dict],
     Raises:
         mysql.connector.Error: En cas d'erreur d'insertion ou de connexion.
     """
+    # Les compteurs du scan ignorent les CVE en liste blanche ; les lignes de
+    # `cve_findings`, elles, sont toutes ecrites.
+    from liste_blanche_cve import actifs
+    comptes = actifs(findings)
     counts = {s: 0 for s in ('CRITICAL', 'HIGH', 'MEDIUM', 'LOW')}
-    for f in findings:
+    for f in comptes:
         sev = f.get('severity', 'NONE')
         if sev in counts:
             counts[sev] += 1
@@ -1159,7 +1174,7 @@ def _save_scan(machine_id: int, findings: list[dict],
                  critical_count, high_count, medium_count, low_count,
                  min_cvss, status)
             VALUES (%s,%s,%s,%s,%s,%s,%s,%s,'completed')
-        """, (machine_id, packages_scanned, len(findings),
+        """, (machine_id, packages_scanned, len(comptes),
               counts['CRITICAL'], counts['HIGH'], counts['MEDIUM'], counts['LOW'],
               min_cvss))
         scan_id = cur.lastrowid
