@@ -144,9 +144,9 @@ class ClesSshController extends Controller
              * change : le traduire ferait que le flux ne se termine plus jamais.
              */
             'marqueur_fin' => '[Fin du flux de logs]',
-            // ⛔ NUL : `/adm/server_users.php` est ARCHIVE (404). Les comptes
-            // distants sont portes ; le renvoi n'a plus d'objet.
-            'url_comptes_distants' => null,
+            // Le prerequis « scan requis » se corrige sur la page des comptes
+            // distants, servie par ce portail : lien interne.
+            'url_comptes_distants' => route('comptes-distants'),
             'lien_comptes_distants' => __('ssh.lien_comptes_distants'),
         ];
     }
