@@ -1,69 +1,49 @@
 <?php
 
 /**
- * Sudo rights per remote account — sub-batch D9a.
+ * Sudo rights per remote account.
  *
  * READ THIS BEFORE CHANGING ANY PRESET HELP TEXT. These strings describe a
- * privilege scope. The legacy claimed, under `apt_only`, "They cannot touch the
- * rest of the system", while `backend/sudo_manager.py:80-84` documents the
- * opposite — "this preset is ROOT-EQUIVALENT".
- *
- * `tests/e2e/go-adm-politiques.mjs` re-reads that module inside the container on
- * every run and refuses to let the screen contradict it. Help text that softens
- * the scope of a preset classed 'root' therefore FAILS the batch — by design.
+ * privilege scope. `tests/e2e/go-adm-politiques.mjs` re-reads
+ * `backend/sudo_manager.py` inside the container on every run and refuses to
+ * let the screen contradict it: help for a preset classed 'root' must say root.
+ * Writing rules: docs/REDACTION-INTERFACE.md.
  */
 
 return [
     'titre'          => 'Sudo rights per remote account',
-    'intro_titre'    => 'What is this page for?',
-    'intro'          => '"sudo" lets an ordinary account run certain commands as the administrator '
-                        . '(root). Here you choose, for ONE account on ONE machine, what it will be '
-                        . 'allowed to do — then you confirm before anything is written to the machine.',
+    'intro'          => 'Choose what a remote account may run as root on a machine. Nothing is written before you confirm.',
     'machine'        => 'Machine',
     'compte'         => 'Remote account',
     'aucun_compte'   => 'No managed account on this machine',
     'vide_titre'     => 'No account to grant rights to',
-    'vide_texte'     => 'This machine has no account with status "managed" or "to review". '
-                        . 'Run an inventory from the remote accounts page, then classify the '
-                        . 'accounts concerned.',
+    'vide_texte'     => 'This machine has no "managed" or "to review" account. Run an inventory from the remote accounts page, then classify the accounts.',
     'vide_action'    => 'Open remote accounts',
 
     'choix'          => 'What the account will be able to do',
     'prereglage'     => 'Preset',
-    'regles_libres'  => 'Rules entered',
-    'regles_aide'    => 'One rule per line, in sudoers format. Only the SYNTAX will be checked '
-                        . '(`visudo -cf`): the actual scope of what you write is not analysed.',
+    'regles_libres'  => 'Typed rules',
+    'regles_aide'    => 'One rule per line, in sudoers format. Only the syntax is checked, not the scope.',
     'services'       => 'Allowed services',
-    'services_aide'  => 'Comma-separated. Example: nginx, php8.2-fpm, redis-server',
+    'services_aide'  => 'Comma-separated.',
     'nopasswd'       => 'Without asking for a password (NOPASSWD)',
-    'nopasswd_aide'  => 'When ticked, the account will have no password to enter for these commands.',
+    'nopasswd_aide'  => 'No password will be asked for these commands.',
     'runas'          => 'Run as',
 
-    // ── SCOPE, as the module itself documents it ───────────────────────────
+    // ── Scope, as sudo_manager.py documents it ─────────────────────────────
     'portee_root'         => 'Grants root access',
-    'portee_root_detail'  => 'This preset ultimately allows full control of the machine.',
+    'portee_root_detail'  => 'This preset can give full control of the machine.',
     'portee_borne'        => 'Bounded scope',
-    'portee_borne_detail' => 'Closed command list, hardened by the module that produces it.',
+    'portee_borne_detail' => 'Closed list of commands.',
     'portee_inconnu'         => 'Scope not analysed',
-    'portee_inconnu_detail'  => 'You write the rule yourself; only its syntax will be checked.',
+    'portee_inconnu_detail'  => 'You write the rule; only its syntax is checked.',
 
-    'aide_all_nopasswd'       => 'Full root access, without a password: the rule written is literally '
-                                 . '"everything, as root". Reserve this for service accounts.',
-    'aide_apt_only'           => 'Allows "apt" to install and upgrade software. '
-                                 . 'THIS AMOUNTS TO ROOT ACCESS: installing a package runs its '
-                                 . 'maintainer scripts as root, which allows obtaining a root shell '
-                                 . 'through a package built for that purpose. There is no safe way to '
-                                 . '"limit this to apt". Grant it only to operators you would already '
-                                 . 'trust with root.',
-    'aide_restart_services'   => 'Allows restarting, reloading and checking the status of systemd '
-                                 . 'services, with no restriction on which ones.',
-    'aide_read_logs'          => 'Reading logs only: "tail" and "cat" under /var/log, and "journalctl" '
-                                 . 'without paging. The module removed "less", which allowed opening a '
-                                 . 'root shell.',
-    'aide_systemctl_specific' => 'Restart, reload and check the status of ONLY the services you name '
-                                 . 'below.',
-    'aide_custom'             => 'Hand-written rules. Their scope is not analysed: they may grant root '
-                                 . 'without anything saying so.',
+    'aide_all_nopasswd'       => 'Every command as root. Reserve it for service accounts.',
+    'aide_apt_only'           => 'Allows apt to install and upgrade software. Equivalent to root access: a crafted package can open a root shell.',
+    'aide_restart_services'   => 'Restart, reload and check the status of any systemd service.',
+    'aide_read_logs'          => 'Log reading: tail and cat under /var/log, journalctl without a pager.',
+    'aide_systemctl_specific' => 'Restart, reload and check the status of only the services named below.',
+    'aide_custom'             => 'Hand-written rules. Their scope is not analysed: they can grant root with nothing flagging it.',
 
     'preset_all_nopasswd'       => 'Full root access',
     'preset_restart_services'   => 'Service restarts',
@@ -72,35 +52,33 @@ return [
     'preset_systemctl_specific' => 'Named services',
     'preset_custom'             => 'Free-form rules',
 
-    // ── THE GESTURES ───────────────────────────────────────────────────────
+    // ── Actions ────────────────────────────────────────────────────────────
     'deployer'       => 'Deploy…',
     'auditer'        => 'Audit',
     'retirer'        => 'Remove…',
     'aide_deployer'  => 'Writes the configuration to the machine, after validating its syntax.',
-    'aide_auditer'   => 'Reads the file actually present on the machine. Changes nothing.',
+    'aide_auditer'   => 'Reads the file present on the machine. Changes nothing.',
     'aide_retirer'   => 'Deletes this configuration from the machine; the account loses these rights.',
 
-    // ── THE CONFIRMATION THAT WAS MISSING ──────────────────────────────────
+    // ── Confirmations ──────────────────────────────────────────────────────
     'confirmer_titre'   => 'Confirm deployment',
-    'confirmer_intro'   => 'This will write a sudoers file to the machine. Check before confirming:',
+    'confirmer_intro'   => 'A sudoers file will be written to the machine.',
     'confirmer_machine' => 'Machine',
     'confirmer_compte'  => 'Account',
     'confirmer_portee'  => 'What this grants',
-    'confirmer_root'    => 'This preset grants root access to that account.',
+    'confirmer_root'    => 'This preset grants root access to this account.',
     'confirmer_valider' => 'Deploy to the machine',
     'confirmer_annuler' => 'Cancel',
     'retirer_titre'     => 'Confirm removal',
-    'retirer_intro'     => 'This account\'s sudoers file will be deleted from the machine. '
-                           . 'The account will lose the rights it granted.',
+    'retirer_intro'     => 'This account\'s sudoers file will be deleted from the machine. The account will lose these rights.',
     'retirer_valider'   => 'Remove from the machine',
     'reauth'            => 'You will be asked to re-authenticate before this is sent.',
 
-    // ── HISTORY ────────────────────────────────────────────────────────────
+    // ── History ────────────────────────────────────────────────────────────
     'historique'        => 'History and rollback',
     'hist_date'         => 'Date',
     'hist_auteur'       => 'By',
     'hist_etat'         => 'Status',
-    'hist_fichier'      => 'File',
     'hist_regle'        => 'Rule written',
     'hist_vide'         => 'No deployment recorded for this account.',
     'etat_applied'      => 'Applied',
@@ -110,10 +88,8 @@ return [
     'derniere'          => 'Last write',
     'jamais'            => 'never deployed',
     'rollback_titre' => 'Restore an earlier version',
-    'rollback_texte' => 'Restores the exact sudoers from before this deployment. The content is what was saved, not a reconstruction. Re-authentication is required.',
+    'rollback_texte' => 'Rewrites on the machine the exact sudoers from before this deployment. Re-authentication required.',
     'resultat'          => 'Result',
-
-    /* L'annulation d'un deploiement, rouverte le 2026-09-07. */
     'rollback' => 'Roll back',
-    'rollback_confirme' => 'Roll this deployment back and restore the previous sudoers?\\n\\nThe exact earlier content is rewritten on the machine — not retyped rules, the saved bytes. Re-authentication will be requested.',
+    'rollback_confirme' => 'Roll this deployment back and rewrite the previous sudoers on the machine? Re-authentication will be requested.',
 ];
