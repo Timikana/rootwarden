@@ -109,7 +109,7 @@ body {
     border: 1px solid var(--rw-bordure);
     border-radius: var(--rw-rayon);
     box-shadow: var(--rw-ombre);
-    padding: 30px 30px 26px;
+    padding: 32px 32px 24px;
 }
 
 .rw-carte--large { max-width: 720px; }
@@ -120,7 +120,7 @@ body {
  * l'etroit et 1 200 px de vide a cote : la page a de la largeur, le formulaire
  * s'en sert.
  */
-.rw-carte--pleine { max-width: none; padding: 22px 24px 18px; }
+.rw-carte--pleine { max-width: none; padding: 24px 24px 16px; }
 
 .rw-titre {
     margin: 0 0 4px;
@@ -130,7 +130,7 @@ body {
 }
 
 .rw-sous-titre {
-    margin: 0 0 22px;
+    margin: 0 0 24px;
     color: var(--rw-texte-doux);
     font-size: 14px;
 }
@@ -138,15 +138,15 @@ body {
 /* Fil d'etapes : dire ou l'on en est evite de faire deviner. */
 .rw-etapes {
     display: flex;
-    gap: 6px;
-    margin: 0 0 22px;
+    gap: 8px;
+    margin: 0 0 24px;
     font-size: 12px;
     color: var(--rw-texte-doux);
 }
 
 .rw-etapes__pas {
     flex: 1;
-    padding-top: 7px;
+    padding-top: 8px;
     border-top: 3px solid var(--rw-bordure);
 }
 
@@ -161,7 +161,7 @@ body {
 
 .rw-etiquette {
     display: block;
-    margin-bottom: 6px;
+    margin-bottom: 8px;
     font-size: 13px;
     font-weight: 500;
     color: var(--rw-texte-doux);
@@ -169,7 +169,7 @@ body {
 
 .rw-saisie {
     width: 100%;
-    padding: 10px 12px;
+    padding: 12px 12px;
     border: 1px solid var(--rw-bordure);
     border-radius: 8px;
     background: var(--rw-surface-2);
@@ -193,7 +193,7 @@ body {
 
 /* Aide sous un champ : dit quoi saisir, pas seulement ce qui est attendu. */
 .rw-aide {
-    margin: 6px 0 0;
+    margin: 8px 0 0;
     font-size: 12px;
     color: var(--rw-texte-doux);
 }
@@ -207,9 +207,9 @@ body {
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    gap: 10px;
-    margin-top: 22px;
-    padding-top: 18px;
+    gap: 12px;
+    margin-top: 24px;
+    padding-top: 16px;
     border-top: 1px solid var(--rw-bordure);
 }
 
@@ -218,7 +218,7 @@ body {
 /* 36 px de haut, 14 px, graisse 500 : un bouton se lit sans crier. Le gras et
    la taille sont reserves aux titres. */
 .rw-bouton {
-    padding: 8px 14px;
+    padding: 8px 16px;
     border: 1px solid transparent;
     border-radius: 6px;
     background: var(--rw-accent);
@@ -247,8 +247,8 @@ body {
    ══════════════════════════════════════════════════════════════════════════ */
 
 .rw-erreur {
-    margin: 0 0 18px;
-    padding: 11px 13px;
+    margin: 0 0 16px;
+    padding: 12px 12px;
     border: 1px solid var(--rw-danger);
     border-radius: 8px;
     background: var(--rw-danger-fond);
@@ -262,8 +262,8 @@ body {
    dimensions que `.rw-erreur`, pour que les deux messages occupent la meme place
    et ne fassent pas sauter la mise en page en se remplacant. */
 .rw-confirmation {
-    margin: 0 0 18px;
-    padding: 11px 13px;
+    margin: 0 0 16px;
+    padding: 12px 12px;
     border: 1px solid var(--rw-succes);
     border-radius: 8px;
     background: var(--rw-succes-fond);
@@ -279,8 +279,8 @@ body {
    les trois messages occupent la meme place et ne font pas sauter la mise en
    page en se remplacant. */
 .rw-avertissement {
-    margin: 0 0 18px;
-    padding: 11px 13px;
+    margin: 0 0 16px;
+    padding: 12px 12px;
     border: 1px solid var(--rw-avertissement);
     border-radius: 8px;
     background: var(--rw-avert-fond);
@@ -315,7 +315,7 @@ body {
 .rw-liste-effets--ordonnee { list-style: decimal; }
 
 .rw-note {
-    margin: 22px 0 0;
+    margin: 24px 0 0;
     padding-top: 16px;
     border-top: 1px solid var(--rw-bordure);
     color: var(--rw-texte-doux);
@@ -325,8 +325,8 @@ body {
 .rw-lien { color: var(--rw-accent); }
 
 .rw-encart {
-    margin: 0 0 22px;
-    padding: 13px 15px;
+    margin: 0 0 24px;
+    padding: 12px 16px;
     border: 1px solid var(--rw-bordure);
     border-left: 3px solid var(--rw-accent);
     border-radius: 8px;
@@ -363,7 +363,7 @@ body {
     align-items: center;
     gap: 8px;
     flex-shrink: 0;
-    padding: 15px 18px;
+    padding: 16px 16px;
     font-weight: 600;
     font-size: 14px;
     color: var(--rw-texte);
@@ -378,7 +378,7 @@ body {
  */
 .rw-laterale__legende {
     flex-shrink: 0;
-    padding: 9px 14px;
+    padding: 8px 16px;
     border-bottom: 1px solid var(--rw-bordure);
     background: var(--rw-surface-2);
     font-size: 12px;
@@ -394,11 +394,11 @@ body {
     flex: 1 1 auto;
     min-height: 0;      /* indispensable : sans lui un enfant flex ne defile pas */
     overflow-y: auto;
-    padding: 6px 8px 12px;
+    padding: 8px 8px 12px;
 }
 
 .rw-menu__section {
-    padding: 16px 10px 4px;
+    padding: 16px 12px 4px;
     font-size: 12px;
     font-weight: 500;
     color: var(--rw-texte-doux);
@@ -408,7 +408,7 @@ body {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 7px 10px;
+    padding: 8px 12px;
     border-radius: 6px;
     color: var(--rw-texte);
     text-decoration: none;
@@ -455,8 +455,8 @@ body {
 .rw-entete {
     display: flex;
     align-items: center;
-    gap: 14px;
-    padding: 11px 24px;
+    gap: 16px;
+    padding: 12px 24px;
     background: var(--rw-surface);
     border-bottom: 1px solid var(--rw-bordure);
     position: sticky;
@@ -527,7 +527,7 @@ body {
  */
 .rw-contenu {
     flex: 1;
-    padding: 26px var(--rw-marge-laterale) 40px;
+    padding: 24px var(--rw-marge-laterale) 40px;
     width: 100%;
 }
 
@@ -546,8 +546,8 @@ body {
 .rw-tuile {
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    padding: 16px 18px;
+    gap: 8px;
+    padding: 16px 16px;
     background: var(--rw-surface);
     border: 1px solid var(--rw-bordure);
     border-radius: var(--rw-rayon);
@@ -563,11 +563,11 @@ body {
     line-height: 1.15;
 }
 
-.rw-tuile__lien { margin-top: auto; padding-top: 10px; font-size: 13px; }
+.rw-tuile__lien { margin-top: auto; padding-top: 12px; font-size: 13px; }
 
 /* Etat vide : dire ce qui manque ET quoi faire. */
 .rw-vide {
-    padding: 24px 26px;
+    padding: 24px 24px;
     border: 1px dashed var(--rw-bordure);
     border-radius: var(--rw-rayon);
     color: var(--rw-texte-doux);
@@ -577,7 +577,7 @@ body {
    se relit ligne par ligne, l'oeil perd le debut de la ligne suivante. */
 .rw-vide p { max-width: 68ch; margin: 0; }
 
-.rw-vide__titre { font-weight: 600; color: var(--rw-texte); margin-bottom: 6px; }
+.rw-vide__titre { font-weight: 600; color: var(--rw-texte); margin-bottom: 8px; }
 
 /*
  * « RIEN A MONTRER » ET « LA LECTURE A ECHOUE » NE SE RESSEMBLENT PAS.
@@ -638,7 +638,7 @@ body {
     align-items: center;
     justify-content: space-between;
     flex-shrink: 0;
-    padding: 13px 16px;
+    padding: 12px 16px;
     border-bottom: 1px solid var(--rw-bordure);
     font-weight: 600;
 }
@@ -647,7 +647,7 @@ body {
     cursor: pointer;
     font-size: 20px;
     line-height: 1;
-    padding: 0 6px;
+    padding: 0 8px;
     color: var(--rw-texte-doux);
 }
 
@@ -715,7 +715,7 @@ body {
 
 .rw-langues__lien,
 .rw-langues__actif {
-    padding: 3px 8px;
+    padding: 4px 8px;
     border-radius: 6px;
     line-height: 1.2;
 }
@@ -770,7 +770,7 @@ body {
     margin: 20px 0 16px;
 }
 
-.rw-filtre { display: flex; flex-direction: column; gap: 5px; }
+.rw-filtre { display: flex; flex-direction: column; gap: 4px; }
 
 .rw-filtre__etiquette {
     font-size: 12px;
@@ -778,7 +778,7 @@ body {
     color: var(--rw-texte-doux);
 }
 
-.rw-saisie--compacte { width: auto; min-width: 190px; padding: 7px 10px; font-size: 14px; }
+.rw-saisie--compacte { width: auto; min-width: 190px; padding: 8px 12px; font-size: 14px; }
 
 /*
  * Le cadre porte le defilement horizontal, PAS le corps de la page : un
@@ -828,7 +828,7 @@ body {
 .rw-tableau thead th {
     position: sticky;
     top: 0;
-    padding: 10px 14px;
+    padding: 12px 16px;
     background: var(--rw-surface-2);
     border-bottom: 1px solid var(--rw-bordure);
     text-align: left;
@@ -839,7 +839,7 @@ body {
 }
 
 .rw-tableau tbody td {
-    padding: 9px 14px;
+    padding: 8px 16px;
     border-top: 1px solid var(--rw-bordure);
     vertical-align: top;
 }
@@ -849,8 +849,8 @@ body {
 .rw-tableau__discret { font-size: 12px; color: var(--rw-texte-doux); white-space: nowrap; }
 
 /* Message pleine largeur : chargement, erreur, ou etat vide. */
-.rw-tableau__message { padding: 30px 20px; text-align: center; color: var(--rw-texte-doux); }
-.rw-tableau__message-titre { font-weight: 600; color: var(--rw-texte); margin-bottom: 6px; }
+.rw-tableau__message { padding: 32px 20px; text-align: center; color: var(--rw-texte-doux); }
+.rw-tableau__message-titre { font-weight: 600; color: var(--rw-texte); margin-bottom: 8px; }
 .rw-tableau__message-aide { max-width: 60ch; margin: 0 auto; font-size: 13px; }
 
 /* ── Etiquettes et pastilles ────────────────────────────────────────────── */
@@ -868,7 +868,7 @@ body {
  */
 .rw-badge {
     display: inline-block;
-    padding: 2px 7px;
+    padding: 2px 8px;
     border-radius: 6px;
     background: var(--rw-accent-doux);
     color: var(--rw-accent);
@@ -879,7 +879,7 @@ body {
 
 .rw-pastille {
     display: inline-block;
-    padding: 2px 9px;
+    padding: 2px 8px;
     border-radius: 999px;
     font-size: 12px;
     font-weight: 600;
@@ -938,7 +938,7 @@ body {
     flex-wrap: wrap;
     gap: 4px;
     margin: 20px 0 16px;
-    padding: 3px;
+    padding: 4px;
     border: 1px solid var(--rw-bordure);
     border-radius: 8px;
     background: var(--rw-surface-2);
@@ -946,7 +946,7 @@ body {
 }
 
 .rw-onglet {
-    padding: 7px 14px;
+    padding: 8px 16px;
     border: 0;
     border-radius: 6px;
     background: transparent;
@@ -973,7 +973,7 @@ body {
     white-space: nowrap;
 }
 
-.rw-tableau__actions .rw-bouton { padding: 5px 12px; font-size: 13px; }
+.rw-tableau__actions .rw-bouton { padding: 4px 12px; font-size: 13px; }
 
 .rw-bouton--succes { background: var(--rw-succes); color: var(--rw-accent-texte); }
 .rw-bouton--danger {
@@ -1025,8 +1025,8 @@ a.rw-bouton { display: inline-block; }
     display: flex;
     flex-wrap: wrap;
     align-items: flex-end;
-    gap: 14px;
-    padding: 14px 16px;
+    gap: 16px;
+    padding: 16px 16px;
     background: var(--rw-surface-2);
     border-left: 3px solid var(--rw-danger);
 }
@@ -1036,7 +1036,7 @@ a.rw-bouton { display: inline-block; }
 .rw-etiquette-champ {
     display: flex;
     flex-direction: column;
-    gap: 5px;
+    gap: 4px;
     flex: 1;
     min-width: 260px;
     font-size: 12px;
@@ -1111,7 +1111,7 @@ a.rw-bouton { display: inline-block; }
 .rw-entete-page__actions {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
     /*
      * PAS de `flex-shrink: 0` : le bloc gardait sa largeur naturelle et
      * debordait de l'ecran au lieu de se replier — a 390 px, « Actualiser
@@ -1136,7 +1136,7 @@ a.rw-bouton { display: inline-block; }
  * s'etirent sur toute la largeur.
  */
 .rw-grille--compacte { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
-.rw-grille--compacte .rw-tuile { padding: 14px 15px; }
+.rw-grille--compacte .rw-tuile { padding: 16px 16px; }
 
 .rw-tuile__valeur--ok     { color: var(--rw-succes); }
 .rw-tuile__valeur--alerte { color: var(--rw-danger); }
@@ -1148,7 +1148,7 @@ a.rw-bouton { display: inline-block; }
  * annoncer. Vide, elle n'occupe aucune place.
  */
 .rw-annonce {
-    margin: 14px 0 0;
+    margin: 16px 0 0;
     font-size: 13px;
     color: var(--rw-texte-doux);
 }
@@ -1163,7 +1163,7 @@ a.rw-bouton { display: inline-block; }
  * c'est la seule information de la page qui dise quoi faire.
  */
 .rw-detail-ecart {
-    margin: 5px 0 0;
+    margin: 4px 0 0;
     max-width: 34ch;
     font-size: 12px;
     line-height: 1.35;
@@ -1175,10 +1175,10 @@ a.rw-bouton { display: inline-block; }
 /* Liste de guidage dans un encart : trois actions, trois lignes lisibles. */
 .rw-liste-guide {
     margin: 8px 0 0;
-    padding-left: 18px;
+    padding-left: 16px;
 }
 
-.rw-liste-guide li { margin-top: 5px; line-height: 1.45; }
+.rw-liste-guide li { margin-top: 4px; line-height: 1.45; }
 
 /*
  * Le panneau de decision porte parfois un texte avant ses champs — un titre et
@@ -1236,13 +1236,13 @@ a.rw-bouton { display: inline-block; }
 /* Libelle d'un champ pose dans un `<label>` englobant, avec son aide dessous. */
 .rw-champ__etiquette {
     display: block;
-    margin-bottom: 6px;
+    margin-bottom: 8px;
     font-size: 13px;
     font-weight: 500;
     color: var(--rw-texte-doux);
 }
 
-.rw-champ .rw-aide { display: block; margin-top: 5px; }
+.rw-champ .rw-aide { display: block; margin-top: 4px; }
 
 /*
  * Annonce d'AVERTISSEMENT : ni une reussite, ni un echec. Sert a prevenir
@@ -1266,7 +1266,7 @@ a.rw-bouton { display: inline-block; }
  */
 .rw-recherche { display: block; max-width: 780px; margin-bottom: 8px; }
 
-.rw-saisie--large { padding: 13px 15px; font-size: 16px; }
+.rw-saisie--large { padding: 12px 16px; font-size: 16px; }
 
 /* Une categorie de resultats. Les liens se touchent, separes d'un filet. */
 .rw-resultats { display: flex; flex-direction: column; margin-top: 4px; }
@@ -1274,7 +1274,7 @@ a.rw-bouton { display: inline-block; }
 .rw-resultat {
     position: relative;
     display: block;
-    padding: 9px 10px;
+    padding: 8px 12px;
     border-top: 1px solid var(--rw-bordure);
     border-radius: 6px;
     color: inherit;
@@ -1293,7 +1293,7 @@ a.rw-bouton { display: inline-block; }
  * legende n'est pas repetee sur chaque ligne — l'encart de la page l'explique
  * une fois, et le `title` la porte entree par entree.
  */
-.rw-resultat--externe { padding-right: 26px; }
+.rw-resultat--externe { padding-right: 24px; }
 
 .rw-resultat__marqueur {
     position: absolute;
@@ -1303,13 +1303,13 @@ a.rw-bouton { display: inline-block; }
     color: var(--rw-texte-doux);
 }
 
-.rw-vide__texte { margin-top: 6px; font-size: 13px; }
+.rw-vide__texte { margin-top: 8px; font-size: 13px; }
 
 /*
  * Bouton de relevé, pose dans une cellule : trois par ligne sur un tableau de
  * treize colonnes. Il reste lisible sans elargir la colonne.
  */
-.rw-bouton--minuscule { padding: 3px 8px; font-size: 12px; }
+.rw-bouton--minuscule { padding: 4px 8px; font-size: 12px; }
 
 /*
  * La colonne d'actions se REPLIE dans une largeur bornee.
@@ -1381,7 +1381,7 @@ a.rw-bouton { display: inline-block; }
 .rw-journal__general {
     max-height: 190px;
     overflow-y: auto;
-    padding: 12px 14px;
+    padding: 12px 16px;
     border: 1px solid var(--rw-bordure);
     border-radius: var(--rw-rayon);
     background: var(--rw-surface-2);
@@ -1403,8 +1403,8 @@ a.rw-bouton { display: inline-block; }
 .rw-journal__panneaux {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-    gap: 14px;
-    margin-top: 14px;
+    gap: 16px;
+    margin-top: 16px;
 }
 
 .rw-journal__panneaux:empty { display: none; }
@@ -1423,7 +1423,7 @@ a.rw-bouton { display: inline-block; }
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 10px;
+    gap: 12px;
     padding: 8px 12px;
     border-bottom: 1px solid var(--rw-bordure);
     background: var(--rw-surface-2);
@@ -1434,7 +1434,7 @@ a.rw-bouton { display: inline-block; }
 .log-follow-toggle {
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: 4px;
     font-size: 12px;
     color: var(--rw-texte-doux);
     cursor: pointer;
@@ -1446,7 +1446,7 @@ a.rw-bouton { display: inline-block; }
 .log-window {
     max-height: 240px;
     overflow-y: auto;
-    padding: 10px 12px;
+    padding: 12px 12px;
     font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
     font-size: 12px;
     line-height: 1.5;
@@ -1479,7 +1479,7 @@ a.rw-bouton { display: inline-block; }
  */
 .rw-actions--groupe {
     flex-wrap: wrap;
-    margin-top: 14px;
+    margin-top: 16px;
     padding-top: 0;
     border-top: none;
 }
@@ -1508,8 +1508,8 @@ a.rw-bouton { display: inline-block; }
  * liste et ce que cron sait exprimer.
  */
 .rw-apercu {
-    margin: 4px 0 18px;
-    padding: 10px 12px;
+    margin: 4px 0 16px;
+    padding: 12px 12px;
     border-left: 3px solid var(--rw-accent);
     border-radius: 0 var(--rw-rayon) var(--rw-rayon) 0;
     background: var(--rw-surface-2);
@@ -1534,11 +1534,11 @@ a.rw-bouton { display: inline-block; }
    absent de la feuille avant d'etre ajoute : une classe deja prise se renomme,
    elle ne se surcharge pas. */
 .rw-section {
-    margin: 30px 0 0;
-    padding-top: 22px;
+    margin: 32px 0 0;
+    padding-top: 24px;
     border-top: 1px solid var(--rw-bordure);
 }
-.rw-section:first-of-type { margin-top: 18px; }
+.rw-section:first-of-type { margin-top: 16px; }
 .rw-section__entete {
     font-size: 16px;
     font-weight: 600;
@@ -1548,7 +1548,7 @@ a.rw-bouton { display: inline-block; }
     justify-content: space-between;
     flex-wrap: wrap;
     gap: 8px;
-    margin-bottom: 10px;
+    margin-bottom: 12px;
 }
 
 /* La note de posture : trois teintes, parce qu'un F rendu comme un A ne
@@ -1576,7 +1576,7 @@ a.rw-bouton { display: inline-block; }
    Vu a l'image, aucune assertion DOM ne le voit. */
 .rw-tableau tbody th[scope="row"] {
     width: 1%;
-    padding: 10px 14px;
+    padding: 12px 16px;
     text-align: left;
     white-space: nowrap;
     font-weight: 600;
@@ -1669,7 +1669,7 @@ a.rw-bouton { display: inline-block; }
     gap: 8px;
     width: 100%;
     margin: 12px 0 0;
-    padding: 9px 12px;
+    padding: 8px 12px;
     background: var(--rw-surface-2);
     border: 1px solid var(--rw-bordure);
     border-radius: var(--rw-rayon);
@@ -1701,11 +1701,11 @@ a.rw-bouton { display: inline-block; }
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    margin-top: 10px;
+    margin-top: 12px;
 }
 
 /* Etat vide a l'interieur d'une carte : le meme discours, moins d'air. */
-.rw-vide--compact { margin: 10px 0 0; padding: 14px 16px; }
+.rw-vide--compact { margin: 12px 0 0; padding: 16px 16px; }
 
 /* Un intitule que seuls les lecteurs d'ecran voient. Le champ de recherche porte
    un `placeholder`, qui n'est PAS un nom accessible. */
@@ -1796,7 +1796,7 @@ a.rw-bouton { display: inline-block; }
 .rw-cve-suivi {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
     white-space: nowrap;
 }
 .rw-cve-suivi select { min-width: 7.5em; }
@@ -1854,7 +1854,7 @@ a.rw-bouton { display: inline-block; }
  * le resume — colonne d'appoint, deja bornee et tronquee — qui cede.
  */
 .rw-cve-severite { white-space: nowrap; }
-.rw-cve-marques { display: inline-flex; align-items: center; gap: 5px; }
+.rw-cve-marques { display: inline-flex; align-items: center; gap: 4px; }
 /* Un finding non enrichi le DIT : une case vide se lit « aucun risque ». */
 .rw-cve-epss--absent { font-style: italic; }
 
@@ -1870,9 +1870,9 @@ a.rw-bouton { display: inline-block; }
 .rw-cve-priorite-barre {
     display: flex;
     align-items: center;
-    gap: 14px;
+    gap: 16px;
     flex-wrap: wrap;
-    margin: 10px 0 6px;
+    margin: 12px 0 8px;
 }
 .rw-cve-priorite-barre .rw-cve-priorite-note { flex: 1 1 24ch; margin: 0; }
 
@@ -1890,8 +1890,8 @@ a.rw-bouton { display: inline-block; }
 .rw-scan-avancement {
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    margin: 10px 0;
+    gap: 8px;
+    margin: 12px 0;
 }
 .rw-scan-avancement .rw-aide { margin: 0; }
 
@@ -1937,19 +1937,19 @@ a.rw-bouton { display: inline-block; }
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 10px 14px;
+    padding: 12px 16px;
     cursor: pointer;
 }
 .rw-liste-selection__etiquette:hover { background: var(--rw-surface-2); }
 .rw-liste-selection__corps { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.rw-liste-selection__nom { font-weight: 500; display: flex; align-items: center; gap: 6px; }
+.rw-liste-selection__nom { font-weight: 500; display: flex; align-items: center; gap: 8px; }
 .rw-liste-selection__detail {
     font-size: 12px;
     color: var(--rw-texte-doux);
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
     flex-wrap: wrap;
 }
 /* Une ligne masquee par un filtre sort du flux : elle ne doit pas laisser de
@@ -1987,7 +1987,7 @@ a.rw-bouton { display: inline-block; }
 .rw-liste-selection__etiquette--empilee {
     flex-direction: column;
     align-items: stretch;
-    gap: 6px;
+    gap: 8px;
 }
 /* Un nom de machine peut etre long et sans espace (`Site_Internet_Pre-Prod`) :
    sans point de coupe il redeborderait a lui seul. */
@@ -2013,13 +2013,13 @@ a.rw-bouton { display: inline-block; }
     border: 1px solid var(--rw-bordure);
     border-left: 3px solid var(--rw-danger);
     border-radius: var(--rw-rayon);
-    padding: 12px 14px;
+    padding: 12px 16px;
 }
-.rw-preflight__entete { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; }
+.rw-preflight__entete { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; }
 .rw-preflight__titre { margin: 8px 0 2px; font-weight: 500; }
 .rw-preflight__liste {
     margin: 0 0 4px;
-    padding-left: 22px;
+    padding-left: 24px;
     font-size: 13px;
     color: var(--rw-texte-doux);
 }
@@ -2036,8 +2036,8 @@ a.rw-bouton { display: inline-block; }
  * en fragment de document.
  */
 .rw-journal {
-    margin: 10px 0;
-    padding: 12px 14px;
+    margin: 12px 0;
+    padding: 12px 16px;
     max-height: 380px;
     overflow: auto;
     background: var(--rw-surface-2);
@@ -2050,7 +2050,7 @@ a.rw-bouton { display: inline-block; }
     word-break: break-word;
 }
 .rw-journal__erreur { color: var(--rw-danger); font-weight: 500; }
-.rw-journal__fin { color: var(--rw-texte-doux); font-style: italic; margin-top: 6px; }
+.rw-journal__fin { color: var(--rw-texte-doux); font-style: italic; margin-top: 8px; }
 
 /* ── Enrôlement du second facteur ─────────────────────────────────────────
    Le QR est un SVG produit par le serveur (le conteneur n'a ni gd ni
@@ -2063,7 +2063,7 @@ a.rw-bouton { display: inline-block; }
     padding: 12px;
     border-radius: 8px;
     width: fit-content;
-    margin: 0 auto 14px;
+    margin: 0 auto 16px;
     line-height: 0;
 }
 .rw-qr svg { display: block; width: 220px; height: 220px; }
@@ -2079,8 +2079,8 @@ a.rw-bouton { display: inline-block; }
     background: var(--rw-surface-2);
     border: 1px solid var(--rw-bordure);
     border-radius: 8px;
-    padding: 10px 12px;
-    margin: 0 0 18px;
+    padding: 12px 12px;
+    margin: 0 0 16px;
     color: var(--rw-texte);
 }
 
@@ -2107,8 +2107,8 @@ a.rw-onglet { text-decoration: none; display: inline-block; }
    casse pas la ligne, d'où les `display: inline` ci-dessous.
    ══════════════════════════════════════════════════════════════════════════ */
 .rw-bloc-secondaire {
-    margin-top: 18px;
-    padding-top: 14px;
+    margin-top: 16px;
+    padding-top: 16px;
     border-top: 1px solid var(--rw-bordure);
 }
 
@@ -2116,8 +2116,8 @@ a.rw-onglet { text-decoration: none; display: inline-block; }
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 6px;
-    margin: 6px 0 10px;
+    gap: 8px;
+    margin: 8px 0 12px;
 }
 
 .rw-jetons__forme { display: inline; }
@@ -2141,7 +2141,7 @@ a.rw-onglet { text-decoration: none; display: inline-block; }
     flex-wrap: wrap;
     align-items: baseline;
     gap: 8px;
-    padding: 5px 0;
+    padding: 4px 0;
     border-bottom: 1px solid var(--rw-bordure);
     font-size: 14px;
 }
@@ -2169,7 +2169,7 @@ a.rw-onglet { text-decoration: none; display: inline-block; }
     display: flex;
     flex-direction: row;
     align-items: flex-start;
-    gap: 10px;
+    gap: 12px;
     cursor: pointer;
 }
 
@@ -2218,7 +2218,7 @@ a.rw-onglet { text-decoration: none; display: inline-block; }
  */
 .rw-diff {
     margin: 8px 0 0;
-    padding: 10px 12px;
+    padding: 12px 12px;
     border: 1px solid var(--rw-bordure);
     border-radius: 8px;
     background: var(--rw-surface-2);
@@ -2302,8 +2302,8 @@ a.rw-onglet { text-decoration: none; display: inline-block; }
  *     pourrait ne pas exister.
  */
 .rw-frise {
-    margin: 12px 0 6px;
-    padding: 10px 12px 0;
+    margin: 12px 0 8px;
+    padding: 12px 12px 0;
     border: 1px solid var(--rw-bordure);
     border-radius: var(--rw-rayon);
     background: var(--rw-surface);
@@ -2312,7 +2312,7 @@ a.rw-onglet { text-decoration: none; display: inline-block; }
 .rw-frise__barres {
     display: flex;
     align-items: flex-end;
-    gap: 3px;
+    gap: 4px;
     height: 148px;
     min-width: 100%;
 }
@@ -2330,7 +2330,7 @@ a.rw-onglet { text-decoration: none; display: inline-block; }
     flex-direction: column;
     justify-content: flex-end;
     align-items: center;
-    gap: 3px;
+    gap: 4px;
 }
 .rw-frise__valeur {
     font-size: 12px;
@@ -2358,8 +2358,8 @@ a.rw-onglet { text-decoration: none; display: inline-block; }
  */
 .rw-frise__axe {
     display: flex;
-    gap: 3px;
-    margin-top: 6px;
+    gap: 4px;
+    margin-top: 8px;
     padding-bottom: 8px;
     min-width: 100%;
 }
@@ -2376,7 +2376,7 @@ a.rw-onglet { text-decoration: none; display: inline-block; }
 .rw-frise__legende {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
     margin: 0 0 4px;
     font-size: 12px;
     color: var(--rw-texte-doux);
@@ -2386,7 +2386,7 @@ a.rw-onglet { text-decoration: none; display: inline-block; }
     width: 10px;
     height: 10px;
     border-radius: 4px;
-    margin-left: 10px;
+    margin-left: 12px;
 }
 .rw-frise__cle:first-child { margin-left: 0; }
 .rw-frise__cle--ban   { background: var(--rw-danger); }
@@ -2418,7 +2418,7 @@ a.rw-onglet { text-decoration: none; display: inline-block; }
  */
 .rw-fichier {
     margin: 8px 0 0;
-    padding: 12px 14px;
+    padding: 12px 16px;
     max-height: 420px;
     overflow: auto;
     border: 1px solid var(--rw-bordure);
@@ -2465,7 +2465,7 @@ a.rw-onglet { text-decoration: none; display: inline-block; }
     display: flex;
     flex-direction: column;
     gap: 8px;
-    margin: 14px 0 0;
+    margin: 16px 0 0;
     padding: 0;
     list-style: none;
 }
@@ -2475,7 +2475,7 @@ a.rw-onglet { text-decoration: none; display: inline-block; }
     align-items: flex-start;
     gap: 12px;
     flex-wrap: wrap;
-    padding: 12px 14px;
+    padding: 12px 16px;
     border: 1px solid var(--rw-bordure);
     border-radius: var(--rw-rayon);
     background: var(--rw-surface);
@@ -2532,8 +2532,8 @@ a.rw-onglet { text-decoration: none; display: inline-block; }
 .rw-liste-etats {
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    margin-top: 10px;
+    gap: 8px;
+    margin-top: 12px;
 }
 /*
  * LA LIGNE EST BORNEE, ET C'EST LE `margin-left: auto` QUI L'IMPOSE.
@@ -2562,9 +2562,9 @@ a.rw-onglet { text-decoration: none; display: inline-block; }
 .rw-liste-etats__ligne {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
     flex-wrap: wrap;
-    padding: 9px 12px;
+    padding: 8px 12px;
     border: 1px solid var(--rw-bordure);
     border-radius: var(--rw-rayon);
     background: var(--rw-surface);
@@ -2579,7 +2579,7 @@ a.rw-onglet { text-decoration: none; display: inline-block; }
 .rw-liste-etats__nom { font-weight: 600; min-width: 8ch; }
 .rw-liste-etats__jails {
     display: flex;
-    gap: 5px;
+    gap: 4px;
     flex-wrap: wrap;
     margin-left: auto;
 }
@@ -2600,8 +2600,8 @@ a.rw-onglet { text-decoration: none; display: inline-block; }
 .rw-faits {
     display: flex;
     flex-wrap: wrap;
-    gap: 10px 26px;
-    margin: 10px 0 18px;
+    gap: 12px 24px;
+    margin: 12px 0 16px;
 }
 .rw-faits__bloc { display: flex; flex-direction: column; gap: 2px; }
 .rw-faits dt {
@@ -2611,7 +2611,7 @@ a.rw-onglet { text-decoration: none; display: inline-block; }
 }
 .rw-faits dd { margin: 0; font-size: 14px; font-weight: 600; }
 
-.rw-champ--espace { margin-top: 14px; }
+.rw-champ--espace { margin-top: 16px; }
 .rw-titre--espace { margin-top: 16px; }
 
 /* Trois reglages cote a cote sur grand ecran, empiles au doigt. Pose au
@@ -2619,8 +2619,8 @@ a.rw-onglet { text-decoration: none; display: inline-block; }
 .rw-grille-champs {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-    gap: 14px;
-    margin: 14px 0 4px;
+    gap: 16px;
+    margin: 16px 0 4px;
 }
 
 /*
@@ -2645,7 +2645,7 @@ a.rw-onglet { text-decoration: none; display: inline-block; }
  * ils ne peuvent plus s'ecarter.
  */
 .rw-pied {
-    padding: 18px var(--rw-marge-laterale) 26px;
+    padding: 16px var(--rw-marge-laterale) 24px;
     color: var(--rw-texte-doux);
     font-size: 12px;
     text-align: right;
@@ -2658,7 +2658,7 @@ a.rw-onglet { text-decoration: none; display: inline-block; }
     flex-wrap: wrap;
     justify-content: flex-end;
     align-items: center;
-    gap: 6px 16px;
+    gap: 8px 16px;
 }
 
 /* ── LES LIENS DU PIED ────────────────────────────────────────────────────
@@ -2741,8 +2741,8 @@ a.rw-onglet { text-decoration: none; display: inline-block; }
  *
  * ══ LE NOMBRE, ET POURQUOI IL N'EST PAS DERIVABLE ═══════════════════════
  *
- * Premier jet : 64 px, estimes EN LISANT le CSS (`padding: 11px`, texte de
- * 15px, une bordure) — soit ~44 px, arrondis vers le haut par prudence.
+ * Premier jet : 64 px, estimes EN LISANT le CSS (`padding: 12px`, texte de
+ * 16px, une bordure) — soit ~44 px, arrondis vers le haut par prudence.
  *
  * **La hauteur RENDUE est 65 px.** L'estimation etait fausse de 21 px, et le
  * plancher ne couvrait pas : 64 < 65. Mesure au rendu par la session 7, dont
@@ -2811,9 +2811,9 @@ html { scroll-padding-top: var(--rw-defilement-marge); }
 .rw-alerte {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
     min-width: 0;
-    padding: 10px 14px;
+    padding: 12px 16px;
     border: 1px solid;
     border-radius: 8px;
     font-size: 14px;
@@ -2857,7 +2857,7 @@ a.rw-alerte:focus-visible { outline: 2px solid var(--rw-accent); outline-offset:
 /* UNE VERIFICATION QUI N'A PAS TOURNE N'EST PAS UN CALME. Ce bandeau porte le
  * ton « attention » parce que son sujet est l'ignorance, pas la panne. */
 .rw-alertes__illisible {
-    padding: 10px 14px;
+    padding: 12px 16px;
     border: 1px dashed var(--rw-avertissement);
     border-radius: 8px;
     background: var(--rw-avert-fond);
@@ -2898,20 +2898,20 @@ a.rw-alerte:focus-visible { outline: 2px solid var(--rw-accent); outline-offset:
  */
 .rw-cgu {
     max-width: 72ch;
-    margin: 18px 0 22px;
+    margin: 16px 0 24px;
     text-align: left;
     font-size: 14px;
     line-height: 1.6;
     color: var(--rw-texte);
     max-height: 46vh;
     overflow-y: auto;
-    padding-right: 10px;
+    padding-right: 12px;
 }
 
 .rw-cgu__date {
     color: var(--rw-texte-doux);
     font-size: 12px;
-    margin-bottom: 14px;
+    margin-bottom: 16px;
 }
 
 .rw-cgu__section { margin-bottom: 16px; }
@@ -2919,13 +2919,13 @@ a.rw-alerte:focus-visible { outline: 2px solid var(--rw-accent); outline-offset:
 .rw-cgu__titre {
     font-size: 14px;
     font-weight: 600;
-    margin-bottom: 6px;
+    margin-bottom: 8px;
     color: var(--rw-texte);
 }
 
 .rw-cgu__liste {
     list-style: disc;
-    padding-left: 22px;
+    padding-left: 24px;
     margin: 0;
 }
 
@@ -3100,7 +3100,7 @@ a.rw-alerte:focus-visible { outline: 2px solid var(--rw-accent); outline-offset:
     right: 0;
     z-index: 40;
     min-width: 210px;
-    padding: 10px;
+    padding: 12px;
     border: 1px solid var(--rw-bordure);
     border-radius: var(--rw-rayon);
     background: var(--rw-surface);
@@ -3108,7 +3108,7 @@ a.rw-alerte:focus-visible { outline: 2px solid var(--rw-accent); outline-offset:
     text-align: left;
 }
 .rw-profil__nom { display: block; font-weight: 600; margin-bottom: 2px; }
-.rw-profil__role { display: block; color: var(--rw-texte-doux); font-size: 12px; margin-bottom: 10px; }
+.rw-profil__role { display: block; color: var(--rw-texte-doux); font-size: 12px; margin-bottom: 12px; }
 .rw-profil__menu .rw-bouton { width: 100%; }
 
 /* ── LES CGU ───────────────────────────────────────────────────────────────
@@ -3128,7 +3128,7 @@ a.rw-alerte:focus-visible { outline: 2px solid var(--rw-accent); outline-offset:
  */
 .rw-cgu {
     max-width: 72ch;
-    margin: 18px 0 22px;
+    margin: 16px 0 24px;
     text-align: left;
     font-size: 14px;
     line-height: 1.6;
@@ -3141,7 +3141,7 @@ a.rw-alerte:focus-visible { outline: 2px solid var(--rw-accent); outline-offset:
     overflow-y: visible;
     padding-right: 0;
 }
-.rw-cgu__contact { margin-top: 6px; }
+.rw-cgu__contact { margin-top: 8px; }
 .rw-cgu__contact a { color: var(--rw-accent); text-decoration: none; }
 .rw-cgu__contact a:hover { text-decoration: underline; }
 
@@ -3160,8 +3160,8 @@ a.rw-alerte:focus-visible { outline: 2px solid var(--rw-accent); outline-offset:
 /* La couleur de la marque : elle ne suit PAS le theme, c'est son role. */
 .rw-cgu__cafe {
     display: inline-block;
-    margin-top: 10px;
-    padding: 7px 16px;
+    margin-top: 12px;
+    padding: 8px 16px;
     border-radius: var(--rw-rayon);
     background: #ffdd00;
     color: #3d2c00;
@@ -3176,7 +3176,7 @@ a.rw-alerte:focus-visible { outline: 2px solid var(--rw-accent); outline-offset:
    replie ; un avertissement sur le geste en cours ne se replie JAMAIS
    (docs/REDACTION-INTERFACE.md). Le triangle natif reste : c'est lui que les
    lecteurs d'ecran annoncent comme etat ouvert ou ferme. */
-.rw-details { margin: 10px 0 0; max-width: 68ch; }
+.rw-details { margin: 12px 0 0; max-width: 68ch; }
 .rw-details > summary {
     width: fit-content;
     cursor: pointer;
@@ -3184,7 +3184,7 @@ a.rw-alerte:focus-visible { outline: 2px solid var(--rw-accent); outline-offset:
     font-size: 13px;
 }
 .rw-details > summary:focus-visible { outline: 2px solid var(--rw-accent); outline-offset: 2px; }
-.rw-details[open] > summary { margin-bottom: 6px; }
+.rw-details[open] > summary { margin-bottom: 8px; }
 .rw-details > :not(summary) { color: var(--rw-texte-doux); font-size: 13px; }
 
 /* ── Icones ───────────────────────────────────────────────────────────────

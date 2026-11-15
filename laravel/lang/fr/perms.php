@@ -27,7 +27,7 @@ return [
     'step_up_titre' => 'Confirmez avec votre second facteur',
     'step_up_aide' => "Saisissez le code à six chiffres de votre authentificateur.",
     'step_up_code' => 'Code à six chiffres',
-    'step_up_valider' => 'Confirmer',
+    'step_up_valider' => "Valider le code",
     'annuler' => 'Annuler',
     'err_soi_meme' => 'Vous ne pouvez pas modifier vos propres droits.',
     'err_rang' => 'Impossible de modifier un compte de rôle égal ou supérieur au vôtre.',

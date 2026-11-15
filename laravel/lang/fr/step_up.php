@@ -23,7 +23,7 @@ return [
     'panneau_titre'   => 'Confirmez avec votre second facteur',
     'panneau_aide'    => "Cette action écrit sur une machine réelle. Saisissez votre code à six chiffres : il vaut quinze minutes, pour cette action seulement.",
     'panneau_code'    => 'Code à six chiffres',
-    'panneau_valider' => 'Confirmer',
+    'panneau_valider' => "Valider le code",
     'panneau_annuler' => 'Annuler',
     'panneau_echec'   => "La re-authentification n'a pas abouti.",
 ];

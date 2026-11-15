@@ -115,6 +115,7 @@ return [
     'panneaux' => [
         'deployer' => [
             'titre' => "Deploy the platform key",
+            'bouton' => "Deploy the key",
             'texte' => "Logs in with a password and writes to the machine.",
             'effets' => [
                 "adds the public key for the SSH user and for root",
@@ -123,6 +124,7 @@ return [
         ],
         'compte_service' => [
             'titre' => "Retry the administration account",
+            'bouton' => "Recreate the account",
             'texte' => "The deployment did not manage to create this account: this action tries again.",
             'effets' => [
                 "creates the “rootwarden” account if missing, with passwordless root access",
@@ -131,6 +133,7 @@ return [
         ],
         'effacer' => [
             'titre' => "Erase the passwords known to RootWarden",
+            'bouton' => "Erase the passwords",
             'texte' => "Does not touch the machine: deletes the copy RootWarden keeps.",
             'effets' => [
                 "deletes the stored SSH password and root password",
@@ -139,6 +142,7 @@ return [
         ],
         'rotation' => [
             'titre' => "Rotate the platform key",
+            'bouton' => "Rotate the key",
             'texte' => "Replaces the key for the whole fleet at once.",
             'effets' => [
                 "destroys the current private key and generates a new one",
@@ -150,6 +154,7 @@ return [
         ],
         'revoquer' => [
             'titre' => "Delete the administration account",
+            'bouton' => "Delete the account",
             'texte' => "Deletes the “rootwarden” account from the machine. Only a new deployment recreates it.",
             'effets' => [
                 "removes its sudo rights, then deletes the account and its home directory",
@@ -160,6 +165,7 @@ return [
         ],
         'ressaisir' => [
             'titre' => "Store an SSH password again",
+            'bouton' => "Save the password",
             'texte' => "Writes to RootWarden, does not touch the machine.",
             'effets' => [
                 "stores the SSH user's password again, encrypted",

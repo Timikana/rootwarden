@@ -266,6 +266,7 @@ window.RW_CLE_PLATEFORME = true;
     var pMdp = document.querySelector('[data-rw="cle-panneau-mdp"]');
     var pAnnuler = document.querySelector('[data-rw="cle-panneau-annuler"]');
     var pConfirmer = document.querySelector('[data-rw="cle-panneau-confirmer"]');
+    var libelleConfirmer = pConfirmer ? pConfirmer.textContent : '';
     var jGeste = document.querySelector('[data-rw="cle-geste-journal"]');
     var bRecharger = document.querySelector('[data-rw="cle-recharger"]');
 
@@ -381,6 +382,8 @@ window.RW_CLE_PLATEFORME = true;
 
         enCours.titre = subst(p.titre);
         pTitre.textContent = enCours.titre;
+        // Le bouton dit l'EFFET (« Supprimer le compte »), pas « Confirmer ».
+        pConfirmer.textContent = p.bouton || libelleConfirmer;
         if (pTexte) { pTexte.textContent = subst(p.texte); }
 
         // Les effets sont POSES A NEUF a chaque ouverture : reutiliser la liste

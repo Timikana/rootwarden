@@ -74,7 +74,7 @@
             <input type="date" name="to" value="{{ $filtres['au'] }}"
                    class="rw-saisie rw-saisie--compacte" data-rw="audit-filtre-au">
         </label>
-        <button type="submit" class="rw-bouton" data-rw="audit-filtrer">{{ __('audit.filtrer') }}</button>
+        <button type="submit" class="rw-bouton rw-bouton--discret" data-rw="audit-filtrer">{{ __('audit.filtrer') }}</button>
         <a class="rw-bouton rw-bouton--discret" data-rw="audit-reinitialiser"
            href="{{ route('journal-audit') }}">{{ __('audit.reinitialiser') }}</a>
     </form>

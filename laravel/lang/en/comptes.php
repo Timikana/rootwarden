@@ -145,7 +145,7 @@ return [
     'step_up_titre' => 'Confirm with your second factor',
     'step_up_aide' => 'This gesture is irreversible. Type the six-digit code from your authenticator.',
     'step_up_code' => 'Six-digit code',
-    'step_up_valider' => 'Confirm',
+    'step_up_valider' => "Verify code",
     'lien_cles_api' => 'Manage API keys',
     'imp_cle_refusee' => 'SSH key refused, account created without a key: :raison',
 ];

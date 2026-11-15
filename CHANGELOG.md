@@ -5,6 +5,18 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## Unslop, seconde passe : boutons qui disent leur effet, espacements sur la grille
+
+- **Les boutons de confirmation disent ce qu'ils font** : « Déployer la clé », « Supprimer le
+  compte », « Redémarrer nginx » au lieu de « Confirmer » (clé de plateforme, comptes distants,
+  services). La re-authentification dit « Valider le code ».
+- **Une action principale par écran** : « Filtrer » (journal d'audit, notifications) et
+  « Télécharger mes données » passent en bouton secondaire.
+- **Espacements sur une grille de 4 px** : 178 valeurs de `padding`, `margin` et `gap` hors grille
+  (5, 6, 10, 14, 18, 22 px…) ramenées à la grille.
+
+---
+
 ## Couleur qui informe, hiérarchie resserrée
 
 La refonte manquait de couleur, et la couleur présente ne disait rien : un bleu générique partout,

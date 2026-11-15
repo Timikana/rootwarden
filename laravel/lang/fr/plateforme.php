@@ -115,6 +115,7 @@ return [
     'panneaux' => [
         'deployer' => [
             'titre' => "Déployer la clé de plateforme",
+            'bouton' => "Déployer la clé",
             'texte' => "Se connecte par mot de passe et écrit sur la machine.",
             'effets' => [
                 "ajoute la clé publique pour l'utilisateur SSH et pour root",
@@ -123,6 +124,7 @@ return [
         ],
         'compte_service' => [
             'titre' => "Reprendre le compte d'administration",
+            'bouton' => "Recréer le compte",
             'texte' => "Le déploiement n'a pas réussi à créer ce compte : cette action recommence.",
             'effets' => [
                 "crée le compte « rootwarden » s'il manque, avec un accès root sans mot de passe",
@@ -131,6 +133,7 @@ return [
         ],
         'effacer' => [
             'titre' => "Effacer les mots de passe connus de RootWarden",
+            'bouton' => "Effacer les mots de passe",
             'texte' => "Ne touche pas la machine : supprime la copie gardée par RootWarden.",
             'effets' => [
                 "supprime le mot de passe SSH et le mot de passe root conservés",
@@ -139,6 +142,7 @@ return [
         ],
         'rotation' => [
             'titre' => "Faire tourner la clé de plateforme",
+            'bouton' => "Faire tourner la clé",
             'texte' => "Remplace la clé de tout le parc en une fois.",
             'effets' => [
                 "détruit la clé privée actuelle et en génère une nouvelle",
@@ -150,6 +154,7 @@ return [
         ],
         'revoquer' => [
             'titre' => "Supprimer le compte d'administration",
+            'bouton' => "Supprimer le compte",
             'texte' => "Supprime le compte « rootwarden » de la machine. Seul un nouveau déploiement le recrée.",
             'effets' => [
                 "retire ses droits sudo, puis supprime le compte et son répertoire",
@@ -160,6 +165,7 @@ return [
         ],
         'ressaisir' => [
             'titre' => "Réenregistrer un mot de passe SSH",
+            'bouton' => "Enregistrer le mot de passe",
             'texte' => "Écrit dans RootWarden, ne touche pas la machine.",
             'effets' => [
                 "réenregistre le mot de passe de l'utilisateur SSH, chiffré",

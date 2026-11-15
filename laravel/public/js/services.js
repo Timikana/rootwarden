@@ -234,7 +234,7 @@
                 el.disabled = true;
                 el.title = textes.protege_aide || '';
             } else {
-                el.addEventListener('click', function () { pilote(b[0], svc.nom, b[3] || ''); });
+                el.addEventListener('click', function () { pilote(b[0], svc.nom, b[3] || '', b[1] || ''); });
             }
             liste.push(el);
         });
@@ -253,6 +253,7 @@
     var pTitre = document.querySelector('[data-rw="services-panneau-titre"]');
     var pTexte = document.querySelector('[data-rw="services-panneau-texte"]');
     var pOui = document.querySelector('[data-rw="services-panneau-confirmer"]');
+    var libelleOui = pOui ? pOui.textContent : '';
     var pNon = document.querySelector('[data-rw="services-panneau-annuler"]');
     var enAttente = null;
 
@@ -292,7 +293,7 @@
      * Le panneau est le meme motif que `cle-plateforme` et `comptes-distants` :
      * il NOMME sa cible, et il n'agit qu'au second clic.
      */
-    function pilote(geste, nom, question) {
+    function pilote(geste, nom, question, libelleAction) {
         var o = machineChoisie();
         if (! o) { return; }
         var texte = (question || '').replace(':service', nom)
@@ -305,6 +306,8 @@
 
         enAttente = { geste: geste, nom: nom, texte: texte, machine: o };
         if (pTitre) { pTitre.textContent = texte; }
+        // Le bouton dit l'EFFET (« Redemarrer nginx »), pas « Confirmer ».
+        pOui.textContent = libelleAction ? libelleAction + ' ' + nom : libelleOui;
         if (pTexte) { pTexte.textContent = textes.panneau_aide || ''; }
         panneau.hidden = false;
         panneau.scrollIntoView({ block: 'nearest' });

@@ -319,7 +319,7 @@
         {{-- Le telechargement suit son propre texte, avant l'effacement : place
              apres ce dernier, il se lisait comme la suite du geste irreversible. --}}
         <div class="rw-actions">
-            <a class="rw-bouton" data-rw="rgpd-telecharger"
+            <a class="rw-bouton rw-bouton--discret" data-rw="rgpd-telecharger"
                href="{{ route('profil.donnees-personnelles') }}">{{ __('profil.rgpd_bouton') }}</a>
         </div>
 
