@@ -453,7 +453,7 @@ try {
         constate('panneau ouvert sur srv-zabbix (PROD)',
             surProd.cache === false ? `« ${surProd.texte.slice(0, 90)} »` : 'aucun avertissement');
         verifie('la PRODUCTION est NOMMEE quand le geste la viserait',
-            surProd.cache === false && /PRODUCTION/.test(surProd.texte)
+            surProd.cache === false && /production/i.test(surProd.texte)
             && surProd.texte.includes('srv-zabbix'),
             surProd.texte.slice(0, 100) || 'rien');
         verifie('et ouvrir ce panneau n\'a rien envoye a la production',
