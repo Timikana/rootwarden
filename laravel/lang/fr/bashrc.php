@@ -1,20 +1,20 @@
 <?php
 
 /**
- * Deploiement du `.bashrc` standardise — sous-lot B1.
+ * Deploiement du `.bashrc` standardise.
  *
- * Ce module n'a AUCUN defaut de securite (voir `MODULE-BASHRC.md` §3). Les trois
- * corrections du portage sont de PRESENTATION, et ces textes en portent deux :
- * distinguer la machine de production, et enoncer un compteur a zero plutot que
- * de l'afficher comme un chiffre.
+ * Regles de redaction : docs/REDACTION-INTERFACE.md. La machine de production
+ * reste signalee, et un compteur a zero s'enonce plutot que de s'afficher comme
+ * un chiffre.
+ *
+ * Les textes lus par le JS voyagent par le bloc `$textes` du controleur : une
+ * cle ajoutee ici pour le JS doit y etre ajoutee aussi.
  */
 
 return [
-    'titre'       => 'Deploiement du .bashrc',
-    'intro'       => 'Cette page installe un fichier `.bashrc` standardise sur les comptes des '
-                     . 'machines que vous choisissez. Ce fichier s\'execute a CHAQUE connexion de '
-                     . 'ces comptes.',
-    'onglet_deploiement' => 'Deploiement',
+    'titre'       => 'Déploiement du .bashrc',
+    'intro'       => 'Installe un `.bashrc` standardisé sur les comptes choisis ; il s\'exécute à chaque connexion.',
+    'onglet_deploiement' => 'Déploiement',
     'onglet_historique'  => 'Historique',
     'onglet_gabarit'     => 'Gabarit',
 
@@ -22,140 +22,99 @@ return [
     'machines'        => 'Machines cibles',
     'col_nom'         => 'Machine',
     'col_ip'          => 'Adresse',
-    'col_etat'        => 'Dernier deploiement',
-    'jamais'          => 'jamais deploye',
-    'simule_le'       => 'simule le :date par :auteur — rien n\'a ete ecrit',
-    'deploye_le'      => 'deploye le :date par :auteur',
+    'col_etat'        => 'Dernier déploiement',
+    'jamais'          => 'jamais déployé',
+    'simule_le'       => 'simulé le :date par :auteur, rien n\'a été écrit',
+    'deploye_le'      => 'déployé le :date par :auteur',
 
-    // ── LA MACHINE SENSIBLE, QUI NE DOIT PAS SE FONDRE DANS LA LISTE ──────
+    // ── LA MACHINE SENSIBLE ────────────────────────────────────────────────
     'sensible'        => 'Production',
-    'sensible_titre'  => 'Machine de production ou critique',
-    'sensible_aide'   => 'Un deploiement sur cette machine remplace le `.bashrc` des comptes '
-                         . 'choisis, y compris celui de `root` s\'il est retenu.',
-    'avert_titre'     => 'Une machine de production figure dans cette liste',
-    'avert_un'        => 'Une des :total machines proposees est en production ou marquee critique. '
-                         . 'Elle est signalee dans le tableau.',
-    'avert_plusieurs' => ':nb des :total machines proposees sont en production ou marquees '
-                         . 'critiques. Elles sont signalees dans le tableau.',
+    'sensible_aide'   => 'Un déploiement remplace le `.bashrc` des comptes choisis, y compris celui de `root` s\'il est coché.',
+    'avert_titre'     => 'Cette liste contient de la production',
+    'avert_un'        => 'Une des :total machines est en production ou critique ; elle est signalée dans le tableau.',
+    'avert_plusieurs' => ':nb des :total machines sont en production ou critiques ; elles sont signalées dans le tableau.',
 
     // ── LE COMPTEUR, QUI S'ENONCE ──────────────────────────────────────────
-    'aucune_selection' => 'Aucune machine selectionnee — un deploiement ne deploierait rien.',
-    'selection_une'    => '1 machine selectionnee.',
-    'selection_n'      => ':nb machines selectionnees.',
-    'selection_prod'   => ':nb machines selectionnees, dont :prod en production.',
+    'aucune_selection' => 'Aucune machine sélectionnée.',
+    'selection_une'    => '1 machine sélectionnée.',
+    'selection_n'      => ':nb machines sélectionnées.',
+    'selection_prod'   => ':nb machines sélectionnées, dont :prod en production.',
 
     'vide_titre'  => 'Aucune machine au parc',
-    'vide_texte'  => 'Aucune machine active n\'est enregistree. Ajoutez-en depuis '
-                     . 'l\'administration des serveurs avant de deployer quoi que ce soit.',
+    'vide_texte'  => 'Ajoutez une machine depuis la page Serveurs.',
     'vide_action' => 'Ouvrir les serveurs',
 
     'comptes_titre' => 'Comptes de la machine',
-    'comptes_choisir' => 'Cochez une machine ci-dessus pour lire ses comptes.',
-    'comptes_plusieurs' => 'Plusieurs machines sont cochees. Les comptes se lisent machine par machine : n\'en cochez qu\'une.',
-    'comptes_chargement' => 'Lecture des comptes sur la machine…',
-    'comptes_echec' => 'Les comptes n\'ont pas pu etre lus. La machine est-elle joignable ?',
-    'comptes_aucun' => 'Cette machine n\'expose aucun compte eligible (UID 0 ou >= 1000, avec un interpreteur).',
+    'comptes_choisir' => 'Cochez une machine pour lire ses comptes.',
+    'comptes_plusieurs' => 'Cochez une seule machine pour lire ses comptes.',
+    'comptes_chargement' => 'Lecture des comptes…',
+    'comptes_echec' => 'Impossible de lire les comptes. Vérifiez que la machine est joignable.',
+    'comptes_aucun' => 'Aucun compte éligible (UID 0 ou ≥ 1000, avec un interpréteur).',
     'col_compte' => 'Compte',
     'col_uid' => 'UID',
     'col_home' => 'Dossier personnel',
     'col_bashrc' => 'Fichier actuel',
     'bashrc_absent' => 'absent',
     'tout' => 'Tout cocher',
-    'tout_avec_root' => '« Tout cocher » retient aussi root.',
+    'tout_avec_root' => '(root compris)',
     'compte_root' => 'administrateur',
-    'compte_root_aide' => 'Le compte administrateur de la machine. Deployer sur root remplace le fichier qui s\'execute a chaque connexion administrateur.',
-    'apercu' => 'Apercu (diff)',
-    'apercu_aide' => 'Lit le fichier present sur la machine et montre ce qui changerait. N\'ecrit rien.',
+    'compte_root_aide' => 'Compte administrateur : son .bashrc s\'exécute à chaque connexion root.',
+    'apercu' => 'Aperçu (diff)',
+    'apercu_aide' => 'Montre ce qui changerait, sans rien écrire.',
     'apercu_titre' => 'Ce qui changerait',
     'apercu_chargement' => 'Lecture du fichier distant…',
-    'apercu_echec' => 'L\'apercu n\'a pas pu etre construit.',
+    'apercu_echec' => 'Impossible de construire l\'aperçu.',
     'apercu_vide' => 'Cochez au moins un compte pour voir ce qui changerait.',
     'apercu_taille' => ':avant o → :apres o',
 
-    'perso' => 'personnalise',
-    'perso_aide' => 'Ce compte a des blocs marques « USER CUSTOM » dans son fichier. En mode « fusionner », ce sont les SEULS qui seront conserves ; tout le reste sera remplace.',
+    'perso' => 'personnalisé',
+    'perso_aide' => 'Seuls les blocs « USER CUSTOM » sont conservés (dans ~/.bashrc.local) ; le reste du fichier est remplacé.',
 
-    'gabarit_titre' => 'Le gabarit deploye',
-    'gabarit_intro' => 'Ce fichier est celui que toutes les machines recevront au prochain deploiement. Il s\'execute a chaque connexion des comptes concernes.',
+    'gabarit_titre' => 'Le gabarit déployé',
+    'gabarit_intro' => 'Toutes les machines recevront ce fichier au prochain déploiement.',
     'gabarit_lignes' => 'Lignes',
     'gabarit_octets' => 'Octets',
     'gabarit_sha' => 'Empreinte',
     'gabarit_chargement' => 'Lecture du gabarit…',
-    'gabarit_echec' => 'Le gabarit n\'a pas pu etre lu.',
-    'gabarit_modifie' => 'Modifications non enregistrees.',
+    'gabarit_echec' => 'Impossible de lire le gabarit.',
+    'gabarit_modifie' => 'Modifications non enregistrées.',
     'gabarit_enregistrer' => 'Enregistrer',
     'gabarit_annuler' => 'Annuler les modifications',
-    'gabarit_enregistre' => 'Gabarit enregistre.',
-    'gabarit_erreur' => 'L\'enregistrement a echoue.',
+    'gabarit_enregistre' => 'Gabarit enregistré.',
+    'gabarit_erreur' => 'L\'enregistrement a échoué.',
     'gabarit_encours' => 'Enregistrement…',
-    'gabarit_confirmer' => 'Enregistrer ce gabarit ? Toutes les machines le recevront au prochain deploiement.',
+    'gabarit_confirmer' => 'Enregistrer ce gabarit ? Toutes les machines le recevront au prochain déploiement.',
     'danger_titre' => 'Formes reconnues comme destructrices',
     'danger_reconnu' => 'Reconnu :',
-    'danger_portee' => 'Cette reconnaissance porte sur huit formes connues. Elle ne verifie ni ce que fait le reste du fichier, ni ce que fera celui-ci une fois deploye — seule sa syntaxe sera controlee a l\'enregistrement.',
-    'danger_confirmer' => 'Ce gabarit contient des formes reconnues comme destructrices. L\'enregistrer quand meme ?',
+    'danger_portee' => 'Seules huit formes connues sont détectées ; à l\'enregistrement, seule la syntaxe est vérifiée.',
+    'danger_confirmer' => 'Ce gabarit contient des formes reconnues comme destructrices. L\'enregistrer quand même ?',
 
-    /*
-     * ⚠ CETTE PHRASE DECLARAIT ABSENTES DEUX CAPACITES QUI SONT PORTEES ICI.
-     *
-     * Elle etait vraie a l'ecriture (B1). Depuis, `chargeComptes()` appelle
-     * `/bashrc/users` et rend une case A COCHER PAR COMPTE, et le bouton
-     * `bashrc-apercu` appelle `/bashrc/preview` puis affiche le diff. La
-     * phrase envoyait donc vers l'ancien portail pour deux gestes que la page
-     * fait -- un manque declare a tort est une capacite perdue sans que rien
-     * ne l'ait retiree.
-     *
-     * L'ENUMERATION EST LA SEULE SOURCE, et elle est apparie aux 7 routes de
-     * `backend/routes/bashrc.py`. Appelees par cette page : `users`,
-     * `preview`, `template`. Appelees par personne, donc absentes :
-     * `deploy`, `prerequisites` (POST, il INSTALLE), `restore`, `backups`.
-     *
-     * Qui porte l'un de ces quatre gestes met a jour CETTE phrase dans le
-     * meme commit.
-     *
-     * ET LA PHRASE N'ANNONCE PAS CE QUI EST PORTE, bien que la correction
-     * l'ait d'abord fait. Vu a l'image : cet encart a pour action PRINCIPALE
-     * un lien vers l'ancien portail, et il tombe juste sous « Cochez une
-     * machine ci-dessus pour lire ses comptes ». Y ecrire « choisir les
-     * comptes est porte ici » faisait dire a l'encart le contraire de ce que
-     * sa place et son bouton disent. Un encart « ce qui manque » n'enonce que
-     * des manques ; le present, la page le MONTRE.
-     */
-
-
-
-    /* B4 — les deux ecritures (2026-09-07). `overwrite` et
-       `/bashrc/prerequisites` ne sont PAS construits : voir public/js/bashrc.js. */
+    // ── LES ECRITURES ──────────────────────────────────────────────────────
     'col_action' => 'Action',
     'deploy' => 'Déployer',
-    'deploy_aide' => 'Écrit le .bashrc standardisé sur les comptes cochés. Le contenu personnalisé existant est déplacé dans ~/.bashrc.local, et une sauvegarde horodatée est créée.',
-    'deploy_confirme' => 'Déployer le .bashrc standardisé sur :nombre compte(s) — :comptes ?\\n\\nUne sauvegarde horodatée est créée, et le contenu personnalisé est déplacé dans ~/.bashrc.local : rien n\'est perdu.',
+    'deploy_aide' => 'Écrit le .bashrc standardisé sur les comptes cochés, après une sauvegarde horodatée de l\'ancien.',
+    'deploy_confirme' => "Déployer le .bashrc standardisé sur :nombre compte(s) : :comptes ?\n\nL'ancien fichier est sauvegardé ; les blocs « USER CUSTOM » sont déplacés dans ~/.bashrc.local.",
     'deploy_en_cours' => 'Déploiement en cours…',
-    'deploy_fait' => 'Déploiement terminé. La liste des comptes est rechargée.',
+    'deploy_fait' => 'Déploiement terminé.',
     'deploy_echec' => 'Le déploiement a échoué. Le .bashrc distant n\'a pas été remplacé.',
-    'deploy_sans_cible' => 'Choisis une machine et au moins un compte avant de déployer.',
+    'deploy_sans_cible' => 'Choisissez une machine et au moins un compte.',
     'restore' => 'Restaurer',
-    'restore_aide' => 'Restaure la sauvegarde la plus récente du .bashrc de ce compte.',
-    'restore_confirme' => 'Restaurer :sauvegarde pour :compte ?\\n\\nDatee du :date, :taille octets. Il existe :nombre sauvegarde(s) pour ce compte ; c\'est la plus recente qui sera restauree.\\n\\nLe .bashrc actuel de :compte sera remplace.',
+    'restore_aide' => 'Restaure la sauvegarde la plus récente de ce compte.',
+    // Le JS ne remplace que la PREMIERE occurrence de chaque marqueur.
+    'restore_confirme' => "Restaurer :sauvegarde pour :compte ?\n\nDatée du :date, :taille octets ; la plus récente des :nombre sauvegarde(s).\n\nLe .bashrc actuel sera remplacé.",
     'restore_en_cours' => 'Restauration de :compte…',
     'restore_fait' => 'Sauvegarde restaurée pour :compte.',
-    'restore_echec' => 'La restauration de :compte a échoué — il n\'existe peut-être aucune sauvegarde.',
-    'figlet_absent' => 'figlet n\'est pas installé sur cette machine : la bannière du .bashrc ne s\'affichera pas. Le reste du fichier fonctionne. L\'installation du paquet n\'est pas offerte ici.',
+    'restore_echec' => 'La restauration de :compte a échoué.',
+    'figlet_absent' => 'figlet n\'est pas installé : la bannière du .bashrc ne s\'affichera pas. Le reste fonctionne.',
 
-    /* La liste des sauvegardes, lue AVANT la confirmation de restauration. */
     'restore_lecture' => 'Lecture des sauvegardes de :compte…',
-    'restore_aucune' => 'Aucune sauvegarde pour :compte — il n\'y a rien a restaurer. Une sauvegarde est creee a chaque deploiement.',
+    'restore_aucune' => 'Aucune sauvegarde pour :compte : rien à restaurer.',
 
-    /*
-     * ══ L'INSTALLATION DE figlet — ISO-PERIMETRE ═════════════════════
-     *
-     * Le legacy l'offrait. Elle avait ete perdue par un arbitrage que
-     * l'exploitant a annule. Le SIGNAL existait deja (`figlet_absent`) ;
-     * ce qui manquait etait le geste.
-     */
+    // ── L'INSTALLATION DE figlet ───────────────────────────────────────────
     'figlet_installer' => "Installer figlet",
-    'figlet_confirme' => "Installer figlet sur cette machine ?\n\nLe paquet sera installé par le gestionnaire de paquets de la machine. L'opération ne se défait pas depuis cet écran.",
-    'figlet_en_cours' => "Installation de figlet en cours…",
-    'figlet_fait' => "figlet est installé. La liste des comptes est rechargée pour le vérifier.",
-    'figlet_echec' => "L'installation de figlet a échoué. Le paquet n'est pas présent sur la machine.",
+    'figlet_confirme' => "Installer figlet sur cette machine ?\n\nLe paquet sera installé par le gestionnaire de paquets. Cette page ne permet pas de le désinstaller.",
+    'figlet_en_cours' => "Installation de figlet…",
+    'figlet_fait' => "figlet est installé.",
+    'figlet_echec' => "L'installation de figlet a échoué.",
 
 ];
