@@ -446,20 +446,51 @@ def check_machine_access(machine_id):
 
 def require_machine_access(func):
     """Decorateur : verifie que l'utilisateur a acces a la/les machine(s) du request.
-    Accepte machine_id/server_id (singulier) ET machine_ids/server_ids (pluriel,
-    listes). Fail-closed : si un id present n'est pas autorise, l'acces est refuse.
+
+    Lit machine_id/server_id (singulier), machine_ids/server_ids (pluriel), et les
+    parametres de CHEMIN. Fail-closed : si un id present n'est pas autorise,
+    l'acces est refuse.
 
     Patch A01 : avant, seul machine_id/server_id (singulier) etait lu. Les routes
     a parametre pluriel (deploy_platform_key, deploy_service_account, ...) voyaient
-    donc machine_id=None -> le decorateur etait un no-op et n'imposait aucun controle."""
+    donc machine_id=None -> le decorateur etait un no-op et n'imposait aucun controle.
+
+    CORRECTIF : ON COLLECTE TOUTES LES SOURCES, ON N'EN CHOISIT PLUS UNE.
+    L'ancienne resolution enchainait les sources par `or` et gardait donc la
+    PREMIERE trouvee, le corps JSON avant la query string. Or `cve_results`,
+    `cve_history` et `cve_compare` lisent EXCLUSIVEMENT `request.args`. Un GET
+    portant un corps `{"machine_id": <la mienne>}` et une query
+    `?machine_id=<celle d'autrui>` faisait donc autoriser l'une et servir l'autre.
+    Mesure : Flask parse le corps d'un GET des que le `Content-Type` est
+    `application/json`.
+    Le trou etait ferme en pratique parce qu'aucune des deux passerelles ne
+    relaie le corps d'un GET -- donc par ACCIDENT, pas par decision. Desormais
+    TOUTES les valeurs presentes sont controlees : peu importe laquelle la route
+    lira, elle aura ete autorisee. Un appel legitime n'en fournit qu'une, donc
+    rien ne change pour lui.
+
+    CORRECTIF : LES PARAMETRES DE CHEMIN SONT LUS AUSSI.
+    `/supervision/machines/<int:mid>/profile` porte son identifiant dans l'URL :
+    le decorateur n'en trouvait aucun et laissait donc tout passer.
+
+    CE QUI RESTE PERMISSIF, ET POURQUOI C'EST DIT ICI. Quand AUCUN identifiant
+    n'est trouve, la route est appelee sans controle. Ce decorateur est pose sur
+    une centaine de routes, dont beaucoup n'ont legitimement pas de machine --
+    `/maintenance/check`, `/fail2ban/stats`, `/wazuh/options`, `/ssh-audit/policies`.
+    Rendre l'absence bloquante les casserait toutes. La parade correcte est
+    par route : nommer son parametre comme le decorateur le lit. Les parametres de
+    chemin desormais couverts reduisent fortement les cas restants."""
     @wraps(func)
     def wrapper(*args, **kwargs):
         data = request.get_json(silent=True) or {}
         ids = []
-        single = (data.get('machine_id') or request.args.get('machine_id')
-                  or data.get('server_id') or request.args.get('server_id'))
-        if single:
-            ids.append(single)
+        # TOUTES les sources, pas la premiere : une valeur presente est une valeur
+        # a controler, quelle que soit celle que la route finira par lire.
+        for source in (data, request.args, kwargs):
+            for cle in ('machine_id', 'server_id', 'mid'):
+                val = source.get(cle)
+                if val not in (None, ''):
+                    ids.append(val)
         for key in ('machine_ids', 'server_ids'):
             val = data.get(key)
             if isinstance(val, list):

@@ -3,7 +3,7 @@ import time
 import threading
 from datetime import datetime
 from flask import Blueprint, jsonify, request, Response
-from routes.helpers import require_api_key, require_role, require_machine_access, threaded_route, get_db_connection, server_decrypt_password, logger, get_current_user
+from routes.helpers import require_api_key, require_role, require_permission, require_machine_access, threaded_route, get_db_connection, server_decrypt_password, logger, get_current_user
 from ssh_utils import ssh_session, validate_machine_id
 from config import Config
 from cve_scanner import scan_server, get_last_scan_results, get_scan_history, get_opencve_client
@@ -36,11 +36,16 @@ def _stream_cve_scan(machine_ids: list[int], min_cvss: float,
             fmt = ','.join(['%s'] * len(machine_ids))
             cur.execute(
                 f"SELECT id, name, ip, port, user, password, root_password, platform_key_deployed, service_account_deployed "
-                f"FROM machines WHERE id IN ({fmt})", machine_ids
+                f"FROM machines WHERE id IN ({fmt}) AND (lifecycle_status IS NULL OR lifecycle_status != 'archived')", machine_ids
             )
         else:
+            # LES MACHINES ARCHIVEES SONT EXCLUES. Sans cette clause, un scan-all
+            # se connectait EN SSH a des machines retirees du parc : l'interface
+            # les masque et le chemin planifie les excluait deja, mais le
+            # declenchement manuel les prenait toutes.
             cur.execute(
-                "SELECT id, name, ip, port, user, password, root_password, platform_key_deployed, service_account_deployed FROM machines"
+                "SELECT id, name, ip, port, user, password, root_password, platform_key_deployed, "
+                "service_account_deployed FROM machines WHERE (lifecycle_status IS NULL OR lifecycle_status != 'archived')"
             )
         machines = cur.fetchall()
     finally:
@@ -226,6 +231,23 @@ def cve_results():
 
 @bp.route('/cve_reprioritize', methods=['POST'])
 @require_api_key
+# `can_scan_cve` EXIGEE : cette route ECRIT — elle reecrit les six colonnes
+# d'enrichissement de tous les findings du dernier scan, soit 1458 lignes sur la
+# seule machine scannee du parc. Elle n'avait NI role NI permission : un role 1
+# disposant d'une machine attribuee pouvait donc la declencher, alors que la page
+# qui porte son bouton exige `can_scan_cve` depuis toujours
+# (`legacy/security/index.php:38`). La garde protegeait la page, pas la requete.
+#
+# POURQUOI SEULEMENT CELLE-CI. Les autres routes CVE ne peuvent pas recevoir ce
+# decorateur sans casser des appels legitimes : `cve_results`, `cve_history` et
+# `cve_trends` figurent dans les scopes `readonly` et `monitoring` des cles d'API
+# (`legacy/adm/api_keys.php:362,405`), et un appel par cle n'a pas de session —
+# `get_current_user()` rend (0,0), donc `require_permission` refuserait. Aucune
+# route du depot ne combine aujourd'hui un scope de cle et une permission : le
+# motif n'existe pas, et l'inventer ici casserait la tuile CVE du tableau de bord
+# (`legacy/index.php:305`) ainsi que `adm/health_check.php`. C'est une decision de
+# conception, pas un correctif — elle est signalee, pas prise.
+@require_permission('can_scan_cve')
 @require_machine_access
 @threaded_route
 def cve_reprioritize():
@@ -272,6 +294,32 @@ def cve_reprioritize():
         except Exception as e:
             logger.error("cve_reprioritize enrich failed: %s", e)
             return jsonify({'success': False, 'message': 'Enrichissement indisponible'}), 503
+
+        # UNE PANNE RESEAU NE DOIT PAS DETRUIRE DES DONNEES.
+        #
+        # `enrich_findings` rattrape lui-meme les echecs EPSS et KEV et rend
+        # normalement : la branche 503 ci-dessus etait donc inatteignable pour une
+        # panne reseau. L'UPDATE qui suit ecrit `1 if f.get('kev') else 0`, soit
+        # **kev = 0 pour TOUS les findings** quand le catalogue CISA n'a pas
+        # repondu, `epss_score` a NULL, et un `priority_score` recalcule sur le
+        # CVSS seul. Autrement dit : un clic pendant une coupure effacait le
+        # drapeau des CVE reellement exploitees, et l'ecran affichait
+        # « Re-priorisation terminee ».
+        #
+        # On refuse donc d'ECRIRE ce que l'on n'a pas pu LIRE. Les donnees en base
+        # restent celles du dernier enrichissement reussi.
+        if stats.get('kev_echoue') or stats.get('epss_echoue'):
+            sources = [n for n, k in (('KEV', 'kev_echoue'), ('EPSS', 'epss_echoue'))
+                       if stats.get(k)]
+            logger.warning(
+                "cve_reprioritize refuse d'ecrire : enrichissement indisponible (%s) "
+                "pour machine_id=%s", ', '.join(sources), machine_id
+            )
+            return jsonify({
+                'success': False,
+                'message': ('Enrichissement indisponible (' + ', '.join(sources) +
+                            ') : les donnees existantes ne sont pas ecrasees.')
+            }), 503
 
         upd = conn.cursor()
         for r, f in zip(rows, findings):
@@ -439,6 +487,10 @@ def cron_preview():
         from datetime import timezone
         if not croniter.is_valid(expr):
             return jsonify({'valid': False, 'error': 'Expression cron invalide'})
+        # L'apercu annonce le refus que l'enregistrement opposerait.
+        refus = _refus_cron(expr)
+        if refus:
+            return jsonify({'valid': False, 'error': refus})
         # On fournit les datetimes en ISO 8601 UTC (suffixe Z) pour que le
         # frontend les convertisse automatiquement vers la TZ du navigateur
         # via new Date(iso).toLocaleString(). Evite le bug "il est 10h13
@@ -477,6 +529,52 @@ def cron_preview():
         return jsonify({'valid': False, 'error': str(e)[:200]})
 
 
+# ══ LE PLAFOND ANTI-FREQUENCE, UNE SEULE FONCTION POUR TOUS LES CHEMINS ══
+#
+# Un scan planifie plus frequent que toutes les 10 minutes vaut un scan par
+# minute : bannissement OpenCVE en amont, charge SSH sur le parc, production
+# comprise. Deux defauts mesures, fermes ici :
+#  - la MODIFICATION ne validait rien (ni l'expression, ni la frequence) et
+#    avalait l'echec : `* * * * *` s'ecrivait par un simple PUT ;
+#  - la CREATION ne comparait que les DEUX prochaines occurrences :
+#    `0,59 * * * *` (ecarts alternes de 59 min puis 1 min) passait si on le
+#    soumettait a la minute ou le grand ecart venait en premier.
+# On mesure donc l'ecart MINIMAL sur 1000 occurrences successives, ce qui
+# couvre les motifs horaires, quotidiens, mensuels et annuels (passage
+# 23:59 -> 00:00, 31 -> 1, decembre -> janvier) quel que soit l'instant.
+INTERVALLE_MIN_S = 600
+
+
+def _refus_cron(expr):
+    """Rend None si l'expression est acceptable, sinon le motif du refus."""
+    from croniter import croniter
+    expr = (expr or '').strip()
+    if not expr or not croniter.is_valid(expr):
+        return 'Expression cron invalide'
+    try:
+        it = croniter(expr, datetime.now())
+        precedente = it.get_next(datetime)
+        for _ in range(1000):
+            suivante = it.get_next(datetime)
+            if (suivante - precedente).total_seconds() < INTERVALLE_MIN_S:
+                return 'Frequence cron trop elevee (intervalle minimum 10 minutes)'
+            precedente = suivante
+    except Exception as e:  # expression valide mais incalculable
+        return f'Expression cron incalculable : {str(e)[:120]}'
+    return None
+
+
+def _refus_cvss(valeur):
+    """min_cvss est un DECIMAL(3,1) : nombre de 0 a 10, sinon refus (et non 500)."""
+    try:
+        v = float(valeur)
+    except (TypeError, ValueError):
+        return 'min_cvss doit etre un nombre'
+    if not 0 <= v <= 10:
+        return 'min_cvss doit etre compris entre 0 et 10'
+    return None
+
+
 # Liste fermee des portees offertes a la creation (E-388). Releve du
 # portage : PlanificationsCve::CIBLES. 'all' en est absent DES DEUX
 # cotes — il reste lisible, il n'est plus proposable.
@@ -492,6 +590,9 @@ def create_cve_schedule():
     data = request.get_json(silent=True) or {}
     name = (data.get('name') or '').strip()
     cron_expr = (data.get('cron_expression') or '0 3 * * *').strip()
+    refus = _refus_cvss(data.get('min_cvss', 7.0))
+    if refus:
+        return jsonify({'success': False, 'message': refus}), 400
     min_cvss = float(data.get('min_cvss', 7.0))
     # E-388 : pas de defaut FABRIQUE. `('target_type') or ''` et non
     # `.get(..., 'all')` : une cle presente a `null` rend None, et le
@@ -528,25 +629,12 @@ def create_cve_schedule():
     if not name:
         return jsonify({'success': False, 'message': 'Nom requis'}), 400
 
-    # Valider l'expression cron
-    try:
-        from croniter import croniter
-        if not croniter.is_valid(cron_expr):
-            raise ValueError("Expression cron invalide")
-        it = croniter(cron_expr)
-        next_run = it.get_next(datetime)
-        # Patch A04-INSEC-N1 (OWASP A04 Insecure Design) : refuse les schedules
-        # plus frequents que 10 minutes. Sans ce clamp, '* * * * *' lancait un
-        # scan par minute -> ban OpenCVE upstream + DoS interne + abus admin
-        # malveillant. 600s = compromise raisonnable (cron quotidien typique).
-        following = it.get_next(datetime)
-        if (following - next_run).total_seconds() < 600:
-            return jsonify({
-                'success': False,
-                'message': "Frequence cron trop elevee (intervalle minimum 10 minutes)"
-            }), 400
-    except Exception as e:
-        return jsonify({'success': False, 'message': f'Expression cron invalide: {e}'}), 400
+    # Patch A04-INSEC-N1 : la meme garde que la modification, voir _refus_cron.
+    refus = _refus_cron(cron_expr)
+    if refus:
+        return jsonify({'success': False, 'message': refus}), 400
+    from croniter import croniter
+    next_run = croniter(cron_expr).get_next(datetime)
 
     conn = get_db_connection()
     try:
@@ -576,6 +664,20 @@ def update_cve_schedule(schedule_id):
         if not cur.fetchone():
             return jsonify({'success': False, 'message': 'Planification introuvable'}), 404
 
+        # VALIDER AVANT D'ECRIRE. La modification acceptait n'importe quelle
+        # expression et avalait l'echec : le plafond de la creation se
+        # contournait par un simple PUT.
+        if 'cron_expression' in data:
+            refus = _refus_cron(data['cron_expression'])
+            if refus:
+                return jsonify({'success': False, 'message': refus}), 400
+        if 'min_cvss' in data:
+            refus = _refus_cvss(data['min_cvss'])
+            if refus:
+                return jsonify({'success': False, 'message': refus}), 400
+        if 'name' in data and not str(data['name'] or '').strip():
+            return jsonify({'success': False, 'message': 'Nom requis'}), 400
+
         updates = []
         params = []
         for field in ('name', 'cron_expression', 'min_cvss', 'scan_source', 'target_type', 'target_value', 'enabled'):
@@ -602,13 +704,10 @@ def update_cve_schedule(schedule_id):
                 params.append(val)
 
         if 'cron_expression' in data:
-            try:
-                from croniter import croniter
-                next_run = croniter(data['cron_expression']).get_next(datetime)
-                updates.append("next_run = %s")
-                params.append(next_run)
-            except Exception:
-                pass
+            # Deja validee ci-dessus : le calcul ne peut plus echouer en silence.
+            from croniter import croniter
+            updates.append("next_run = %s")
+            params.append(croniter(data['cron_expression'].strip()).get_next(datetime))
 
         if updates:
             params.append(schedule_id)
@@ -670,11 +769,32 @@ def add_cve_whitelist():
     cve_id = (data.get('cve_id') or '').strip()
     reason = (data.get('reason') or '').strip()
     machine_id = data.get('machine_id')  # None = global
-    whitelisted_by = (data.get('whitelisted_by') or 'admin').strip()
     expires_at = data.get('expires_at')  # YYYY-MM-DD ou null
 
     if not cve_id or not reason:
         return jsonify({'success': False, 'message': 'cve_id et reason requis'}), 400
+
+    # L'AUTEUR VIENT DE LA SESSION, PLUS DU CLIENT. Auparavant :
+    #     whitelisted_by = (data.get('whitelisted_by') or 'admin').strip()
+    # Le client choisissait donc le nom sous lequel une acceptation de risque
+    # etait signee — n'importe quel nom, ou « admin » par defaut s'il omettait le
+    # champ. Blanchir une CVE est une decision qui s'assume : elle doit porter le
+    # nom de qui l'a prise. `tickets.created_by` (`tickets.py:114`) le fait deja
+    # ainsi ; c'est le meme geste, applique ici.
+    user_id, _role = get_current_user()
+    whitelisted_by = str(user_id or 0)
+    conn_nom = get_db_connection()
+    try:
+        # `dictionary=True` EXPLICITE : lire `ligne[0]` ferait dependre le code de
+        # la forme par defaut du curseur, qui differe entre le pilote et le double
+        # de test. On nomme la colonne qu'on veut.
+        cur_nom = conn_nom.cursor(dictionary=True)
+        cur_nom.execute("SELECT name FROM users WHERE id = %s", (user_id,))
+        ligne = cur_nom.fetchone()
+        if ligne and ligne.get('name'):
+            whitelisted_by = str(ligne['name'])
+    finally:
+        conn_nom.close()
 
     conn = get_db_connection()
     try:
