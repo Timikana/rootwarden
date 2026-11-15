@@ -94,9 +94,9 @@ result = cur.execute(f"SELECT * FROM {table_whitelist}")  # nosemgrep: rw-sql-fs
 
 ## 11. Signaler une faille
 
-Pas de bug bounty public, mais en interne :
+Pas de bug bounty public :
 1. **Ne PAS** ouvrir une issue GitHub publique pour une vuln active.
-2. Envoyer à `mainteneur@example.com` avec sujet `[RW-SECU]`.
+2. La signaler en privé par l'onglet **Security** du dépôt (« Report a vulnerability »).
 3. Si exploit confirmé : créer une branche `security/...`, patch, review, merge avec validation explicite.
 
 ---

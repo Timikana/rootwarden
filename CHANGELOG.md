@@ -5,6 +5,14 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## Signalement des failles et licence
+
+- Une faille se signale désormais en privé par l'onglet **Security** du dépôt (« Report a
+  vulnerability »), activé, au lieu d'une adresse électronique.
+- La licence MIT nomme le mainteneur du projet comme titulaire.
+
+---
+
 ## Mises à jour : les planifications déjà posées sur la machine se voient et se retirent
 
 Trois routes du backend écrivent un fichier dans `/etc/cron.d/` : la planification actuelle, l'ancien
