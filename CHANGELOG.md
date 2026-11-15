@@ -5,6 +5,18 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## Suites E2E : une pile isolée peut servir de banc
+
+- `tests/e2e/lib-base.mjs` lit la base visée dans `E2E_DB_CONTENEUR` et `E2E_ENV`. Les valeurs par
+  défaut restent celles de la pile de développement (`rootwarden_db`).
+- `go-page-update-u1.mjs` prend sa machine d'épreuve dans `E2E_MACHINE_EPREUVE` (2 par défaut), et
+  compare le résultat du filtre au nom de cette machine lu en base, au lieu d'un nom écrit en dur.
+- Rejouées ainsi sur une pile isolée (portail hors production, comptes de banc avec mot de passe
+  privé via `E2E_TEST_PASS`) : `go-page-update-u1` 21/21, `go-adm-audit` 22/22,
+  `go-adm-suppression` 21/21.
+
+---
+
 ## Unslop, cinquième passe : audit mesuré des 32 pages
 
 - **Mises à jour** :

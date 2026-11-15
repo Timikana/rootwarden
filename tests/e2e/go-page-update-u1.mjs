@@ -275,7 +275,12 @@ function renseignee(valeur) {
  * la joindre, aucune requete ne part vers elle.
  */
 const ETIQUETTE_EPREUVE = 'epreuve-u1';
-const MACHINE_EPREUVE = 2;
+// Configurable pour un banc dont les machines n'ont pas les memes identifiants.
+const MACHINE_EPREUVE = Number(process.env.E2E_MACHINE_EPREUVE || 2);
+// Son NOM vient de la base, pas d'une constante : sur le banc de dev c'est
+// « Test-Server-Debian », ailleurs autre chose.
+const NOM_MACHINE_EPREUVE = (litEnBase(
+    `SELECT name FROM rootwarden.machines WHERE id = ${MACHINE_EPREUVE}`)[0] || '').trim();
 
 const compteEtiquetteEpreuve = () => compteEnBase(
     `SELECT COUNT(*) FROM rootwarden.machine_tags WHERE tag = '${ETIQUETTE_EPREUVE}'`);
@@ -504,7 +509,7 @@ try {
         verifie(`le filtre « ${etiquette} » ne garde que les machines etiquetees`,
                 parEtiquette.nbLignes > 0
                 && parEtiquette.nbLignes < depart.nbLignes
-                && parEtiquette.machines.every(m => /Test-Server-Debian/i.test(m.nom)),
+                && parEtiquette.machines.every(m => m.nom === NOM_MACHINE_EPREUVE),
                 `${depart.nbLignes} -> ${parEtiquette.nbLignes} : `
                 + (parEtiquette.machines.map(m => m.nom).join(', ') || 'aucune'));
 
