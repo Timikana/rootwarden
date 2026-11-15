@@ -1,23 +1,14 @@
 <?php
 
 /**
- * Firewall (iptables) — sub-lot I1.
+ * iptables firewall. Writing rules: docs/REDACTION-INTERFACE.md.
  *
- * The legacy header claims "superadmin (role_id = 3) only — access denied to
- * all other roles", twice, while its guard admits role 1 (pattern E-36, fourth
- * occurrence). No text on this page may announce stricter access than the one
- * actually enforced.
- *
- * And none may suggest that `can_manage_iptables` protects the ACTIONS: of the
- * 23 routes across both filtering modules, only two checked it before the E-152
- * fix. It protects the screen.
- *
- * Key set MUST match `lang/fr/pare-feu.php` exactly — parity is verified.
+ * No text may announce stricter access than the one actually enforced.
  */
 
 return [
     'titre' => 'Firewall',
-    'intro' => 'The iptables firewall decides which connections a machine accepts. This page reads the rules currently in force, without changing anything.',
+    'intro' => 'Read, validate, apply and restore the iptables rules of a machine.',
 
     // ── Choosing the machine ────────────────────────────────────────────
     'serveur' => 'Machine',
@@ -25,14 +16,14 @@ return [
     'relever' => 'Read the rules',
     'aucune_machine_choisie' => 'Pick a machine first.',
     'machines_aucune_titre' => 'No machine is available to you',
-    'machines_aucune' => 'This page only lists machines your account has access to. Ask an administrator for access.',
+    'machines_aucune' => 'Ask an administrator for access.',
 
     // ── What the page says BEFORE the action ────────────────────────────
     'sensible' => 'Production',
-    'sensible_avert' => 'This machine is in production or flagged critical. Reading its rules does not change them — but it is the machine the next actions will target.',
+    'sensible_avert' => 'Machine in production or critical: reading its rules changes nothing, the next actions do.',
     'avert_titre' => 'A production machine is in this list',
-    'avert_un' => 'One of the :total machines listed is in production or flagged critical.',
-    'avert_plusieurs' => ':nb of the :total machines listed are in production or flagged critical.',
+    'avert_un' => 'One of the :total machines is in production or critical.',
+    'avert_plusieurs' => ':nb of the :total machines are in production or critical.',
 
     /*
      * The SSH port is announced at the moment of choice, and it comes from the
@@ -40,14 +31,14 @@ return [
      * on 22 today, so the defect is not armed — which is exactly what makes it
      * invisible. Announcing it now is refusing to reproduce it later.
      */
-    'port_ssh_annonce' => 'SSH access for this machine: port :port. A ruleset that does not leave this port open would cut access, including RootWarden\'s own.',
+    'port_ssh_annonce' => 'SSH access for this machine: port :port. A rule set that closes this port would cut access, including RootWarden\'s.',
 
     // ── The reading ─────────────────────────────────────────────────────
     'chargement' => 'Reading rules on the machine…',
     'releve_ok' => 'Rules read on :machine.',
     'releve_le' => 'Read on :date',
     'echec' => 'The rules could not be read. Is the machine reachable?',
-    'echec_reseau' => 'The request did not complete. Neither success nor refusal: nothing was read.',
+    'echec_reseau' => 'The request did not complete: nothing was read.',
 
     // ── The four blocks ─────────────────────────────────────────────────
     'bloc_actives_v4' => 'Active rules (IPv4)',
@@ -64,7 +55,7 @@ return [
     'bloc_vide_titre' => 'No rules',
     'bloc_vide' => 'The machine applies no rule on this stack. Everything is accepted by default.',
     'fichier_absent_titre' => 'File missing',
-    'fichier_absent' => 'This file does not exist on the machine. The active rules will therefore not be restored on reboot.',
+    'fichier_absent' => 'This file does not exist on the machine: the active rules will not be restored at reboot.',
 
     // ── What I1 does not do, said on screen rather than silently absent ──
     /* ⚠ Fixed 2026-09-02 (E-318) — see the FR catalogue for the full note.
@@ -74,16 +65,16 @@ return [
      * running process, so the call being wired does not mean it answers. */
 
     // ── I2: the database copy ───────────────────────────────────────────
-    'copie_titre' => 'Copy stored in the database',
-    'copie_intro' => 'The portal can keep a copy of a machine\'s rules, to find them again later. Storing a copy does NOT validate it and does NOT apply it.',
+    'copie_titre' => 'Saved copy',
+    'copie_intro' => 'The portal can keep a copy of a machine\'s rules. Saving it neither validates nor applies it.',
     'copie_charger' => 'Load the copy',
     'copie_enregistrer' => 'Store these rules',
     'copie_absente' => 'No copy stored for this machine.',
     'copie_le' => 'Copy stored on :date',
     'copie_enregistree' => 'Copy stored for :machine. It has been neither validated nor applied.',
     'copie_rien_a_enregistrer' => 'Read the rules first: there is nothing to store.',
-    'copie_v4_vide' => 'The IPv4 rules are empty. An empty copy would be refused when restoring it, so it is not stored.',
-    'copie_trop_grande' => 'The rules exceed what the column can hold (:max bytes). Nothing was stored.',
+    'copie_v4_vide' => 'The IPv4 rules are empty: an empty copy could not be restored, so it is not saved.',
+    'copie_trop_grande' => 'The rules exceed the maximum size (:max bytes). Nothing was saved.',
     'champs_manquants' => 'Incomplete request: both rule sets are expected, even when empty.',
     'machine_refusee' => 'Unknown machine, or outside your scope.',
     'copie_lignes_multiples' => 'Warning: :nb copies exist for this machine. The most recent one is shown.',
@@ -92,12 +83,12 @@ return [
 
     // ── I3: the archived version history ────────────────────────────────
     'histo_titre' => 'Archived versions',
-    'histo_intro' => 'Every rule application archives the rules it replaces. An empty version is never archived: every version listed here can be restored.',
+    'histo_intro' => 'Each apply archives the rules it replaces, unless they were empty. Every version listed can be restored.',
     'histo_chargement' => 'Reading history…',
     'histo_vide_titre' => 'No archived version',
-    'histo_vide' => 'No rule application has taken place on this machine from this portal yet. There is therefore nothing to restore.',
+    'histo_vide' => 'No rules have been applied on this machine from this portal yet: nothing to restore.',
     'histo_echec_titre' => 'History unreadable',
-    'histo_echec' => 'The history could not be read. That is not the same as an empty history: do not conclude there is nothing to restore.',
+    'histo_echec' => 'The history could not be read: do not conclude there is nothing to restore.',
     'histo_tout' => ':nb archived version(s).',
     'histo_tronque' => 'The :affichees most recent, out of :total in total.',
     'histo_col_date' => 'Archived on',
@@ -109,24 +100,23 @@ return [
 
     // ── I4: dry-run validation ──────────────────────────────────────────
     'valid_titre' => 'Dry-run validation',
-    'valid_intro' => 'The server can check that a ruleset is syntactically applicable, without applying it.',
+    'valid_intro' => 'Checks that a rule set can be applied, without applying it.',
     'valid_bouton' => 'Validate the stored copy',
-    'valid_avant' => 'This check OPENS an SSH session on the machine and writes a temporary file there. It modifies no firewall table.',
-    'valid_limite' => 'Validation covers IPv4 rules ONLY. A copy whose IPv6 is malformed would pass this check and fail on apply.',
-    'valid_v4_vide' => 'This copy carries no IPv4 rules. There is nothing to validate: validation only knows IPv4, and refuses an empty copy.',
+    'valid_avant' => 'This check opens an SSH session and writes a temporary file on the machine; it does not change the firewall.',
+    'valid_limite' => 'Only the IPv4 rules are checked: an IPv6 error would pass this check and fail when applied.',
+    'valid_v4_vide' => 'This copy has no IPv4 rule: nothing to validate.',
     'valid_sans_copie' => 'Load the stored copy first: it is what gets validated.',
     'valid_en_cours' => 'Validation running on the machine…',
     'valid_ok' => 'The server reports these rules as applicable.',
-    'valid_invalide_court' => 'The server reports these rules as invalid — verdict to be re-read below.',
-    'valid_invalide_titre' => 'Reported invalid — verdict to be re-read',
-    'valid_invalide' => 'The server reports these rules as invalid. This verdict IS NOT RELIABLE on long output: the exit-code detection looks for its marker inside 4096-byte chunks, and a VALID ruleset can be reported invalid when the marker straddles a boundary. Read the output before concluding.',
+    'valid_invalide_court' => 'The server reports these rules as invalid: read the output below.',
+    'valid_invalide_titre' => 'Rules reported as invalid',
+    'valid_invalide' => 'The server reports these rules as invalid. Read the output before fixing them.',
     'valid_echec_titre' => 'Check did not complete',
-    'valid_echec' => 'The check did not complete. This is neither "valid" nor "invalid": nothing was verified.',
+    'valid_echec' => 'The check did not complete: nothing was verified.',
     'valid_sortie' => 'Server output',
 
     // A non-measurement announced in advance is a reserve; announced
     // afterwards, an excuse. Said above the button — see fr.
-    'copie_jamais_exercee' => "Saving a rule copy has never yet been performed from this interface: the action is wired and confirmed, but its completion has not been observed on a machine. The old portal remains the only proven route.",
 
     /* Q3 — the eight titles `rwRetourPareFeu()` returns. They were cited by the
      * module and existed nowhere: a title that designates nothing satisfies every
@@ -134,7 +124,7 @@ return [
      * "I don't know", never "it failed". */
     'ipt_retour_succes'           => 'The rules were applied.',
     'ipt_retour_regles_invalides' => 'The server rejected these rules: nothing was applied, and the machine is unchanged.',
-    'ipt_retour_refus'            => 'The request was refused before the rules were checked at all. Nothing was applied — and whether these rules are valid is unknown.',
+    'ipt_retour_refus'            => 'The request was refused before any check of the rules. Nothing was applied.',
     'ipt_retour_erreur_serveur'   => 'The server failed before answering. Nothing tells us whether the rules were applied: read the machine state before retrying.',
     'ipt_retour_corps_illisible'  => 'The server answered, but its answer is unreadable. The change may have gone through: read the machine state before retrying.',
     'ipt_retour_inabouti'         => 'The request never left. Nothing was applied.',
@@ -143,17 +133,17 @@ return [
 
     /* I5 — the apply screen. */
     'appl_titre'      => 'Apply a rule set',
-    'appl_intro'      => 'The chosen set REPLACES every rule on the machine in one gesture: `iptables-restore` overwrites the tables, it does not append. The previous version is archived before the write.',
+    'appl_intro'      => 'The chosen set replaces every rule on the machine (iptables-restore). The previous version is archived before writing.',
     'appl_gabarit'    => 'Rule set',
-    'appl_gabarit_aide' => 'The SSH port is read from the chosen machine, never assumed to be 22 — that is what stops a template from locking you out.',
+    'appl_gabarit_aide' => 'The SSH port comes from the chosen machine; it is never assumed to be 22.',
     'appl_apercu'     => 'What will be applied',
     'appl_ssh_ouvert' => 'SSH port :port stays reachable with this set.',
-    'appl_ssh_ferme'  => '⛔ This set CLOSES SSH port :port. Applied, it would cut your access to the machine — and returning would need a physical console.',
-    'appl_ssh_doute'  => '⛔ Whether SSH port :port stays open with this set cannot be determined. We refuse rather than gamble: a doubt here is paid in lost access.',
+    'appl_ssh_ferme'  => '⛔ This set closes SSH port :port: once applied, it would cut your access, and only a physical console could bring it back.',
+    'appl_ssh_doute'  => '⛔ Cannot tell whether SSH port :port stays open with this set: applying is refused.',
     'appl_bouton'     => 'Apply to the machine',
     'appl_en_cours'   => 'Applying…',
     'appl_conf_titre' => 'Replace the rules on :machine?',
-    'appl_conf_texte' => 'Every current rule on :machine will be REPLACED by the set ":gabarit". The previous version is archived and stays restorable from the history. No request has been sent yet.',
+    'appl_conf_texte' => 'Every current rule on :machine will be replaced by the ":gabarit" set. The previous version is archived and can be restored from the history.',
     'appl_conf_ok'    => 'Replace the rules',
     'appl_conf_non'   => 'Cancel',
     'appl_annule'     => 'Cancelled — no request was sent.',
@@ -172,11 +162,11 @@ return [
     'rb_lecture_echec' => 'The version could not be read. Nothing was restored.',
     'rb_apercu'     => 'What will be restored',
     'rb_archive_le' => 'Version archived on :date',
-    'rb_ssh_ouvert' => "SSH port :port — the machine's port TODAY — stays reachable with this version.",
-    'rb_ssh_ferme'  => "⛔ This version CLOSES SSH port :port, which is the machine's port today. It may have been valid the day it was archived: restored now, it would cut your access.",
-    'rb_ssh_doute'  => '⛔ Whether this version leaves SSH port :port open cannot be determined. We refuse rather than gamble — and recovery would also go over SSH.',
+    'rb_ssh_ouvert' => 'SSH port :port, the machine\'s port today, stays reachable with this version.',
+    'rb_ssh_ferme'  => '⛔ This version closes the current SSH port :port: restored now, it would cut your access.',
+    'rb_ssh_doute'  => '⛔ Cannot tell whether this version leaves SSH port :port open: restoring is refused.',
     'rb_conf_titre' => 'Restore the version from :date on :machine?',
-    'rb_conf_texte' => 'The current rules on :machine will be REPLACED by this archived version. The current state is archived before the write, so this rollback is itself reversible. No request has been sent yet.',
+    'rb_conf_texte' => 'The current rules on :machine will be replaced by this version. The current state is archived before writing: this rollback can be undone.',
     'rb_conf_ok'    => 'Restore this version',
     'rb_conf_non'   => 'Cancel',
     /*
@@ -188,8 +178,8 @@ return [
      * is sound would learn that the guard is wrong.
      */
     'rb_valid_en_cours'   => 'Checking this version against the machine…',
-    'rb_valid_invalide'   => "⛔ This version is refused: the machine cannot load it. It may have been valid the day it was archived — restored now, it would overwrite the rules file without being able to load it, and the machine would come back up with no firewall. Nothing was applied.",
-    'rb_valid_indecidable' => "⚠ Rollback refused: the check did not complete, so nothing proves this version can be loaded. Reason: :motif. Nothing was applied.",
+    'rb_valid_invalide'   => '⛔ Version refused: the machine cannot load it. Restored, it would overwrite the rules file and the machine would reboot without a firewall. Nothing was applied.',
+    'rb_valid_indecidable' => '⚠ Restore refused: the check did not complete (:motif). Nothing was applied.',
     'rb_en_cours'   => 'Restoring…',
     'rb_annule'     => 'Cancelled — no request was sent.',
 ];
