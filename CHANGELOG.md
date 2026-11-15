@@ -23,6 +23,30 @@ que rien ne les montre.
   liste fermée, jamais par un chemin.
 - La description du panneau citait encore la colonne « Mise à jour planifiée », renommée
   « Planification ».
+- L'aperçu et le journal annonçaient `30 03 * * 2` quand la machine recevait `30 3 * * 2` : le
+  backend écrit des entiers. L'aperçu dit désormais exactement ce qui est écrit.
+- `go-page-update-u4` se rejoue sur une pile isolée (`E2E_MACHINE_EPREUVE`, `E2E_PY_CONTENEUR`) et
+  vérifie le panneau : lecture, confirmation, retrait relu sur la machine. Rejouée sur un serveur
+  SSH de test : 17/17.
+
+---
+
+## L'ancien portail est retiré du dépôt
+
+`legacy/` ne contenait plus que des parties archivées (235 fichiers) que plus aucun service ne
+servait. Le dossier est retiré ; son dernier état est conservé par le tag **`legacy-final`** :
+
+    git show legacy-final:legacy/_deprecated/<partie>/<fichier>
+
+- La CI ne cherche plus de PHP dans `legacy/`, et les exemptions de semgrep et gitleaks qui
+  visaient l'archive sont retirées.
+- `scripts/eteindre-le-legacy.sh` est retiré : sa séquence est terminée.
+- `test-server/seed_test_machine.php` est retiré : il chargeait des fichiers du legacy et ne
+  tournait que dans le conteneur `rootwarden_php`, supprimé depuis septembre. Aucun appelant.
+- `scripts/rejouer-lot.sh` ne joue plus que le portail Laravel ; `--legacy` refuse.
+- `legacy/` reste dans `.gitignore` : un serveur installé avant ce retrait garde sur disque des
+  fichiers que git ignorait, dont `legacy/.first_run_credentials`, qui contient des secrets.
+  Ils peuvent être supprimés à la main.
 
 ---
 

@@ -15,7 +15,6 @@ package-lock.json
 !tests/e2e/package-lock.json
 vendor/
 !vendor/composer/
-!legacy/vendor/.htaccess
 
 # Secrets — NE JAMAIS commiter ces fichiers
 srv-docker.env
@@ -37,19 +36,10 @@ backend/ssl/
 *.log
 backend/logs/
 legacy/logs/
-!legacy/logs/.htaccess
 
 # Backups — generes automatiquement
 backend/backups/
 backups/
-# Exception : legacy/backups/ est du CODE (page UI de gestion des sauvegardes), pas du stockage.
-# L'archivage la deplace dans legacy/_deprecated/ : sans cette seconde exception, le dossier
-# archive retombe sous la regle `backups/` et tout fichier qu'on y ajouterait deviendrait
-# invisible. Les fichiers deja suivis survivent au deplacement, ce qui masque le probleme.
-!legacy/backups/
-!legacy/backups/**
-!legacy/_deprecated/backups/
-!legacy/_deprecated/backups/**
 
 # Base de donnees locale
 mysql/data/
@@ -160,3 +150,9 @@ laravel/version.txt
 # REPERTOIRE et le montage ne s'accroche plus. `ecrire-version.sh` le pose
 # avant chaque `up`, y compris hors depot git.
 legacy/version.txt
+
+# Le dossier legacy/ n'est plus suivi (tag legacy-final). Un hote installe AVANT
+# son retrait garde sur disque ce que git ignorait : version.txt, logs/,
+# .installed, _ul, et .first_run_credentials, qui porte des SECRETS. Cette entree
+# reste pour qu'un `git add -A` sur cet hote ne les embarque pas.
+legacy/
