@@ -5,6 +5,30 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## PHP 8.5, Guzzle 8, PHPUnit 13 : les montées de version majeure retenues jusqu'ici
+
+| | Avant | Après |
+|---|---|---|
+| PHP du portail | 8.4 | **8.5** (image `php:8.5-apache`, CI comprise) |
+| Guzzle (client HTTP de la passerelle) | 7.16 | **8.5** — promises 3, psr7 3, uri-template 2 |
+| brick/math | 0.18 | 1.0 |
+| PHPUnit (tests seulement) | 12.5 | 13.4 |
+
+- **OPcache** n'est plus compilé à part : il est intégré au moteur depuis PHP 8.5, et l'ancienne ligne
+  faisait échouer la construction de l'image.
+- **Le relais en flux de la passerelle** (journaux en direct) est vérifié sous Guzzle 8 : le corps est
+  désormais un `ChunkedBodyStream`, la ressource détachée est déjà décodée et le relais rend le contenu
+  exact. Le témoin du test, qui prouvait que l'ancienne lecture bloquait, a cessé de bloquer sous
+  Guzzle 8 comme il était écrit pour le signaler ; il lit désormais la ressource en mode bloquant. Un
+  relais remis volontairement en mode bloquant fait échouer trois tests.
+- Vérifié : 521 tests en PHP 8.4 et 8.5, aucune dépréciation signalée ; portail PHP 8.5 démarré sur
+  une pile isolée, connexion et pages passant par la passerelle sans erreur.
+
+Notes d'exploitation : `./maj.sh --release` reconstruit l'image du portail en PHP 8.5. Aucune
+migration.
+
+---
+
 ## Mises à jour de sécurité — PHP, images, MySQL : ce qui arrivait, et ce qui n'arrivait jamais
 
 | | Avant | Après |

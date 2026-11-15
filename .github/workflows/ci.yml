@@ -58,7 +58,7 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5 (epingle par SHA, audit 2026-10-13 B-4)
       - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962  # v2 (epingle par SHA, audit 2026-10-13 B-4)
         with:
-          php-version: "8.4"
+          php-version: "8.5"
 
       # ⚠ CE JOB LINTAIT L'ARCHIVE ET RIEN D'AUTRE.
       #
@@ -204,7 +204,7 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5 (epingle par SHA, audit 2026-10-13 B-4)
       - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962  # v2 (epingle par SHA, audit 2026-10-13 B-4)
         with:
-          php-version: "8.4"
+          php-version: "8.5"
           # Nommees explicitement plutot que laissees au defaut de l'image :
           # `pdo_sqlite` est ce sur quoi la suite entiere repose, et une
           # extension absente se manifesterait par une erreur de connexion
@@ -769,7 +769,7 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5 (epingle par SHA, audit 2026-10-13 B-4)
       - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962  # v2 (epingle par SHA, audit 2026-10-13 B-4)
         with:
-          php-version: "8.4"
+          php-version: "8.5"
           tools: composer
       # ⚠ CE JOB N'AUDITAIT QUE LE LEGACY, ET C'EST UN JOB DE SECURITE.
       #

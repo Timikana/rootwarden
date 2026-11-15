@@ -18,7 +18,7 @@ set -euo pipefail
 
 IMAGES=(
     "python:3.13-slim"
-    "php:8.4-apache"
+    "php:8.5-apache"
     "mysql:9.2.0"
     "composer:2"
 )
