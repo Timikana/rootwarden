@@ -570,8 +570,12 @@
      */
     function calculeCron(date, heureChoisie, recurrence) {
         // `heureChoisie` et non `heure` : `heure()` est l'horloge du journal.
-        const [hh, mm] = heureChoisie.split(':');
-        const [, mois, jour] = date.split('-');
+        // Des ENTIERS, sans zero initial : le backend ecrit `f"{_minute} {_heure}"`
+        // sur des `int`, donc `30 3`, et un apercu `30 03` ne disait pas
+        // exactement ce que la machine recevait. Mesure par u4 le 2026-11-15.
+        const entier = (v) => String(parseInt(v, 10));
+        const [hh, mm] = heureChoisie.split(':').map(entier);
+        const [, mois, jour] = date.split('-').map(entier);
         const jourJs = new Date(date + 'T00:00:00').getDay();
         const jourCron = jourJs === 0 ? 7 : jourJs;   // Python : weekday() + 1
 
@@ -588,14 +592,13 @@
         if (recurrence === 'monthly') {
             return {
                 cron: `${mm} ${hh} ${jour} * *`,
-                texte: planif.apercu_monthly.replace(':jour', String(parseInt(jour, 10))),
+                texte: planif.apercu_monthly.replace(':jour', jour),
                 reserve: '',
             };
         }
         return {
             cron: `${mm} ${hh} ${jour} ${mois} *`,
-            texte: planif.apercu_none.replace(':jour', String(parseInt(jour, 10)))
-                                     .replace(':mois', String(parseInt(mois, 10))),
+            texte: planif.apercu_none.replace(':jour', jour).replace(':mois', mois),
             reserve: planif.reserve_annuel,
         };
     }

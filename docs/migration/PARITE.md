@@ -1783,8 +1783,13 @@ Deux écarts entre le mot et l'effet :
 
 | Formulaire | Fichier écrit | Expression |
 |---|---|---|
-| Générale | `/etc/cron.d/auto_update_advanced` | `30 03 * * 1` (lundi) |
-| Sécurité | `/etc/cron.d/auto_security_update_advanced` | `30 03 * * 2` (mardi) |
+| Générale | `/etc/cron.d/auto_update_advanced` | `30 3 * * 1` (lundi) |
+| Sécurité | `/etc/cron.d/auto_security_update_advanced` | `30 3 * * 2` (mardi) |
+
+> **Rectifié le 2026-11-15.** Ce tableau portait `30 03`, la forme de l'aperçu, et non celle du
+> fichier : le backend écrit des entiers, sans zéro initial. u4, rejouée sur une machine réelle, a
+> relu `30 3 * * 2` ; son assertion « l'aperçu annonçait exactement ce qui a été écrit » ne
+> comparait que l'aperçu. Les deux sont corrigés.
 
 ### Ce que fait le portage
 
