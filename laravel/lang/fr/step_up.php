@@ -21,7 +21,7 @@ return [
     // `politiques` et `acces-sftp` — les lisent ICI : quatre copies d'un meme
     // libelle divergent, et celui-ci decrit une garde.
     'panneau_titre'   => 'Confirmez avec votre second facteur',
-    'panneau_aide'    => "Ce geste écrit une règle sur une machine réelle. Saisissez le code à six chiffres de votre authentificateur : la re-authentification vaut quinze minutes, et pour CETTE action seulement.",
+    'panneau_aide'    => "Cette action écrit sur une machine réelle. Saisissez votre code à six chiffres : il vaut quinze minutes, pour cette action seulement.",
     'panneau_code'    => 'Code à six chiffres',
     'panneau_valider' => 'Confirmer',
     'panneau_annuler' => 'Annuler',

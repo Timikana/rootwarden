@@ -13,7 +13,7 @@
 return [
 
     'title' => 'Portal accounts',
-    'desc' => 'Create an account, set a password, unlock an access, reset a second factor.',
+    'desc' => "The accounts that sign in to this portal: creation, password, role, suspension.",
 
     'col_nom' => 'Name',
     'col_courriel' => 'Email',
@@ -43,7 +43,7 @@ return [
     'mdp_change' => 'Password saved. The account will have to change it on next sign-in.',
 
     'secret_titre' => 'Generated password — it will not be shown again.',
-    'secret_aide' => 'Pass it on through a safe channel. It is written neither in the page nor in the log.',
+    'secret_aide' => "Pass it on through a safe channel.",
     'compris' => 'Noted',
 
     'deverrouiller' => 'Unlock',
@@ -68,7 +68,7 @@ return [
     'suspendu' => 'Account suspended. It can no longer sign in, and its machine access will be removed on the next deployment.',
     'err_auto_activite' => 'You cannot suspend your own account.',
     'err_dernier_superadmin' => 'Cannot suspend the last active superadministrator: nobody would be able to reopen the portal.',
-    'err_actif_requis' => 'The desired state (actif) must be given: an omission is not a suspension.',
+    'err_actif_requis' => "The desired state (actif) must be given.",
 
     'totp_reinitialiser' => 'Reset 2FA',
     'totp_question' => 'Reset the second factor for ":nom"? The user will have to enrol a new authenticator before signing in.',
@@ -83,23 +83,20 @@ return [
     /* Password expiry exemption — three values, and "empty" is not "zero".
      * See fr for why the self-edit refusal is a ported gesture and not a copy. */
     'exp_titre'   => 'Password expiry',
-    'exp_aide'    => 'Superadministrator only, and never on their own account.',
     'exp_globale' => 'Follow the global rule',
     'exp_exempte' => 'Exempt this account',
-    'exp_jours'   => 'Account-specific duration (in days)',
-    'exp_valider' => 'Save',
     'exp_pose'    => 'Expiry saved. The due date is recomputed from the last password change.',
     'exp_valeur'  => 'Invalid expiry value: expected a positive duration, zero to exempt, or nothing to follow the global rule.',
-    'exp_pas_soi' => 'You cannot change the expiry of your own password: exempting yourself from a security rule must go through someone else.',
+    'exp_pas_soi' => "You cannot change the expiry of your own password: ask another superadministrator.",
 
     'imp_valider' => 'Import the accounts',
-    'imp_roles_aide' => 'The "role" column accepts: :roles. Any other value yields the lowest role.',
-    'imp_courriel_exige' => 'The email address is REQUIRED here, whereas the legacy portal accepted it empty — an account with no address and no known password has neither access nor recovery.',
-    'imp_mdp_avert' => 'Each created account\'s password is shown ONCE below. It is stored nowhere and will never be shown again: copy it before leaving this page. The person must change it at first sign-in — it passed through this screen, it must not stay theirs.',
+    'imp_roles_aide' => "The \"role\" column accepts: :roles. Any other value yields the \"User\" role.",
+    'imp_courriel_exige' => "The email address is required: without it, the account cannot recover its access.",
+    'imp_mdp_avert' => "Each password is shown only once, here: copy it before leaving the page. The person must change it at first sign-in.",
     'imp_bilan_titre' => 'Import summary',
     'imp_lues' => ':n row(s) read.',
     'imp_crees' => ':n account(s) created.',
-    'imp_tronque' => 'The file exceeds :max rows: the rest was NOT processed.',
+    'imp_tronque' => "The file exceeds :max rows: the following ones were not processed.",
     'imp_manquantes' => 'Required columns missing from the header: :colonnes. Nothing was imported.',
     'imp_erreurs_titre' => ':n row(s) to report',
     'imp_ligne' => 'Row :n',
@@ -111,7 +108,7 @@ return [
     'imp_err_ecriture' => 'Creation failed in the database: row skipped.',
     'imp_err_role' => 'The "role" column value ":valeur" is not a role: the account was created with the "User" role. Accepted values: :roles.',
     'imp_rang_ramene' => 'Account created, but with the "User" role: you may only create a role below your own.',
-    'imp_sudo_refuse' => 'Account created WITHOUT sudo: granting sudo requires the "Superadmin" role.',
+    'imp_sudo_refuse' => "Account created without sudo: granting sudo requires the \"Super administrator\" role.",
     'err_nom' => 'The name is required and cannot exceed 255 characters.',
     'err_nom_pris' => 'That name is already used by another account.',
     'err_inconnu' => 'That account does not exist.',
@@ -133,7 +130,7 @@ return [
     'anonymiser_plutot' => 'Anonymise instead',
     'suppr_question' => 'Delete account ":nom"?',
     'suppr_sans_journal' => 'This account carries no audit log line: deleting it takes nothing else with it.',
-    'suppr_avec_journal' => 'This account carries :nombre audit log line(s). Deleting them would break the sealing chain — deletion is therefore refused. Anonymising erases the personal data and keeps the log.',
+    'suppr_avec_journal' => "This account carries :nombre audit log line(s): deleting it would break the sealing chain. Anonymise it instead: its personal data is erased, the log is kept.",
     'suppr_consigne' => 'To confirm, type exactly: :nom',
     'anon_question' => 'Anonymise account ":nom"? Personal data will be erased; the audit log will be kept.',
     'supprime' => 'Account ":nom" deleted.',

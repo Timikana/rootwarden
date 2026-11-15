@@ -70,18 +70,6 @@
         </p>
     @endif
 
-    {{-- ══ CE QUI N'EST PAS RECOPIE, ET LA MESURE QUI LE JUSTIFIE ══════════ --}}
-    <h2 class="rw-section__entete rw-titre--espace">{{ __('documentation.reste_titre') }}</h2>
-    <p class="rw-prose">{{ __('documentation.reste_texte') }}</p>
-    <p class="rw-prose" data-rw="doc-reste-perime">{{ __('documentation.reste_perime') }}</p>
-    <p class="rw-prose" data-rw="doc-reste-cache">{{ __('documentation.reste_cache') }}</p>
-    <p class="rw-tuile__lien">
-        @if ($lienLegacy)
-            <a class="rw-lien" href="{{ $lienLegacy }}" target="_blank" rel="noopener"
-               data-rw="doc-reste-lien">{{ __('documentation.reste_ouvrir') }} ↗</a>
-        @endif
-    </p>
-
     @if ($administration)
         {{--
             LA CONSOLE D'API N'EST PAS REPRISE — decision rendue, pas un oubli.

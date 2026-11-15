@@ -8,7 +8,7 @@
 return [
 
     'bienvenue'   => 'Bonjour :nom',
-    'orientation' => "Vous êtes sur la nouvelle interface. Les raccourcis ci-dessous mènent aux modules que vos droits vous ouvrent ; ceux qui ne sont pas encore portés ouvrent l'ancien portail dans un nouvel onglet.",
+    'orientation' => "Vos modules, l'état de votre parc et ce qui demande votre attention.",
 
     // Roles
     'role_lecteur'    => 'Lecteur',
@@ -17,17 +17,13 @@ return [
 
     // Tuiles
     'acces_titre' => 'Modules accessibles',
-    'acces_texte' => '{0}Aucun module ne vous est ouvert avec le rôle :role.|{1}Un seul module vous est ouvert avec le rôle :role.|[2,*]Modules ouverts par vos droits, rôle :role.',
+    'acces_texte' => "{0}Aucun module ouvert au rôle :role.|{1}Un module ouvert au rôle :role.|[2,*]Modules ouverts au rôle :role.",
 
-    'portes_titre' => 'Déjà portés',
-    'portes_texte' => "Nombre de vos modules servis par la nouvelle interface. Les autres ouvrent l'ancien portail dans un nouvel onglet.",
 
     'securite_titre'  => 'Second facteur',
     'securite_valeur' => 'Actif',
-    'securite_texte'  => "Votre session a été ouverte avec un code à usage unique. Un code déjà utilisé est refusé, même depuis un autre navigateur.",
+    'securite_texte'  => "Session ouverte avec un code à usage unique.",
 
-    'ancien_titre' => 'Ancien portail',
-    'ancien_texte' => "Toujours en service, avec les mêmes identifiants. Les entrées de menu marquées d'une flèche y renvoient directement.",
 
     // Etat vide, explicite
     // ── LES DOUZE RACCOURCIS, PORTES DE `legacy/index.php:363-385` ────────
@@ -35,8 +31,8 @@ return [
     // jeux qui disent la meme chose, et deux jeux divergent. Seule la
     // DESCRIPTION est propre aux tuiles, et elle est reprise du legacy.
     'raccourcis_titre' => 'Aller directement à',
-    'raccourcis_aide' => "Ces raccourcis suivent vos droits : vous ne voyez que ce que votre rôle et vos permissions vous ouvrent. Une flèche signale une page encore servie par l'ancien portail.",
-    'raccourcis_aucun' => "Aucun module n'est ouvert à votre compte pour l'instant. Ce n'est pas une erreur d'affichage : demandez les permissions correspondantes à un administrateur.",
+    'raccourcis_aide' => "Selon votre rôle et vos permissions.",
+    'raccourcis_aucun' => "Aucun module n'est ouvert à votre compte. Demandez les permissions à un administrateur.",
 
     'desc_ssh_keys' => 'Déployer les clés publiques',
     'desc_updates' => 'Mises à jour APT et redémarrages',
@@ -55,12 +51,11 @@ return [
     // Demande de l'exploitant : « quand on ajoute un serveur, les menus ou
     // aller ensuite ne sont pas evidents, et un nouvel utilisateur ne le sait
     // pas ». Une liste NUMEROTEE : l'ordre est l'acquis, pas la presentation.
-    'sequence_titre' => "Vous venez d'ajouter un serveur ? L'ordre compte",
-    'sequence_1' => "Déployez la clé de plateforme sur le serveur. Le même geste crée aussi le compte d'administration avec les droits root sans mot de passe.",
-    'sequence_2' => "Relevez les comptes distants du serveur, et classez ceux que RootWarden doit gérer ou ignorer.",
-    'sequence_3' => "Vérifiez que la connexion par clé fonctionne avant de retirer quoi que ce soit — le bouton « Tester » le fait sans rien écrire.",
-    'sequence_4' => "Alors seulement, effacer le mot de passe de la base a un sens. Fait avant, il vous prive du seul recours si la clé ne fonctionne pas.",
-    'sequence_aide' => "Cet ordre n'est pas une préférence : effacer le mot de passe avant d'avoir vérifié la clé retire à RootWarden son unique moyen de revenir sur le serveur.",
+    'sequence_titre' => "Après l'ajout d'un serveur, dans cet ordre",
+    'sequence_1' => "Déployez la clé de plateforme (elle crée aussi le compte d'administration).",
+    'sequence_2' => "Relevez les comptes distants et classez-les.",
+    'sequence_3' => "Testez la connexion par clé.",
+    'sequence_4' => "Seulement ensuite, effacez les mots de passe enregistrés : avant, vous perdriez le seul recours si la clé ne fonctionne pas.",
 
     // ── LE PARC, BORNE AU PERIMETRE DU COMPTE ─────────────────────────────
     'parc_compteur_titre' => 'Vos machines',
@@ -83,8 +78,8 @@ return [
      * {0} laisserait croire qu'il peut etre rendu a zero.
      */
     'parc_neutre' => '{0}aucune machine au parc|{1}1 machine au parc|[2,*]:count machines au parc',
-    'parc_borne_aide' => "Vous ne voyez ici que les machines qui vous sont attribuées. Le second nombre est la taille réelle du parc : il est affiché pour que la borne soit visible, et non devinée.",
-    'parc_illisible' => "Le parc n'a pas pu être lu. Ce n'est pas « aucune machine » : la base n'a pas répondu, et aucun nombre affiché ici ne serait fiable.",
+    'parc_borne_aide' => "Seules vos machines sont comptées ; le second nombre est la taille du parc.",
+    'parc_illisible' => "Le parc n'a pas pu être lu : aucun nombre ici n'est fiable.",
     // ══ LES NEUF INDICATEURS DU LEGACY, BORNES ═══════════════════════════
     'ind_parc_titre' => 'Votre parc',
     /*
@@ -106,7 +101,7 @@ return [
     // au total, ce qui les fait paraitre coherents — et c'est ce qui rendait le
     // defaut invisible.
     'ind_inconnu' => 'état inconnu',
-    'ind_inconnu_aide' => "Ces machines ne sont ni en ligne ni hors ligne : le produit n'a pas d'information à jour sur elles. L'ancien portail les comptait comme hors ligne, ce qui affirmait un état que la donnée ne porte pas.",
+    'ind_inconnu_aide' => "Aucune information récente sur ces machines.",
     'ind_cle' => 'avec la clé de plateforme',
 
     'ind_cve_titre' => 'Vulnérabilités connues',
@@ -117,19 +112,19 @@ return [
     'ind_cve_nombre' => 'CVE au dernier scan',
     'ind_cve_nombre_machine' => 'CVE au dernier scan de :machine',
     'ind_cve_critiques' => 'critiques, dernier scan par machine',
-    'ind_cve_aucun_scan' => "Aucun scan de vulnérabilités n'a été fait sur les machines de votre périmètre. Ce n'est pas « zéro CVE » : c'est l'absence de mesure.",
-    'ind_cve_illisible' => "L'historique des scans n'a pas pu être lu. Ce n'est pas « aucune CVE » — aucun nombre affiché ici ne serait fiable.",
+    'ind_cve_aucun_scan' => "Aucun scan de vulnérabilités sur vos machines (ce n'est pas « zéro CVE »).",
+    'ind_cve_illisible' => "L'historique des scans n'a pas pu être lu.",
 
     'ind_comptes_titre' => 'Comptes du portail',
     'ind_actifs' => 'comptes actifs',
     'ind_sans_cle' => 'sans clé SSH enregistrée',
-    'ind_sans_cle_sature' => "Cet indicateur vaut aujourd'hui 100 % : aucun compte n'a de clé SSH enregistrée. Il est porté quand même — un indicateur saturé est le seul moyen de voir qu'il cesse de l'être.",
+    'ind_sans_cle_sature' => "Aucun compte n'a encore de clé SSH enregistrée.",
     'ind_sans_2fa' => 'sans second facteur',
-    'ind_sans_2fa_aide' => "Ce nombre est réservé au rôle 3. Il dit quelle part des comptes du portail s'ouvre avec un mot de passe seul — une information utile pour agir, et une carte de cibles pour qui n'a pas à agir. Votre propre état de second facteur est affiché plus haut.",
-    'ind_comptes_reserve' => "Les compteurs de comptes ne sont pas affichés à votre rôle. Ils ne portent pas sur vos machines : un périmètre de machines ne borne pas une population d'utilisateurs, donc ils se bornent par rôle.",
+    'ind_sans_2fa_aide' => "Visible des superadmins uniquement.",
+    'ind_comptes_reserve' => "Les compteurs de comptes ne sont pas affichés pour votre rôle.",
 
-    'ind_illisible' => "Ces valeurs n'ont pas pu être lues. Ce n'est pas « zéro » : la base n'a pas répondu.",
-    'ind_borne' => "Ces nombres ne portent que sur les machines qui vous sont attribuées.",
+    'ind_illisible' => "Valeurs illisibles : la base n'a pas répondu.",
+    'ind_borne' => "Sur vos machines uniquement.",
 
     // ══ E-264 : LA REGION D'ALERTES ══════════════════════════════════════
     'alertes_titre' => "Ce qui demande votre attention",
@@ -139,8 +134,8 @@ return [
      * vide se lit « tout va bien ». Deux messages, jamais un seul.
      */
     'alertes_aucune' => "Rien ne demande votre attention pour le moment.",
-    'alertes_aucune_aide' => "Ce constat porte sur les machines de votre périmètre et sur ce que votre rôle permet de lire.",
-    'alertes_illisible' => "Attention : certaines vérifications n'ont pas pu être faites, et leur silence ne veut pas dire qu'il n'y a rien à signaler.",
+    'alertes_aucune_aide' => "Sur vos machines, selon ce que votre rôle permet de lire.",
+    'alertes_illisible' => "Certaines vérifications ont échoué : leur silence ne veut pas dire que tout va bien.",
     'alertes_illisible_familles' => "Non lu : :familles.",
     'alertes_voir' => "Voir",
 

@@ -6,20 +6,20 @@
  */
 return [
     'title' => 'Maintenance windows',
-    'desc'  => 'Define the time ranges during which mutating actions — updates, reboots, deployments — are allowed.',
+    'desc'  => "Time slots during which changing actions (updates, reboots, deployments) are allowed.",
 
-    'guide_titre'    => 'Careful: creating a window RESTRICTS',
-    'guide_aucune'   => 'As long as no window is enabled, no restriction applies: every mutating action goes through.',
-    'guide_une'      => 'As soon as a single window is enabled, mutating actions only go through DURING its ranges. Outside them, they are refused.',
-    'guide_role'     => 'Superadministrator accounts keep priority, and their bypass is logged.',
-    'guide_ailleurs' => 'The refusal does not show on this page: it shows on the page that attempted the action — updates, monitoring.',
+    'guide_titre'    => "Warning: a window restricts the fleet",
+    'guide_aucune'   => "With no window enabled, nothing is restricted.",
+    'guide_une'      => "As soon as one window is enabled, changing actions only run during its slots.",
+    'guide_role'     => "Superadmins always pass; their bypass is logged.",
+    'guide_ailleurs' => "A refusal shows on the action's page (updates, supervision), not here.",
 
     'etat_libre'     => 'No restriction',
     'etat_restreint' => 'Fleet restricted',
     'etat_machines'  => ':n machine restricted|:n machines restricted',
 
     'etat_detail'    => ':n window(s) enabled, :g of them global',
-    'horloge_serveur' => '⚠ The state below is computed on the server clock, which reads :heure (:decalage) — not on your browser clock. A window entered in local time is enforced on that clock.',
+    'horloge_serveur' => "⚠ Computed on the server clock (:heure, :decalage), not on your browser's.",
 
     'btn_new'        => 'New window',
     'tip_new'        => 'Define a range during which mutating actions are allowed.',
@@ -32,7 +32,7 @@ return [
     'f_start'        => 'Start',
     'f_end'          => 'End',
     'f_enabled'      => 'Enabled',
-    'overnight_hint' => 'If the start time is later than the end time, the window is treated as spanning midnight — for example 22:00 → 06:00.',
+    'overnight_hint' => "Start after end: the window spans midnight (e.g. 22:00 → 06:00).",
     'btn_save'       => 'Save',
     'btn_cancel'     => 'Cancel',
 
@@ -55,7 +55,7 @@ return [
     'delete'     => 'Delete',
 
     'confirm_titre'     => 'Delete this window?',
-    'confirm_aide'      => 'The window ":name" will be removed. If it was the last enabled one, every restriction on the fleet is lifted.',
+    'confirm_aide'      => "The window “:name” will be deleted. If it was the last enabled one, the fleet is no longer restricted.",
     'confirm_supprimer' => 'Delete',
     'confirm_annuler'   => 'Cancel',
 

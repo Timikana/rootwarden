@@ -8,25 +8,6 @@
         </div>
     </div>
 
-    {{-- L'ENCART QUE LE LEGACY N'A PAS.
-
-         Trois boutons de l'onglet Machines ouvrent une session SSH réelle et
-         exécutent en root : installation d'un paquet, écriture de fichiers,
-         redémarrage d'un service. Le legacy ne le dit nulle part, et il ne
-         demande même pas confirmation pour « Tester ».
-
-         Le dire AVANT le clic, pas dans la boîte de confirmation : quelqu'un qui
-         découvre la page doit savoir ce qu'elle peut faire avant d'y toucher. --}}
-    <div class="rw-encart rw-prose">
-        <strong>{{ __('graylog.guide_titre') }}</strong>
-        <ul class="rw-liste-guide">
-            <li>{{ __('graylog.guide_deploy') }}</li>
-            <li>{{ __('graylog.guide_test') }}</li>
-            <li>{{ __('graylog.guide_retirer') }}</li>
-            <li>{{ __('graylog.guide_prod') }}</li>
-        </ul>
-    </div>
-
     {{-- Les onglets viennent du contrôleur, en données : leur ordre et leur
          nombre se lisent d'un coup, et le test les parcourt sans connaître la
          page. Les panneaux se cachent par l'attribut `hidden`, jamais par une
@@ -109,6 +90,17 @@
                         data-rw="graylog-rafraichir">{{ __('graylog.rafraichir') }}</button>
             </div>
         </div>
+        {{-- Replie : utile a la premiere visite. Chaque confirmation redit la
+             machine visee et l'execution en root. --}}
+        <details class="rw-details" data-rw="graylog-guide">
+            <summary>{{ __('graylog.guide_titre') }}</summary>
+            <ul class="rw-liste-guide">
+                <li>{{ __('graylog.guide_deploy') }}</li>
+                <li>{{ __('graylog.guide_test') }}</li>
+                <li>{{ __('graylog.guide_retirer') }}</li>
+                <li>{{ __('graylog.guide_prod') }}</li>
+            </ul>
+        </details>
         <div class="rw-tableau-cadre" data-rw="graylog-serveurs">
             <p class="rw-vide">{{ __('graylog.chargement') }}</p>
         </div>

@@ -166,7 +166,9 @@ class AppelantsDuBackendTest extends TestCase
              */
             // 491 -> 495 le 2026-11-02 : liste « sans cle » ajoutee au preflight,
             // plus haut. Site RELU : `declenche()` inchange.
-            'cles-ssh.js:495',
+            // 495 -> 493 le 2026-11-15 : lien vers les comptes distants rendu
+            // interne, plus haut. Site RELU : `declenche()` inchange.
+            'cles-ssh.js:493',
             'journal-audit.js:73',
             /*
              * AJOUTE le 2026-09-07 avec le portage de la liste blanche des CVE.

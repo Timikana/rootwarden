@@ -10,21 +10,21 @@
          colonnes, 14 posables a la creation, 16 basculables — et les ecarts se
          croisent : une permission s'accorde sans se reprendre, une autre
          n'existe ni a la creation ni a la bascule (PARITE E-118). --}}
-    <div class="rw-encart" data-rw="perms-source">
-        <p class="rw-prose">{{ __('perms.source', ['nombre' => count($permissions)]) }}</p>
-    </div>
 
-    {{-- CES TROIS NOTES SONT RENDUES UNE FOIS, PAS PAR COMPTE. La section
+    {{-- CES NOTES SONT RENDUES UNE FOIS, PAS PAR COMPTE. La section
          « acces » vit dans la boucle des comptes ; y placer ces avertissements
-         les repeterait autant de fois qu'il y a de comptes — c'est le defaut
-         des « 31 fois ancien portail » vu a l'image sur le menu. --}}
+         les repeterait autant de fois qu'il y a de comptes. L'equivalence root
+         d'apt reste visible ; le reste se replie. --}}
     <div class="rw-encart" data-rw="perms-sudo-notes">
         <p class="rw-prose rw-aide">{{ __('perms.acces_aide') }}</p>
         <p class="rw-prose rw-alerte rw-alerte--attention" data-rw="perms-sudo-apt">
             {{ __('perms.acces_apt_avert') }}
         </p>
-        <p class="rw-prose rw-aide" data-rw="perms-sudo-absents">{{ __('perms.acces_absents') }}</p>
-        <p class="rw-prose rw-aide" data-rw="perms-sudo-nopasswd">{{ __('perms.acces_nopasswd_derive') }}</p>
+        <details class="rw-details">
+            <summary>{{ __('perms.acces_details') }}</summary>
+            <p class="rw-prose" data-rw="perms-sudo-nopasswd">{{ __('perms.acces_nopasswd_derive') }}</p>
+            <p class="rw-prose" data-rw="perms-sudo-absents">{{ __('perms.acces_absents') }}</p>
+        </details>
     </div>
 
     <p class="rw-annonce" data-rw="perms-annonce" role="status" aria-live="polite"></p>

@@ -5,42 +5,19 @@
 <p class="rw-sous-titre rw-prose">{{ __('plateforme.intro') }}</p>
 
 {{--
-    L'EN-TETE DU LEGACY MENT, ET CELUI-CI DIT LA GARDE REELLE.
-
-    `platform_keys.php:4` annonce « Acces : superadmin uniquement » ; sa ligne 11
-    admet les trois roles et c'est la PERMISSION qui decide. Cinquieme occurrence
-    du motif, et la page concernee est celle qui manipule la cle de la flotte.
+    LE GUIDE EST REPLIE : il sert a la premiere visite, pas aux suivantes. Son
+    ORDRE compte (deployer AVANT d'effacer les mots de passe), d'ou la liste
+    numerotee. L'avertissement qui suit, lui, reste visible.
 --}}
-<p class="rw-aide rw-prose" data-rw="cle-garde">{{ __('plateforme.garde_reelle') }}</p>
-
-{{--
-    ── LE GUIDE DE PROCEDURE, PORTE ET CORRIGE ─────────────────────────────
-
-    Le legacy affiche un guide en quatre etapes (`platform_keys.php:50`, via
-    `howto_tip.php`). **Mon premier jet de P1 l'avait laisse tomber** — un acquis
-    du legacy perdu sans que rien ne le signale, parce que personne n'ouvre
-    `lang/`. Le Lead a nomme le motif : le legacy porte dans ses catalogues une
-    reponse contextuelle que le portage laisse tomber module apres module.
-
-    Ce que ce guide apporte est son ORDRE : « deployer la cle » AVANT « effacer le
-    mot de passe » n'est pas une preference de presentation, c'est la difference
-    entre une migration et un verrouillage. D'ou une liste NUMEROTEE.
-
-    Et DEUX de ses quatre etapes sont corrigees, mesure en main — le porter
-    fidelement aurait porte deux affirmations fausses, dont une dans le sens
-    rassurant. La correction est DITE sous le guide plutot que faite en silence :
-    un exploitant qui a lu l'ancien texte doit savoir lequel des deux croire.
---}}
-<div class="rw-encart" data-rw="cle-guide">
-    <p class="rw-sous-titre-fort">{{ __('plateforme.guide_titre') }}</p>
+<details class="rw-details" data-rw="cle-guide">
+    <summary>{{ __('plateforme.guide_titre') }}</summary>
     <ol class="rw-liste-effets rw-liste-effets--ordonnee">
         <li>{{ __('plateforme.guide_etape1') }}</li>
         <li>{{ __('plateforme.guide_etape2') }}</li>
         <li>{{ __('plateforme.guide_etape3') }}</li>
         <li>{{ __('plateforme.guide_etape4') }}</li>
     </ol>
-    <p class="rw-note rw-prose">{{ __('plateforme.guide_corrige') }}</p>
-</div>
+</details>
 
 @if ($compteurs['total'] === 0)
     <div class="rw-vide" data-rw="cle-vide">
@@ -158,27 +135,6 @@
         </p>
     @endif
 </div>
-
-{{--
-    ── LE COMPTEUR DE L'ANCIEN PORTAIL EST FAUX, ET ON DIT POURQUOI ───────
-
-    Il compte `ssh_password_required`, un DRAPEAU. La page Serveurs est le seul
-    chemin qui REMPLIT `root_password`, et elle ne touche pas ce drapeau :
-    restaurer un mot de passe la-bas laisse cette ligne annoncee comme effacee.
-    Mesure du 2026-08-27 : une machine sur trois est dans ce cas.
-
-    Un exploitant qui compare les deux portails verra deux nombres differents ;
-    il doit savoir lequel compte quoi.
---}}
-@if ($compteurs['divergentes'] > 0)
-    <div class="rw-encart" data-rw="cle-divergence">
-        <p class="rw-sous-titre-fort">{{ __('plateforme.divergence_titre') }}</p>
-        <p class="rw-prose">{{ __('plateforme.divergence_texte', [
-            'nb' => $compteurs['divergentes'],
-            'noms' => implode(', ', $compteurs['noms_divergentes']),
-        ]) }}</p>
-    </div>
-@endif
 
 <div class="rw-section">
     <h2 class="rw-section__entete">{{ __('plateforme.th_machine') }}</h2>
@@ -441,8 +397,11 @@
                  l'etage au-dessus. --}}
             <div class="rw-encart" data-rw="cle-rotation-remede">
                 <p class="rw-prose">{{ __('plateforme.rotation_remede') }}</p>
-                <p class="rw-prose" data-rw="cle-rotation-remede-ou">{{ __('plateforme.rotation_remede_ou') }}</p>
-                <p class="rw-aide rw-prose" data-rw="cle-rotation-remede-parc">{{ __('plateforme.rotation_remede_parc') }}</p>
+                <details class="rw-details">
+                    <summary>{{ __('plateforme.details') }}</summary>
+                    <p class="rw-prose" data-rw="cle-rotation-remede-ou">{{ __('plateforme.rotation_remede_ou') }}</p>
+                    <p class="rw-prose" data-rw="cle-rotation-remede-parc">{{ __('plateforme.rotation_remede_parc') }}</p>
+                </details>
             </div>
 
             {{-- LES MACHINES POUR LESQUELLES LA ROTATION EST SANS RETOUR AU SENS

@@ -53,10 +53,9 @@ class AuditSshController extends Controller
      * n'est donc PAS le formulaire qui garde — c'est le serveur. Le formulaire
      * porte l'ergonomie : eviter l'erreur plutot que la refuser apres coup.
      *
-     * ⚠ CAPACITE REDUITE ET DECLAREE : une expression cron arbitraire n'est
-     * pas saisissable ici. `planif_freq_bornee` le dit a l'ecran et renvoie a
-     * l'ancien portail. *Une capacite qui disparait doit etre DECLAREE, jamais
-     * perdue.*
+     * CAPACITE REDUITE : une expression cron arbitraire n'est pas saisissable
+     * ici, et l'ancien portail qui l'offrait est archive. La liste des quatre
+     * periodicites, visible dans le formulaire, suffit a le dire.
      *
      * Les quatre valeurs sont toutes au-dessus du plancher de dix minutes —
      * la plus frequente est horaire.
@@ -174,13 +173,6 @@ class AuditSshController extends Controller
                 ),
             ] : ['environment' => [], 'tag' => [], 'machines' => []],
             'libelles' => __('ssh_audit'),
-            /*
-             * ⛔ NUL DEPUIS LE 2026-09-05 : la cible est ARCHIVEE et rend 404.
-             * Offrir un lien vers une page retiree est le defaut que ce chantier
-             * a corrige deux fois ailleurs (supervision le 03/09, /profil le 05/09).
-             * La vue garde le nul et n'affiche plus le renvoi.
-             */
-            'lienLegacy' => null,
         ]);
     }
 }

@@ -30,25 +30,20 @@ return [
     'sec_5' => 'Server accounts must be classified before any deployment.',
 
     'titre' => 'Documentation',
-    'desc'  => 'Getting started with the portal, and where to find the rest.',
+    'desc'  => 'Getting started with the portal.',
 
     // The guard on this page is a ROLE THRESHOLD, not a permission — see fr.
     'seuil_titre' => 'What your role opens',
     'seuil_role1' => "Your role gives access to the functional documentation. Five sections describing infrastructure and the API surface are reserved for administration — that is a decision, not an oversight.",
     'seuil_admin' => 'Your role gives access to the whole documentation, including the infrastructure and API sections.',
 
-    'reste_titre' => 'The reference documentation',
-    'reste_texte' => "The rest of the documentation — architecture, encryption, sessions, procedures — still lives on the old portal and is not copied here.",
-    'reste_perime' => "It carries references measured as stale: twelve page paths that no longer answer, and two cited routes that do not exist. Eleven of its sections describe parts already removed from the product.",
-    'reste_cache'  => "This page does not copy it: reproducing a text that nothing regenerates would amount to freezing a cache. What can be derived is derived elsewhere, from the source.",
-    'reste_ouvrir' => 'Open the reference documentation',
 
     'derive_titre' => 'Routes and rights, derived',
     'derive_texte' => "The list of reachable routes and the rights they require is not written by hand: it is derived from the gateway's real configuration. That is the only form that cannot go stale in silence.",
     'derive_lien'  => 'View the gateway authorisations',
     'derive_reserve' => 'An authorisation claim cannot be derived from a single layer: the product has three, and they do not always agree.',
 
-    'console_titre' => 'The API console is not carried over',
-    'console_texte' => "The old portal offers a free-text field that composes a request to any route in the product. It elevates no privilege — the guards still apply — but it bypasses the interface: no decision panel, no machine named, for actions that carry one on their own pages.",
+    'console_titre' => "No free-form API console",
+    'console_texte' => "Each action goes through its page, with its confirmation and the machine named. Rights remain those of the gateway and the backend.",
 
 ];

@@ -62,7 +62,6 @@
                     {{ __('auth.memorisation_duree', ['jours' => \App\Services\JetonMemorisation::JOURS]) }}
                 </p>
                 <p class="rw-aide" data-rw="memorisation-un-appareil">{{ __('auth.memorisation_un_appareil') }}</p>
-                <p class="rw-aide" data-rw="memorisation-ancien-portail">{{ __('auth.memorisation_ancien_portail') }}</p>
             </div>
 
             {{-- Action principale a droite : c'est la que l'oeil arrive apres

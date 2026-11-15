@@ -17,14 +17,14 @@
          pas : il lit le fichier et compte les tables, sans executer une seule
          instruction. Le libelle dit ici ce que le controle fait vraiment — et
          surtout ce qu'il ne prouve pas. --}}
-    <div class="rw-encart rw-prose">
-        <strong>{{ __('backup.guide_titre') }}</strong>
+    <details class="rw-details">
+        <summary>{{ __('backup.guide_titre') }}</summary>
         <ul class="rw-liste-guide">
             <li>{{ __('backup.guide_creer') }}</li>
             <li>{{ __('backup.guide_controler') }}</li>
             <li>{{ __('backup.guide_restaurer') }}</li>
         </ul>
-    </div>
+    </details>
 
     @if ($estSuperadmin)
         <p class="rw-erreur rw-prose" data-rw="avertissement-restauration">{{ __('backup.restore_warning') }}</p>

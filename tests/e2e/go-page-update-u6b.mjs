@@ -363,7 +363,7 @@ verifiePortage('la mise a jour complete demande une decision, bouton desactive',
     Boolean(panneauComplete) && panneauComplete.visible && panneauComplete.desactive === true,
     panneauComplete ? `desactive : ${panneauComplete.desactive}` : 'aucun panneau');
 verifiePortage('le panneau distingue « tous les paquets » des seules corrections',
-    Boolean(panneauComplete) && /TOUS|EVERY/.test(panneauComplete.consequences),
+    Boolean(panneauComplete) && /tous|every/i.test(panneauComplete.consequences),
     "le legacy nomme le bouton « mise a jour » sans dire ce qu'il embarque");
 
 if (CIBLE === 'laravel') {

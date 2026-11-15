@@ -23,7 +23,6 @@ return [
     'memorisation_libelle' => 'Remember me on this device',
     'memorisation_duree' => 'For :jours days this browser will remember who you are — but it will ALWAYS ask for your second factor. It never signs you in on its own.',
     'memorisation_un_appareil' => 'One device at a time: ticking this box in another browser cancels this one. That is a product limit, not a setting.',
-    'memorisation_ancien_portail' => 'And if you go through the old portal, it will erase this — during the migration the two do not share it.',
     'connexion_valider'      => 'Sign in',
     'connexion_aide'         => 'A single-use code will be requested at the next step.',
 
@@ -67,5 +66,4 @@ return [
     'changement_requis'         => 'Your password must be changed. The form is on this page, just below.',
 
     // Migration
-    'ouvrir_ancien_portail' => 'Open the previous portal',
 ];

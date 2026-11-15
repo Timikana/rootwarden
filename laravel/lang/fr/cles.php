@@ -1,23 +1,23 @@
 <?php
 
 /**
- * Les cles d'API — module `adm/`, sous-lot D7.
+ * Les cles d'API. Redaction : docs/REDACTION-INTERFACE.md.
  *
  * PARITE STRICTE avec `lang/en/cles.php` : memes cles, dans le meme ordre.
  */
 return [
     'title' => "Clés d'API",
-    'desc' => 'Les clés qui autorisent un appel au backend. Elles ne sont jamais stockées en clair : seul leur préfixe et leur empreinte sont conservés.',
+    'desc' => "Les clés qui autorisent un appel au backend. Seuls leur préfixe et leur empreinte sont conservés.",
     'unique_titre' => 'Voici la clé. Elle ne sera plus jamais affichée.',
-    'unique_aide' => "Copiez-la maintenant. Elle n'est conservée nulle part — la base ne garde que son empreinte, et il n'existe aucun moyen de la retrouver. Si elle est perdue, il faut en créer une autre et révoquer celle-ci.",
+    'unique_aide' => "Copiez-la maintenant : seule son empreinte est conservée. Si elle est perdue, créez-en une autre et révoquez celle-ci.",
     'creer_titre' => 'Créer une clé',
     'champ_nom' => 'Nom',
     'aide_nom' => 'Lettres, chiffres, tiret et souligné. De 3 à 100 caractères.',
     'champ_indice' => 'Consommateur',
     'indice_placeholder' => 'Nagios, script de sauvegarde…',
-    'aide_indice' => "Qui se sert de cette clé. Facultatif, mais c'est ce qui permettra de la révoquer sans hésiter.",
+    'aide_indice' => "Qui utilise cette clé. Facultatif, mais utile pour la révoquer sans hésiter.",
     'portee_titre' => 'Portée',
-    'portee_aide' => "Une clé n'accède qu'aux routes de ses modules. La liste est fermée : les motifs sont écrits et ancrés côté serveur, il n'y a pas de champ libre. Voir PARITE E-135 et E-136.",
+    'portee_aide' => "Une clé n'accède qu'aux routes des modules cochés.",
     'requis' => 'Le nom et au moins un module sont obligatoires.',
     'btn_creer' => 'Créer la clé',
     'liste_titre' => ':n clé(s)',
@@ -34,7 +34,7 @@ return [
     'revoquee_etat' => 'révoquée',
     'btn_revoquer' => 'Révoquer',
     'vide' => "Aucune clé d'API.",
-    'vide_aide' => "Tant qu'aucune clé n'existe, le backend n'accepte que la clé d'environnement, et seulement en mode amorçage explicite.",
+    'vide_aide' => "Sans clé, le backend n'accepte que la clé d'environnement, et seulement si API_KEY_BOOTSTRAP est activé.",
     'creee' => 'La clé est créée. Copiez-la maintenant.',
     'revoquee' => 'La clé :nom est révoquée.',
     'err_nom' => 'Nom invalide : lettres, chiffres, tiret et souligné, de 3 à 100 caractères.',

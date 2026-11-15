@@ -19,7 +19,7 @@
 @if ($rwRole >= 2 && ($rwRole >= 3 || ($rwPerms['can_admin_portal'] ?? false)))
     <details class="rw-recherche" data-rw="recherche-menu">
         <summary class="rw-lien" title="{{ __('search.tip_input') }}"
-                 aria-label="{{ __('search.menu_ouvrir') }}" data-rw="recherche-menu-bascule">🔍</summary>
+                 aria-label="{{ __('search.menu_ouvrir') }}" data-rw="recherche-menu-bascule">@include('composants.icone', ['nom' => 'search'])</summary>
 
         <div class="rw-recherche__menu">
             {{-- Un `placeholder` n'est PAS un nom accessible : l'intitule existe,

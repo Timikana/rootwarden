@@ -1,109 +1,75 @@
 <?php
 
 /*
- * Module `ssh/` — « Cles SSH ». Sous-lot K1 : la page nue.
+ * Cles SSH : deploiement des cles publiques sur le parc.
  *
- * `serveurs_disponibles` porte un jeton `:nombre` REELLEMENT substitue. Le legacy
- * ecrit `count($machines)` puis `t('ssh.servers_available')`, dont la valeur est
- * « :count serveur(s) disponible(s) » : le jeton reste en clair a l'ecran.
+ * `serveurs_disponibles` porte un jeton `:nombre` REELLEMENT substitue.
+ * Redaction : docs/REDACTION-INTERFACE.md.
  */
 
 return [
-    'titre' => 'Deploiement des cles SSH',
-    'description' => "Selectionnez les serveurs sur lesquels deployer les cles publiques des comptes habilites. Le deploiement lui-meme reste sur l'ancien portail.",
+    'titre' => 'Déploiement des clés SSH',
+    'description' => "Sélectionnez les serveurs, vérifiez les prérequis, puis déployez les clés publiques des comptes habilités.",
     'serveurs_disponibles' => ':nombre serveur(s) disponible(s)',
 
     'aucun_serveur' => 'Aucun serveur accessible',
-    'aucun_serveur_aide' => "Aucune machine ne vous est attribuee, ou toutes celles du parc sont archivees.",
+    'aucun_serveur_aide' => "Aucune machine ne vous est attribuée, ou toutes celles du parc sont archivées.",
 
-    'filtre_tag' => 'Etiquette',
+    'filtre_tag' => 'Étiquette',
     'filtre_env' => 'Environnement',
-    'tous_tags' => 'Toutes les etiquettes',
+    'tous_tags' => 'Toutes les étiquettes',
     'tous_envs' => 'Tous les environnements',
     'cocher_filtre' => 'Cocher le filtre',
     'cocher_tout' => 'Cocher tout',
-    'decocher_tout' => 'Tout decocher',
+    'decocher_tout' => 'Tout décocher',
 
-    'aucune_selection' => 'Aucun serveur selectionne',
-    'selection' => ':nombre serveur(s) selectionne(s)',
+    'aucune_selection' => 'Aucun serveur sélectionné',
+    'selection' => ':nombre serveur(s) sélectionné(s)',
 
-    'deployer' => 'Deployer les cles',
+    'deployer' => 'Déployer les clés',
     'annuler' => 'Annuler',
-    'confirmer_titre' => 'Deployer les cles SSH sur ces serveurs ?',
-    'confirmer_avertissement' => "Sur chaque serveur coche, et en tant que root : le paquet sudo est installe s'il manque, les comptes habilites sont crees, leur fichier authorized_keys est REECRIT, et une politique sudoers est posee. Les cles de tout compte ayant perdu son habilitation sont REVOQUEES. Rien de tout cela n'est reversible depuis cette page.",
-    /*
-     * ⚠ UNE CONJONCTION DONT UN MEMBRE EST DEVENU FAUX.
-     *
-     *   avant  « Le declenchement du deploiement ET LA LECTURE DE SON JOURNAL
-     *            ne sont pas encore portes. »
-     *
-     *   mesure du 2026-09-03, croisement geste par geste :
-     *     /deploy   NON appelee   -> la premiere moitie est VRAIE
-     *     /logs     EXACTE        -> la seconde est FAUSSE
-     *       `ClesSshController.php:93`  'url_journal' => url('/api/gateway/logs')
-     *       `cles-ssh.js:390`           await fetch(L.url_journal, …)
-     *
-     * **Une phrase qui dit « A et B ne sont pas portes » se lit comme
-     * entierement vraie quand seul A l'est encore.** Septieme occurrence de
-     * cette forme, apres `serveurs`, `bashrc`, `fail2ban`, `ssh_audit`,
-     * `groups` et `superv`.
-     *
-     * ⚠ ET UNE URL FOURNIE N'EST PAS UNE URL LUE — la distinction a deja
-     * coute une mesure. C'est le `fetch` qui tranche, pas le passage de la
-     * variable au gabarit.
-     *
-     * `description` porte la meme idee en plus court — « le deploiement
-     * lui-meme reste sur l'ancien portail » — et elle est JUSTE. *La
-     * formulation qui a survecu est celle qui n'affirmait qu'UNE chose : une
-     * conjonction est un pari sur la stabilite de DEUX faits.*
-     */
-    'non_porte' => "Le declenchement du deploiement n'est pas encore porte : il reste sur l'ancien portail.",
-    'non_porte_lien' => "Les lancer depuis l'ancien portail",
-    // ── Le constat avant deploiement (sous-lot K2) ──────────────────────────
-    'verifier' => 'Verifier les prerequis',
-    'verifier_aide' => "Interroge les serveurs coches en LECTURE seule et rend un constat. Ne deploie rien.",
-    'verif_en_cours' => 'Verification en cours...',
-    'verif_echec' => 'La verification a echoue (code :statut)',
-    'verif_non_concluante' => "La verification n'est pas concluante : le serveur n'a pas rendu de verdict. Rien n'est affiche ci-dessous, parce qu'un resultat partiel se lirait comme une verification reussie.",
-    'verif_pret' => 'Aucun prerequis manquant',
-    'verif_bloque' => ':nombre serveur(s) bloque(s) : corrigez ci-dessous ou decochez-les',
-    'cles_aucune' => "ATTENTION : aucun compte actif ne porte de cle SSH. Un deploiement ne POSERAIT aucune cle — mais il REVOQUERAIT quand meme les acces listes ci-dessous : la revocation ne depend d'aucune cle.",
-    'cles_nombre' => ':nombre compte(s) actif(s) avec une cle SSH',
-    'inventaire' => ':nombre compte(s) inventorie(s) sur ce serveur',
-    'revoques_synthese' => "Acces qui seront REVOQUES sur le parc coche — :nombre au total : :noms",
-    'inventaire_non_lu' => "L'inventaire des comptes n'a pas pu etre lu sur cette machine : on ne sait pas quels acces seraient revoques. L'absence de liste ci-dessous ne veut donc PAS dire qu'il n'y en a aucun.",
-    'machines_sans_resultat' => "Machines cochees sans resultat : :nombre. Elles ne sont comptees ni bloquantes ni pretes.",
+    'confirmer_titre' => 'Déployer les clés SSH sur ces serveurs ?',
+    'confirmer_avertissement' => "Sur chaque serveur coché, en root : sudo est installé s'il manque, les comptes habilités sont créés, leur authorized_keys est réécrit et une politique sudoers est posée. Les clés des comptes qui ont perdu leur habilitation sont révoquées, sans retour possible depuis cette page.",
+
+    // ── Le constat avant deploiement ────────────────────────────────────────
+    'verifier' => 'Vérifier les prérequis',
+    'verifier_aide' => "Interroge les serveurs cochés en lecture seule. Ne déploie rien.",
+    'verif_en_cours' => 'Vérification en cours…',
+    'verif_echec' => 'La vérification a échoué (code :statut)',
+    'verif_non_concluante' => "Vérification non concluante : le serveur n'a pas rendu de verdict.",
+    'verif_pret' => 'Aucun prérequis manquant',
+    'verif_bloque' => ':nombre serveur(s) bloqué(s) : corrigez ci-dessous ou décochez-les',
+    // DeploiementCles refuse le deploiement quand `users_with_keys` vaut zero.
+    'cles_aucune' => "Aucun compte actif ne porte de clé SSH : le déploiement sera refusé. Ajoutez une clé à au moins un compte.",
+    'cles_nombre' => ':nombre compte(s) actif(s) avec une clé SSH',
+    'inventaire' => ':nombre compte(s) inventorié(s) sur ce serveur',
+    'revoques_synthese' => "Accès qui seront révoqués sur les serveurs cochés — :nombre au total : :noms",
+    'inventaire_non_lu' => "L'inventaire des comptes n'a pas pu être lu sur cette machine : les accès qui seraient révoqués sont inconnus.",
+    'machines_sans_resultat' => "Machines cochées sans résultat : :nombre. Elles ne sont comptées ni bloquantes ni prêtes.",
     'badge_ok' => "OK",
-    'badge_echec' => "ECHEC",
+    'badge_echec' => "ÉCHEC",
     'badge_partiel' => "PARTIEL",
-    'a_creer' => 'Comptes qui seront crees :',
-    'a_revoquer' => 'Acces qui seront REVOQUES (cle retiree, compte conserve) :',
-    'lien_comptes_distants' => 'Ouvrir Utilisateurs distants',
-    // ── Le journal du deploiement (sous-lot K3) ─────────────────────────────
-    'journal' => 'Voir le journal du dernier deploiement',
-    'journal_aide' => "Lit le journal deja ecrit. Ne joint aucun serveur et ne declenche rien.",
-    'journal_ouverture' => 'Lecture du journal...',
-    'journal_vide' => 'Le journal est vide : aucun deploiement n\'a encore ete lance.',
-    'journal_fin' => '— fin du journal —',
-    'journal_refus' => 'Le journal a ete refuse par le serveur (code :statut)',
-    'journal_interrompu' => "Le flux s'est interrompu avant la fin du journal : ce qui precede est incomplet",
-
-
-    /*
-     * ── K4 — LE DECLENCHEMENT DU DEPLOIEMENT ────────────────────────────────
-     *
-     * Les messages d'echec disent TOUS ce qui n'a PAS ete fait. Un refus qui ne
-     * nomme pas son effet laisse l'operateur decider s'il relance — et ici
-     * relancer a l'aveugle peut REVOQUER des acces.
-     */
-    "deployer" => "Deployer les cles",
-    "deploiement_confirmation" => "Deployer les cles SSH sur les machines cochees ?",
-    "deploiement_lance" => "Deploiement lance. Le journal suit ci-dessous.",
-    "err_aucune_machine" => "Aucune machine selectionnee.",
-    "err_backend_injoignable" => "Le service de deploiement est injoignable. Rien n'a ete deploye.",
-    "err_preflight_refuse" => "La verification pre-deploiement a ete refusee. Rien n'a ete deploye.",
-    "err_preflight_sans_resultat" => "La verification pre-deploiement n'a rendu aucun resultat : elle n'a pas eu lieu. Rien n'a ete deploye.",
-    "err_preflight_echoue" => "Verification pre-deploiement en echec pour : :machines. RIEN n'a ete deploye — corrigez ces machines ou decochez-les.",
-    "err_aucun_compte_avec_cle" => "Aucun compte actif ne porte de cle SSH sur ce parc : un deploiement RETIRERAIT tous les acces au lieu d'en poser. RIEN n'a ete deploye — ajoutez une cle a au moins un compte.",
+    'a_creer' => 'Comptes qui seront créés :',
+    'a_revoquer' => 'Accès qui seront révoqués (clé retirée, compte conservé) :',
     'sans_cle' => 'Comptes autorisés sans clé pour cette machine — leurs clés y seront retirées :',
+    'lien_comptes_distants' => 'Ouvrir les comptes distants',
+
+    // ── Le journal du deploiement ───────────────────────────────────────────
+    'journal' => 'Voir le journal du dernier déploiement',
+    'journal_aide' => "Lit le journal déjà écrit. Ne joint aucun serveur.",
+    'journal_ouverture' => 'Lecture du journal…',
+    'journal_vide' => "Le journal est vide : aucun déploiement n'a encore été lancé.",
+    'journal_fin' => '— fin du journal —',
+    'journal_refus' => 'Le journal a été refusé par le serveur (code :statut)',
+    'journal_interrompu' => "Le flux s'est interrompu avant la fin du journal : ce qui précède est incomplet.",
+
+    // ── Les refus du declenchement ──────────────────────────────────────────
+    // Chaque message dit ce qui n'a PAS ete fait : relancer a l'aveugle peut
+    // revoquer des acces.
+    'err_aucune_machine' => "Aucune machine sélectionnée.",
+    'err_backend_injoignable' => "Le service de déploiement est injoignable. Rien n'a été déployé.",
+    'err_preflight_refuse' => "La vérification avant déploiement a été refusée. Rien n'a été déployé.",
+    'err_preflight_sans_resultat' => "La vérification avant déploiement n'a rendu aucun résultat. Rien n'a été déployé.",
+    'err_preflight_echoue' => "Vérification en échec pour : :machines. Rien n'a été déployé : corrigez ces machines ou décochez-les.",
+    'err_aucun_compte_avec_cle' => "Aucun compte actif ne porte de clé SSH sur ce parc : le déploiement retirerait tous les accès. Rien n'a été déployé ; ajoutez une clé à au moins un compte.",
 ];

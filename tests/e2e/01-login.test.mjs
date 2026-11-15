@@ -52,7 +52,7 @@ describe('01 - Login + TOTP → Dashboard', () => {
         assert.ok(sidebar, 'Sidebar element not found');
         const hasDashboard = await page.evaluate(() => {
             const labels = document.querySelectorAll('#sidebar .sidebar-label');
-            for (const l of labels) if (l.textContent.includes('Dashboard')) return true;
+            for (const l of labels) if ((l.textContent.includes('Dashboard') || l.textContent.includes('Tableau de bord'))) return true;
             return false;
         });
         assert.ok(hasDashboard, 'Dashboard link not found in sidebar');

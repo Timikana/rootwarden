@@ -12,7 +12,7 @@
 return [
 
     'title' => 'Journal des commandes',
-    'desc'  => "Traçabilité de type bastion : commandes privilégiées réellement exécutées par RootWarden sur les serveurs distants — qui, quoi, où, quand, résultat. Lecture seule.",
+    'desc'  => "Commandes privilégiées exécutées par RootWarden sur les serveurs : qui, quoi, où, quand, résultat.",
 
     // Filtres
     'all_machines' => 'Toutes les machines',
@@ -31,7 +31,7 @@ return [
     // Etats
     'loading'  => 'Chargement…',
     'empty'    => 'Aucune commande journalisée',
-    'empty_aide' => "Aucune commande privilégiée n'a encore été exécutée avec ces filtres. Élargissez la sélection, ou lancez une action sur une machine depuis les modules de mise à jour ou de maintenance.",
+    'empty_aide' => "Élargissez les filtres, ou lancez une action sur une machine (mises à jour, maintenance).",
     'failed'   => 'Échec',
     'system'   => 'système',
     'en_cours' => 'en cours',

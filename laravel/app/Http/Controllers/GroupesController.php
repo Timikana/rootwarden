@@ -65,16 +65,6 @@ class GroupesController extends Controller
             // Le catalogue part d'un bloc, en une ligne : `@json` multiligne
             // casse le PHP compile.
             'libelles' => __('groups'),
-            // L'adresse de l'ancien portail est resolue ICI et non dans le
-            // script : une URL construite en JavaScript ne se relit pas, et
-            // c'est la meme forme que partout ailleurs dans le portage.
-            /*
-             * ⛔ NUL DEPUIS LE 2026-09-05 : la cible est ARCHIVEE et rend 404.
-             * Offrir un lien vers une page retiree est le defaut que ce chantier
-             * a corrige deux fois ailleurs (supervision le 03/09, /profil le 05/09).
-             * La vue garde le nul et n'affiche plus le renvoi.
-             */
-            'lienLegacy' => null,
         ]);
     }
 }

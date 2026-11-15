@@ -7,24 +7,24 @@
  */
 return [
     'title' => 'Fenêtres de maintenance',
-    'desc'  => 'Définissez les plages horaires pendant lesquelles les actions mutantes — mises à jour, redémarrages, déploiements — sont autorisées.',
+    'desc'  => "Plages horaires pendant lesquelles les actions mutantes (mises à jour, redémarrages, déploiements) sont autorisées.",
 
     /*
      * L'ENCART QUI DIT CE QUE LE LEGACY GLISSE EN DEMI-PHRASE. Se tromper ici
      * bloque la flotte a l'heure ou l'on en a besoin.
      */
-    'guide_titre'    => 'Attention : créer une fenêtre RESTREINT',
-    'guide_aucune'   => 'Tant qu\'aucune fenêtre n\'est activée, aucune restriction ne s\'applique : toutes les actions mutantes passent.',
-    'guide_une'      => 'Dès qu\'une seule fenêtre est activée, les actions mutantes ne passent plus QUE pendant ses plages. En dehors, elles sont refusées.',
-    'guide_role'     => 'Les comptes superadministrateurs restent prioritaires, et leur contournement est journalisé.',
-    'guide_ailleurs' => 'Le refus n\'apparaît pas sur cette page : il apparaît sur celle qui a tenté l\'action — mises à jour, supervision.',
+    'guide_titre'    => "Attention : une fenêtre restreint la flotte",
+    'guide_aucune'   => "Sans fenêtre activée, rien n'est restreint.",
+    'guide_une'      => "Dès qu'une fenêtre est activée, les actions mutantes ne passent plus que pendant ses plages.",
+    'guide_role'     => "Les superadmins passent toujours ; leur passage est journalisé.",
+    'guide_ailleurs' => "Un refus s'affiche sur la page de l'action (mises à jour, supervision), pas ici.",
 
     'etat_libre'     => 'Aucune restriction',
     'etat_restreint' => 'Flotte restreinte',
     'etat_machines'  => ':n machine restreinte|:n machines restreintes',
 
     'etat_detail'    => ':n fenêtre(s) activée(s), dont :g globale(s)',
-    'horloge_serveur' => '⚠ L\'état ci-dessous est calculé sur l\'horloge du serveur, qui indique :heure (:decalage) — pas sur celle de votre navigateur. Une fenêtre saisie en heure locale est appliquée sur cette horloge.',
+    'horloge_serveur' => "⚠ Calculé sur l'horloge du serveur (:heure, :decalage), pas sur celle de votre navigateur.",
 
     'btn_new'        => 'Nouvelle fenêtre',
     'tip_new'        => 'Définir une plage pendant laquelle les actions mutantes sont autorisées.',
@@ -37,7 +37,7 @@ return [
     'f_start'        => 'Début',
     'f_end'          => 'Fin',
     'f_enabled'      => 'Activée',
-    'overnight_hint' => 'Si l\'heure de début est postérieure à l\'heure de fin, la fenêtre est considérée à cheval sur minuit — par exemple 22:00 → 06:00.',
+    'overnight_hint' => "Début après la fin : la fenêtre passe minuit (ex. 22:00 → 06:00).",
     'btn_save'       => 'Enregistrer',
     'btn_cancel'     => 'Annuler',
 
@@ -61,7 +61,7 @@ return [
 
     // La confirmation se prend EN PAGE : pas de boite native.
     'confirm_titre'     => 'Supprimer cette fenêtre ?',
-    'confirm_aide'      => 'La fenêtre « :name » disparaîtra. Si c\'était la dernière activée, toute restriction sur la flotte est levée.',
+    'confirm_aide'      => "La fenêtre « :name » sera supprimée. Si c'était la dernière activée, la flotte n'est plus restreinte.",
     'confirm_supprimer' => 'Supprimer',
     'confirm_annuler'   => 'Annuler',
 

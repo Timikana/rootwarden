@@ -10,11 +10,11 @@
  */
 return [
     'titre' => 'Groupes et actions de masse',
-    'desc'  => "Regroupez vos serveurs par règle dynamique (environnement, criticité, réseau, cycle de vie, tags) ou par liste statique, puis lancez des opérations groupées suivies dans le centre de tâches.",
+    'desc'  => "Regroupez des serveurs par critères ou par liste, puis lancez des actions sur tout le groupe.",
 
     'chargement' => 'Chargement…',
     'vide_titre'  => 'Aucun groupe',
-    'vide_texte'  => "Aucun groupe n'existe pour l'instant. Un groupe rassemble des serveurs, puis sert de cible à une action de masse.",
+    'vide_texte'  => "Créez-en un avec « Nouveau groupe ».",
     'err_charge'  => "La liste des groupes n'a pas pu être lue.",
 
     'membres'       => 'Membres',
@@ -39,15 +39,15 @@ return [
 
     'aide_membres' => 'Affiche les serveurs que ce groupe résout en ce moment.',
 
-    // ══ LES PANNEAUX DES CAPACITES NON PORTEES ═══════════════════════════
-    // R1 ne porte que la LECTURE. Chaque geste absent ouvre un panneau qui
-    // dit ce qu'il engage, plutot qu'un bouton qui ne fait rien.
+    // ══ LE PANNEAU DES CAPACITES ABSENTES ════════════════════════════════
+    // Un geste absent (le scan CVE de masse) ouvre un panneau qui dit ce qu'il
+    // engage, plutot qu'un bouton qui ne fait rien. Aucun renvoi : l'ancien
+    // portail n'est plus servi.
     // UN PANNEAU PARTAGE DOIT NOMMER SA CIBLE. Il vit au niveau de la PAGE
     // et sert quatre boutons de cartes differentes : sans cette ligne, il
     // decrit un geste sans dire sur quoi il porte — vu a l'image.
     'np_sur_groupe' => 'Groupe visé : :nom',
-    'np_titre'      => 'Pas encore porté',
-    'np_ouvrir'     => "Ouvrir dans l'ancien portail",
+    'np_titre'      => "Non disponible ici",
     'np_fermer'     => 'Fermer',
 
     /*
@@ -82,7 +82,7 @@ return [
      */
     'supprimer_titre'      => 'Supprimer ce groupe ?',
     'supprimer_membres'    => 'Ce groupe rassemble :n serveur(s) aujourd\'hui.',
-    'supprimer_definitif'  => 'Cette suppression ne se défait pas : le groupe et ses appartenances disparaissent, et il faudra le recréer.',
+    'supprimer_definitif'  => "Suppression définitive : il faudra recréer le groupe.",
     'supprimer_valider'    => 'Supprimer le groupe',
     'supprimer_fait'       => 'Le groupe « :nom » est supprimé. Les serveurs qu\'il rassemblait n\'ont pas été modifiés.',
     'supprimer_introuvable' => 'Aucun groupe n\'a été supprimé : « :nom » n\'existait plus. La liste est rechargée.',
@@ -101,7 +101,7 @@ return [
     // session SSH par machine et envoie un courriel par machine a resultats.
     // Il reste hors de cette interface, et cette declaration reste vraie.
     'der_titre'  => 'Lancer un scan de dérive',
-    'der_texte'  => "Ce geste n'ouvre AUCUNE session SSH : il relit des données déjà en base et met à jour le relevé de dérive de chaque membre. Le planificateur fait déjà le même travail toutes les heures sur l'ensemble du parc.",
+    'der_texte'  => "N'ouvre aucune session SSH : relit les données en base et met à jour le relevé de dérive de chaque membre. Le planificateur le fait déjà toutes les heures.",
     'der_lancer' => 'Lancer le scan de dérive',
 
     // LE NOMBRE ANNONCE EST LE NOMBRE RESOLU, jamais le nombre attendu. Un
@@ -116,34 +116,30 @@ return [
     // en place. A unifier quand ce panneau sera porte — il sera reecrit.
     'resolu_nombre'   => "Ce groupe résout :n serveur(s) aujourd'hui.",
     'resolu_prod'     => "⚠ La production en fait partie : :noms.",
-    'resolu_reresolu' => "Le nombre affiché est celui d'aujourd'hui. Un groupe dynamique est ré-résolu au moment du lancement : une machine ajoutée au parc entre-temps entrerait dans le geste sans avoir jamais été affichée ici.",
+    'resolu_reresolu' => "Nombre calculé maintenant : un groupe dynamique est recalculé au lancement et peut inclure une machine ajoutée entre-temps.",
 
     // ⚠ SANS PORTEE ANNONCEE, PAS DE CONFIRMATION OFFERTE. Un panneau qui ne
     // sait pas sur combien de machines il porte ne peut pas faire consentir :
     // le bouton reste absent, et la raison est dite.
-    'der_illisible' => "La portée n'a pas pu être lue : impossible de dire sur combien de serveurs ce scan porterait. Le lancement n'est donc pas proposé.",
+    'der_illisible' => "Impossible de lire la portée de ce groupe : le lancement n'est pas proposé.",
     'der_vide'      => "Ce groupe ne résout aucun serveur aujourd'hui : un scan ne relèverait rien.",
     'der_lance'     => ':n serveur(s) mis en file. Le suivi se fait dans le centre de tâches.',
     'der_echoue'    => "Le scan de dérive n'a pas pu être lancé. :message",
 
-    'np_cve'        => "Le scan CVE de masse n'est pas encore porté sur cette interface.",
+    'np_cve'        => "Le scan CVE de masse n'est pas disponible sur cette page.",
     // ⚠ LE PANNEAU LE PLUS IMPORTANT DU MODULE. Un clic, N machines, et pour
     // CHACUNE : une session SSH reelle, un courriel, une notification, un
     // webhook. Le `confirm()` du legacy ne nomme ni le nombre, ni les
     // machines, ni la production, ni la difference avec le scan de derive.
-    'np_cve_detail' => "Ce geste ouvre une session SSH réelle sur CHAQUE membre du groupe, et chaque machine dont le scan aboutit déclenche l'envoi d'un rapport par courriel. Ce n'est pas une lecture : c'est autant de connexions et d'envois que le groupe compte de serveurs.",
+    'np_cve_detail' => "Il ouvrirait une session SSH sur chaque membre du groupe et enverrait un rapport par courriel pour chaque machine scannée.",
     'np_cve_membres' => "Ce groupe résout :n serveur(s) aujourd'hui.",
     'np_cve_prod'   => "⚠ La production en fait partie : :noms.",
-    'np_cve_derive' => "Le nombre affiché est celui d'aujourd'hui. Un groupe dynamique est ré-résolu au moment du lancement : une machine ajoutée au parc entre-temps entrerait dans le geste sans avoir jamais été affichée ici.",
+    'np_cve_derive' => "Nombre calculé maintenant : un groupe dynamique est recalculé au lancement et peut inclure une machine ajoutée entre-temps.",
 
     // ── CE QUE LA PAGE DIT D'ELLE-MEME ────────────────────────────────────
-    'portee_titre' => 'Ce que cette page peut faire aujourd’hui',
-    // ⚠ R2 : cette phrase disait que la CREATION passait par l'ancien portail.
-    // Elle est devenue fausse au moment ou R2 l'a portee — le meme mecanisme
-    // que `pare-feu`, `superv` et l'encart des CGU, et je l'aurais livre.
-    // Un libelle se relit avec le code qu'il decrit, dans le MEME commit.
-    'portee_texte' => "La lecture des groupes, de leurs membres, la création, la suppression et le scan de dérive de masse sont portés. Seul le scan CVE de masse passe encore par l'ancien portail — son bouton explique ce qu'il engage avant d'y renvoyer.",
-    'parc_entier'  => "Un rôle administrateur peut viser l'ensemble du parc : aucune attribution de machine ne borne les actions de masse.",
+    // `check_machine_access` admet tout role >= 2 (routes/helpers.py) : aucune
+    // attribution de machine ne borne les actions de masse.
+    'parc_entier'  => "Les actions de masse peuvent viser tout le parc : les accès par machine ne les limitent pas.",
 
     // ══ R2 — LA CREATION D'UN GROUPE ═════════════════════════════════════
     'form_titre' => 'Nouveau groupe',
@@ -171,12 +167,11 @@ return [
      * portee resolue. On ne peut donc plus creer un groupe sans avoir lu ce
      * qu'il contiendra.
      */
-    'portee_aucun_filtre' => "Aucun critère n'est coché : ce groupe contiendra TOUTES les machines du parc, production comprise.",
+    'portee_aucun_filtre' => "Aucun critère coché : ce groupe contiendra toutes les machines du parc, production comprise.",
     'portee_filtres' => 'Critères retenus : :liste',
     'portee_statique' => ':n machine(s) désignée(s).',
     'portee_statique_vide' => "Aucune machine désignée : le groupe sera vide.",
-    'portee_archivees' => "Le calcul du parc côté serveur n'exclut pas les machines archivées : un groupe sans critère peut en contenir.",
+    'portee_archivees' => "Un groupe sans critère inclut aussi les machines archivées.",
     'err_nom' => 'Un nom est nécessaire.',
-    'cree' => 'Groupe créé.',
     'err_creation' => "Le groupe n'a pas pu être créé.",
 ];

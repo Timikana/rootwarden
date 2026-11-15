@@ -16,14 +16,14 @@
          tickets pour la meme alerte » ; la cle reelle est (source, reference,
          machine), ce qui pour un ticket manuel revient a la machine seule. Le
          dire ici evite de croire creer un ticket qu'on ne cree pas. --}}
-    <div class="rw-encart rw-prose">
-        <strong>{{ __('tickets.guide_titre') }}</strong>
+    <details class="rw-details">
+        <summary>{{ __('tickets.guide_titre') }}</summary>
         <ul class="rw-liste-guide">
             <li>{{ __('tickets.guide_local') }}</li>
             <li>{{ __('tickets.guide_dedup') }}</li>
             <li>{{ __('tickets.guide_cve') }}</li>
         </ul>
-    </div>
+    </details>
 
     <p id="tickets-status" data-rw="fournisseur"></p>
 

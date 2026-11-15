@@ -14,11 +14,11 @@ return [
     // NAV-001 : cinq sections, dans l'ordre de la sequence operationnelle.
     // `section_navigation` et `section_other` sont RETIREES — mesure faite,
     // zero consommateur hors de ce catalogue apres le reordonnancement.
-    'section_parc' => "FLEET & ACCESS",
-    'section_exploitation' => "OPERATIONS",
-    'section_securite' => "SECURITY",
-    'section_admin' => "ADMINISTRATION",
-    'section_autre' => "OTHER",
+    'section_parc' => "Fleet and access",
+    'section_exploitation' => "Operations",
+    'section_securite' => "Security",
+    'section_admin' => "Administration",
+    'section_autre' => "Other",
 
     'cgu' => "Terms of use",
     'cafe' => "Buy me a coffee",

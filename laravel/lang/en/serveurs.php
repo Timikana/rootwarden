@@ -7,11 +7,8 @@
  */
 return [
     'title' => 'Servers',
-    'desc' => 'The machines RootWarden administers: their address, the SSH account used to reach them, their environment and their criticality.',
+    'desc' => "The machines RootWarden administers and the SSH account used to reach them.",
     'compte' => ':n machine(s) in the estate',
-
-    // Environment legend
-    'legende' => 'Environments',
 
     // Search
     'filtre_label' => 'Filter the estate',
@@ -35,7 +32,7 @@ return [
     'res_interne' => 'Internal',
     'res_externe' => 'External',
     'aide_nom' => 'Letters, digits, spaces, dots, hyphens, underscores, plus signs and parentheses.',
-    'aide_ip' => 'Private addresses are accepted. Loopback, link-local and multicast are refused: they do not designate a reachable machine.',
+    'aide_ip' => "Private addresses are accepted. Loopback, link-local, multicast and reserved ranges are refused.",
     'btn_ajouter' => 'Add the machine',
     'champs_requis' => 'Fields marked with a star are required.',
 
@@ -43,13 +40,13 @@ return [
     'inchange' => 'Leave empty to keep unchanged',
     'options_deploiement' => 'Deployment options',
     'opt_nettoyage' => 'Clean up stale accounts',
-    'opt_nettoyage_aide' => 'On the next deployment, machine accounts that no longer match any access will be removed.',
+    'opt_nettoyage_aide' => "No effect today: no deployment deletes an account. An account that lost access loses its key and sudo rights, but stays on the machine.",
     'btn_enregistrer' => 'Save',
     'btn_supprimer' => 'Remove from estate',
 
     // Deletion
     'suppr_titre' => 'Remove :nom from the estate?',
-    'suppr_texte' => 'The machine disappears from vulnerability scans, from supervision and from key deployments. The machine itself is not touched: nothing is changed on it, no access is revoked.',
+    'suppr_texte' => "The machine leaves vulnerability scans, monitoring and key deployments. Nothing changes on the machine itself: the accounts and keys installed there stay in place.",
     'suppr_confirmer' => 'Remove from estate',
     'suppr_annuler' => 'Cancel',
 
@@ -65,7 +62,7 @@ return [
 
     // Empty state
     'vide' => 'No machine in the estate.',
-    'vide_aide' => 'Until a machine is declared, neither vulnerability scans nor key deployments have a target.',
+    'vide_aide' => "Add one with « Add a machine », or import a CSV file.",
 
 
     // Outcomes
@@ -123,7 +120,7 @@ return [
 
     /* ═══ CSV import — D6e ═══════════════════════════════════════════════ */
     'imp_titre' => 'Import servers from a CSV file',
-    'imp_aide' => 'The file must have a header row. Required columns: name, ip, user, password, root_password. Optional columns: port, environment, criticality, network_type, tags.',
+    'imp_aide' => "A header row is required. Required columns: name, ip, user, password, root_password. Optional: port, environment, criticality, network_type, tags (separated by « ; »).",
     'imp_champ' => 'CSV file',
     'imp_fichier' => 'CSV file',
     'imp_fichier_aide' => 'At most :ko KiB and :lignes data rows.',
@@ -131,8 +128,8 @@ return [
     'imp_valider' => 'Import',
 
     // See the note in `lang/fr/serveurs.php`: `password` and `root_password` are
-    // PLAINTEXT secrets inside the file. The legacy said this nowhere.
-    'imp_secrets' => 'This file holds plaintext passwords, root ones included. They are encrypted on save, but the file is not: delete it after the import and do not leave it in a shared folder.',
+    // PLAINTEXT secrets inside the file.
+    'imp_secrets' => "This file holds plaintext passwords, root ones included, and it is not encrypted. Delete it after the import.",
 
     'imp_bilan_titre' => 'Import result',
     'imp_crees' => ':n server(s) created.',
@@ -142,21 +139,17 @@ return [
     'imp_ligne' => 'Row :n',
     'imp_doublon' => 'already present (name or address), skipped',
 
-    'imp_tronque' => "The file goes past :lignes data rows: the rows after that were NOT processed. Split it and run again — this is neither a full success nor a failure.",
+    'imp_tronque' => "The file exceeds :lignes data rows: the following ones were not processed. Split it and import the rest.",
     'imp_manquantes' => 'Required columns missing from the header row: :noms. No row was processed.',
     'imp_err_illisible' => 'The file could not be opened. No row was processed.',
     'imp_err_vide' => 'The file is empty or has no header row. No row was processed.',
-
-    'imp_diverge_titre' => 'Two differences from the legacy portal',
-    'imp_diverge_secret' => 'A row whose password or root password is empty is REJECTED. The legacy portal created it, and the machine then looked as though it carried a password when it had none.',
-    'imp_diverge_env' => 'An unrecognised environment, criticality or network type REJECTS the row. The legacy portal silently replaced it with "OTHER": a typo on "PROD" removed the machine from the population of production machines, with nothing to signal it.',
-
+    'imp_refus' => "A row is refused if a password is empty, or if environment (PROD, DEV, TEST, OTHER), criticality (CRITIQUE, NON CRITIQUE) or network_type (INTERNE, EXTERNE) has another value.",
 
     // Audit 2026-10-13, H-3 : cle d'hote SSH memorisee (TOFU).
     "cle_hote_titre" => "SSH host key",
-    "cle_hote_inconnue" => "No key stored: it will be recorded at the next backend connection.",
+    "cle_hote_inconnue" => "No key stored: it will be recorded at the next connection.",
     "cle_hote_memorisee" => "Stored since :depuis — :type, SHA-256 fingerprint :empreinte",
-    "cle_hote_aide" => "The backend refuses any connection if this machine presents another key: protection against impersonation. If the machine was REINSTALLED, forget its key: the next one will be accepted.",
+    "cle_hote_aide" => "RootWarden refuses to connect if the machine presents another key. If it was reinstalled, forget its key: the next one will be accepted.",
     "cle_hote_confirme" => "I confirm this machine was reinstalled (otherwise, impersonation is possible)",
     "cle_hote_oublier" => "Forget host key",
     "cle_hote_oubliee" => "Host key forgotten for :nom: the next connection will record it again.",

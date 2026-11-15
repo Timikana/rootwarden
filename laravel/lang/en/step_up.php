@@ -18,7 +18,7 @@ return [
     // `permissions` carry their own; the two new consumers read these. Four
     // copies of one label diverge, and this one describes a guard.
     'panneau_titre'   => 'Confirm with your second factor',
-    'panneau_aide'    => 'This action writes a rule on a real machine. Enter the six-digit code from your authenticator: the re-authentication lasts fifteen minutes, and for THIS action only.',
+    'panneau_aide'    => "This action writes to a real machine. Enter your six-digit code: it is valid for fifteen minutes, for this action only.",
     'panneau_code'    => 'Six-digit code',
     'panneau_valider' => 'Confirm',
     'panneau_annuler' => 'Cancel',

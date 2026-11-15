@@ -1,13 +1,12 @@
 <?php
 
 /*
- * Transfert des journaux vers Graylog. Cles PLATES : le fichier est charge d'un
- * bloc par `@json(__('graylog'))`. Jeu identique a `lang/en/graylog.php`,
- * verifie dans le meme commit.
+ * Transfert des journaux vers Graylog. Cles PLATES : le fichier part d'un bloc
+ * par `@json(__('graylog'))`. Regles de redaction : docs/REDACTION-INTERFACE.md.
  */
 return [
     'title' => 'Transfert des journaux (Graylog)',
-    'desc'  => 'Configure l\'envoi des journaux système des machines vers un serveur Graylog, via rsyslog.',
+    'desc'  => 'Envoi des journaux système des machines vers un serveur Graylog, par rsyslog.',
 
     'onglet_config'    => 'Configuration',
     'onglet_deploy'    => 'Machines',
@@ -18,14 +17,14 @@ return [
      * L'ENCART QUE LE LEGACY N'A PAS. Trois gestes de cette page ouvrent une
      * session SSH reelle et installent ou retirent un paquet. Le dire avant.
      */
-    'guide_titre'    => 'Ce que les boutons de l\'onglet Machines font vraiment',
-    'guide_deploy'   => '« Déployer » ouvre une connexion SSH et installe rsyslog sur la machine si elle ne l\'a pas, puis y écrit les fichiers de configuration.',
-    'guide_test'     => '« Tester » exécute une commande sur la machine pour y produire une entrée de journal. Le legacy le fait sans demander confirmation ; ici la confirmation est demandée.',
-    'guide_retirer'  => '« Retirer » supprime les fichiers posés par RootWarden et redémarre rsyslog. Le paquet rsyslog lui-même est conservé.',
-    'guide_prod'     => 'Le tableau liste toutes les machines non archivées, y compris celles de production. La confirmation nomme la machine visée.',
+    'guide_titre'    => 'Ce que font les boutons',
+    'guide_deploy'   => "« Déployer » installe rsyslog si besoin, puis écrit sa configuration sur la machine.",
+    'guide_test'     => "« Tester » écrit une entrée de test dans le journal de la machine.",
+    'guide_retirer'  => "« Retirer » supprime les fichiers posés par RootWarden et redémarre rsyslog ; le paquet reste installé.",
+    'guide_prod'     => "Le tableau inclut les machines de production ; la confirmation nomme la machine visée.",
 
     'config_titre'   => 'Serveur de destination',
-    'config_aide'    => 'Ces réglages valent pour la flotte entière : ils sont écrits dans la configuration rsyslog de chaque machine au prochain déploiement.',
+    'config_aide'    => "Ces réglages valent pour tout le parc ; ils sont appliqués au prochain déploiement.",
     'hote'           => 'Hôte',
     'hote_aide'      => 'Nom ou adresse du serveur Graylog qui reçoit les journaux.',
     'port'           => 'Port',
@@ -37,12 +36,12 @@ return [
     'rl_aide'        => 'Zéro désactive la limitation de débit de rsyslog.',
     'enregistrer'    => 'Enregistrer',
     'enregistre'     => 'Configuration enregistrée.',
-    'err_hote'       => 'L\'hôte est obligatoire : sans lui, aucun journal ne part.',
+    'err_hote'       => "L'hôte est obligatoire.",
     'err_config'     => 'La configuration n\'a pas pu être enregistrée.',
     'err_charge'     => 'La configuration n\'a pas pu être lue.',
     'err_reseau'     => 'Le serveur n\'a pas répondu. Rien n\'a été modifié.',
 
-    'err_retrait_actif' => '⚠ Le retrait a échoué : le transfert peut être ENCORE ACTIF sur cette machine. Vérifiez avant de considérer que les journaux ne partent plus.',
+    'err_retrait_actif' => "Le retrait a échoué : le transfert est peut-être encore actif sur cette machine. Vérifiez-le.",
 
     'machines_titre' => 'Machines',
     'rafraichir'     => 'Rafraîchir',
@@ -76,7 +75,7 @@ return [
     'gabarit_supprimer' => 'Supprimer',
     'gabarit_enregistre' => 'Gabarit enregistré.',
     'gabarit_supprime'   => 'Gabarit supprimé.',
-    'gabarit_aucun'      => 'Aucun gabarit. Ceux qui sont actifs sont poussés sur les machines au déploiement.',
+    'gabarit_aucun'      => "Aucun gabarit. Créez-en un avec « Nouveau ».",
     'gabarit_actif_court' => 'actif',
     'gabarit_inactif'     => 'inactif',
     'err_gabarit_nom'  => 'Le nom du gabarit est obligatoire.',

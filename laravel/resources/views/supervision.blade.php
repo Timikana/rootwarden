@@ -6,7 +6,6 @@
             <div>
                 <h2 class="rw-titre">{{ __('superv.titre') }}</h2>
                 <p class="rw-aide">{{ __('superv.sous_titre') }}</p>
-                <p class="rw-aide rw-prose">{{ __('superv.description') }}</p>
             </div>
 
             {{-- LE CHOIX DE PLATEFORME. Il ne declenche AUCUN appel : les quatre
@@ -170,13 +169,8 @@
                             </table>
                         </div>
 
-                        @if ($config !== null)
-                            <p class="rw-aide rw-prose">{{ __('superv.config_plus_recente') }}</p>
-                        @endif
-
                         {{-- Action principale a DROITE en pied de formulaire. --}}
                         <div class="rw-actions">
-                            <p class="rw-aide rw-actions__gauche">{{ __('superv.enregistrement_portee', ['plateforme' => ucfirst($plateforme)]) }}</p>
                             <button type="submit" class="rw-bouton"
                                     data-rw="superv-config-enregistrer">{{ __('superv.enregistrer') }}</button>
                         </div>
@@ -916,7 +910,6 @@
                                         ]) }}
                                     </p>
                                 @endif
-                                <p class="rw-aide rw-prose">{{ __('superv.releve_aide_fond') }}</p>
                             </div>
                             <div class="rw-panneau-decision__actions">
                                 <button type="button" class="rw-bouton rw-bouton--discret"

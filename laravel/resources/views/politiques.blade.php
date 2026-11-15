@@ -10,11 +10,7 @@
 <div class="rw-entete-page">
     <h1 class="rw-titre">{{ __('politiques.titre') }}</h1>
 </div>
-
-<div class="rw-encart">
-    <p class="rw-sous-titre-fort">{{ __('politiques.intro_titre') }}</p>
-    <p class="rw-prose">{{ __('politiques.intro') }}</p>
-</div>
+<p class="rw-sous-titre rw-prose">{{ __('politiques.intro') }}</p>
 
 <div class="rw-section">
     <form method="get" action="{{ route('politiques') }}" class="rw-barre-filtres" data-rw="politique-filtres">

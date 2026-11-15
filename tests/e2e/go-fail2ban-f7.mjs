@@ -18,10 +18,8 @@
  *
  * ══ CE QU'ON MESURE, EN DEUX TEMPS ════════════════════════════════════════
  *
- * 1. SANS JOINDRE PERSONNE. La vue porte `f2b-desact-jamais` — l'avertissement
- *    que ce geste n'a jamais ete exerce — **a cote du bouton, donc visible
- *    AVANT le clic**. C'est la propriete que le portage ajoute et que le
- *    legacy n'a pas ; elle se mesure sur la page nue.
+ * 1. (Retire.) L'avertissement « jamais exerce » relayait un releve date ;
+ *    la page concise l'a supprime.
  *
  * 2. EN JOIGNANT LA MACHINE 2. Le panneau de confirmation ne s'ouvre qu'avec
  *    une jail reelle, et `POST /fail2ban/status` ouvre une session SSH pour
@@ -147,7 +145,6 @@ const C = { connexion: '/connexion', page: '/fail2ban',
     detail: '[data-rw="f2b-jail-detail"]',
     jailNom: '[data-rw="f2b-jail-nom"]',
     desactiver: '[data-rw="f2b-jail-desactiver"]',
-    jamais: '[data-rw="f2b-desact-jamais"]',
     confirmation: '[data-rw="f2b-confirmation"]',
     confTitre: '[data-rw="f2b-confirmation-titre"]',
     confTexte: '[data-rw="f2b-confirmation-texte"]',
@@ -407,39 +404,9 @@ try {
         `redirige vers ${page.url()} : ce qui suit ne mesurerait pas cette page`,
         page.url().replace(/^https?:\/\/[^/]+/, ''));
 
-    // ══ 1. CE QUI SE MESURE SANS JOINDRE PERSONNE ════════════════════════
-    await etape('l\'avertissement est A COTE du bouton, et donc lu AVANT le clic', async () => {
-        const vu = await page.evaluate((sel) => {
-            const b = document.querySelector(sel.desactiver);
-            const j = document.querySelector(sel.jamais);
-            if (! b || ! j) return { bouton: b !== null, jamais: j !== null };
-            /*
-             * « A COTE » se mesure par la PARENTE, pas par les coordonnees :
-             * un test de position rougirait a la premiere retouche de mise en
-             * page sans que rien de vrai ait change.
-             */
-            let a = b, prof = 0, contient = false;
-            while (a && prof < 4) { if (a.contains(j)) { contient = true; break; } a = a.parentElement; prof += 1; }
-
-            return {
-                bouton: true, jamais: true, contient, prof,
-                texte: (j.innerText || '').replace(/\s+/g, ' ').trim(),
-            };
-        }, C);
-        constate('avertissement', vu.jamais
-            ? `« ${(vu.texte || '').slice(0, 90) || '(vide)'} », a ${vu.prof} parent(s) du bouton`
-            : 'ancre absente');
-        verifie('le bouton de desactivation existe', vu.bouton, 'ancre `f2b-jail-desactiver` absente');
-        verifie('l\'avertissement « jamais exerce » est rendu', vu.jamais,
-            'ancre `f2b-desact-jamais` absente : le portage n\'annonce plus que ce geste n\'a jamais servi');
-        if (! vu.bouton || ! vu.jamais) return;
-        verifie('l\'avertissement partage un ancetre proche avec le bouton',
-            vu.contient,
-            `aucun ancetre commun a moins de 4 niveaux : l'avertissement peut etre ailleurs sur la page`);
-        verifie('l\'avertissement est traduit et non vide',
-            vu.texte.length > 0 && ! /:[a-z_]{3,}/.test(vu.texte),
-            vu.texte.length === 0 ? 'avertissement vide' : `jeton non traduit : ${vu.texte}`);
-    });
+    // ══ 1. (RETIRE) L'avertissement « jamais exerce » a cote du bouton ════
+    // Il relayait un releve date propre a une base : retire avec la page
+    // concise. La consequence du geste est dite dans le panneau, mesure en 2.
 
     // ══ 2. LE PANNEAU, EN JOIGNANT LA SEULE MACHINE 2 ════════════════════
     let jailOuverte = null;

@@ -433,7 +433,7 @@ try {
          * version anterieure exigeait le CHIFFRE zero et condamnait le meilleur
          * rendu des deux. Le defaut se repete parce qu'il est facile : on ecrit
          * l'assertion en pensant au cas qu'on a sous les yeux. */
-        const nommeCeQuiManque = /scan|utilisateurs distants|cle ssh|clé ssh/i.test(rendu?.texte || '');
+        const nommeCeQuiManque = /scan|utilisateurs distants|comptes distants|cle ssh|clé ssh/i.test(rendu?.texte || '');
         const ditQueRienNeManque = /aucun prerequis manquant|aucun prérequis manquant|no missing prerequisite/i
             .test(rendu?.texte || '');
         verifie('le rapport est SPECIFIQUE : il nomme ce qui manque, ou dit que rien ne manque',

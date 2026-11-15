@@ -3,46 +3,44 @@
 // lang/fr/tasks.php - Centre de taches.
 
 return [
-    'title' => 'Centre de taches',
-    'desc'  => 'Historique et statut de l\'activite de fond de la plateforme : scans de derive, '
-             . 'audits SSH, sauvegardes. Lecture seule.',
+    'title' => "Tâches",
+    'desc'  => "Activité de fond de la plateforme : calculs de dérive, audits SSH, sauvegardes.",
 
     'filter_label' => 'Statut',
     'filter_all'   => 'Tous les statuts',
     'autorefresh'  => 'Actualiser toutes les 5 s',
-    'tip_autorefresh' => 'Interroge le backend en continu. A decocher pour figer l\'affichage le temps de le lire.',
+    'tip_autorefresh' => "Décochez pour figer l'affichage pendant la lecture.",
 
     'col_status'   => 'Statut',
     'col_type'     => 'Type',
-    'col_label'    => 'Tache',
-    'col_started'  => 'Demarree',
-    'col_duration' => 'Duree',
-    'loading'      => 'Chargement...',
+    'col_label'    => "Tâche",
+    'col_started'  => "Démarrée",
+    'col_duration' => "Durée",
+    'loading'      => "Chargement…",
 
     'st_running' => 'En cours',
-    'st_success' => 'Reussie',
-    'st_error'   => 'Echec',
+    'st_success' => "Réussie",
+    'st_error'   => "Échec",
     'st_pending' => 'En attente',
 
     'sum_running_now' => 'En cours',
-    'sum_success_24h' => 'Reussies (24 h)',
-    'sum_error_24h'   => 'Echecs (24 h)',
+    'sum_success_24h' => "Réussies (24 h)",
+    'sum_error_24h'   => "Échecs (24 h)",
     'sum_total_24h'   => 'Total (24 h)',
-    'sum_running_aide' => 'Taches actives a cet instant',
-    'sum_success_aide' => 'Terminees sans erreur',
-    'sum_error_aide'   => 'Terminees en erreur',
-    'sum_total_aide'   => 'Toutes taches des 24 dernieres heures',
+    'sum_running_aide' => "Tâches actives",
+    'sum_success_aide' => "Terminées sans erreur",
+    'sum_error_aide'   => "Terminées en erreur",
+    'sum_total_aide'   => "Sur les dernières 24 h",
 
-    'empty'      => 'Aucune tache a afficher',
-    'empty_aide' => 'L\'activite de fond alimente cette liste : scans de derive, audits SSH, sauvegardes.',
-    'empty_filtre'      => 'Aucune tache avec le statut « :statut »',
-    'empty_filtre_aide' => 'D\'autres taches existent avec un autre statut. Revenez a « Tous les statuts » pour les voir.',
+    'empty'      => "Aucune tâche",
+    'empty_aide' => "Les calculs de dérive, audits SSH et sauvegardes apparaîtront ici.",
+    'empty_filtre'      => "Aucune tâche « :statut »",
+    'empty_filtre_aide' => "Choisissez « Tous les statuts » pour voir les autres.",
 
-    'err_load'   => 'Impossible de charger la liste des taches.',
+    'err_load'   => "Impossible de charger les tâches.",
     // Le filtre par statut renvoie une erreur du backend (voir PARITE.md E-10).
     // Le dire, plutot que de laisser a l'ecran des lignes non filtrees.
-    'err_filtre' => 'Le filtrage par statut a echoue cote serveur (:statut). La liste n\'est donc pas filtree : '
-                  . 'elle est vidée plutot que de vous montrer des taches qui ne repondent pas a votre demande.',
-    'err_stats'  => 'Les compteurs n\'ont pas pu etre charges.',
-    'derniere_maj' => 'Derniere actualisation a :heure',
+    'err_filtre' => "Le filtre « :statut » a échoué côté serveur : la liste est vidée plutôt que de montrer des tâches non filtrées.",
+    'err_stats'  => "Les compteurs n'ont pas pu être chargés.",
+    'derniere_maj' => "Dernière actualisation à :heure",
 ];

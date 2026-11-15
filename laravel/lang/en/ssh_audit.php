@@ -1,21 +1,26 @@
 <?php
 
 /*
- * SSH configuration audit — sub-lot A1. Flat keys, loaded as one block by
- * `@json(__('ssh_audit'))`. The key set must stay identical to
- * `lang/fr/ssh_audit.php`.
+ * SSH configuration audit.
+ *
+ * FLAT keys: the file is sent whole through `@json(__('ssh_audit'))`. The key
+ * set must stay identical to `lang/fr/ssh_audit.php`. Writing rules:
+ * docs/REDACTION-INTERFACE.md.
  */
 return [
     'titre' => 'SSH configuration audit',
-    'desc'  => 'Reads the SSH service configuration of your servers, scores it against a policy, and tracks how it changes.',
+    'desc'  => 'Reads the SSH service configuration of your servers, scores it against a policy and tracks how it changes.',
 
+    // ── Server selector, bounded to the perimeter ────────────────────────
     'chargement' => 'Loading…',
     'serveur_cible'   => 'Server',
     'serveur_choisir' => 'Choose a server…',
-    'serveur_aucun'   => 'No server is assigned to you. The SSH audit covers the machines in your perimeter, and it is empty.',
+    'serveur_aucun'   => 'No server is assigned to you. Ask an administrator for access.',
     'serveur_borne'   => 'You only see the machines assigned to you here.',
 
+    // ── History ──────────────────────────────────────────────────────────
     'historique_titre' => 'Previous readings',
+    'historique_choisir' => 'Choose a server to see its previous readings.',
     'historique_vide'  => 'No reading has been taken on this server yet.',
     'historique_err'   => 'The readings for this server could not be read.',
     'note'   => 'Score',
@@ -27,10 +32,11 @@ return [
     'sev_moyenne'  => 'medium',
     'sev_basse'    => 'low',
 
+    // ── Fleet (administration) ───────────────────────────────────────────
     'flotte_titre' => 'Latest reading for each server',
     'flotte_vide'  => 'No server has been read yet.',
     'flotte_err'   => 'The fleet state could not be read.',
-    'flotte_reserve' => 'This view covers the whole fleet and is not bounded to your perimeter: it is reserved for administration.',
+    'reserve_admin' => 'The whole-fleet state and scheduled readings are reserved for administrators.',
     'th_serveur'   => 'Server',
     'th_ip'        => 'Address',
     'th_note'      => 'Score',
@@ -38,23 +44,21 @@ return [
     'th_critiques' => 'Critical',
     'th_releve_le' => 'Read on',
 
+    // ── Policy, read-only ────────────────────────────────────────────────
+    // Writing is composed nowhere (SEC-013, see AuditSshController).
     'politique_titre' => 'Policy applied to this server',
-    'politique_desc'  => 'Each rule can be audited or ignored. This page displays them; it does not change them.',
     'politique_choisir' => 'Choose a server to see the policy applied to it.',
     'politique_vide'  => 'No rule is defined for this server: the default policy applies.',
     'politique_err'   => 'The policy for this server could not be read.',
     'politique_auditee' => 'audited',
     'politique_ignoree' => 'ignored',
     'politique_motif'   => 'Reason',
-    // SEC-013: GET requires `can_audit_ssh`, POST requires `role(2)` ALONE —
-    // writing is less guarded than reading, on the same URL, and the gateway
-    // compares PATHS, never methods. Closure is by ABSENCE of any call.
-    'politique_lecture_seule' => 'Changing the policy is not offered here, and that is not an oversight: on the old portal, writing a policy is less guarded than reading one. Until that is fixed server-side, this page composes no call that would write it.',
+    'politique_lecture_seule' => 'Read-only: the policy cannot be changed from the portal.',
 
+    // ── Schedules (administration) ───────────────────────────────────────
     'planifs_titre'   => 'Scheduled readings',
     'planifs_vide'    => 'No scheduled reading.',
     'planifs_err'     => 'The schedules could not be read.',
-    'planifs_reserve' => 'Scheduled readings are reserved for administration.',
     'planif_active'   => 'active',
     'planif_suspendue' => 'paused',
     'planif_prochaine' => 'Next run',
@@ -62,98 +66,50 @@ return [
     'planif_cible_tag'  => 'tag: :valeur',
     'planif_cible_env'  => 'environment: :valeur',
     'planif_cible_machines' => ':n named server(s)',
-    // E-280: a malformed or unrecognised target falls back to THE WHOLE FLEET.
-    // E-280, corrected: `target_type` IS a closed enum, so an invented value is
-    // refused by the database. What remains reachable is an INCOMPLETE target.
-    'planif_cible_inconnue' => 'incomplete target — will run on THE WHOLE FLEET',
-    // E-280: "whole fleet" and "target not understood" are the SAME branch.
-    'planif_cible_ambigue' => "'The whole fleet' is both a legitimate choice and what an incomplete target produces — a tag whose field was left blank. Both go through the same path, and nothing afterwards tells which one was used.",
+    // Narrow scope without a value: the scheduler skips it (scheduler.py,
+    // `else` branch: WHERE 1=0).
+    'planif_cible_inconnue' => 'incomplete target: skipped when due',
 
-    'portee_titre' => 'What this page can do today',
-    'portee_texte' => "It reads: the readings already taken, the policy applied, the fleet state and the scheduled readings. It also WRITES: it audits a server — which OPENS an SSH session on it — it reads its sshd_config, and it arms, suspends or deletes a scheduled reading. The three schedule actions write only to the database and join no machine; it is their DUE TIME that will open the SSH sessions, asking no one for permission.",
-
-    // A button label says what it DOES; the explanation lives in the panel.
+    // ── Buttons and decision panel ───────────────────────────────────────
     'btn_relever' => 'Read this server',
     'btn_config'  => 'View sshd_config',
     'btn_parc'    => 'Read the whole fleet',
     'btn_planif'  => 'Schedule a reading',
-    'historique_choisir' => 'Choose a server to see its previous readings.',
-    'np_titre'  => 'Not ported yet',
-    'np_ouvrir' => 'Open in the old portal',
-    /* A5 — disarming a schedule. Two measurements shape these labels:
-     * `toggle` does `SET enabled = NOT enabled` — a BLIND flip, not a set, so
-     * the screen must RE-READ the state instead of announcing it; and `DELETE`
-     * returns success: True without checking rowcount. See fr. */
-    'planif_suppr_titre'   => 'Delete this schedule',
-    'planif_suppr_texte'   => 'The schedule is removed from the database. No machine is joined by this action, and nothing is restored: there is no undo.',
-    'planif_suppr_court'   => 'Delete',
-    'planif_suppr_valider' => 'Delete the schedule',
-    'planif_suppr_faite'   => 'Schedule deleted. The list is re-read below.',
-    'planif_suppr_echec'   => 'Deletion failed: :message',
-
-    'planif_suspendre'     => 'Suspend',
-    'planif_reactiver'     => 'Resume',
-    'planif_bascule_faite' => 'State changed. The list is re-read below — it is the list that states the result, not this button.',
-    'planif_bascule_echec' => 'The state change failed: :message',
-    'planif_bascule_aveugle' => 'This button INVERTS the stored state; it does not set it. If someone changed it meanwhile, the result is the opposite of what this screen displayed — the re-read list is what counts.',
-
-    'planif_ce_qui_est_arme' => 'What this schedule triggers when it comes due: an SSH audit on the machines in its scope. Its due time asks no one for permission.',
-    'planif_prochaine_le'    => 'Next run:',
-    'planif_aucune_echeance' => 'no run time recorded',
-
+    'np_titre'  => 'Not available on this portal',
     'np_fermer' => 'Close',
     'np_sur_serveur' => 'Target server: :nom',
-    // A4: the reading of a server IS ported. `np_relever_detail` does NOT move
-    // — its reserve is about the CONNECTION and stays true. But it is
-    // INCOMPLETE: the action also persists a record, writes to the audit log
-    // and raises notifications. Measured: those notifications are IN-APP only
-    // (`notify.py:122` filters `channel IN ('inapp','both')`, and the file has
-    // no smtp/webhook/telegram/slack at all). Nothing goes outward — saying
-    // otherwise would make people refuse a safe action.
-    'relever_ecrit' => 'The reading is saved: it appears under "Previous readings", it is written to the audit log, and it raises in-portal notifications. Nothing is sent outside.',
+
+    'np_parc' => 'Reading the whole fleet is not available on this portal.',
+    'np_parc_detail' => 'It would open an SSH session on every non-archived machine, production included, with no way to narrow it.',
+
+    // ── Read a server ────────────────────────────────────────────────────
     'relever_titre' => 'Read this server?',
+    'np_relever_detail' => 'Opens an SSH session on the server to read its configuration.',
+    // Notifications are stored in the database (notify.py, inapp channel).
+    'relever_ecrit' => 'The result is saved to the history and the audit log, and notified in the portal.',
     'relever_lancer' => 'Read now',
     'relever_en_cours' => 'Reading…',
     'relever_sans_serveur' => 'Choose a server before reading it.',
     'relever_fait' => 'Reading finished: grade :grade, score :score/100.',
     'relever_echec' => 'The reading did not complete. :message',
     'relever_refus' => 'The reading was refused. :message',
-    'np_relever_detail' => 'Reading a server opens a real SSH session on it and reads its configuration. It is a read, but it is a connection.',
 
-    'np_parc' => 'Reading the whole fleet is not ported to this interface yet.',
-    'np_parc_detail' => 'This action opens an SSH session on EVERY non-archived machine in the fleet, production included. It takes no parameter: there is nothing to restrict, and no way to aim it elsewhere.',
-    // A3: the conjunction is SPLIT, not removed — see the note in
-    // `lang/fr/ssh_audit.php`. `np_config_detail` does NOT move: its reserve
-    // is about WRITING, which stays absent.
-    'np_config' => 'Changing `sshd_config` is not ported to this interface yet.',
-
-    // A3 — reading it IS ported. This action JOINS the machine: the backend
-    // opens a real SSH session to read the file. Nothing is written.
-    'cfg_titre'    => 'Read `sshd_config` on this server?',
-    'cfg_texte'    => 'This read opens a real SSH session on the chosen server. It writes nothing, neither on the machine nor in the database, and the file is shown here read-only.',
+    // ── Read sshd_config ─────────────────────────────────────────────────
+    'cfg_titre'    => 'Read sshd_config on this server?',
+    'cfg_texte'    => 'Opens an SSH session on the server. Nothing is written, neither on the machine nor in the database.',
     'cfg_lire'     => 'Read the file',
     'cfg_en_cours' => 'Reading…',
-    'cfg_titre_resultat' => '`sshd_config` of :nom',
+    'cfg_titre_resultat' => 'sshd_config of :nom',
     'cfg_vide'     => 'The server answered, but the file is empty.',
     'cfg_echec'    => 'The file could not be read. :message',
     'cfg_refus'    => 'The read was refused. :message',
     'cfg_sans_serveur' => 'Choose a server before reading its configuration.',
-    'cfg_lecture_seule' => 'This content is shown read-only: changing `sshd_config` is not ported here.',
+    'cfg_lecture_seule' => 'Read-only: sshd_config cannot be changed from the portal.',
 
-    'np_config_detail' => 'Writing to `sshd_config` and reloading the service can cut SSH access to the server — and SSH is the only channel RootWarden has to get back in. A backup exists and restoring is possible.',
-    // A2: creating a scheduled reading is PORTED — see the note in
-    // `lang/fr/ssh_audit.php`. `np_planif_detail` does NOT move: it describes
-    // the consequence, and it is the decision panel's text.
-    //
-    // DECLARED REDUCTION: only FOUR periodicities are offered. A free cron
-    // expression cannot be typed here — a schedule triggers real SSH sessions
-    // with nobody watching, and a closed list cannot be bypassed by a forged
-    // request. The legacy portal stays open for another periodicity.
-    'planif_freq_bornee' => "Four periodicities are offered. A free cron expression cannot be typed here: a schedule triggers real SSH sessions with nobody watching, and a closed list cannot be bypassed by a forged request. For another periodicity, the legacy portal stays open.",
-
+    // ── Schedule a reading ───────────────────────────────────────────────
     'planif_form_titre' => 'Schedule a reading',
     'planif_f_nom'      => 'Schedule name',
-    'planif_f_nom_aide' => 'This name identifies the schedule in the list. 100 characters at most.',
+    'planif_f_nom_aide' => '100 characters at most.',
     'planif_f_freq'     => 'Periodicity',
     'planif_f_portee'   => 'What the reading covers',
     'planif_f_valeur'   => 'Scope value',
@@ -167,13 +123,31 @@ return [
     'planif_valider'    => 'Save the schedule',
     'planif_annuler'    => 'Cancel',
 
-    // Without a value, a restricted scope covers the WHOLE fleet — E-280.
-    'planif_valeur_requise' => 'This scope needs a value. Without it, the schedule would cover the whole fleet — production included.',
-    'planif_aucun_tag'      => 'No tag is carried by any machine in the fleet: this scope has nothing to target.',
-    'planif_aucune_machine'  => 'No server is visible from this account: this scope has nothing to target.',
+    'planif_valeur_requise' => 'Choose a value for this scope.',
+    'planif_aucun_tag'      => 'No machine in the fleet carries a tag.',
+    'planif_aucune_machine'  => 'No server is visible from this account.',
     'planif_nom_requis'      => 'A name is required.',
     'planif_creee'           => 'The schedule ":nom" is saved. Next run: :quand.',
     'planif_echec'           => 'The schedule could not be saved. :message',
     'planif_conf_titre'      => 'Save this schedule?',
-    'np_planif_detail' => 'A schedule opens real SSH sessions, repeatedly, with nobody watching. It targets the whole fleet by default, production included — and a narrow target whose field was left blank comes to the same thing.',
+    'np_planif_detail' => 'Each time it is due, the schedule opens SSH sessions on the machines in its scope, without confirmation.',
+
+    // ── Suspend, resume, delete ──────────────────────────────────────────
+    // `toggle` inverts the state without setting it, and `DELETE` does not
+    // check `rowcount`: the RE-READ list is what counts, not the message.
+    'planif_suppr_titre'   => 'Delete this schedule',
+    'planif_suppr_texte'   => 'The schedule is deleted permanently. No machine is joined.',
+    'planif_suppr_court'   => 'Delete',
+    'planif_suppr_valider' => 'Delete the schedule',
+    'planif_suppr_faite'   => 'Schedule deleted.',
+    'planif_suppr_echec'   => 'Deletion failed: :message',
+
+    'planif_suspendre'     => 'Suspend',
+    'planif_reactiver'     => 'Resume',
+    'planif_bascule_faite' => 'State changed. The list below shows the result.',
+    'planif_bascule_echec' => 'The state change failed: :message',
+    'planif_bascule_aveugle' => 'This button inverts the stored state. If someone changed it meanwhile, rely on the re-read list.',
+    'planif_ce_qui_est_arme' => 'When due, this schedule reads the machines in its scope over SSH, without confirmation.',
+    'planif_prochaine_le'    => 'Next run:',
+    'planif_aucune_echeance' => 'no run time recorded',
 ];

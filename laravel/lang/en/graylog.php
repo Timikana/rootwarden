@@ -1,27 +1,26 @@
 <?php
 
 /*
- * Log forwarding to Graylog. FLAT keys: the file is loaded in one block by
- * `@json(__('graylog'))`. Identical key set to `lang/fr/graylog.php`, checked in
- * the same commit.
+ * Log forwarding to Graylog. FLAT keys: the file is sent in one block by
+ * `@json(__('graylog'))`. Writing rules: docs/REDACTION-INTERFACE.md.
  */
 return [
     'title' => 'Log forwarding (Graylog)',
-    'desc'  => 'Configures how machines ship their system logs to a Graylog server, through rsyslog.',
+    'desc'  => 'Ships the system logs of the machines to a Graylog server, through rsyslog.',
 
     'onglet_config'    => 'Configuration',
     'onglet_deploy'    => 'Machines',
     'onglet_templates' => 'Templates',
     'onglet_history'   => 'History',
 
-    'guide_titre'    => 'What the buttons on the Machines tab actually do',
-    'guide_deploy'   => '"Deploy" opens an SSH connection and installs rsyslog on the machine if missing, then writes the configuration files there.',
-    'guide_test'     => '"Test" runs a command on the machine to produce a log entry. The old portal did this without asking; here confirmation is required.',
-    'guide_retirer'  => '"Remove" deletes the files RootWarden placed and restarts rsyslog. The rsyslog package itself is kept.',
-    'guide_prod'     => 'The table lists every non-archived machine, production ones included. The confirmation names the target machine.',
+    'guide_titre'    => 'What the buttons do',
+    'guide_deploy'   => '"Deploy" installs rsyslog if needed, then writes its configuration on the machine.',
+    'guide_test'     => '"Test" writes a test entry to the machine log.',
+    'guide_retirer'  => '"Remove" deletes the files RootWarden placed and restarts rsyslog; the package stays installed.',
+    'guide_prod'     => 'The table includes production machines; the confirmation names the target machine.',
 
     'config_titre'   => 'Destination server',
-    'config_aide'    => 'These settings apply to the whole fleet: they are written into each machine\'s rsyslog configuration on the next deployment.',
+    'config_aide'    => 'These settings apply to the whole fleet; they take effect on the next deployment.',
     'hote'           => 'Host',
     'hote_aide'      => 'Name or address of the Graylog server receiving the logs.',
     'port'           => 'Port',
@@ -33,12 +32,12 @@ return [
     'rl_aide'        => 'Zero disables rsyslog rate limiting.',
     'enregistrer'    => 'Save',
     'enregistre'     => 'Configuration saved.',
-    'err_hote'       => 'The host is required: without it, no log is shipped.',
+    'err_hote'       => 'The host is required.',
     'err_config'     => 'The configuration could not be saved.',
     'err_charge'     => 'The configuration could not be read.',
     'err_reseau'     => 'The server did not answer. Nothing was changed.',
 
-    'err_retrait_actif' => '⚠ Removal failed: forwarding may STILL BE ACTIVE on this machine. Check before assuming logs are no longer shipped.',
+    'err_retrait_actif' => 'Removal failed: forwarding may still be active on this machine. Check it.',
 
     'machines_titre' => 'Machines',
     'rafraichir'     => 'Refresh',
@@ -72,7 +71,7 @@ return [
     'gabarit_supprimer' => 'Delete',
     'gabarit_enregistre' => 'Template saved.',
     'gabarit_supprime'   => 'Template deleted.',
-    'gabarit_aucun'      => 'No template. Enabled ones are pushed to the machines on deployment.',
+    'gabarit_aucun'      => 'No template. Create one with "New".',
     'gabarit_actif_court' => 'enabled',
     'gabarit_inactif'     => 'disabled',
     'err_gabarit_nom'  => 'The template name is required.',
