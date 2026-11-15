@@ -7,38 +7,35 @@ description: Checklist OBLIGATOIRE avant chaque commit feature/fix RootWarden - 
 
 A derouler AVANT chaque commit de feature ou de fix. Aucune etape n'est optionnelle.
 
-> **Migration en cours** : le frontend legacy vit dans `legacy/` (anciennement
-> `www/`) et se deprecie partie par partie — voir `docs/migration/DEPRECIATION.md`.
-> Une partie deja portee est sous `legacy/_deprecated/` : ne plus la modifier.
+> Le portail servi est `laravel/`. Le legacy n'est plus servi : `legacy/_deprecated/`
+> est une archive, ne plus la modifier.
 
 ## 1. Versioning
-- Bump `legacy/version.txt` (SemVer `MAJEUR.MINEUR.PATCH`). L'auto-tag CI lit ce fichier.
+- La version se DERIVE (`scripts/version.sh`) : `MAJEUR.MINEUR` vient de `VERSION-JALON`, seul fichier ecrit a la main et seulement aux jalons ; le correctif se compte. Ne jamais assigner un numero.
 - Entree `CHANGELOG.md` complete : symptome, cause racine, fix, tests, notes exploitation.
-- Mettre a jour la ligne d'avertissement en tete du CHANGELOG (`main vX.Y.Z`).
-- Exception : les chores (tooling, docs internes) ne bumpent pas la version.
 
 ## 2. i18n — parite FR/EN stricte
-- Toute nouvelle cle va dans `legacy/lang/fr/<module>.php` **ET** `legacy/lang/en/<module>.php`, dans le meme commit.
-- Cles JS : `legacy/lang/fr/js.php` + `en/js.php`, prefixe `js.` ; consommees via `__('cle_sans_prefixe')` (defini par `head.php`). Le PHP, lui, appelle `t('module.cle')`.
+- Toute nouvelle cle va dans `laravel/lang/fr/<module>.php` **ET** `laravel/lang/en/<module>.php`, dans le meme commit.
+- Libelles lus par un script : poses EN DONNEES dans la page (`@json` sur une ligne), jamais ecrits dans le JS (voir `rw-laravel`).
 - Jamais de chaine UI en dur dans le PHP/JS des modules.
 
 ## 3. Securite (OWASP, cf CONTRIBUTING-SECURITY.md)
 - Endpoints backend : `@require_api_key` + `@require_role`/`@require_permission` + `@require_machine_access` si machine_id.
 - SQL : placeholders partout (`%s` / PDO `?`). Noms de tables dynamiques : whitelist en dur.
-- Frontend : `escHtml`/`htmlspecialchars` sur toute donnee affichee ; `json_encode` pour injecter du PHP dans du JS ; `textContent` plutot que innerHTML.
+- Frontend : `{{ }}` en Blade sur toute donnee affichee ; `@json` pour passer du PHP au JS ; `textContent` plutot que innerHTML.
 - Commandes SSH : `shlex.quote` ou payload base64 (`printf '%s' '<b64>' | base64 -d`). JAMAIS d'interpolation brute.
-- CSRF sur tout POST PHP (`checkCsrfToken()`).
+- CSRF : assure par le groupe `web` de Laravel (`PreventRequestForgery`) ; ne rien ajouter par-dessus (voir `rw-laravel`).
 - Nouvelle var d'env → documenter dans `srv-docker.env.example` (recuperee auto par `./maj.sh`).
 
 ## 4. Tests
 - `cd backend && python -m pytest -q` : la suite complete doit etre 100% verte.
 - Un nouveau test doit asserter le comportement ATTENDU (spec), pas figer le comportement actuel. Signaler un vrai bug AVANT de le figer.
-- PHP modifie : `docker exec rootwarden_php php -l /var/www/html/<chemin>`.
+- PHP modifie : `docker exec rootwarden_laravel php -l /var/www/html/<chemin sous laravel/>`.
 - UI modifiee : script E2E Puppeteer auto-validant (voir skill `rw-e2e`).
 
 ## 5. Commit
 - Direct sur `main` pour hotfixes/patches (pas de branche sauf demande explicite ; patchs securite d'audit → branche `security/...`).
-- Message : `type(scope): resume - vX.Y.Z` + corps expliquant symptome/cause/fix/tests.
+- Message : `type(scope): resume` + corps expliquant symptome/cause/fix/tests. Aucun numero de version : il se derive.
 - **JAMAIS de trace AI** : pas de Co-Authored-By, aucune mention d'assistant dans code/commits/docs.
 - Ne committer QUE les fichiers du fix (le vault Obsidian se synchronise seul via hook post-commit).
 - **NE PAS pousser** sans feu vert explicite de l'utilisateur.

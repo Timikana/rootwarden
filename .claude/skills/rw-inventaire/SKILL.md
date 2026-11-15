@@ -50,7 +50,7 @@ la garde de la requête depuis celle de la page. Pour chaque route, lire :
 | Où | Quoi |
 |---|---|
 | la **page** | `checkAuth([...])` + `checkPermission(...)` |
-| le **proxy** | `legacy/api_proxy.php` — présence dans `$ADMIN_ONLY_PREFIXES` |
+| la **passerelle** | `App\Support\RoutesBackend` — `LISTE_BLANCHE`, `ADMIN_SEULEMENT`, `MOTIFS_STEP_UP` |
 | le **backend** | les décorateurs Python |
 
 Un seul des trois suffit à laisser passer. Exemples mesurés : `POST /deploy` porte

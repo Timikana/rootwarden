@@ -40,7 +40,7 @@ il faut savoir qu'ils existent pour comprendre un échec.
    compteur **par IP** en base (seuil 10 sur 10 min). Enchaîner les suites le fait
    déborder tout seul.
 5. **Il faut attendre le basculement de la fenêtre TOTP entre deux suites.** Le
-   garde anti-rejeu est **par compte et en base** : il traverse les suites.
+   garde anti-rejeu est **par compte**, persistant (cache applicatif, pilote fichier) : il traverse les suites.
 6. **`go-vague0-legacy` vise `superadmin`**, dont le mot de passe en base n'est pas
    celui qu'attend la suite et dont `force_password_change` vaut 1. Le script le
    joue avec `rw-test-super`.

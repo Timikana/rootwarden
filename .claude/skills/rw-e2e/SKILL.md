@@ -11,7 +11,6 @@ Les scripts vivent dans `tests/e2e/go-<sujet>.mjs`. Un script de regression est
 
 ## Modeles a copier
 - `go-access-toggle-refresh.mjs` — toggle + verification DOM sans reload (marqueur JS anti-reload).
-- `go-update-filter.mjs` — lecture seule, verification tableau + absence d'erreur dans les logs.
 - `go-ssh-audit-scanall.mjs` — operation asynchrone : reponse immediate puis polling jusqu'au terminal.
 - `go-supervision-profile-assign.mjs` — CRUD + assignation + persistance apres reload + cleanup.
 
@@ -21,7 +20,7 @@ Les scripts vivent dans `tests/e2e/go-<sujet>.mjs`. Un script de regression est
 - Login : `superadmin` + mot de passe (defaut du script, surchargable `E2E_USER`/`E2E_PASS`),
   TOTP calcule a la volee depuis **`E2E_TOTP_SECRET` (variable d'env, JAMAIS en dur
   dans le script — gitleaks est bloquant en CI)**. Gerer les redirections
-  `verify_2fa` et `terms` (voir boilerplate des modeles).
+  `/second-facteur` et `/cgu` (voir boilerplate des modeles).
 - Si le secret 2FA a change (apres `docker compose down -v`), le regenerer via
   l'enrollment puis mettre a jour l'env.
 - `check(label, ok)` : log `PASS/FAIL`, compteur d'echecs, verdict final `=== TOUT OK ===`.
@@ -35,15 +34,11 @@ Les scripts vivent dans `tests/e2e/go-<sujet>.mjs`. Un script de regression est
 
 ## Regles d'or
 - **Attendre le TOTP** : si `30 - (epoch % 30) < 6`, dormir jusqu'a la fenetre suivante.
-- **CLIQUER LE BOUTON, PAS APPELER LA FONCTION. C'est une CONVENTION du projet**, rappelee
-  par l'exploitant le 2026-08-23. Une suite se pilote par des **clics simules** sur les
+- **CLIQUER LE BOUTON, PAS APPELER LA FONCTION. C'est une CONVENTION du projet.** Une suite se pilote par des **clics simules** sur les
   elements reels (`page.click`, `page.type`), pas par `page.evaluate(() => fonctionDeLaPage())`
   ni par des requetes HTTP brutes.
 
-  Cette ligne disait l'inverse jusqu'au 2026-08-23 (« preferer `page.evaluate` aux clics
-  fragiles quand on teste la LOGIQUE »), et c'est ce qui a laisse deriver une suite entiere
-  vers `node:https` sans navigateur. **Appeler la fonction ne mesure pas que le bouton
-  l'appelle** : un `onclick` absent, un bouton `disabled`, un ecouteur jamais attache, un
+  **Appeler la fonction ne mesure pas que le bouton l'appelle** : un `onclick` absent, un bouton `disabled`, un ecouteur jamais attache, un
   formulaire dont l'action a change — rien de tout cela ne se voit.
 
   Les deux seules exceptions, et elles ont chacune leur raison ecrite :
@@ -95,7 +90,7 @@ l'asserter** : `getBoundingClientRect().height > 0` et `display !== 'none'`.
 annonce le sous-total du filtre — ce qui est correct. L'asserter la comparait deux
 grandeurs differentes. Mon erreur, pas celle du legacy.
 
-**UN TEST QUI NE PEUT PAS ECHOUER.** `go-cve-schedules.mjs:98-113` : le seul test
+**UN TEST QUI NE PEUT PAS ECHOUER.** `go-cve-schedules.mjs`, branche `if (beforeHtml)` : le seul test
 d'interface de la suite est une branche `if (beforeHtml)` dont le resultat du clic
 est simplement `console.log`e. Si le bouton manque, ou si le clic ne change rien,
 la suite passe quand meme — alors que son en-tete annonce verifier exactement ce
@@ -158,7 +153,7 @@ supposer.
 
 ## Deux connexions dans la meme suite : attendre la fenetre TOTP
 
-Le garde anti-rejeu est par COMPTE et EN BASE : un contexte de navigateur neuf
+Le garde anti-rejeu est par COMPTE et persistant (cache applicatif, pilote fichier) : un contexte de navigateur neuf
 n'y echappe pas. Une suite qui se connecte deux fois (passe FR puis passe EN)
 doit **attendre le basculement de la fenetre** entre les deux, **asserter que la
 seconde session a tenu** (URL != page de connexion), et reproposer une fois un
@@ -197,13 +192,6 @@ ailleurs.
 Pour se connecter A LA MAIN a un portail : `node tests/e2e/code-totp.mjs <compte>`
 imprime le code a six chiffres.
 
-### L'ancienne invocation, pour memoire
-
-```bash
-cd tests/e2e
-E2E_TOTP_SECRET='<secret>' node go-<sujet>.mjs
-```
-
 ## Pieges d'attente et de mesure (sous-lot V12, 2026-08-23)
 
 ### NE JAMAIS combiner la verification d'un rejeu et son lancement
@@ -234,12 +222,11 @@ que le rejeu commence a peine. Utiliser `setsid ... < /dev/null &` puis attendre
 explicitement la disparition du processus, et **ne jamais conclure d'un code de
 sortie** qu'un rejeu est fini — lire le journal.
 
-### Le legacy n'ecrit pas ou l'on croit
+### Une page n'ecrit pas forcement ou l'on croit
 
-`appendDeployLog` cree une fenetre par serveur dans **`#deploy-logs-container`** ;
-`#deploy-logs` reste vide. Une suite qui lit le mauvais conteneur mesure une
-chaine vide et **accuse le legacy de ne rien conclure** alors qu'il conclut
-ailleurs. Lire la fonction d'affichage avant de choisir le selecteur.
+Une suite qui lit le mauvais conteneur mesure une chaine vide et **accuse la page
+de ne rien conclure** alors qu'elle conclut ailleurs. Lire la fonction d'affichage
+avant de choisir le selecteur.
 
 ### Tester la visibilite du CONTENEUR, pas du descendant
 
@@ -301,7 +288,7 @@ passer l'assertion pour rien.
 
 ### Aucune session pendant un rejeu — captures comprises
 
-Le garde anti-rejeu TOTP est **par compte et EN BASE** : il traverse les contextes de navigateur ET les
+Le garde anti-rejeu TOTP est **par compte et persistant** (cache applicatif, pilote fichier) : il traverse les contextes de navigateur ET les
 executions. Prendre des captures pendant un LOT rend une suite instable. Attendre la fin.
 
 ## Lire le bon element, cliquer le bon bouton (sous-lot A2, 2026-08-23)
