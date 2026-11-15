@@ -386,7 +386,7 @@ try {
              * ne soit PAS accepte : ni message de succes, ni hache modifie. La
              * revalidation SERVEUR est prouvee separement, par une requete forgee.
              */
-            const accepte = /succ|modifi|updated/i.test(msg);
+            const accepte = /succ|modifi|updated|changed/i.test(msg);
             const hacheIntact = etatCompte().hache === origine.hache;
             verifie(`refuse : ${libelle}`, ! accepte && hacheIntact,
                 accepte ? `ACCEPTE : ${msg}` : (msg || 'refuse par le navigateur, sans requete'));
@@ -419,8 +419,13 @@ try {
                     redirect: 'follow',
                 });
                 const t = await r.text();
+                // Le refus se lit dans le porte-message d'ERREUR : l'enonce de la
+                // politique, toujours affiche, cite lui aussi « 15 caracteres ».
+                const err = new DOMParser().parseFromString(t, 'text/html')
+                    .querySelector('[data-rw="profil-mdp-erreur"]');
 
-                return { statut: r.status, refuse: /15 caracteres|15 characters/i.test(t) };
+                return { statut: r.status,
+                    refuse: err !== null && /15 caract[eè]res|15 characters/i.test(err.textContent) };
             }, MDP);
             constate('requete forgee, mot de passe trop court',
                 `statut ${forge.statut} · le serveur refuse=${forge.refuse}`);
@@ -437,7 +442,7 @@ try {
         const ok = await essaie(page, MDP, NOUVEAU, NOUVEAU);
         constate('message apres un mot de passe valide', ok || '(aucun)');
         verifie('accepte un mot de passe conforme a la politique',
-            /succ|modifi|updated/i.test(ok), ok || 'aucun message');
+            /succ|modifi|updated|changed/i.test(ok), ok || 'aucun message');
 
         const apres = etatCompte();
         verifie('le hache a REELLEMENT change', apres.hache !== origine.hache,
