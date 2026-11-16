@@ -36,6 +36,32 @@
         );
     }
 
+    /**
+     * Le resume d'un compte se RECOMPTE dans la grille, apres chaque geste
+     * confirme. Il est rendu au chargement : sans ce recompte, il dirait
+     * « 3 machines » au-dessus d'une grille qui en ouvre quatre.
+     */
+    function recompte(id) {
+        const carte = document.querySelector(`[data-rw="perms-carte-${id}"]`);
+        if (! carte) return;
+        const cases = carte.querySelectorAll('input[data-permission]');
+        const droits = carte.querySelector('[data-rw="perms-resume-droits"]');
+        // Sans cases, le compte a tous les droits par son role : le libelle
+        // rendu par le serveur reste.
+        if (droits && cases.length) {
+            droits.textContent = garnis(L.resume_droits, {
+                n: [...cases].filter((c) => c.checked).length, total: cases.length,
+            });
+        }
+        const listes = carte.querySelectorAll('select[data-machine-id]');
+        const machines = carte.querySelector('[data-rw="perms-resume-machines"]');
+        if (machines) {
+            machines.textContent = garnis(L.resume_machines, {
+                n: [...listes].filter((l) => (l.dataset.actuel || '') !== '').length, total: listes.length,
+            });
+        }
+    }
+
     async function appelle(chemin, corps) {
         try {
             const r = await fetch(chemin, {
@@ -116,6 +142,7 @@
         if (! r.ok || ! r.corps.success) { dis(r.corps.message, 'echec'); return; }
 
         caseCible.checked = r.corps.actif;
+        recompte(id);
         dis(r.corps.message, 'ok');
     }
 
@@ -157,6 +184,9 @@
         const ecrit = typeof r.corps.preset === 'string' ? r.corps.preset : '';
         liste.value = ecrit;
         liste.dataset.actuel = ecrit;
+        const ligne = liste.closest('[data-preset]');
+        if (ligne) ligne.dataset.preset = ecrit;
+        recompte(liste.dataset.userId);
         dis(r.corps.message, 'ok');
     }
 

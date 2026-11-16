@@ -32,7 +32,7 @@ namespace Tests\Support;
  *
  *     ComptesController:633      compte_supprimer
  *     ComptesController:658      compte_anonymiser
- *     PermissionsController:165  permission_definir
+ *     PermissionsController:174  permission_definir
  *     PortailController:208      profil_effacement      (E-449)
  *     PasserelleController:89    generique, action DERIVEE du chemin
  *

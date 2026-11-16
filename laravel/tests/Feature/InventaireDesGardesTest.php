@@ -349,7 +349,7 @@ class InventaireDesGardesTest extends TestCase
             'ComptesController.php:633',      // compte_supprimer
             'ComptesController.php:658',      // compte_anonymiser
             'PasserelleController.php:89',    // generique, action DERIVEE du chemin
-            'PermissionsController.php:165',  // permission_definir
+            'PermissionsController.php:174',  // permission_definir
             // ⚠ 196 -> 208 le 2026-11-02 : `ajouterCleSsh` / `retirerCleSsh`
             //    remplacent `definirCleSsh` plus haut (plusieurs cles, migration
             //    067). Site RELU : le step-up de l'effacement y est inchange.
