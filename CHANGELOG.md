@@ -5,6 +5,22 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## Clé de plateforme : une machine critique n'était pas signalée
+
+Cinq pages avertissent quand une machine est sensible (production, critique, ou environnement
+inconnu) : bashrc, services, Fail2ban, iptables et clé de plateforme. Chacune portait sa propre
+copie de la règle, et celle de la clé de plateforme avait perdu la criticité : son commentaire
+disait « production ou critique », son code ne lisait que l'environnement. Une machine de
+développement marquée critique n'était donc pas signalée sur la page qui peut couper l'accès à
+tout le parc.
+
+- La règle est désormais écrite une seule fois (`App\Support\MachineSensible`), et les cinq pages
+  l'appliquent.
+- Un test vérifie que les cinq services rendent le même verdict sur huit cas, et qu'aucun service
+  ne réécrit la règle. Il échoue avec l'ancienne copie.
+
+---
+
 ## Audit d'accessibilité et de rendu des 34 pages
 
 Audit mesuré sur les 34 pages du menu, à 1400 et 390 px, en clair et en sombre (grille d'audit

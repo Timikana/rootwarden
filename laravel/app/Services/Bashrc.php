@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\MachineSensible;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -145,13 +146,7 @@ class Bashrc
      */
     public function estSensible(object $machine): bool
     {
-        $env = strtoupper(trim((string) ($machine->environment ?? '')));
-        $crit = strtoupper(trim((string) ($machine->criticality ?? '')));
-
-        // Un environnement vide est inconnu, donc sensible : meme raison
-        // qu'`OTHER`. Fail-closed sur l'avertissement.
-        return $env === 'PROD' || $env === 'OTHER' || $env === ''
-            || $crit === 'CRITIQUE';
+        return MachineSensible::est($machine);
     }
 
     /** Le nombre de machines sensibles au parc, pour l'annonce d'ensemble. */

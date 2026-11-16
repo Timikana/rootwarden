@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\MachineSensible;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -66,20 +67,13 @@ class ServicesSystemd
     /**
      * Cette machine demande-t-elle une attention particuliere ?
      *
-     * Reprise a l'identique de `Bashrc::estSensible()` : `PROD` OU `CRITIQUE`,
-     * et **`OTHER` ou une valeur vide comptent comme sensibles** — un
-     * environnement inconnu ne se range pas du cote sur.
-     *
-     * Les deux colonnes sont des `enum` (`PROD|DEV|TEST|OTHER` et
-     * `CRITIQUE|NON CRITIQUE`), relevees en base le 2026-08-26.
+     * La regle vit dans `App\Support\MachineSensible` : `PROD` OU `CRITIQUE`,
+     * et un environnement inconnu compte comme sensible. Elle y est UNE seule
+     * fois pour les cinq pages qui l'avertissent.
      */
     public function estSensible(object $machine): bool
     {
-        $env = strtoupper(trim((string) ($machine->environment ?? '')));
-        $crit = strtoupper(trim((string) ($machine->criticality ?? '')));
-
-        return $env === 'PROD' || $env === 'OTHER' || $env === ''
-            || $crit === 'CRITIQUE';
+        return MachineSensible::est($machine);
     }
 
     /** Le nombre de machines sensibles, pour l'annonce d'ensemble. */

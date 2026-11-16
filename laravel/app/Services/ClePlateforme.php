@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\MachineSensible;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -43,7 +44,7 @@ class ClePlateforme
     public function machines(): array
     {
         return DB::select(
-            'SELECT id, name, ip, port, user, online_status, environment, '
+            'SELECT id, name, ip, port, user, online_status, environment, criticality, '
             . 'platform_key_deployed, platform_key_deployed_at, ssh_password_required, '
             . 'service_account_deployed, service_account_deployed_at, '
             // ── LES DEUX COLONNES QUE LE LEGACY NE REGARDE PAS ────────────
@@ -379,8 +380,6 @@ class ClePlateforme
     /** `PROD` ou `CRITIQUE`, et une valeur inconnue compte comme sensible. */
     public function estSensible(object $m): bool
     {
-        $env = strtoupper(trim((string) ($m->environment ?? '')));
-
-        return $env === 'PROD' || $env === 'OTHER' || $env === '';
+        return MachineSensible::est($m);
     }
 }
