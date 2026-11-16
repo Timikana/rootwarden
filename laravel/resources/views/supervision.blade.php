@@ -505,7 +505,7 @@
                                                 <button type="button" class="rw-bouton rw-bouton--discret rw-menu-ligne__bouton"
                                                         popovertarget="superv-menu-{{ $m->id }}" aria-expanded="false"
                                                         aria-label="{{ __('superv.menu_plus_pour', ['machine' => $m->name]) }}"
-                                                        data-rw="superv-menu-{{ $m->id }}">{{ __('superv.menu_plus') }}@include('composants.icone', ['nom' => 'chevron-down'])</button>
+                                                        data-rw="superv-menu-{{ $m->id }}">{{ __('superv.menu_plus') }}<x-icone nom="chevron-down" /></button>
                                                 <div class="rw-menu-ligne__liste" id="superv-menu-{{ $m->id }}" popover="auto">
                                                     <button type="button" class="rw-bouton rw-bouton--discret"
                                                             data-rw="superv-detecter-version"

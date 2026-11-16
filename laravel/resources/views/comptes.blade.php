@@ -307,7 +307,7 @@
                                         <button type="button" class="rw-bouton rw-bouton--discret rw-bouton--minuscule rw-menu-ligne__bouton"
                                                 popovertarget="compte-menu-{{ $c['id'] }}" aria-expanded="false"
                                                 aria-label="{{ __('comptes.actions_pour', ['compte' => $c['name']]) }}"
-                                                data-rw="compte-menu-{{ $c['id'] }}">{{ __('comptes.col_actions') }}@include('composants.icone', ['nom' => 'chevron-down'])</button>
+                                                data-rw="compte-menu-{{ $c['id'] }}">{{ __('comptes.col_actions') }}<x-icone nom="chevron-down" /></button>
                                         <div class="rw-menu-ligne__liste" id="compte-menu-{{ $c['id'] }}" popover="auto">
                                             @if (! empty($c['locked_until']))
                                                 <button type="button" class="rw-bouton rw-bouton--minuscule"

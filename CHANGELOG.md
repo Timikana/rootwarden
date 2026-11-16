@@ -5,6 +5,19 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## Icônes : vides sur la page « Clé de plateforme »
+
+Sur cette page, toutes les icônes du menu et de la barre du haut s'affichaient en pastilles rouges
+vides. La page nomme `$classe` la classe de ses boutons, et le gabarit d'icône lisait une variable
+de même nom : Blade la lui transmettait, et chaque icône devenait un bouton « danger » sans texte.
+
+- L'icône est désormais un composant Blade (`<x-icone nom="…" />`), qui ne voit que ses attributs :
+  une variable d'une page ne peut plus l'atteindre, quel que soit son nom.
+- Un test reproduit la fuite (et échoue avec l'ancien gabarit), avec un témoin : une classe passée
+  en attribut arrive bien.
+
+---
+
 ## Permissions et accès : une ligne par machine, des cases seulement là où elles décident
 
 - **Un super-administrateur n'a plus de cases à cocher.** Son rôle passe toute garde de permission
