@@ -220,6 +220,7 @@
                             {{-- Un champ par ligne, jamais « le premier de la page ». --}}
                             <input type="password" class="rw-saisie rw-saisie--compacte"
                                    data-rw="compte-mdp" data-id="{{ $c['id'] }}"
+                                   aria-label="{{ __('comptes.mdp_pour', ['nom' => $c['name']]) }}"
                                    autocomplete="new-password"
                                    placeholder="{{ __('comptes.mdp_placeholder', ['minimum' => $longueurMinimale]) }}">
                             <button type="button" class="rw-bouton rw-bouton--minuscule"

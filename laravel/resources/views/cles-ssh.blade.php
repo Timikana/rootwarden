@@ -4,7 +4,7 @@
     <section class="rw-section">
         <div class="rw-entete-page">
             <div>
-                <h2 class="rw-titre">{{ __('ssh.titre') }}</h2>
+                <h1 class="rw-titre">{{ __('ssh.titre') }}</h1>
                 {{-- LE COMPTEUR EST SUBSTITUE. Le legacy ecrit `count($machines)`
                      PUIS `t('ssh.servers_available')`, dont la valeur est
                      « :count serveur(s) disponible(s) » : le jeton n'est jamais

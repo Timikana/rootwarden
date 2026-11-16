@@ -4,7 +4,7 @@
     <section class="rw-section">
         <div class="rw-entete-page">
             <div>
-                <h2 class="rw-titre">{{ __('superv.titre') }}</h2>
+                <h1 class="rw-titre">{{ __('superv.titre') }}</h1>
                 <p class="rw-aide">{{ __('superv.sous_titre') }}</p>
             </div>
 

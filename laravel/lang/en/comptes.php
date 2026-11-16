@@ -38,6 +38,7 @@ return [
     'creer' => 'Create',
     'cree' => 'Account ":nom" created (id :id). It will have to change this password at first sign-in.',
 
+    'mdp_pour' => 'New password for :nom',
     'mdp_placeholder' => ':minimum chars min.',
     'mdp_poser' => 'Save',
     'mdp_generer' => 'Generate',

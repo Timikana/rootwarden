@@ -33,6 +33,7 @@ return [
     // Releves par machine
     'btn_actions'  => 'Actions',
     'actions_pour' => 'Actions pour :machine',
+    'selectionner' => 'Retenir :machine',
     'btn_version' => 'Version',
     'tip_version' => 'Lit la version Linux de la machine, sans la modifier.',
     'btn_statut'  => 'Disponibilité',
