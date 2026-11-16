@@ -27,7 +27,7 @@
 <div class="rw-portail">
 
     <aside class="rw-laterale">
-        <a class="rw-laterale__marque" href="{{ route('accueil') }}">@include('composants.icone', ['nom' => 'shield', 'classe' => 'rw-marque__icone']){{ config('app.name') }}</a>
+        <a class="rw-laterale__marque" href="{{ route('accueil') }}"><x-icone nom="shield" classe="rw-marque__icone" />{{ config('app.name') }}</a>
 
         {{-- La legende explique la fleche UNE FOIS, au lieu de repeter
              « ancien portail » sur chaque entree non portee. --}}
@@ -103,7 +103,7 @@
                 --}}
                 @php($rwNonLues = app(\App\Services\Notifications::class)->nonLues((int) session('utilisateur_id', 0), (int) session('role_id', 0)))
                 <a class="rw-lien" href="{{ route('notifications') }}"
-                   title="{{ __('notif.title') }}" aria-label="{{ __('notif.title') }}" data-rw="notif-cloche">@include('composants.icone', ['nom' => 'bell'])
+                   title="{{ __('notif.title') }}" aria-label="{{ __('notif.title') }}" data-rw="notif-cloche"><x-icone nom="bell" />
                     <span class="rw-badge rw-badge--alerte" data-rw="notif-pastille"
                           @if ($rwNonLues === 0) hidden @endif>{{ $rwNonLues }}</span>
                 </a>
@@ -174,7 +174,7 @@
                  portage ne l'avait pas repris. --}}
             <a class="rw-pied__lien" href="https://buymeacoffee.com/timikana"
                target="_blank" rel="noopener" data-rw="pied-cafe"
-               title="{{ __('nav.cafe_titre') }}">@include('composants.icone', ['nom' => 'coffee']) {{ __('nav.cafe') }}</a>
+               title="{{ __('nav.cafe_titre') }}"><x-icone nom="coffee" /> {{ __('nav.cafe') }}</a>
         </footer>
     </div>
 

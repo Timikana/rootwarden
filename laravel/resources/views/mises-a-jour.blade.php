@@ -88,7 +88,7 @@
         <div class="rw-menu-ligne">
             <button type="button" class="rw-bouton rw-bouton--discret rw-menu-ligne__bouton"
                     popovertarget="maj-menu-autres" aria-expanded="false"
-                    data-rw="maj-menu-autres">{{ __('maj.btn_autres') }}@include('composants.icone', ['nom' => 'chevron-down'])</button>
+                    data-rw="maj-menu-autres">{{ __('maj.btn_autres') }}<x-icone nom="chevron-down" /></button>
             <div class="rw-menu-ligne__liste" id="maj-menu-autres" popover="auto">
                 <button class="rw-bouton rw-bouton--avertissement" id="full-update-btn" type="button"
                         data-rw="maj-complete"
