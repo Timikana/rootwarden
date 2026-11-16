@@ -101,7 +101,7 @@
         @forelse ($temporaires as $t)
             <div class="rw-ligne-note" data-rw="temp-ligne" data-id="{{ $t['id'] }}">
                 <strong>{{ $t['compte'] }}</strong>
-                <code class="rw-code">{{ $t['permission'] }}</code>
+                <span>{{ __('perms.p_' . $t['permission']) === 'perms.p_' . $t['permission'] ? $t['permission'] : __('perms.p_' . $t['permission']) }}</span>
                 <span class="rw-badge rw-badge--attention">{{ __('perms.temp_jusqua', ['date' => $t['expires_at']]) }}</span>
                 @if ($t['machine'])
                     {{-- `machine_id` est DÉCLARÉ et jamais filtré par la
@@ -141,71 +141,95 @@
     </div>
 
     @foreach ($comptes as $c)
+        {{-- QUI A TOUS LES DROITS PAR SON ROLE N'A PAS DE CASES. Le rôle 3 passe
+             toute garde de permission (`ExigePermission`, et `require_permission`
+             côté backend) : ses cases ne décident de rien. Elles s'affichaient
+             décochées, sous un résumé « 0 droit(s) », pour un compte qui peut
+             tout — et les cocher était refusé (rang égal, ou soi-même). --}}
+        @php($parRole = (int) $c['role_id'] >= 3)
+        @php($droitsFiges = $parRole || $c['id'] === $moi || (int) $c['role_id'] >= $monRole)
         <section class="rw-carte rw-carte--pleine">
-            <details data-rw="perms-carte-{{ $c['id'] }}">
+            <details data-rw="perms-carte-{{ $c['id'] }}" data-user-id="{{ $c['id'] }}">
                 <summary class="rw-sous-titre-fort">
                     {{ $c['name'] }}
                     <span class="rw-badge rw-badge--neutre">{{ __('perms.role_' . $c['role_id']) }}</span>
-                    <span class="rw-tableau__discret">{{ __('perms.compte_resume', [
-                        'droits' => count(array_filter($droits[$c['id']])),
-                        'machines' => count($acces[$c['id']]),
-                    ]) }}</span>
+                    @if ($c['id'] === $moi)<span class="rw-badge rw-badge--neutre">{{ __('perms.vous') }}</span>@endif
+                    <span class="rw-tableau__discret" data-rw="perms-resume-{{ $c['id'] }}"><span data-rw="perms-resume-droits">{{ $parRole
+                            ? __('perms.resume_droits_role')
+                            : __('perms.resume_droits', ['n' => count(array_filter($droits[$c['id']])), 'total' => count($permissions)]) }}</span>
+                        · <span data-rw="perms-resume-machines">{{ __('perms.resume_machines', ['n' => count($acces[$c['id']]), 'total' => count($machines)]) }}</span></span>
                 </summary>
 
-                <p class="rw-sous-titre-fort">{{ __('perms.droits') }}</p>
-                <div class="rw-grille rw-grille--compacte">
-                    @foreach ($permissions as $perm)
-                        <label class="rw-liste-selection__etiquette">
-                            <input type="checkbox"
-                                   data-rw="perm-{{ $perm }}-{{ $c['id'] }}"
-                                   data-user-id="{{ $c['id'] }}"
-                                   data-permission="{{ $perm }}"
-                                   @checked($droits[$c['id']][$perm])>
-                            <span class="rw-liste-selection__nom">
-                                {{ __('perms.p_' . $perm) === 'perms.p_' . $perm ? $perm : __('perms.p_' . $perm) }}
-                            </span>
-                        </label>
-                    @endforeach
-                </div>
+                <h3 class="rw-perms__titre">{{ __('perms.droits') }}</h3>
+                @if ($droitsFiges)
+                    <p class="rw-aide rw-prose" data-rw="perms-droits-figes-{{ $c['id'] }}">
+                        {{ $parRole ? __('perms.droits_par_role') : __('perms.err_rang') }}
+                    </p>
+                @else
+                    <div class="rw-perms__droits">
+                        @foreach ($permissions as $perm)
+                            <label class="rw-perms__droit">
+                                <input type="checkbox"
+                                       data-rw="perm-{{ $perm }}-{{ $c['id'] }}"
+                                       data-user-id="{{ $c['id'] }}"
+                                       data-permission="{{ $perm }}"
+                                       @checked($droits[$c['id']][$perm])>
+                                <span>{{ __('perms.p_' . $perm) === 'perms.p_' . $perm ? $perm : __('perms.p_' . $perm) }}</span>
+                            </label>
+                        @endforeach
+                    </div>
+                @endif
 
-                <p class="rw-sous-titre-fort">{{ __('perms.acces') }}</p>
-                <div class="rw-grille rw-grille--compacte rw-grille--listes">
-                    {{-- UN SEUL CONTROLE POUR TOUT L'ETAT. Une case a cocher plus une
-                         liste de prereglages autoriseraient une combinaison
-                         impossible — coche sans prereglage, ou prereglage sans
-                         acces. Ici « pas d'acces » est une valeur de la liste, et
-                         il n'y a pas d'etat inexprimable.
+                <h3 class="rw-perms__titre">{{ __('perms.acces') }}</h3>
+                {{-- UN SEUL CONTROLE POUR TOUT L'ETAT. Une case a cocher plus une
+                     liste de prereglages autoriseraient une combinaison
+                     impossible — coche sans prereglage, ou prereglage sans
+                     acces. Ici « pas d'acces » est une valeur de la liste, et
+                     il n'y a pas d'etat inexprimable.
 
-                         Le prereglage AFFICHE est celui de la base. Une ligne
-                         d'acces creee sans prereglage vaut `none`
-                         (`NOT NULL DEFAULT 'none'`, migration 051) : l'ecran
-                         disait « acces accorde » sans dire que le deploiement
-                         RETIRERAIT le sudo. Il le dit desormais. --}}
+                     Le prereglage AFFICHE est celui de la base. Une ligne
+                     d'acces creee sans prereglage vaut `none`
+                     (`NOT NULL DEFAULT 'none'`, migration 051) : l'ecran
+                     disait « acces accorde » sans dire que le deploiement
+                     RETIRERAIT le sudo. Il le dit desormais.
+
+                     UNE LIGNE PAR MACHINE, le nom à gauche et la liste à droite,
+                     au lieu d'une liste empilée sous son nom : la liste était
+                     tronquée (« Accès + sudo complet, sans ») et la grille de 33
+                     machines tenait sur deux écrans. `data-preset` porte l'état
+                     confirmé — vide quand il n'y a pas d'accès — et la feuille de
+                     style s'en sert pour griser les machines fermées et signaler
+                     apt, équivalent root. --}}
+                <ul class="rw-perms__acces">
                     @foreach ($machines as $m)
                         @php($aAcces = in_array((int) $m->id, $acces[$c['id']], true))
-                        <label class="rw-liste-selection__etiquette rw-liste-selection__etiquette--empilee">
-                            <span class="rw-liste-selection__nom">{{ $m->name }}</span>
-                            <select class="rw-saisie rw-saisie--compacte"
+                        @php($actuel = $aAcces ? ($presets[$c['id']][(int) $m->id] ?? 'none') : '')
+                        <li class="rw-perms__machine" data-preset="{{ $actuel }}">
+                            <label class="rw-perms__nom" for="acces-{{ $m->id }}-{{ $c['id'] }}">{{ $m->name }}</label>
+                            <select class="rw-saisie rw-saisie--compacte rw-perms__liste"
+                                    id="acces-{{ $m->id }}-{{ $c['id'] }}"
                                     data-rw="acces-{{ $m->id }}-{{ $c['id'] }}"
                                     data-user-id="{{ $c['id'] }}"
                                     data-machine-id="{{ $m->id }}"
-                                    data-actuel="{{ $aAcces ? ($presets[$c['id']][(int) $m->id] ?? 'none') : '' }}"
-                                    aria-label="{{ $m->name }}">
+                                    data-actuel="{{ $actuel }}">
                                 <option value="" @selected(! $aAcces)>{{ __('perms.acces_aucun') }}</option>
                                 @foreach ($presetsProposes as $pr)
-                                    <option value="{{ $pr }}"
-                                            @selected($aAcces && ($presets[$c['id']][(int) $m->id] ?? 'none') === $pr)>{{ __('perms.preset_' . $pr) }}</option>
+                                    <option value="{{ $pr }}" @selected($actuel === $pr)>{{ __('perms.preset_' . $pr) }}</option>
                                 @endforeach
                             </select>
-                        </label>
+                        </li>
                     @endforeach
-                </div>
+                </ul>
             </details>
         </section>
     @endforeach
 
     @php($libelles = [
         'err_reseau' => __('perms.err_reseau'),
+        // Le résumé se recompte après chaque geste : un résumé figé au
+        // chargement contredirait la grille juste en dessous.
+        'resume_droits' => __('perms.resume_droits'),
+        'resume_machines' => __('perms.resume_machines'),
         // Sous-lot D5b : l'octroi passe par la passerelle, donc par le JS.
         'temp_en_cours' => __('perms.temp_en_cours'),
         'temp_accorde' => __('perms.temp_accorde'),

@@ -82,8 +82,17 @@ class PermissionsController extends Controller
             $presets[$c['id']] = $this->permissions->presetsDe($c['id']);
         }
 
+        [$moi, $monRole] = $this->qui($requete);
+
         return view('permissions', [
             'comptes' => $comptes,
+            /*
+             * Qui regarde : la vue ne propose pas un geste que `refuse()` et
+             * `definitAcces()` rejetteraient (soi-meme, rang egal ou superieur).
+             * Une case qui repond toujours « impossible » n'est pas un controle.
+             */
+            'moi' => $moi,
+            'monRole' => $monRole,
             'permissions' => $this->permissions->toutes(),
             'droits' => $droits,
             'acces' => $acces,

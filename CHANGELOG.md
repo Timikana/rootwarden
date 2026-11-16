@@ -5,6 +5,27 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## Permissions et accès : une ligne par machine, des cases seulement là où elles décident
+
+- **Un super-administrateur n'a plus de cases à cocher.** Son rôle passe toute garde de permission
+  (portail et backend) : ses cases ne décidaient de rien, s'affichaient décochées sous un résumé
+  « 0 droit(s) », et les cocher était refusé (rang égal, ou son propre compte). Une phrase dit
+  désormais qu'il a tous les droits par son rôle, et où le changer.
+- **L'accès aux machines tient sur une ligne par machine** : le nom à gauche, le préréglage à droite.
+  Les listes empilées sous chaque nom étaient tronquées (« Accès + sudo complet, sans ») et 33
+  machines tenaient sur deux écrans. Les machines sans accès sont grisées ; apt, équivalent root,
+  est signalé en ambre.
+- **Libellés de préréglage raccourcis** : « Aucun accès », « Accès sans sudo », « Sudo complet, sans
+  mot de passe », « Sudo : restart/reload des services », « Sudo : apt (⚠ équivaut à root) »,
+  « Sudo : lecture des journaux ».
+- **Le résumé de chaque compte se recompte** après chaque geste confirmé (« droits : 4 sur 18 ·
+  machines : 25 sur 33 ») ; il restait figé à sa valeur de chargement. Votre propre compte porte
+  un badge « vous ».
+- Les droits fonctionnels se lisent sur une ligne chacun, au lieu de libellés coupés sur trois.
+- Une permission temporaire en cours affiche son libellé au lieu de son nom de colonne.
+
+---
+
 ## Signalement des failles et licence
 
 - Une faille se signale désormais en privé par l'onglet **Security** du dépôt (« Report a
