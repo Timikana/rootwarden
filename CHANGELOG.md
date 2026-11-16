@@ -5,6 +5,14 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## Mouvement réduit
+
+Quand le système demande moins de mouvement (`prefers-reduced-motion`), le chevron des blocs
+repliables ne tourne plus et la jauge de la clé de plateforme ne s'étire plus : l'état final
+s'affiche d'un coup. Les fondus de couleur au survol restent, ils ne déplacent rien.
+
+---
+
 ## Backend : le scan des comptes distants découpé, à comportement identique
 
 `scan_server_users`, la plus longue fonction du backend (267 lignes de code), est découpée en

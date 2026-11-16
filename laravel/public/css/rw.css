@@ -3342,3 +3342,15 @@ h1, h2, h3, h4, strong, b { font-weight: 600; }
  * d'actions ou une autre carte collees au bloc suivant). Le premier enfant
  * n'est pas concerne : son ecart est celui de son conteneur. */
 * + :is(.rw-carte, .rw-encart, .rw-tableau-cadre) { margin-top: 16px; }
+
+/*
+ * MOUVEMENT REDUIT. Deux transitions DEPLACENT quelque chose : le chevron d'un
+ * bloc repliable qui tourne, et la jauge qui s'etire. Elles s'arretent quand
+ * le systeme demande moins de mouvement ; l'etat final s'affiche d'un coup.
+ * Les fondus de couleur (liens du pied, tuiles) restent : ils ne deplacent
+ * rien et disent un survol.
+ */
+@media (prefers-reduced-motion: reduce) {
+    .rw-repliable__chevron,
+    .rw-jauge__part { transition: none; }
+}
