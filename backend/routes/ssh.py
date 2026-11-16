@@ -589,6 +589,99 @@ def stream_logs():
 # Preflight Check
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _blocage_avant_deploiement(m):
+    """La raison de ne PAS deployer sur ``m``, avant toute connexion ; None sinon.
+
+    Deux blocages, dans cet ordre : le serveur n'a jamais ete scanne, ou des
+    comptes y attendent d'etre classes. Dans les deux cas l'audit d'impact ne
+    saurait pas dire ce que le deploiement revoquerait.
+    """
+    # Bloquer si le serveur n'a jamais ete scanne
+    if not m.get('users_scanned_at'):
+        return ("Scan utilisateurs requis avant le premier deploiement. "
+                "Allez dans Utilisateurs distants pour scanner ce serveur.")
+
+    # Bloquer si des users sont en pending_review
+    conn_pending = get_db_connection()
+    try:
+        cur_p = conn_pending.cursor(dictionary=True)
+        cur_p.execute(
+            "SELECT COUNT(*) as cnt FROM server_user_inventory "
+            "WHERE machine_id = %s AND status = 'pending_review'",
+            (m['id'],)
+        )
+        pending = cur_p.fetchone()['cnt']
+    finally:
+        conn_pending.close()
+    if pending > 0:
+        return (f"{pending} utilisateur(s) en attente de classification. "
+                "Classifiez-les dans Utilisateurs distants avant de deployer.")
+    return None
+
+
+def _audit_impact(machine_id):
+    """Ce qu'un deploiement changerait sur la machine, lu dans l'inventaire.
+
+    Rend ``comptes_sans_cle``, ``user_impact``, ``users_to_create`` et
+    ``users_revoked``. Leve si la base ne repond pas : l'appelant (le preflight)
+    le DIT a l'ecran (E-194) au lieu de rendre des listes vides.
+    """
+    impact = {}
+    conn_inv = get_db_connection()
+    try:
+        cur_inv = conn_inv.cursor(dictionary=True)
+        cur_inv.execute(
+            "SELECT username, status, managed_by FROM server_user_inventory "
+            "WHERE machine_id = %s", (machine_id,)
+        )
+        inventory = cur_inv.fetchall()
+
+        cur_inv.execute(
+            "SELECT u.name FROM users u "
+            "JOIN user_machine_access uma ON u.id = uma.user_id "
+            "WHERE uma.machine_id = %s AND u.active = 1",
+            (machine_id,)
+        )
+        authorized = {r['name'] for r in cur_inv.fetchall()}
+
+        # Migration 067 : qui a au moins UNE cle visant cette
+        # machine. Un compte autorise sans aucune cle pour elle y
+        # perd son `authorized_keys` (`deploy_user_config`) : on
+        # l'annonce AVANT, comme une revocation.
+        cur_inv.execute(
+            "SELECT DISTINCT u.name FROM users u "
+            "JOIN user_machine_access uma ON uma.user_id = u.id AND uma.machine_id = %s "
+            "JOIN user_ssh_keys k ON k.user_id = u.id "
+            "LEFT JOIN user_ssh_key_machines km ON km.key_id = k.id AND km.machine_id = %s "
+            "WHERE u.active = 1 AND (k.toutes_machines = 1 OR km.machine_id IS NOT NULL)",
+            (machine_id, machine_id)
+        )
+        avec_cle = {r['name'] for r in cur_inv.fetchall()}
+    finally:
+        conn_inv.close()
+    impact['comptes_sans_cle'] = sorted(authorized - avec_cle)
+
+    user_impact = []
+    for row in inventory:
+        user_impact.append({
+            'name': row['username'],
+            'status': row['status'],
+            'managed_by': row['managed_by'],
+        })
+
+    impact['user_impact'] = user_impact
+
+    # Users RootWarden absents du serveur (seront crees)
+    inv_names = {r['username'] for r in inventory}
+    impact['users_to_create'] = sorted(authorized - inv_names)
+
+    # Users managed qui perdent l'acces (cle retiree, compte conserve)
+    managed_names = {r['username'] for r in inventory if r['status'] == 'managed' and r['managed_by'] == 'rootwarden'}
+    impact['users_revoked'] = sorted(managed_names - authorized)
+
+    return impact
+
+
 @bp.route('/preflight_check', methods=['POST'])
 @require_api_key
 @threaded_route
@@ -657,36 +750,12 @@ def preflight_check():
             'errors': [],
         }
 
-        # Bloquer si le serveur n'a jamais ete scanne
-        if not m.get('users_scanned_at'):
-            result['errors'].append(
-                "Scan utilisateurs requis avant le premier deploiement. "
-                "Allez dans Utilisateurs distants pour scanner ce serveur."
-            )
+        blocage = _blocage_avant_deploiement(m)
+        if blocage:
+            result['errors'].append(blocage)
             result['scan_required'] = True
             results.append(result)
             continue
-
-        # Bloquer si des users sont en pending_review
-        conn_pending = get_db_connection()
-        try:
-            cur_p = conn_pending.cursor(dictionary=True)
-            cur_p.execute(
-                "SELECT COUNT(*) as cnt FROM server_user_inventory "
-                "WHERE machine_id = %s AND status = 'pending_review'",
-                (m['id'],)
-            )
-            pending = cur_p.fetchone()['cnt']
-            if pending > 0:
-                result['errors'].append(
-                    f"{pending} utilisateur(s) en attente de classification. "
-                    "Classifiez-les dans Utilisateurs distants avant de deployer."
-                )
-                result['scan_required'] = True
-                results.append(result)
-                continue
-        finally:
-            conn_pending.close()
 
         ssh_pass = server_decrypt_password(m.get('password', '')) or ''
         has_keypair = m.get('service_account_deployed') or m.get('platform_key_deployed', False)
@@ -726,57 +795,7 @@ def preflight_check():
 
                 # ── Audit d'impact depuis l'inventaire ────────────────────
                 try:
-                    conn_inv = get_db_connection()
-                    try:
-                        cur_inv = conn_inv.cursor(dictionary=True)
-                        cur_inv.execute(
-                            "SELECT username, status, managed_by FROM server_user_inventory "
-                            "WHERE machine_id = %s", (m['id'],)
-                        )
-                        inventory = cur_inv.fetchall()
-
-                        cur_inv.execute(
-                            "SELECT u.name FROM users u "
-                            "JOIN user_machine_access uma ON u.id = uma.user_id "
-                            "WHERE uma.machine_id = %s AND u.active = 1",
-                            (m['id'],)
-                        )
-                        authorized = {r['name'] for r in cur_inv.fetchall()}
-
-                        # Migration 067 : qui a au moins UNE cle visant cette
-                        # machine. Un compte autorise sans aucune cle pour elle y
-                        # perd son `authorized_keys` (`deploy_user_config`) : on
-                        # l'annonce AVANT, comme une revocation.
-                        cur_inv.execute(
-                            "SELECT DISTINCT u.name FROM users u "
-                            "JOIN user_machine_access uma ON uma.user_id = u.id AND uma.machine_id = %s "
-                            "JOIN user_ssh_keys k ON k.user_id = u.id "
-                            "LEFT JOIN user_ssh_key_machines km ON km.key_id = k.id AND km.machine_id = %s "
-                            "WHERE u.active = 1 AND (k.toutes_machines = 1 OR km.machine_id IS NOT NULL)",
-                            (m['id'], m['id'])
-                        )
-                        avec_cle = {r['name'] for r in cur_inv.fetchall()}
-                    finally:
-                        conn_inv.close()
-                    result['comptes_sans_cle'] = sorted(authorized - avec_cle)
-
-                    user_impact = []
-                    for row in inventory:
-                        user_impact.append({
-                            'name': row['username'],
-                            'status': row['status'],
-                            'managed_by': row['managed_by'],
-                        })
-
-                    result['user_impact'] = user_impact
-
-                    # Users RootWarden absents du serveur (seront crees)
-                    inv_names = {r['username'] for r in inventory}
-                    result['users_to_create'] = sorted(authorized - inv_names)
-
-                    # Users managed qui perdent l'acces (cle retiree, compte conserve)
-                    managed_names = {r['username'] for r in inventory if r['status'] == 'managed' and r['managed_by'] == 'rootwarden'}
-                    result['users_revoked'] = sorted(managed_names - authorized)
+                    result.update(_audit_impact(m['id']))
 
                     # L'audit a ABOUTI : les trois champs ci-dessus sont des
                     # constats, pas des absences.

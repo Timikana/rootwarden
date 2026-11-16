@@ -16,6 +16,11 @@ clés en base (`_synchronise_cles_ssh`). La route ne garde que l'enchaînement (
   clé et un troisième scan. Réponses et base identiques avant et après, purge comprise. Une
   mutation du classement est bien détectée par cette comparaison.
 - Les deux étapes sans effet de bord ont maintenant leurs propres tests.
+- `preflight_check` (152 lignes → 93) suit le même traitement : les deux blocages avant connexion
+  (`_blocage_avant_deploiement`) et l'audit d'impact sur l'inventaire (`_audit_impact`) sont
+  extraits. Comportement comparé sur le banc dans trois états de la machine (jamais scannée,
+  compte à classer, audit complet par SSH) : réponses identiques, et une mutation de l'audit est
+  détectée.
 
 ---
 
