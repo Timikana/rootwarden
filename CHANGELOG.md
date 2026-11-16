@@ -5,6 +5,20 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## Backend : le scan des comptes distants découpé, à comportement identique
+
+`scan_server_users`, la plus longue fonction du backend (267 lignes de code), est découpée en
+quatre étapes nommées : lecture des clés (`_lire_cles_autorisees`), lecture des comptes
+(`_comptes_scannes`), classement d'un nouveau compte (`_classement_automatique`) et écriture des
+clés en base (`_synchronise_cles_ssh`). La route ne garde que l'enchaînement (142 lignes).
+
+- Comportement inchangé, vérifié sur le serveur SSH de banc : deux scans, puis le retrait d'une
+  clé et un troisième scan. Réponses et base identiques avant et après, purge comprise. Une
+  mutation du classement est bien détectée par cette comparaison.
+- Les deux étapes sans effet de bord ont maintenant leurs propres tests.
+
+---
+
 ## Clé de plateforme : la jauge compte les mêmes états que le tableau
 
 - La part « clé seule » de la jauge comptait les machines **sans mot de passe connu**, qu'elles aient
