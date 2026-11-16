@@ -545,7 +545,8 @@
        forcait le lundi et le 1er du mois et sa date n'etait affichee nulle
        part, a cote d'une planification qui fait le meme `apt-get upgrade` en
        suivant la date choisie. Seule `/schedule_advanced_security_update`
-       reste appelee ; la route generale existe toujours cote backend.
+       reste appelee ; les routes generales sont retirees du backend
+       (2026-11-16).
        ═════════════════════════════════════════════════════════════════════ */
 
     const planif = JSON.parse(document.getElementById('maj-planif-libelles')?.textContent || '{}');
