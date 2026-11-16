@@ -431,6 +431,89 @@ def preview():
         return jsonify({'success': False, 'message': f"Erreur SSH : {e}"}), 500
 
 
+def _deploie_bashrc(client, root_pwd, uname, u, template, template_sha, mode, dry_run, ts):
+    """Deploie le .bashrc d'UN utilisateur ; rend son entree de resultat.
+
+    Extrait de `deploy` (2026-11-16), bloc pour bloc : idempotence, simulation,
+    sauvegarde, ecriture en base64, bloc custom, controle `bash -n`.
+    """
+    home = u['home']
+    if not _safe_home(home):
+        logger.warning("bashrc deploy : home non conforme refuse : %r", home)
+        return {'user': uname, 'ok': False, 'error': 'home non conforme'}
+    bashrc = f"{home}/.bashrc"
+    current = _read_remote_bashrc(client, root_pwd, home)
+    current_sha = hashlib.sha256(current.encode('utf-8')).hexdigest() if current else ''
+
+    # Idempotence
+    if current and current_sha == template_sha and mode == 'overwrite':
+        return {
+            'user': uname, 'ok': True, 'skipped': True,
+            'reason': 'Deja conforme au template (sha256 identique).',
+        }
+
+    effective = template
+    custom = ''
+    if mode == 'merge':
+        custom = _extract_custom_blocks(current)
+        # Le bloc custom ira dans ~/.bashrc.local (sourcee section 13),
+        # ecrit apres le .bashrc ci-dessous.
+
+    if dry_run:
+        return {
+            'user': uname, 'ok': True, 'dry_run': True,
+            'would_backup': bool(current),
+            'custom_detected': bool(custom),
+            'new_bytes': len(effective),
+        }
+
+    # Backup (seulement si fichier existant)
+    backup_name = f".bashrc.bak.{ts}"
+    if current:
+        bkp_cmd = f"cp -a '{bashrc}' '{home}/{backup_name}' && chmod 600 '{home}/{backup_name}'"
+        _, bkp_err, bkp_code = _ssh_exec(client, bkp_cmd, root_pwd, as_root=True, timeout=10)
+        if bkp_code != 0:
+            return {'user': uname, 'ok': False,
+                            'error': f'Backup echoue : {bkp_err.strip()}'}
+
+    # Deploiement via base64 (pattern securise)
+    b64 = base64.b64encode(effective.encode('utf-8')).decode('ascii')
+    write_cmd = (
+        f"printf '%s' '{b64}' | base64 -d > '{bashrc}' && "
+        f"chmod 644 '{bashrc}' && "
+        f"chown {uname}:{uname} '{bashrc}'"
+    )
+    _, wr_err, wr_code = _ssh_exec(client, write_cmd, root_pwd, as_root=True, timeout=15)
+    if wr_code != 0:
+        return {'user': uname, 'ok': False,
+                        'error': f'Ecriture echouee : {wr_err.strip()}'}
+
+    # Ecriture du bloc custom dans ~/.bashrc.local si mode merge
+    if mode == 'merge' and custom:
+        local_b64 = base64.b64encode(
+            (f"# Migre depuis ancien .bashrc le {ts}\n{custom}\n").encode('utf-8')
+        ).decode('ascii')
+        local_cmd = (
+            f"printf '%s' '{local_b64}' | base64 -d >> '{home}/.bashrc.local' && "
+            f"chmod 644 '{home}/.bashrc.local' && "
+            f"chown {uname}:{uname} '{home}/.bashrc.local'"
+        )
+        _ssh_exec(client, local_cmd, root_pwd, as_root=True, timeout=10)
+
+    # Validation syntaxique
+    _, syn_err, syn_code = _ssh_exec(client, f"bash -n '{bashrc}'",
+                                      root_pwd, as_root=True, timeout=10)
+    syntax_ok = (syn_code == 0)
+
+    return {
+        'user': uname, 'ok': True, 'skipped': False,
+        'backup': backup_name if current else None,
+        'custom_migrated': bool(custom and mode == 'merge'),
+        'syntax_ok': syntax_ok,
+        'syntax_err': syn_err.strip() if not syntax_ok else '',
+    }
+
+
 @bp.route('/bashrc/deploy', methods=['POST'])
 @require_api_key
 @require_role(2)
@@ -472,90 +555,8 @@ def deploy():
                 if not u:
                     results.append({'user': uname, 'ok': False, 'error': 'Utilisateur introuvable'})
                     continue
-
-                home = u['home']
-                if not _safe_home(home):
-                    logger.warning("bashrc deploy : home non conforme refuse : %r", home)
-                    results.append({'user': uname, 'ok': False, 'error': 'home non conforme'})
-                    continue
-                bashrc = f"{home}/.bashrc"
-                current = _read_remote_bashrc(client, root_pwd, home)
-                current_sha = hashlib.sha256(current.encode('utf-8')).hexdigest() if current else ''
-
-                # Idempotence
-                if current and current_sha == template_sha and mode == 'overwrite':
-                    results.append({
-                        'user': uname, 'ok': True, 'skipped': True,
-                        'reason': 'Deja conforme au template (sha256 identique).',
-                    })
-                    continue
-
-                effective = template
-                custom = ''
-                if mode == 'merge':
-                    custom = _extract_custom_blocks(current)
-                    if custom:
-                        # On stocke le bloc custom dans ~/.bashrc.local (sourcee section 13)
-                        b64_custom = base64.b64encode(
-                            (f"# Migre depuis ancien .bashrc le {ts}\n{custom}\n").encode('utf-8')
-                        ).decode('ascii')
-
-                if dry_run:
-                    results.append({
-                        'user': uname, 'ok': True, 'dry_run': True,
-                        'would_backup': bool(current),
-                        'custom_detected': bool(custom),
-                        'new_bytes': len(effective),
-                    })
-                    continue
-
-                # Backup (seulement si fichier existant)
-                backup_name = f".bashrc.bak.{ts}"
-                if current:
-                    bkp_cmd = f"cp -a '{bashrc}' '{home}/{backup_name}' && chmod 600 '{home}/{backup_name}'"
-                    _, bkp_err, bkp_code = _ssh_exec(client, bkp_cmd, root_pwd, as_root=True, timeout=10)
-                    if bkp_code != 0:
-                        results.append({'user': uname, 'ok': False,
-                                        'error': f'Backup echoue : {bkp_err.strip()}'})
-                        continue
-
-                # Deploiement via base64 (pattern securise)
-                b64 = base64.b64encode(effective.encode('utf-8')).decode('ascii')
-                write_cmd = (
-                    f"printf '%s' '{b64}' | base64 -d > '{bashrc}' && "
-                    f"chmod 644 '{bashrc}' && "
-                    f"chown {uname}:{uname} '{bashrc}'"
-                )
-                _, wr_err, wr_code = _ssh_exec(client, write_cmd, root_pwd, as_root=True, timeout=15)
-                if wr_code != 0:
-                    results.append({'user': uname, 'ok': False,
-                                    'error': f'Ecriture echouee : {wr_err.strip()}'})
-                    continue
-
-                # Ecriture du bloc custom dans ~/.bashrc.local si mode merge
-                if mode == 'merge' and custom:
-                    local_b64 = base64.b64encode(
-                        (f"# Migre depuis ancien .bashrc le {ts}\n{custom}\n").encode('utf-8')
-                    ).decode('ascii')
-                    local_cmd = (
-                        f"printf '%s' '{local_b64}' | base64 -d >> '{home}/.bashrc.local' && "
-                        f"chmod 644 '{home}/.bashrc.local' && "
-                        f"chown {uname}:{uname} '{home}/.bashrc.local'"
-                    )
-                    _ssh_exec(client, local_cmd, root_pwd, as_root=True, timeout=10)
-
-                # Validation syntaxique
-                _, syn_err, syn_code = _ssh_exec(client, f"bash -n '{bashrc}'",
-                                                  root_pwd, as_root=True, timeout=10)
-                syntax_ok = (syn_code == 0)
-
-                results.append({
-                    'user': uname, 'ok': True, 'skipped': False,
-                    'backup': backup_name if current else None,
-                    'custom_migrated': bool(custom and mode == 'merge'),
-                    'syntax_ok': syntax_ok,
-                    'syntax_err': syn_err.strip() if not syntax_ok else '',
-                })
+                results.append(_deploie_bashrc(client, root_pwd, uname, u, template,
+                                               template_sha, mode, dry_run, ts))
 
         summary = {
             'total': len(results),
