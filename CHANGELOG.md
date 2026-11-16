@@ -5,6 +5,20 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## Backend : le déploiement des .bashrc découpé, à comportement identique
+
+La boucle de `deploy` (module bashrc, 113 lignes de code) traite désormais chaque utilisateur
+dans `_deploie_bashrc` : idempotence, simulation, sauvegarde, écriture, bloc personnalisé et
+contrôle `bash -n`. La route passe sous 80 lignes.
+
+- Une variable calculée et jamais lue (`b64_custom`) est retirée : le bloc personnalisé était déjà
+  encodé une seconde fois au moment de l'écrire.
+- Comparé sur le serveur SSH de banc en quatre étapes (simulation, écrasement avec un utilisateur
+  inconnu, second écrasement déjà conforme, fusion avec un bloc personnalisé) : réponses et
+  fichiers du serveur identiques avant et après. Une mutation est détectée.
+
+---
+
 ## Mouvement réduit
 
 Quand le système demande moins de mouvement (`prefers-reduced-motion`), le chevron des blocs
