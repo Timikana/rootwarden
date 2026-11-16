@@ -113,6 +113,17 @@ class ClePlateforme
         $sansRetour = array_filter($machines, fn ($m) => $vrai($m->platform_key_deployed)
             && ! $vrai($m->a_mot_de_passe) && ! $vrai($m->a_mot_de_passe_root));
 
+        // LA JAUGE COMPTE LES MEMES ETATS QUE LE TABLEAU. Elle peignait en
+        // « cle seule » les machines SANS MOT DE PASSE CONNU, cle ou non :
+        // mesure du 2026-11-16 sur le banc, 5 machines en vert pour 3 cles. Une
+        // seule fonction (`etatAuth`) classe desormais chaque machine, et la
+        // jauge et les pastilles en lisent le resultat.
+        $parEtat = ['cle_seule' => 0, 'cle_et_mot_de_passe' => 0, 'mot_de_passe_seul' => 0, 'aucun_acces' => 0];
+        foreach ($machines as $m) {
+            $parEtat[$this->etatAuth($m)]++;
+        }
+        $pct = fn (int $n) => $total > 0 ? (int) round($n / $total * 100) : 0;
+
         return [
             'total'            => $total,
             'cle'              => count($cle),
@@ -121,19 +132,26 @@ class ClePlateforme
             'sans_mot_de_passe' => count($sansMotDePasse),
             'sans_retour'      => count($sansRetour),
             'noms_sans_retour' => array_values(array_map(fn ($m) => $m->name, $sansRetour)),
-            // La barre de progression : deux segments, en POURCENTAGE d'un total
-            // qui peut valoir zero — un parc vide ne divise pas.
-            'pct_cle'          => $total > 0 ? (int) round(count($cle) / $total * 100) : 0,
-            'pct_sans_mdp'     => $total > 0 ? (int) round(count($sansMotDePasse) / $total * 100) : 0,
+            'par_etat'         => $parEtat,
+            // La barre de progression, en POURCENTAGE d'un total qui peut valoir
+            // zero — un parc vide ne divise pas. Le reste de la barre (son fond)
+            // est le « mot de passe seul ».
+            'pct_cle_seule'    => $pct($parEtat['cle_seule']),
+            'pct_cle_et_mdp'   => $pct($parEtat['cle_et_mot_de_passe']),
+            'pct_aucun_acces'  => $pct($parEtat['aucun_acces']),
         ];
     }
 
     /**
-     * L'etat d'authentification d'une machine, en TROIS valeurs.
+     * L'etat d'authentification d'une machine, en QUATRE valeurs.
      *
      * Le legacy rend trois pastilles (`keypair`, `keypair + pwd`, `password`)
      * calculees sur le drapeau. Ici elles se calculent sur le FAIT, pour la
      * meme raison que les compteurs.
+     *
+     * LE QUATRIEME ETAT : ni cle ni mot de passe connu. Il etait range sous
+     * « mot de passe seul » — une pastille qui affirmait un acces que
+     * RootWarden n'a pas. Une telle machine n'est joignable par aucune voie.
      */
     public function etatAuth(object $m): string
     {
@@ -144,7 +162,11 @@ class ClePlateforme
             return 'cle_seule';
         }
 
-        return $cle ? 'cle_et_mot_de_passe' : 'mot_de_passe_seul';
+        if ($cle) {
+            return 'cle_et_mot_de_passe';
+        }
+
+        return $mdp ? 'mot_de_passe_seul' : 'aucun_acces';
     }
 
     /**
