@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\MachineSensible;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -114,11 +115,7 @@ class Fail2ban
      */
     public function estSensible(object $machine): bool
     {
-        $env = strtoupper(trim((string) ($machine->environment ?? '')));
-        $crit = strtoupper(trim((string) ($machine->criticality ?? '')));
-
-        return $env === 'PROD' || $env === 'OTHER' || $env === ''
-            || $crit === 'CRITIQUE';
+        return MachineSensible::est($machine);
     }
 
     /** Le nombre de machines sensibles, pour l'annonce d'ensemble. */
