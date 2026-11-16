@@ -40,6 +40,7 @@ return [
     'cree' => "Compte « :nom » créé (identifiant :id). Il devra changer ce mot de passe à sa première connexion.",
 
     'mdp_placeholder' => ':minimum car. min.',
+    'mdp_pour' => 'Nouveau mot de passe de :nom',
     'mdp_poser' => 'Enregistrer',
     'mdp_generer' => 'Générer',
     'mdp_change' => 'Mot de passe enregistré. Le compte devra le changer à la prochaine connexion.',

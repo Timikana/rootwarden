@@ -33,6 +33,7 @@ return [
     // Per-machine readings
     'btn_actions'  => 'Actions',
     'actions_pour' => 'Actions for :machine',
+    'selectionner' => 'Select :machine',
     'btn_version' => 'Version',
     'tip_version' => 'Reads the Linux version of the machine, without changing it.',
     'btn_statut'  => 'Availability',

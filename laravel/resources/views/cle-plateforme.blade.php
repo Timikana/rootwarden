@@ -94,9 +94,9 @@
         </div>
     </div>
     <p class="rw-frise__legende">
-        <span class="rw-frise__cle rw-frise__cle--ban"></span>{{ __('plateforme.legende_mot_de_passe') }}
-        <span class="rw-frise__cle rw-frise__cle--unban"></span>{{ __('plateforme.legende_les_deux') }}
         <span class="rw-frise__cle rw-frise__cle--ok"></span>{{ __('plateforme.legende_cle') }}
+        <span class="rw-frise__cle rw-frise__cle--accent"></span>{{ __('plateforme.legende_les_deux') }}
+        <span class="rw-frise__cle rw-frise__cle--fond"></span>{{ __('plateforme.legende_mot_de_passe') }}
     </p>
 
     <div class="rw-grille rw-grille--compacte">

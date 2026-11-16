@@ -212,6 +212,8 @@
             coche.type = 'checkbox';
             coche.name = 'selected_machines[]';
             coche.value = String(id);
+            // Une case sans nom se lit « case a cocher, non cochee » : laquelle ?
+            coche.setAttribute('aria-label', (libelles.selectionner || '').replace(':machine', m.name ?? ''));
             tdCase.appendChild(coche);
             tr.appendChild(tdCase);
 

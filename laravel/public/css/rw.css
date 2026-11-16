@@ -715,6 +715,9 @@ body {
 
 .rw-langues__lien,
 .rw-langues__actif {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
     padding: 4px 8px;
     border-radius: 6px;
     line-height: 1.2;
@@ -796,6 +799,11 @@ body {
  * Resultat : une ombre a droite tant qu'il reste des colonnes a droite.
  */
 .rw-tableau-cadre {
+    /* POSITIONNE, pour que les etiquettes `rw-visuellement-cache` (absolues)
+       des cellules defilent DANS le cadre. Non positionne, il ne les contenait
+       pas : elles se placaient a leur position statique dans le tableau large
+       et etiraient la PAGE entiere (comptes a 390 px : 560 px de large). */
+    position: relative;
     overflow-x: auto;
     border: 1px solid var(--rw-bordure);
     border-radius: var(--rw-rayon);
@@ -2468,6 +2476,16 @@ a.rw-onglet { text-decoration: none; display: inline-block; }
 .rw-frise__cle:first-child { margin-left: 0; }
 .rw-frise__cle--ban   { background: var(--rw-danger); }
 .rw-frise__cle--unban { background: var(--rw-succes); }
+/* La legende de la cle de plateforme suit la jauge, dans son ordre : la cle
+   seule (le but), la cle et le mot de passe (en cours), le mot de passe seul
+   (le reste, le fond de la jauge). Elle annoncait rouge et vert pour une
+   jauge peinte d'une seule couleur, et sa troisieme pastille n'avait pas de
+   regle : elle ne se voyait pas. */
+.rw-frise__cle--ok      { background: var(--rw-succes); }
+.rw-frise__cle--accent  { background: var(--rw-accent); }
+.rw-frise__cle--fond    { background: var(--rw-surface-2); border: 1px solid var(--rw-bordure); }
+.rw-jauge__part--ok      { background: var(--rw-succes); }
+.rw-jauge__part--attente { background: var(--rw-accent); }
 
 /* Une valeur non resolue se DIT, elle ne se devine pas : un identifiant de
    compte absent de la table reste lisible, et se signale comme tel. */
@@ -3280,7 +3298,7 @@ a.rw-alerte:focus-visible { outline: 2px solid var(--rw-accent); outline-offset:
 }
 .rw-menu__lien .rw-icone { color: var(--rw-texte-doux); }
 .rw-menu__lien--actif .rw-icone, .rw-menu__lien:hover .rw-icone { color: currentColor; }
-[data-rw="notif-cloche"] { display: inline-flex; align-items: center; gap: 4px; color: var(--rw-texte-doux); }
+[data-rw="notif-cloche"] { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 24px; min-height: 24px; color: var(--rw-texte-doux); }
 .rw-recherche > summary { display: inline-flex; align-items: center; }
 .rw-recherche > summary .rw-icone { color: var(--rw-texte-doux); vertical-align: 0; }
 

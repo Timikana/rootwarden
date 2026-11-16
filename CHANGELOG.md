@@ -5,6 +5,27 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## Audit d'accessibilité et de rendu des 34 pages
+
+Audit mesuré sur les 34 pages du menu, à 1400 et 390 px, en clair et en sombre (grille d'audit
+Impeccable, règles du projet prioritaires). Contrastes : aucun texte sous 4,5:1 dans les deux
+thèmes. Corrigé :
+
+- **Comptes sur mobile** : la page s'étirait à 560 px de large. Les étiquettes masquées des
+  cellules, positionnées en absolu, s'échappaient du cadre de défilement du tableau, qui n'était
+  pas positionné. Le cadre l'est désormais, pour tous les tableaux.
+- **Clé de plateforme** : la légende de la jauge ne la décrivait pas. Elle annonçait rouge et vert
+  pour une jauge d'une seule couleur, et sa troisième pastille n'avait pas de style. La jauge et la
+  légende suivent maintenant le même ordre : clé seule (vert), clé et mot de passe (accent),
+  mot de passe seul (fond).
+- **Noms accessibles** : le champ de mot de passe de chaque compte et les cases de sélection des
+  mises à jour n'avaient pas de nom pour un lecteur d'écran (« case à cocher », laquelle ?).
+- **Titres** : Clés SSH et Supervision n'avaient pas de titre de niveau 1.
+- **Cibles tactiles** : la cloche des notifications (16×16) et les liens FR/EN (22 px de haut)
+  passent à 24 px au moins.
+
+---
+
 ## Icônes : vides sur la page « Clé de plateforme »
 
 Sur cette page, toutes les icônes du menu et de la barre du haut s'affichaient en pastilles rouges
