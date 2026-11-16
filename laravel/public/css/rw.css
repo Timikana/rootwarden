@@ -2486,6 +2486,11 @@ a.rw-onglet { text-decoration: none; display: inline-block; }
 .rw-frise__cle--fond    { background: var(--rw-surface-2); border: 1px solid var(--rw-bordure); }
 .rw-jauge__part--ok      { background: var(--rw-succes); }
 .rw-jauge__part--attente { background: var(--rw-accent); }
+/* Ni cle ni mot de passe : poussee a DROITE de la barre, apres le fond « mot
+   de passe seul », pour ne pas se lire comme une progression. */
+.rw-jauge__part--echec   { background: var(--rw-danger); }
+.rw-jauge { display: flex; }
+.rw-jauge__part--fin     { margin-left: auto; }
 
 /* Une valeur non resolue se DIT, elle ne se devine pas : un identifiant de
    compte absent de la table reste lisible, et se signale comme tel. */

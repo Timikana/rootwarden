@@ -85,18 +85,27 @@
     --}}
     <div class="rw-frise" data-rw="cle-barre">
         <div class="rw-jauge">
-            <span class="rw-jauge__part rw-jauge__part--ok"
-                  style="width: {{ $compteurs['pct_sans_mdp'] }}%"
+            <span class="rw-jauge__part rw-jauge__part--ok" data-rw="cle-jauge-cle-seule"
+                  style="width: {{ $compteurs['pct_cle_seule'] }}%"
                   title="{{ __('plateforme.legende_cle') }}"></span>
-            <span class="rw-jauge__part rw-jauge__part--attente"
-                  style="width: {{ max(0, $compteurs['pct_cle'] - $compteurs['pct_sans_mdp']) }}%"
+            <span class="rw-jauge__part rw-jauge__part--attente" data-rw="cle-jauge-cle-et-mdp"
+                  style="width: {{ $compteurs['pct_cle_et_mdp'] }}%"
                   title="{{ __('plateforme.legende_les_deux') }}"></span>
+            @if ($compteurs['par_etat']['aucun_acces'] > 0)
+                {{-- En DERNIER et en rouge : une machine qu'aucune voie n'atteint. --}}
+                <span class="rw-jauge__part rw-jauge__part--echec rw-jauge__part--fin" data-rw="cle-jauge-aucun-acces"
+                      style="width: {{ $compteurs['pct_aucun_acces'] }}%"
+                      title="{{ __('plateforme.legende_aucun_acces') }}"></span>
+            @endif
         </div>
     </div>
     <p class="rw-frise__legende">
         <span class="rw-frise__cle rw-frise__cle--ok"></span>{{ __('plateforme.legende_cle') }}
         <span class="rw-frise__cle rw-frise__cle--accent"></span>{{ __('plateforme.legende_les_deux') }}
         <span class="rw-frise__cle rw-frise__cle--fond"></span>{{ __('plateforme.legende_mot_de_passe') }}
+        @if ($compteurs['par_etat']['aucun_acces'] > 0)
+            <span class="rw-frise__cle rw-frise__cle--ban"></span>{{ __('plateforme.legende_aucun_acces') }}
+        @endif
     </p>
 
     <div class="rw-grille rw-grille--compacte">
@@ -172,7 +181,7 @@
                             {{-- L'ETAT S'ECRIT EN MOT. Le legacy le rend par une
                                  pastille coloree calculee sur le DRAPEAU ; ici il
                                  vient des colonnes, et il se lit. --}}
-                            <span class="rw-pastille rw-pastille--{{ $l['auth'] === 'cle_seule' ? 'ok' : ($l['auth'] === 'mot_de_passe_seul' ? 'echec' : 'attente') }}"
+                            <span class="rw-pastille rw-pastille--{{ ['cle_seule' => 'ok', 'cle_et_mot_de_passe' => 'attente', 'mot_de_passe_seul' => 'attente', 'aucun_acces' => 'echec'][$l['auth']] }}"
                                   data-rw="cle-auth-{{ $m->id }}">
                                 {{ __('plateforme.etat_' . $l['auth']) }}
                             </span>

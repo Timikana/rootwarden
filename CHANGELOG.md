@@ -5,6 +5,19 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## Clé de plateforme : la jauge compte les mêmes états que le tableau
+
+- La part « clé seule » de la jauge comptait les machines **sans mot de passe connu**, qu'elles aient
+  la clé ou non : sur le banc, 5 machines en vert pour 3 clés. La jauge et les pastilles du tableau
+  se calculent désormais par la même fonction.
+- Un quatrième état est nommé : **ni clé ni mot de passe**. Une telle machine portait la pastille
+  « mot de passe seul », un accès que RootWarden n'a pas. Elle apparaît en rouge, à droite de la
+  jauge, et dans la légende quand il y en a.
+- La pastille « mot de passe seul » passe du rouge à l'ambre : c'est une machine en attente de la
+  clé, pas une machine injoignable. Le rouge est réservé à « ni clé ni mot de passe ».
+
+---
+
 ## Sécurité : deux routes de planification retirées du backend
 
 `POST /schedule_update` et `POST /schedule_advanced_update` écrivaient un fichier dans
