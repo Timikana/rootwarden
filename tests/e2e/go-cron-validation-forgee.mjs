@@ -165,7 +165,9 @@ const REGIME = 'ARBRE — fonctions extraites du fichier, PAS le processus en se
 const COMMENT_TRANCHER = 'sudo docker inspect -f \'{{.State.StartedAt}}\' rootwarden_python'
     + '  compare au mtime de backend/routes/updates.py (les deux en UTC)';
 const VALIDATEURS = ['_cron_heure_minute', '_cron_annee_mois_jour'];
-const ROUTE = 'schedule_advanced_update';
+// La route « advanced » generale est retiree (2026-11-16) ; la planification
+// de securite appelle les MEMES validateurs, et c'est la seule qui ecrit encore.
+const ROUTE = 'schedule_advanced_security_update';
 
 let echecs = 0;
 let indispo = false;
@@ -358,8 +360,8 @@ for (const v of VALIDATEURS) {
 
 console.log('\n=== ③ ce que cette suite NE prouve PAS\n');
 console.log('  Le sens nominal PAR HTTP : NON PROUVE, et volontairement.');
-console.log('  Un `14:30` accepte par POST /schedule_advanced_update poursuit vers');
-console.log('  l\'ecriture de /etc/cron.d/auto_update_advanced et le redemarrage de');
+console.log('  Un `14:30` accepte par POST /schedule_advanced_security_update poursuit vers');
+console.log('  l\'ecriture de /etc/cron.d/auto_security_update_advanced et le redemarrage de');
 console.log('  cron. C\'est un geste SORTANT ; il n\'est pas a moi de le declencher.');
 console.log('');
 console.log('  Et le sens FORGE par HTTP n\'est pas joue non plus : il ne serait sans');

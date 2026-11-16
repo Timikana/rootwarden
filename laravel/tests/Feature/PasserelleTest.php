@@ -198,6 +198,12 @@ class PasserelleTest extends TestCase
         yield '/scheduled_updates'          => ['/scheduled_updates', true];
         yield '/scheduled_updates/remove'   => ['/scheduled_updates/remove', true];
         yield '/scheduled_updatesX REFUSE'  => ['/scheduled_updatesX', false];
+        // Les deux planifications generales sont RETIREES du backend : la
+        // passerelle ne les transmet plus. Temoin : la planification de
+        // securite, qui ecrit encore, passe.
+        yield '/schedule_update RETIREE'          => ['/schedule_update', false];
+        yield '/schedule_advanced_update RETIREE' => ['/schedule_advanced_update', false];
+        yield '/schedule_advanced_security_update' => ['/schedule_advanced_security_update', true];
     }
 
     // ─────────────────────────────────────────────────────────────────────────

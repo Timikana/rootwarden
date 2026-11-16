@@ -85,9 +85,9 @@ from ssh_utils import ssh_session, validate_machine_id, execute_as_root, execute
 # `strptime` refuse la queue (`'2026-01-05\n'` -> ValueError), et on rend quand
 # meme `d.year/d.month/d.day` : la meme raison, deux fois.
 #
-# ⚠ Et la forme etait DEJA dans ce fichier : `schedule_update` (`:411`) ecrit dans
-# le meme puits et n'interpole que `int(data.get('interval_minutes'))`. Les deux
-# routes « advanced » sont un OUBLI, pas une architecture.
+# ⚠ Et la forme etait DEJA dans ce fichier : l'ancienne route `schedule_update`
+# (retiree le 2026-11-16) ecrivait dans le meme puits et n'interpolait que
+# `int(data.get('interval_minutes'))`.
 
 
 def _cron_heure_minute(brut):
@@ -436,69 +436,6 @@ def apply_security_updates():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Schedule periodic update (cron)
-# ─────────────────────────────────────────────────────────────────────────────
-
-@bp.route('/schedule_update', methods=['POST'])
-@require_api_key
-@require_permission('can_update_linux')
-@require_machine_access
-@threaded_route
-def schedule_update():
-    """
-    Planifie une mise à jour périodique via un job cron.
-    La commande est écrite dans un fichier dédié dans /etc/cron.d/ et le cron est redémarré.
-    """
-    data = request.json or {}
-    try:
-        machine_id       = validate_machine_id(data.get('machine_id'))
-        interval_minutes = int(data.get('interval_minutes', 0))
-        if not (1 <= interval_minutes <= 10080):  # max 1 semaine
-            raise ValueError("interval_minutes doit être entre 1 et 10080")
-    except (TypeError, ValueError) as e:
-        return jsonify({'success': False, 'message': str(e)}), 400
-
-    try:
-        with get_db_connection() as conn:
-            cursor = conn.cursor(dictionary=True)
-            cursor.execute(
-                "SELECT ip, port, user, password, root_password, service_account_deployed FROM machines WHERE id = %s",
-                (machine_id,)
-            )
-            row = cursor.fetchone()
-        if not row:
-            return jsonify({'success': False, 'message': 'Machine introuvable'}), 404
-        ip           = row['ip']
-        port         = row['port']
-        ssh_user     = row['user']
-        ssh_password = server_decrypt_password(row['password'], logger=logger)
-        root_password= server_decrypt_password(row['root_password'], logger=logger)
-        import base64
-        cron_job = (
-            f"*/{interval_minutes} * * * * root "
-            f"export LC_ALL=C.UTF-8 LANG=C.UTF-8 DEBIAN_FRONTEND=noninteractive && "
-            f"/usr/bin/apt update && /usr/bin/apt full-upgrade -y "
-            f"-o Dpkg::Options::='--force-confold' -o Dpkg::Options::='--force-confdef' "
-            f">> /var/log/auto_update.log 2>&1\n"
-        )
-        encoded = base64.b64encode(cron_job.encode('utf-8')).decode('ascii')
-
-        with ssh_session(ip, port, ssh_user, ssh_password, logger=logger, service_account=row.get('service_account_deployed', False)) as client:
-            execute_as_root(client,
-                f"printf '%s' '{encoded}' | base64 -d > /etc/cron.d/auto_update",
-                root_password)
-            execute_as_root(client, "chmod 0644 /etc/cron.d/auto_update", root_password)
-            execute_as_root(client,
-                "systemctl restart cron 2>/dev/null || service cron restart 2>/dev/null || true",
-                root_password)
-
-        return jsonify({'success': True, 'message': 'Tâche planifiée avec succès'}), 200
-    except Exception as e:
-        logging.error(f"[schedule_update] Erreur: {e}")
-        return erreur_interne(e)
-
-
-# ─────────────────────────────────────────────────────────────────────────────
 # Package validation helper + targeted APT update
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -713,133 +650,6 @@ def custom_update():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Advanced scheduled update (date/time/repeat)
-# ─────────────────────────────────────────────────────────────────────────────
-
-@bp.route('/schedule_advanced_update', methods=['POST'])
-@require_api_key
-@require_permission('can_update_linux')
-@require_machine_access
-@threaded_route
-def schedule_advanced_update():
-    """
-    Planifie une mise à jour avancée avec des paramètres précis (date, heure et répétition).
-    La commande est ajoutée à un fichier dédié dans /etc/cron.d/.
-    """
-    data = request.json
-    machine_id = data.get('machine_id')
-    date = data.get('date')  # Format YYYY-MM-DD
-    time_ = data.get('time')  # Format HH:MM
-    repeat = data.get('repeat')  # none, daily, weekly, monthly
-    try:
-        machine_id = validate_machine_id(machine_id)
-    except ValueError as e:
-        return jsonify({'success': False, 'message': str(e)}), 400
-    if not all([date, time_]):
-        return jsonify({'success': False, 'message': 'Paramètres manquants'}), 400
-
-    # E-463 : la FORME est validee ICI, avant toute connexion. Une valeur forgee
-    # est refusee sans qu'aucune machine ne soit jointe.
-    # E-463 bis : DEUX blocs, pour que le message dise LAQUELLE des deux valeurs
-    # est en cause. Un `try` commun disait « date ou heure », et l'appelant devait
-    # deviner — un refus qui n'instruit pas se fait contourner.
-    try:
-        _heure, _minute = _cron_heure_minute(time_)
-    except (ValueError, TypeError) as e:
-        return jsonify({'success': False,
-                        'message': f"Champ « time » invalide : {e}"}), 400
-    try:
-        _annee, _mois, _jour = _cron_annee_mois_jour(date)
-    except (ValueError, TypeError) as e:
-        return jsonify({'success': False,
-                        'message': f"Champ « date » invalide : {e}"}), 400
-
-    try:
-        with get_db_connection() as conn:
-            cursor = conn.cursor(dictionary=True)
-            cursor.execute("""
-                SELECT ip, port, user, password, root_password, service_account_deployed
-                FROM machines
-                WHERE id = %s
-            """, (machine_id,))
-            row = cursor.fetchone()
-        if not row:
-            return jsonify({'success': False, 'message': 'Machine introuvable'}), 404
-        ip = row['ip']
-        port = row['port']
-        ssh_user = row['user']
-        ssh_password = server_decrypt_password(row['password'], logger=logger)
-        root_password = server_decrypt_password(row['root_password'], logger=logger)
-        # Construction de l'heure du job cron selon le type de répétition
-        if repeat == 'daily':
-            cron_time = f"{_minute} {_heure} * * *"
-        elif repeat == 'weekly':
-            cron_time = f"{_minute} {_heure} * * 1"
-        elif repeat == 'monthly':
-            cron_time = f"{_minute} {_heure} 1 * *"
-        else:
-            cron_time = f"{_minute} {_heure} {_jour} {_mois} *"
-        import base64
-        apt_command = "export LC_ALL=C.UTF-8 && export LANG=C.UTF-8 && apt-get update && apt-get upgrade --with-new-pkgs --only-upgrade -y >> /var/log/auto_update.log 2>&1"
-        cron_job = f"{cron_time} root {apt_command}\n"
-        cron_file = "/etc/cron.d/auto_update_advanced"
-        encoded = base64.b64encode(cron_job.encode('utf-8')).decode('ascii')
-        with ssh_session(ip, port, ssh_user, ssh_password, logger=logger, service_account=row.get('service_account_deployed', False)) as client:
-            execute_as_root(client, f"printf '%s' '{encoded}' | base64 -d > {cron_file}", root_password)
-            #   `cron_file` est un litteral pose 4 lignes plus haut :
-            #   '/etc/cron.d/auto_update_advanced'. Le `printf … base64 -d` de la ligne
-            #   precedente ecrit dans le MEME chemin et n'est pas signale, lui, parce que
-            #   la regle exempte `base64 -d` — la charge y est encodee.
-            # nosemgrep: rw-shell-fstring-execute-as-root
-            execute_as_root(client, f"chmod 0644 {cron_file}", root_password)
-            execute_as_root(client, "systemctl restart cron 2>/dev/null || service cron restart 2>/dev/null || true", root_password)
-        # ⚠ CETTE ROUTE N'ENREGISTRE RIEN, ET CE N'EST PAS UN OUBLI DE CODE.
-        #
-        # Mesure du 2026-09-08 : 0 ecriture SQL ici, 1 dans la route soeur
-        # (`UPDATE machines SET maj_secu_date`) — temoin que la sonde fonctionne.
-        #
-        # ⚠ CORRECTION D'UNE PREMIERE REDACTION DE CE COMMENTAIRE. J'avais ecrit
-        # « il n'existe aucune colonne pour la mise a jour complete ». C'est FAUX,
-        # et la verite est en deux morceaux qui ne sont pas le meme travail :
-        #
-        #   `mysql/init.sql:99-107`   TABLE `update_schedules` — machine_id,
-        #                             interval_minutes, last_run, next_run, FK
-        #                             vers `machines`. Elle modelise un INTERVALLE.
-        #   qui la touche             py=0 · php=0     ZERO code, nulle part
-        #                             (temoin : `machines` py=28/php=115,
-        #                              `ssh_audit_schedules` py=2 — la sonde voit)
-        #
-        # Donc : **une structure existe pour le modele par INTERVALLE et personne
-        # ne l'ecrit — c'est un VESTIGE. Aucune structure n'existe pour le modele
-        # par DATE/HEURE/RECURRENCE, celui de cette route — c'est une MIGRATION.**
-        #
-        # Consequence inchangee : pour cette route, « planifiee sur la machine et
-        # rien en base » est l'etat PERMANENT. L'ecran peut montrer une MAJ de
-        # securite planifiee, jamais une MAJ complete planifiee.
-        #
-        # ⚠ ET LE « VOISIN SAIN » PARTAGE CET ANGLE MORT. `schedule_update`
-        # (`:447-498`), cite partout comme le modele d'hygiene, installe un cron et
-        # **n'enregistre rien non plus** — alors que `update_schedules` a ete taillee
-        # exactement pour lui. Il est sain sur l'INJECTION (`int()` plus bornes
-        # `1 <= n <= 10080`) et aveugle sur la PERSISTANCE. *« Voisin sain » etait
-        # vrai sur l'axe mesure et faux comme jugement general : l'etiquette a
-        # voyage d'un axe a l'autre sans que personne le dise.*
-        #
-        # Trois routes installent un cron ; la base n'en garde qu'une trace,
-        # `maj_secu_date`, par une COLONNE et non par cette table.
-        #
-        # Rien n'est corrige ici, et la raison se demontre toute seule : **une
-        # table sans lecteur, nous en avons une sous les yeux.** C'est exactement
-        # ce qu'on obtient en decidant une moitie sans l'autre. Si
-        # `update_schedules` est un vestige a retirer ou une intention jamais
-        # cablee, `init.sql` ne le dit pas — a trancher par qui tient le schema.
-        return jsonify({'success': True, 'message': 'Planification avancée enregistrée avec succès.'}), 200
-    except Exception as e:
-        logging.error(f"[schedule_advanced_update] Erreur: {e}")
-        return erreur_interne(e)
-
-
-# ─────────────────────────────────────────────────────────────────────────────
 # Advanced scheduled security update
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -1008,16 +818,17 @@ def schedule_advanced_security_update():
 # Planifications presentes sur la machine : lecture et retrait
 # ─────────────────────────────────────────────────────────────────────────────
 #
-# Trois routes de ce module ecrivent un fichier `cron.d`, et la base n'en garde
+# Trois routes de ce module ont ecrit un fichier `cron.d`, et la base n'en garde
 # qu'une trace (`maj_secu_date`, pour la seule planification de securite) :
 #
-#     /schedule_update                      -> /etc/cron.d/auto_update
-#     /schedule_advanced_update             -> /etc/cron.d/auto_update_advanced
+#     /schedule_update                      -> /etc/cron.d/auto_update            (retiree)
+#     /schedule_advanced_update             -> /etc/cron.d/auto_update_advanced   (retiree)
 #     /schedule_advanced_security_update    -> /etc/cron.d/auto_security_update_advanced
 #
-# Le portail n'appelle plus que la troisieme. Les deux autres fichiers restent sur
-# les machines ou ils ont ete poses, et RIEN ne les montrait : ces deux routes les
-# lisent sur la machine elle-meme, et retirent celui qu'on designe.
+# Les deux premieres sont RETIREES (2026-11-16) : plus aucun appelant depuis le
+# 2026-11-15, et la passerelle les transmettait encore. Leurs fichiers restent
+# sur les machines ou ils ont ete poses : ces deux routes les lisent sur la
+# machine elle-meme, et retirent celui qu'on designe.
 #
 # LISTE FERMEE : la requete designe un fichier par sa CLE, jamais par un chemin.
 # Les commandes sont des litteraux assembles ici, a l'import ; aucune donnee de

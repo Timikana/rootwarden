@@ -548,17 +548,6 @@ Met a jour l'agent Zabbix en streaming.
 
 ---
 
-### `POST /schedule_update`
-Planifie une mise a jour periodique.
-
-```json
-// Request
-{ "machine_id": 1, "interval_minutes": 1440 }
-// interval_minutes: 1 a 10080 (7 jours)
-```
-
----
-
 ### `POST /apt_update`
 Mise a jour APT avec methode configurable.
 
@@ -575,14 +564,19 @@ Installation de paquets specifiques avec exclusions.
 
 ---
 
-### `POST /schedule_advanced_update` | `POST /schedule_advanced_security_update`
-Planification avancee avec cron.
+### `POST /schedule_advanced_security_update`
+Planifie la mise a jour des paquets en cron (`/etc/cron.d/auto_security_update_advanced`) et
+inscrit sa date dans `machines.maj_secu_date`.
 
 ```json
 // Request
 { "machine_id": 1, "date": "2026-04-10", "time": "03:00", "repeat": "weekly" }
 // repeat: "none", "daily", "weekly", "monthly"
 ```
+
+`/schedule_update` et `/schedule_advanced_update` sont retirees (2026-11-16). Les fichiers
+qu'elles ont poses se lisent et se retirent par `POST /scheduled_updates` et
+`POST /scheduled_updates/remove`.
 
 ---
 

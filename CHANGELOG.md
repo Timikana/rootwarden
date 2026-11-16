@@ -5,6 +5,21 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## Sécurité : deux routes de planification retirées du backend
+
+`POST /schedule_update` et `POST /schedule_advanced_update` écrivaient un fichier dans
+`/etc/cron.d/` sur la machine, en root. Le portail ne les appelle plus depuis le 2026-11-15, mais la
+passerelle les transmettait toujours : deux gestes d'écriture sans aucun usage, ouverts à tout
+compte titulaire de `can_update_linux`.
+
+- Les deux routes sont retirées du backend et de la liste blanche de la passerelle.
+- Les fichiers qu'elles ont posés restent visibles et se retirent depuis le panneau « Planifier ».
+- La planification de sécurité, seule utilisée, ne change pas. Le contrôle
+  `go-cron-validation-forgee` porte désormais sur elle : mêmes validateurs, appelés avant toute
+  écriture.
+
+---
+
 ## Clé de plateforme : une machine critique n'était pas signalée
 
 Cinq pages avertissent quand une machine est sensible (production, critique, ou environnement
