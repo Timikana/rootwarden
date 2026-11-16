@@ -1793,6 +1793,234 @@ def server_users_inventory():
         return erreur_interne(e)
 
 
+def _lire_cles_autorisees(client, root_pass, mid):
+    """Les authorized_keys de la machine : en root d'abord, en simple user ensuite.
+
+    Rend ``(keys_by_user, dump_root_ok, dump_user_ok, cles_lues)``. Extrait tel
+    quel de `scan_server_users` (2026-11-16) : les drapeaux E-187 restent un par
+    lecture, et `cles_lues` garde le meme sens.
+    """
+    # 2. Dump des authorized_keys.
+    # Strategie en 2 etages :
+    #   a) Tente execute_as_root -> dump TOUS les users (root + home prot).
+    #   b) En parallele : `cat ~/.ssh/authorized_keys` en simple user
+    #      pour AU MOINS recuperer les cles du user connecte (ex: ses
+    #      cles a lui dans ~/ qu'il peut lire sans sudo). Ainsi si
+    #      root_password absent ou sudo refuse, on a quand meme le user.
+    # Resultat : on merge les 2 dumps -- root prioritaire si il a vu.
+    # IMPORTANT : `printf '\\n'` apres `cat` car les authorized_keys
+    # ecrits par RootWarden via `printf '%s'` n'ont PAS de newline
+    # finale -> le marqueur ###ENDUSER### colle sur la derniere cle,
+    # le parser ne le voit pas -> les cles de l'user ne sont jamais
+    # enregistrees. Bug observe sur 4 comptes (rootwarden et trois
+    # comptes d'administrateurs) v1.19.0.
+    dump_script = (
+        "awk -F: '{print $6\":\"$1}' /etc/passwd | "
+        "while IFS=: read home user; do "
+        "  ak=\"$home/.ssh/authorized_keys\"; "
+        "  [ -r \"$ak\" ] || continue; "
+        "  echo \"###USER:$user###\"; "
+        "  cat \"$ak\"; "
+        "  printf '\\n'; "
+        "  echo \"###ENDUSER###\"; "
+        "done"
+    )
+    ak_dump_root = ''
+    # E-187 : UN DRAPEAU PAR LECTURE, PAS UN PAR FONCTION.
+    # `scan_concluant` (E-183) mesure la lecture de `/etc/passwd`. Il ne
+    # dit RIEN de ces deux dumps-ci, qui sont des lectures entierement
+    # differentes — et ce sont elles qui alimentent la purge des cles et
+    # la colonne `keys_count`.
+    dump_root_ok = False
+    try:
+        ak_dump_root, _err, _code = execute_as_root(client, dump_script, root_pass,
+                                                    logger=logger, timeout=30)
+        # `_code` etait capture et JAMAIS lu. C'etait la seule occurrence
+        # de ce nom dans la fonction : la valeur qui ferme le trou etait
+        # deja la, a portee d'un `if`.
+        dump_root_ok = (_code == 0)
+        if not dump_root_ok:
+            logger.warning("scan_server_users(%s): dump root authorized_keys en ECHEC (code=%s) -- fallback simple-user", mid, _code)
+        elif not ak_dump_root.strip():
+            logger.info("scan_server_users(%s): dump root vide (probable absence de fichiers ou silent fail). Fallback simple-user.", mid)
+    except Exception as _e:
+        logger.warning("scan_server_users(%s): dump root authorized_keys echoue (%s) -- fallback simple-user", mid, _e)
+
+    # Fallback simple-user : recupere AU MOINS authorized_keys du user
+    # connecte (et tout home world-readable, rare). Pas de filtre awk
+    # de tous les users car cat /home/X/.ssh/* en simple user echoue
+    # pour les autres -> on cible le user de connexion uniquement.
+    ak_dump_user = ''
+    dump_user_ok = False
+    try:
+        user_script = (
+            "ak=\"$HOME/.ssh/authorized_keys\"; "
+            "if [ -r \"$ak\" ]; then "
+            "  echo \"###USER:$(whoami)###\"; "
+            "  cat \"$ak\"; "
+            "  printf '\\n'; "
+            "  echo \"###ENDUSER###\"; "
+            "fi"
+        )
+        _stdin, _stdout, _stderr = client.exec_command(user_script, timeout=10)
+        ak_dump_user = _stdout.read().decode('utf-8', errors='replace')
+        # E-187 : ce code de sortie n'etait meme pas OBTENU.
+        dump_user_ok = (_stdout.channel.recv_exit_status() == 0)
+    except Exception as _e:
+        logger.warning("scan_server_users(%s): dump simple-user echoue (%s)", mid, _e)
+
+    # E-187 : AUCUNE des deux lectures de cles n'a abouti ?
+    # Alors on n'a AUCUNE donnee de cles, et tout ce qui en decoule est
+    # une invention : `keys_count = 0` sur chaque compte, et l'ensemble
+    # `seen_keys` vide, dont la difference vaut TOUTES les cles connues.
+    #
+    # Ce drapeau ne porte que sur le cas NON AMBIGU — un code de sortie
+    # non nul, ou une exception. Le cas « code nul mais dump vide » est
+    # DELIBEREMENT laisse de cote : la boucle du script sort en 0 meme
+    # sans rien emettre, donc un dump vide est aussi ce que rend une
+    # machine qui n'a reellement aucune cle. Les distinguer demande une
+    # mesure sur une machine a zero cle (Test-Server-Debian), attribuee
+    # a la session 6. Trancher sans elle reproduirait E-183 dans l'autre
+    # sens : purger a tort une machine qui n'a legitimement rien.
+    cles_lues = dump_root_ok or dump_user_ok
+    if not cles_lues:
+        logger.warning(
+            "scan_server_users(%s): AUCUNE lecture de cles n'a abouti "
+            "(root=%s, simple-user=%s) — `keys_count` et la purge des cles "
+            "sont ABANDONNEES, l'inventaire des cles est conserve tel quel",
+            mid, dump_root_ok, dump_user_ok)
+
+    # Parse les 2 dumps. Root gagne en cas de doublon (dump_root est
+    # autoritatif). Le simple-user comble les trous.
+    keys_root = _parse_authorized_keys_dump(ak_dump_root)
+    keys_user = _parse_authorized_keys_dump(ak_dump_user)
+    keys_by_user = dict(keys_user)  # base = user
+    keys_by_user.update(keys_root)  # root ecrase si present
+    logger.info("scan_server_users(%s): %d user(s) avec cles (root=%d, fallback=%d)",
+                mid, len(keys_by_user), len(keys_root), len(keys_user))
+
+    return keys_by_user, dump_root_ok, dump_user_ok, cles_lues
+
+
+def _comptes_scannes(passwd_output, keys_by_user, platform_fragment):
+    """Les comptes lus dans `/etc/passwd`, avec leurs cles. Sans effet de bord."""
+    scanned_users = []
+    for line in passwd_output.strip().split('\n'):
+        if not line.strip():
+            continue
+        parts = line.strip().split(':')
+        if len(parts) < 4:
+            continue
+        uname, uid_str, home, shell = parts[0], parts[1], parts[2], parts[3]
+        uid = int(uid_str) if uid_str.isdigit() else 0
+
+        if not re.fullmatch(r'^/[a-zA-Z0-9/_.-]+$', home):
+            continue
+
+        user_keys = keys_by_user.get(uname, [])
+        # Marque has_platform_key si le fragment de cle plateforme y est
+        for k in user_keys:
+            k['is_platform'] = bool(platform_fragment and platform_fragment in k.get('data', ''))
+        has_platform = any(k['is_platform'] for k in user_keys)
+
+        scanned_users.append({
+            'name': uname,
+            'uid': uid,
+            'home': home,
+            'shell': shell,
+            'keys_count': len(user_keys),
+            'has_platform_key': has_platform,
+            'keys': user_keys,
+        })
+
+    return scanned_users
+
+
+def _classement_automatique(u, sys_users, rw_authorized):
+    """Le statut d'un compte vu pour la premiere fois. Sans effet de bord.
+
+    Rend ``(status, managed_by, notes)``.
+    """
+    uname = u['name']
+    shell_basename = (u.get('shell') or '').rsplit('/', 1)[-1].lower()
+    is_nologin_shell = shell_basename in ('nologin', 'false', 'sync', 'halt', 'shutdown')
+    if uname in sys_users or uname.lower() in sys_users:
+        auto_status = 'excluded'
+        auto_managed = 'manual'
+        auto_notes = 'Compte systeme (auto-classifie)'
+    elif is_nologin_shell:
+        auto_status = 'excluded'
+        auto_managed = 'manual'
+        auto_notes = f'Compte sans login (shell={u["shell"]}) - auto-classifie'
+    elif uname in rw_authorized:
+        auto_status = 'managed'
+        auto_managed = 'rootwarden'
+        auto_notes = 'Utilisateur RootWarden (auto-classifie)'
+    else:
+        auto_status = 'pending_review'
+        auto_managed = None
+        auto_notes = None
+
+    return auto_status, auto_managed, auto_notes
+
+
+def _synchronise_cles_ssh(conn_inv, cur, mid, scanned_users, purge_autorisee):
+    """Ecrit les cles vues et, si ``purge_autorisee``, retire celles qui ont disparu.
+
+    ``purge_autorisee`` vaut ``scan_concluant and cles_lues`` : le commentaire
+    E-183 / E-187 ci-dessous explique pourquoi il faut les deux lectures.
+    """
+    # Inventaire detaille des cles SSH (table server_user_ssh_keys
+    # depuis migration 044). On upsert chaque cle vue ; les cles
+    # disparues entre 2 scans sont supprimees -> drift detection
+    # gratuite via ALTER de last_seen_at.
+    try:
+        seen_keys = set()  # {(username, fingerprint)}
+        for u in scanned_users:
+            for k in u.get('keys', []):
+                seen_keys.add((u['name'], k['fingerprint']))
+                cur.execute("""
+                    INSERT INTO server_user_ssh_keys
+                        (machine_id, username, key_type, fingerprint_sha256,
+                         comment, is_platform_key)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    ON DUPLICATE KEY UPDATE
+                        key_type = VALUES(key_type),
+                        comment = VALUES(comment),
+                        is_platform_key = VALUES(is_platform_key),
+                        last_seen_at = CURRENT_TIMESTAMP
+                """, (mid, u['name'], k['type'], k['fingerprint'],
+                      k.get('comment'), 1 if k.get('is_platform') else 0))
+
+        # Supprimer les cles qui n'ont pas ete revues sur ce scan
+        cur.execute(
+            "SELECT username, fingerprint_sha256 FROM server_user_ssh_keys "
+            "WHERE machine_id = %s", (mid,))
+        existing_keys = {(r['username'], r['fingerprint_sha256'])
+                         for r in cur.fetchall()}
+        # E-183 puis E-187 : `seen_keys` depend de DEUX lectures —
+        # celle de `/etc/passwd` (qui donne les comptes) et celle des
+        # `authorized_keys` (qui donne les cles). Il faut les DEUX, et
+        # c'est le defaut qu'E-183 avait laisse ouvert : `scan_concluant`
+        # seul laissait une purge complete partir quand le dump des cles
+        # avait echoue.
+        stale = ((existing_keys - seen_keys)
+                 if purge_autorisee else set())
+        if stale:
+            for uname, fp in stale:
+                cur.execute(
+                    "DELETE FROM server_user_ssh_keys "
+                    "WHERE machine_id = %s AND username = %s "
+                    "AND fingerprint_sha256 = %s",
+                    (mid, uname, fp))
+            logger.info("scan_server_users(%s): %d cle(s) SSH retiree(s)",
+                        mid, len(stale))
+        conn_inv.commit()
+    except Exception as _e:
+        logger.warning("scan_server_users: maj server_user_ssh_keys echoue (%s)", _e)
+        conn_inv.rollback()
+
+
 @bp.route('/scan_server_users', methods=['POST'])
 @require_api_key
 @require_role(2)  # Patch A01 : enumeration des comptes distants reservee admin
@@ -1832,137 +2060,16 @@ def scan_server_users():
             # n'apparaissait pas une seule fois dans ce fichier.
             passwd_rc = stdout.channel.recv_exit_status()
 
-            # 2. Dump des authorized_keys.
-            # Strategie en 2 etages :
-            #   a) Tente execute_as_root -> dump TOUS les users (root + home prot).
-            #   b) En parallele : `cat ~/.ssh/authorized_keys` en simple user
-            #      pour AU MOINS recuperer les cles du user connecte (ex: ses
-            #      cles a lui dans ~/ qu'il peut lire sans sudo). Ainsi si
-            #      root_password absent ou sudo refuse, on a quand meme le user.
-            # Resultat : on merge les 2 dumps -- root prioritaire si il a vu.
-            # IMPORTANT : `printf '\\n'` apres `cat` car les authorized_keys
-            # ecrits par RootWarden via `printf '%s'` n'ont PAS de newline
-            # finale -> le marqueur ###ENDUSER### colle sur la derniere cle,
-            # le parser ne le voit pas -> les cles de l'user ne sont jamais
-            # enregistrees. Bug observe sur 4 comptes (rootwarden et trois
-            # comptes d'administrateurs) v1.19.0.
-            dump_script = (
-                "awk -F: '{print $6\":\"$1}' /etc/passwd | "
-                "while IFS=: read home user; do "
-                "  ak=\"$home/.ssh/authorized_keys\"; "
-                "  [ -r \"$ak\" ] || continue; "
-                "  echo \"###USER:$user###\"; "
-                "  cat \"$ak\"; "
-                "  printf '\\n'; "
-                "  echo \"###ENDUSER###\"; "
-                "done"
-            )
-            ak_dump_root = ''
-            # E-187 : UN DRAPEAU PAR LECTURE, PAS UN PAR FONCTION.
-            # `scan_concluant` (E-183) mesure la lecture de `/etc/passwd`. Il ne
-            # dit RIEN de ces deux dumps-ci, qui sont des lectures entierement
-            # differentes — et ce sont elles qui alimentent la purge des cles et
-            # la colonne `keys_count`.
-            dump_root_ok = False
-            try:
-                ak_dump_root, _err, _code = execute_as_root(client, dump_script, root_pass,
-                                                            logger=logger, timeout=30)
-                # `_code` etait capture et JAMAIS lu. C'etait la seule occurrence
-                # de ce nom dans la fonction : la valeur qui ferme le trou etait
-                # deja la, a portee d'un `if`.
-                dump_root_ok = (_code == 0)
-                if not dump_root_ok:
-                    logger.warning("scan_server_users(%s): dump root authorized_keys en ECHEC (code=%s) -- fallback simple-user", mid, _code)
-                elif not ak_dump_root.strip():
-                    logger.info("scan_server_users(%s): dump root vide (probable absence de fichiers ou silent fail). Fallback simple-user.", mid)
-            except Exception as _e:
-                logger.warning("scan_server_users(%s): dump root authorized_keys echoue (%s) -- fallback simple-user", mid, _e)
-
-            # Fallback simple-user : recupere AU MOINS authorized_keys du user
-            # connecte (et tout home world-readable, rare). Pas de filtre awk
-            # de tous les users car cat /home/X/.ssh/* en simple user echoue
-            # pour les autres -> on cible le user de connexion uniquement.
-            ak_dump_user = ''
-            dump_user_ok = False
-            try:
-                user_script = (
-                    "ak=\"$HOME/.ssh/authorized_keys\"; "
-                    "if [ -r \"$ak\" ]; then "
-                    "  echo \"###USER:$(whoami)###\"; "
-                    "  cat \"$ak\"; "
-                    "  printf '\\n'; "
-                    "  echo \"###ENDUSER###\"; "
-                    "fi"
-                )
-                _stdin, _stdout, _stderr = client.exec_command(user_script, timeout=10)
-                ak_dump_user = _stdout.read().decode('utf-8', errors='replace')
-                # E-187 : ce code de sortie n'etait meme pas OBTENU.
-                dump_user_ok = (_stdout.channel.recv_exit_status() == 0)
-            except Exception as _e:
-                logger.warning("scan_server_users(%s): dump simple-user echoue (%s)", mid, _e)
-
-            # E-187 : AUCUNE des deux lectures de cles n'a abouti ?
-            # Alors on n'a AUCUNE donnee de cles, et tout ce qui en decoule est
-            # une invention : `keys_count = 0` sur chaque compte, et l'ensemble
-            # `seen_keys` vide, dont la difference vaut TOUTES les cles connues.
-            #
-            # Ce drapeau ne porte que sur le cas NON AMBIGU — un code de sortie
-            # non nul, ou une exception. Le cas « code nul mais dump vide » est
-            # DELIBEREMENT laisse de cote : la boucle du script sort en 0 meme
-            # sans rien emettre, donc un dump vide est aussi ce que rend une
-            # machine qui n'a reellement aucune cle. Les distinguer demande une
-            # mesure sur une machine a zero cle (Test-Server-Debian), attribuee
-            # a la session 6. Trancher sans elle reproduirait E-183 dans l'autre
-            # sens : purger a tort une machine qui n'a legitimement rien.
-            cles_lues = dump_root_ok or dump_user_ok
-            if not cles_lues:
-                logger.warning(
-                    "scan_server_users(%s): AUCUNE lecture de cles n'a abouti "
-                    "(root=%s, simple-user=%s) — `keys_count` et la purge des cles "
-                    "sont ABANDONNEES, l'inventaire des cles est conserve tel quel",
-                    mid, dump_root_ok, dump_user_ok)
-
-            # Parse les 2 dumps. Root gagne en cas de doublon (dump_root est
-            # autoritatif). Le simple-user comble les trous.
-            keys_root = _parse_authorized_keys_dump(ak_dump_root)
-            keys_user = _parse_authorized_keys_dump(ak_dump_user)
-            keys_by_user = dict(keys_user)  # base = user
-            keys_by_user.update(keys_root)  # root ecrase si present
-            logger.info("scan_server_users(%s): %d user(s) avec cles (root=%d, fallback=%d)",
-                        mid, len(keys_by_user), len(keys_root), len(keys_user))
+            # 2. Dump des authorized_keys (root, puis simple user) : voir
+            # `_lire_cles_autorisees`, qui porte E-187 (un drapeau par lecture).
+            keys_by_user, dump_root_ok, dump_user_ok, cles_lues = _lire_cles_autorisees(
+                client, root_pass, mid)
 
             from ssh_key_manager import get_platform_public_key
             platform_pubkey = get_platform_public_key() or ''
             platform_fragment = platform_pubkey.split()[1] if len(platform_pubkey.split()) > 1 else ''
 
-            scanned_users = []
-            for line in passwd_output.strip().split('\n'):
-                if not line.strip():
-                    continue
-                parts = line.strip().split(':')
-                if len(parts) < 4:
-                    continue
-                uname, uid_str, home, shell = parts[0], parts[1], parts[2], parts[3]
-                uid = int(uid_str) if uid_str.isdigit() else 0
-
-                if not re.fullmatch(r'^/[a-zA-Z0-9/_.-]+$', home):
-                    continue
-
-                user_keys = keys_by_user.get(uname, [])
-                # Marque has_platform_key si le fragment de cle plateforme y est
-                for k in user_keys:
-                    k['is_platform'] = bool(platform_fragment and platform_fragment in k.get('data', ''))
-                has_platform = any(k['is_platform'] for k in user_keys)
-
-                scanned_users.append({
-                    'name': uname,
-                    'uid': uid,
-                    'home': home,
-                    'shell': shell,
-                    'keys_count': len(user_keys),
-                    'has_platform_key': has_platform,
-                    'keys': user_keys,
-                })
+            scanned_users = _comptes_scannes(passwd_output, keys_by_user, platform_fragment)
 
         # Peupler server_user_inventory
         conn_inv = get_db_connection()
@@ -2012,24 +2119,8 @@ def scan_server_users():
                         """, (u['uid'], u['home'], u['shell'], mid, uname))
                 else:
                     # Nouveau user - classifier automatiquement
-                    shell_basename = (u.get('shell') or '').rsplit('/', 1)[-1].lower()
-                    is_nologin_shell = shell_basename in ('nologin', 'false', 'sync', 'halt', 'shutdown')
-                    if uname in sys_users or uname.lower() in sys_users:
-                        auto_status = 'excluded'
-                        auto_managed = 'manual'
-                        auto_notes = 'Compte systeme (auto-classifie)'
-                    elif is_nologin_shell:
-                        auto_status = 'excluded'
-                        auto_managed = 'manual'
-                        auto_notes = f'Compte sans login (shell={u["shell"]}) - auto-classifie'
-                    elif uname in rw_authorized:
-                        auto_status = 'managed'
-                        auto_managed = 'rootwarden'
-                        auto_notes = 'Utilisateur RootWarden (auto-classifie)'
-                    else:
-                        auto_status = 'pending_review'
-                        auto_managed = None
-                        auto_notes = None
+                    auto_status, auto_managed, auto_notes = _classement_automatique(
+                        u, sys_users, rw_authorized)
 
                     cur.execute("""
                         INSERT INTO server_user_inventory
@@ -2090,55 +2181,10 @@ def scan_server_users():
 
             conn_inv.commit()
 
-            # Inventaire detaille des cles SSH (table server_user_ssh_keys
-            # depuis migration 044). On upsert chaque cle vue ; les cles
-            # disparues entre 2 scans sont supprimees -> drift detection
-            # gratuite via ALTER de last_seen_at.
-            try:
-                seen_keys = set()  # {(username, fingerprint)}
-                for u in scanned_users:
-                    for k in u.get('keys', []):
-                        seen_keys.add((u['name'], k['fingerprint']))
-                        cur.execute("""
-                            INSERT INTO server_user_ssh_keys
-                                (machine_id, username, key_type, fingerprint_sha256,
-                                 comment, is_platform_key)
-                            VALUES (%s, %s, %s, %s, %s, %s)
-                            ON DUPLICATE KEY UPDATE
-                                key_type = VALUES(key_type),
-                                comment = VALUES(comment),
-                                is_platform_key = VALUES(is_platform_key),
-                                last_seen_at = CURRENT_TIMESTAMP
-                        """, (mid, u['name'], k['type'], k['fingerprint'],
-                              k.get('comment'), 1 if k.get('is_platform') else 0))
-
-                # Supprimer les cles qui n'ont pas ete revues sur ce scan
-                cur.execute(
-                    "SELECT username, fingerprint_sha256 FROM server_user_ssh_keys "
-                    "WHERE machine_id = %s", (mid,))
-                existing_keys = {(r['username'], r['fingerprint_sha256'])
-                                 for r in cur.fetchall()}
-                # E-183 puis E-187 : `seen_keys` depend de DEUX lectures —
-                # celle de `/etc/passwd` (qui donne les comptes) et celle des
-                # `authorized_keys` (qui donne les cles). Il faut les DEUX, et
-                # c'est le defaut qu'E-183 avait laisse ouvert : `scan_concluant`
-                # seul laissait une purge complete partir quand le dump des cles
-                # avait echoue.
-                stale = ((existing_keys - seen_keys)
-                         if (scan_concluant and cles_lues) else set())
-                if stale:
-                    for uname, fp in stale:
-                        cur.execute(
-                            "DELETE FROM server_user_ssh_keys "
-                            "WHERE machine_id = %s AND username = %s "
-                            "AND fingerprint_sha256 = %s",
-                            (mid, uname, fp))
-                    logger.info("scan_server_users(%s): %d cle(s) SSH retiree(s)",
-                                mid, len(stale))
-                conn_inv.commit()
-            except Exception as _e:
-                logger.warning("scan_server_users: maj server_user_ssh_keys echoue (%s)", _e)
-                conn_inv.rollback()
+            # Inventaire detaille des cles SSH : voir `_synchronise_cles_ssh`.
+            # La purge exige les DEUX lectures (E-183, E-187).
+            _synchronise_cles_ssh(conn_inv, cur, mid, scanned_users,
+                                  purge_autorisee=scan_concluant and cles_lues)
 
             # Marquer scanne — SEULEMENT si le scan a abouti.
             #
