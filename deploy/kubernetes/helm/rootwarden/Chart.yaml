@@ -1,0 +1,6 @@
+apiVersion: v2
+name: rootwarden
+description: Portail RootWarden (Laravel), backend (Flask/Hypercorn) et MySQL.
+type: application
+version: 0.1.0
+appVersion: "main"

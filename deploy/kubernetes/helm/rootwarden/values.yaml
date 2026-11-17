@@ -1,0 +1,88 @@
+# Valeurs du chart RootWarden. Aucun secret ici : ils vivent dans le Secret
+# `envSecret`, cree par deploy/kubernetes/preparer.sh depuis srv-docker.env.
+
+# Etiquette commune aux deux images de l'application (construire-images.sh).
+imageTag: ""
+
+images:
+  laravel:
+    repository: rootwarden-laravel
+    tag: ""            # vide = imageTag
+    pullPolicy: IfNotPresent
+  python:
+    repository: rootwarden-python
+    tag: ""
+    pullPolicy: IfNotPresent
+  mysql:
+    repository: mysql
+    tag: "9.7"
+    pullPolicy: IfNotPresent
+  # Petite image pour attendre la base avant de demarrer le backend.
+  attente:
+    repository: busybox
+    tag: "1.37"
+    pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+# Secret et ConfigMap crees par preparer.sh.
+envSecret: rootwarden-env
+initdbConfigMap: rootwarden-initdb
+
+laravel:
+  # UN seul replica par defaut : les sessions sont des fichiers dans le pod
+  # (SESSION_DRIVER=file). Plusieurs replicas demandent un pilote de session
+  # partage (database, redis) ou l'affinite de session sur l'Ingress.
+  replicas: 1
+  # auto = certificat auto-signe genere au demarrage ; custom = tlsSecret ;
+  # disabled = HTTP seul, UNIQUEMENT derriere un Ingress qui termine le TLS.
+  sslMode: auto
+  tlsSecret: ""
+  # Port HTTPS vu par le navigateur, pour la redirection HTTP -> HTTPS.
+  httpsPort: 443
+  service:
+    type: ClusterIP
+  resources:
+    limits: { memory: 512Mi, cpu: "1" }
+    requests: { memory: 128Mi, cpu: 100m }
+
+python:
+  # Le planificateur se protege par un verrou MySQL (GET_LOCK) : plusieurs
+  # replicas n'executent pas deux fois les memes taches. Mais les journaux et
+  # la paire de cles de plateforme sont sur des volumes ReadWriteOnce : au-dela
+  # d'un replica, il faut un stockage ReadWriteMany.
+  replicas: 1
+  resources:
+    limits: { memory: 1Gi, cpu: "1" }
+    requests: { memory: 128Mi, cpu: 100m }
+  persistence:
+    storageClass: ""
+    # La paire de cles Ed25519 de la plateforme. LA PERDRE COUPE L'ACCES aux
+    # machines dont les mots de passe ont ete effaces : sauvegarder ce volume.
+    platformSsh: { size: 64Mi }
+    backups: { size: 5Gi }
+
+db:
+  persistence:
+    storageClass: ""
+    size: 10Gi
+  resources:
+    limits: { memory: 1Gi, cpu: "1" }
+    requests: { memory: 256Mi, cpu: 100m }
+
+ingress:
+  enabled: false
+  className: ""
+  host: ""
+  # Secret TLS de l'Ingress (cert-manager ou manuel).
+  tlsSecret: ""
+  annotations: {}
+  # Exemple pour ingress-nginx, le portail servant HTTPS (sslMode auto/custom) :
+  #   nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+  #   nginx.ingress.kubernetes.io/proxy-buffering: "off"     # flux SSE
+  #   nginx.ingress.kubernetes.io/proxy-read-timeout: "900"  # BACKEND_TIMEOUT_FLUX
+
+# Restreint la base au portail et au backend. Le backend garde sa sortie libre :
+# il ouvre des sessions SSH vers les machines du parc.
+networkPolicy:
+  enabled: false
