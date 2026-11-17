@@ -50,13 +50,21 @@ if [ ! -f .env ] && [ -f .env.example ]; then
     chmod 640 .env
 fi
 
-if [ -f .env ] && ! grep -q '^APP_KEY=base64:' .env; then
-    echo "[laravel] generation de APP_KEY..."
-    php artisan key:generate --force --no-interaction || true
-fi
+# APP_KEY FOURNIE PAR L'ENVIRONNEMENT (Kubernetes : le Secret). Elle prime sur
+# le .env, et chaque pod doit avoir LA MEME : en generer une ici en donnerait une
+# differente a chaque redemarrage, et deconnecterait tout le monde. Docker
+# Compose ne la fournit pas (srv-docker.env n'en porte pas) : rien n'y change.
+case "${APP_KEY:-}" in
+    base64:*) echo "[laravel] APP_KEY fournie par l'environnement" ;;
+    *)
+        if [ -f .env ] && ! grep -q '^APP_KEY=base64:' .env; then
+            echo "[laravel] generation de APP_KEY..."
+            php artisan key:generate --force --no-interaction || true
+        fi ;;
+esac
 # VERIFIER apres le geste, pas croire la commande : sans cle, CHAQUE page rend
 # 500. On le dit fort ici plutot que de le laisser decouvrir au navigateur.
-if [ -f .env ] && ! grep -q '^APP_KEY=base64:' .env; then
+if [ -f .env ] && ! grep -q '^APP_KEY=base64:' .env && [ "${APP_KEY#base64:}" = "${APP_KEY:-}" ]; then
     echo "[laravel] ⛔ APP_KEY ABSENTE apres generation : le portail rendra 500 sur toutes les pages" >&2
 fi
 

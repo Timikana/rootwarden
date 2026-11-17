@@ -5,6 +5,32 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## Kubernetes, à côté de Docker Compose
+
+RootWarden s'installe désormais aussi sur Kubernetes. Docker Compose et `maj.sh` restent
+inchangés. Guide : `docs/KUBERNETES.md`.
+
+- **Images avec le code** (`deploy/kubernetes/construire-images.sh`) : construites par-dessus les
+  images de Docker Compose. Le portail y gagne son code et ses dépendances, le backend ses
+  migrations SQL.
+- **Chart Helm** (`deploy/kubernetes/helm/rootwarden`) : MySQL, backend et portail. Les Services
+  s'appellent `db`, `python` et `laravel`, comme dans Compose. Les droits sont ceux de
+  `docker-compose.prod.yml` (capacités retirées, racine du backend en lecture seule). Ingress et
+  règles réseau sont optionnels. Les volumes de la paire de clés et des sauvegardes survivent à
+  la désinstallation.
+- **`preparer.sh`** convertit `srv-docker.env` en Secret, en résolvant ses renvois `${...}` comme
+  Compose, avec une `APP_KEY` stable d'une exécution à l'autre.
+- **Le portail ne génère plus sa clé** quand l'environnement en fournit une. Sinon, chaque pod en
+  aurait une différente. Sous Compose, rien ne change : la clé reste générée dans le `.env`.
+- **Essai complet sur un cluster local** (`deploy/kubernetes/kind/essai-local.sh`). Pods prêts sans
+  redémarrage, 67 migrations jouées, un seul planificateur actif (verrou MySQL), portail joignant
+  le backend, connexion réussie jusqu'à l'enrôlement du second facteur. Une mise à jour sur place
+  garde la même clé et les données.
+- **CI** : nouveau job « Chart Helm » (lint, trois variantes validées contre le schéma Kubernetes,
+  résolution de l'environnement). Il bloque l'étiquetage automatique.
+
+---
+
 ## Backend : le déploiement des .bashrc découpé, à comportement identique
 
 La boucle de `deploy` (module bashrc, 113 lignes de code) traite désormais chaque utilisateur

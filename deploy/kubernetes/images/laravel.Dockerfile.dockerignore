@@ -1,0 +1,22 @@
+# Remplace le .dockerignore racine pour CETTE construction (BuildKit).
+.git
+.github/
+.claude/
+**/*.md
+srv-docker.env
+**/*.env
+**/.env
+laravel/vendor/
+laravel/node_modules/
+laravel/storage/logs/*
+laravel/storage/framework/cache/*
+laravel/storage/framework/sessions/*
+laravel/storage/framework/views/*
+laravel/bootstrap/cache/*.php
+laravel/tests/
+backend/
+tests/
+docs/
+obsidian-rootwarden/
+backups/
+certs/

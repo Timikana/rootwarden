@@ -1,0 +1,131 @@
+# Backend Flask/Hypercorn. Le Service s'appelle `python` : BACKEND_INTERNAL_URL
+# (https://python:5000 par defaut) fonctionne sans changement.
+{{- range $nom, $vol := dict "platform-ssh" .Values.python.persistence.platformSsh "backups" .Values.python.persistence.backups }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rootwarden-{{ $nom }}
+  labels:
+    {{- include "rw.etiquettes" $ | nindent 4 }}
+  annotations:
+    # Garde le volume si le chart est desinstalle : la paire de cles de la
+    # plateforme et les sauvegardes ne se recreent pas.
+    helm.sh/resource-policy: keep
+spec:
+  accessModes: ["ReadWriteOnce"]
+  {{- with $.Values.python.persistence.storageClass }}
+  storageClassName: {{ . }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ $vol.size }}
+---
+{{- end }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: python
+  labels:
+    {{- include "rw.etiquettes" . | nindent 4 }}
+    app.kubernetes.io/component: python
+spec:
+  selector:
+    {{- include "rw.selecteur" (dict "root" . "composant" "python") | nindent 4 }}
+  ports:
+    - name: https
+      port: 5000
+      targetPort: 5000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: python
+  labels:
+    {{- include "rw.etiquettes" . | nindent 4 }}
+    app.kubernetes.io/component: python
+spec:
+  replicas: {{ .Values.python.replicas }}
+  strategy:
+    # Volumes ReadWriteOnce : l'ancien pod libere avant que le nouveau monte.
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "rw.selecteur" (dict "root" . "composant" "python") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "rw.etiquettes" . | nindent 8 }}
+        app.kubernetes.io/component: python
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        # Docker Compose attend `db` en bonne sante ; ici on attend son port.
+        - name: attend-db
+          image: {{ include "rw.image" (dict "root" . "nom" "attente") }}
+          imagePullPolicy: {{ .Values.images.attente.pullPolicy }}
+          command: ["sh", "-c", "until nc -z -w 2 db 3306; do echo 'attente de db:3306'; sleep 3; done"]
+          securityContext:
+            {{- include "rw.securite" (dict "ajout" (list)) | nindent 12 }}
+            runAsNonRoot: true
+            runAsUser: 65534
+        # Un volume neuf appartient a root : l'utilisateur `rootwarden` du
+        # backend ne pourrait pas y ecrire la paire de cles. Docker, lui,
+        # recopie les droits de l'image dans un volume nomme neuf.
+        - name: droits-volumes
+          image: {{ include "rw.image" (dict "root" . "nom" "python") }}
+          imagePullPolicy: {{ .Values.images.python.pullPolicy }}
+          command: ["sh", "-c", "chown rootwarden:rootwarden /app/platform_ssh /app/backups && chmod 700 /app/platform_ssh"]
+          securityContext:
+            {{- include "rw.securite" (dict "ajout" (list "CHOWN" "FOWNER")) | nindent 12 }}
+          volumeMounts:
+            - { name: platform-ssh, mountPath: /app/platform_ssh }
+            - { name: backups, mountPath: /app/backups }
+      containers:
+        - name: python
+          image: {{ include "rw.image" (dict "root" . "nom" "python") }}
+          imagePullPolicy: {{ .Values.images.python.pullPolicy }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.envSecret }}
+          env:
+            - { name: FLASK_ENV, value: production }
+            - { name: PYTHONUNBUFFERED, value: "1" }
+            - { name: FLASK_APP, value: server.py }
+            # Racine en lecture seule : pas de __pycache__ a ecrire.
+            - { name: PYTHONDONTWRITEBYTECODE, value: "1" }
+          ports:
+            - name: https
+              containerPort: 5000
+          securityContext:
+            {{- include "rw.securite" (dict "ajout" (list "CHOWN" "DAC_OVERRIDE" "FOWNER" "SETUID" "SETGID")) | nindent 12 }}
+            readOnlyRootFilesystem: true
+          readinessProbe:
+            httpGet: { path: /test, port: 5000, scheme: HTTPS }
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet: { path: /test, port: 5000, scheme: HTTPS }
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+          resources:
+            {{- toYaml .Values.python.resources | nindent 12 }}
+          volumeMounts:
+            - { name: platform-ssh, mountPath: /app/platform_ssh }
+            - { name: backups, mountPath: /app/backups }
+            - { name: journaux, mountPath: /app/logs }
+            - { name: tmp, mountPath: /tmp }
+            - { name: run, mountPath: /var/run }
+      volumes:
+        - name: platform-ssh
+          persistentVolumeClaim: { claimName: rootwarden-platform-ssh }
+        - name: backups
+          persistentVolumeClaim: { claimName: rootwarden-backups }
+        - name: journaux
+          emptyDir: {}
+        - name: tmp
+          emptyDir: { sizeLimit: 64Mi }
+        - name: run
+          emptyDir: { sizeLimit: 8Mi }

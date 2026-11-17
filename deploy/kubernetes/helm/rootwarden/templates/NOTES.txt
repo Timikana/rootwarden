@@ -1,0 +1,11 @@
+RootWarden est installe dans l'espace de noms {{ .Release.Namespace }}.
+
+Suivre le demarrage :
+  kubectl -n {{ .Release.Namespace }} get pods -w
+
+Ouvrir le portail sans Ingress :
+  kubectl -n {{ .Release.Namespace }} port-forward svc/laravel 8443:{{ if eq .Values.laravel.sslMode "disabled" }}80{{ else }}443{{ end }}
+  puis https://localhost:8443
+
+A sauvegarder : le volume rootwarden-platform-ssh (paire de cles de la
+plateforme) et la base (volume donnees-db-0). Ils survivent a `helm uninstall`.

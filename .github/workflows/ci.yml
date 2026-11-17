@@ -919,6 +919,53 @@ jobs:
           ignore-unfixed: true
 
   # ─────────────────────────────────────────────────────────────
+  # Job 5.1 : Chart Helm (deploy/kubernetes) — lint et rendu valide
+  # ─────────────────────────────────────────────────────────────
+  # Le chart n'est joue par aucun autre job : sans celui-ci, un gabarit casse
+  # partirait avec l'etiquette. Outils telecharges en VERSIONS FIXEES, empreintes
+  # en dur (meme regle que les actions epinglees par SHA, audit B-4).
+  helm-chart:
+    name: Chart Helm (lint et rendu valide)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09  # v5 (epingle par SHA, audit 2026-10-13 B-4)
+      - name: Installer helm v4.3.2 et kubeconform v0.8.0 (empreintes verifiees)
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          curl -fsSLO https://get.helm.sh/helm-v4.3.2-linux-amd64.tar.gz
+          echo "d1c0278d46beab79582d7e50f5b3dc206944ba8e577cde618513fd07daa53983  helm-v4.3.2-linux-amd64.tar.gz" | sha256sum -c -
+          tar -xzf helm-v4.3.2-linux-amd64.tar.gz linux-amd64/helm
+          curl -fsSLO https://github.com/yannh/kubeconform/releases/download/v0.8.0/kubeconform-linux-amd64.tar.gz
+          echo "9bc2bffbf71f261128533edaf912153948b7ff238f9a531ae6d34466ec287883  kubeconform-linux-amd64.tar.gz" | sha256sum -c -
+          tar -xzf kubeconform-linux-amd64.tar.gz kubeconform
+          install -m 0755 linux-amd64/helm kubeconform /usr/local/bin/
+      - name: helm lint
+        run: helm lint deploy/kubernetes/helm/rootwarden --set imageTag=ci
+      - name: Rendu valide contre le schema Kubernetes (trois variantes)
+        run: |
+          set -euo pipefail
+          C=deploy/kubernetes/helm/rootwarden
+          helm template rw "$C" --set imageTag=ci \
+            | kubeconform -strict -summary -kubernetes-version 1.33.0 -
+          helm template rw "$C" --set imageTag=ci --set ingress.enabled=true \
+              --set ingress.host=rw.example.com --set networkPolicy.enabled=true \
+            | kubeconform -strict -summary -kubernetes-version 1.33.0 -
+          helm template rw "$C" --set imageTag=ci --set laravel.sslMode=custom \
+              --set laravel.tlsSecret=rw-tls --set laravel.replicas=2 \
+            | kubeconform -strict -summary -kubernetes-version 1.33.0 -
+      - name: Resolution du fichier d'environnement (comme Docker Compose)
+        run: |
+          set -euo pipefail
+          python3 -I deploy/kubernetes/env-resolu.py srv-docker.env.example > "$RUNNER_TEMP/env"
+          grep -qx 'MYSQL_DATABASE=rootwarden' "$RUNNER_TEMP/env"
+          # `! grep` ne ferait JAMAIS echouer le pas : sous `set -e`, une commande
+          # inversee par `!` n'arrete pas le script. Le test est donc explicite.
+          if grep -n '\${' "$RUNNER_TEMP/env"; then
+            echo "renvoi \${...} non resolu"; exit 1
+          fi
+
+  # ─────────────────────────────────────────────────────────────
   # Job 6 : Tag version automatique (depuis version.txt)
   # ─────────────────────────────────────────────────────────────
   auto-tag:
@@ -932,7 +979,7 @@ jobs:
     # rouge. Un job vert de plus n'est pas une garde de plus ; ici c'est un ROUGE qui bloque
     # de plus. ⚠ Ne couvre PAS le code qui compile et qui casse (E-388, E-389, DOSSIER-25 :
     # trois defauts destructeurs qui auraient passe cette CI).
-    needs: [build-docker, security-scan, secrets-scan, sast-python, sast-semgrep, sca-python, sca-php, trivy-fs,
+    needs: [build-docker, helm-chart, security-scan, secrets-scan, sast-python, sast-semgrep, sca-python, sca-php, trivy-fs,
             test-php, test-python]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     permissions:

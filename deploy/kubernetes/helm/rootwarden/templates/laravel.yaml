@@ -1,0 +1,97 @@
+{{- $tls := ne .Values.laravel.sslMode "disabled" -}}
+{{- if and (eq .Values.laravel.sslMode "custom") (not .Values.laravel.tlsSecret) -}}
+{{- fail "laravel.sslMode=custom exige laravel.tlsSecret" -}}
+{{- end -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: laravel
+  labels:
+    {{- include "rw.etiquettes" . | nindent 4 }}
+    app.kubernetes.io/component: laravel
+spec:
+  type: {{ .Values.laravel.service.type }}
+  selector:
+    {{- include "rw.selecteur" (dict "root" . "composant" "laravel") | nindent 4 }}
+  ports:
+    {{- if $tls }}
+    - name: https
+      port: 443
+      targetPort: 443
+    {{- end }}
+    - name: http
+      port: 80
+      targetPort: 80
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: laravel
+  labels:
+    {{- include "rw.etiquettes" . | nindent 4 }}
+    app.kubernetes.io/component: laravel
+spec:
+  replicas: {{ .Values.laravel.replicas }}
+  selector:
+    matchLabels:
+      {{- include "rw.selecteur" (dict "root" . "composant" "laravel") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "rw.etiquettes" . | nindent 8 }}
+        app.kubernetes.io/component: laravel
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: laravel
+          image: {{ include "rw.image" (dict "root" . "nom" "laravel") }}
+          imagePullPolicy: {{ .Values.images.laravel.pullPolicy }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.envSecret }}
+          env:
+            - { name: SSL_MODE, value: {{ .Values.laravel.sslMode | quote }} }
+            - { name: LARAVEL_HTTPS_PORT, value: {{ .Values.laravel.httpsPort | quote }} }
+            {{- if eq .Values.laravel.sslMode "custom" }}
+            - { name: SSL_CERT_PATH, value: /var/www/certs/tls.crt }
+            - { name: SSL_KEY_PATH, value: /var/www/certs/tls.key }
+            {{- end }}
+          ports:
+            - { name: http, containerPort: 80 }
+            {{- if $tls }}
+            - { name: https, containerPort: 443 }
+            {{- end }}
+          securityContext:
+            {{- include "rw.securite" (dict "ajout" (list "NET_BIND_SERVICE" "CHOWN" "SETUID" "SETGID" "DAC_OVERRIDE" "FOWNER")) | nindent 12 }}
+          # /up : la route de sante de Laravel. Le kubelet ne verifie pas le
+          # certificat d'une sonde HTTPS : l'auto-signe convient.
+          startupProbe:
+            httpGet: { path: /up, port: {{ if $tls }}443{{ else }}80{{ end }}, scheme: {{ if $tls }}HTTPS{{ else }}HTTP{{ end }} }
+            periodSeconds: 5
+            failureThreshold: 36
+          readinessProbe:
+            httpGet: { path: /up, port: {{ if $tls }}443{{ else }}80{{ end }}, scheme: {{ if $tls }}HTTPS{{ else }}HTTP{{ end }} }
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet: { path: /up, port: {{ if $tls }}443{{ else }}80{{ end }}, scheme: {{ if $tls }}HTTPS{{ else }}HTTP{{ end }} }
+            periodSeconds: 30
+            timeoutSeconds: 10
+          resources:
+            {{- toYaml .Values.laravel.resources | nindent 12 }}
+          volumeMounts:
+            - name: certs
+              mountPath: /var/www/certs
+              {{- if eq .Values.laravel.sslMode "custom" }}
+              readOnly: true
+              {{- end }}
+      volumes:
+        - name: certs
+          {{- if eq .Values.laravel.sslMode "custom" }}
+          secret:
+            secretName: {{ .Values.laravel.tlsSecret }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}

@@ -1,0 +1,85 @@
+# MySQL. Le Service s'appelle `db` comme dans Docker Compose : DB_HOST=db
+# fonctionne sans changement.
+apiVersion: v1
+kind: Service
+metadata:
+  name: db
+  labels:
+    {{- include "rw.etiquettes" . | nindent 4 }}
+    app.kubernetes.io/component: db
+spec:
+  clusterIP: None
+  selector:
+    {{- include "rw.selecteur" (dict "root" . "composant" "db") | nindent 4 }}
+  ports:
+    - name: mysql
+      port: 3306
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: db
+  labels:
+    {{- include "rw.etiquettes" . | nindent 4 }}
+    app.kubernetes.io/component: db
+spec:
+  serviceName: db
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "rw.selecteur" (dict "root" . "composant" "db") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "rw.etiquettes" . | nindent 8 }}
+        app.kubernetes.io/component: db
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: mysql
+          image: {{ include "rw.image" (dict "root" . "nom" "mysql") }}
+          imagePullPolicy: {{ .Values.images.mysql.pullPolicy }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.envSecret }}
+          ports:
+            - name: mysql
+              containerPort: 3306
+          securityContext:
+            {{- include "rw.securite" (dict "ajout" (list "SETUID" "SETGID" "CHOWN" "DAC_OVERRIDE" "FOWNER")) | nindent 12 }}
+          readinessProbe:
+            exec:
+              command: ["mysqladmin", "ping", "-h", "localhost", "--silent"]
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["mysqladmin", "ping", "-h", "localhost", "--silent"]
+            initialDelaySeconds: 60
+            periodSeconds: 20
+            timeoutSeconds: 5
+          resources:
+            {{- toYaml .Values.db.resources | nindent 12 }}
+          volumeMounts:
+            - name: donnees
+              mountPath: /var/lib/mysql
+            - name: initdb
+              mountPath: /docker-entrypoint-initdb.d
+              readOnly: true
+      volumes:
+        - name: initdb
+          configMap:
+            name: {{ .Values.initdbConfigMap }}
+  volumeClaimTemplates:
+    - metadata:
+        name: donnees
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- with .Values.db.persistence.storageClass }}
+        storageClassName: {{ . }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.db.persistence.size }}
