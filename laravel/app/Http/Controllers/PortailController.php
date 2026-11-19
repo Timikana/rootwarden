@@ -112,6 +112,32 @@ class PortailController extends Controller
     }
 
     /**
+     * Changer la portee d'une de SES cles sans la retirer. Le journal porte
+     * l'avant et l'apres : « portee restreinte » ne dirait pas QUELLES machines
+     * ont perdu la cle.
+     */
+    public function changerPorteeCleSsh(Request $requete, int $cle): RedirectResponse
+    {
+        $idCompte = (int) $requete->session()->get('utilisateur_id', 0);
+        if ($idCompte === 0) {
+            return redirect()->route('connexion');
+        }
+
+        $avant = $this->cles->portee($idCompte, $cle);
+        $err = $this->cles->changePortee($idCompte, $cle, $requete->input('portee', 'toutes') !== 'machines',
+            (array) $requete->input('machines', []));
+        if ($err !== null) {
+            return redirect()->route('profil')->with('cle_erreur', __($err));
+        }
+
+        $apres = (array) $this->cles->portee($idCompte, $cle);
+        $this->journal->ajoute($idCompte, "profil: portee de la cle SSH #{$cle} modifiee ("
+            . ClesPubliques::decrit((array) $avant) . ' → ' . ClesPubliques::decrit($apres) . ')');
+
+        return redirect()->route('profil')->with('cle_message', __('profil.cle_portee_modifiee'));
+    }
+
+    /**
      * ⚠ CE N'EST PAS UNE SUPPRESSION, ET C'EST LA PARTIE QUI COMPTE.
      *
      * `user_logs` est une chaine de hachage : retirer une ligne casse la

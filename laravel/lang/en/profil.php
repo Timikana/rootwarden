@@ -103,4 +103,11 @@ return [
     'err_cle_portee_vide' => 'Check at least one machine, or choose « All my machines ».',
     'err_cle_portee_hors_acces' => 'One of the checked machines is not reachable by your account: nothing was saved.',
     'err_cle_introuvable' => 'This key does not exist on your account.',
+
+    // Changing a key's scope without removing it
+    'cles_modifier_portee' => 'Change scope',
+    'cles_enregistrer_portee' => 'Save the scope',
+    'cle_portee_modifiee' => 'Key scope changed. It takes effect at the next deployment: machines taken out of the scope lose the key.',
+    'err_cle_portee_toutes' => 'This key is installed on all your machines: change its scope with « Change scope ».',
+    'err_cle_derniere_machine' => 'This is the last machine of this key: to take it off, remove the key.',
 ];

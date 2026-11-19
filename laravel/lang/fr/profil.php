@@ -112,4 +112,11 @@ return [
     'err_cle_portee_vide' => 'Cochez au moins une machine, ou choisissez « Toutes mes machines ».',
     'err_cle_portee_hors_acces' => 'Une des machines cochées n\'est pas accessible à votre compte : rien n\'a été enregistré.',
     'err_cle_introuvable' => 'Cette clé n\'existe pas sur votre compte.',
+
+    // Changer la portee d'une cle sans la retirer
+    'cles_modifier_portee' => 'Modifier la portée',
+    'cles_enregistrer_portee' => 'Enregistrer la portée',
+    'cle_portee_modifiee' => 'Portée de la clé modifiée. Elle prend effet au prochain déploiement : les machines sorties de la portée perdent la clé.',
+    'err_cle_portee_toutes' => 'Cette clé est posée sur toutes vos machines : changez sa portée avec « Modifier la portée ».',
+    'err_cle_derniere_machine' => 'C\'est la dernière machine de cette clé : pour l\'enlever, retirez la clé.',
 ];

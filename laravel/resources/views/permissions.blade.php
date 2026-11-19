@@ -17,6 +17,7 @@
          d'apt reste visible ; le reste se replie. --}}
     <div class="rw-encart" data-rw="perms-sudo-notes">
         <p class="rw-prose rw-aide">{{ __('perms.acces_aide') }}</p>
+        <p class="rw-prose rw-aide" data-rw="perms-cles-aide">{{ __('perms.cles_aide') }}</p>
         <p class="rw-prose rw-alerte rw-alerte--attention" data-rw="perms-sudo-apt">
             {{ __('perms.acces_apt_avert') }}
         </p>
@@ -217,6 +218,34 @@
                                     <option value="{{ $pr }}" @selected($actuel === $pr)>{{ __('perms.preset_' . $pr) }}</option>
                                 @endforeach
                             </select>
+                            {{-- LES CLES DU COMPTE SUR CETTE MACHINE — la vue inverse du
+                                 profil, qui les range par cle. Rendue pour les seules
+                                 machines OUVERTES : une portee ne peut designer qu'une
+                                 machine accessible. Une cle posee partout est cochee et
+                                 figee : la restreindre changerait aussi son sens pour
+                                 les machines a venir, ce choix se fait dans le profil. --}}
+                            @if ($aAcces && $cles[$c['id']] !== [])
+                                @php($ici = array_filter($cles[$c['id']], fn ($k) => $k['toutes_machines']
+                                    || in_array((int) $m->id, array_column($k['machines'], 'id'), true)))
+                                <details class="rw-perms__cles" data-rw="cles-{{ $m->id }}-{{ $c['id'] }}">
+                                    <summary class="rw-aide">{{ __('perms.cles_resume', ['n' => count($ici), 'total' => count($cles[$c['id']])]) }}</summary>
+                                    @foreach ($cles[$c['id']] as $i => $k)
+                                        <label class="rw-perms__droit">
+                                            <input type="checkbox"
+                                                   data-rw="cle-{{ $k['id'] }}-{{ $m->id }}"
+                                                   data-user-id="{{ $c['id'] }}"
+                                                   data-cle-id="{{ $k['id'] }}"
+                                                   data-cle-machine="{{ $m->id }}"
+                                                   @checked(isset($ici[$i]))
+                                                   @disabled($k['toutes_machines'])>
+                                            <span>{{ $k['libelle'] }}
+                                                <span class="rw-tableau__discret rw-tableau__mono">{{ $k['algo'] }} SHA256:{{ \Illuminate\Support\Str::limit($k['empreinte'], 12, '…') }}</span>
+                                                @if ($k['toutes_machines'])<span class="rw-badge rw-badge--neutre">{{ __('perms.cles_partout') }}</span>@endif
+                                            </span>
+                                        </label>
+                                    @endforeach
+                                </details>
+                            @endif
                         </li>
                     @endforeach
                 </ul>
@@ -230,6 +259,7 @@
         // chargement contredirait la grille juste en dessous.
         'resume_droits' => __('perms.resume_droits'),
         'resume_machines' => __('perms.resume_machines'),
+        'cles_resume' => __('perms.cles_resume'),
         // Sous-lot D5b : l'octroi passe par la passerelle, donc par le JS.
         'temp_en_cours' => __('perms.temp_en_cours'),
         'temp_accorde' => __('perms.temp_accorde'),

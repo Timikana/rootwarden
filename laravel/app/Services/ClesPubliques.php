@@ -137,17 +137,8 @@ final class ClesPubliques
         }
 
         $ids = [];
-        if (! $toutes) {
-            $ids = array_values(array_unique(array_map('intval', $machines)));
-            if ($ids === []) {
-                return 'profil.err_cle_portee_vide';
-            }
-            $accessibles = array_column($this->machinesAccessibles($idCompte), 'id');
-            if (array_diff($ids, $accessibles) !== []) {
-                // Une machine hors d'acces : refus ENTIER, pas un filtrage
-                // silencieux qui poserait une portee differente de la demandee.
-                return 'profil.err_cle_portee_hors_acces';
-            }
+        if (! $toutes && ($err = $this->verifiePortee($idCompte, $machines, $ids)) !== null) {
+            return $err;
         }
 
         DB::transaction(function () use ($idCompte, $libelle, $cle, $toutes, $ids): void {
@@ -162,6 +153,122 @@ final class ClesPubliques
                 DB::table('user_ssh_key_machines')->insert(['key_id' => $id, 'machine_id' => $machine]);
             }
         });
+
+        return null;
+    }
+
+    /**
+     * La portee d'UNE cle du compte, ou null si elle n'existe pas ou appartient
+     * a un autre compte.
+     *
+     * @return array{toutes:bool, machines:list<array{id:int, name:string}>}|null
+     */
+    public function portee(int $idCompte, int $idCle): ?array
+    {
+        $ligne = DB::table('user_ssh_keys')->where('id', $idCle)->where('user_id', $idCompte)->first();
+        if ($ligne === null) {
+            return null;
+        }
+
+        return [
+            'toutes' => (bool) $ligne->toutes_machines,
+            'machines' => DB::table('user_ssh_key_machines as km')
+                ->join('machines as m', 'm.id', '=', 'km.machine_id')
+                ->where('km.key_id', $idCle)
+                ->orderBy('m.name')
+                ->get(['m.id', 'm.name'])
+                ->map(fn ($m) => ['id' => (int) $m->id, 'name' => (string) $m->name])->values()->all(),
+        ];
+    }
+
+    /** La portee en clair, pour le journal : « toutes ses machines » ou les noms. */
+    public static function decrit(array $portee): string
+    {
+        return $portee['toutes'] ? 'toutes ses machines' : implode(', ', array_column($portee['machines'], 'name'));
+    }
+
+    /**
+     * Change la portee d'une cle SANS la retirer. Memes controles qu'a l'ajout :
+     * portee restreinte vide refusee, une machine hors d'acces refuse TOUT,
+     * la cle d'un autre compte n'est pas trouvee.
+     *
+     * ⚠ LA PORTEE ECRITE REMPLACE L'ANCIENNE. Une machine de l'ancienne portee
+     * a laquelle le compte n'a plus acces n'est donc pas conservee : elle ne
+     * peut pas etre redemandee, puisqu'elle serait refusee. Au deploiement
+     * suivant, `deploy_user_config` reecrit `authorized_keys` en entier (`>`,
+     * pas `>>`) : une machine sortie de la portee perd la cle, elle ne cesse pas
+     * seulement de la recevoir.
+     *
+     * @param  list<int|string>  $machines  ignore si `$toutes`
+     */
+    public function changePortee(int $idCompte, int $idCle, bool $toutes, array $machines = []): ?string
+    {
+        if ($this->portee($idCompte, $idCle) === null) {
+            return 'profil.err_cle_introuvable';
+        }
+        $ids = [];
+        if (! $toutes && ($err = $this->verifiePortee($idCompte, $machines, $ids)) !== null) {
+            return $err;
+        }
+
+        DB::transaction(function () use ($idCle, $toutes, $ids): void {
+            DB::table('user_ssh_keys')->where('id', $idCle)->update(['toutes_machines' => $toutes ? 1 : 0]);
+            DB::table('user_ssh_key_machines')->where('key_id', $idCle)->delete();
+            foreach ($ids as $machine) {
+                DB::table('user_ssh_key_machines')->insert(['key_id' => $idCle, 'machine_id' => $machine]);
+            }
+        });
+
+        return null;
+    }
+
+    /**
+     * Pose ou retire UNE cle restreinte sur UNE machine — la vue par serveur.
+     *
+     * Une cle valable partout n'a pas de case a decocher ici : la restreindre
+     * changerait aussi son sens pour les machines a venir, et ce choix se fait
+     * par `changePortee`, ou il se voit. Retirer sa derniere machine viderait la
+     * portee : c'est retirer la cle, et ce geste-la a son propre bouton.
+     */
+    public function basculeSurMachine(int $idCompte, int $idCle, int $idMachine, bool $posee): ?string
+    {
+        $portee = $this->portee($idCompte, $idCle);
+        if ($portee === null) {
+            return 'profil.err_cle_introuvable';
+        }
+        if ($portee['toutes']) {
+            return 'profil.err_cle_portee_toutes';
+        }
+        $accessibles = array_column($this->machinesAccessibles($idCompte), 'id');
+        $ids = array_values(array_intersect(array_column($portee['machines'], 'id'), $accessibles));
+        $ids = $posee
+            ? array_values(array_unique([...$ids, $idMachine]))
+            : array_values(array_diff($ids, [$idMachine]));
+        if ($ids === []) {
+            return 'profil.err_cle_derniere_machine';
+        }
+
+        return $this->changePortee($idCompte, $idCle, false, $ids);
+    }
+
+    /**
+     * Une portee restreinte : non vide, et seulement des machines accessibles.
+     *
+     * @param  list<int|string>  $machines
+     * @param  list<int>  $ids  rendue normalisee
+     */
+    private function verifiePortee(int $idCompte, array $machines, array &$ids): ?string
+    {
+        $ids = array_values(array_unique(array_map('intval', $machines)));
+        if ($ids === []) {
+            return 'profil.err_cle_portee_vide';
+        }
+        $accessibles = array_column($this->machinesAccessibles($idCompte), 'id');
+        if (array_diff($ids, $accessibles) !== []) {
+            // Une machine hors d'acces : refus ENTIER, pas un filtrage
+            // silencieux qui poserait une portee differente de la demandee.
+            return 'profil.err_cle_portee_hors_acces';
+        }
 
         return null;
     }

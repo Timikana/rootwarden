@@ -96,4 +96,16 @@ return [
     'temp_echec' => 'The grant did not go through.',
     'temp_revoque' => 'Grant :quoi has been revoked.',
     'temp_err_revocation' => 'That grant does not exist, or it has already expired.',
+
+    // An account's SSH keys, listed per machine
+    'cles_resume' => 'SSH keys: :n / :total',
+    'cles_partout' => 'everywhere',
+    'cles_aide' => 'SSH keys: under each open machine, check the account\'s restricted keys to install there. A key installed everywhere is changed from its account\'s profile. Takes effect at the next deployment.',
+    'cle_posee' => 'Key added to the machine. Takes effect at the next deployment.',
+    'cle_retiree' => 'Key taken off the machine. It will be removed at the next deployment.',
+    'err_cle_introuvable' => 'This key does not exist on this account.',
+    'err_cle_portee_toutes' => 'This key is installed on all of the account\'s machines: its scope is changed from its profile.',
+    'err_cle_derniere_machine' => 'This is the last machine of this key: unchecking it would empty its scope. The account can remove the key from its profile.',
+    'err_cle_portee_hors_acces' => 'The account has no access to this machine: grant access first.',
+    'err_cle_portee_vide' => 'This is the last machine of this key: unchecking it would empty its scope.',
 ];

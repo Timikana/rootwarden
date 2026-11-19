@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\ClesPubliques;
 use App\Services\Comptes;
 use App\Services\JournalAudit;
 use App\Services\Machines;
@@ -37,6 +38,7 @@ class PermissionsController extends Controller
         private readonly Comptes $comptes,
         private readonly JournalAudit $journal,
         private readonly StepUp $stepUp,
+        private readonly ClesPubliques $cles,
     ) {
     }
 
@@ -76,10 +78,12 @@ class PermissionsController extends Controller
         $droits = [];
         $acces = [];
         $presets = [];
+        $cles = [];
         foreach ($comptes as $c) {
             $droits[$c['id']] = $this->permissions->pour($c['id']);
             $acces[$c['id']] = $this->permissions->machinesDe($c['id']);
             $presets[$c['id']] = $this->permissions->presetsDe($c['id']);
+            $cles[$c['id']] = $this->cles->duCompte($c['id']);
         }
 
         [$moi, $monRole] = $this->qui($requete);
@@ -97,6 +101,9 @@ class PermissionsController extends Controller
             'droits' => $droits,
             'acces' => $acces,
             'presets' => $presets,
+            // Les cles SSH de chaque compte, avec leur portee : la vue les range
+            // PAR MACHINE, l'inverse du profil qui les range par cle.
+            'cles' => $cles,
             /*
              * La liste FERMEE vient du SERVICE, pas de la vue : c'est la meme
              * qui valide cote serveur. Deux listes divergeraient, et celle qui
@@ -245,6 +252,48 @@ class PermissionsController extends Controller
             'actif' => $accorde,
             'preset' => $accorde ? ($preset ?? 'none') : null,
             'message' => $accorde ? __('perms.acces_accorde') : __('perms.acces_retire'),
+        ]);
+    }
+
+    /**
+     * Pose ou retire une cle RESTREINTE d'un compte sur une machine — la vue par
+     * serveur des cles. Elle ecrit `user_ssh_key_machines` par le meme service
+     * que le profil, donc sous les memes regles : la machine doit etre
+     * accessible au compte, une cle valable partout ne se decoche pas ici, et
+     * une portee ne se vide pas.
+     *
+     * Pas de garde de rang ni de step-up, comme `acces()` : ce geste ne fait
+     * que REPARTIR des cles deja enregistrees sur des machines deja ouvertes.
+     * Il n'ouvre rien que `acces()` n'ait ouvert.
+     */
+    public function cle(Request $requete, int $id, int $cle): JsonResponse
+    {
+        [$auteur] = $this->qui($requete);
+        if (! $this->comptes->trouve($id)) {
+            return response()->json(['success' => false, 'message' => __('perms.err_inconnu')], 404);
+        }
+        if (! $requete->has('value')) {
+            return response()->json(['success' => false, 'message' => __('perms.err_valeur')], 422);
+        }
+        $machine = (int) $requete->input('machine_id', 0);
+        $posee = $requete->boolean('value');
+
+        $avant = $this->cles->portee($id, $cle);
+        $err = $this->cles->basculeSurMachine($id, $cle, $machine, $posee);
+        if ($err !== null) {
+            // Les messages du service parlent au titulaire (« votre compte ») ;
+            // ici c'est un administrateur qui lit, d'ou le jeu `perms.`.
+            return response()->json(['success' => false, 'message' => __(str_replace('profil.', 'perms.', $err))],
+                $err === 'profil.err_cle_introuvable' ? 404 : 422);
+        }
+        $apres = (array) $this->cles->portee($id, $cle);
+        $this->journalise($auteur, "Portee de la cle SSH #{$cle} du compte #{$id} modifiee ("
+            . ClesPubliques::decrit((array) $avant) . ' → ' . ClesPubliques::decrit($apres) . ')');
+
+        return response()->json([
+            'success' => true,
+            'actif' => in_array($machine, array_column($apres['machines'], 'id'), true),
+            'message' => $posee ? __('perms.cle_posee') : __('perms.cle_retiree'),
         ]);
     }
 }

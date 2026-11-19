@@ -2084,6 +2084,16 @@ a.rw-bouton { display: inline-block; }
     .rw-perms__machine { flex-wrap: wrap; }
     .rw-perms__liste.rw-saisie--compacte { flex-basis: 100%; width: 100%; }
 }
+/* Les cles du compte sur la machine : un repli SOUS la ligne, sur toute sa
+   largeur. Replie par defaut — un compte peut porter des dizaines de cles, et
+   la grille des machines doit rester lisible d'un coup d'oeil. */
+.rw-perms__machine:has(> .rw-perms__cles) { flex-wrap: wrap; }
+.rw-perms__cles { flex-basis: 100%; min-width: 0; padding: 0 0 4px; }
+.rw-perms__cles > summary { cursor: pointer; }
+.rw-perms__cles .rw-perms__droit > span { overflow-wrap: anywhere; }
+/* Profil : le formulaire de portee s'ouvre DANS sa cellule. Ouvert, il
+   elargit la colonne au lieu de couper les noms de machine en deux. */
+.rw-cle-portee[open] { min-width: 16rem; }
 
 /*
  * RAPPORT DU CONSTAT AVANT DEPLOIEMENT — sous-lot K2 du module `ssh/`.
