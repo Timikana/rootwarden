@@ -6,6 +6,7 @@ use App\Services\ClesPubliques;
 use App\Services\Comptes;
 use App\Services\MotDePasse;
 use App\Services\JournalAudit;
+use App\Services\LienAcces;
 use App\Services\StepUp;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -55,6 +56,7 @@ class ComptesController extends Controller
         private readonly StepUp $stepUp,
         private readonly MotDePasse $motDePasse,
         private readonly ClesPubliques $cles,
+        private readonly LienAcces $lienAcces,
     ) {
     }
 
@@ -355,6 +357,50 @@ class ComptesController extends Controller
             // Rendu UNE fois, ici. Absent quand l'administrateur a saisi le mot
             // de passe : il le connait deja, l'echo serait gratuit.
             'genere' => $genere ? $mdp : null,
+        ]);
+    }
+
+    /**
+     * Envoie au compte un lien a usage unique pour choisir son mot de passe —
+     * l'alternative au mot de passe genere, qui transite par l'ecran.
+     *
+     * Le mot de passe actuel reste valable tant que le lien n'a pas servi : le
+     * geste ne coupe donc l'acces de personne.
+     */
+    public function lienAcces(Request $requete, int $id): JsonResponse
+    {
+        [$auteur, $roleId] = $this->qui($requete);
+        $err = $this->lienAcces->envoie($id, $roleId, (string) $requete->ip(),
+            fn (int $uid, string $jeton) => route('reinit.formulaire', ['uid' => $uid, 'jeton' => $jeton]));
+
+        if ($err !== null) {
+            if ($err === 'comptes.lien_echec') {
+                $this->journalise($auteur, "Echec d'envoi du lien d'acces au compte #{$id}");
+            }
+            $statut = match ($err) {
+                'comptes.err_inconnu' => 404,
+                'comptes.err_hierarchie' => 403,
+                'comptes.lien_trop_tot' => 429,
+                'comptes.lien_echec' => 502,
+                default => 422,
+            };
+
+            return response()->json(['success' => false, 'message' => __($err)], $statut);
+        }
+
+        // Un transport local n'envoie rien : le dire, plutot qu'annoncer un
+        // courriel que personne ne recevra.
+        $local = $this->lienAcces->transportLocal();
+        $this->journalise($auteur, "Lien d'acces " . ($local ? 'prepare (transport local, rien envoye)' : 'envoye')
+            . " au compte #{$id}, valable " . intdiv(LienAcces::DUREE_SECONDES, 3600) . ' h');
+
+        return response()->json([
+            'success' => true,
+            // `false` : le geste a reussi mais rien n'est parti. L'ecran
+            // l'affiche en avertissement, pas en reussite.
+            'envoye' => ! $local,
+            'message' => __($local ? 'comptes.lien_prepare_local' : 'comptes.lien_envoye',
+                ['heures' => intdiv(LienAcces::DUREE_SECONDES, 3600)]),
         ]);
     }
 

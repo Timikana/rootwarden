@@ -28,10 +28,10 @@ namespace Tests\Support;
  * le vrai.
  *
  * C'est le cas de TOUS les step-up du depot. Releve du 2026-09-06, numeros
- * de ligne remis a jour le 2026-11-02 :
+ * de ligne remis a jour le 2026-11-19 :
  *
- *     ComptesController:633      compte_supprimer
- *     ComptesController:658      compte_anonymiser
+ *     ComptesController:679      compte_supprimer
+ *     ComptesController:704      compte_anonymiser
  *     PermissionsController:174  permission_definir
  *     PortailController:208      profil_effacement      (E-449)
  *     PasserelleController:89    generique, action DERIVEE du chemin
@@ -101,6 +101,7 @@ class TableDesGardes
             ['POST', 'comptes/{id}/deverrouiller', ['role:3', 'perm:can_admin_portal']],
             ['GET', 'comptes/{id}/etat-suppression', ['role:3', 'perm:can_admin_portal']],
             ['POST', 'comptes/{id}/mot-de-passe', ['role:2', 'perm:can_admin_portal']],
+            ['POST', 'comptes/{id}/lien-acces', ['role:2', 'perm:can_admin_portal']],
             // ⚠ `role:2` ET NON `role:3` : `manage_roles.php:31` pose
             //   `checkAuth([ROLE_ADMIN, ROLE_SUPERADMIN])`, donc le legacy
             //   l'ouvrait au role 2. Ce qui borne un role 2 sont DEUX gardes du

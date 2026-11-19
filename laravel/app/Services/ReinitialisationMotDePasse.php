@@ -101,13 +101,16 @@ final class ReinitialisationMotDePasse
      * Emet un jeton pour ce compte et rend sa valeur EN CLAIR — la seule fois
      * ou elle existe. La base n'en garde que le hache.
      *
+     * La duree est celle d'une demande « mot de passe oublie » ; le lien
+     * d'acces envoye par un administrateur (`LienAcces`) en pose une plus longue.
+     *
      * @return string 64 caracteres hexadecimaux
      */
-    public function emet(int $idCompte, string $ip): string
+    public function emet(int $idCompte, string $ip, int $dureeSecondes = self::DUREE_SECONDES): string
     {
         $clair = bin2hex(random_bytes(32));
 
-        DB::transaction(function () use ($idCompte, $ip, $clair): void {
+        DB::transaction(function () use ($idCompte, $ip, $clair, $dureeSecondes): void {
             /*
              * LES JETONS PRECEDENTS MEURENT D'ABORD. Sans cela, une personne
              * demandant trois liens en aurait trois valides — et le plus ancien,
@@ -124,7 +127,7 @@ final class ReinitialisationMotDePasse
                 // base, et un jeton en clair y serait un mot de passe a usage
                 // unique en libre-service.
                 'token_hash' => password_hash($clair, PASSWORD_BCRYPT, ['cost' => $this->cout()]),
-                'expires_at' => now()->addSeconds(self::DUREE_SECONDES),
+                'expires_at' => now()->addSeconds($dureeSecondes),
                 'ip_address' => mb_substr($ip, 0, 45),
                 'created_at' => now(),
             ]);
