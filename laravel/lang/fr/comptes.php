@@ -136,7 +136,6 @@ return [
     'err_cle_algo' => "Cet algorithme de clé n'est pas accepté.",
     'err_cle_base64' => "Le corps de la clé n'est pas du base64 valide.",
     'err_cle_lignes' => 'Une clé publique tient sur une seule ligne.',
-    'cle_enregistree' => 'Clé SSH enregistrée.',
     'err_reseau' => "Le portail n'a pas répondu (statut :statut). Rien n'a été modifié.",
 
     // Suppression et anonymisation — sous-lot D4

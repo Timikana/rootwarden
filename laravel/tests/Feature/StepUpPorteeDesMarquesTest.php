@@ -174,6 +174,10 @@ class StepUpPorteeDesMarquesTest extends TestCase
             // l'anonymisation ADMINISTRATIVE ouvre l'effacement de son propre
             // compte.
             'profil_effacement',
+            // AJOUTEE le 2026-11-19 : poser une cle SSH dans le compte d'autrui
+            // ouvre une connexion SOUS SON NOM. Nom propre, pour qu'aucune autre
+            // marque ne l'ouvre.
+            'cle_ssh_poser',
         ], StepUp::ACTIONS_PORTAGE,
             "la liste des actions du portage a change. Une entree neuve ouvre un "
             . "geste destructeur : la motiver ici, et verifier qu'elle ne REUTILISE "

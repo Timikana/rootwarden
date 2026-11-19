@@ -2094,6 +2094,9 @@ a.rw-bouton { display: inline-block; }
 /* Profil : le formulaire de portee s'ouvre DANS sa cellule. Ouvert, il
    elargit la colonne au lieu de couper les noms de machine en deux. */
 .rw-cle-portee[open] { min-width: 16rem; }
+/* Le formulaire d'ajout d'une cle, replie sous la liste des cles du compte. */
+.rw-perms__ajout-cle { margin: 12px 0 0; max-width: 68ch; }
+.rw-perms__ajout-cle > summary { cursor: pointer; margin-bottom: 8px; }
 
 /*
  * RAPPORT DU CONSTAT AVANT DEPLOIEMENT — sous-lot K2 du module `ssh/`.

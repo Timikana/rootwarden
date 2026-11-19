@@ -110,4 +110,23 @@ return [
     'err_cle_derniere_machine' => "C'est la dernière machine de cette clé : la décocher viderait sa portée. Le compte peut retirer la clé depuis son profil.",
     'err_cle_portee_hors_acces' => "Le compte n'a pas accès à cette machine : accordez d'abord l'accès.",
     'err_cle_portee_vide' => "C'est la dernière machine de cette clé : la décocher viderait sa portée.",
+
+    // Ajouter ou retirer une cle SSH d'un compte
+    'cles_titre' => 'Clés SSH',
+    'cles_aucune' => 'Aucune clé enregistrée : rien ne sera posé pour ce compte.',
+    'cles_figees_soi' => 'Vos propres clés se gèrent depuis votre profil.',
+    'cle_ajout_titre' => 'Ajouter une clé à ce compte',
+    'cle_libelle' => 'Nom de la clé',
+    'cle_cle' => 'Clé publique',
+    'cle_portee_toutes' => 'Toutes ses machines',
+    'cle_portee_machines' => 'Seulement les machines cochées',
+    'cle_sans_machine' => "Ce compte n'a accès à aucune machine : la clé ne sera posée nulle part tant qu'un accès n'est pas accordé.",
+    'cle_btn_ajouter' => 'Ajouter la clé',
+    'cle_btn_retirer' => 'Retirer',
+    'cle_avertissement' => 'La clé permettra de se connecter en SSH sous le nom de ce compte, au prochain déploiement. Le code du second facteur est demandé.',
+    'cle_ajoutee' => 'Clé SSH ajoutée au compte. Elle sera posée au prochain déploiement.',
+    'cle_retiree_du_compte' => 'Clé SSH retirée du compte. Elle sera enlevée des serveurs au prochain déploiement.',
+    'err_cle_vide' => 'Collez une clé publique.',
+    'err_cle_libelle' => 'Donnez un nom à la clé (100 caractères au plus).',
+    'err_cle_doublon' => 'Cette clé est déjà enregistrée sur ce compte.',
 ];

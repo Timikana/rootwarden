@@ -108,4 +108,23 @@ return [
     'err_cle_derniere_machine' => 'This is the last machine of this key: unchecking it would empty its scope. The account can remove the key from its profile.',
     'err_cle_portee_hors_acces' => 'The account has no access to this machine: grant access first.',
     'err_cle_portee_vide' => 'This is the last machine of this key: unchecking it would empty its scope.',
+
+    // Adding or removing an account's SSH key
+    'cles_titre' => 'SSH keys',
+    'cles_aucune' => 'No key saved: nothing will be installed for this account.',
+    'cles_figees_soi' => 'Your own keys are managed from your profile.',
+    'cle_ajout_titre' => 'Add a key to this account',
+    'cle_libelle' => 'Key name',
+    'cle_cle' => 'Public key',
+    'cle_portee_toutes' => 'All its machines',
+    'cle_portee_machines' => 'Only the checked machines',
+    'cle_sans_machine' => 'This account has access to no machine: the key will not be installed anywhere until access is granted.',
+    'cle_btn_ajouter' => 'Add the key',
+    'cle_btn_retirer' => 'Remove',
+    'cle_avertissement' => 'The key will allow SSH logins under this account\'s name, at the next deployment. The second-factor code is required.',
+    'cle_ajoutee' => 'SSH key added to the account. It will be installed at the next deployment.',
+    'cle_retiree_du_compte' => 'SSH key removed from the account. It will be taken off the servers at the next deployment.',
+    'err_cle_vide' => 'Paste a public key.',
+    'err_cle_libelle' => 'Give the key a name (100 characters at most).',
+    'err_cle_doublon' => 'This key is already saved on this account.',
 ];

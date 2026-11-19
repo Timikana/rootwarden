@@ -28,7 +28,11 @@
         </details>
     </div>
 
-    <p class="rw-annonce" data-rw="perms-annonce" role="status" aria-live="polite"></p>
+    {{-- Les gestes qui RECHARGENT la page (ajout ou retrait d'une cle) y
+         laissent leur message en session : il s'affiche ici, au meme endroit
+         que celui des gestes sans rechargement. --}}
+    <p class="rw-annonce @if (session('succes')) rw-annonce--ok @endif @if (session('erreur')) rw-annonce--echec @endif"
+       data-rw="perms-annonce" role="status" aria-live="polite">@if (session('succes')){{ session('succes') }}@endif @if (session('erreur')){{ session('erreur') }}@endif</p>
 
     {{-- Le panneau de re-authentification, le MEME que D4. C'est lui qui rend la
          garde franchissable : le legacy l'exige et n'offre aucun moyen d'y
@@ -249,6 +253,97 @@
                         </li>
                     @endforeach
                 </ul>
+
+                {{-- LES CLES DU COMPTE : les lister, en retirer une, en ajouter une.
+                     Le geste du legacy (`manage_users.php`, superadmin) que le
+                     portage n'exposait sur aucun ecran. Memes refus que les
+                     droits : ni soi-meme (le profil sert a ca), ni un rang egal
+                     ou superieur — une cle posee ouvre une connexion SSH sous le
+                     nom du compte. --}}
+                @php($clesFigees = $c['id'] === $moi || (int) $c['role_id'] >= $monRole)
+                @php($ouvertes = array_values(array_filter($machines, fn ($m) => in_array((int) $m->id, $acces[$c['id']], true))))
+                <h3 class="rw-perms__titre">{{ __('perms.cles_titre') }}</h3>
+                @if ($cles[$c['id']] === [])
+                    <p class="rw-aide" data-rw="perms-cles-vide-{{ $c['id'] }}">{{ __('perms.cles_aucune') }}</p>
+                @else
+                    <div class="rw-tableau-cadre">
+                        <table class="rw-tableau" data-rw="perms-cles-{{ $c['id'] }}">
+                            <thead>
+                                <tr>
+                                    <th>{{ __('profil.cles_th_nom') }}</th>
+                                    <th>{{ __('profil.cles_th_empreinte') }}</th>
+                                    <th>{{ __('profil.cles_th_portee') }}</th>
+                                    @unless ($clesFigees)<th></th>@endunless
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($cles[$c['id']] as $k)
+                                    <tr>
+                                        <td>{{ $k['libelle'] }}</td>
+                                        <td class="rw-tableau__mono">{{ $k['algo'] }} SHA256:{{ $k['empreinte'] }}</td>
+                                        <td>{{ $k['toutes_machines'] ? __('perms.cle_portee_toutes') : implode(', ', array_column($k['machines'], 'name')) }}</td>
+                                        @unless ($clesFigees)
+                                            <td>
+                                                <button type="button" class="rw-bouton rw-bouton--minuscule rw-bouton--danger"
+                                                        data-rw="cle-retirer" data-user-id="{{ $c['id'] }}"
+                                                        data-cle-id="{{ $k['id'] }}">{{ __('perms.cle_btn_retirer') }}</button>
+                                            </td>
+                                        @endunless
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @endif
+
+                @if ($clesFigees)
+                    <p class="rw-aide rw-prose" data-rw="perms-cles-figees-{{ $c['id'] }}">
+                        {{ $c['id'] === $moi ? __('perms.cles_figees_soi') : __('perms.err_rang') }}
+                    </p>
+                @else
+                    <details class="rw-perms__ajout-cle" data-rw="cle-ajout-{{ $c['id'] }}">
+                        <summary class="rw-sous-titre-fort">{{ __('perms.cle_ajout_titre') }}</summary>
+                        <label class="rw-champ">
+                            <span>{{ __('perms.cle_libelle') }}</span>
+                            <input class="rw-saisie" type="text" maxlength="100" data-champ="libelle"
+                                   placeholder="{{ __('profil.cles_nom_exemple') }}">
+                        </label>
+                        <label class="rw-champ">
+                            <span>{{ __('perms.cle_cle') }}</span>
+                            <textarea class="rw-saisie" rows="3" data-champ="cle_ssh"></textarea>
+                        </label>
+                        <div class="rw-champ rw-champ--espace">
+                            <span class="rw-champ__etiquette">{{ __('profil.cles_th_portee') }}</span>
+                            <label class="rw-champ--case">
+                                <input type="radio" name="portee-{{ $c['id'] }}" value="toutes" data-champ="portee" checked>
+                                <span>{{ __('perms.cle_portee_toutes') }}</span>
+                            </label>
+                            <label class="rw-champ--case">
+                                <input type="radio" name="portee-{{ $c['id'] }}" value="machines" data-champ="portee">
+                                <span>{{ __('perms.cle_portee_machines') }}</span>
+                            </label>
+                            @if ($ouvertes === [])
+                                <p class="rw-aide">{{ __('perms.cle_sans_machine') }}</p>
+                            @else
+                                <ul class="rw-liste-selection">
+                                    @foreach ($ouvertes as $m)
+                                        <li class="rw-liste-selection__ligne">
+                                            <label class="rw-liste-selection__etiquette">
+                                                <input type="checkbox" class="rw-case" value="{{ $m->id }}" data-champ="machines">
+                                                <span class="rw-liste-selection__nom">{{ $m->name }}</span>
+                                            </label>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            @endif
+                        </div>
+                        <div class="rw-actions">
+                            <span class="rw-actions__gauche rw-aide">{{ __('perms.cle_avertissement') }}</span>
+                            <button type="button" class="rw-bouton" data-rw="cle-ajouter"
+                                    data-user-id="{{ $c['id'] }}">{{ __('perms.cle_btn_ajouter') }}</button>
+                        </div>
+                    </details>
+                @endif
             </details>
         </section>
     @endforeach

@@ -106,6 +106,15 @@ class StepUp
          * ligne dans un releve qui ne compte que les secrets.*
          */
         'profil_effacement',
+        /*
+         * Poser une cle SSH dans le compte d'AUTRUI. Ce n'est pas un geste
+         * destructeur, c'est pire : la cle posee ouvre une connexion SSH SOUS
+         * LE NOM de ce compte, sur chacune de ses machines, au deploiement
+         * suivant. Nom propre : la marque de `permission_definir` ne doit pas
+         * l'ouvrir. Le RETRAIT d'une cle n'en exige pas — il ferme, il n'ouvre
+         * rien, comme le retrait d'un acces machine.
+         */
+        'cle_ssh_poser',
     ];
 
     /**

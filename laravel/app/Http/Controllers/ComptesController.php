@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\ClesPubliques;
 use App\Services\Comptes;
 use App\Services\MotDePasse;
 use App\Services\JournalAudit;
@@ -55,7 +54,6 @@ class ComptesController extends Controller
         private readonly JournalAudit $journal,
         private readonly StepUp $stepUp,
         private readonly MotDePasse $motDePasse,
-        private readonly ClesPubliques $cles,
         private readonly LienAcces $lienAcces,
     ) {
     }
@@ -402,28 +400,6 @@ class ComptesController extends Controller
             'message' => __($local ? 'comptes.lien_prepare_local' : 'comptes.lien_envoye',
                 ['heures' => intdiv(LienAcces::DUREE_SECONDES, 3600)]),
         ]);
-    }
-
-    /* ═══ Clé SSH ══════════════════════════════════════════════════════════ */
-
-    public function cleSsh(Request $requete, int $id): JsonResponse
-    {
-        [$auteur] = $this->qui($requete);
-        if (! $this->comptes->trouve($id)) {
-            return response()->json(['success' => false, 'message' => __('comptes.err_inconnu')], 404);
-        }
-        $cle = (string) $requete->input('cle_ssh', '');
-        // Sens CONSERVE : « la cle du compte » — toutes ses cles sont remplacees
-        // par celle-ci, valable partout ; une cle vide les retire toutes.
-        $err = $this->cles->remplaceParUneSeule($id, $cle, 'posee par un administrateur');
-        if ($err !== null) {
-            return response()->json(['success' => false, 'message' => __($err)], 422);
-        }
-        $this->journalise($auteur, trim($cle) === ''
-            ? "Cle SSH effacee pour le compte #{$id}"
-            : "Cle SSH remplacee pour le compte #{$id}");
-
-        return response()->json(['success' => true, 'message' => __('comptes.cle_enregistree')]);
     }
 
     /* ═══ Etats ════════════════════════════════════════════════════════════ */
