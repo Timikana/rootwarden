@@ -59,3 +59,26 @@ def test_sans_cle_pour_la_machine_le_fichier_est_retire():
 
     assert _contenu_ecrit(commandes) is None
     assert any(c.startswith('rm -f') and '/home/alice/.ssh/authorized_keys' in c for c in commandes), commandes
+
+
+def test_une_machine_sortie_de_la_portee_perd_la_cle_au_deploiement():
+    """Changer la portee (profil ou Acces & permissions) RETIRE la cle du serveur.
+
+    Le fichier est REECRIT (`>`), jamais complete (`>>`) : une machine sortie de
+    la portee recoit un `authorized_keys` sans la cle — elle ne cesse pas
+    seulement de la recevoir. Et si c'etait sa seule cle, le fichier part.
+    """
+    avant = {'name': 'alice', 'active': 1, 'ssh_keys': [
+        {'cle': PERSO, 'toutes': True, 'machines': set()},
+        {'cle': DEDIEE_WEB, 'toutes': False, 'machines': {1, 2}},
+    ]}
+    apres = {**avant, 'ssh_keys': [avant['ssh_keys'][0], {**avant['ssh_keys'][1], 'machines': {1}}]}
+
+    assert DEDIEE_WEB in _contenu_ecrit(_ecrit(avant, 2))   # temoin : elle y etait
+    commandes = _ecrit(apres, 2)
+    assert _contenu_ecrit(commandes) == PERSO + '\n'
+    assert not any('>> /home/alice/.ssh/authorized_keys' in c for c in commandes), commandes
+
+    seule = {'name': 'alice', 'active': 1, 'ssh_keys': [{'cle': DEDIEE_WEB, 'toutes': False, 'machines': {1}}]}
+    commandes = _ecrit(seule, 2)
+    assert any(c.startswith('rm -f') and '/home/alice/.ssh/authorized_keys' in c for c in commandes), commandes

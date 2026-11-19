@@ -244,6 +244,42 @@
                                     @else
                                         {{ implode(', ', array_column($c['machines'], 'name')) }}
                                     @endif
+                                    {{-- LA PORTEE SE CHANGE SANS RETIRER LA CLE. Les cases
+                                         partent de l'etat ENREGISTRE, pas d'un formulaire
+                                         vide : decocher ce qu'on ne voit pas coche est le
+                                         geste qu'on ne veut pas faire par megarde. --}}
+                                    @php($cochees = array_column($c['machines'], 'id'))
+                                    <details class="rw-details rw-cle-portee" data-rw="profil-cle-portee-{{ $c['id'] }}">
+                                        <summary>{{ __('profil.cles_modifier_portee') }}</summary>
+                                        <form method="POST" action="{{ route('profil.cles-ssh.portee', ['cle' => $c['id']]) }}">
+                                            @csrf
+                                            <label class="rw-champ--case">
+                                                <input type="radio" name="portee" value="toutes" @checked($c['toutes_machines'])>
+                                                <span>{{ __('profil.cles_portee_toutes') }}</span>
+                                            </label>
+                                            <label class="rw-champ--case">
+                                                <input type="radio" name="portee" value="machines" @checked(! $c['toutes_machines'])>
+                                                <span>{{ __('profil.cles_portee_machines') }}</span>
+                                            </label>
+                                            @if ($machinesCles !== [])
+                                                <ul class="rw-liste-selection">
+                                                    @foreach ($machinesCles as $m)
+                                                        <li class="rw-liste-selection__ligne">
+                                                            <label class="rw-liste-selection__etiquette">
+                                                                <input type="checkbox" name="machines[]" value="{{ $m['id'] }}" class="rw-case"
+                                                                       @checked(in_array($m['id'], $cochees, true))>
+                                                                <span class="rw-liste-selection__nom">{{ $m['name'] }}</span>
+                                                            </label>
+                                                        </li>
+                                                    @endforeach
+                                                </ul>
+                                            @endif
+                                            <div class="rw-actions">
+                                                <button type="submit" class="rw-bouton rw-bouton--minuscule"
+                                                        data-rw="profil-cle-portee-enregistrer">{{ __('profil.cles_enregistrer_portee') }}</button>
+                                            </div>
+                                        </form>
+                                    </details>
                                 </td>
                                 <td>{{ $c['created_at'] }}</td>
                                 <td>

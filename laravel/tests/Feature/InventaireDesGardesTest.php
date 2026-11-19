@@ -159,7 +159,7 @@ class InventaireDesGardesTest extends TestCase
          * Les autres n'ont pas d'objet a proteger au-dela de l'authentification :
          *   accueil, cgu (GET+POST), profil        l'ecran de tout compte
          *   profil/mot-de-passe, profil/step-up*   ses propres identifiants
- *   profil/courriel, profil/cles-ssh(/{cle}/retirer)  SES propres coordonnees
+ *   profil/courriel, profil/cles-ssh(/{cle}/retirer|portee)  SES propres coordonnees
  *       et SES propres cles (plusieurs depuis la migration 067 ; le retrait
  *       ne trouve pas la cle d'un autre compte) — `feaaaa2`, DOSSIER-30. La cible EST le demandeur,
  *       l'identifiant vient de la SESSION. Le pendant administratif
@@ -222,6 +222,7 @@ class InventaireDesGardesTest extends TestCase
             'POST accueil/assistant/masquer',
             'POST cgu',
             'POST profil/cles-ssh',
+            'POST profil/cles-ssh/{cle}/portee',
             'POST profil/cles-ssh/{cle}/retirer',
             'POST profil/courriel',
             'POST profil/effacement',
@@ -352,11 +353,11 @@ class InventaireDesGardesTest extends TestCase
             'ComptesController.php:679',      // compte_supprimer
             'ComptesController.php:704',      // compte_anonymiser
             'PasserelleController.php:89',    // generique, action DERIVEE du chemin
-            'PermissionsController.php:174',  // permission_definir
+            'PermissionsController.php:181',  // permission_definir
             // ⚠ 196 -> 208 le 2026-11-02 : `ajouterCleSsh` / `retirerCleSsh`
             //    remplacent `definirCleSsh` plus haut (plusieurs cles, migration
             //    067). Site RELU : le step-up de l'effacement y est inchange.
-            'PortailController.php:208',      // profil_effacement (E-449)
+            'PortailController.php:234',      // profil_effacement (E-449)
         ], $sites,
             "Les gardes de step-up vivant dans un CONTROLEUR ont change.\n"
             . "`TableDesGardes` ne peut pas les exprimer : son en-tete les recense, "

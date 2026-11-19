@@ -222,13 +222,16 @@ Route::middleware(['memorisation', 'session.authentifiee', 'session.revoquee', '
      * `role:3`. Ici la cible EST le demandeur, donc la garde de role n'a pas
      * d'objet : un role 1 doit pouvoir poser la cle qui sert son propre acces.
      */
-    // Migration 067 : PLUSIEURS cles par compte. Ajouter, retirer — toujours SES
-    // cles : le compte vient de la session, et `ClesPubliques::retire` ne trouve
-    // pas la cle d'un autre compte meme si son identifiant est soumis.
+    // Migration 067 : PLUSIEURS cles par compte. Ajouter, retirer, changer la
+    // portee — toujours SES cles : le compte vient de la session, et
+    // `ClesPubliques` ne trouve pas la cle d'un autre compte meme si son
+    // identifiant est soumis.
     Route::post('/profil/cles-ssh', [PortailController::class, 'ajouterCleSsh'])
         ->name('profil.cles-ssh.ajouter');
     Route::post('/profil/cles-ssh/{cle}/retirer', [PortailController::class, 'retirerCleSsh'])
         ->whereNumber('cle')->name('profil.cles-ssh.retirer');
+    Route::post('/profil/cles-ssh/{cle}/portee', [PortailController::class, 'changerPorteeCleSsh'])
+        ->whereNumber('cle')->name('profil.cles-ssh.portee');
     /*
      * ⚠ IRREVERSIBLE. Le geste execute est l'ANONYMISATION, pas une suppression :
      * `user_logs` est une chaine de hachage et retirer une ligne casserait la
@@ -1238,6 +1241,11 @@ Route::middleware(['memorisation', 'session.authentifiee', 'session.revoquee', '
         ->whereNumber('id')->middleware(['role:3', 'perm:can_admin_portal'])->name('permissions.definir');
     Route::post('/permissions/{id}/acces', [PermissionsController::class, 'acces'])
         ->whereNumber('id')->middleware(['role:3', 'perm:can_admin_portal'])->name('permissions.acces');
+    // La vue par serveur des cles d'un compte : poser ou retirer une de SES
+    // cles restreintes sur une machine qu'il atteint deja. Rien ne s'ouvre ici.
+    Route::post('/permissions/{id}/cles/{cle}', [PermissionsController::class, 'cle'])
+        ->whereNumber('id')->whereNumber('cle')
+        ->middleware(['role:3', 'perm:can_admin_portal'])->name('permissions.cle');
 
     /*
      * Permissions TEMPORAIRES — sous-lot D5b.

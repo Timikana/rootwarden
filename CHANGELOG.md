@@ -5,6 +5,26 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## Clés SSH : la portée d'une clé se modifie sans la retirer
+
+La portée d'une clé (toutes ses machines, ou seulement certaines) ne se choisissait qu'à l'ajout :
+pour la changer, il fallait retirer la clé et la recoller. Avec plusieurs clés par compte, chacune
+sur un à quatre serveurs, ce n'était plus praticable.
+
+- **Profil > Clés SSH** : « Modifier la portée » sur chaque clé. Le formulaire part de l'état
+  enregistré (« Toutes mes machines » ou les machines cochées) et s'enregistre sans retirer la clé.
+- **Accès & permissions** : sous chaque machine ouverte à un compte, ses clés SSH en cases à
+  cocher. Une clé restreinte s'y pose ou s'en retire ; une clé posée partout est cochée et figée
+  (sa portée se change depuis le profil) ; la dernière machine d'une clé ne se décoche pas.
+- **Mêmes règles qu'à l'ajout** : portée restreinte vide refusée, une machine hors des accès du
+  compte refuse toute la modification, la clé d'un autre compte est introuvable.
+- **Le retrait est effectif** : au déploiement suivant, `authorized_keys` est réécrit en entier,
+  donc une machine sortie de la portée perd la clé (et le fichier part si c'était la seule).
+- Le journal porte l'avant et l'après : « portée de la clé SSH #id modifiée (srv-a → toutes ses
+  machines) ».
+
+---
+
 ## Comptes : envoyer un lien pour choisir son mot de passe
 
 Sur `/comptes`, le bouton « Envoyer un lien » (colonne Mot de passe) envoie au compte un courriel

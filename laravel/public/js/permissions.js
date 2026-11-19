@@ -192,8 +192,40 @@
         dis(r.corps.message, 'ok');
     }
 
+    /**
+     * Une cle d'un compte, posee ou retiree sur UNE machine. Meme discipline que
+     * `bascule` : la case reprend son etat d'avant, et ne prend que celui que le
+     * serveur a ECRIT (`r.corps.actif`).
+     */
+    async function basculeCle(caseCible) {
+        const voulu = caseCible.checked;
+        caseCible.checked = ! voulu;
+        caseCible.disabled = true;
+
+        const r = await appelle(`/permissions/${caseCible.dataset.userId}/cles/${caseCible.dataset.cleId}`,
+            { machine_id: caseCible.dataset.cleMachine, value: voulu ? 1 : 0 });
+        caseCible.disabled = false;
+
+        if (! r.corps) { dis(garnis(L.err_reseau, { statut: r.statut }), 'echec'); return; }
+        if (! r.ok || ! r.corps.success) { dis(r.corps.message, 'echec'); return; }
+
+        caseCible.checked = r.corps.actif;
+        const bloc = caseCible.closest('details');
+        const resume = bloc ? bloc.querySelector('summary') : null;
+        if (resume) {
+            const cases = bloc.querySelectorAll('input[data-cle-id]');
+            resume.textContent = garnis(L.cles_resume, {
+                n: [...cases].filter((c) => c.checked).length, total: cases.length,
+            });
+        }
+        dis(r.corps.message, 'ok');
+    }
+
     document.addEventListener('change', (ev) => {
         const c = ev.target;
+        if (c instanceof HTMLInputElement && c.type === 'checkbox' && c.dataset.cleId) {
+            basculeCle(c);
+        }
         // `dataset.machineId` a QUITTE les cases a cocher : les machines sont
         // desormais une liste de prereglages. Le laisser dans la condition
         // ci-dessous ferait croire qu'un chemin existe encore ici.

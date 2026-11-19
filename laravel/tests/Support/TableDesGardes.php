@@ -173,6 +173,7 @@ class TableDesGardes
             ['POST', 'permissions/temporaires/{id}/revoquer', ['role:3', 'perm:can_admin_portal']],
             ['POST', 'permissions/{id}', ['role:3', 'perm:can_admin_portal']],
             ['POST', 'permissions/{id}/acces', ['role:3', 'perm:can_admin_portal']],
+            ['POST', 'permissions/{id}/cles/{cle}', ['role:3', 'perm:can_admin_portal']],
             ['GET', 'politiques', ['role:3']],
             ['GET', 'profil', []],
             ['POST', 'profil/mot-de-passe', []],
@@ -197,6 +198,7 @@ class TableDesGardes
              */
             ['POST', 'profil/cles-ssh', []],
             ['POST', 'profil/cles-ssh/{cle}/retirer', []],
+            ['POST', 'profil/cles-ssh/{cle}/portee', []],
             /*
              * ⚠ IRREVERSIBLE, ET SANS RE-AUTHENTIFICATION — a lire ensemble.
              *

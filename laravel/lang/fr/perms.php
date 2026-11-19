@@ -98,4 +98,16 @@ return [
     'temp_echec' => "L'octroi n'a pas abouti.",
     'temp_revoque' => "L'octroi :quoi est révoqué.",
     'temp_err_revocation' => "Cet octroi n'existe pas, ou il a déjà expiré.",
+
+    // Les cles SSH d'un compte, rangees par machine
+    'cles_resume' => 'Clés SSH : :n / :total',
+    'cles_partout' => 'partout',
+    'cles_aide' => 'Clés SSH : sous chaque machine ouverte, cochez les clés restreintes du compte à y poser. Une clé posée partout se règle depuis le profil de son compte. Effet au prochain déploiement.',
+    'cle_posee' => 'Clé posée sur la machine. Effet au prochain déploiement.',
+    'cle_retiree' => 'Clé retirée de la machine. Elle en sera enlevée au prochain déploiement.',
+    'err_cle_introuvable' => "Cette clé n'existe pas sur ce compte.",
+    'err_cle_portee_toutes' => 'Cette clé est posée sur toutes les machines du compte : sa portée se change depuis son profil.',
+    'err_cle_derniere_machine' => "C'est la dernière machine de cette clé : la décocher viderait sa portée. Le compte peut retirer la clé depuis son profil.",
+    'err_cle_portee_hors_acces' => "Le compte n'a pas accès à cette machine : accordez d'abord l'accès.",
+    'err_cle_portee_vide' => "C'est la dernière machine de cette clé : la décocher viderait sa portée.",
 ];
