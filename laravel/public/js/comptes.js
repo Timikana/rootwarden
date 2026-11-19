@@ -101,6 +101,25 @@
         dis(r.corps.message, 'ok');
     }
 
+    /* ── Lien d'acces par courriel ────────────────────────────────────────────
+     *
+     * Aucune decision a prendre en page : le geste ne change pas le mot de
+     * passe actuel, il envoie un lien. Le message du serveur dit s'il est
+     * parti, ou seulement ecrit dans le journal faute de transport.
+     */
+    async function envoieLien(bouton) {
+        bouton.disabled = true;
+        const r = await appelle(`/comptes/${bouton.dataset.id}/lien-acces`, {});
+        bouton.disabled = false;
+        if (! r.corps) {
+            dis(garnis(L.err_reseau, { statut: r.statut }), 'echec');
+
+            return;
+        }
+        if (! r.ok || ! r.corps.success) { dis(r.corps.message, 'echec'); return; }
+        dis(r.corps.message, r.corps.envoye === false ? 'attention' : 'ok');
+    }
+
     /* ── Second facteur : decision EN PAGE ────────────────────────────────── */
 
     let cibleTotp = null;
@@ -397,6 +416,7 @@
         if (rw === 'comptes-stepup-valider') return valideStepUp();
         if (rw.startsWith('compte-mdp-poser-')) return poseMotDePasse(el, false);
         if (rw.startsWith('compte-mdp-generer-')) return poseMotDePasse(el, true);
+        if (rw.startsWith('compte-lien-')) return envoieLien(el);
         if (rw.startsWith('compte-deverrouiller-')) return deverrouille(el);
         if (rw.startsWith('compte-activite-')) return basculeActivite(el);
         if (rw.startsWith('compte-sudo-')) return basculeSudo(el);

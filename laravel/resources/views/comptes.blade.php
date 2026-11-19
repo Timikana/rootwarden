@@ -229,6 +229,17 @@
                             <button type="button" class="rw-bouton rw-bouton--minuscule rw-bouton--discret"
                                     data-rw="compte-mdp-generer-{{ $c['id'] }}"
                                     data-id="{{ $c['id'] }}">{{ __('comptes.mdp_generer') }}</button>
+                            {{-- LE LIEN D'ACCES : la condition est celle du service
+                                 (`LienAcces::envoie`) — une adresse, un compte actif, et
+                                 la garde hierarchique. Un bouton qui serait refuse a
+                                 coup sur n'est pas rendu. --}}
+                            @if (! empty($c['email']) && (int) $c['active'] === 1 && ($estSuperadmin || (int) $c['role_id'] < 3))
+                                <button type="button" class="rw-bouton rw-bouton--minuscule rw-bouton--discret"
+                                        data-rw="compte-lien-{{ $c['id'] }}"
+                                        data-id="{{ $c['id'] }}"
+                                        title="{{ __('comptes.lien_aide', ['courriel' => $c['email']]) }}"
+                                        aria-label="{{ __('comptes.lien_pour', ['nom' => $c['name']]) }}">{{ __('comptes.lien_envoyer') }}</button>
+                            @endif
                         </td>
                         <td>
                             <div class="rw-tableau__actions">

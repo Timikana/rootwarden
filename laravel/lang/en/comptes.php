@@ -150,4 +150,32 @@ return [
     'step_up_valider' => "Verify code",
     'lien_cles_api' => 'Manage API keys',
     'imp_cle_refusee' => 'SSH key refused, account created without a key: :raison',
+    /*
+     * The access link sent by an administrator (`LienAcces`). Same token and
+     * same form as "forgot password", valid for 24 hours.
+     */
+    'lien_envoyer' => 'Send a link',
+    'lien_pour' => 'Send :nom a link to choose their password',
+    'lien_aide' => 'Sends :courriel a link, valid for 24 hours, to choose a password. The current password stays valid until then.',
+    'lien_envoye' => 'Link sent. It is valid for :heures hours and works once; the current password stays valid until it is used.',
+    'lien_prepare_local' => 'Link prepared, but email sending is not configured on this portal: nobody will receive it.',
+    'lien_inactif' => 'This account is suspended: a link would be of no use to it.',
+    'lien_sans_courriel' => 'This account has no valid email address.',
+    'lien_trop_tot' => 'A link was just sent to this account. Try again in a minute.',
+    'lien_echec' => 'Sending the email failed; no link is valid. Check the SMTP configuration.',
+    'lien_courriel_sujet' => 'RootWarden — choose your password',
+    'lien_courriel_corps' => <<<'TXT'
+Hello :nom,
+
+An administrator sent you a link to choose your RootWarden password.
+
+Open this link:
+
+:lien
+
+This link is valid for :heures hours and works only once. After choosing your
+password, sign in as usual: the second factor is still required.
+
+If you were not expecting this message, ignore it: without this link, nothing changes.
+TXT,
 ];

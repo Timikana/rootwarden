@@ -5,6 +5,25 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## Comptes : envoyer un lien pour choisir son mot de passe
+
+Sur `/comptes`, le bouton « Envoyer un lien » (colonne Mot de passe) envoie au compte un courriel
+avec un lien à usage unique, valable 24 heures, pour choisir son mot de passe. C'est l'alternative
+au mot de passe généré, qu'il fallait transmettre à la main.
+
+- **Même mécanisme que « Mot de passe oublié »** : même jeton (haché en base), même formulaire,
+  même politique de mot de passe, mêmes sessions fermées. Le lien n'ouvre aucune session : la
+  connexion qui suit exige le second facteur.
+- **Le mot de passe actuel reste valable** tant que le lien n'a pas servi. Envoyer un lien
+  invalide les liens précédents du compte.
+- **Gardes** : celles du mot de passe (rôle 2 et `can_admin_portal`, un rôle 2 ne vise pas un
+  rôle 3), plus un compte actif avec une adresse valide, et un envoi par compte et par minute.
+- **L'écran dit ce qui s'est passé** : envoyé ; préparé mais non envoyé quand le transport de
+  courriel est local (`MAIL_MAILER=log`) ; échec SMTP, auquel cas le lien est aussitôt invalidé.
+- Chaque envoi est journalisé.
+
+---
+
 ## Code à six chiffres : la touche Entrée le valide
 
 Sur Accès & permissions, Comptes, Politiques et Accès SFTP, le panneau qui demande le code du

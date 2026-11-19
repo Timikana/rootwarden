@@ -805,6 +805,9 @@ Route::middleware(['memorisation', 'session.authentifiee', 'session.revoquee', '
         ->middleware(['role:2', 'perm:can_admin_portal'])->name('comptes.importer');
     Route::post('/comptes/{id}/mot-de-passe', [ComptesController::class, 'motDePasse'])
         ->whereNumber('id')->middleware(['role:2', 'perm:can_admin_portal'])->name('comptes.mot-de-passe');
+    // Meme garde que le mot de passe : c'est une autre facon d'en poser un.
+    Route::post('/comptes/{id}/lien-acces', [ComptesController::class, 'lienAcces'])
+        ->whereNumber('id')->middleware(['role:2', 'perm:can_admin_portal'])->name('comptes.lien-acces');
     Route::post('/comptes/{id}/cle-ssh', [ComptesController::class, 'cleSsh'])
         ->whereNumber('id')->middleware(['role:3', 'perm:can_admin_portal'])->name('comptes.cle-ssh');
     Route::post('/comptes/{id}/deverrouiller', [ComptesController::class, 'deverrouiller'])

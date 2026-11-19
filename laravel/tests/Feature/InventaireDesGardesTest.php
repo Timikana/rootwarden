@@ -346,8 +346,11 @@ class InventaireDesGardesTest extends TestCase
             //    RELU a sa nouvelle place : le step-up y est inchange.
             // ⚠ 629 -> 633 et 654 -> 658 le 2026-11-02 : injection de
             //    `ClesPubliques` et commentaire de `cleSsh`, plus haut. RELUS.
-            'ComptesController.php:633',      // compte_supprimer
-            'ComptesController.php:658',      // compte_anonymiser
+            // ⚠ 633 -> 679 et 658 -> 704 le 2026-11-19 : `lienAcces()` inseree
+            //    plus haut (lien d'acces par courriel). RELUS : le step-up y est
+            //    inchange.
+            'ComptesController.php:679',      // compte_supprimer
+            'ComptesController.php:704',      // compte_anonymiser
             'PasserelleController.php:89',    // generique, action DERIVEE du chemin
             'PermissionsController.php:174',  // permission_definir
             // ⚠ 196 -> 208 le 2026-11-02 : `ajouterCleSsh` / `retirerCleSsh`

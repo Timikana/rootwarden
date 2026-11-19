@@ -163,4 +163,32 @@ return [
     'step_up_valider' => "Valider le code",
     'lien_cles_api' => "Gérer les clés d'API",
     'imp_cle_refusee' => 'Clé SSH refusée, compte créé sans clé : :raison',
+    /*
+     * Le lien d'acces envoye par un administrateur (`LienAcces`). Le meme jeton
+     * et le meme formulaire que « mot de passe oublie », valable 24 heures.
+     */
+    'lien_envoyer' => 'Envoyer un lien',
+    'lien_pour' => "Envoyer à :nom un lien pour choisir son mot de passe",
+    'lien_aide' => "Envoie à :courriel un lien valable 24 heures pour choisir un mot de passe. Le mot de passe actuel reste valable jusque-là.",
+    'lien_envoye' => "Lien envoyé. Il est valable :heures heures et ne sert qu'une fois ; le mot de passe actuel reste valable jusqu'à son utilisation.",
+    'lien_prepare_local' => "Lien préparé, mais l'envoi de courriels n'est pas configuré sur ce portail : personne ne le recevra.",
+    'lien_inactif' => "Ce compte est suspendu : un lien ne lui servirait à rien.",
+    'lien_sans_courriel' => "Ce compte n'a pas d'adresse de courriel valide.",
+    'lien_trop_tot' => "Un lien vient d'être envoyé à ce compte. Réessayez dans une minute.",
+    'lien_echec' => "L'envoi du courriel a échoué ; aucun lien n'est valable. Vérifiez la configuration SMTP.",
+    'lien_courriel_sujet' => 'RootWarden — choisissez votre mot de passe',
+    'lien_courriel_corps' => <<<'TXT'
+Bonjour :nom,
+
+Un administrateur vous a envoyé un lien pour choisir votre mot de passe RootWarden.
+
+Ouvrez ce lien :
+
+:lien
+
+Ce lien est valable :heures heures et ne peut servir qu'une fois. Après avoir choisi
+votre mot de passe, connectez-vous normalement : le second facteur reste exigé.
+
+Si vous n'attendiez pas ce message, ignorez-le : sans ce lien, rien ne change.
+TXT,
 ];
