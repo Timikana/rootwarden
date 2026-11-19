@@ -218,7 +218,7 @@ Route::middleware(['memorisation', 'session.authentifiee', 'session.revoquee', '
     Route::post('/profil/courriel', [PortailController::class, 'changerCourriel'])
         ->name('profil.courriel');
     /*
-     * L'ecriture administrative de la cle (`/comptes/{id}/cle-ssh`) est gardee
+     * L'ecriture administrative des cles (`/permissions/{id}/cles`) est gardee
      * `role:3`. Ici la cible EST le demandeur, donc la garde de role n'a pas
      * d'objet : un role 1 doit pouvoir poser la cle qui sert son propre acces.
      */
@@ -811,8 +811,6 @@ Route::middleware(['memorisation', 'session.authentifiee', 'session.revoquee', '
     // Meme garde que le mot de passe : c'est une autre facon d'en poser un.
     Route::post('/comptes/{id}/lien-acces', [ComptesController::class, 'lienAcces'])
         ->whereNumber('id')->middleware(['role:2', 'perm:can_admin_portal'])->name('comptes.lien-acces');
-    Route::post('/comptes/{id}/cle-ssh', [ComptesController::class, 'cleSsh'])
-        ->whereNumber('id')->middleware(['role:3', 'perm:can_admin_portal'])->name('comptes.cle-ssh');
     Route::post('/comptes/{id}/deverrouiller', [ComptesController::class, 'deverrouiller'])
         ->whereNumber('id')->middleware(['role:3', 'perm:can_admin_portal'])->name('comptes.deverrouiller');
 
@@ -1246,6 +1244,13 @@ Route::middleware(['memorisation', 'session.authentifiee', 'session.revoquee', '
     Route::post('/permissions/{id}/cles/{cle}', [PermissionsController::class, 'cle'])
         ->whereNumber('id')->whereNumber('cle')
         ->middleware(['role:3', 'perm:can_admin_portal'])->name('permissions.cle');
+    // Ajouter ou retirer une cle d'un compte. La garde de rang et le step-up
+    // de l'ajout vivent dans le controleur : ils dependent de la CIBLE.
+    Route::post('/permissions/{id}/cles', [PermissionsController::class, 'ajouterCle'])
+        ->whereNumber('id')->middleware(['role:3', 'perm:can_admin_portal'])->name('permissions.cles.ajouter');
+    Route::post('/permissions/{id}/cles/{cle}/retirer', [PermissionsController::class, 'retirerCle'])
+        ->whereNumber('id')->whereNumber('cle')
+        ->middleware(['role:3', 'perm:can_admin_portal'])->name('permissions.cles.retirer');
 
     /*
      * Permissions TEMPORAIRES — sous-lot D5b.

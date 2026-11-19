@@ -221,6 +221,49 @@
         dis(r.corps.message, 'ok');
     }
 
+    /**
+     * Ajouter une cle a un compte. Le serveur exige un step-up : le refus
+     * ouvre le panneau, et le geste repart une fois le code valide. En cas de
+     * succes la page se RECHARGE — la liste des cles et leur repartition par
+     * machine se relisent du serveur, le message suit en session.
+     */
+    async function ajouteCle(bouton) {
+        const bloc = bouton.closest('[data-rw^="cle-ajout-"]');
+        if (! bloc || bouton.disabled) return;
+        const lis = (champ) => bloc.querySelector(`[data-champ="${champ}"]`);
+        const portee = bloc.querySelector('[data-champ="portee"]:checked');
+        const corps = {
+            libelle: lis('libelle').value,
+            cle_ssh: lis('cle_ssh').value,
+            portee: portee ? portee.value : 'toutes',
+            machines: [...bloc.querySelectorAll('[data-champ="machines"]:checked')].map((c) => c.value),
+        };
+
+        bouton.disabled = true;
+        const r = await appelle(`/permissions/${bouton.dataset.userId}/cles`, corps);
+        bouton.disabled = false;
+
+        if (r.corps && r.corps.step_up_required) {
+            dis(r.corps.message, 'attention');
+
+            return demandeStepUp(r.corps.action, () => ajouteCle(bouton));
+        }
+        if (! r.corps) { dis(garnis(L.err_reseau, { statut: r.statut }), 'echec'); return; }
+        if (! r.ok || ! r.corps.success) { dis(r.corps.message, 'echec'); return; }
+        window.location.reload();
+    }
+
+    /** Retirer une cle d'un compte : pas de step-up, retirer ferme. */
+    async function retireCle(bouton) {
+        if (bouton.disabled) return;
+        bouton.disabled = true;
+        const r = await appelle(`/permissions/${bouton.dataset.userId}/cles/${bouton.dataset.cleId}/retirer`, {});
+        bouton.disabled = false;
+        if (! r.corps) { dis(garnis(L.err_reseau, { statut: r.statut }), 'echec'); return; }
+        if (! r.ok || ! r.corps.success) { dis(r.corps.message, 'echec'); return; }
+        window.location.reload();
+    }
+
     document.addEventListener('change', (ev) => {
         const c = ev.target;
         if (c instanceof HTMLInputElement && c.type === 'checkbox' && c.dataset.cleId) {
@@ -240,6 +283,8 @@
         const rw = ev.target instanceof HTMLElement ? (ev.target.dataset.rw || '') : '';
         if (rw === 'perms-stepup-annuler') { panneau.hidden = true; enAttente = null; }
         if (rw === 'perms-stepup-valider') valideStepUp();
+        if (rw === 'cle-ajouter') ajouteCle(ev.target);
+        if (rw === 'cle-retirer') retireCle(ev.target);
     });
     // ENTREE VALIDE LE CODE. Le panneau n'est pas un formulaire : sans cet
     // ecouteur, Entree ne faisait rien et le geste restait en attente, muet.

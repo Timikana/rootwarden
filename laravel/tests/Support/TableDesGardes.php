@@ -30,13 +30,14 @@ namespace Tests\Support;
  * C'est le cas de TOUS les step-up du depot. Releve du 2026-09-06, numeros
  * de ligne remis a jour le 2026-11-19 :
  *
- *     ComptesController:679      compte_supprimer
- *     ComptesController:704      compte_anonymiser
- *     PermissionsController:174  permission_definir
- *     PortailController:208      profil_effacement      (E-449)
+ *     ComptesController:655      compte_supprimer
+ *     ComptesController:680      compte_anonymiser
+ *     PermissionsController:181  permission_definir
+ *     PermissionsController:317  cle_ssh_poser
+ *     PortailController:234      profil_effacement      (E-449)
  *     PasserelleController:89    generique, action DERIVEE du chemin
  *
- * Cinq sites, quatre actions nommees du portage et une garde generique de
+ * Six sites, cinq actions nommees du portage et une garde generique de
  * passerelle. **Une route de cette table peut donc etre plus gardee qu'elle n'y
  * parait** — jamais moins : un site de controleur AJOUTE une exigence, il n'en
  * retire aucune. Lire un tableau vide comme « rien ne garde ce geste » serait
@@ -97,7 +98,6 @@ class TableDesGardes
             ['POST', 'comptes/{id}/expiration', ['role:3', 'perm:can_admin_portal']],
             ['POST', 'comptes/{id}/activite', ['role:3', 'perm:can_admin_portal']],
             ['POST', 'comptes/{id}/anonymiser', ['role:3', 'perm:can_admin_portal']],
-            ['POST', 'comptes/{id}/cle-ssh', ['role:3', 'perm:can_admin_portal']],
             ['POST', 'comptes/{id}/deverrouiller', ['role:3', 'perm:can_admin_portal']],
             ['GET', 'comptes/{id}/etat-suppression', ['role:3', 'perm:can_admin_portal']],
             ['POST', 'comptes/{id}/mot-de-passe', ['role:2', 'perm:can_admin_portal']],
@@ -174,6 +174,8 @@ class TableDesGardes
             ['POST', 'permissions/{id}', ['role:3', 'perm:can_admin_portal']],
             ['POST', 'permissions/{id}/acces', ['role:3', 'perm:can_admin_portal']],
             ['POST', 'permissions/{id}/cles/{cle}', ['role:3', 'perm:can_admin_portal']],
+            ['POST', 'permissions/{id}/cles', ['role:3', 'perm:can_admin_portal']],
+            ['POST', 'permissions/{id}/cles/{cle}/retirer', ['role:3', 'perm:can_admin_portal']],
             ['GET', 'politiques', ['role:3']],
             ['GET', 'profil', []],
             ['POST', 'profil/mot-de-passe', []],
@@ -184,7 +186,7 @@ class TableDesGardes
              * la cible EST le demandeur, l'identifiant venant de la SESSION et
              * jamais de la requete. Exiger un role ici interdirait a un role 1 de
              * poser la cle qui sert son propre acces. Le pendant administratif
-             * (`POST comptes/{id}/cle-ssh`) reste `role:3` — deux routes, deux
+             * (`POST permissions/{id}/cles`) reste `role:3` — deux routes, deux
              * arites, et c'est la difference d'arite qui fonde la difference de
              * garde.
              */

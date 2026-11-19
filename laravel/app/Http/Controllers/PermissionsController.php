@@ -296,4 +296,63 @@ class PermissionsController extends Controller
             'message' => $posee ? __('perms.cle_posee') : __('perms.cle_retiree'),
         ]);
     }
+
+    /**
+     * Ajoute une cle SSH au compte d'AUTRUI — le geste du legacy
+     * (`manage_users.php`, superadmin) que le portage n'exposait sur aucun
+     * ecran. Il AJOUTE une cle : les autres cles du compte restent.
+     *
+     * ⚠ GARDE DE RANG ET STEP-UP. Une cle posee ouvre une connexion SSH sous le
+     * nom du compte : on ne la pose ni dans son propre compte (le profil sert a
+     * ca), ni dans celui d'un rang egal ou superieur — un superadmin ne plante
+     * pas une cle chez un autre. Et la marque est propre au geste
+     * (`cle_ssh_poser`).
+     */
+    public function ajouterCle(Request $requete, int $id): JsonResponse
+    {
+        [$auteur, $roleAuteur] = $this->qui($requete);
+        if (($refus = $this->refuse($id, $auteur, $roleAuteur)) !== null) {
+            return response()->json(['success' => false, 'message' => __($refus)], 403);
+        }
+        if (! $this->stepUp->valide($auteur, 'cle_ssh_poser')) {
+            return response()->json([
+                'success' => false,
+                'step_up_required' => true,
+                'action' => 'cle_ssh_poser',
+                'message' => __('perms.err_step_up'),
+            ], 403);
+        }
+
+        $toutes = $requete->input('portee', 'toutes') !== 'machines';
+        $libelle = trim((string) $requete->input('libelle', ''));
+        $err = $this->cles->ajoute($id, $libelle, (string) $requete->input('cle_ssh', ''),
+            $toutes, (array) $requete->input('machines', []));
+        if ($err !== null) {
+            return response()->json(['success' => false, 'message' => __(str_replace('profil.', 'perms.', $err))], 422);
+        }
+        $this->journalise($auteur, "Cle SSH « {$libelle} » ajoutee au compte #{$id} ("
+            . ($toutes ? 'toutes ses machines' : 'portee restreinte') . ')');
+        $message = __('perms.cle_ajoutee');
+        // La page se RECHARGE apres le geste : la liste se relit du serveur.
+        $requete->session()->flash('succes', $message);
+
+        return response()->json(['success' => true, 'message' => $message]);
+    }
+
+    /** Retire UNE cle d'un compte. Meme garde de rang ; pas de step-up : retirer ferme. */
+    public function retirerCle(Request $requete, int $id, int $cle): JsonResponse
+    {
+        [$auteur, $roleAuteur] = $this->qui($requete);
+        if (($refus = $this->refuse($id, $auteur, $roleAuteur)) !== null) {
+            return response()->json(['success' => false, 'message' => __($refus)], 403);
+        }
+        if (! $this->cles->retire($id, $cle)) {
+            return response()->json(['success' => false, 'message' => __('perms.err_cle_introuvable')], 404);
+        }
+        $this->journalise($auteur, "Cle SSH #{$cle} retiree du compte #{$id}");
+        $message = __('perms.cle_retiree_du_compte');
+        $requete->session()->flash('succes', $message);
+
+        return response()->json(['success' => true, 'message' => $message]);
+    }
 }

@@ -285,8 +285,13 @@ final class ClesPubliques
 
     /**
      * Remplace TOUTES les cles du compte par une seule, valable partout — le
-     * sens de l'ecriture administrative `POST comptes/{id}/cle-ssh` et de
-     * l'import CSV, conserve tel quel. Une cle vide retire toutes les cles.
+     * sens de l'import CSV (« la cle du compte »), conserve tel quel. Une cle
+     * vide retire toutes les cles.
+     *
+     * L'ancienne ecriture administrative `POST comptes/{id}/cle-ssh` avait ce
+     * sens et aucun ecran ne l'appelait : elle est retiree. L'administrateur
+     * ajoute ou retire desormais UNE cle (`POST permissions/{id}/cles`), sans
+     * effacer les autres.
      */
     public function remplaceParUneSeule(int $idCompte, string $cle, string $libelle = 'cle principale'): ?string
     {

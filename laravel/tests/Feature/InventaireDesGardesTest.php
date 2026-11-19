@@ -163,7 +163,7 @@ class InventaireDesGardesTest extends TestCase
  *       et SES propres cles (plusieurs depuis la migration 067 ; le retrait
  *       ne trouve pas la cle d'un autre compte) — `feaaaa2`, DOSSIER-30. La cible EST le demandeur,
  *       l'identifiant vient de la SESSION. Le pendant administratif
- *       (`POST comptes/{id}/cle-ssh`) reste `role:3` : deux arites, deux
+ *       (`POST permissions/{id}/cles`) reste `role:3` : deux arites, deux
  *       gardes. Exiger un role ici interdirait a un role 1 de poser la cle
  *       qui sert son propre acces.
  *   profil/effacement                      SON propre compte — et c'est la
@@ -350,13 +350,22 @@ class InventaireDesGardesTest extends TestCase
             // ⚠ 633 -> 679 et 658 -> 704 le 2026-11-19 : `lienAcces()` inseree
             //    plus haut (lien d'acces par courriel). RELUS : le step-up y est
             //    inchange.
-            'ComptesController.php:679',      // compte_supprimer
-            'ComptesController.php:704',      // compte_anonymiser
+            // ⚠ 679 -> 655 et 704 -> 680 le 2026-11-19 : `cleSsh()` RETIREE plus
+            //    haut (l'ecriture qui remplacait toutes les cles, sans ecran).
+            //    RELUS : le step-up y est inchange.
+            'ComptesController.php:655',      // compte_supprimer
+            'ComptesController.php:680',      // compte_anonymiser
             'PasserelleController.php:89',    // generique, action DERIVEE du chemin
+            // ⚠ 174 -> 181 le 2026-11-19 : injection de `ClesPubliques` et cles
+            //    passees a la vue, plus haut (portee des cles). RELU.
             'PermissionsController.php:181',  // permission_definir
+            // AJOUTE le 2026-11-19 : poser une cle dans le compte d'autrui.
+            'PermissionsController.php:317',  // cle_ssh_poser
             // ⚠ 196 -> 208 le 2026-11-02 : `ajouterCleSsh` / `retirerCleSsh`
             //    remplacent `definirCleSsh` plus haut (plusieurs cles, migration
             //    067). Site RELU : le step-up de l'effacement y est inchange.
+            // ⚠ 208 -> 234 le 2026-11-19 : `changerPorteeCleSsh` inseree plus
+            //    haut. RELU.
             'PortailController.php:234',      // profil_effacement (E-449)
         ], $sites,
             "Les gardes de step-up vivant dans un CONTROLEUR ont change.\n"

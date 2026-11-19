@@ -123,7 +123,6 @@ return [
     'err_cle_algo' => 'That key algorithm is not accepted.',
     'err_cle_base64' => 'The key body is not valid base64.',
     'err_cle_lignes' => 'A public key fits on a single line.',
-    'cle_enregistree' => 'SSH key saved.',
     'err_reseau' => 'The portal did not answer (status :statut). Nothing was changed.',
 
     // Deletion and anonymisation — sub-lot D4

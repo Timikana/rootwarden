@@ -5,6 +5,24 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## Accès & permissions : ajouter ou retirer une clé SSH d'un compte
+
+Un administrateur ne pouvait plus poser la clé publique d'un utilisateur : l'ancien portail le
+faisait depuis sa page de gestion des utilisateurs, le nouveau n'avait que la route, sans écran.
+
+- Dans la carte de chaque compte, une section « Clés SSH » liste ses clés (nom, empreinte,
+  portée) avec « Retirer », et « Ajouter une clé à ce compte » : nom, clé publique, portée
+  (toutes ses machines ou celles cochées parmi ses accès). Une clé ajoutée s'ajoute aux autres.
+- **L'ajout demande le code du second facteur** : la clé permettra de se connecter en SSH sous
+  le nom du compte. Le retrait n'en demande pas.
+- **Ni soi-même ni un rang égal ou supérieur** : ses propres clés se gèrent depuis le profil, et
+  un superadmin ne pose pas de clé chez un autre superadmin.
+- Chaque ajout et retrait est journalisé. Effet au prochain déploiement.
+- L'ancienne route `POST /comptes/{id}/cle-ssh`, qui remplaçait toutes les clés d'un compte par
+  une seule et qu'aucun écran n'appelait, est retirée. L'import CSV garde ce sens.
+
+---
+
 ## Clés SSH : la portée d'une clé se modifie sans la retirer
 
 La portée d'une clé (toutes ses machines, ou seulement certaines) ne se choisissait qu'à l'ajout :
