@@ -95,6 +95,8 @@
         if (! enAttente) return;
         const champ = panneau.querySelector('[data-rw="perms-stepup-code"]');
         const bouton = panneau.querySelector('[data-rw="perms-stepup-valider"]');
+        // Un envoi en cours : le meme code renvoye serait refuse par l'anti-rejeu.
+        if (bouton.disabled) return;
         bouton.disabled = true;
         const r = await appelle('/profil/step-up',
             { action: enAttente.action, code: champ.value.trim() });
@@ -206,6 +208,13 @@
         const rw = ev.target instanceof HTMLElement ? (ev.target.dataset.rw || '') : '';
         if (rw === 'perms-stepup-annuler') { panneau.hidden = true; enAttente = null; }
         if (rw === 'perms-stepup-valider') valideStepUp();
+    });
+    // ENTREE VALIDE LE CODE. Le panneau n'est pas un formulaire : sans cet
+    // ecouteur, Entree ne faisait rien et le geste restait en attente, muet.
+    document.addEventListener('keydown', (ev) => {
+        if (ev.key !== 'Enter' || ! ev.target.matches('[data-rw="perms-stepup-code"]')) return;
+        ev.preventDefault();
+        valideStepUp();
     });
 
     /* ═══ Permissions temporaires — sous-lot D5b ══════════════════════════

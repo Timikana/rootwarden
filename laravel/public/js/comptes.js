@@ -240,6 +240,8 @@
         if (! enAttente) return;
         const champ = panneauStepUp.querySelector('[data-rw="comptes-stepup-code"]');
         const bouton = panneauStepUp.querySelector('[data-rw="comptes-stepup-valider"]');
+        // Un envoi en cours : le meme code renvoye serait refuse par l'anti-rejeu.
+        if (bouton.disabled) return;
         bouton.disabled = true;
         const r = await appelle('/profil/step-up',
             { action: enAttente.action, code: champ.value.trim() });
@@ -416,5 +418,13 @@
             secret.querySelector('[data-rw="comptes-secret-valeur"]').textContent = '';
             secret.hidden = true;
         }
+    });
+
+    // ENTREE VALIDE LE CODE. Le panneau n'est pas un formulaire : sans cet
+    // ecouteur, Entree ne faisait rien et le geste restait en attente, muet.
+    document.addEventListener('keydown', (ev) => {
+        if (ev.key !== 'Enter' || ! ev.target.matches('[data-rw="comptes-stepup-code"]')) return;
+        ev.preventDefault();
+        valideStepUp();
     });
 })();
