@@ -5,6 +5,15 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## Code à six chiffres : la touche Entrée le valide
+
+Sur Accès & permissions, Comptes, Politiques et Accès SFTP, le panneau qui demande le code du
+second facteur ne réagissait qu'au bouton « Valider ». Taper le code puis Entrée ne faisait rien :
+le geste restait en attente, sans message. Entrée valide désormais le code, et un seul envoi part
+à la fois (un second envoi du même code serait refusé par l'anti-rejeu et masquerait la réussite).
+
+---
+
 ## Kubernetes, à côté de Docker Compose
 
 RootWarden s'installe désormais aussi sur Kubernetes. Docker Compose et `maj.sh` restent

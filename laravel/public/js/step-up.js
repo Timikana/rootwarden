@@ -105,7 +105,10 @@ window.rwStepUp = (function () {
         }
 
         function valide() {
-            if (! enAttente) { return; }
+            // Bouton desactive = un envoi en cours. Un second envoi du meme code
+            // reviendrait refuse par l'anti-rejeu, et son message d'echec
+            // recouvrirait la reussite du premier.
+            if (! enAttente || (o.valider && o.valider.disabled)) { return; }
             if (o.valider) { o.valider.disabled = true; }
 
             fetch('/profil/step-up', {
@@ -141,6 +144,16 @@ window.rwStepUp = (function () {
         }
 
         if (o.valider) { o.valider.addEventListener('click', valide); }
+        /*
+         * ENTREE VALIDE. Le panneau n'est pas un formulaire : sans cet ecouteur,
+         * taper le code puis Entree ne faisait rien, et le geste restait en
+         * attente sans aucun message.
+         */
+        if (o.champ) {
+            o.champ.addEventListener('keydown', function (ev) {
+                if (ev.key === 'Enter') { ev.preventDefault(); valide(); }
+            });
+        }
         if (o.annuler) { o.annuler.addEventListener('click', ferme); }
 
         /**
