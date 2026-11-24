@@ -21,9 +21,11 @@ use Tests\TestCase;
  * La page ne rend plus que le resume ; le detail d'une machine arrive par page,
  * a l'ouverture de sa carte, par `GET /scan-cve/{machine}/findings`.
  *
- * LA LIMITE N'EST PAS SIMULEE : le processus de test tourne sous les 128 Mo de
- * l'image, ceux de la production. Le premier test le verifie avant de mesurer —
- * une limite relevee ferait passer n'importe quoi.
+ * LA LIMITE EST CELLE DE LA PRODUCTION, POSEE ICI : 128 Mo, la valeur par defaut
+ * de l'image. Elle est fixee au demarrage du processus plutot que lue dans
+ * l'environnement — la CI execute PHPUnit sous un autre `memory_limit` que
+ * l'image. Le premier test verifie qu'elle a pris avant de mesurer : une limite
+ * relevee ferait passer n'importe quoi.
  *
  * UN PROCESSUS PAR TEST. Dans la suite complete, le processus PHPUnit tient deja
  * ce que les centaines de tests precedents ont laisse : le temoin y depassait
@@ -42,6 +44,9 @@ class ScanCveMemoireTest extends TestCase
 
     protected function setUp(): void
     {
+        // Processus neuf (un par test) : il tient bien moins de 128 Mo, donc la
+        // limite se pose. `ini_set` rend false sinon, et le test le dira.
+        ini_set('memory_limit', '128M');
         parent::setUp();
         // SQLite ne connait pas FIELD(), que le tri des severites emploie (MySQL).
         $field = static function ($valeur, ...$liste) {
@@ -169,7 +174,7 @@ class ScanCveMemoireTest extends TestCase
     public function la_page_repond_200_sous_128m_avec_100_000_findings(): void
     {
         $this->assertSame('128M', ini_get('memory_limit'),
-            'le test doit tourner sous la limite de la production, sinon il ne mesure rien');
+            'la limite de la production n\'a pas pu etre posee : le test ne mesurerait rien');
         $this->parc();
         $this->assertSame(100000, DB::table('cve_findings')->count());
 
