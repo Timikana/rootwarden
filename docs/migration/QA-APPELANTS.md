@@ -65,6 +65,7 @@ Les **cinq** derniers sont ceux que l'analyseur ne peut pas dédouaner seul. Ils
 | `planification-cve.js:78` | route **Laravel** | idem |
 | `planification-cve.js:180` | routes **Laravel** | idem |
 | `scan-cve.js:713` | route **Laravel** | idem |
+| `scan-cve.js:90` (2026-11-24) | route **Laravel** `GET /scan-cve/{machine}/findings` | idem : 404 hors périmètre, 422 filtre hors liste |
 
 **La distinction qui tranche est la FAMILLE de la cible.** `success` est la convention
 du backend Python ; les contrôleurs Laravel la respectent aussi, mais tous leurs refus

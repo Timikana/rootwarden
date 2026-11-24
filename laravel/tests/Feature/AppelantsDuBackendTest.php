@@ -200,7 +200,17 @@ class AppelantsDuBackendTest extends TestCase
              * nomme l'absence d'UN lecteur, pas l'absence de lecture.
              */
             'planification-cve.js:204',   // routes Laravel
-            'scan-cve.js:722',            // route Laravel
+            /*
+             * 2026-11-24 — le detail CVE n'est plus dans la page (85 133 findings
+             * y epuisaient les 128 Mo de PHP) : il arrive par page.
+             * `scan-cve.js:90` est ce NOUVEAU site, `charge()`, vers
+             * `GET /scan-cve/{machine}/findings`. Lu et qualifie : route Laravel,
+             * dont chaque refus porte un statut (404 hors perimetre, 422 filtre
+             * hors liste) ; le script lit `rep.ok` et dit l'echec dans le tableau.
+             * La comparaison, inchangee, passe de 722 a 775 sous l'ajout.
+             */
+            'scan-cve.js:90',             // route Laravel
+            'scan-cve.js:775',            // route Laravel
         ];
 
         $reels = array_map(

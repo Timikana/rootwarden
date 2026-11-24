@@ -487,12 +487,18 @@ _BUDGET_RETENTION_CVE_S = 120
 
 
 def _purge_cve_bornee():
-    """Retention des scans CVE, par lots, au plus `_BUDGET_RETENTION_CVE_S` par heure."""
+    """Retention des scans CVE puis de leur detail, par lots, au plus `_BUDGET_RETENTION_CVE_S` par heure."""
     conn = None
     try:
-        from retention_cve import purge
+        from retention_cve import purge, purge_detail
         conn = _get_db()
+        debut = time.monotonic()
         purge(conn, budget_s=_BUDGET_RETENTION_CVE_S)
+        # Le detail des vieux scans, dans ce qui reste du MEME budget : les deux
+        # purges ensemble ne tiennent pas la base plus de 2 min par heure.
+        reste = _BUDGET_RETENTION_CVE_S - (time.monotonic() - debut)
+        if reste > 0:
+            purge_detail(conn, budget_s=reste)
     except Exception as e:
         _log.error("Retention CVE echouee : %s", e)
     finally:

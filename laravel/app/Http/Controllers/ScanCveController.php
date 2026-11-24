@@ -41,19 +41,21 @@ use Illuminate\View\View;
  * un panneau que personne n'a encore ouvert. Elle vit donc dans
  * `ComparaisonCveController`, appele au clic, sous la MEME garde.
  *
- * TOUT LE RESTE EST RENDU EN UNE REQUETE. Les findings de chaque machine scannee partent
- * en donnees dans la page ; la pagination, la recherche et le filtre travaillent
- * dessus sans rien redemander. Cela ferme le defaut d'affichage mesure sur le
- * legacy — quatre generateurs de lignes dont trois oublient une colonne — parce
- * qu'il n'y a plus qu'UN generateur, cote navigateur, et qu'il est partage par
- * tous les gestes. S7 s'y branchera au lieu de le dupliquer.
+ * LE DETAIL N'EST PLUS DANS LA PAGE. Elle y mettait les findings du dernier
+ * scan de CHAQUE machine visible : 85 133 lignes pour 32 machines en production,
+ * et le `json_encode` du gabarit epuisait les 128 Mo de PHP — un 500 sur toute la
+ * page. Elle ne rend plus que le resume de parc, les compteurs de chaque scan et
+ * les facettes (calculees en SQL, `facettesParScan`) ; les lignes d'une machine
+ * arrivent a l'ouverture de sa carte, page par page, par
+ * `FindingsCveController`. Il n'y a toujours qu'UN generateur de lignes, cote
+ * navigateur — le defaut du legacy, quatre generateurs dont trois oublient une
+ * colonne, reste ferme.
  */
 class ScanCveController extends Controller
 {
     public function __construct(
         private readonly ScansCve $scans,
         private readonly \App\Services\PlanificationsCve $planifs,
-        private readonly \App\Services\SuiviCve $suivi,
         private readonly \App\Services\Droits $droits,
     ) {
     }
@@ -68,21 +70,11 @@ class ScanCveController extends Controller
 
         $derniers = $this->scans->derniersScansParMachine($ids);
 
-        // Les findings, machine par machine, et SEULEMENT pour celles qui ont un
-        // scan : une machine jamais scannee doit rendre un etat vide explicite,
-        // pas un tableau de zero ligne qui ressemble a un chargement inacheve.
-        $findings = [];
+        // Indexees par MACHINE, comme les cartes qui les affichent.
+        $parScan  = $this->scans->facettesParScan(array_map(static fn ($s) => (int) $s->id, array_values($derniers)));
+        $facettes = [];
         foreach ($derniers as $machineId => $scan) {
-            $findings[$machineId] = $this->scans->findingsPourAffichage((int) $scan->id);
-        }
-
-        // LE SUIVI STOCKE, machine par machine — sous-lot S5. Le legacy ne lit
-        // JAMAIS cette table depuis la page : son selecteur montrait un tiret meme
-        // quand une remediation existait, et le choix qu'on venait de faire
-        // disparaissait au rechargement.
-        $suivi = [];
-        foreach (array_keys($derniers) as $machineId) {
-            $suivi[$machineId] = $this->suivi->parMachine((int) $machineId);
+            $facettes[$machineId] = $parScan[(int) $scan->id];
         }
 
         return view('scan-cve', [
@@ -105,9 +97,7 @@ class ScanCveController extends Controller
             'tags'          => $role >= 2 ? $this->planifs->tagsDisponibles() : [],
             'machines'   => $machines,
             'derniers'   => $derniers,
-            'findings'   => $findings,
-            'facettes'   => array_map([$this, 'facettes'], $findings),
-            'suivi'       => $suivi,
+            'facettes'   => $facettes,
             // UNE REGLE APPLIQUEE PAR LE BACKEND SE REND VISIBLE. `POST /tickets`
             // exige `can_admin_portal` ; sans elle, le bouton est DESACTIVE avec
             // son explication plutot que cliquable pour rien. La regle n'est pas
@@ -137,6 +127,7 @@ class ScanCveController extends Controller
             'affiche_sur' => __('cve.affiche_sur', ['montre' => '{montre}', 'total' => '{total}']),
             'aucun_resultat' => __('cve.aucun_resultat'),
             'erreur_chargement' => __('cve.erreur_chargement'),
+            'chargement' => __('cve.chargement'),
             'erreur_comparaison' => __('cve.erreur_comparaison'),
             'comparaison_titre' => __('cve.comparaison_titre'),
             'comparaison_insuffisante' => __('cve.comparaison_insuffisante'),
@@ -276,50 +267,5 @@ class ScanCveController extends Controller
         $libelles['langue'] = app()->getLocale();
 
         return $libelles;
-    }
-
-    /**
-     * Les severites et les annees REELLEMENT presentes dans un jeu de findings,
-     * avec leur compte.
-     *
-     * Calcule ici et rendu par le gabarit : les boutons de filtre sont alors du
-     * HTML traduit, et non des chaines fabriquees par du JS — cote legacy, le
-     * libelle « Tout (n) » et les noms de severite sont ecrits en dur dans le
-     * script, donc hors de toute parite FR/EN.
-     *
-     * @param  list<array<string,mixed>>  $findings
-     * @return array{severites:array<string,int>,annees:array<string,int>,total:int,kev:int}
-     */
-    private function facettes(array $findings): array
-    {
-        $ordre = ['CRITICAL' => 0, 'HIGH' => 1, 'MEDIUM' => 2, 'LOW' => 3, 'NONE' => 4];
-        $severites = [];
-        $annees = [];
-        $kev = 0;
-
-        foreach ($findings as $f) {
-            if (! empty($f['k'])) {
-                $kev++;
-            }
-            $sev = (string) ($f['s'] ?: 'NONE');
-            $severites[$sev] = ($severites[$sev] ?? 0) + 1;
-            // L'annee vient de l'identifiant CVE, jamais d'une date de scan :
-            // « CVE-2019-... » reste de 2019 quel que soit le jour du scan.
-            $an = preg_match('/^CVE-(\d{4})-/', (string) $f['c'], $m) ? $m[1] : '?';
-            $annees[$an] = ($annees[$an] ?? 0) + 1;
-        }
-
-        uksort($severites, fn ($a, $b) => ($ordre[$a] ?? 9) <=> ($ordre[$b] ?? 9));
-        krsort($annees);
-
-        return [
-            'severites' => $severites,
-            'annees' => $annees,
-            'total' => count($findings),
-            // Le compte des vulnerabilites REELLEMENT exploitees. Comme sur le
-            // legacy, le bouton de filtre n'existe que s'il y en a : un filtre
-            // « KEV (0) » invite a un clic qui ne peut rien montrer.
-            'kev' => $kev,
-        ];
     }
 }

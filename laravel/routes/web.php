@@ -8,6 +8,7 @@ use App\Http\Controllers\DeploiementClesController;
 use App\Http\Controllers\ClesSshController;
 use App\Http\Controllers\ExportRgpdController;
 use App\Http\Controllers\ComparaisonCveController;
+use App\Http\Controllers\FindingsCveController;
 use App\Http\Controllers\ComptesController;
 use App\Http\Controllers\ComptesDistantsController;
 use App\Http\Controllers\AutorisationsPasserelleController;
@@ -636,6 +637,18 @@ Route::middleware(['memorisation', 'session.authentifiee', 'session.revoquee', '
     Route::get('/scan-cve/comparaison', ComparaisonCveController::class)
         ->middleware(['role:1', 'perm:can_scan_cve'])
         ->name('scan-cve.comparaison');
+
+    /*
+     * Le detail d'une machine, PAGINE — la page n'en porte plus que le resume.
+     * Elle mettait les findings de tout le parc dans son gabarit (85 133 lignes
+     * en production) et epuisait les 128 Mo de PHP. MEME GARDE que la page ; le
+     * perimetre machine est controle dans le controleur, sur la liste meme qui
+     * peint les cartes.
+     */
+    Route::get('/scan-cve/{machine}/findings', FindingsCveController::class)
+        ->middleware(['role:1', 'perm:can_scan_cve'])
+        ->whereNumber('machine')
+        ->name('scan-cve.findings');
 
     /*
      * Planification des scans CVE — sous-lot S4.
