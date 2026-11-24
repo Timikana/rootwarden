@@ -423,7 +423,12 @@
                             <span class="rw-repliable__aide">{{ __('cve.voir_details') }}</span>
                         </button>
 
-                        <div id="results-detail-{{ $id }}" hidden>
+                        {{-- L'ADRESSE DU DETAIL EST POSEE PAR LE SERVEUR, carte par carte :
+                             le script ne fabrique aucune URL. Les lignes ne sont
+                             plus dans la page — 85 133 findings y epuisaient les
+                             128 Mo de PHP — elles arrivent a l'ouverture. --}}
+                        <div id="results-detail-{{ $id }}" hidden
+                             data-url-findings="{{ route('scan-cve.findings', ['machine' => $id]) }}">
                             @if ($f['total'] === 0)
                                 <p class="rw-aide">{{ __('cve.aucune_cve') }}</p>
                             @else
@@ -549,15 +554,14 @@
         </section>
     @endif
 
-    {{-- Les donnees partent EN DONNEES, pas en HTML fabrique : le script rend par
+    {{-- Les libelles partent EN DONNEES, pas en HTML fabrique : le script rend par
          `textContent`, et une valeur qui contient des caracteres de balisage reste
          du texte. Cote legacy tout passe par `innerHTML` (E-50).
-         @json sur UNE SEULE ligne : multiligne, il casse le PHP compile. --}}
-    <script id="cve-findings" type="application/json">@json($findings)</script>
-    {{-- Le suivi STOCKE, et les libelles du sous-lot S5. `peut_ticket` voyage avec
-         eux : le script en a besoin pour desactiver le bouton, pas pour decider —
+         @json sur UNE SEULE ligne : multiligne, il casse le PHP compile.
+         Les FINDINGS et leur suivi n'y sont plus : ils arrivent par page, avec la
+         ligne qu'ils peignent. `peut_ticket` voyage avec les libelles du suivi :
+         le script en a besoin pour desactiver le bouton, pas pour decider —
          c'est le backend qui refuse. --}}
-    <script id="cve-suivi" type="application/json">@json($suivi)</script>
     <script id="suivi-libelles" type="application/json">@json($libellesSuivi + ['peut_ticket' => $peutTicket])</script>
     <script id="cve-libelles" type="application/json">@json($libelles)</script>
     @if ($peutPlanifier)

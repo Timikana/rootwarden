@@ -30,6 +30,7 @@ return [
 
     // Empty state: it SAYS what it covers, rather than rendering a bare table.
     'export_aucune' => 'No vulnerability found above the configured threshold',
+    'export_detail_purge'     => "Detail purged by retention: only this scan's counters are kept.",
 
     // Sous-lot S3 : la consultation des resultats CVE.
     'titre'                   => 'CVE vulnerability scan',
@@ -71,6 +72,8 @@ return [
     'comparaison_identique'   => 'No difference between the two scans.',
     'fermer'                  => 'Close',
     'erreur_chargement'       => 'The vulnerability detail could not be displayed.',
+    'chargement'              => 'Loading the detail...',
+    'filtre_invalide'         => 'Invalid search filter.',
     'erreur_comparaison'      => 'The comparison could not be retrieved.',
     'machine_invalide'        => 'Unknown or inaccessible server.',
     'aucun_serveur'           => 'No server is assigned to you.',

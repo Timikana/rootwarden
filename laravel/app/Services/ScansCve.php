@@ -49,37 +49,66 @@ class ScansCve
     }
 
     /**
-     * Les vulnerabilites d'un scan, dans l'ordre d'affichage du legacy :
-     * severite decroissante, puis score CVSS decroissant.
+     * Les vulnerabilites d'un scan, TOUTES, dans l'ordre d'affichage
+     * (`ordonne()`). Pour l'export et la comparaison, qui portent sur un scan.
      *
      * @return list<object>
      */
     public function resultats(int $scanId): array
     {
-        return DB::table('cve_findings')
-            ->select(
-                'cve_id', 'package_name', 'package_version', 'cvss_score', 'severity', 'summary',
-                // Enrichissement EPSS / KEV — colonnes de la migration 054.
-                'epss_score', 'kev', 'kev_date_added', 'priority_score', 'priority_label',
-            )
-            ->where('scan_id', $scanId)
-            // CE QUI EST REELLEMENT EXPLOITE PASSE DEVANT CE QUI EST GRAVE EN THEORIE.
-            // Les cinq findings KEV du parc sont HIGH (7,1 a 7,8) : un tri par
-            // severite les enterrait derriere 103 CRITICAL a 9,8. Le legacy trie
-            // deja ainsi (`backend/cve_scanner.py:1230-1241`), et son script
-            // retriait par-dessus ; ici l'ordre est etabli UNE FOIS, en SQL, et le
-            // script ne fait plus que filtrer — donc aucun geste ne peut le defaire.
-            //
-            // MySQL classe NULL comme la plus petite valeur : en DESC, un finding
-            // non enrichi arrive donc APRES tous les autres, exactement ce que le
-            // legacy obtenait par `priority_score ?? -1`. Le comportement est
-            // identique ; ce qui change, c'est que la page l'EXPLIQUE desormais.
+        return $this->ordonne(DB::table('cve_findings')
+            ->select(self::COLONNES)
+            ->where('scan_id', $scanId))
+            ->get()
+            ->all();
+    }
+
+    /** Les colonnes lues pour l'affichage et pour l'export. */
+    private const COLONNES = [
+        'cve_id', 'package_name', 'package_version', 'cvss_score', 'severity', 'summary',
+        // Enrichissement EPSS / KEV — colonnes de la migration 054.
+        'epss_score', 'kev', 'kev_date_added', 'priority_score', 'priority_label',
+    ];
+
+    /**
+     * L'ANNEE D'UNE CVE ET SA SEVERITE, chacune en UNE expression SQL : la
+     * facette les compte et le filtre les compare avec la MEME. Un bouton
+     * « 2019 (12) » rend donc 12 lignes, par construction.
+     *
+     * L'annee vient de l'identifiant, jamais d'une date de scan : « CVE-2019-... »
+     * reste de 2019 quel que soit le jour du scan. Une severite vide (valeur hors
+     * ENUM ecrite par MySQL) compte pour NONE, comme le faisait le tableau.
+     */
+    private const EXPR_ANNEE = "CASE WHEN cve_id LIKE 'CVE-____-%' THEN SUBSTR(cve_id, 5, 4) ELSE '?' END";
+    private const EXPR_SEVERITE = "COALESCE(NULLIF(severity, ''), 'NONE')";
+
+    /** Les filtres de severite acceptes ; KEV n'est pas une severite mais partage la barre. */
+    public const FILTRES_SEVERITE = ['ALL', 'KEV', 'CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'NONE'];
+
+    /**
+     * L'ordre d'affichage, UN SEUL pour la page, sa pagination et l'export.
+     *
+     * CE QUI EST REELLEMENT EXPLOITE PASSE DEVANT CE QUI EST GRAVE EN THEORIE.
+     * Les cinq findings KEV du parc sont HIGH (7,1 a 7,8) : un tri par severite
+     * les enterrait derriere 103 CRITICAL a 9,8. Le legacy trie deja ainsi
+     * (`backend/cve_scanner.py:1230-1241`).
+     *
+     * MySQL classe NULL comme la plus petite valeur : en DESC, un finding non
+     * enrichi arrive donc APRES tous les autres, exactement ce que le legacy
+     * obtenait par `priority_score ?? -1`.
+     *
+     * `id` DEPARTAGE LES EGALITES, et la pagination en depend : sans lui, deux
+     * lignes de meme rang peuvent changer de place entre deux pages, l'une
+     * apparaitre deux fois et l'autre jamais.
+     */
+    private function ordonne(\Illuminate\Database\Query\Builder $requete): \Illuminate\Database\Query\Builder
+    {
+        return $requete
             ->orderByDesc('kev')
             ->orderByDesc('priority_score')
             ->orderByRaw("FIELD(severity,'CRITICAL','HIGH','MEDIUM','LOW','NONE')")
             ->orderByDesc('cvss_score')
-            ->get()
-            ->all();
+            ->orderBy('id');
     }
 
     /**
@@ -196,18 +225,135 @@ class ScansCve
     }
 
     /**
-     * Les vulnerabilites d'un scan, preparees pour le rendu de la page.
+     * Les vulnerabilites d'un scan, TOUTES, preparees pour le rendu.
      *
-     * Cles COURTES et resume TRONQUE : la charge part en donnees dans la page, et
-     * 1458 findings a cles longues pesent inutilement. La troncature a 200
-     * caracteres laisse de la marge sur les 150 reellement affiches.
+     * Plus appele par la page : 85 000 findings mis dans un seul gabarit ont
+     * epuise les 128 Mo de PHP en production. La page lit desormais
+     * `pageFindings()`, une page a la fois.
      *
      * @return list<array<string,mixed>>
      */
     public function findingsPourAffichage(int $scanId): array
     {
         $scan = $this->parId($scanId);
-        $blanchies = $scan === null ? [] : app(ListeBlancheCve::class)->cvesActives((int) $scan->machine_id);
+
+        return $this->pourAffichage($this->resultats($scanId), $scan === null ? null : (int) $scan->machine_id);
+    }
+
+    /**
+     * Une PAGE des vulnerabilites d'un scan, filtree, dans l'ordre d'affichage.
+     *
+     * Le filtre et le compte sont faits en SQL, sur le meme predicat : `total`
+     * est le nombre de lignes que la recherche retient, pas celui du scan.
+     *
+     * @param  array{severite?:string,annee?:string,q?:string}  $filtres
+     * @return array{lignes:list<array<string,mixed>>,total:int}
+     */
+    public function pageFindings(int $scanId, int $machineId, array $filtres, int $page, int $parPage): array
+    {
+        $requete = DB::table('cve_findings')->where('scan_id', $scanId);
+
+        $severite = $filtres['severite'] ?? 'ALL';
+        if ($severite === 'KEV') {
+            $requete->where('kev', 1);
+        } elseif ($severite !== 'ALL') {
+            $requete->whereRaw(self::EXPR_SEVERITE . ' = ?', [$severite]);
+        }
+
+        $annee = $filtres['annee'] ?? 'ALL';
+        if ($annee !== 'ALL') {
+            $requete->whereRaw(self::EXPR_ANNEE . ' = ?', [$annee]);
+        }
+
+        $q = trim((string) ($filtres['q'] ?? ''));
+        if ($q !== '') {
+            // `!` comme caractere d'echappement : SQLite n'en a aucun par defaut,
+            // MySQL prend l'antislash. Un `%` tape cherche un `%`, pas « tout ».
+            $motif = '%' . strtr($q, ['!' => '!!', '%' => '!%', '_' => '!_']) . '%';
+            $requete->where(function ($w) use ($motif) {
+                $w->whereRaw("cve_id LIKE ? ESCAPE '!'", [$motif])
+                  ->orWhereRaw("package_name LIKE ? ESCAPE '!'", [$motif])
+                  ->orWhereRaw("summary LIKE ? ESCAPE '!'", [$motif]);
+            });
+        }
+
+        $total = (clone $requete)->count();
+        $lignes = $this->ordonne($requete->select(self::COLONNES))
+            ->forPage(max(1, $page), $parPage)
+            ->get()
+            ->all();
+
+        return ['lignes' => $this->pourAffichage($lignes, $machineId), 'total' => $total];
+    }
+
+    /**
+     * Les severites et les annees REELLEMENT presentes dans le scan de chaque
+     * machine, avec leur compte, en DEUX requetes pour tout le parc.
+     *
+     * Calcule en SQL : le comptage en PHP exigeait de charger chaque finding.
+     * Les boutons de filtre restent du HTML traduit rendu par le gabarit.
+     *
+     * @param  list<int>  $scanIds
+     * @return array<int,array{severites:array<string,int>,annees:array<string,int>,total:int,kev:int}>
+     */
+    public function facettesParScan(array $scanIds): array
+    {
+        $facettes = [];
+        foreach ($scanIds as $id) {
+            $facettes[(int) $id] = ['severites' => [], 'annees' => [], 'total' => 0, 'kev' => 0];
+        }
+        if ($facettes === []) {
+            return [];
+        }
+
+        $parSeverite = DB::table('cve_findings')
+            ->selectRaw('scan_id, ' . self::EXPR_SEVERITE . ' as sev, COUNT(*) as n, '
+                . 'SUM(CASE WHEN kev = 1 THEN 1 ELSE 0 END) as k')
+            ->whereIn('scan_id', array_keys($facettes))
+            ->groupBy('scan_id')
+            ->groupByRaw(self::EXPR_SEVERITE)
+            ->get();
+        foreach ($parSeverite as $l) {
+            $f = &$facettes[(int) $l->scan_id];
+            $f['severites'][(string) $l->sev] = (int) $l->n;
+            $f['total'] += (int) $l->n;
+            // Le compte des vulnerabilites REELLEMENT exploitees. Le bouton de
+            // filtre n'existe que s'il y en a : un « KEV (0) » invite a un clic
+            // qui ne peut rien montrer.
+            $f['kev'] += (int) $l->k;
+            unset($f);
+        }
+
+        $parAnnee = DB::table('cve_findings')
+            ->selectRaw('scan_id, ' . self::EXPR_ANNEE . ' as an, COUNT(*) as n')
+            ->whereIn('scan_id', array_keys($facettes))
+            ->groupBy('scan_id')
+            ->groupByRaw(self::EXPR_ANNEE)
+            ->get();
+        foreach ($parAnnee as $l) {
+            $facettes[(int) $l->scan_id]['annees'][(string) $l->an] = (int) $l->n;
+        }
+
+        $ordre = ['CRITICAL' => 0, 'HIGH' => 1, 'MEDIUM' => 2, 'LOW' => 3, 'NONE' => 4];
+        foreach ($facettes as &$f) {
+            uksort($f['severites'], fn ($a, $b) => ($ordre[$a] ?? 9) <=> ($ordre[$b] ?? 9));
+            krsort($f['annees']);
+        }
+        unset($f);
+
+        return $facettes;
+    }
+
+    /**
+     * Cles COURTES et resume TRONQUE : la charge part en JSON, et la troncature a
+     * 200 caracteres laisse de la marge sur les 150 reellement affiches.
+     *
+     * @param  list<object>  $lignes
+     * @return list<array<string,mixed>>
+     */
+    private function pourAffichage(array $lignes, ?int $machineId): array
+    {
+        $blanchies = $machineId === null ? [] : app(ListeBlancheCve::class)->cvesActives($machineId);
 
         return array_map(static fn ($f) => [
             // EN LISTE BLANCHE : la ligne reste visible (on sait ce qui a ete
@@ -228,7 +374,7 @@ class ScansCve
             'kd' => (string) ($f->kev_date_added ?? ''),
             'e' => $f->epss_score === null ? null : (float) $f->epss_score,
             'pl' => (string) ($f->priority_label ?? ''),
-        ], $this->resultats($scanId));
+        ], $lignes);
     }
 
     /**

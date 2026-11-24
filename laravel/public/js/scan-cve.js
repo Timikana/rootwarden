@@ -26,18 +26,22 @@
  * interpolation dans `innerHTML`, et son `esc()` n'echappe pas l'apostrophe alors
  * que son docblock affirme empecher l'XSS. Rien n'est interpole ici.
  *
- * AUCUN APPEL RESEAU POUR AFFICHER : les findings arrivent en donnees dans la
- * page. Le seul appel est la comparaison de deux scans, faite au clic.
+ * LES FINDINGS ARRIVENT PAR PAGE, A L'OUVERTURE DE LA CARTE. Ils etaient en
+ * donnees dans la page : 85 133 lignes pour 32 machines en production, et le
+ * gabarit epuisait les 128 Mo de PHP avant d'etre envoye. Chaque filtre, chaque
+ * recherche et chaque « Voir plus » redemande une page au serveur, qui filtre et
+ * compte en SQL ; le script n'a plus en memoire que les lignes affichees.
  */
 (function () {
     'use strict';
 
-    const donnees = lisJson('cve-findings') || {};
     const L = lisJson('cve-libelles') || {};
-    /** Le suivi stocke, par machine puis par identifiant de CVE — sous-lot S5. */
-    const SUIVI = lisJson('cve-suivi') || {};
+    /**
+     * Le suivi stocke, par machine puis par identifiant de CVE — sous-lot S5.
+     * Rempli page par page : chaque reponse porte le suivi de SES lignes.
+     */
+    const SUIVI = {};
     const S = lisJson('suivi-libelles') || {};
-    const PAR_PAGE = 50;
 
     /** L'etat d'affichage de chaque machine. Une seule source. */
     const etats = {};
@@ -49,31 +53,78 @@
     }
 
     function etat(mid) {
-        if (!etats[mid]) etats[mid] = { severite: 'ALL', annee: 'ALL', recherche: '', page: 1 };
+        if (!etats[mid]) {
+            etats[mid] = {
+                severite: 'ALL', annee: 'ALL', recherche: '', page: 1,
+                // Les lignes RECUES, dans l'ordre du serveur, et le total que le
+                // filtre courant retient — pas celui du scan.
+                lignes: [], total: 0, ouvert: false,
+                // Chaque demande porte un numero : une reponse arrivee apres un
+                // filtre plus recent est ignoree, sinon une frappe lente
+                // repeindrait le tableau avec un resultat perime.
+                generation: 0,
+            };
+        }
         return etats[mid];
     }
 
-    /** Les findings retenus par les filtres courants. */
-    function retenus(mid) {
+    /**
+     * Demande une page au serveur. `ajout` : « Voir plus », les lignes
+     * s'ajoutent ; sinon elles remplacent (ouverture, filtre, recherche).
+     */
+    async function charge(mid, ajout) {
+        const detail = document.getElementById('results-detail-' + mid);
+        const base = detail ? detail.dataset.urlFindings : '';
+        if (!base) return;
         const e = etat(mid);
-        const tout = donnees[mid] || [];
-        const q = e.recherche.trim().toLowerCase();
-        return tout.filter((f) => {
-            // KEV partage la dimension des severites sans en etre une : compare
-            // a `f.s`, la valeur « KEV » ne correspondrait a aucune ligne et le
-            // filtre viderait le tableau en silence.
-            if (e.severite === 'KEV') {
-                if (!f.k) return false;
-            } else if (e.severite !== 'ALL' && (f.s || 'NONE') !== e.severite) return false;
-            if (e.annee !== 'ALL') {
-                const an = /^CVE-(\d{4})-/.exec(f.c || '');
-                if ((an ? an[1] : '?') !== e.annee) return false;
-            }
-            if (q && !(f.c || '').toLowerCase().includes(q)
-                  && !(f.p || '').toLowerCase().includes(q)
-                  && !(f.r || '').toLowerCase().includes(q)) return false;
-            return true;
+        const numero = ++e.generation;
+        if (!ajout) message(mid, L.chargement || '');
+        const plus = document.getElementById('load-more-' + mid);
+        if (plus) plus.disabled = true;
+
+        const params = new URLSearchParams({
+            page: String(e.page), severite: e.severite, annee: e.annee, q: e.recherche.trim(),
         });
+        let d = null;
+        try {
+            const rep = await fetch(base + '?' + params.toString(),
+                { credentials: 'same-origin', headers: { Accept: 'application/json' } });
+            if (!rep.ok) throw new Error(String(rep.status));
+            d = await rep.json();
+        } catch {
+            d = null;
+        }
+        if (numero !== e.generation) return;
+        if (plus) plus.disabled = false;
+
+        if (!d || !Array.isArray(d.lignes)) {
+            // ON LE DIT A L'ECRAN, dans le tableau meme. Un « Voir plus » rate
+            // garde les lignes deja la et rend son pas, pour etre rejoue.
+            if (ajout) { e.page = Math.max(1, e.page - 1); annonce(L.erreur_chargement || '', false); return; }
+            e.lignes = []; e.total = 0;
+            message(mid, L.erreur_chargement || '');
+            return;
+        }
+        SUIVI[mid] = Object.assign(SUIVI[mid] || {}, d.suivi || {});
+        e.lignes = ajout ? e.lignes.concat(d.lignes) : d.lignes;
+        e.total = Number(d.total) || 0;
+        rendu(mid);
+    }
+
+    /** Une ligne de message en travers du tableau : chargement, echec. */
+    function message(mid, texte) {
+        const corps = document.getElementById('findings-body-' + mid);
+        if (!corps) return;
+        const tr = document.createElement('tr');
+        const td = cellule(texte, 'rw-tableau__message');
+        td.colSpan = 6;
+        tr.appendChild(td);
+        corps.replaceChildren(tr);
+        // Le compteur se tait avec le tableau : il decrirait des lignes absentes.
+        const compteur = document.getElementById('findings-count-' + mid);
+        if (compteur) compteur.textContent = '';
+        const plus = document.getElementById('load-more-' + mid);
+        if (plus) plus.hidden = true;
     }
 
     /** La severite abregee, pour les ecrans ou le mot entier ne tient pas. */
@@ -594,11 +645,10 @@
         if (!corps) return;
 
         const e = etat(mid);
-        const liste = retenus(mid);
-        const jusqua = Math.min(liste.length, e.page * PAR_PAGE);
+        const liste = e.lignes;
 
         corps.replaceChildren();
-        for (let i = 0; i < jusqua; i++) corps.appendChild(ligne(liste[i], mid));
+        for (const f of liste) corps.appendChild(ligne(f, mid));
 
         if (liste.length === 0) {
             const tr = document.createElement('tr');
@@ -611,14 +661,14 @@
         const compteur = document.getElementById('findings-count-' + mid);
         if (compteur) {
             compteur.textContent = (L.affiche_sur || '{montre} / {total}')
-                .replace('{montre}', String(jusqua))
-                .replace('{total}', String(liste.length));
+                .replace('{montre}', String(liste.length))
+                .replace('{total}', String(e.total));
         }
 
         // Le bouton se CACHE, il ne quitte pas le DOM : un element qui disparait
         // et reapparait fait perdre le focus et deroute un lecteur d'ecran.
         const plus = document.getElementById('load-more-' + mid);
-        if (plus) plus.hidden = jusqua >= liste.length;
+        if (plus) plus.hidden = liste.length >= e.total;
     }
 
     function activePuce(barre, bouton) {
@@ -635,7 +685,7 @@
             .filter((n) => !isNaN(n)),
     };
 
-    // ── Depli : le tableau n'est rendu qu'a la premiere ouverture ────────────
+    // ── Depli : le detail est DEMANDE a la premiere ouverture ────────────────
     document.querySelectorAll('.rw-repliable[data-cible]').forEach((bascule) => {
         bascule.addEventListener('click', () => {
             const detail = document.getElementById(bascule.dataset.cible);
@@ -645,8 +695,14 @@
             bascule.setAttribute('aria-expanded', ouvert ? 'true' : 'false');
             const aide = bascule.querySelector('.rw-repliable__aide');
             if (aide) aide.textContent = ouvert ? (L.replier || '') : (L.voir_details || '');
-            // Pas de rendu ici : le tableau est deja peint (voir plus bas). Le
-            // depli est PUREMENT visuel.
+            // La premiere ouverture seulement : replier puis rouvrir garde les
+            // lignes et les filtres tels qu'on les a laisses.
+            const mid = bascule.id.replace('results-', '');
+            const e = etat(mid);
+            if (ouvert && !e.ouvert) {
+                e.ouvert = true;
+                charge(mid, false);
+            }
         });
     });
 
@@ -660,7 +716,7 @@
                 if (bouton.dataset.an !== undefined) e.annee = bouton.dataset.an;
                 e.page = 1;
                 activePuce(barre, bouton);
-                rendu(mid);
+                charge(mid, false);
             });
         });
     });
@@ -669,16 +725,16 @@
         const mid = champ.dataset.machine;
         let minuteur = null;
         champ.addEventListener('input', () => {
-            // Un debounce, pas une attente fixe apres un geste : il n'y a aucun
-            // appel reseau ici, seulement un rendu a ne pas refaire a chaque
-            // frappe sur 1458 lignes.
+            // Un debounce : chaque recherche est une requete, on ne la refait pas a
+            // chaque frappe. Une reponse depassee par une frappe plus recente est
+            // ignoree par `charge` (numero de generation).
             clearTimeout(minuteur);
             minuteur = setTimeout(() => {
                 const e = etat(mid);
                 e.recherche = champ.value;
                 e.page = 1;
-                rendu(mid);
-            }, 120);
+                charge(mid, false);
+            }, 250);
         });
     });
 
@@ -686,18 +742,15 @@
         bouton.addEventListener('click', () => {
             const mid = bouton.id.replace('load-more-', '');
             etat(mid).page += 1;
-            rendu(mid);
+            charge(mid, true);
         });
     });
 
-    // ── Premier rendu, des le chargement ────────────────────────────────────
-    // Peindre au DEPLI seulement etait tentant — 50 lignes de moins par machine —
-    // mais cela rendait faux, au chargement, le compteur que le tableau doit
-    // accorder avec la base : la page annoncait un vide qui n'existait pas. Les
-    // lignes sont donc peintes tout de suite, dans un bloc masque : c'est ce que
-    // fait le legacy, et c'est la propriete que la caracterisation mesure sur les
-    // deux portails.
-    Object.keys(donnees).forEach((mid) => rendu(mid));
+    // ── Aucun rendu au chargement ───────────────────────────────────────────
+    // Les lignes etaient peintes d'office dans un bloc masque, pour que le
+    // compteur soit juste des le chargement. Le nombre que la carte annonce vient
+    // desormais du serveur (`nb_cve`, compte en SQL) ; le tableau, lui, n'existe
+    // qu'une fois ouvert.
 
     // ── Comparaison des deux derniers scans, au clic ─────────────────────────
     function dateLocale(valeur) {

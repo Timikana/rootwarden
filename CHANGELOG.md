@@ -5,6 +5,29 @@ Format : [Semantic Versioning](https://semver.org/lang/fr/) - `MAJEUR.MINEUR.PAT
 
 ---
 
+## Vulnérabilités : la page ne tombe plus en erreur sur un gros parc
+
+`/scan-cve` répondait 500 (« Allowed memory size of 134217728 bytes exhausted ») : la page mettait
+dans son HTML toutes les vulnérabilités du dernier scan de chaque serveur visible, 85 133 lignes
+pour 32 serveurs, et dépassait les 128 Mo de PHP.
+
+- **La page ne charge plus que le résumé** : compteurs du parc, et par serveur ses compteurs par
+  sévérité et ses filtres, comptés en base. Mesuré avec 100 000 vulnérabilités : 5 Mo.
+- **Le détail d'un serveur arrive à l'ouverture de sa carte**, 50 lignes à la fois
+  (`GET /scan-cve/{serveur}/findings`). Filtres, recherche et « Voir plus » interrogent le serveur ;
+  un filtre rend exactement le nombre que son bouton annonce. Même accès que la page : un
+  utilisateur ne voit que ses serveurs, personne ne voit un serveur archivé.
+- **Rétention du détail** : seuls les 10 derniers scans de chaque serveur gardent leurs
+  vulnérabilités (`CVE_FINDINGS_RETENTION`, minimum 2, `0` pour désactiver). Les scans plus
+  anciens et leurs compteurs restent, donc le graphique « Tendances CVE » est inchangé. La purge
+  se fait par lots, dans les 2 minutes par heure déjà réservées à la rétention des scans.
+  Pour mesurer avant, puis rattraper d'un coup hors heures :
+  `docker exec rootwarden_python python /app/retention_cve.py --compte` puis `--purger`.
+- L'export CSV d'un scan dont le détail a été purgé le signale, au lieu d'annoncer « aucune
+  vulnérabilité ».
+
+---
+
 ## Accès & permissions : ajouter ou retirer une clé SSH d'un compte
 
 Un administrateur ne pouvait plus poser la clé publique d'un utilisateur : l'ancien portail le

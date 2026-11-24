@@ -65,6 +65,27 @@ class SuiviCve
             ->all();
     }
 
+    /**
+     * Les remediations d'une machine, limitees aux CVE donnees : celles d'une
+     * page du tableau. Une machine peut en porter des milliers, la page en
+     * affiche cinquante.
+     *
+     * @param  list<string>  $cveIds
+     * @return array<string,string>  cve_id => statut
+     */
+    public function pourCves(int $machineId, array $cveIds): array
+    {
+        if ($cveIds === []) {
+            return [];
+        }
+
+        return DB::table('cve_remediation')
+            ->where('machine_id', $machineId)
+            ->whereIn('cve_id', array_values(array_unique($cveIds)))
+            ->pluck('status', 'cve_id')
+            ->all();
+    }
+
     public function statut(string $cveId, int $machineId): ?string
     {
         $v = DB::table('cve_remediation')

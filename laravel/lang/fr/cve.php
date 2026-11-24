@@ -30,6 +30,7 @@ return [
 
     // Etat vide : il DIT sur quoi il porte, plutot que de rendre un tableau nu.
     'export_aucune' => 'Aucune vulnerabilite trouvee au-dessus du seuil configure',
+    'export_detail_purge'     => "Detail purge par la retention : seuls les compteurs de ce scan sont conserves.",
 
     // Sous-lot S3 : la consultation des resultats CVE.
     'titre'                   => 'Scan de vulnerabilites CVE',
@@ -71,6 +72,8 @@ return [
     'comparaison_identique'   => 'Aucune difference entre les deux scans.',
     'fermer'                  => 'Fermer',
     'erreur_chargement'       => 'Le detail des vulnerabilites n’a pas pu etre affiche.',
+    'chargement'              => 'Chargement du detail...',
+    'filtre_invalide'         => 'Filtre de recherche invalide.',
     'erreur_comparaison'      => 'La comparaison n’a pas pu etre obtenue.',
     'machine_invalide'        => 'Serveur inconnu ou non accessible.',
     'aucun_serveur'           => 'Aucun serveur ne vous est attribue.',

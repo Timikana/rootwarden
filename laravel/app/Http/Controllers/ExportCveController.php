@@ -139,7 +139,10 @@ class ExportCveController extends Controller
         }
 
         if ($resultats === []) {
-            $ligne([__('cve.export_aucune')]);
+            // UN SCAN QUI COMPTAIT DES CVE ET N'A PLUS DE LIGNES a perdu son
+            // detail par la retention (`backend/retention_cve.py`), qui garde les
+            // compteurs. Annoncer « aucune vulnerabilite » serait faux.
+            $ligne([(int) $scan->cve_count > 0 ? __('cve.export_detail_purge') : __('cve.export_aucune')]);
         }
 
         rewind($flux);

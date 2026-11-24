@@ -253,6 +253,9 @@ class TableDesGardes
             ['POST', 'scan-cve/liste-blanche', ['role:2', 'perm:can_scan_cve']],
             ['DELETE', 'scan-cve/liste-blanche/{id}', ['role:2', 'perm:can_scan_cve']],
             ['GET', 'scan-cve/comparaison', ['role:1', 'perm:can_scan_cve']],
+            // Le detail d'une machine, par page : la garde de la page, le
+            // perimetre machine controle dans le controleur.
+            ['GET', 'scan-cve/{machine}/findings', ['role:1', 'perm:can_scan_cve']],
             ['GET', 'scan-cve/planifications', ['role:2', 'perm:can_scan_cve']],
             ['POST', 'scan-cve/planifications', ['role:2', 'perm:can_scan_cve']],
             ['PUT', 'scan-cve/planifications/{id}', ['role:2', 'perm:can_scan_cve']],

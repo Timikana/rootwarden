@@ -29,6 +29,19 @@ le rattrapage s'etale. Pour le faire d'un coup, hors heures :
 
 L'espace disque n'est rendu par InnoDB qu'apres `OPTIMIZE TABLE cve_findings`
 (reconstruction de la table) : a jouer hors heures, apres le rattrapage.
+
+══ LE DETAIL, SEPARE DU SCAN (2026-11-24) ═══════════════════════════════════
+
+La retention des scans garde tout ce qui a moins de 90 jours : en production,
+1 384 scans pour 32 machines, et 3,46 millions de findings. Or rien ne relit le
+detail d'un vieux scan — la page, l'export, la comparaison et la resolution
+automatique ne lisent que les DERNIERS — alors que le diagramme « Tendances CVE
+(30 jours) » lit les COMPTEURS de `cve_scans`.
+
+`purge_detail` supprime donc les findings des scans hors des
+`CVE_FINDINGS_RETENTION` plus recents de leur machine (defaut 10, au moins 2 :
+la comparaison en lit deux ; 0 = desactivee) et GARDE la ligne du scan et ses
+compteurs. Meme mecanique : par lots, dans le budget horaire.
 """
 
 import logging
@@ -55,6 +68,33 @@ _SELECTION = """
     WHERE keep.id IS NULL
       AND s.scan_date < DATE_SUB(NOW(), INTERVAL %s DAY)
 """
+
+
+# Scans dont le detail est supprime par transaction : quelques milliers de
+# findings chacun, un lot reste une transaction courte.
+LOT_DETAIL_PAR_DEFAUT = 5
+
+# Les scans TERMINES seulement, classes deux fois : par date (la comparaison
+# lit les deux plus recents par date) et par identifiant (la page lit le
+# MAX(id)). Un scan garde son detail s'il est dans les N de L'UN OU L'AUTRE :
+# aucun des deux lecteurs ne peut tomber sur un scan vide.
+_SELECTION_DETAIL = """
+    SELECT r.id FROM (
+        SELECT id,
+               ROW_NUMBER() OVER (PARTITION BY machine_id ORDER BY scan_date DESC, id DESC) AS rn_date,
+               ROW_NUMBER() OVER (PARTITION BY machine_id ORDER BY id DESC) AS rn_id
+        FROM cve_scans
+        WHERE status = 'completed'
+    ) r
+    WHERE r.rn_date > %s AND r.rn_id > %s
+      AND EXISTS (SELECT 1 FROM cve_findings f WHERE f.scan_id = r.id)
+"""
+
+
+def parametre_detail():
+    """Scans par machine dont le detail est garde ; 0 = retention desactivee."""
+    n = int(os.environ.get('CVE_FINDINGS_RETENTION', '10'))
+    return 0 if n <= 0 else max(2, n)
 
 
 def parametres():
@@ -121,6 +161,60 @@ def purge(conn, budget_s=None, lot=LOT_PAR_DEFAUT):
     return bilan
 
 
+def scans_a_vider(cur, lot):
+    """Les identifiants d'au plus `lot` scans dont le detail est a supprimer."""
+    n = parametre_detail()
+    cur.execute(_SELECTION_DETAIL + " ORDER BY r.id LIMIT %s", (n, n, lot))
+    return [_premiere_colonne(r) for r in cur.fetchall()]
+
+
+def compte_detail(conn):
+    """Ce que la retention du detail supprimerait : (scans, findings). N'ecrit rien."""
+    n = parametre_detail()
+    if n <= 0:
+        return 0, 0
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT COUNT(*), COALESCE(SUM((SELECT COUNT(*) FROM cve_findings f "
+        "WHERE f.scan_id = v.id)), 0) FROM (" + _SELECTION_DETAIL + ") v",
+        (n, n))
+    scans, findings = cur.fetchone()
+    return int(scans), int(findings)
+
+
+def purge_detail(conn, budget_s=None, lot=LOT_DETAIL_PAR_DEFAUT):
+    """Supprime les findings des scans hors des N derniers, par lots ; garde les scans.
+
+    Meme contrat que `purge` : `budget_s` arrete entre deux lots, le bilan dit
+    si la purge est `complete`.
+    """
+    bilan = {'scans': 0, 'findings': 0, 'lots': 0, 'complete': False,
+             'desactivee': parametre_detail() <= 0}
+    if bilan['desactivee']:
+        return bilan
+    t0 = time.monotonic()
+    while True:
+        cur = conn.cursor()
+        ids = scans_a_vider(cur, lot)
+        if not ids:
+            bilan['complete'] = True
+            break
+        marques = ','.join(['%s'] * len(ids))
+        # `marques` ne porte que des `%s` : les valeurs passent en parametres.
+        cur.execute(f"DELETE FROM cve_findings WHERE scan_id IN ({marques})", ids)
+        bilan['findings'] += max(0, int(cur.rowcount or 0))
+        conn.commit()
+        bilan['scans'] += len(ids)
+        bilan['lots'] += 1
+        if budget_s is not None and time.monotonic() - t0 >= budget_s:
+            break
+    if bilan['scans']:
+        _log.info("Retention du detail CVE : %d finding(s) de %d scan(s) supprime(s) en %d lot(s)%s",
+                  bilan['findings'], bilan['scans'], bilan['lots'],
+                  '' if bilan['complete'] else ' — reste a purger, reprise a l\'heure suivante')
+    return bilan
+
+
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
     import mysql.connector
@@ -133,12 +227,21 @@ if __name__ == '__main__':
             b = purge(connexion)
             print(f"{b['scans']} scan(s), {b['findings']} finding(s) supprime(s) "
                   f"en {time.monotonic() - debut:.0f} s")
+            debut = time.monotonic()
+            d = purge_detail(connexion)
+            print(f"Detail : {d['findings']} finding(s) de {d['scans']} scan(s) supprime(s), "
+                  f"scans gardes, en {time.monotonic() - debut:.0f} s")
         else:
             s, f = compte(connexion)
             plancher, jours = parametres()
             print(f"Retention : plancher {plancher} scans/machine, fenetre {jours} jours"
                   f"{' (DESACTIVEE)' if jours <= 0 else ''}")
-            print(f"A purger : {s} scan(s), {f} finding(s). Rien n'a ete supprime "
-                  f"(--purger pour supprimer).")
+            print(f"A purger : {s} scan(s), {f} finding(s).")
+            n = parametre_detail()
+            ds, df = compte_detail(connexion)
+            print(f"Detail garde pour les {n} derniers scans/machine"
+                  f"{' (DESACTIVEE)' if n <= 0 else ''} : {df} finding(s) de {ds} scan(s) "
+                  f"a supprimer, scans gardes.")
+            print("Rien n'a ete supprime (--purger pour supprimer).")
     finally:
         connexion.close()

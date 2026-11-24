@@ -3,12 +3,12 @@
   "dossier": "laravel/public/js",
   "totaux": {
     "fichiers": 43,
-    "appels": 75,
+    "appels": 76,
     "verifie": 32,
     "flux": 7,
     "delegue": 30,
     "delegue_sans_lecteur": 3,
-    "ignore": 3,
+    "ignore": 4,
     "illisible": 0
   },
   "empreintes": {
@@ -47,7 +47,7 @@
     "recherche-menu.js": "8d8d2070eae2c159",
     "recherche.js": "a1c577b222c05fbc",
     "sauvegardes.js": "8fa92cb269d32a40",
-    "scan-cve.js": "e01e05a362cdc75b",
+    "scan-cve.js": "5b3c0edd03f604f7",
     "serveurs.js": "75ac0ff9843b8717",
     "services.js": "900fd15cbc220acb",
     "step-up.js": "847ca02757501cd7",
@@ -128,7 +128,20 @@
     },
     {
       "fichier": "scan-cve.js",
-      "ligne": 722,
+      "ligne": 90,
+      "fonction": "charge",
+      "cible": "base + '?' + params.toString()",
+      "success": false,
+      "ok": true,
+      "verdict": "ignore",
+      "chemins_appelants": [],
+      "origine": null,
+      "prefixe": null,
+      "fichier_consulte_success": true
+    },
+    {
+      "fichier": "scan-cve.js",
+      "ligne": 775,
       "fonction": "(anonyme)",
       "cible": "L.url_comparaison + '?machine_id=' + encodeURIComponent(mid)",
       "success": false,
